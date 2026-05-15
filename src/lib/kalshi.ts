@@ -15,11 +15,21 @@ export interface KalshiMarket {
   volume_24h_fp?: string;
   close_time?: string;
   status?: string;
+  yes_bid_size_fp?: string;
+  no_bid_size_fp?: string;
+  yes_ask_size_fp?: string;
+  no_ask_size_fp?: string;
 }
 
 export function extractKalshiEventTicker(url: string): string | null {
-  // Format: https://kalshi.com/markets/{series_ticker}/.../{ticker}
+  // Format: https://kalshi.com/markets/{series_ticker}/.../{market_ticker}
   const match = url.match(/kalshi\.com\/markets\/([^\/]+)/);
+  return match ? match[1].toUpperCase() : null;
+}
+
+export function extractKalshiMarketTicker(url: string): string | null {
+  // Extract the last path segment (specific market ticker)
+  const match = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([^\/\?]+)/);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -36,6 +46,21 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
   return data.markets || [];
+}
+
+export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<KalshiMarket[]> {
+  const res = await fetch(
+    `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open`,
+    { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
+  );
+  if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
+  const data = await res.json();
+  return data.markets || [];
+}
+
+export interface KalshiFetchResult {
+  markets: KalshiMarket[];
+  source: 'event_ticker' | 'series_ticker' | 'market_ticker' | 'none';
 }
 
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {

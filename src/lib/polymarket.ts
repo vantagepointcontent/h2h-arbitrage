@@ -14,6 +14,9 @@ export interface PMMarket {
   groupItemTitle?: string;
   volume?: string;
   liquidity?: string;
+  liquidityNum?: number;
+  volumeNum?: number;
+  volumeClob?: number;
   active: boolean;
   closed: boolean;
 }
@@ -29,8 +32,8 @@ export interface PMEvent {
 }
 
 export function extractPolymarketSlug(url: string): string | null {
-  // Format: https://polymarket.com/event/{slug}
-  const match = url.match(/polymarket\.com\/event\/([^\/\?]+)/);
+  // Accept both /event/{slug} and /sports/{category}/{slug}
+  const match = url.match(/polymarket\.com\/(?:event|(?:sports(?:\/[^/]+)+))\/([^\/\s\?\#]+)/);
   return match ? match[1] : null;
 }
 

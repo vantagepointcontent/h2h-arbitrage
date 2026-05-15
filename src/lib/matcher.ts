@@ -11,6 +11,11 @@ export interface UnifiedOutcome {
     noAsk: number;
     lastPrice: number;
     volume24h?: string;
+    yesBidDepth?: string;
+    yesAskDepth?: string;
+    noBidDepth?: string;
+    noAskDepth?: string;
+    eventId?: string;
   } | null;
   polymarket: {
     marketId: string;
@@ -22,10 +27,59 @@ export interface UnifiedOutcome {
     lastTradePrice: number;
     volume?: string;
     liquidity?: string;
+    askDepth?: number;
   } | null;
+  arbitrage: {
+    strategy: string;
+    kalshiStake: number;
+    pmStake: number;
+    expectedProfit: number;
+    roiPct: number;
+    buyPlatform: 'kalshi' | 'polymarket' | null;
+    buyPrice: number;
+    sellPlatform: 'kalshi' | 'polymarket' | null;
+    sellPrice: number;
+  };
 }
 
-function normalizeArtistName(name: string): string {
+function extractNameFromKalshiTitle(title: string): string {
+  // "Will Will Christian Edwards win the Bukauskas vs Edwards professional MMA..."
+  // Extract "Will {Name}" → "Name"
+  
+  // First: "Will {Name} win the {Opponent1} vs {Opponent2} ..."
+  const willWinMatch = title.match(/^Will\s+(.+?)\s+(?:win|lose|be|finish|end|survive|get|score)/i);
+  if (willWinMatch) {
+    return willWinMatch[1].trim();
+  }
+
+  // Fallback: just take whatever comes after "Will "
+  const simpleMatch = title.match(/^Will\s+(.{2,40}?)\s+(?:win|at|by|score|finish|get|lose|be|end|survive)/i);
+  if (simpleMatch) {
+    return simpleMatch[1].trim();
+  }
+
+  return title.slice(0, 30);
+}
+
+function getKalshiName(km: KalshiMarket): string {
+  // Try custom_strike first (for named strikes like Artist, Word)
+  const cs = km.custom_strike;
+  if (cs) {
+    const values = Object.values(cs);
+    if (values.length > 0) {
+      const val = String(values[0]);
+      // If it's a UUID or looks like an ID, skip and use title
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(val)) {
+        return val;
+      }
+    }
+  }
+  // Use title
+  return extractNameFromKalshiTitle(km.title || km.ticker);
+}
+
+function normalizeName(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
@@ -33,150 +87,288 @@ function normalizeArtistName(name: string): string {
     .trim();
 }
 
-export function matchOutcomes(
-  kalshiMarkets: KalshiMarket[],
-  pmMarkets: PMMarket[]
-): UnifiedOutcome[] {
-  const kalshiMap = new Map<string, KalshiMarket>();
-  const pmMap = new Map<string, PMMarket>();
-
-  for (const km of kalshiMarkets) {
-    const artist = km.custom_strike?.Artist;
-    if (artist) {
-      kalshiMap.set(normalizeArtistName(artist), km);
-    }
+function similarity(a: string, b: string): number {
+  const arrA = a.split(' ').filter(s => s.length >= 2);
+  const arrB = b.split(' ').filter(s => s.length >= 2);
+  const setA = new Set(arrA);
+  const setB = new Set(arrB);
+  const all = new Set([...arrA, ...arrB]);
+  if (all.size === 0) return 0;
+  let shared = 0;
+  for (const w of all) {
+    if (setA.has(w) && setB.has(w)) shared++;
   }
-
-  for (const pm of pmMarkets) {
-    const artist = pm.groupItemTitle;
-    if (artist) {
-      pmMap.set(normalizeArtistName(artist), pm);
-    }
-  }
-
-  const allArtists = new Set([
-    ...Array.from(kalshiMap.keys()),
-    ...Array.from(pmMap.keys()),
-  ]);
-
-  const outcomes: UnifiedOutcome[] = [];
-
-  for (const artist of Array.from(allArtists)) {
-    const km = kalshiMap.get(artist) || null;
-    const pm = pmMap.get(artist) || null;
-
-    const pmParsed = pm ? parseOutcomes(pm) : null;
-
-    outcomes.push({
-      artist: km?.custom_strike?.Artist || pm?.groupItemTitle || artist,
-      kalshi: km ? {
-        ticker: km.ticker,
-        yesBid: parseFloat(km.yes_bid_dollars || '0'),
-        yesAsk: parseFloat(km.yes_ask_dollars || '0'),
-        noBid: parseFloat(km.no_bid_dollars || '0'),
-        noAsk: parseFloat(km.no_ask_dollars || '0'),
-        lastPrice: parseFloat(km.last_price_dollars || '0'),
-        volume24h: km.volume_24h_fp,
-      } : null,
-      polymarket: pm && pmParsed ? {
-        marketId: pm.id,
-        conditionId: pm.conditionId,
-        yesPrice: pmParsed.prices[0] || 0,
-        noPrice: pmParsed.prices[1] || 0,
-        bestBid: pm.bestBid || 0,
-        bestAsk: pm.bestAsk || 0,
-        lastTradePrice: pm.lastTradePrice || 0,
-        volume: pm.volume,
-        liquidity: pm.liquidity,
-      } : null,
-    });
-  }
-
-  // Sort: matched first (both platforms), then by artist name
-  return outcomes.sort((a, b) => {
-    const aMatched = a.kalshi && a.polymarket ? 1 : 0;
-    const bMatched = b.kalshi && b.polymarket ? 1 : 0;
-    if (aMatched !== bMatched) return bMatched - aMatched;
-    return a.artist.localeCompare(b.artist);
-  });
+  return shared / all.size;
 }
 
-// Arbitrage calculations
-export interface ArbitrageCalc {
-  strategy: 'NO_OP' | string;
-  kalshiStake: number;
-  pmStake: number;
-  expectedProfit: number;
-  roiPct: number;
-  // Detailed breakdown
-  buyPlatform: 'kalshi' | 'polymarket' | null;
-  buyPrice: number;
-  sellPlatform: 'kalshi' | 'polymarket' | null;
-  sellPrice: number;
-}
+export function calculateArbitrage(kalshi: NonNullable<UnifiedOutcome['kalshi']>, pm: NonNullable<UnifiedOutcome['polymarket']>, capital = 1000) {
+  const kYes = kalshi.yesAsk;
+  const kNo = kalshi.noAsk;
+  const pYes = pm.bestAsk;
+  const pNo = pm.noPrice;
 
-export function calculateArbitrage(
-  outcome: UnifiedOutcome,
-  totalCapital: number = 1000
-): ArbitrageCalc {
-  if (!outcome.kalshi || !outcome.polymarket) {
-    return {
-      strategy: 'NO_OP',
-      kalshiStake: 0,
-      pmStake: 0,
-      expectedProfit: 0,
-      roiPct: 0,
-      buyPlatform: null,
-      buyPrice: 0,
-      sellPlatform: null,
-      sellPrice: 0,
-    };
+  let bestRoi = 0;
+  let strategy = 'No arb';
+  let kalshiStake = 0;
+  let pmStake = 0;
+  let profit = 0;
+  let buyPlatform: 'kalshi' | 'polymarket' | null = null;
+  let buyPrice = 0;
+  let sellPlatform: 'kalshi' | 'polymarket' | null = null;
+  let sellPrice = 0;
+
+  if (kYes + pNo < 1) {
+    const r = 1 - (kYes + pNo);
+    if (r > bestRoi) {
+      bestRoi = r;
+      strategy = 'Buy YES Kalshi + NO PM';
+      kalshiStake = capital * kYes;
+      pmStake = capital * pNo;
+      profit = capital * r;
+      buyPlatform = 'kalshi';
+      buyPrice = kYes;
+      sellPlatform = 'polymarket';
+      sellPrice = pNo;
+    }
   }
-
-  const k = outcome.kalshi;
-  const p = outcome.polymarket;
-
-  // Best YES price to BUY (lower is better to buy)
-  const yesBuyOptions = [
-    { platform: 'kalshi' as const, price: k.yesAsk },
-    { platform: 'polymarket' as const, price: p.bestAsk || p.yesPrice },
-  ].sort((a, b) => a.price - b.price);
-
-  // Best NO price to BUY
-  const noBuyOptions = [
-    { platform: 'kalshi' as const, price: k.noAsk },
-    { platform: 'polymarket' as const, price: p.noPrice }, // PM has no separate "NO" orderbook, use outcomePrices[1]
-  ].sort((a, b) => a.price - b.price);
-
-  // Strategy: Buy YES on cheaper platform + Buy NO on cheaper platform
-  const yesBuy = yesBuyOptions[0];
-  const noBuy = noBuyOptions[0];
-
-  const totalCost = yesBuy.price + noBuy.price;
-  const profit = 1 - totalCost; // If we hold both, one pays $1
-  const roi = (profit / totalCost) * 100;
-
-  // Kelly-style sizing: stake proportionally by odds
-  const yesWeight = yesBuy.price / totalCost;
-  const noWeight = noBuy.price / totalCost;
-
-  const kalshiStake =
-    (yesBuy.platform === 'kalshi' ? yesWeight : 0) +
-    (noBuy.platform === 'kalshi' ? noWeight : 0);
-
-  const pmStake =
-    (yesBuy.platform === 'polymarket' ? yesWeight : 0) +
-    (noBuy.platform === 'polymarket' ? noWeight : 0);
+  if (pYes + kNo < 1) {
+    const r = 1 - (pYes + kNo);
+    if (r > bestRoi) {
+      bestRoi = r;
+      strategy = 'Buy YES PM + NO Kalshi';
+      kalshiStake = capital * kNo;
+      pmStake = capital * pYes;
+      profit = capital * r;
+      buyPlatform = 'polymarket';
+      buyPrice = pYes;
+      sellPlatform = 'kalshi';
+      sellPrice = kNo;
+    }
+  }
 
   return {
-    strategy: `BUY YES @ ${yesBuy.platform.toUpperCase()} + BUY NO @ ${noBuy.platform.toUpperCase()}`,
-    kalshiStake: Math.round(kalshiStake * totalCapital * 100) / 100,
-    pmStake: Math.round(pmStake * totalCapital * 100) / 100,
-    expectedProfit: Math.round(profit * totalCapital * 100) / 100,
-    roiPct: Math.round(roi * 100) / 100,
-    buyPlatform: yesBuy.platform,
-    buyPrice: yesBuy.price,
-    sellPlatform: noBuy.platform,
-    sellPrice: noBuy.price,
+    strategy,
+    kalshiStake,
+    pmStake,
+    expectedProfit: profit,
+    roiPct: bestRoi * 100,
+    buyPlatform,
+    buyPrice,
+    sellPlatform,
+    sellPrice,
   };
+}
+
+function filterKalshiMarketsByEventTitle(kMarkets: KalshiMarket[], pmEventTitle: string): KalshiMarket[] {
+  if (kMarkets.length <= 20) return kMarkets;
+  const stopWords = new Set(['the', 'and', 'or', 'vs', 'at', 'in', 'on', 'by', 'to', 'of', 'for', 'a', 'an']);
+  const pmWords = normalizeName(pmEventTitle).split(' ').filter(w => w.length >= 3 && !stopWords.has(w));
+  if (pmWords.length === 0) return kMarkets.slice(0, 30);
+  const matches: KalshiMarket[] = [];
+  for (const km of kMarkets) {
+    const title = normalizeName(km.title || '');
+    const score = pmWords.filter(w => title.includes(w)).length;
+    if (score >= 2) matches.push(km);
+  }
+  return matches.length > 0 ? matches : kMarkets.slice(0, 30);
+}
+
+function isBinaryMarket(outcomes: string[]): boolean {
+  const lower = outcomes.map(o => o.toLowerCase());
+  return (lower.length === 2 && lower.includes('yes') && lower.includes('no'));
+}
+
+export function matchOutcomes(
+  kalshiMarkets: KalshiMarket[],
+  pmMarkets: PMMarket[],
+  pmEventTitle?: string,
+  capital = 1000,
+): UnifiedOutcome[] {
+  const kMarkets = pmEventTitle ? filterKalshiMarketsByEventTitle(kalshiMarkets, pmEventTitle) : kalshiMarkets;
+  
+  const kalshiMap = new Map<string, KalshiMarket>();
+  for (const km of kMarkets) {
+    const name = normalizeName(getKalshiName(km));
+    kalshiMap.set(name, km);
+  }
+
+  const pmOutcomes: { title: string; yesPrice: number; noPrice: number; market: PMMarket }[] = [];
+  for (const pm of pmMarkets) {
+    const { outcomes, prices } = parseOutcomes(pm);
+    
+    // Named binary outcome markets (e.g. Drake: groupItemTitle="21 Savage", outcomes=["Yes","No"])
+    // Each market represents ONE candidate/asset. Keep all of these.
+    const hasNamedGroup = pm.groupItemTitle && pm.groupItemTitle.trim() !== '' && pm.groupItemTitle !== 'N/A';
+    const isNamedBinary = hasNamedGroup && outcomes.length === 2 && outcomes[0].toLowerCase() === 'yes' && outcomes[1].toLowerCase() === 'no';
+    
+    if (isNamedBinary) {
+      pmOutcomes.push({
+        title: pm.groupItemTitle!,
+        yesPrice: prices[0] || 0,
+        noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
+        market: pm,
+      });
+      continue;
+    }
+    
+    // Skip generic binary Yes/No sub-markets (Completed Match, Over/Under, etc.)
+    if (isBinaryMarket(outcomes)) continue;
+    
+    // For named outcome markets, create one entry per outcome
+    for (let i = 0; i < outcomes.length; i++) {
+      pmOutcomes.push({
+        title: outcomes[i] || pm.groupItemTitle || pm.question || '',
+        yesPrice: prices[i] || 0,
+        noPrice: prices.length > i + 1 ? prices[i + 1] : (1 - prices[i]),
+        market: pm,
+      });
+    }
+  }
+
+  const matched: UnifiedOutcome[] = [];
+  const usedKalshi = new Set<string>();
+  const usedPm = new Set<number>();
+
+  // Exact match pass
+  for (let pi = 0; pi < pmOutcomes.length; pi++) {
+    const pmo = pmOutcomes[pi];
+    const pmNorm = normalizeName(pmo.title);
+    const exact = kalshiMap.get(pmNorm);
+    if (exact) {
+      const kalshi = {
+        ticker: exact.ticker,
+        yesBid: parseFloat(exact.yes_bid_dollars || '0'),
+        yesAsk: parseFloat(exact.yes_ask_dollars || '1'),
+        noBid: parseFloat(exact.no_bid_dollars || '0'),
+        noAsk: parseFloat(exact.no_ask_dollars || '1'),
+        lastPrice: parseFloat(exact.last_price_dollars || '0'),
+        volume24h: exact.volume_24h_fp,
+        yesBidDepth: exact.yes_bid_size_fp,
+        yesAskDepth: exact.yes_ask_size_fp,
+        noBidDepth: exact.no_bid_size_fp,
+        noAskDepth: exact.no_ask_size_fp,
+      };
+      matched.push({
+        artist: getKalshiName(exact),
+        kalshi,
+        polymarket: {
+          marketId: pmo.market.id,
+          conditionId: pmo.market.conditionId,
+          yesPrice: pmo.yesPrice,
+          noPrice: pmo.noPrice,
+          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
+          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
+          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
+          volume: pmo.market.volume,
+          liquidity: pmo.market.liquidity,
+          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
+        },
+        arbitrage: calculateArbitrage(kalshi, { yesPrice: pmo.yesPrice, noPrice: pmo.noPrice, bestBid: pmo.market.bestBid ?? pmo.yesPrice, bestAsk: pmo.market.bestAsk ?? pmo.yesPrice, lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice, askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0) } as any, capital),
+      });
+      usedKalshi.add(exact.ticker);
+      usedPm.add(pi);
+    }
+  }
+
+  // Fuzzy match pass for remaining
+  const unusedKalshi = Array.from(kalshiMap.entries()).filter(([, v]) => !usedKalshi.has(v.ticker));
+  const unusedPm = Array.from(new Set(pmOutcomes.map((_, i) => i))).filter(i => !usedPm.has(i));
+
+  for (const pi of unusedPm) {
+    const pmo = pmOutcomes[pi];
+    let bestKm: KalshiMarket | null = null;
+    let bestScore = 0;
+    for (const [, km] of unusedKalshi) {
+      const kmName = getKalshiName(km);
+      const s = similarity(normalizeName(pmo.title), normalizeName(kmName));
+      if (s > bestScore && s >= 0.4) {
+        bestScore = s;
+        bestKm = km;
+      }
+    }
+    if (bestKm) {
+      const kalshi = {
+        ticker: bestKm.ticker,
+        yesBid: parseFloat(bestKm.yes_bid_dollars || '0'),
+        yesAsk: parseFloat(bestKm.yes_ask_dollars || '1'),
+        noBid: parseFloat(bestKm.no_bid_dollars || '0'),
+        noAsk: parseFloat(bestKm.no_ask_dollars || '1'),
+        lastPrice: parseFloat(bestKm.last_price_dollars || '0'),
+        volume24h: bestKm.volume_24h_fp,
+        yesBidDepth: bestKm.yes_bid_size_fp,
+        yesAskDepth: bestKm.yes_ask_size_fp,
+        noBidDepth: bestKm.no_bid_size_fp,
+        noAskDepth: bestKm.no_ask_size_fp,
+      };
+      matched.push({
+        artist: getKalshiName(bestKm),
+        kalshi,
+        polymarket: {
+          marketId: pmo.market.id,
+          conditionId: pmo.market.conditionId,
+          yesPrice: pmo.yesPrice,
+          noPrice: pmo.noPrice,
+          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
+          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
+          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
+          volume: pmo.market.volume,
+          liquidity: pmo.market.liquidity,
+          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
+        },
+        arbitrage: calculateArbitrage(kalshi, { yesPrice: pmo.yesPrice, noPrice: pmo.noPrice, bestBid: pmo.market.bestBid ?? pmo.yesPrice, bestAsk: pmo.market.bestAsk ?? pmo.yesPrice, lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice, askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0) } as any, capital),
+      });
+      usedKalshi.add(bestKm.ticker);
+      usedPm.add(pi);
+    }
+  }
+
+  // Remaining Kalshi only
+  for (const [, km] of unusedKalshi) {
+    if (!usedKalshi.has(km.ticker)) {
+      matched.push({
+        artist: getKalshiName(km),
+        kalshi: {
+          ticker: km.ticker,
+          yesBid: parseFloat(km.yes_bid_dollars || '0'),
+          yesAsk: parseFloat(km.yes_ask_dollars || '1'),
+          noBid: parseFloat(km.no_bid_dollars || '0'),
+          noAsk: parseFloat(km.no_ask_dollars || '1'),
+          lastPrice: parseFloat(km.last_price_dollars || '0'),
+          volume24h: km.volume_24h_fp,
+          yesBidDepth: km.yes_bid_size_fp,
+          yesAskDepth: km.yes_ask_size_fp,
+          noBidDepth: km.no_bid_size_fp,
+          noAskDepth: km.no_ask_size_fp,
+        },
+        polymarket: null,
+        arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+      });
+    }
+  }
+
+  // Remaining PM only
+  for (const pi of unusedPm) {
+    if (!usedPm.has(pi)) {
+      const pmo = pmOutcomes[pi];
+      matched.push({
+        artist: pmo.title || 'Unknown',
+        kalshi: null,
+        polymarket: {
+          marketId: pmo.market.id,
+          conditionId: pmo.market.conditionId,
+          yesPrice: pmo.yesPrice,
+          noPrice: pmo.noPrice,
+          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
+          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
+          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
+          volume: pmo.market.volume,
+          liquidity: pmo.market.liquidity,
+          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
+        },
+        arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+      });
+    }
+  }
+
+  return matched;
 }
