@@ -7,21 +7,22 @@ import {
 import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
 import { matchOutcomes, calculateArbitrage } from '@/lib/matcher';
 
-// Detect if a Polymarket event contains only named binary outcome markets
-// (e.g. Drake artists, where each market = one artist, outcomes=[Yes,No])
-// vs. events with numbered outcomes + sub-markets (e.g. tennis with over/under sub-markets)
+const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 function filterPolymarketMarkets(markets: any[]): any[] {
   if (!markets || markets.length === 0) return [];
-
   const hasAnyEmpty = markets.some((m: any) => {
     const g = m.groupItemTitle;
     return !g || g === '' || g === 'N/A';
   });
-
-  // If no empty groupItemTitle exists, ALL markets are likely named binary outcomes → keep all
   if (!hasAnyEmpty) return markets;
-
-  // Mixed: some empty (main markets), some with title (sub-markets) → keep only empty ones
   return markets.filter((m: any) => {
     const group = m.groupItemTitle;
     return !group || group === '' || group === 'N/A';
@@ -30,14 +31,26 @@ function filterPolymarketMarkets(markets: any[]): any[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const { kalshiUrl, polymarketUrl } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const { kalshiUrl, polymarketUrl } = body;
 
-    const kalshiTicker = extractKalshiEventTicker(kalshiUrl);
-    const pmSlug = extractPolymarketSlug(polymarketUrl);
+    const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
+    const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
 
-    if (!kalshiTicker || !pmSlug) {
+    if (!kalshiTicker) {
       return NextResponse.json(
-        { error: 'Invalid URLs. Kalshi format: /markets/{series}/.../{ticker}, Polymarket format: /event/{slug}' },
+        { error: 'Invalid Kalshi URL. Expected format: https://kalshi.com/markets/{series}/.../{ticker}' },
+        { status: 400 }
+      );
+    }
+    if (!pmSlug) {
+      return NextResponse.json(
+        { error: 'Invalid Polymarket URL. Expected format: https://polymarket.com/event/{slug} or /sports/{path}' },
         { status: 400 }
       );
     }
@@ -46,21 +59,25 @@ export async function POST(request: NextRequest) {
     const [kalshiMarkets, pmEvent] = await Promise.all([
       (async () => {
         try {
-          const m = await fetchKalshiEventMarkets(kalshiTicker);
+          const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi event markets');
           if (m.length > 0) return m;
-        } catch {}
+        } catch (e: any) {
+          if (e.message?.includes('timed out')) throw e;
+        }
         try {
-          const m = await fetchKalshiSeriesMarkets(kalshiTicker);
+          const m = await withTimeout(fetchKalshiSeriesMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi series markets');
           if (m.length > 0) return m;
-        } catch {}
+        } catch (e: any) {
+          if (e.message?.includes('timed out')) throw e;
+        }
         return [] as any[];
       })(),
-      fetchPolymarketEvent(pmSlug),
+      withTimeout(fetchPolymarketEvent(pmSlug), API_TIMEOUT_MS, 'Polymarket event'),
     ]);
 
     if (!pmEvent) {
       return NextResponse.json(
-        { error: 'Polymarket event not found' },
+        { error: 'Polymarket event not found. The market may have closed or the URL may be incorrect.' },
         { status: 404 }
       );
     }
@@ -93,9 +110,12 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (err: any) {
+    console.error('[scan-api-error]', err);
+    const msg = err.message || 'Unknown error';
+    const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
     return NextResponse.json(
-      { error: err.message || 'Unknown error' },
-      { status: 500 }
+      { error: msg },
+      { status }
     );
   }
 }
