@@ -194,10 +194,11 @@ export default function Home() {
     if (!silent) setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/scan", {
+      const res = await fetch(`/api/scan?_=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         body: JSON.stringify({ kalshiUrl, polymarketUrl: pmUrl }),
+        cache: 'no-store',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -591,7 +592,7 @@ export default function Home() {
                                 <td className="px-4 py-3 text-center">
                                   {outcome.polymarket ? (
                                     <div>
-                                      <div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.bestAsk)}</div>
+                                      <div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.yesPrice)}</div>
                                       {(outcome.polymarket.askDepth ?? 0) > 0 && (
                                         <div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>
                                       )}

@@ -52,6 +52,20 @@ function extractNameFromKalshiTitle(title: string): string {
     return willWinMatch[1].trim();
   }
 
+  // Fallback: "Will [Subject] say \"[Word/Phrase]\" before [Date]"
+  const sayQuoteMatch = title.match(/say\s+["']([^"']+)["']/i);
+  if (sayQuoteMatch) {
+    return sayQuoteMatch[1].trim();
+  }
+
+  // Fallback: "Will [Subject] say [Word/Phrase] before"
+  const sayMatch = title.match(/say\s+(.+?)\s+(?:before|by|at|on|in\s+the)/i);
+  if (sayMatch) {
+    const candidate = sayMatch[1].trim();
+    // Exclude very short or generic candidates
+    if (candidate.length >= 2) return candidate;
+  }
+
   // Fallback: just take whatever comes after "Will "
   const simpleMatch = title.match(/^Will\s+(.{2,40}?)\s+(?:win|at|by|score|finish|get|lose|be|end|survive)/i);
   if (simpleMatch) {

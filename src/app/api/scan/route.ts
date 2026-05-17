@@ -64,6 +64,17 @@ export async function POST(request: NextRequest) {
         } catch (e: any) {
           if (e.message?.includes('timed out')) throw e;
         }
+        // Try series_ticker fallback (the base part before any date suffix)
+        const seriesMatch = kalshiTicker.match(/^([A-Z]+)/);
+        const seriesFallback = seriesMatch ? seriesMatch[1] : null;
+        if (seriesFallback && seriesFallback !== kalshiTicker) {
+          try {
+            const m = await withTimeout(fetchKalshiSeriesMarkets(seriesFallback), API_TIMEOUT_MS, 'Kalshi series markets');
+            if (m.length > 0) return m;
+          } catch (e: any) {
+            if (e.message?.includes('timed out')) throw e;
+          }
+        }
         try {
           const m = await withTimeout(fetchKalshiSeriesMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi series markets');
           if (m.length > 0) return m;

@@ -22,9 +22,33 @@ export interface KalshiMarket {
 }
 
 export function extractKalshiEventTicker(url: string): string | null {
-  // Format: https://kalshi.com/markets/{series_ticker}/.../{market_ticker}
+  // Try to extract the full event_ticker pattern first:
+  // Format: https://kalshi.com/markets/{series_ticker}/{event_slug}/{market_ticker}
+  // The event_ticker is typically series_ticker + date suffix derived from the URL
+  // Or: just return the series_ticker and let event_ticker fallback handle it
   const match = url.match(/kalshi\.com\/markets\/([^\/]+)/);
-  return match ? match[1].toUpperCase() : null;
+  if (!match) return null;
+
+  const firstSegment = match[1].toUpperCase();
+
+  // Try to extract explicit event_ticker from deeper path if available
+  // e.g. /markets/kxtrumpsaymonth/trump-monthly/kxtrumpsaymonth-26jun01 -> event_ticker = KXTRUMPSAYMONTH-26JUN01
+  const deeper = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([A-Z0-9-]+)/i);
+  if (deeper) {
+    const deepTicker = deeper[1].toUpperCase();
+    // Only return deeper ticker if it's longer (has date suffix)
+    if (deepTicker.length > firstSegment.length) {
+      return deepTicker;
+    }
+  }
+
+  // Also look for any pattern like SERIES-YYYYMMDD in the URL
+  const dateMatch = url.match(/kalshi\.com\/markets\/[^\/]+.*[\-_]\/(.*?)(?:\?|#|$)/);
+  if (dateMatch && dateMatch[1].includes(firstSegment)) {
+    return dateMatch[1].toUpperCase();
+  }
+
+  return firstSegment;
 }
 
 export function extractKalshiMarketTicker(url: string): string | null {
