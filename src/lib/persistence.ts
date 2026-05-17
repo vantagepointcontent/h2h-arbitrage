@@ -3,12 +3,24 @@ import path from 'path';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
+export interface LastScanResult {
+  bestRoiPct: number;      // t.ex. 26.5
+  bestProfit: number;       // t.ex. 265
+  strategy: string;         // "Buy YES Kalshi + NO PM"
+  outcomeCount: number;
+  matchedCount: number;
+  kalshiCount: number;
+  pmCount: number;
+  scannedAt: string;        // ISO timestamp
+}
+
 export interface SavedMarket {
   id: string;
   kalshiUrl: string;
   polymarketUrl: string;
   eventTitle: string;
   createdAt: string;
+  lastScanResult?: LastScanResult | null;
 }
 
 async function ensureDir() {
@@ -26,17 +38,27 @@ export async function getSavedMarkets(): Promise<SavedMarket[]> {
   }
 }
 
-export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt'>): Promise<SavedMarket> {
+export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt' | 'lastScanResult'>): Promise<SavedMarket> {
   const markets = await getSavedMarkets();
   const newMarket: SavedMarket = {
     ...market,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     createdAt: new Date().toISOString(),
+    lastScanResult: null,
   };
   markets.push(newMarket);
   await ensureDir();
   await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
   return newMarket;
+}
+
+export async function updateSavedMarketScanResult(id: string, result: LastScanResult): Promise<void> {
+  const markets = await getSavedMarkets();
+  const idx = markets.findIndex(m => m.id === id);
+  if (idx >= 0) {
+    markets[idx].lastScanResult = result;
+    await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
+  }
 }
 
 export async function deleteSavedMarket(id: string): Promise<boolean> {

@@ -4,6 +4,16 @@
     "polymarketUrl": "https://polymarket.com/event/presidential-election-winner-2028",
     "eventTitle": "Presidential Election Winner 2028",
     "id": "1778856700892-bbig3cm",
-    "createdAt": "2026-05-15T14:51:40.892Z"
+    "createdAt": "2026-05-15T14:51:40.892Z",
+    "lastScanResult": {
+      "bestRoiPct": 4.200000000000004,
+      "bestProfit": 42.000000000000036,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 37,
+      "matchedCount": 24,
+      "kalshiCount": 25,
+      "pmCount": 36,
+      "scannedAt": "2026-05-17T20:10:14.066Z"
+    }
   }
 ]

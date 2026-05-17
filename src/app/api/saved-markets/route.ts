@@ -4,7 +4,12 @@ import { getSavedMarkets, addSavedMarket, deleteSavedMarket } from '@/lib/persis
 export async function GET() {
   try {
     const markets = await getSavedMarkets();
-    return NextResponse.json({ markets });
+    return NextResponse.json({ markets }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      }
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
