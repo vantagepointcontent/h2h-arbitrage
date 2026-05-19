@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSavedMarkets, addSavedMarket, deleteSavedMarket } from '@/lib/persistence';
+import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket } from '@/lib/persistence';
 
 export async function GET() {
   try {
@@ -25,8 +25,26 @@ export async function POST(request: NextRequest) {
       kalshiUrl: body.kalshiUrl,
       polymarketUrl: body.polymarketUrl,
       eventTitle: body.eventTitle || 'Untitled',
+      expiryDate: body.expiryDate || null,
     });
     return NextResponse.json({ market }, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    if (!body.id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
+    const ok = await updateSavedMarket(body.id, {
+      eventTitle: body.eventTitle,
+      expiryDate: body.expiryDate,
+    });
+    if (!ok) return NextResponse.json({ error: 'Market not found' }, { status: 404 });
+    return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

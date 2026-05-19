@@ -6,14 +6,31 @@
     "id": "1778856700892-bbig3cm",
     "createdAt": "2026-05-15T14:51:40.892Z",
     "lastScanResult": {
-      "bestRoiPct": 4.200000000000004,
-      "bestProfit": 42.000000000000036,
+      "bestRoiPct": 3.400000000000003,
+      "bestProfit": 34.00000000000003,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 37,
       "matchedCount": 24,
       "kalshiCount": 25,
       "pmCount": 36,
-      "scannedAt": "2026-05-17T20:10:14.066Z"
+      "scannedAt": "2026-05-19T22:17:04.426Z"
+    }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxtrumpmention/what-will-trump-say/kxtrumpmention-26may20c?op_market_ticker=KXTRUMPMENTION-26MAY20-GULF&op_side=BUY&op_order_side=yes&op_order_type=dollars",
+    "polymarketUrl": "https://polymarket.com/event/what-will-trump-say-during-coast-guard-keynote",
+    "eventTitle": "What will Trump say during Coast Guard Keynote?",
+    "id": "1779141538125-2edrix8",
+    "createdAt": "2026-05-18T21:58:58.125Z",
+    "lastScanResult": {
+      "bestRoiPct": 5.499999999999994,
+      "bestProfit": 54.999999999999936,
+      "strategy": "Buy YES Kalshi + NO PM",
+      "outcomeCount": 53,
+      "matchedCount": 5,
+      "kalshiCount": 29,
+      "pmCount": 29,
+      "scannedAt": "2026-05-19T22:17:06.065Z"
     }
   }
 ]

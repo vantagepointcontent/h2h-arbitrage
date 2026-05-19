@@ -1,0 +1,183 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+
+interface DateTimePickerProps {
+  value: string | null;
+  onChange: (iso: string | null) => void;
+  placeholder?: string;
+}
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getFirstDayOfMonth(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+
+export function DateTimePicker({ value, onChange, placeholder = "Select expiry…" }: DateTimePickerProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const initial = value ? new Date(value) : null;
+  const [year, setYear] = useState(initial?.getFullYear() ?? new Date().getFullYear());
+  const [month, setMonth] = useState(initial?.getMonth() ?? new Date().getMonth());
+  const [time, setTime] = useState(() => {
+    if (initial) {
+      return `${String(initial.getHours()).padStart(2, "0")}:${String(initial.getMinutes()).padStart(2, "0")}`;
+    }
+    return "00:00";
+  });
+  const [selectedDay, setSelectedDay] = useState<number | null>(initial?.getDate() ?? null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const handleDayClick = (day: number) => {
+    setSelectedDay(day);
+  };
+
+  const handleApply = () => {
+    if (!selectedDay) {
+      onChange(null);
+      setOpen(false);
+      return;
+    }
+    const [h, m] = time.split(":").map(Number);
+    const dt = new Date(year, month, selectedDay, h, m, 0, 0);
+    onChange(dt.toISOString());
+    setOpen(false);
+  };
+
+  const handleClear = () => {
+    onChange(null);
+    setSelectedDay(null);
+    setOpen(false);
+  };
+
+  const displayValue = (() => {
+    if (!value) return placeholder;
+    const d = new Date(value);
+    return d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  })();
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#1a1a1a] border text-sm transition-all ${
+          open || value ? "border-[#22c55e] ring-1 ring-[#22c55e]/30" : "border-[#262626]"
+        } text-[#e5e5e5] hover:border-[#22c55e]/50`}
+      >
+        <CalendarIcon className="w-4 h-4 text-[#737373]" />
+        <span className={value ? "text-[#e5e5e5]" : "text-[#525252]"}>{displayValue}</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 w-80 rounded-xl border border-[#262626] bg-[#111111] shadow-xl shadow-black/60 p-4 space-y-4">
+          {/* Month / Year nav */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (month === 0) { setMonth(11); setYear(y => y - 1); }
+                else setMonth(m => m - 1);
+              }}
+              className="p-1 rounded hover:bg-[#1a1a1a] text-[#a3a3a3]"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold text-[#e5e5e5]">
+              {monthNames[month]} {year}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (month === 11) { setMonth(0); setYear(y => y + 1); }
+                else setMonth(m => m + 1);
+              }}
+              className="p-1 rounded hover:bg-[#1a1a1a] text-[#a3a3a3]"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Day grid */}
+          <div className="grid grid-cols-7 gap-1 text-center text-xs">
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+              <div key={d} className="text-[#525252] py-1">{d}</div>
+            ))}
+            {Array.from({ length: firstDay }, (_, i) => (
+              <div key={`pad-${i}`} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const isSelected = selectedDay === day;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => handleDayClick(day)}
+                  className={`py-1.5 rounded-md text-sm transition-colors ${
+                    isSelected
+                      ? "bg-[#22c55e] text-black font-semibold"
+                      : "text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]"
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Time picker */}
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-[#737373]" />
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded-md bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-[#737373] hover:text-[#e5e5e5] hover:bg-[#1a1a1a] transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={handleApply}
+              className="flex-1 px-3 py-2 rounded-lg bg-[#22c55e] text-black text-xs font-semibold hover:bg-[#16a34a] transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

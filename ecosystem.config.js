@@ -2,13 +2,14 @@ module.exports = {
   apps: [
     {
       name: 'h2h-arbitrage',
-      script: './.next/standalone/server.js',
+      script: './node_modules/next/dist/bin/next',
+      args: 'start -p 3000 -H 0.0.0.0',
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 3010,
+        PORT: 3000,
       },
       log_file: '/home/scott/.pm2/logs/h2h-arbitrage.log',
       error_file: '/home/scott/.pm2/logs/h2h-arbitrage-error.log',
@@ -24,7 +25,7 @@ module.exports = {
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        H2H_BASE_URL: 'http://100.86.7.30:3010',
+        H2H_BASE_URL: 'http://100.86.7.30:3000',
       },
       log_file: '/home/scott/.pm2/logs/h2h-poller.log',
       error_file: '/home/scott/.pm2/logs/h2h-poller-error.log',
