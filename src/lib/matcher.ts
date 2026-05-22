@@ -35,70 +35,56 @@ export interface UnifiedOutcome {
     pmStake: number;
     expectedProfit: number;
     roiPct: number;
+    apyPct: number;
     buyPlatform: 'kalshi' | 'polymarket' | null;
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket' | null;
     sellPrice: number;
   };
+  source: 'auto' | 'manual';
+}
+
+export interface ManualMatch {
+  id: string;
+  kalshiTicker: string;
+  pmConditionId: string;
+  kalshiTitle: string;
+  pmTitle: string;
+  kalshiUrl?: string;
+  polymarketUrl?: string;
+  createdAt: string;
 }
 
 function extractNameFromKalshiTitle(title: string): string {
-  // "Will Will Christian Edwards win the Bukauskas vs Edwards professional MMA..."
-  // Extract "Will {Name}" → "Name"
-  
-  // First: "Will {Name} win the {Opponent1} vs {Opponent2} ..."
   const willWinMatch = title.match(/^Will\s+(.+?)\s+(?:win|lose|be|finish|end|survive|get|score)/i);
-  if (willWinMatch) {
-    return willWinMatch[1].trim();
-  }
-
-  // Fallback: "Will [Subject] say \"[Word/Phrase]\" before [Date]"
+  if (willWinMatch) return willWinMatch[1].trim();
   const sayQuoteMatch = title.match(/say\s+["']([^"']+)["']/i);
-  if (sayQuoteMatch) {
-    return sayQuoteMatch[1].trim();
-  }
-
-  // Fallback: "Will [Subject] say [Word/Phrase] before"
+  if (sayQuoteMatch) return sayQuoteMatch[1].trim();
   const sayMatch = title.match(/say\s+(.+?)\s+(?:before|by|at|on|in\s+the)/i);
   if (sayMatch) {
     const candidate = sayMatch[1].trim();
-    // Exclude very short or generic candidates
     if (candidate.length >= 2) return candidate;
   }
-
-  // Fallback: just take whatever comes after "Will "
   const simpleMatch = title.match(/^Will\s+(.{2,40}?)\s+(?:win|at|by|score|finish|get|lose|be|end|survive)/i);
-  if (simpleMatch) {
-    return simpleMatch[1].trim();
-  }
-
+  if (simpleMatch) return simpleMatch[1].trim();
   return title.slice(0, 30);
 }
 
 function getKalshiName(km: KalshiMarket): string {
-  // Try custom_strike first (for named strikes like Artist, Word)
   const cs = km.custom_strike;
   if (cs) {
     const values = Object.values(cs);
     if (values.length > 0) {
       const val = String(values[0]);
-      // If it's a UUID or looks like an ID, skip and use title
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(val)) {
-        return val;
-      }
+      if (!uuidRegex.test(val)) return val;
     }
   }
-  // Use title
   return extractNameFromKalshiTitle(km.title || km.ticker);
 }
 
 function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function similarity(a: string, b: string): number {
@@ -109,12 +95,105 @@ function similarity(a: string, b: string): number {
   const all = new Set([...arrA, ...arrB]);
   if (all.size === 0) return 0;
   let shared = 0;
-  for (const w of all) {
-    if (setA.has(w) && setB.has(w)) shared++;
-  }
+  for (const w of all) if (setA.has(w) && setB.has(w)) shared++;
   return shared / all.size;
 }
 
+export function parseDepth(val: string | number | null | undefined): number {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val).trim().replace(/^\$/, '');
+  const m = s.match(/^([\d.,]+)\s*([KMB]?)/i);
+  if (!m) return 0;
+  let num = parseFloat(m[1].replace(/,/g, ''));
+  const suffix = (m[2] || '').toUpperCase();
+  if (suffix === 'K') num *= 1000;
+  if (suffix === 'M') num *= 1_000_000;
+  if (suffix === 'B') num *= 1_000_000_000;
+  return num;
+}
+
+/** Compute the maximum profit possible given available liquidity (depth). */
+export function calculateArbitrageMax(
+  kalshi: NonNullable<UnifiedOutcome['kalshi']>,
+  pm: NonNullable<UnifiedOutcome['polymarket']>,
+  depthKYes: number,
+  depthKNo: number,
+  depthPYes: number,
+  depthPNo: number,
+) {
+  const kYes = kalshi.yesAsk;
+  const kNo = kalshi.noAsk;
+  const pYes = pm.bestAsk;
+  const pNo = pm.noPrice;
+
+  let maxProfit = 0;
+  let strategy = 'No arb';
+  let bestCapital = 0;
+  let kalshiStakeResult = 0;
+  let pmStakeResult = 0;
+  let buyPlatform: 'kalshi' | 'polymarket' | null = null;
+  let buyPrice = 0;
+  let sellPlatform: 'kalshi' | 'polymarket' | null = null;
+  let sellPrice = 0;
+
+  if (kYes + pNo < 1) {
+    const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
+    const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
+    const capital = Math.min(capK, capP);
+    if (isFinite(capital) && capital > 0) {
+      const roi = 1 - (kYes + pNo);
+      const profit = capital * roi;
+      if (profit > maxProfit) {
+        maxProfit = profit;
+        strategy = 'Buy YES Kalshi + NO PM';
+        bestCapital = capital;
+        kalshiStakeResult = capital * kYes;
+        pmStakeResult = capital * pNo;
+        buyPlatform = 'kalshi';
+        buyPrice = kYes;
+        sellPlatform = 'polymarket';
+        sellPrice = pNo;
+      }
+    }
+  }
+
+  if (pYes + kNo < 1) {
+    const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
+    const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
+    const capital = Math.min(capP, capK);
+    if (isFinite(capital) && capital > 0) {
+      const roi = 1 - (pYes + kNo);
+      const profit = capital * roi;
+      if (profit > maxProfit) {
+        maxProfit = profit;
+        strategy = 'Buy YES PM + NO Kalshi';
+        bestCapital = capital;
+        kalshiStakeResult = capital * kNo;
+        pmStakeResult = capital * pYes;
+        buyPlatform = 'polymarket';
+        buyPrice = pYes;
+        sellPlatform = 'kalshi';
+        sellPrice = kNo;
+      }
+    }
+  }
+
+  return {
+    strategy,
+    kalshiStake: kalshiStakeResult,
+    pmStake: pmStakeResult,
+    expectedProfit: maxProfit,
+    roiPct: bestCapital > 0 ? (maxProfit / bestCapital) * 100 : 0,
+    maxCapital: bestCapital,
+    buyPlatform,
+    buyPrice,
+    sellPlatform,
+    sellPrice,
+  };
+}
+
+/** Legacy entry-point kept for callers that still pass a fixed capital */
 export function calculateArbitrage(kalshi: NonNullable<UnifiedOutcome['kalshi']>, pm: NonNullable<UnifiedOutcome['polymarket']>, capital = 1000) {
   const kYes = kalshi.yesAsk;
   const kNo = kalshi.noAsk;
@@ -173,6 +252,19 @@ export function calculateArbitrage(kalshi: NonNullable<UnifiedOutcome['kalshi']>
   };
 }
 
+/** Compute APY from ROI and days until expiry. Compound formula. */
+export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
+  if (!expiryDate) return 0;
+  const expiry = new Date(expiryDate).getTime();
+  const now = Date.now();
+  if (expiry <= now) return 0;
+  const daysToExpiry = (expiry - now) / (1000 * 60 * 60 * 24);
+  if (daysToExpiry <= 0) return 0;
+  const roiDecimal = roiPct / 100;
+  const apyDecimal = Math.pow(1 + roiDecimal, 365 / daysToExpiry) - 1;
+  return apyDecimal * 100;
+}
+
 function filterKalshiMarketsByEventTitle(kMarkets: KalshiMarket[], pmEventTitle: string): KalshiMarket[] {
   if (kMarkets.length <= 20) return kMarkets;
   const stopWords = new Set(['the', 'and', 'or', 'vs', 'at', 'in', 'on', 'by', 'to', 'of', 'for', 'a', 'an']);
@@ -192,14 +284,28 @@ function isBinaryMarket(outcomes: string[]): boolean {
   return (lower.length === 2 && lower.includes('yes') && lower.includes('no'));
 }
 
+// --- Helper to build the PM shape used by calculateArbitrage ---
+function buildPmArbShape(market: PMMarket) {
+  const { prices } = parseOutcomes(market);
+  return {
+    yesPrice: prices[0] || 0,
+    noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
+    bestBid: market.bestBid ?? prices[0] ?? 0,
+    bestAsk: market.bestAsk ?? prices[0] ?? 0,
+    lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
+    askDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
+  } as NonNullable<UnifiedOutcome['polymarket']>;
+}
+
 export function matchOutcomes(
   kalshiMarkets: KalshiMarket[],
   pmMarkets: PMMarket[],
   pmEventTitle?: string,
   capital = 1000,
+  expiryDate?: string,
 ): UnifiedOutcome[] {
   const kMarkets = pmEventTitle ? filterKalshiMarketsByEventTitle(kalshiMarkets, pmEventTitle) : kalshiMarkets;
-  
+
   const kalshiMap = new Map<string, KalshiMarket>();
   for (const km of kMarkets) {
     const name = normalizeName(getKalshiName(km));
@@ -209,12 +315,9 @@ export function matchOutcomes(
   const pmOutcomes: { title: string; yesPrice: number; noPrice: number; market: PMMarket }[] = [];
   for (const pm of pmMarkets) {
     const { outcomes, prices } = parseOutcomes(pm);
-    
-    // Named binary outcome markets (e.g. Drake: groupItemTitle="21 Savage", outcomes=["Yes","No"])
-    // Each market represents ONE candidate/asset. Keep all of these.
     const hasNamedGroup = pm.groupItemTitle && pm.groupItemTitle.trim() !== '' && pm.groupItemTitle !== 'N/A';
     const isNamedBinary = hasNamedGroup && outcomes.length === 2 && outcomes[0].toLowerCase() === 'yes' && outcomes[1].toLowerCase() === 'no';
-    
+
     if (isNamedBinary) {
       pmOutcomes.push({
         title: pm.groupItemTitle!,
@@ -224,11 +327,9 @@ export function matchOutcomes(
       });
       continue;
     }
-    
-    // Skip generic binary Yes/No sub-markets (Completed Match, Over/Under, etc.)
+
     if (isBinaryMarket(outcomes)) continue;
-    
-    // For named outcome markets, create one entry per outcome
+
     for (let i = 0; i < outcomes.length; i++) {
       pmOutcomes.push({
         title: outcomes[i] || pm.groupItemTitle || pm.question || '',
@@ -242,6 +343,8 @@ export function matchOutcomes(
   const matched: UnifiedOutcome[] = [];
   const usedKalshi = new Set<string>();
   const usedPm = new Set<number>();
+
+  const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
 
   // Exact match pass
   for (let pi = 0; pi < pmOutcomes.length; pi++) {
@@ -262,22 +365,15 @@ export function matchOutcomes(
         noBidDepth: exact.no_bid_size_fp,
         noAskDepth: exact.no_ask_size_fp,
       };
+      const pmShape = buildPmArbShape(pmo.market);
+      const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
+      const apyPct = computeApy(arbRaw.roiPct, expiryDate);
       matched.push({
         artist: getKalshiName(exact),
         kalshi,
-        polymarket: {
-          marketId: pmo.market.id,
-          conditionId: pmo.market.conditionId,
-          yesPrice: pmo.yesPrice,
-          noPrice: pmo.noPrice,
-          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
-          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
-          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
-          volume: pmo.market.volume,
-          liquidity: pmo.market.liquidity,
-          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
-        },
-        arbitrage: calculateArbitrage(kalshi, { yesPrice: pmo.yesPrice, noPrice: pmo.noPrice, bestBid: pmo.market.bestBid ?? pmo.yesPrice, bestAsk: pmo.market.bestAsk ?? pmo.yesPrice, lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice, askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0) } as any, capital),
+        polymarket: pmShape,
+        arbitrage: { ...arbRaw, apyPct },
+        source: 'auto' as const,
       });
       usedKalshi.add(exact.ticker);
       usedPm.add(pi);
@@ -314,22 +410,15 @@ export function matchOutcomes(
         noBidDepth: bestKm.no_bid_size_fp,
         noAskDepth: bestKm.no_ask_size_fp,
       };
+      const pmShape = buildPmArbShape(pmo.market);
+      const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
+      const apyPct = computeApy(arbRaw.roiPct, expiryDate);
       matched.push({
         artist: getKalshiName(bestKm),
         kalshi,
-        polymarket: {
-          marketId: pmo.market.id,
-          conditionId: pmo.market.conditionId,
-          yesPrice: pmo.yesPrice,
-          noPrice: pmo.noPrice,
-          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
-          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
-          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
-          volume: pmo.market.volume,
-          liquidity: pmo.market.liquidity,
-          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
-        },
-        arbitrage: calculateArbitrage(kalshi, { yesPrice: pmo.yesPrice, noPrice: pmo.noPrice, bestBid: pmo.market.bestBid ?? pmo.yesPrice, bestAsk: pmo.market.bestAsk ?? pmo.yesPrice, lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice, askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0) } as any, capital),
+        polymarket: pmShape,
+        arbitrage: { ...arbRaw, apyPct },
+        source: 'auto' as const,
       });
       usedKalshi.add(bestKm.ticker);
       usedPm.add(pi);
@@ -355,7 +444,8 @@ export function matchOutcomes(
           noAskDepth: km.no_ask_size_fp,
         },
         polymarket: null,
-        arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+        arbitrage: noArbResult,
+        source: 'auto' as const,
       });
     }
   }
@@ -367,22 +457,83 @@ export function matchOutcomes(
       matched.push({
         artist: pmo.title || 'Unknown',
         kalshi: null,
-        polymarket: {
-          marketId: pmo.market.id,
-          conditionId: pmo.market.conditionId,
-          yesPrice: pmo.yesPrice,
-          noPrice: pmo.noPrice,
-          bestBid: pmo.market.bestBid ?? pmo.yesPrice,
-          bestAsk: pmo.market.bestAsk ?? pmo.yesPrice,
-          lastTradePrice: pmo.market.lastTradePrice ?? pmo.yesPrice,
-          volume: pmo.market.volume,
-          liquidity: pmo.market.liquidity,
-          askDepth: Number(pmo.market.liquidityNum ?? pmo.market.liquidity ?? 0),
-        },
-        arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+        polymarket: buildPmArbShape(pmo.market),
+        arbitrage: noArbResult,
+        source: 'auto' as const,
       });
     }
   }
 
   return matched;
+}
+
+/**
+ * Apply manually configured matches to a list of outcomes.
+ * For each manual match where we have a Kalshi-only and PM-only entry,
+ * merge them into one UnifiedOutcome with source: 'manual'.
+ * Returns the merged list and removes the original single-platform entries.
+ */
+export function applyManualMatches(
+  outcomes: UnifiedOutcome[],
+  manualMatches: ManualMatch[],
+  kalshiMarkets: KalshiMarket[],
+  pmMarkets: PMMarket[],
+  capital = 1000,
+  expiryDate?: string,
+): UnifiedOutcome[] {
+  if (!manualMatches.length) return outcomes;
+
+  const kalshiByTicker = new Map(kalshiMarkets.map(k => [k.ticker, k]));
+  const pmByConditionId = new Map(pmMarkets.map(m => [m.conditionId, m]));
+
+  // Index outcomes by ticker and conditionId
+  const kalshiOnlyIdx = new Map<string, number>(); // ticker -> index
+  const pmOnlyIdx = new Map<string, number>();     // conditionId -> index
+  const matchedPairs = new Set<string>();            // "kalshiTicker|pmConditionId"
+
+  for (let i = 0; i < outcomes.length; i++) {
+    const o = outcomes[i];
+    if (o.kalshi && !o.polymarket) kalshiOnlyIdx.set(o.kalshi.ticker, i);
+    if (o.polymarket && !o.kalshi) pmOnlyIdx.set(o.polymarket.conditionId, i);
+    if (o.kalshi && o.polymarket) matchedPairs.add(`${o.kalshi.ticker}|${o.polymarket.conditionId}`);
+  }
+
+  const merged = [...outcomes];
+  const indicesToRemove = new Set<number>();
+
+  for (const mm of manualMatches) {
+    // Skip if this pair was already auto-matched
+    if (matchedPairs.has(`${mm.kalshiTicker}|${mm.pmConditionId}`)) continue;
+
+    const kIdx = kalshiOnlyIdx.get(mm.kalshiTicker);
+    const pIdx = pmOnlyIdx.get(mm.pmConditionId);
+
+    if (kIdx === undefined || pIdx === undefined) continue;
+
+    const kalshi = outcomes[kIdx].kalshi;
+    const pmRaw = outcomes[pIdx].polymarket;
+    if (!kalshi || !pmRaw) continue;
+
+    // Rebuild PM shape using fresh market data if available
+    const pmMarket = pmByConditionId.get(mm.pmConditionId);
+    const pmShape = pmMarket
+      ? buildPmArbShape(pmMarket)
+      : pmRaw;
+
+    const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
+    const apyPct = computeApy(arbRaw.roiPct, expiryDate);
+
+    merged[kIdx] = {
+      artist: kalshi.ticker + '+' + mm.pmConditionId,
+      // Prefer match's saved titles if available, otherwise tickers
+      kalshi,
+      polymarket: pmShape,
+      arbitrage: { ...arbRaw, apyPct },
+      source: 'manual' as const,
+    };
+    indicesToRemove.add(pIdx);
+  }
+
+  // Remove PM-only entries that got merged
+  return merged.filter((_, i) => !indicesToRemove.has(i));
 }

@@ -19,6 +19,7 @@ export interface PMMarket {
   volumeClob?: number;
   active: boolean;
   closed: boolean;
+  endDate?: string; // ISO 8601, market close date
 }
 
 export interface PMEvent {
@@ -29,6 +30,7 @@ export interface PMEvent {
   active: boolean;
   closed: boolean;
   markets: PMMarket[];
+  endDate?: string; // ISO 8601, event close date
 }
 
 export function extractPolymarketSlug(url: string): string | null {

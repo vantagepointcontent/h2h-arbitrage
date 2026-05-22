@@ -25,6 +25,8 @@ import {
   ArrowDown,
   Edit3,
   Pencil,
+  Hand,
+  Unlink,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/DateTimePicker";
 
@@ -66,6 +68,34 @@ interface UnifiedOutcome {
     askDepth?: number;
   } | null;
   arbitrage: ArbitrageInfo;
+  source?: "auto" | "manual";
+}
+
+interface UnmatchedKalshi {
+  ticker: string;
+  title: string;
+  artist: string;
+  yesAsk: number;
+  noAsk: number;
+}
+
+interface UnmatchedPolymarket {
+  conditionId: string;
+  marketId: string;
+  title: string;
+  yesPrice: number;
+  noPrice: number;
+}
+
+interface ManualMatch {
+  id: string;
+  kalshiTicker: string;
+  pmConditionId: string;
+  kalshiTitle: string;
+  pmTitle: string;
+  kalshiUrl?: string;
+  polymarketUrl?: string;
+  createdAt: string;
 }
 
 interface ScanResult {
@@ -73,10 +103,13 @@ interface ScanResult {
   kalshiEventTicker: string;
   pmEventSlug: string;
   pmEventId: string;
+  expiryDate?: string | null;
   kalshiCount: number;
   pmCount: number;
   matchedCount: number;
   outcomes: UnifiedOutcome[];
+  unmatchedKalshi: UnmatchedKalshi[];
+  unmatchedPolymarket: UnmatchedPolymarket[];
 }
 
 interface SavedMarket {
@@ -109,6 +142,10 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
+  const [manualMatches, setManualMatches] = useState<ManualMatch[]>([]);
+  const [selectedKalshi, setSelectedKalshi] = useState<UnmatchedKalshi | null>(null);
+  const [selectedPM, setSelectedPM] = useState<UnmatchedPolymarket | null>(null);
+  const [manualMatchMsg, setManualMatchMsg] = useState("");
   const [sortField, setSortField] = useState<"roi" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [lastScanTime, setLastScanTime] = useState<number>(0);
@@ -140,6 +177,7 @@ export default function Home() {
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
+  useEffect(() => { loadManualMatches(); }, []);
 
   // Auto-refresh saved markets every 10s
   useEffect(() => {
@@ -159,6 +197,16 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setSavedMarkets(data.markets || []);
+      }
+    } catch {}
+  };
+
+  const loadManualMatches = async () => {
+    try {
+      const res = await fetch("/api/manual-matches");
+      if (res.ok) {
+        const data = await res.json();
+        setManualMatches(data.matches || []);
       }
     } catch {}
   };
@@ -211,6 +259,46 @@ export default function Home() {
           stopPolling();
           setResult(null);
         }
+      }
+    } catch {}
+  };
+
+  const createManualMatch = async (kalshiTicker: string, pmConditionId: string, kalshiTitle?: string, pmTitle?: string) => {
+    try {
+      const res = await fetch("/api/manual-matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kalshiTicker,
+          pmConditionId,
+          kalshiTitle: kalshiTitle || kalshiTicker,
+          pmTitle: pmTitle || pmConditionId,
+          kalshiUrl,
+          polymarketUrl: pmUrl,
+        }),
+      });
+      if (res.ok) {
+        await loadManualMatches();
+        setSelectedKalshi(null);
+        setSelectedPM(null);
+        setManualMatchMsg("✓ Linked!");
+        setTimeout(() => setManualMatchMsg(""), 2000);
+        await scan(false);
+      } else {
+        const data = await res.json();
+        setManualMatchMsg(data.error || "Failed to link");
+      }
+    } catch (e: any) {
+      setManualMatchMsg(e.message || "Error");
+    }
+  };
+
+  const deleteManualMatch = async (id: string) => {
+    try {
+      const res = await fetch(`/api/manual-matches?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await loadManualMatches();
+        await scan(false);
       }
     } catch {}
   };
@@ -280,6 +368,7 @@ export default function Home() {
       previousPricesRef.current = newPrev;
       setResult(data);
       setLastUpdated(new Date());
+      loadManualMatches();
       setLastScanTime(data._ts || Date.now());
     } catch (err: any) {
       if (!silent) setError(err.message || "Scan failed");
@@ -596,7 +685,7 @@ export default function Home() {
                             const priceFlash = priceChanges.get(outcome.artist);
                             return (
                               <tr key={`${outcome.artist}-${idx}`} className={`transition-colors ${isMatched ? "bg-[#22c55e]/[0.02]" : ""} hover:bg-[#1a1a1a]/50 ${priceFlash === "up" ? "bg-[#22c55e]/[0.15]" : priceFlash === "down" ? "bg-[#ef4444]/[0.15]" : ""} ${priceFlash ? "animate-pulse" : ""}`}>
-                                <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${isMatched ? "text-[#22c55e]" : "text-[#a3a3a3]"}`}>{outcome.artist}</span>{isMatched && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#22c55e]/10 text-[#22c55e]">MATCHED</span>}</div></td>
+                                <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${isMatched ? "text-[#22c55e]" : "text-[#a3a3a3]"}`}>{outcome.artist}</span>{isMatched && <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${outcome.source === "manual" ? "bg-[#eab308]/10 text-[#eab308]" : "bg-[#22c55e]/10 text-[#22c55e]"}`}>{outcome.source === "manual" ? "MANUAL" : "MATCHED"}</span>}</div></td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.yesAsk)}</div>{outcome.kalshi.yesAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.yesAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.noAsk)}</div>{outcome.kalshi.noAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.noAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.yesPrice)}</div>{(outcome.polymarket.askDepth ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
@@ -616,6 +705,26 @@ export default function Home() {
           )}
         </main>
       </div>
+
+
+      {/* Manual Matching Panel */}
+      {result && (result.unmatchedKalshi?.length > 0 || result.unmatchedPolymarket?.length > 0) && (
+        <ManualMatchingPanel
+          kalshiUrl={kalshiUrl}
+          pmUrl={pmUrl}
+          pmSlug={result.pmEventSlug}
+          unmatchedKalshi={result.unmatchedKalshi || []}
+          unmatchedPolymarket={result.unmatchedPolymarket || []}
+          manualMatches={manualMatches}
+          selectedKalshi={selectedKalshi}
+          selectedPM={selectedPM}
+          onSelectKalshi={setSelectedKalshi}
+          onSelectPM={setSelectedPM}
+          onCreateMatch={createManualMatch}
+          onDeleteMatch={deleteManualMatch}
+          msg={manualMatchMsg}
+        />
+      )}
 
       {/* Save Modal */}
       {saveModalOpen && (
@@ -827,6 +936,186 @@ function StatCard({ label, value, icon, color }: { label: string; value: string 
 
 function formatProfit(n: number) {
   return `$${n.toFixed(2)}`;
+}
+
+
+/* ── Manual Matching Panel ── */
+interface ManualMatchingPanelProps {
+  kalshiUrl: string;
+  pmUrl: string;
+  pmSlug: string;
+  unmatchedKalshi: UnmatchedKalshi[];
+  unmatchedPolymarket: UnmatchedPolymarket[];
+  manualMatches: ManualMatch[];
+  selectedKalshi: UnmatchedKalshi | null;
+  selectedPM: UnmatchedPolymarket | null;
+  onSelectKalshi: (k: UnmatchedKalshi | null) => void;
+  onSelectPM: (p: UnmatchedPolymarket | null) => void;
+  onCreateMatch: (kalshiTicker: string, pmConditionId: string, kalshiTitle?: string, pmTitle?: string) => void;
+  onDeleteMatch: (id: string) => void;
+  msg: string;
+}
+
+function ManualMatchingPanel({
+  kalshiUrl, pmUrl, pmSlug,
+  unmatchedKalshi, unmatchedPolymarket,
+  manualMatches, selectedKalshi, selectedPM,
+  onSelectKalshi, onSelectPM,
+  onCreateMatch, onDeleteMatch, msg,
+}: ManualMatchingPanelProps) {
+  const [kFilter, setKFilter] = useState("");
+  const [pFilter, setPFilter] = useState("");
+
+  const filteredKalshi = unmatchedKalshi.filter(k =>
+    k.title.toLowerCase().includes(kFilter.toLowerCase()) ||
+    k.ticker.toLowerCase().includes(kFilter.toLowerCase())
+  );
+  const filteredPM = unmatchedPolymarket.filter(p =>
+    p.title.toLowerCase().includes(pFilter.toLowerCase()) ||
+    p.conditionId.toLowerCase().includes(pFilter.toLowerCase())
+  );
+
+  const activeMatchIds = new Map<string, ManualMatch>();
+  for (const m of manualMatches) activeMatchIds.set(`${m.kalshiTicker}|${m.pmConditionId}`, m);
+
+  return (
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden mt-6">
+      <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Hand className="w-4 h-4 text-[#eab308]" />
+          <h2 className="text-sm font-semibold">Manual Match</h2>
+          <span className="text-xs text-[#737373]">Select one market from each platform and link them</span>
+        </div>
+        {msg && (
+          <span className="text-xs font-medium text-[#22c55e]">{msg}</span>
+        )}
+      </div>
+
+      <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Kalshi unmatched */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Kalshi ({unmatchedKalshi.length})</h3>
+            <input
+              type="text"
+              value={kFilter}
+              onChange={(e) => setKFilter(e.target.value)}
+              placeholder="Search..."
+              className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
+            {filteredKalshi.map((k) => {
+              const isActive = activeMatchIds.has(`${k.ticker}|${(selectedPM?.conditionId ?? '')}`);
+              const isSelected = selectedKalshi?.ticker === k.ticker;
+              return (
+                <div
+                  key={k.ticker}
+                  onClick={() => onSelectKalshi(isSelected ? null : k)}
+                  className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
+                    isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
+                  }`}
+                >
+                  <div className="font-medium truncate">{k.title}</div>
+                  <div className="text-[10px] text-[#737373]">YES {k.yesAsk.toFixed(2)} NO {k.noAsk.toFixed(2)}</div>
+                </div>
+              );
+            })}
+            {filteredKalshi.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Kalshi markets.</div>}
+          </div>
+        </div>
+
+        {/* Polymarket unmatched */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Polymarket ({unmatchedPolymarket.length})</h3>
+            <input
+              type="text"
+              value={pFilter}
+              onChange={(e) => setPFilter(e.target.value)}
+              placeholder="Search..."
+              className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
+            {filteredPM.map((p) => {
+              const isActive = activeMatchIds.has(`${(selectedKalshi?.ticker ?? '')}|${p.conditionId}`);
+              const isSelected = selectedPM?.conditionId === p.conditionId;
+              return (
+                <div
+                  key={p.conditionId}
+                  onClick={() => onSelectPM(isSelected ? null : p)}
+                  className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
+                    isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
+                  }`}
+                >
+                  <div className="font-medium truncate">{p.title}</div>
+                  <div className="text-[10px] text-[#737373]">YES {p.yesPrice.toFixed(2)} NO {p.noPrice.toFixed(2)}</div>
+                </div>
+              );
+            })}
+            {filteredPM.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Polymarket markets.</div>}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Actions</h3>
+          <div className="rounded-lg bg-[#111111] border border-[#1a1a1a] p-3 space-y-2">
+            <div className="text-xs text-[#737373]">Selected:</div>
+            {selectedKalshi && (
+              <div className="text-xs text-[#e5e5e5] truncate">
+                <span className="text-[#eab308]">Kalshi:</span> {selectedKalshi.title}
+              </div>
+            )}
+            {selectedPM && (
+              <div className="text-xs text-[#e5e5e5] truncate">
+                <span className="text-[#eab308]">PM:</span> {selectedPM.title}
+              </div>
+            )}
+            {!selectedKalshi && !selectedPM && (
+              <div className="text-xs text-[#525252]">Click one market from each side.</div>
+            )}
+            <button
+              onClick={() => {
+                if (selectedKalshi && selectedPM) {
+                  onCreateMatch(selectedKalshi.ticker, selectedPM.conditionId, selectedKalshi.title, selectedPM.title);
+                }
+              }}
+              disabled={!selectedKalshi || !selectedPM}
+              className="w-full px-3 py-2 rounded-lg bg-[#eab308] text-black text-xs font-semibold hover:bg-[#ca8a04] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <div className="flex items-center justify-center gap-1.5">
+                <Link2 className="w-3 h-3" />
+                Link Markets
+              </div>
+            </button>
+          </div>
+
+          {/* Existing manual matches */}
+          {manualMatches.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-[#a3a3a3] uppercase pt-2">Saved Links</div>
+              <div className="max-h-44 overflow-y-auto space-y-1">
+                {manualMatches.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded bg-[#1a1a1a]">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-[#737373] truncate">
+                        <span className="text-[#eab308]">K:</span> {m.kalshiTitle} <span className="text-[#737373]">↔</span> <span className="text-[#eab308]">PM:</span> {m.pmTitle}
+                      </div>
+                    </div>
+                    <button onClick={() => onDeleteMatch(m.id)} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444] transition-colors">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function getTimeAgo(iso: string): string {
