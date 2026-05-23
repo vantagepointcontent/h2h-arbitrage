@@ -1,7 +1,7 @@
 // Node.js poller (ES module) - polls saved markets every ~30s
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
-const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3010';
+const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
 const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
 const fs = await import('fs');
 

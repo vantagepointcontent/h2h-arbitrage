@@ -55,6 +55,31 @@ export interface ManualMatch {
   createdAt: string;
 }
 
+const MONTH_MAP: Record<string, string> = {
+  JAN: 'Jan', FEB: 'Feb', MAR: 'Mar', APR: 'Apr', MAY: 'May', JUN: 'Jun',
+  JUL: 'Jul', AUG: 'Aug', SEP: 'Sep', OCT: 'Oct', NOV: 'Nov', DEC: 'Dec',
+};
+
+/** Parse the date suffix and sub-code from a Kalshi ticker, e.g.
+ *  KXIPOSPACEX-27MAY01   -> { year: '2027', month: 'May', day: '01' }
+ *  KXHIGHTSEA-26MAY23-T77 -> { year: '2026', month: 'May', day: '23', sub: 'T77' }
+ *  KXHIGHTSEA-26MAY23-B74.5 -> { year: '2026', month: 'May', day: '23', sub: 'B74.5' }
+ */
+function parseKalshiTicker(ticker: string): { label?: string; sub?: string } | null {
+  const m = ticker.match(/-([0-9]{2})([A-Z]{3})([0-9]{2})(?:-([TB].+))?$/);
+  if (!m) return null;
+  const [, yy, mon, dd, sub] = m;
+  const month = MONTH_MAP[mon] || mon;
+  const year = '20' + yy;
+  let label: string;
+  if (dd === '01') {
+    label = `${month} ${year}`;
+  } else {
+    label = `${month} ${dd}, ${year}`;
+  }
+  return { label, sub };
+}
+
 function extractNameFromKalshiTitle(title: string): string {
   const willWinMatch = title.match(/^Will\s+(.+?)\s+(?:win|lose|be|finish|end|survive|get|score)/i);
   if (willWinMatch) return willWinMatch[1].trim();
@@ -71,16 +96,42 @@ function extractNameFromKalshiTitle(title: string): string {
 }
 
 function getKalshiName(km: KalshiMarket): string {
+  // 1. Get a human-readable base name (custom_strike or extracted title)
+  let base = '';
   const cs = km.custom_strike;
   if (cs) {
     const values = Object.values(cs);
     if (values.length > 0) {
       const val = String(values[0]);
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(val)) return val;
+      if (!uuidRegex.test(val)) base = val;
     }
   }
-  return extractNameFromKalshiTitle(km.title || km.ticker);
+  if (!base) {
+    base = extractNameFromKalshiTitle(km.title || km.ticker);
+  }
+
+  // 2. ALWAYS append ticker-derived date/sub-code so identical bases stay distinct.
+  // Fixes "SpaceX" from custom_strike (all 13 markets same) and
+  // "the maximum temperature" from title (all 6 markets same).
+  const parsed = parseKalshiTicker(km.ticker);
+  if (!parsed) return base; // ticker has no date suffix
+
+  if (parsed.sub) {
+    // sub like T77  -> >77°F,  T70 -> <70°F,  B74.5 -> 74-75°F
+    let detail = parsed.sub;
+    if (detail.startsWith('T')) {
+      const val = parseFloat(detail.slice(1));
+      // Temperature threshold:  T70 -> <70°, T77 -> >77° (heuristic: lower T = threshold, higher T = threshold)
+      detail = (val <= 50 ? '\u003c' : '\u003e') + detail.slice(1) + '°F';
+    } else if (detail.startsWith('B')) {
+      const val = parseFloat(detail.slice(1));
+      detail = (val - 0.5) + '-' + (val + 0.5) + '°F';
+    }
+    return `${base} (${detail}, ${parsed.label})`;
+  }
+  // No sub-code — just month/year (e.g. SpaceX IPO markets)
+  return `${base} (${parsed.label})`;
 }
 
 function normalizeName(name: string): string {
@@ -288,11 +339,15 @@ function isBinaryMarket(outcomes: string[]): boolean {
 function buildPmArbShape(market: PMMarket) {
   const { prices } = parseOutcomes(market);
   return {
+    marketId: market.id,
+    conditionId: market.conditionId,
     yesPrice: prices[0] || 0,
     noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
     bestBid: market.bestBid ?? prices[0] ?? 0,
     bestAsk: market.bestAsk ?? prices[0] ?? 0,
     lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
+    volume: market.volume,
+    liquidity: market.liquidity,
     askDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
