@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       kalshiUrl: body.kalshiUrl,
       polymarketUrl: body.polymarketUrl,
       eventTitle: body.eventTitle || 'Untitled',
+      category: body.category || '',
       expiryDate: body.expiryDate || null,
     });
     return NextResponse.json({ market }, { status: 201 });
@@ -42,6 +43,7 @@ export async function PUT(request: NextRequest) {
     const ok = await updateSavedMarket(body.id, {
       eventTitle: body.eventTitle,
       expiryDate: body.expiryDate,
+      category: body.category,
     });
     if (!ok) return NextResponse.json({ error: 'Market not found' }, { status: 404 });
     return NextResponse.json({ success: true });

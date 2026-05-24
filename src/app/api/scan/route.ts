@@ -5,6 +5,7 @@ import {
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
+import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateArbitrageMax, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
 
@@ -94,7 +95,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pmMarkets = filterPolymarketMarkets(pmEvent.markets || []);
+    // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
+    const pmMarketsRaw = filterPolymarketMarkets(pmEvent.markets || []);
+    const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
+    const clobMap = await fetchClobMarkets(conditionIds);
+
+    const pmMarkets = pmMarketsRaw.map((m): any => {
+      const clob = clobMap.get(m.conditionId);
+      if (!clob) return m;
+      const live = getClobPrices(clob);
+      if (!live) return m;
+      return {
+        ...m,
+        outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
+        bestBid: live.bestBid,
+        bestAsk: live.bestAsk,
+        lastTradePrice: live.lastTradePrice,
+      };
+    });
 
     // Step 1: auto-match
     const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);

@@ -41,7 +41,7 @@ export function extractPolymarketSlug(url: string): string | null {
 
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
   const res = await fetch(
-    `https://gamma-api.polymarket.com/events/slug/${slug}`,
+    `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
     { headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' }, cache: 'no-store' }
   );
   if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);

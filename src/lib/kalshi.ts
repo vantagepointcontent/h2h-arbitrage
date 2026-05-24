@@ -64,7 +64,7 @@ export function extractKalshiTicker(url: string): string | null {
 
 export async function fetchKalshiEventMarkets(eventTicker: string): Promise<KalshiMarket[]> {
   const res = await fetch(
-    `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open`,
+    `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&_t=${Date.now()}`,
     { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
@@ -74,7 +74,7 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
 
 export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<KalshiMarket[]> {
   const res = await fetch(
-    `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open`,
+    `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&_t=${Date.now()}`,
     { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);

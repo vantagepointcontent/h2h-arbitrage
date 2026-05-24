@@ -12,9 +12,12 @@ import {
   Loader2,
   AlertCircle,
   Save,
+  RefreshCw,
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Bookmark,
   Plus,
   BarChart3,
@@ -36,6 +39,7 @@ interface ArbitrageInfo {
   pmStake: number;
   expectedProfit: number;
   roiPct: number;
+  apyPct?: number;
   buyPlatform: "kalshi" | "polymarket" | null;
   buyPrice: number;
   sellPlatform: "kalshi" | "polymarket" | null;
@@ -117,6 +121,7 @@ interface SavedMarket {
   kalshiUrl: string;
   polymarketUrl: string;
   eventTitle: string;
+  category?: string;
   createdAt: string;
   expiryDate?: string | null;
   lastScanResult?: {
@@ -156,6 +161,7 @@ export default function Home() {
 
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview">("scan");
@@ -164,16 +170,27 @@ export default function Home() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveExpiry, setSaveExpiry] = useState<string | null>(null);
+  const [saveCategory, setSaveCategory] = useState("");
 
-  // Edit modal state (for editing existing market name/expiry)
+  // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editMarketId, setEditMarketId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editExpiry, setEditExpiry] = useState<string | null>(null);
+  const [editCategory, setEditCategory] = useState("");
+
+  // Sidebar category filter
+  const [sidebarCategoryFilter, setSidebarCategoryFilter] = useState<string>("");
+  const allCategories = Array.from(new Set(savedMarkets.map(m => m.category).filter((c): c is string => !!c))).sort();
 
   // Overview sort
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
+
+  // Sidebar sort
+  type SidebarSort = "name" | "roi" | "expiry" | "apy";
+  const [sidebarSort, setSidebarSort] = useState<SidebarSort>("name");
+  const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("asc");
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
@@ -222,6 +239,7 @@ export default function Home() {
           kalshiUrl,
           polymarketUrl: pmUrl,
           eventTitle: saveName || result.eventTitle,
+          category: saveCategory,
           expiryDate: saveExpiry,
         }),
       });
@@ -229,6 +247,7 @@ export default function Home() {
         await loadSavedMarkets();
         setSaveModalOpen(false);
         setSaveName("");
+        setSaveCategory("");
         setSaveExpiry(null);
       }
     } catch (e: any) {
@@ -238,7 +257,7 @@ export default function Home() {
     }
   };
 
-  const updateMarketMeta = async (id: string, updates: { eventTitle?: string; expiryDate?: string | null }) => {
+  const updateMarketMeta = async (id: string, updates: { eventTitle?: string; expiryDate?: string | null; category?: string }) => {
     try {
       await fetch("/api/saved-markets", {
         method: "PUT",
@@ -308,9 +327,24 @@ export default function Home() {
     setPmUrl(market.polymarketUrl);
     setActiveMarketId(market.id);
     setViewMode("scan");
-    setResult(null);
     setError("");
-    setTimeout(() => handleScan(false), 0);
+    // Show cached scan result immediately if we have nothing displayed
+    if (!result && market.lastScanResult) {
+      setResult({
+        eventTitle: market.eventTitle,
+        kalshiEventTicker: "",
+        pmEventSlug: "",
+        pmEventId: "",
+        expiryDate: market.expiryDate,
+        kalshiCount: market.lastScanResult.kalshiCount,
+        pmCount: market.lastScanResult.pmCount,
+        matchedCount: market.lastScanResult.matchedCount,
+        outcomes: [],
+        unmatchedKalshi: [],
+        unmatchedPolymarket: [],
+      });
+    }
+    handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
   };
 
   const goToNewScan = () => {
@@ -329,14 +363,14 @@ export default function Home() {
     setActiveMarketId(null);
   };
 
-  const scan = useCallback(async (silent = false) => {
+  const scan = useCallback(async (silent = false, overrideKUrl?: string, overridePmUrl?: string) => {
     if (!silent) setLoading(true);
     setError("");
     try {
       const res = await fetch(`/api/scan?_=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-        body: JSON.stringify({ kalshiUrl, polymarketUrl: pmUrl }),
+        body: JSON.stringify({ kalshiUrl: overrideKUrl ?? kalshiUrl, polymarketUrl: overridePmUrl ?? pmUrl }),
         cache: 'no-store',
       });
       const data = await res.json();
@@ -400,6 +434,11 @@ export default function Home() {
     if (!silent) startPolling();
   };
 
+  const handleScanWithUrls = async (kUrl: string, pUrl: string) => {
+    await scan(false, kUrl, pUrl);
+    startPolling();
+  };
+
   const formatPrice = (p: number) => `${(p * 100).toFixed(1)}¢`;
   const formatDollar = (n: number) => `$${n.toFixed(2)}`;
 
@@ -423,6 +462,7 @@ export default function Home() {
     if (!result) return;
     setSaveName(result.eventTitle);
     setSaveExpiry(null);
+    setSaveCategory("");
     setSaveModalOpen(true);
   };
 
@@ -431,6 +471,7 @@ export default function Home() {
     setEditMarketId(market.id);
     setEditName(market.eventTitle);
     setEditExpiry(market.expiryDate ?? null);
+    setEditCategory(market.category || "");
     setEditModalOpen(true);
   };
 
@@ -439,6 +480,7 @@ export default function Home() {
     await updateMarketMeta(editMarketId, {
       eventTitle: editName,
       expiryDate: editExpiry,
+      category: editCategory,
     });
     setEditModalOpen(false);
     setEditMarketId(null);
@@ -473,6 +515,43 @@ export default function Home() {
     else { setOverviewSort(field); setOverviewSortDir(field === "roi" ? "desc" : "asc"); }
   };
 
+  const sortedSidebarMarkets = (() => {
+    let arr = [...savedMarkets];
+    if (sidebarCategoryFilter) {
+      arr = arr.filter(m => m.category === sidebarCategoryFilter);
+    }
+    if (sidebarSort === "name") {
+      arr.sort((a, b) => {
+        const cmp = a.eventTitle.localeCompare(b.eventTitle);
+        return sidebarSortDir === "asc" ? cmp : -cmp;
+      });
+    } else if (sidebarSort === "roi") {
+      arr.sort((a, b) => {
+        const aRoi = a.lastScanResult?.bestRoiPct ?? -1;
+        const bRoi = b.lastScanResult?.bestRoiPct ?? -1;
+        return sidebarSortDir === "desc" ? bRoi - aRoi : aRoi - bRoi;
+      });
+    } else if (sidebarSort === "expiry") {
+      arr.sort((a, b) => {
+        const aExp = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+        const bExp = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+        return sidebarSortDir === "asc" ? aExp - bExp : bExp - aExp;
+      });
+    } else if (sidebarSort === "apy") {
+      arr.sort((a, b) => {
+        const aRoi = a.lastScanResult?.bestRoiPct ?? -1;
+        const bRoi = b.lastScanResult?.bestRoiPct ?? -1;
+        return sidebarSortDir === "desc" ? bRoi - aRoi : aRoi - bRoi;
+      });
+    }
+    return arr;
+  })();
+
+  const toggleSidebarSort = (field: SidebarSort) => {
+    if (sidebarSort === field) setSidebarSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSidebarSort(field); setSidebarSortDir(field === "roi" || field === "apy" ? "desc" : "asc"); }
+  };
+
   const timeUntilExpiry = (iso: string | null | undefined) => {
     if (!iso) return null;
     const diff = new Date(iso).getTime() - Date.now();
@@ -505,13 +584,53 @@ export default function Home() {
           {sidebarOpen && <span>Overview</span>}
         </button>
 
-        <button onClick={goToNewScan} className="flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg bg-[#1a1a1a] hover:bg-[#262626] text-[#a3a3a3] hover:text-[#e5e5e5] transition-colors text-sm">
-          <Plus className="w-4 h-4 shrink-0" />
-          {sidebarOpen && <span>New Scan</span>}
-        </button>
-
         <div className="flex-1 overflow-y-auto py-2 space-y-1 px-2">
-          {savedMarkets.map((market) => {
+          {sidebarOpen && allCategories.length > 0 && (
+            <div className="flex flex-wrap gap-1 px-2 mb-2">
+              <button
+                onClick={() => setSidebarCategoryFilter("")}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                  !sidebarCategoryFilter ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                }`}
+              >
+                All
+              </button>
+              {allCategories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSidebarCategoryFilter(cat)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                    sidebarCategoryFilter === cat ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+          {sidebarOpen && savedMarkets.length > 0 && (
+            <div className="flex items-center gap-1 px-2 mb-2">
+              <span className="text-[10px] text-[#737373] uppercase tracking-wider font-medium">Sort by</span>
+              <div className="flex gap-0.5 ml-auto">
+                {(["name","roi","expiry","apy"] as SidebarSort[]).map((field) => (
+                  <button
+                    key={field}
+                    onClick={() => toggleSidebarSort(field)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      sidebarSort === field
+                        ? "bg-[#22c55e]/20 text-[#22c55e]"
+                        : "text-[#525252] hover:text-[#a3a3a3]"
+                    }`}
+                    title={`Sort by ${field}${sidebarSort === field ? (sidebarSortDir === "asc" ? " ↑" : " ↓") : ""}`}
+                  >
+                    {field === "name" ? "Name" : field === "roi" ? "ROI" : field === "expiry" ? "Expiry" : "APY"}
+                    {sidebarSort === field && (sidebarSortDir === "asc" ? " ↑" : " ↓")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {sortedSidebarMarkets.map((market) => {
             const last = market.lastScanResult;
             const hasPositive = last && last.bestRoiPct > 0;
             return (
@@ -520,10 +639,22 @@ export default function Home() {
                 {sidebarOpen && (
                   <>
                     <span className="truncate flex-1">{market.eventTitle}</span>
+                    {market.category && (
+                      <span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{market.category}</span>
+                    )}
                     {last && (
-                      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${hasPositive ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#262626] text-[#737373]"}`}>
-                        {hasPositive ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
-                      </span>
+                      <>
+                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${hasPositive ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#262626] text-[#737373]"}`}>
+                          {hasPositive ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
+                        </span>
+                        {(() => {
+                          if (!market.expiryDate || !hasPositive) return null;
+                          const days = (new Date(market.expiryDate).getTime() - Date.now()) / 86400000;
+                          if (days <= 0) return null;
+                          const apy = last.bestRoiPct * (365 / days);
+                          return <span className="shrink-0 text-[9px] text-[#737373]">({apy.toFixed(0)}% APY)</span>;
+                        })()}
+                      </>
                     )}
                     <button onClick={(e) => openEditModal(market, e)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5] transition-opacity">
                       <Pencil className="w-3 h-3" />
@@ -541,11 +672,10 @@ export default function Home() {
           )}
         </div>
 
-        {sidebarOpen && (
-          <div className="px-3 py-2 border-t border-[#1a1a1a] text-[10px] text-[#525252]">
-            {savedMarkets.length} market{savedMarkets.length !== 1 ? "s" : ""} saved
-          </div>
-        )}
+        <button onClick={goToNewScan} className="flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-sm font-medium border border-[#22c55e]/20">
+          <Plus className="w-4 h-4 shrink-0" />
+          {sidebarOpen && <span>Add market</span>}
+        </button>
       </aside>
 
       {/* Main content */}
@@ -596,7 +726,8 @@ export default function Home() {
             />
           ) : (
             <>
-              {/* Scan inputs */}
+              {/* Scan inputs — hidden when viewing a saved market */}
+              {!activeMarketId && (
               <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mb-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                   <div className="space-y-2">
@@ -638,15 +769,45 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Results */}
               {result && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {activeMarketId && (
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="text-xl font-bold tracking-tight text-[#e5e5e5]">{result.eventTitle}</h2>
+                      {savedMarkets.find(m => m.id === activeMarketId)?.category && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#1a1a1a] text-[#737373]">
+                          {savedMarkets.find(m => m.id === activeMarketId)?.category}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <StatCard label="Kalshi Markets" value={result.kalshiCount} icon={<Activity className="w-4 h-4" />} color="blue" />
                     <StatCard label="Polymarket Markets" value={result.pmCount} icon={<Activity className="w-4 h-4" />} color="purple" />
                     <StatCard label="Matched Pairs" value={result.matchedCount} icon={<Link2 className="w-4 h-4" />} color="green" />
-                    <StatCard label="Event" value={result.eventTitle.length > 20 ? result.eventTitle.slice(0, 20) + "..." : result.eventTitle} icon={<Clock className="w-4 h-4" />} color="yellow" />
+                    <StatCard label="Expiry" value={formatExpiry(result.expiryDate)} icon={<Calendar className="w-4 h-4" />} color="yellow" />
+                    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-1 flex gap-1">
+                      <a href={kalshiDeepLink(result.kalshiEventTicker)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-xs font-bold py-3" title="Kalshi">K</a>
+                      <a href={pmDeepLink(result.pmEventSlug)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center rounded-lg bg-[#a855f7]/10 text-[#a855f7] hover:bg-[#a855f7]/20 transition-colors text-xs font-bold py-3" title="Polymarket">PM</a>
+                      {activeMarketId ? (
+                        <button
+                          onClick={() => {
+                            const market = savedMarkets.find(m => m.id === activeMarketId);
+                            if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                          }}
+                          disabled={loading}
+                          className="flex-1 flex items-center justify-center rounded-lg bg-[#262626] text-[#737373] hover:text-[#e5e5e5] hover:bg-[#404040] transition-colors disabled:opacity-50 py-3"
+                          title="Refresh"
+                        >
+                          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        </button>
+                      ) : (
+                        <div className="flex-1" />
+                      )}
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
@@ -684,6 +845,7 @@ export default function Home() {
                             const hasArb = arb.roiPct > 0;
                             const priceFlash = priceChanges.get(outcome.artist);
                             return (
+                              <>
                               <tr key={`${outcome.artist}-${idx}`} className={`transition-colors ${isMatched ? "bg-[#22c55e]/[0.02]" : ""} hover:bg-[#1a1a1a]/50 ${priceFlash === "up" ? "bg-[#22c55e]/[0.15]" : priceFlash === "down" ? "bg-[#ef4444]/[0.15]" : ""} ${priceFlash ? "animate-pulse" : ""}`}>
                                 <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${isMatched ? "text-[#22c55e]" : "text-[#a3a3a3]"}`}>{outcome.artist}</span>{isMatched && <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${outcome.source === "manual" ? "bg-[#eab308]/10 text-[#eab308]" : "bg-[#22c55e]/10 text-[#22c55e]"}`}>{outcome.source === "manual" ? "MANUAL" : "MATCHED"}</span>}</div></td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.yesAsk)}</div>{outcome.kalshi.yesAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.yesAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
@@ -693,6 +855,49 @@ export default function Home() {
                                 <td className="px-4 py-3 text-center">{isMatched ? (<div className="flex flex-col items-center"><span className={`text-xs font-bold ${hasArb ? "text-[#22c55e]" : "text-[#737373]"}`}>{hasArb ? `+${arb.roiPct.toFixed(2)}%` : "No arb"}</span>{hasArb && <span className="text-[10px] text-[#737373]">{formatDollar(arb.expectedProfit)} profit</span>}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">{outcome.kalshi && (<a href={kalshiDeepLink(outcome.kalshi.ticker)} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{outcome.polymarket && (<a href={pmDeepLink(result.pmEventSlug)} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{isMatched && (<button onClick={() => setExpandedArtist(isExpanded ? null : outcome.artist)} className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><TrendingUp className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} /></button>)}</div></td>
                               </tr>
+                              {isExpanded && isMatched && (
+                                <tr>
+                                  <td colSpan={7} className="px-4 py-4 bg-[#0f0f0f] border-t border-[#1a1a1a]">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                      <div className="space-y-2">
+                                        <div className="text-[#737373] font-semibold uppercase tracking-wider">Arb Details</div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                          <span className="text-[#525252]">Strategy:</span>
+                                          <span className="text-[#e5e5e5]">{arb.strategy}</span>
+                                          <span className="text-[#525252]">Buy platform:</span>
+                                          <span className={`${arb.buyPlatform === 'kalshi' ? 'text-[#3b82f6]' : 'text-[#a855f7]'}`}>{arb.buyPlatform?.toUpperCase() || '—'}</span>
+                                          <span className="text-[#525252]">Buy price:</span>
+                                          <span className="text-[#e5e5e5]">{formatPrice(arb.buyPrice)}</span>
+                                          <span className="text-[#525252]">Sell platform:</span>
+                                          <span className={`${arb.sellPlatform === 'kalshi' ? 'text-[#3b82f6]' : 'text-[#a855f7]'}`}>{arb.sellPlatform?.toUpperCase() || '—'}</span>
+                                          <span className="text-[#525252]">Sell price:</span>
+                                          <span className="text-[#e5e5e5]">{formatPrice(arb.sellPrice)}</span>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="text-[#737373] font-semibold uppercase tracking-wider">Stake &amp; Profit</div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                          <span className="text-[#525252]">Kalshi stake:</span>
+                                          <span className="text-[#e5e5e5]">{formatDollar(arb.kalshiStake)}</span>
+                                          <span className="text-[#525252]">PM stake:</span>
+                                          <span className="text-[#e5e5e5]">{formatDollar(arb.pmStake)}</span>
+                                          <span className="text-[#525252]">Expected profit:</span>
+                                          <span className="text-[#22c55e] font-bold">{formatDollar(arb.expectedProfit)}</span>
+                                          <span className="text-[#525252]">ROI:</span>
+                                          <span className={`font-bold ${arb.roiPct > 0 ? 'text-[#22c55e]' : 'text-[#737373]'}`}>{hasArb ? `+${arb.roiPct.toFixed(2)}%` : '0%'}</span>
+                                          {arb.apyPct != null && arb.apyPct > 0 && (
+                                            <>
+                                              <span className="text-[#525252]">APY est:</span>
+                                              <span className="text-[#eab308] font-bold">{arb.apyPct.toFixed(1)}%</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                              </>
                             );
                           })}
                         </tbody>
@@ -710,6 +915,8 @@ export default function Home() {
       {/* Manual Matching Panel */}
       {result && (result.unmatchedKalshi?.length > 0 || result.unmatchedPolymarket?.length > 0) && (
         <ManualMatchingPanel
+          open={rightPanelOpen}
+          onToggle={() => setRightPanelOpen(!rightPanelOpen)}
           kalshiUrl={kalshiUrl}
           pmUrl={pmUrl}
           pmSlug={result.pmEventSlug}
@@ -741,6 +948,18 @@ export default function Home() {
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm font-medium text-[#a3a3a3]">Category</label>
+              <select value={saveCategory} onChange={(e) => setSaveCategory(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e] focus:ring-1 focus:ring-[#22c55e]/30 transition-all">
+                <option value="">No category</option>
+                <option value="Politics">Politics</option>
+                <option value="Temperature">Temperature</option>
+                <option value="Finances">Finances</option>
+                <option value="Mentions">Mentions</option>
+                <option value="Sports">Sports</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium text-[#a3a3a3]">Expiry Date</label>
               <DateTimePicker value={saveExpiry} onChange={setSaveExpiry} placeholder="No expiry set" />
             </div>
@@ -767,6 +986,18 @@ export default function Home() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#a3a3a3]">Market Name</label>
               <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e] focus:ring-1 focus:ring-[#22c55e]/30 transition-all" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#a3a3a3]">Category</label>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e] focus:ring-1 focus:ring-[#22c55e]/30 transition-all">
+                <option value="">No category</option>
+                <option value="Politics">Politics</option>
+                <option value="Temperature">Temperature</option>
+                <option value="Finances">Finances</option>
+                <option value="Mentions">Mentions</option>
+                <option value="Sports">Sports</option>
+              </select>
             </div>
 
             <div className="space-y-2">
@@ -807,6 +1038,57 @@ function OverviewPanel({
 }) {
   return (
     <div className="space-y-5">
+      {/* Top summary cards */}
+      {(() => {
+        const withResults = markets.filter(m => m.lastScanResult && m.lastScanResult.bestRoiPct > 0);
+        const totalProfit = withResults.reduce((sum, m) => sum + (m.lastScanResult?.bestProfit ?? 0), 0);
+        const totalStake = withResults.reduce((sum, m) => {
+          const r = m.lastScanResult;
+          if (!r || r.bestRoiPct <= 0) return sum;
+          return sum + (r.bestProfit / (r.bestRoiPct / 100));
+        }, 0);
+        const weightedApy = totalStake > 0
+          ? withResults.reduce((sum, m) => {
+              const r = m.lastScanResult;
+              if (!r || r.bestRoiPct <= 0) return sum;
+              const stake = r.bestProfit / (r.bestRoiPct / 100);
+              return sum + r.bestRoiPct * stake;
+            }, 0) / totalStake
+          : 0;
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="group relative rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
+              <div className="text-[10px] text-[#737373] uppercase tracking-wider mb-1">Total Profit Potential</div>
+              <div className="text-2xl font-bold text-[#22c55e]">{formatProfit(totalProfit)}</div>
+              <div className="text-xs text-[#525252] mt-0.5">Across {withResults.length} markets</div>
+              {withResults.length > 0 && (
+                <div className="absolute z-10 top-full mt-2 left-0 right-0 rounded-lg border border-[#262626] bg-[#111111] p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="text-[10px] text-[#737373] uppercase tracking-wider mb-2">Breakdown</div>
+                  <div className="space-y-1">
+                    {withResults.map(m => (
+                      <div key={m.id} className="flex items-center justify-between text-xs">
+                        <span className="text-[#a3a3a3] truncate max-w-[60%]">{m.eventTitle}</span>
+                        <span className="text-[#22c55e] font-mono">{formatProfit(m.lastScanResult?.bestProfit ?? 0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
+              <div className="text-[10px] text-[#737373] uppercase tracking-wider mb-1">Total Stake Required</div>
+              <div className="text-2xl font-bold text-[#e5e5e5]">{formatProfit(totalStake)}</div>
+              <div className="text-xs text-[#525252] mt-0.5">At best available depth</div>
+            </div>
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
+              <div className="text-[10px] text-[#737373] uppercase tracking-wider mb-1">Weighted APY</div>
+              <div className="text-2xl font-bold text-[#22c55e]">{weightedApy.toFixed(2)}%</div>
+              <div className="text-xs text-[#525252] mt-0.5">Profit-weighted average</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Header + sort controls */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Market Overview</h2>
@@ -851,10 +1133,12 @@ function OverviewPanel({
                   : "border-[#1a1a1a] hover:border-[#262626]"
               }`}
             >
-              {/* Top row: name + edit/delete */}
+              {/* Top row: name + edit/delete + links */}
               <div className="flex items-start justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#e5e5e5] leading-tight pr-2">{market.eventTitle}</h3>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 transition-opacity">
+                  <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#22c55e]/20 text-[#737373] hover:text-[#22c55e]" title="Kalshi"><span className="text-[10px] font-bold">K</span></a>
+                  <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#a855f7]/20 text-[#737373] hover:text-[#a855f7]" title="Polymarket"><span className="text-[10px] font-bold">PM</span></a>
                   <button onClick={(e) => onEditMarket(market, e)} className="p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5]"><Pencil className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); onDeleteMarket(market.id); }} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
                 </div>
@@ -938,9 +1222,18 @@ function formatProfit(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
+function formatExpiry(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 
 /* ── Manual Matching Panel ── */
 interface ManualMatchingPanelProps {
+  open: boolean;
+  onToggle: () => void;
   kalshiUrl: string;
   pmUrl: string;
   pmSlug: string;
@@ -957,6 +1250,7 @@ interface ManualMatchingPanelProps {
 }
 
 function ManualMatchingPanel({
+  open, onToggle,
   kalshiUrl, pmUrl, pmSlug,
   unmatchedKalshi, unmatchedPolymarket,
   manualMatches, selectedKalshi, selectedPM,
@@ -979,142 +1273,155 @@ function ManualMatchingPanel({
   for (const m of manualMatches) activeMatchIds.set(`${m.kalshiTicker}|${m.pmConditionId}`, m);
 
   return (
-    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden mt-6">
-      <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Hand className="w-4 h-4 text-[#eab308]" />
-          <h2 className="text-sm font-semibold">Manual Match</h2>
-          <span className="text-xs text-[#737373]">Select one market from each platform and link them</span>
-        </div>
-        {msg && (
-          <span className="text-xs font-medium text-[#22c55e]">{msg}</span>
+    <aside className={`shrink-0 border-l border-[#1a1a1a] bg-[#0f0f0f] flex flex-col transition-all duration-300 ${open ? "w-96" : "w-14"}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-3 border-b border-[#1a1a1a]">
+        {open && (
+          <div className="flex items-center gap-2">
+            <Hand className="w-4 h-4 text-[#eab308]" />
+            <span className="text-sm font-semibold">Manual Match</span>
+          </div>
         )}
+        <button onClick={onToggle} className="p-1.5 rounded-md hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors">
+          {open ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </div>
 
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Kalshi unmatched */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Kalshi ({unmatchedKalshi.length})</h3>
-            <input
-              type="text"
-              value={kFilter}
-              onChange={(e) => setKFilter(e.target.value)}
-              placeholder="Search..."
-              className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
-            />
-          </div>
-          <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
-            {filteredKalshi.map((k) => {
-              const isActive = activeMatchIds.has(`${k.ticker}|${(selectedPM?.conditionId ?? '')}`);
-              const isSelected = selectedKalshi?.ticker === k.ticker;
-              return (
-                <div
-                  key={k.ticker}
-                  onClick={() => onSelectKalshi(isSelected ? null : k)}
-                  className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
-                    isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
-                  }`}
-                >
-                  <div className="font-medium truncate">{k.title}</div>
-                  <div className="text-[10px] text-[#737373]">YES {k.yesAsk.toFixed(2)} NO {k.noAsk.toFixed(2)}</div>
-                </div>
-              );
-            })}
-            {filteredKalshi.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Kalshi markets.</div>}
-          </div>
-        </div>
-
-        {/* Polymarket unmatched */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Polymarket ({unmatchedPolymarket.length})</h3>
-            <input
-              type="text"
-              value={pFilter}
-              onChange={(e) => setPFilter(e.target.value)}
-              placeholder="Search..."
-              className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
-            />
-          </div>
-          <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
-            {filteredPM.map((p) => {
-              const isActive = activeMatchIds.has(`${(selectedKalshi?.ticker ?? '')}|${p.conditionId}`);
-              const isSelected = selectedPM?.conditionId === p.conditionId;
-              return (
-                <div
-                  key={p.conditionId}
-                  onClick={() => onSelectPM(isSelected ? null : p)}
-                  className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
-                    isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
-                  }`}
-                >
-                  <div className="font-medium truncate">{p.title}</div>
-                  <div className="text-[10px] text-[#737373]">YES {p.yesPrice.toFixed(2)} NO {p.noPrice.toFixed(2)}</div>
-                </div>
-              );
-            })}
-            {filteredPM.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Polymarket markets.</div>}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Actions</h3>
-          <div className="rounded-lg bg-[#111111] border border-[#1a1a1a] p-3 space-y-2">
-            <div className="text-xs text-[#737373]">Selected:</div>
-            {selectedKalshi && (
-              <div className="text-xs text-[#e5e5e5] truncate">
-                <span className="text-[#eab308]">Kalshi:</span> {selectedKalshi.title}
-              </div>
-            )}
-            {selectedPM && (
-              <div className="text-xs text-[#e5e5e5] truncate">
-                <span className="text-[#eab308]">PM:</span> {selectedPM.title}
-              </div>
-            )}
-            {!selectedKalshi && !selectedPM && (
-              <div className="text-xs text-[#525252]">Click one market from each side.</div>
-            )}
-            <button
-              onClick={() => {
-                if (selectedKalshi && selectedPM) {
-                  onCreateMatch(selectedKalshi.ticker, selectedPM.conditionId, selectedKalshi.title, selectedPM.title);
-                }
-              }}
-              disabled={!selectedKalshi || !selectedPM}
-              className="w-full px-3 py-2 rounded-lg bg-[#eab308] text-black text-xs font-semibold hover:bg-[#ca8a04] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            >
-              <div className="flex items-center justify-center gap-1.5">
-                <Link2 className="w-3 h-3" />
-                Link Markets
-              </div>
-            </button>
-          </div>
-
-          {/* Existing manual matches */}
+      {!open && (
+        <div className="flex-1 flex flex-col items-center gap-4 py-4">
+          <Hand className="w-4 h-4 text-[#eab308]" />
           {manualMatches.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs font-semibold text-[#a3a3a3] uppercase pt-2">Saved Links</div>
-              <div className="max-h-44 overflow-y-auto space-y-1">
-                {manualMatches.map((m) => (
-                  <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded bg-[#1a1a1a]">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-[#737373] truncate">
-                        <span className="text-[#eab308]">K:</span> {m.kalshiTitle} <span className="text-[#737373]">↔</span> <span className="text-[#eab308]">PM:</span> {m.pmTitle}
-                      </div>
-                    </div>
-                    <button onClick={() => onDeleteMatch(m.id)} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444] transition-colors">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#eab308]/10 text-[#eab308]">{manualMatches.length}</span>
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {open && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Kalshi unmatched */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Kalshi ({unmatchedKalshi.length})</h3>
+              <input
+                type="text"
+                value={kFilter}
+                onChange={(e) => setKFilter(e.target.value)}
+                placeholder="Search..."
+                className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
+              {filteredKalshi.map((k) => {
+                const isActive = activeMatchIds.has(`${k.ticker}|${(selectedPM?.conditionId ?? '')}`);
+                const isSelected = selectedKalshi?.ticker === k.ticker;
+                return (
+                  <div
+                    key={k.ticker}
+                    onClick={() => onSelectKalshi(isSelected ? null : k)}
+                    className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
+                      isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
+                    }`}
+                  >
+                    <div className="font-medium truncate">{k.title}</div>
+                    <div className="text-[10px] text-[#737373]">YES {k.yesAsk.toFixed(2)} NO {k.noAsk.toFixed(2)}</div>
+                  </div>
+                );
+              })}
+              {filteredKalshi.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Kalshi markets.</div>}
+            </div>
+          </div>
+
+          {/* Polymarket unmatched */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Polymarket ({unmatchedPolymarket.length})</h3>
+              <input
+                type="text"
+                value={pFilter}
+                onChange={(e) => setPFilter(e.target.value)}
+                placeholder="Search..."
+                className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] w-28"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border border-[#1a1a1a]">
+              {filteredPM.map((p) => {
+                const isActive = activeMatchIds.has(`${(selectedKalshi?.ticker ?? '')}|${p.conditionId}`);
+                const isSelected = selectedPM?.conditionId === p.conditionId;
+                return (
+                  <div
+                    key={p.conditionId}
+                    onClick={() => onSelectPM(isSelected ? null : p)}
+                    className={`px-2 py-1.5 cursor-pointer transition-colors text-xs ${
+                      isSelected ? "bg-[#eab308]/10 text-[#eab308]" : "hover:bg-[#1a1a1a] text-[#a3a3a3]"
+                    }`}
+                  >
+                    <div className="font-medium truncate">{p.title}</div>
+                    <div className="text-[10px] text-[#737373]">YES {p.yesPrice.toFixed(2)} NO {p.noPrice.toFixed(2)}</div>
+                  </div>
+                );
+              })}
+              {filteredPM.length === 0 && <div className="px-2 py-3 text-xs text-[#525252]">No unmatched Polymarket markets.</div>}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#a3a3a3] uppercase">Actions</h3>
+            <div className="rounded-lg bg-[#111111] border border-[#1a1a1a] p-3 space-y-2">
+              <div className="text-xs text-[#737373]">Selected:</div>
+              {selectedKalshi && (
+                <div className="text-xs text-[#e5e5e5] truncate">
+                  <span className="text-[#eab308]">Kalshi:</span> {selectedKalshi.title}
+                </div>
+              )}
+              {selectedPM && (
+                <div className="text-xs text-[#e5e5e5] truncate">
+                  <span className="text-[#eab308]">PM:</span> {selectedPM.title}
+                </div>
+              )}
+              {!selectedKalshi && !selectedPM && (
+                <div className="text-xs text-[#525252]">Click one market from each side.</div>
+              )}
+              <button
+                onClick={() => {
+                  if (selectedKalshi && selectedPM) {
+                    onCreateMatch(selectedKalshi.ticker, selectedPM.conditionId, selectedKalshi.title, selectedPM.title);
+                  }
+                }}
+                disabled={!selectedKalshi || !selectedPM}
+                className="w-full px-3 py-2 rounded-lg bg-[#eab308] text-black text-xs font-semibold hover:bg-[#ca8a04] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  <Link2 className="w-3 h-3" />
+                  Link Markets
+                </div>
+              </button>
+            </div>
+
+            {/* Existing manual matches */}
+            {manualMatches.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-[#a3a3a3] uppercase pt-2">Saved Links</div>
+                <div className="max-h-44 overflow-y-auto space-y-1">
+                  {manualMatches.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded bg-[#1a1a1a]">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] text-[#737373] truncate">
+                          <span className="text-[#eab308]">K:</span> {m.kalshiTitle} {' <-> '} <span className="text-[#eab308]">PM:</span> {m.pmTitle}
+                        </div>
+                      </div>
+                      <button onClick={() => onDeleteMatch(m.id)} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444] transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
 

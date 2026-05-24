@@ -19,6 +19,7 @@ export interface SavedMarket {
   kalshiUrl: string;
   polymarketUrl: string;
   eventTitle: string;
+  category?: string; // e.g. "Politics", "Temperature", "Finances", "Mentions", "Sports"
   createdAt: string;
   expiryDate?: string | null; // ISO timestamp
   lastScanResult?: LastScanResult | null;
@@ -64,12 +65,13 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   }
 }
 
-export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate'>>): Promise<boolean> {
+export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate' | 'category'>>): Promise<boolean> {
   const markets = await getSavedMarkets();
   const idx = markets.findIndex(m => m.id === id);
   if (idx < 0) return false;
   if (updates.eventTitle !== undefined) markets[idx].eventTitle = updates.eventTitle;
   if (updates.expiryDate !== undefined) markets[idx].expiryDate = updates.expiryDate || null;
+  if (updates.category !== undefined) markets[idx].category = updates.category;
   await ensureDir();
   await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
   return true;
