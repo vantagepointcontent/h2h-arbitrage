@@ -138,5 +138,95 @@
     "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
     "id": "1779568106081-n3dm8ew",
     "createdAt": "2026-05-23T20:28:26.081Z"
+  },
+  {
+    "kalshiTicker": "HOUSECA21-26-D",
+    "pmConditionId": "0x44f7e3582eba72648fb5e03cb1dacc0ace21da93285999c7e14642cf91e279bf",
+    "kalshiTitle": "HOUSECA21-26-D",
+    "pmTitle": "Democratic Party",
+    "kalshiUrl": "https://kalshi.com/markets/houseca21/ca21/houseca21-26",
+    "polymarketUrl": "https://polymarket.com/event/ca-21-house-election-winner/will-the-republican-party-win-the-ca-21-house-seat",
+    "id": "1779615894038-do8emku",
+    "createdAt": "2026-05-24T09:44:54.038Z"
+  },
+  {
+    "kalshiTicker": "KXCBDECISIONJAPAN-26JUN15-HOLD",
+    "pmConditionId": "0xe2fc1b6f5e644f939e090c42c309a498db86fb3bc20c02f05021ab42f1567de7",
+    "kalshiTitle": "KXCBDECISIONJAPAN-26JUN15-HOLD",
+    "pmTitle": "No change",
+    "kalshiUrl": "https://kalshi.com/markets/kxcbdecisionjapan/bank-of-japan-policy-interest-rate-decision/kxcbdecisionjapan-26jun15",
+    "polymarketUrl": "https://polymarket.com/event/bank-of-japan-decision-in-june/bank-of-japan-increases-interest-rates-by-25-bps-after-the-june-2026-meeting",
+    "id": "1779617652666-cdniob7",
+    "createdAt": "2026-05-24T10:14:12.666Z"
+  },
+  {
+    "kalshiTicker": "KXCBDECISIONJAPAN-26JUN15-H25",
+    "pmConditionId": "0xb3237c597bd198f2e5af2d9c2597c71cdda3ab88649a410a917798b3eec8cff4",
+    "kalshiTitle": "KXCBDECISIONJAPAN-26JUN15-H25",
+    "pmTitle": "25 bps increase",
+    "kalshiUrl": "https://kalshi.com/markets/kxcbdecisionjapan/bank-of-japan-policy-interest-rate-decision/kxcbdecisionjapan-26jun15",
+    "polymarketUrl": "https://polymarket.com/event/bank-of-japan-decision-in-june/bank-of-japan-increases-interest-rates-by-25-bps-after-the-june-2026-meeting",
+    "id": "1779617671176-2oqlnzb",
+    "createdAt": "2026-05-24T10:14:31.176Z"
+  },
+  {
+    "kalshiTicker": "KXCBDECISIONJAPAN-26JUN15-H25P",
+    "pmConditionId": "0xd175952df3f4312096d408a699c922af54d31b17b8d22afb35e8f09016053de9",
+    "kalshiTitle": "KXCBDECISIONJAPAN-26JUN15-H25P",
+    "pmTitle": "50+ bps increase",
+    "kalshiUrl": "https://kalshi.com/markets/kxcbdecisionjapan/bank-of-japan-policy-interest-rate-decision/kxcbdecisionjapan-26jun15",
+    "polymarketUrl": "https://polymarket.com/event/bank-of-japan-decision-in-june/bank-of-japan-increases-interest-rates-by-25-bps-after-the-june-2026-meeting",
+    "id": "1779617730880-l46od33",
+    "createdAt": "2026-05-24T10:15:30.880Z"
+  },
+  {
+    "kalshiTicker": "SENATESC-26-R",
+    "pmConditionId": "0x1c017cbb38a9d0ab233ebb265b25c78290317e6a2470657ca18a73a112397b55",
+    "kalshiTitle": "SENATESC-26-R",
+    "pmTitle": "Republican",
+    "kalshiUrl": "https://kalshi.com/markets/senatesc/south-carolina-senate-race/senatesc-26",
+    "polymarketUrl": "https://polymarket.com/event/south-carolina-senate-election-winner",
+    "id": "1779652426245-cbon68b",
+    "createdAt": "2026-05-24T19:53:46.245Z"
+  },
+  {
+    "kalshiTicker": "SENATESC-26-D",
+    "pmConditionId": "0x4de72138204727d2821bff847d8158819ab5b591db1b5b263676126cbb3a0430",
+    "kalshiTitle": "SENATESC-26-D",
+    "pmTitle": "Democrat",
+    "kalshiUrl": "https://kalshi.com/markets/senatesc/south-carolina-senate-race/senatesc-26",
+    "polymarketUrl": "https://polymarket.com/event/south-carolina-senate-election-winner",
+    "id": "1779652429761-k14w1vf",
+    "createdAt": "2026-05-24T19:53:49.761Z"
+  },
+  {
+    "kalshiTicker": "GOVPARTYOR-26-R",
+    "pmConditionId": "0x883c09380a078565f29485a9d3671fff48853a87de9a5bf48bc204f7161250c9",
+    "kalshiTitle": "GOVPARTYOR-26-R",
+    "pmTitle": "Republican",
+    "kalshiUrl": "https://kalshi.com/markets/govpartyor/oregon-governor/govpartyor-26",
+    "polymarketUrl": "https://polymarket.com/event/oregon-governor-winner-2026/will-the-democrats-win-the-oregon-governor-race-in-2026",
+    "id": "1779652543244-d4eascv",
+    "createdAt": "2026-05-24T19:55:43.244Z"
+  },
+  {
+    "kalshiTicker": "GOVPARTYOR-26-D",
+    "pmConditionId": "0x8d65ff57f443011c4c10e7aa50aa54b3a3b5e2b940cb3ca97c0357bbcaee0b36",
+    "kalshiTitle": "GOVPARTYOR-26-D",
+    "pmTitle": "Democrat",
+    "kalshiUrl": "https://kalshi.com/markets/govpartyor/oregon-governor/govpartyor-26",
+    "polymarketUrl": "https://polymarket.com/event/oregon-governor-winner-2026/will-the-democrats-win-the-oregon-governor-race-in-2026",
+    "id": "1779652545266-oqcgi1h",
+    "createdAt": "2026-05-24T19:55:45.266Z"
+  },
+  {
+    "kalshiTicker": "KXNBAEAST-26-CLE",
+    "pmConditionId": "0x85f3e001ffe2a24f985b939460d0cc22041d47107ed8c681f75abb6a5bd1d1d7",
+    "kalshiTitle": "KXNBAEAST-26-CLE",
+    "pmTitle": "Cleveland Cavaliers",
+    "kalshiUrl": "https://kalshi.com/markets/kxnbaeast/pro-basketball-eastern-conference-champion/kxnbaeast-26",
+    "polymarketUrl": "https://polymarket.com/event/nba-playoffs-eastern-conference-champion/will-the-cleveland-cavaliers-win-the-nba-eastern-conference-finals",
+    "id": "1779662422245-wl7486b",
+    "createdAt": "2026-05-24T22:40:22.245Z"
   }
 ]
