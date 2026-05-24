@@ -3,36 +3,271 @@
     "kalshiUrl": "https://kalshi.com/markets/kxtrumpsay/what-will-trump-say/kxtrumpsay-26may25?op_market_ticker=KXTRUMPSAY-26MAY25-STUP&op_side=BUY&op_order_side=yes&op_order_type=dollars",
     "polymarketUrl": "https://polymarket.com/event/what-will-trump-say-this-week-may-24",
     "eventTitle": "What will Trump say this week? (May 24)",
-    "expiryDate": null,
+    "expiryDate": "2026-05-24T21:59:00.000Z",
     "id": "1779235302087-ud9iqbt",
     "createdAt": "2026-05-20T00:01:42.087Z",
     "lastScanResult": {
-      "bestRoiPct": 5.000000000000004,
-      "bestProfit": 2.4719101123595526,
+      "bestRoiPct": 2.2500000000000075,
+      "bestProfit": 2.578125000000009,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 48,
       "matchedCount": 1,
       "kalshiCount": 22,
       "pmCount": 27,
-      "scannedAt": "2026-05-22T12:50:51.825Z"
+      "scannedAt": "2026-05-24T09:30:30.441Z"
     }
   },
   {
     "kalshiUrl": "https://kalshi.com/markets/kxtrumpsaymonth/trump-monthly/kxtrumpsaymonth-26jun01?op_market_ticker=KXTRUMPSAYMONTH-26JUN01-EPST&op_side=BUY&op_order_side=yes&op_order_type=dollars",
     "polymarketUrl": "https://polymarket.com/event/what-will-trump-say-in-may",
     "eventTitle": "What will Trump say in May?",
-    "expiryDate": null,
+    "expiryDate": "2026-05-30T22:00:00.000Z",
     "id": "1779235424608-5ymvadi",
     "createdAt": "2026-05-20T00:03:44.608Z",
     "lastScanResult": {
-      "bestRoiPct": 7.499999999999996,
-      "bestProfit": 9.639377142857137,
+      "bestRoiPct": 11,
+      "bestProfit": 18.153338823529413,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 40,
       "matchedCount": 3,
       "kalshiCount": 13,
       "pmCount": 30,
-      "scannedAt": "2026-05-22T12:50:53.368Z"
+      "scannedAt": "2026-05-24T09:30:32.250Z"
     }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxmayorla/la/kxmayorla-26",
+    "polymarketUrl": "https://polymarket.com/event/los-angeles-mayoral-election-117",
+    "eventTitle": "Los Angeles Mayoral Election",
+    "expiryDate": "2026-06-01T22:00:00.000Z",
+    "id": "1779543664987-9jefwry",
+    "createdAt": "2026-05-23T13:41:04.987Z",
+    "lastScanResult": {
+      "bestRoiPct": 4.5000000000000036,
+      "bestProfit": 17958.81770270272,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 12,
+      "matchedCount": 9,
+      "kalshiCount": 10,
+      "pmCount": 11,
+      "scannedAt": "2026-05-24T09:30:34.081Z"
+    }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "eventTitle": "SpaceX IPO by ___ ?",
+    "expiryDate": null,
+    "id": "1779543785453-0b5xeq5",
+    "createdAt": "2026-05-23T13:43:05.453Z",
+    "lastScanResult": {
+      "bestRoiPct": 1.750000000000007,
+      "bestProfit": 1421.7339285714345,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 16,
+      "matchedCount": 5,
+      "kalshiCount": 13,
+      "pmCount": 8,
+      "scannedAt": "2026-05-24T09:30:35.896Z"
+    }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxberniemention/bernie-says/kxberniemention-26may24",
+    "polymarketUrl": "https://polymarket.com/event/what-will-bernie-sanders-say-during-fighting-oligarchy-tour",
+    "eventTitle": "What will Bernie Sanders say during Fighting Oligarchy Tour?",
+    "expiryDate": "2026-05-24T21:59:00.000Z",
+    "id": "1779543879223-zmoasbb",
+    "createdAt": "2026-05-23T13:44:39.223Z",
+    "lastScanResult": {
+      "bestRoiPct": 2.0000000000000018,
+      "bestProfit": 0.5791666666666673,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 44,
+      "matchedCount": 8,
+      "kalshiCount": 26,
+      "pmCount": 26,
+      "scannedAt": "2026-05-24T09:30:37.728Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-in02-26",
+    "polymarketUrl": "https://polymarket.com/event/nj-02-house-election-winner/will-the-democratic-party-win-the-nj-02-house-seat",
+    "eventTitle": "NJ-02 House Election Winner",
+    "expiryDate": "2026-11-03T11:00:00.000Z",
+    "id": "1779556055010-7m7a618",
+    "createdAt": "2026-05-23T17:07:35.010Z",
+    "lastScanResult": {
+      "bestRoiPct": 20.000000000000007,
+      "bestProfit": 30.909090909090917,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-05-24T09:30:39.488Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar01-26",
+    "polymarketUrl": "https://polymarket.com/event/ar-01-house-election-winner/will-the-republican-party-win-the-ar-01-house-seat",
+    "eventTitle": "AR-01 House Election Winner",
+    "expiryDate": "2026-11-02T23:00:00.000Z",
+    "id": "1779565176140-1wbmbh7",
+    "createdAt": "2026-05-23T19:39:36.140Z",
+    "lastScanResult": {
+      "bestRoiPct": 4.699999999999993,
+      "bestProfit": 785.6322854054042,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-05-24T09:30:41.242Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/senateme/maine-senate-race/senateme-26",
+    "polymarketUrl": "https://polymarket.com/event/maine-senate-election-winner/will-the-republicans-win-the-maine-senate-race-in-2026",
+    "eventTitle": "Maine Senate Election Winner",
+    "expiryDate": "2026-11-02T23:00:00.000Z",
+    "id": "1779565300940-jqb54rc",
+    "createdAt": "2026-05-23T19:41:40.940Z",
+    "lastScanResult": {
+      "bestRoiPct": 6.500000000000005,
+      "bestProfit": 104.8704347826088,
+      "strategy": "Buy YES Kalshi + NO PM",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-05-24T09:30:43.033Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/senateok/oklahoma-senate-race/senateok-26",
+    "polymarketUrl": "https://polymarket.com/event/oklahoma-senate-election-winner/will-the-democrats-win-the-oklahoma-senate-race-in-2026",
+    "eventTitle": "Oklahoma Senate Election Winner",
+    "expiryDate": "2026-11-02T23:00:00.000Z",
+    "id": "1779565414697-01jpgss",
+    "createdAt": "2026-05-23T19:43:34.698Z",
+    "lastScanResult": {
+      "bestRoiPct": 3.949999999999998,
+      "bestProfit": 1.0128205128205123,
+      "strategy": "Buy YES Kalshi + NO PM",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-05-24T09:30:44.949Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxoaihardware/what-hardware-will-openaijony-ive-launch/kxoaihardware-27",
+    "polymarketUrl": "https://polymarket.com/event/what-kind-of-product-will-openai-announce-in-2026/will-openai-announce-glasses-in-2026",
+    "eventTitle": "What kind of product will OpenAI announce in 2026?",
+    "expiryDate": "2026-12-30T23:00:00.000Z",
+    "id": "1779565449693-6x9njfk",
+    "createdAt": "2026-05-23T19:44:09.693Z",
+    "lastScanResult": {
+      "bestRoiPct": 8.999999999999996,
+      "bestProfit": 60.83999999999998,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 10,
+      "matchedCount": 10,
+      "kalshiCount": 10,
+      "pmCount": 10,
+      "scannedAt": "2026-05-24T09:30:46.712Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxf1constructors/formula-1-constructors/kxf1constructors-26",
+    "polymarketUrl": "https://polymarket.com/event/f1-constructors-champion/will-ferrari-be-the-2026-f1-constructors-champion",
+    "eventTitle": "F1 Constructors' Champion",
+    "expiryDate": "2026-12-05T23:00:00.000Z",
+    "id": "1779565498134-v5tij6n",
+    "createdAt": "2026-05-23T19:44:58.134Z",
+    "lastScanResult": {
+      "bestRoiPct": 4.600000000000004,
+      "bestProfit": 2.0909090909090926,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 11,
+      "matchedCount": 11,
+      "kalshiCount": 11,
+      "pmCount": 11,
+      "scannedAt": "2026-05-24T09:30:48.479Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxgovcaprimary/ca-primary/kxgovcaprimary-26",
+    "polymarketUrl": "https://polymarket.com/event/who-will-advance-from-the-california-governor-primary",
+    "eventTitle": "Who will advance from the California Governor primary?",
+    "expiryDate": "2026-06-01T22:00:00.000Z",
+    "id": "1779565979775-odhmjsu",
+    "createdAt": "2026-05-23T19:52:59.775Z",
+    "lastScanResult": {
+      "bestRoiPct": 1.9500000000000073,
+      "bestProfit": 18.423600000000068,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 40,
+      "matchedCount": 11,
+      "kalshiCount": 15,
+      "pmCount": 36,
+      "scannedAt": "2026-05-24T09:30:50.803Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxcaprimary/who-will-advance-in-the-ca-primary/kxcaprimary-4826",
+    "polymarketUrl": "https://polymarket.com/event/ca-48-primary-winners",
+    "eventTitle": "CA-48 Primary Winners",
+    "expiryDate": "2026-06-01T22:00:00.000Z",
+    "id": "1779566039236-2oq9rjl",
+    "createdAt": "2026-05-23T19:53:59.236Z",
+    "lastScanResult": {
+      "bestRoiPct": 3.849999999999998,
+      "bestProfit": 9.872559139784938,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 12,
+      "matchedCount": 4,
+      "kalshiCount": 4,
+      "pmCount": 12,
+      "scannedAt": "2026-05-24T09:30:52.815Z"
+    },
+    "category": ""
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxgovtnnomr/tn-gov-nom-r/kxgovtnnomr-2-26",
+    "polymarketUrl": "https://polymarket.com/event/tennessee-governor-republican-primary-winner/will-john-rose-win-the-2026-tennessee-governor-republican-primary-election",
+    "eventTitle": "Tennessee Governor Republican Primary Winner",
+    "expiryDate": null,
+    "id": "1779566094057-vc90yk8",
+    "createdAt": "2026-05-23T19:54:54.057Z",
+    "lastScanResult": {
+      "bestRoiPct": 1.4999999999999902,
+      "bestProfit": 0.6847826086956477,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 3,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 3,
+      "scannedAt": "2026-05-24T09:30:54.604Z"
+    }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/test",
+    "polymarketUrl": "https://polymarket.com/event/test",
+    "eventTitle": "Test Market Updated",
+    "category": "Sports",
+    "expiryDate": "2026-06-01T12:00:00Z",
+    "id": "1779568158285-7ixahaa",
+    "createdAt": "2026-05-23T20:29:18.285Z",
+    "lastScanResult": null
   }
 ]

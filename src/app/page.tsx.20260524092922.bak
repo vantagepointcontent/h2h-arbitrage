@@ -30,8 +30,6 @@ import {
   Pencil,
   Hand,
   Unlink,
-  LayoutGrid,
-  Rows3,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/DateTimePicker";
 
@@ -137,7 +135,7 @@ interface SavedMarket {
   } | null;
 }
 
-type OverviewSort = "expiry" | "roi" | "name" | "apy";
+type OverviewSort = "expiry" | "roi" | "name";
 
 export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake");
@@ -188,7 +186,6 @@ export default function Home() {
   // Overview sort
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
-  const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
 
   // Sidebar sort
   type SidebarSort = "name" | "roi" | "expiry" | "apy";
@@ -504,22 +501,6 @@ export default function Home() {
         const bRoi = b.lastScanResult?.bestRoiPct ?? -1;
         return overviewSortDir === "desc" ? bRoi - aRoi : aRoi - bRoi;
       });
-    } else if (overviewSort === "apy") {
-      arr.sort((a, b) => {
-        const aApy = (() => {
-          if (!a.expiryDate || !a.lastScanResult?.bestRoiPct || a.lastScanResult.bestRoiPct <= 0) return -1;
-          const days = (new Date(a.expiryDate).getTime() - Date.now()) / 86400000;
-          if (days <= 0) return -1;
-          return a.lastScanResult.bestRoiPct * (365 / days);
-        })();
-        const bApy = (() => {
-          if (!b.expiryDate || !b.lastScanResult?.bestRoiPct || b.lastScanResult.bestRoiPct <= 0) return -1;
-          const days = (new Date(b.expiryDate).getTime() - Date.now()) / 86400000;
-          if (days <= 0) return -1;
-          return b.lastScanResult.bestRoiPct * (365 / days);
-        })();
-        return overviewSortDir === "desc" ? bApy - aApy : aApy - bApy;
-      });
     } else {
       arr.sort((a, b) => {
         const cmp = a.eventTitle.localeCompare(b.eventTitle);
@@ -530,8 +511,8 @@ export default function Home() {
   })();
 
   const toggleOverviewSort = (field: OverviewSort) => {
-    if (overviewSort === field) setOverviewSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setOverviewSort(field); setOverviewSortDir(field === "roi" || field === "apy" ? "desc" : "asc"); }
+    if (overviewSort === field) setOverviewSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setOverviewSort(field); setOverviewSortDir(field === "roi" ? "desc" : "asc"); }
   };
 
   const sortedSidebarMarkets = (() => {
@@ -558,19 +539,9 @@ export default function Home() {
       });
     } else if (sidebarSort === "apy") {
       arr.sort((a, b) => {
-        const aApy = (() => {
-          if (!a.expiryDate || !a.lastScanResult?.bestRoiPct || a.lastScanResult.bestRoiPct <= 0) return -1;
-          const days = (new Date(a.expiryDate).getTime() - Date.now()) / 86400000;
-          if (days <= 0) return -1;
-          return a.lastScanResult.bestRoiPct * (365 / days);
-        })();
-        const bApy = (() => {
-          if (!b.expiryDate || !b.lastScanResult?.bestRoiPct || b.lastScanResult.bestRoiPct <= 0) return -1;
-          const days = (new Date(b.expiryDate).getTime() - Date.now()) / 86400000;
-          if (days <= 0) return -1;
-          return b.lastScanResult.bestRoiPct * (365 / days);
-        })();
-        return sidebarSortDir === "desc" ? bApy - aApy : aApy - bApy;
+        const aRoi = a.lastScanResult?.bestRoiPct ?? -1;
+        const bRoi = b.lastScanResult?.bestRoiPct ?? -1;
+        return sidebarSortDir === "desc" ? bRoi - aRoi : aRoi - bRoi;
       });
     }
     return arr;
@@ -752,8 +723,6 @@ export default function Home() {
               sortDir={overviewSortDir}
               onToggleSort={toggleOverviewSort}
               timeUntilExpiry={timeUntilExpiry}
-              layout={overviewLayout}
-              onToggleLayout={setOverviewLayout}
             />
           ) : (
             <>
@@ -1057,8 +1026,6 @@ function OverviewPanel({
   sortDir,
   onToggleSort,
   timeUntilExpiry,
-  layout,
-  onToggleLayout,
 }: {
   markets: SavedMarket[];
   onSelectMarket: (m: SavedMarket) => void;
@@ -1068,8 +1035,6 @@ function OverviewPanel({
   sortDir: "asc" | "desc";
   onToggleSort: (field: OverviewSort) => void;
   timeUntilExpiry: (iso: string | null | undefined) => string | null;
-  layout: "grid" | "table";
-  onToggleLayout: (l: "grid" | "table") => void;
 }) {
   return (
     <div className="space-y-5">
@@ -1124,11 +1089,11 @@ function OverviewPanel({
         );
       })()}
 
-            {/* Header + sort controls + layout toggle */}
+      {/* Header + sort controls */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Market Overview</h2>
         <div className="flex items-center gap-2">
-          {(["expiry", "roi", "apy", "name"] as OverviewSort[]).map((field) => (
+          {(["expiry", "roi", "name"] as OverviewSort[]).map((field) => (
             <button
               key={field}
               onClick={() => onToggleSort(field)}
@@ -1138,7 +1103,7 @@ function OverviewPanel({
                   : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] border border-transparent"
               }`}
             >
-              {field === "expiry" ? "Expiry" : field === "roi" ? "Best Arb" : field === "apy" ? "APY%" : "Name"}
+              {field === "expiry" ? "Expiry" : field === "roi" ? "Best Arb" : "Name"}
               {sort === field && (
                 sortDir === "asc"
                   ? <ArrowUp className="w-3 h-3" />
@@ -1146,19 +1111,10 @@ function OverviewPanel({
               )}
             </button>
           ))}
-          <div className="w-px h-5 bg-[#262626] mx-0.5" />
-          <button
-            onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] border border-transparent hover:border-[#262626]"
-            title={layout === "grid" ? "Switch to table view" : "Switch to grid view"}
-          >
-            {layout === "grid" ? <><Rows3 className="w-3 h-3" /> List</> : <><LayoutGrid className="w-3 h-3" /> Grid</>}
-          </button>
         </div>
       </div>
 
-      {/* Flashcard grid or Table */}
-      {layout === "grid" ? (
+      {/* Flashcard grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {markets.map((market) => {
           const last = market.lastScanResult;
@@ -1166,12 +1122,6 @@ function OverviewPanel({
           const ttl = timeUntilExpiry(market.expiryDate);
           const isExpired = ttl === "Expired";
           const scannedAgo = last ? getTimeAgo(last.scannedAt) : null;
-          const apy = (() => {
-            if (!market.expiryDate || !last?.bestRoiPct || last.bestRoiPct <= 0) return null;
-            const days = (new Date(market.expiryDate).getTime() - Date.now()) / 86400000;
-            if (days <= 0) return null;
-            return last.bestRoiPct * (365 / days);
-          })();
 
           return (
             <div
@@ -1227,7 +1177,6 @@ function OverviewPanel({
                   {market.expiryDate ? (
                     <span className={isExpired ? "text-[#ef4444]" : "text-[#737373]"}>
                       {ttl} · {new Date(market.expiryDate).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {apy !== null && <span className="text-[#eab308] ml-1">· {apy.toFixed(0)}% APY</span>}
                     </span>
                   ) : (
                     <span>No expiry</span>
@@ -1247,80 +1196,6 @@ function OverviewPanel({
           </div>
         )}
       </div>
-      ) : (
-      <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#1a1a1a] text-xs text-[#737373]">
-              <th className="px-4 py-2 text-left font-medium">Name</th>
-              <th className="px-4 py-2 text-center font-medium">ROI</th>
-              <th className="px-4 py-2 text-center font-medium">Profit</th>
-              <th className="px-4 py-2 text-center font-medium">APY</th>
-              <th className="px-4 py-2 text-center font-medium">Expiry</th>
-              <th className="px-4 py-2 text-center font-medium">K · PM · ✎ · 🗑</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#1a1a1a]">
-            {markets.map((market) => {
-              const last = market.lastScanResult;
-              const hasArb = last && last.bestRoiPct > 0;
-              const ttl = timeUntilExpiry(market.expiryDate);
-              const apy = (() => {
-                if (!market.expiryDate || !last?.bestRoiPct || last.bestRoiPct <= 0) return null;
-                const days = (new Date(market.expiryDate).getTime() - Date.now()) / 86400000;
-                if (days <= 0) return null;
-                return last.bestRoiPct * (365 / days);
-              })();
-              return (
-                <tr
-                  key={market.id}
-                  onClick={() => onSelectMarket(market)}
-                  className={`cursor-pointer transition-colors hover:bg-[#1a1a1a]/50 ${hasArb ? "bg-[#22c55e]/[0.02]" : ""}`}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[#e5e5e5] truncate max-w-[200px]">{market.eventTitle}</span>
-                      {market.category && <span className="text-[10px] text-[#737373]">{market.category}</span>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs font-bold ${hasArb ? "text-[#22c55e]" : "text-[#525252]"}`}>
-                      {hasArb ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="text-xs text-[#737373]">
-                      {last ? formatProfit(last.bestProfit) : "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="text-xs font-bold text-[#eab308]">
-                      {apy !== null ? `${apy.toFixed(0)}%` : "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs ${ttl === "Expired" ? "text-[#ef4444]" : "text-[#737373]"}`}>
-                      {ttl ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#22c55e]/20 text-[#737373] hover:text-[#22c55e]" title="Kalshi"><span className="text-[10px] font-bold">K</span></a>
-                      <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#a855f7]/20 text-[#737373] hover:text-[#a855f7]" title="Polymarket"><span className="text-[10px] font-bold">PM</span></a>
-                      <button onClick={(e) => { e.stopPropagation(); onEditMarket(market, e); }} className="p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5]"><Pencil className="w-3 h-3" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); onDeleteMarket(market.id); }} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {markets.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-[#737373]">No saved markets yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      )}
     </div>
   );
 }
