@@ -32,6 +32,8 @@ import {
   Unlink,
   LayoutGrid,
   Rows3,
+  Search,
+  Filter,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/DateTimePicker";
 
@@ -134,6 +136,14 @@ interface SavedMarket {
     kalshiCount: number;
     pmCount: number;
     scannedAt: string;
+    totalStake?: number;
+    allArbs?: {
+      artist: string;
+      roiPct: number;
+      expectedProfit: number;
+      strategy: string;
+      totalStake?: number;
+    }[];
   } | null;
 }
 
@@ -166,7 +176,7 @@ export default function Home() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview">("scan");
+  const [viewMode, setViewMode] = useState<"scan" | "overview">("overview");
 
   // Save modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -183,12 +193,15 @@ export default function Home() {
 
   // Sidebar category filter
   const [sidebarCategoryFilter, setSidebarCategoryFilter] = useState<string>("");
+  const [sidebarSearch, setSidebarSearch] = useState<string>("");
   const allCategories = Array.from(new Set(savedMarkets.map(m => m.category).filter((c): c is string => !!c))).sort();
 
-  // Overview sort
+  // Overview sort + expiry filter
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
+  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
+  const [hideUnmatched, setHideUnmatched] = useState(false);
 
   // Sidebar sort
   type SidebarSort = "name" | "roi" | "expiry" | "apy";
@@ -331,22 +344,7 @@ export default function Home() {
     setActiveMarketId(market.id);
     setViewMode("scan");
     setError("");
-    // Show cached scan result immediately if we have nothing displayed
-    if (!result && market.lastScanResult) {
-      setResult({
-        eventTitle: market.eventTitle,
-        kalshiEventTicker: "",
-        pmEventSlug: "",
-        pmEventId: "",
-        expiryDate: market.expiryDate,
-        kalshiCount: market.lastScanResult.kalshiCount,
-        pmCount: market.lastScanResult.pmCount,
-        matchedCount: market.lastScanResult.matchedCount,
-        outcomes: [],
-        unmatchedKalshi: [],
-        unmatchedPolymarket: [],
-      });
-    }
+    setResult(null);            // ← wipe old result immediately
     handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
   };
 
@@ -443,14 +441,16 @@ export default function Home() {
   };
 
   const formatPrice = (p: number) => `${(p * 100).toFixed(1)}¢`;
-  const formatDollar = (n: number) => `$${n.toFixed(2)}`;
 
   const kalshiDeepLink = (ticker: string) => `https://kalshi.com/markets/${ticker}`;
   const pmDeepLink = (slug: string) => `https://polymarket.com/event/${slug}`;
 
   const sortedData = (() => {
     if (!result) return [];
-    const arr = result.outcomes.slice();
+    let arr = result.outcomes.slice();
+    if (hideUnmatched) {
+      arr = arr.filter(o => !!o.kalshi && !!o.polymarket);
+    }
     if (sortField === "roi") {
       arr.sort((a, b) => {
         const aRoi = a.arbitrage?.roiPct ?? -Infinity;
@@ -464,7 +464,7 @@ export default function Home() {
   const openSaveModal = () => {
     if (!result) return;
     setSaveName(result.eventTitle);
-    setSaveExpiry(null);
+    setSaveExpiry(result.expiryDate || null);
     setSaveCategory("");
     setSaveModalOpen(true);
   };
@@ -491,7 +491,19 @@ export default function Home() {
 
   // Overview sorted markets
   const sortedOverviewMarkets = (() => {
-    const arr = [...savedMarkets];
+    let arr = [...savedMarkets];
+    // Expiry filter
+    if (overviewExpiryFilter !== "all") {
+      const thresholdDays = overviewExpiryFilter === "lte30" ? 30 : overviewExpiryFilter === "lte14" ? 14 : 7;
+      const now = Date.now();
+      arr = arr.filter(m => {
+        if (!m.expiryDate) return true;
+        const diffMs = new Date(m.expiryDate).getTime() - now;
+        const days = diffMs / 86400000;
+        return days <= thresholdDays && days >= 0;
+      });
+    }
+    // Sort
     if (overviewSort === "expiry") {
       arr.sort((a, b) => {
         const aExp = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
@@ -538,6 +550,10 @@ export default function Home() {
     let arr = [...savedMarkets];
     if (sidebarCategoryFilter) {
       arr = arr.filter(m => m.category === sidebarCategoryFilter);
+    }
+    if (sidebarSearch.trim()) {
+      const q = sidebarSearch.toLowerCase();
+      arr = arr.filter(m => m.eventTitle.toLowerCase().includes(q) || (m.category?.toLowerCase().includes(q) ?? false));
     }
     if (sidebarSort === "name") {
       arr.sort((a, b) => {
@@ -595,7 +611,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5] flex">
       {/* Sidebar */}
-      <aside className={`shrink-0 border-r border-[#1a1a1a] bg-[#0f0f0f] flex flex-col transition-all duration-300 ${sidebarOpen ? "w-72" : "w-14"}`}>
+      <aside className={`shrink-0 border-r border-[#1a1a1a] bg-[#0f0f0f] flex flex-col sticky top-0 h-screen transition-all duration-300 ${sidebarOpen ? "w-[22.5rem]" : "w-14"}`}>
         <div className="flex items-center justify-between px-3 py-3 border-b border-[#1a1a1a]">
           {sidebarOpen && (
             <div className="flex items-center gap-2">
@@ -612,6 +628,27 @@ export default function Home() {
           <BarChart3 className="w-4 h-4 shrink-0" />
           {sidebarOpen && <span>Overview</span>}
         </button>
+
+        {sidebarOpen && (
+          <div className="mx-2 mt-2 relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#737373] pointer-events-none" />
+            <input
+              type="text"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              placeholder="Search markets..."
+              className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-8 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder:text-[#525252] focus:outline-none focus:border-[#22c55e]/50"
+            />
+            {sidebarSearch && (
+              <button
+                onClick={() => setSidebarSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#525252] hover:text-[#e5e5e5]"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto py-2 space-y-1 px-2">
           {sidebarOpen && allCategories.length > 0 && (
@@ -663,34 +700,40 @@ export default function Home() {
             const last = market.lastScanResult;
             const hasPositive = last && last.bestRoiPct > 0;
             return (
-              <div key={market.id} onClick={() => loadMarket(market)} className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors text-sm ${activeMarketId === market.id && viewMode === "scan" ? "bg-[#22c55e]/10 text-[#22c55e]" : "text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]"}`}>
+              <div key={market.id} onClick={() => loadMarket(market)} className={`group relative flex items-center gap-2 px-2 pr-1 py-2 rounded-lg cursor-pointer transition-colors text-sm ${activeMarketId === market.id && viewMode === "scan" ? "bg-[#22c55e]/10 text-[#22c55e]" : "text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]"}`} title={market.eventTitle}>
                 <Bookmark className="w-3.5 h-3.5 shrink-0" />
                 {sidebarOpen && (
                   <>
-                    <span className="truncate flex-1">{market.eventTitle}</span>
-                    {market.category && (
-                      <span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{market.category}</span>
-                    )}
-                    {last && (
-                      <>
-                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${hasPositive ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#262626] text-[#737373]"}`}>
-                          {hasPositive ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
-                        </span>
-                        {(() => {
-                          if (!market.expiryDate || !hasPositive) return null;
-                          const days = (new Date(market.expiryDate).getTime() - Date.now()) / 86400000;
-                          if (days <= 0) return null;
-                          const apy = last.bestRoiPct * (365 / days);
-                          return <span className="shrink-0 text-[9px] text-[#737373]">({apy.toFixed(0)}% APY)</span>;
-                        })()}
-                      </>
-                    )}
-                    <button onClick={(e) => openEditModal(market, e)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5] transition-opacity">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteMarket(market.id); }} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444] transition-opacity">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    <div className="flex-1 min-w-0 flex items-center gap-1">
+                      <span className="truncate">{market.eventTitle}</span>
+                      {market.category && (
+                        <span className="text-[9px] font-medium px-1 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373] shrink-0">{market.category}</span>
+                      )}
+                    </div>
+                    <div className="ml-auto shrink-0 flex items-center gap-0.5">
+                      {last && (
+                        <>
+                          <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${hasPositive ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#262626] text-[#737373]"}`}>
+                            {hasPositive ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
+                          </span>
+                          {(() => {
+                            if (!market.expiryDate || !hasPositive) return null;
+                            const days = (new Date(market.expiryDate).getTime() - Date.now()) / 86400000;
+                            if (days <= 0) return null;
+                            const apy = last.bestRoiPct * (365 / days);
+                            return <span className="text-[9px] text-[#737373]">({apy.toFixed(0)}% APY)</span>;
+                          })()}
+                        </>
+                      )}
+                    </div>
+                    <div className="shrink-0 hidden group-hover:flex items-center gap-0">
+                      <button onClick={(e) => openEditModal(market, e)} className="p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5] transition-colors">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteMarket(market.id); }} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444] transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
@@ -701,7 +744,7 @@ export default function Home() {
           )}
         </div>
 
-        <button onClick={goToNewScan} className="flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-sm font-medium border border-[#22c55e]/20">
+        <button onClick={goToNewScan} className="flex items-center gap-2 px-3 py-2.5 mx-2 my-2 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-sm font-medium border border-[#22c55e]/20 shrink-0">
           <Plus className="w-4 h-4 shrink-0" />
           {sidebarOpen && <span>Add market</span>}
         </button>
@@ -754,6 +797,8 @@ export default function Home() {
               timeUntilExpiry={timeUntilExpiry}
               layout={overviewLayout}
               onToggleLayout={setOverviewLayout}
+              expiryFilter={overviewExpiryFilter}
+              onSetExpiryFilter={setOverviewExpiryFilter}
             />
           ) : (
             <>
@@ -819,10 +864,14 @@ export default function Home() {
                     <StatCard label="Kalshi Markets" value={result.kalshiCount} icon={<Activity className="w-4 h-4" />} color="blue" />
                     <StatCard label="Polymarket Markets" value={result.pmCount} icon={<Activity className="w-4 h-4" />} color="purple" />
                     <StatCard label="Matched Pairs" value={result.matchedCount} icon={<Link2 className="w-4 h-4" />} color="green" />
-                    <StatCard label="Expiry" value={formatExpiry(result.expiryDate)} icon={<Calendar className="w-4 h-4" />} color="yellow" />
+                    <StatCard label="Expiry" value={formatExpiry(result.expiryDate)} icon={<Calendar className="w-4 h-4" />} color="yellow" valueSize="xs" />
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-1 flex gap-1">
-                      <a href={kalshiDeepLink(result.kalshiEventTicker)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-xs font-bold py-3" title="Kalshi">K</a>
-                      <a href={pmDeepLink(result.pmEventSlug)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center rounded-lg bg-[#a855f7]/10 text-[#a855f7] hover:bg-[#a855f7]/20 transition-colors text-xs font-bold py-3" title="Polymarket">PM</a>
+                      <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 flex-1 flex items-center justify-center rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors text-xs font-bold py-3" title="Kalshi">
+                        <img src="/kalshi-icon.png" alt="Kalshi" className="w-8 h-8 rounded-sm" />
+                      </a>
+                      <a href={pmUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 flex-1 flex items-center justify-center rounded-lg bg-[#a855f7]/10 text-[#a855f7] hover:bg-[#a855f7]/20 transition-colors text-xs font-bold py-3" title="Polymarket">
+                        <img src="/polymarket-icon.png" alt="Polymarket" className="w-8 h-8 rounded-sm" />
+                      </a>
                       {activeMarketId ? (
                         <button
                           onClick={() => {
@@ -843,11 +892,10 @@ export default function Home() {
 
                   <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
-                      <h2 className="text-sm font-semibold">All Outcomes · {result.outcomes.length}</h2>
-                      <div className="flex items-center gap-2 text-xs text-[#737373]">
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22c55e]" /> Matched</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#262626]" /> Single</span>
-                      </div>
+                      <h2 className="text-sm font-semibold">All Outcomes · {result.outcomes.filter(o => !!o.kalshi && !!o.polymarket).length} matched</h2>
+                      <button onClick={() => setHideUnmatched(v => !v)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors border ${hideUnmatched ? "bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e]" : "bg-[#1a1a1a] border-[#262626] text-[#737373] hover:text-[#e5e5e5]"}`}>
+                        <Filter className="w-3 h-3" /> {hideUnmatched ? "Showing matched only" : "Show all"}
+                      </button>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -878,13 +926,13 @@ export default function Home() {
                             return (
                               <>
                               <tr key={`${outcome.artist}-${idx}`} className={`transition-colors ${isMatched ? "bg-[#22c55e]/[0.02]" : ""} hover:bg-[#1a1a1a]/50 ${priceFlash === "up" ? "bg-[#22c55e]/[0.15]" : priceFlash === "down" ? "bg-[#ef4444]/[0.15]" : ""} ${priceFlash ? "animate-pulse" : ""}`}>
-                                <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${isMatched ? "text-[#22c55e]" : "text-[#a3a3a3]"}`}>{outcome.artist}</span>{isMatched && <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${outcome.source === "manual" ? "bg-[#eab308]/10 text-[#eab308]" : "bg-[#22c55e]/10 text-[#22c55e]"}`}>{outcome.source === "manual" ? "MANUAL" : "MATCHED"}</span>}</div></td>
+                                <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${isMatched ? "text-[#22c55e]" : "text-[#a3a3a3]"}`}>{outcome.artist}</span></div></td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.yesAsk)}</div>{outcome.kalshi.yesAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.yesAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.noAsk)}</div>{outcome.kalshi.noAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.noAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.yesPrice)}</div>{(outcome.polymarket.askDepth ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.noPrice)}</div>{(outcome.polymarket.askDepth ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{isMatched ? (<div className="flex flex-col items-center"><span className={`text-xs font-bold ${hasArb ? "text-[#22c55e]" : "text-[#737373]"}`}>{hasArb ? `+${arb.roiPct.toFixed(2)}%` : "No arb"}</span>{hasArb && <span className="text-[10px] text-[#737373]">{formatDollar(arb.expectedProfit)} profit</span>}</div>) : (<span className="text-[#404040]">—</span>)}</td>
-                                <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">{outcome.kalshi && (<a href={kalshiDeepLink(outcome.kalshi.ticker)} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{outcome.polymarket && (<a href={pmDeepLink(result.pmEventSlug)} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{isMatched && (<button onClick={() => setExpandedArtist(isExpanded ? null : outcome.artist)} className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><TrendingUp className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} /></button>)}</div></td>
+                                <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">{outcome.kalshi && (<a href={kalshiUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{outcome.polymarket && (<a href={pmUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{isMatched && (<button onClick={() => setExpandedArtist(isExpanded ? null : outcome.artist)} className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><TrendingUp className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} /></button>)}</div></td>
                               </tr>
                               {isExpanded && isMatched && (
                                 <tr>
@@ -990,10 +1038,12 @@ export default function Home() {
               </select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[#a3a3a3]">Expiry Date</label>
-              <DateTimePicker value={saveExpiry} onChange={setSaveExpiry} placeholder="No expiry set" />
-            </div>
+            {result?.expiryDate && (
+              <div className="text-xs text-[#737373] flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                Expiry: {formatExpiry(result.expiryDate)}
+              </div>
+            )}
 
             <div className="flex items-center gap-3 pt-2">
               <button onClick={() => setSaveModalOpen(false)} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-[#737373] hover:text-[#e5e5e5] hover:bg-[#1a1a1a] transition-colors">Cancel</button>
@@ -1059,6 +1109,8 @@ function OverviewPanel({
   timeUntilExpiry,
   layout,
   onToggleLayout,
+  expiryFilter,
+  onSetExpiryFilter,
 }: {
   markets: SavedMarket[];
   onSelectMarket: (m: SavedMarket) => void;
@@ -1070,26 +1122,64 @@ function OverviewPanel({
   timeUntilExpiry: (iso: string | null | undefined) => string | null;
   layout: "grid" | "table";
   onToggleLayout: (l: "grid" | "table") => void;
+  expiryFilter: "all" | "lte7" | "lte14" | "lte30";
+  onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
 }) {
   return (
     <div className="space-y-5">
       {/* Top summary cards */}
       {(() => {
         const withResults = markets.filter(m => m.lastScanResult && m.lastScanResult.bestRoiPct > 0);
-        const totalProfit = withResults.reduce((sum, m) => sum + (m.lastScanResult?.bestProfit ?? 0), 0);
+
+        // Total Profit: sum ALL positive arbs per market
+        const totalProfit = withResults.reduce((sum, m) => {
+          const arbs = m.lastScanResult?.allArbs;
+          if (arbs && arbs.length > 0) return sum + arbs.reduce((s, a) => s + a.expectedProfit, 0);
+          return sum + (m.lastScanResult?.bestProfit ?? 0);
+        }, 0);
+
+        // Weighted APY: vikta ALLA individuella arbs över hela portfolion
+        const activeForApy = withResults.filter(m => {
+          if (!m.expiryDate) return false;
+          const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
+          return days > 0;
+        });
+        const totalStakeForApy = activeForApy.reduce((sum, m) => {
+          const r = m.lastScanResult!;
+          const arbs = r.allArbs;
+          if (arbs && arbs.length > 0) {
+            return sum + arbs.reduce((s, a) => s + (a.expectedProfit / (a.roiPct / 100)), 0);
+          }
+          return sum + (r.bestProfit / (r.bestRoiPct / 100));
+        }, 0);
+        const weightedApy = totalStakeForApy > 0
+          ? activeForApy.reduce((sum, m) => {
+              const r = m.lastScanResult!;
+              const days = (new Date(m.expiryDate!).getTime() - Date.now()) / 86400000;
+              const arbs = r.allArbs;
+              if (arbs && arbs.length > 0) {
+                return sum + arbs.reduce((s, a) => {
+                  const stake = a.expectedProfit / (a.roiPct / 100);
+                  const apy = a.roiPct * (365 / days);
+                  return s + apy * stake;
+                }, 0);
+              }
+              const stake = r.bestProfit / (r.bestRoiPct / 100);
+              const apy = r.bestRoiPct * (365 / days);
+              return sum + apy * stake;
+            }, 0) / totalStakeForApy
+          : 0;
+
+        // Total Stake: sum ALL individual stakes across all arbs
         const totalStake = withResults.reduce((sum, m) => {
           const r = m.lastScanResult;
           if (!r || r.bestRoiPct <= 0) return sum;
+          const arbs = r.allArbs;
+          if (arbs && arbs.length > 0) {
+            return sum + arbs.reduce((s, a) => s + (a.expectedProfit / (a.roiPct / 100)), 0);
+          }
           return sum + (r.bestProfit / (r.bestRoiPct / 100));
         }, 0);
-        const weightedApy = totalStake > 0
-          ? withResults.reduce((sum, m) => {
-              const r = m.lastScanResult;
-              if (!r || r.bestRoiPct <= 0) return sum;
-              const stake = r.bestProfit / (r.bestRoiPct / 100);
-              return sum + r.bestRoiPct * stake;
-            }, 0) / totalStake
-          : 0;
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="group relative rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
@@ -1157,9 +1247,29 @@ function OverviewPanel({
         </div>
       </div>
 
+      {/* Expiry filter toolbar */}
+      <div className="flex items-center gap-2">
+        {(["all", "lte7", "lte14", "lte30"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => onSetExpiryFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+              expiryFilter === f
+                ? "bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/30"
+                : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] border-transparent"
+            }`}
+          >
+            {f === "all" ? "All" : f === "lte7" ? "7d" : f === "lte14" ? "14d" : "30d"}
+          </button>
+        ))}
+        <span className="text-[#525252] text-xs ml-2">
+          {markets.length} market{markets.length !== 1 ? "s" : ""} shown
+        </span>
+      </div>
+
       {/* Flashcard grid or Table */}
       {layout === "grid" ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
         {markets.map((market) => {
           const last = market.lastScanResult;
           const hasArb = last && last.bestRoiPct > 0;
@@ -1186,11 +1296,15 @@ function OverviewPanel({
               {/* Top row: name + edit/delete + links */}
               <div className="flex items-start justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#e5e5e5] leading-tight pr-2">{market.eventTitle}</h3>
-                <div className="flex items-center gap-1 transition-opacity">
-                  <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#22c55e]/20 text-[#737373] hover:text-[#22c55e]" title="Kalshi"><span className="text-[10px] font-bold">K</span></a>
-                  <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#a855f7]/20 text-[#737373] hover:text-[#a855f7]" title="Polymarket"><span className="text-[10px] font-bold">PM</span></a>
-                  <button onClick={(e) => onEditMarket(market, e)} className="p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5]"><Pencil className="w-3 h-3" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); onDeleteMarket(market.id); }} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
+                <div className="flex items-center gap-1 transition-opacity shrink-0">
+                  <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 p-1 rounded hover:bg-[#22c55e]/20 opacity-70 hover:opacity-100 transition-opacity" title="Kalshi">
+                    <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />
+                  </a>
+                  <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 p-1 rounded hover:bg-[#a855f7]/20 opacity-70 hover:opacity-100 transition-opacity" title="Polymarket">
+                    <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />
+                  </a>
+                  <button onClick={(e) => onEditMarket(market, e)} className="shrink-0 p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5]"><Pencil className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); onDeleteMarket(market.id); }} className="shrink-0 p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
 
@@ -1201,7 +1315,7 @@ function OverviewPanel({
                     {hasArb ? `+${last.bestRoiPct.toFixed(2)}%` : "0%"}
                   </div>
                   <div className="text-xs text-[#737373] mt-0.5">
-                    {last.strategy} · {formatProfit(last.bestProfit)} profit
+                    {last.strategy} · {formatProfit(last.bestProfit)} profit {last.totalStake ? `(${formatDollar(last.totalStake)} total stake)` : ''}
                   </div>
                 </div>
               ) : (
@@ -1221,20 +1335,27 @@ function OverviewPanel({
               )}
 
               {/* Bottom row: expiry + scan time */}
-              <div className="flex items-center justify-between text-[10px] text-[#525252] pt-2 border-t border-[#1a1a1a]">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[10px] text-[#525252] pt-2 border-t border-[#1a1a1a] gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Calendar className="w-3 h-3 shrink-0" />
                   {market.expiryDate ? (
-                    <span className={isExpired ? "text-[#ef4444]" : "text-[#737373]"}>
-                      {ttl} · {new Date(market.expiryDate).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {apy !== null && <span className="text-[#eab308] ml-1">· {apy.toFixed(0)}% APY</span>}
+                    <span className={`flex items-center gap-1 flex-wrap ${isExpired ? "text-[#ef4444]" : "text-[#737373]"}`}>
+                      <span className="whitespace-nowrap">{ttl}</span>
+                      <span className="text-[#525252]">·</span>
+                      <span className="whitespace-nowrap">{new Date(market.expiryDate).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                      {apy !== null && (
+                        <>
+                          <span className="text-[#525252]">·</span>
+                          <span className="text-[#eab308] whitespace-nowrap">{apy.toFixed(0)}% APY</span>
+                        </>
+                      )}
                     </span>
                   ) : (
                     <span>No expiry</span>
                   )}
                 </div>
                 {scannedAgo && (
-                  <span className="text-[#525252]">Scanned {scannedAgo}</span>
+                  <span className="text-[#525252] shrink-0">Scanned {scannedAgo}</span>
                 )}
               </div>
             </div>
@@ -1257,7 +1378,7 @@ function OverviewPanel({
               <th className="px-4 py-2 text-center font-medium">Profit</th>
               <th className="px-4 py-2 text-center font-medium">APY</th>
               <th className="px-4 py-2 text-center font-medium">Expiry</th>
-              <th className="px-4 py-2 text-center font-medium">K · PM · ✎ · 🗑</th>
+              <th className="px-4 py-2 text-center font-medium w-28">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1a1a1a]">
@@ -1304,9 +1425,13 @@ function OverviewPanel({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#22c55e]/20 text-[#737373] hover:text-[#22c55e]" title="Kalshi"><span className="text-[10px] font-bold">K</span></a>
-                      <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 rounded hover:bg-[#a855f7]/20 text-[#737373] hover:text-[#a855f7]" title="Polymarket"><span className="text-[10px] font-bold">PM</span></a>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <a href={market.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 p-1 rounded hover:bg-[#22c55e]/20 opacity-70 hover:opacity-100 transition-opacity" title="Kalshi">
+                        <img src="/kalshi-icon.png" alt="K" className="w-4 h-4 rounded-sm" />
+                      </a>
+                      <a href={market.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="shrink-0 p-1 rounded hover:bg-[#a855f7]/20 opacity-70 hover:opacity-100 transition-opacity" title="Polymarket">
+                        <img src="/polymarket-icon.png" alt="PM" className="w-4 h-4 rounded-sm" />
+                      </a>
                       <button onClick={(e) => { e.stopPropagation(); onEditMarket(market, e); }} className="p-1 rounded hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5]"><Pencil className="w-3 h-3" /></button>
                       <button onClick={(e) => { e.stopPropagation(); onDeleteMarket(market.id); }} className="p-1 rounded hover:bg-[#ef4444]/20 text-[#737373] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
                     </div>
@@ -1325,7 +1450,7 @@ function OverviewPanel({
   );
 }
 
-function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: React.ReactNode; color: "green" | "blue" | "purple" | "yellow" }) {
+function StatCard({ label, value, icon, color, valueSize }: { label: string; value: string | number; icon: React.ReactNode; color: "green" | "blue" | "purple" | "yellow"; valueSize?: "xl" | "xs" }) {
   const colors: Record<typeof color, string> = {
     green: "bg-[#22c55e]/10 text-[#22c55e]",
     blue: "bg-[#3b82f6]/10 text-[#3b82f6]",
@@ -1338,7 +1463,7 @@ function StatCard({ label, value, icon, color }: { label: string; value: string 
         <span className={`w-7 h-7 rounded-md flex items-center justify-center ${colors[color]}`}>{icon}</span>
         <span className="text-xs text-[#737373]">{label}</span>
       </div>
-      <div className="text-xl font-bold text-[#e5e5e5]">{value}</div>
+      <div className={`font-bold text-[#e5e5e5] ${valueSize === 'xs' ? 'text-xs' : 'text-xl'}`}>{value}</div>
     </div>
   );
 }
@@ -1347,11 +1472,15 @@ function formatProfit(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
+function formatDollar(n: number) {
+  return `$${n.toFixed(2)}`;
+}
+
 function formatExpiry(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 

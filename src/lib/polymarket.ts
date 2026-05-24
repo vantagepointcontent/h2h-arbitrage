@@ -42,10 +42,15 @@ export function extractPolymarketSlug(url: string): string | null {
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
   const res = await fetch(
     `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
-    { headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' }, cache: 'no-store' }
+    {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+      cache: 'no-store',
+    }
   );
   if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  console.log('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: any) => ({q: m.question?.slice(0, 20), p: m.outcomePrices})));
+  return data;
 }
 
 export function parseOutcomes(market: PMMarket): { outcomes: string[]; prices: number[] } {

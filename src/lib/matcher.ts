@@ -134,11 +134,11 @@ function getKalshiName(km: KalshiMarket): string {
   return `${base} (${parsed.label})`;
 }
 
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const arrA = a.split(' ').filter(s => s.length >= 2);
   const arrB = b.split(' ').filter(s => s.length >= 2);
   const setA = new Set(arrA);
@@ -350,6 +350,22 @@ function buildPmArbShape(market: PMMarket) {
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 
+function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
+  return {
+    ticker: km.ticker,
+    yesBid: parseFloat(km.yes_bid_dollars || '0'),
+    yesAsk: parseFloat(km.yes_ask_dollars || '1'),
+    noBid: parseFloat(km.no_bid_dollars || '0'),
+    noAsk: parseFloat(km.no_ask_dollars || '1'),
+    lastPrice: parseFloat(km.last_price_dollars || '0'),
+    volume24h: km.volume_24h_fp,
+    yesBidDepth: km.yes_bid_size_fp,
+    yesAskDepth: km.yes_ask_size_fp,
+    noBidDepth: km.no_bid_size_fp,
+    noAskDepth: km.no_ask_size_fp,
+  };
+}
+
 export function matchOutcomes(
   kalshiMarkets: KalshiMarket[],
   pmMarkets: PMMarket[],
@@ -405,19 +421,7 @@ export function matchOutcomes(
     const pmNorm = normalizeName(pmo.title);
     const exact = kalshiMap.get(pmNorm);
     if (exact) {
-      const kalshi = {
-        ticker: exact.ticker,
-        yesBid: parseFloat(exact.yes_bid_dollars || '0'),
-        yesAsk: parseFloat(exact.yes_ask_dollars || '1'),
-        noBid: parseFloat(exact.no_bid_dollars || '0'),
-        noAsk: parseFloat(exact.no_ask_dollars || '1'),
-        lastPrice: parseFloat(exact.last_price_dollars || '0'),
-        volume24h: exact.volume_24h_fp,
-        yesBidDepth: exact.yes_bid_size_fp,
-        yesAskDepth: exact.yes_ask_size_fp,
-        noBidDepth: exact.no_bid_size_fp,
-        noAskDepth: exact.no_ask_size_fp,
-      };
+      const kalshi = buildKalshiArbShape(exact);
       const pmShape = buildPmArbShape(pmo.market);
       const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
       const apyPct = computeApy(arbRaw.roiPct, expiryDate);
@@ -450,19 +454,7 @@ export function matchOutcomes(
       }
     }
     if (bestKm) {
-      const kalshi = {
-        ticker: bestKm.ticker,
-        yesBid: parseFloat(bestKm.yes_bid_dollars || '0'),
-        yesAsk: parseFloat(bestKm.yes_ask_dollars || '1'),
-        noBid: parseFloat(bestKm.no_bid_dollars || '0'),
-        noAsk: parseFloat(bestKm.no_ask_dollars || '1'),
-        lastPrice: parseFloat(bestKm.last_price_dollars || '0'),
-        volume24h: bestKm.volume_24h_fp,
-        yesBidDepth: bestKm.yes_bid_size_fp,
-        yesAskDepth: bestKm.yes_ask_size_fp,
-        noBidDepth: bestKm.no_bid_size_fp,
-        noAskDepth: bestKm.no_ask_size_fp,
-      };
+      const kalshi = buildKalshiArbShape(bestKm);
       const pmShape = buildPmArbShape(pmo.market);
       const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
       const apyPct = computeApy(arbRaw.roiPct, expiryDate);
@@ -483,19 +475,7 @@ export function matchOutcomes(
     if (!usedKalshi.has(km.ticker)) {
       matched.push({
         artist: getKalshiName(km),
-        kalshi: {
-          ticker: km.ticker,
-          yesBid: parseFloat(km.yes_bid_dollars || '0'),
-          yesAsk: parseFloat(km.yes_ask_dollars || '1'),
-          noBid: parseFloat(km.no_bid_dollars || '0'),
-          noAsk: parseFloat(km.no_ask_dollars || '1'),
-          lastPrice: parseFloat(km.last_price_dollars || '0'),
-          volume24h: km.volume_24h_fp,
-          yesBidDepth: km.yes_bid_size_fp,
-          yesAskDepth: km.yes_ask_size_fp,
-          noBidDepth: km.no_bid_size_fp,
-          noAskDepth: km.no_ask_size_fp,
-        },
+        kalshi: buildKalshiArbShape(km),
         polymarket: null,
         arbitrage: noArbResult,
         source: 'auto' as const,

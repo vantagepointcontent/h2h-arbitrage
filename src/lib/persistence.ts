@@ -4,7 +4,7 @@ import path from 'path';
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
 export interface LastScanResult {
-  bestRoiPct: number;      // t.ex. 26.5
+  bestRoiPct: number;      // t.ex. 26.5 (for backward compat / display)
   bestProfit: number;       // t.ex. 265
   strategy: string;         // "Buy YES Kalshi + NO PM"
   outcomeCount: number;
@@ -12,6 +12,12 @@ export interface LastScanResult {
   kalshiCount: number;
   pmCount: number;
   scannedAt: string;        // ISO timestamp
+  allArbs?: {               // ALL positive arbitrage opportunities in this scan
+    artist: string;
+    roiPct: number;
+    expectedProfit: number;
+    strategy: string;
+  }[];
 }
 
 export interface SavedMarket {
@@ -46,7 +52,6 @@ export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt
     ...market,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     createdAt: new Date().toISOString(),
-    expiryDate: null,
     lastScanResult: null,
   };
   markets.push(newMarket);
