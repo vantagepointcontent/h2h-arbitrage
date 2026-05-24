@@ -1,0 +1,142 @@
+[
+  {
+    "kalshiTicker": "KXIPOSPACEX-26JUL01",
+    "pmConditionId": "0x3dbeee81527f6d4868a6e500fca15d8905a6dda0e9b1f525145a4ad813bac98e",
+    "kalshiTitle": "KXIPOSPACEX-26JUL01",
+    "pmTitle": "June 30",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1779552204821-swex21g",
+    "createdAt": "2026-05-23T16:03:24.821Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSEA-26MAY23-B70.5",
+    "pmConditionId": "0x17f4f170236f32b8cf3acd28282cd24bf308a06f0c165fd28c3234bbc71475fe",
+    "kalshiTitle": "KXHIGHTSEA-26MAY23-B70.5",
+    "pmTitle": "70-71°F",
+    "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
+    "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
+    "id": "1779552284999-i5lhldt",
+    "createdAt": "2026-05-23T16:04:44.999Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSEA-26MAY23-B72.5",
+    "pmConditionId": "0x159075046c879b2c5e66856014ea45973ca55d431ff935ea42aed50a5b9718fa",
+    "kalshiTitle": "KXHIGHTSEA-26MAY23-B72.5",
+    "pmTitle": "72-73°F",
+    "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
+    "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
+    "id": "1779552297191-dpp511v",
+    "createdAt": "2026-05-23T16:04:57.191Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSEA-26MAY23-B74.5",
+    "pmConditionId": "0x4e842a0577a06bfadd37a336f302fbf7e3bf9e5a60d4955859dab5a6546b73fa",
+    "kalshiTitle": "KXHIGHTSEA-26MAY23-B74.5",
+    "pmTitle": "74-75°F",
+    "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
+    "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
+    "id": "1779552306796-axzxykk",
+    "createdAt": "2026-05-23T16:05:06.796Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSEA-26MAY23-B76.5",
+    "pmConditionId": "0x350d83b6af8e472ba37c3cac25ecca1a0afde37a005e83a563e6f43331a7f08b",
+    "kalshiTitle": "KXHIGHTSEA-26MAY23-B76.5",
+    "pmTitle": "76-77°F",
+    "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
+    "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
+    "id": "1779552329728-9uh8d9x",
+    "createdAt": "2026-05-23T16:05:29.728Z"
+  },
+  {
+    "kalshiTicker": "SENATEME-26-R",
+    "pmConditionId": "0x2c00cb09722a0f0501c5e49131b898ed57bb5c075db4dc2bcbc14908f45b8c48",
+    "kalshiTitle": "SENATEME-26-R",
+    "pmTitle": "Republican",
+    "kalshiUrl": "https://kalshi.com/markets/senateme/maine-senate-race/senateme-26",
+    "polymarketUrl": "https://polymarket.com/event/maine-senate-election-winner/will-the-republicans-win-the-maine-senate-race-in-2026",
+    "id": "1779565319634-zco674c",
+    "createdAt": "2026-05-23T19:41:59.634Z"
+  },
+  {
+    "kalshiTicker": "SENATEME-26-D",
+    "pmConditionId": "0x66bbf6d55e0296278858b3147689f3df9259374f158f9f028b608baa322a639c",
+    "kalshiTitle": "SENATEME-26-D",
+    "pmTitle": "Democrat",
+    "kalshiUrl": "https://kalshi.com/markets/senateme/maine-senate-race/senateme-26",
+    "polymarketUrl": "https://polymarket.com/event/maine-senate-election-winner/will-the-republicans-win-the-maine-senate-race-in-2026",
+    "id": "1779565322331-tk89zep",
+    "createdAt": "2026-05-23T19:42:02.331Z"
+  },
+  {
+    "kalshiTicker": "SENATEOK-26-D",
+    "pmConditionId": "0x83337f7e7a080c796fea1192addc126b415f21ea534cbe2ba2b3af3483c08b88",
+    "kalshiTitle": "SENATEOK-26-D",
+    "pmTitle": "Democrat",
+    "kalshiUrl": "https://kalshi.com/markets/senateok/oklahoma-senate-race/senateok-26",
+    "polymarketUrl": "https://polymarket.com/event/oklahoma-senate-election-winner/will-the-democrats-win-the-oklahoma-senate-race-in-2026",
+    "id": "1779565404834-4dckonc",
+    "createdAt": "2026-05-23T19:43:24.834Z"
+  },
+  {
+    "kalshiTicker": "SENATEOK-26-R",
+    "pmConditionId": "0xc1e1d5a2814a6abf40e304c00a43cfd05519caa11b04665c709b0a94d8c34d05",
+    "kalshiTitle": "SENATEOK-26-R",
+    "pmTitle": "Republican",
+    "kalshiUrl": "https://kalshi.com/markets/senateok/oklahoma-senate-race/senateok-26",
+    "polymarketUrl": "https://polymarket.com/event/oklahoma-senate-election-winner/will-the-democrats-win-the-oklahoma-senate-race-in-2026",
+    "id": "1779565407515-xnvbodw",
+    "createdAt": "2026-05-23T19:43:27.515Z"
+  },
+  {
+    "kalshiTicker": "KXF1CONSTRUCTORS-26-MER",
+    "pmConditionId": "0x9c4459a70fd67a346075c22a6b010b454794204f2f28d128983b9056fe8d64b5",
+    "kalshiTitle": "KXF1CONSTRUCTORS-26-MER",
+    "pmTitle": "Mercedes",
+    "kalshiUrl": "https://kalshi.com/markets/kxf1constructors/formula-1-constructors/kxf1constructors-26",
+    "polymarketUrl": "https://polymarket.com/event/f1-constructors-champion/will-ferrari-be-the-2026-f1-constructors-champion",
+    "id": "1779565483729-ywj07ve",
+    "createdAt": "2026-05-23T19:44:43.729Z"
+  },
+  {
+    "kalshiTicker": "KXIPOSPACEX-26JUN01",
+    "pmConditionId": "0xe05f83ed91d2dcf7e744f86bbda236525eb9441bbf039c858f5438d9dc3e7431",
+    "kalshiTitle": "KXIPOSPACEX-26JUN01",
+    "pmTitle": "May 31",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1779568019599-vl4w9gb",
+    "createdAt": "2026-05-23T20:26:59.599Z"
+  },
+  {
+    "kalshiTicker": "KXIPOSPACEX-26OCT01",
+    "pmConditionId": "0x58ae4880738f502cf9c3ca8e1f7747ead62c32308ca520efd16ee0f91af06415",
+    "kalshiTitle": "KXIPOSPACEX-26OCT01",
+    "pmTitle": "September 30",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1779568084151-786h0tx",
+    "createdAt": "2026-05-23T20:28:04.151Z"
+  },
+  {
+    "kalshiTicker": "KXIPOSPACEX-26NOV01",
+    "pmConditionId": "0x01759192de454d25043610a0dff13621b60f71d867114ed86778d0e485e46b0f",
+    "kalshiTitle": "KXIPOSPACEX-26NOV01",
+    "pmTitle": "December 31",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1779568094538-vp0qelc",
+    "createdAt": "2026-05-23T20:28:14.538Z"
+  },
+  {
+    "kalshiTicker": "KXIPOSPACEX-26SEP01",
+    "pmConditionId": "0x9c01bea9b869ca2acb0c28efa8bbaba184f807c3c3cd9bccaad9e6022dfc8a19",
+    "kalshiTitle": "KXIPOSPACEX-26SEP01",
+    "pmTitle": "August 31",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1779568106081-n3dm8ew",
+    "createdAt": "2026-05-23T20:28:26.081Z"
+  }
+]
