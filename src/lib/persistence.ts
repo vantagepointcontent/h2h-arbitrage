@@ -48,6 +48,10 @@ export async function getSavedMarkets(): Promise<SavedMarket[]> {
 
 export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt' | 'lastScanResult'>): Promise<SavedMarket> {
   const markets = await getSavedMarkets();
+  const nameExists = markets.some(m => m.eventTitle.toLowerCase().trim() === (market.eventTitle || 'Untitled').toLowerCase().trim());
+  if (nameExists) {
+    throw new Error(`Market already exists: "${market.eventTitle || 'Untitled'}"`);
+  }
   const newMarket: SavedMarket = {
     ...market,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
