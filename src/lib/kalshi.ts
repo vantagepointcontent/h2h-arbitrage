@@ -19,6 +19,8 @@ export interface KalshiMarket {
   no_bid_size_fp?: string;
   yes_ask_size_fp?: string;
   no_ask_size_fp?: string;
+  yes_sub_title?: string;
+  no_sub_title?: string;
 }
 
 export function extractKalshiEventTicker(url: string): string | null {

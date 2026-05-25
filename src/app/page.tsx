@@ -265,6 +265,9 @@ export default function Home() {
         setSaveName("");
         setSaveCategory("");
         setSaveExpiry(null);
+      } else {
+        const data = await res.json().catch(() => ({ error: "Save failed" }));
+        setError(data.error || "Save failed");
       }
     } catch (e: any) {
       setError("Failed to save: " + e.message);

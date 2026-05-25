@@ -66,7 +66,7 @@ const MONTH_MAP: Record<string, string> = {
  *  KXHIGHTSEA-26MAY23-B74.5 -> { year: '2026', month: 'May', day: '23', sub: 'B74.5' }
  */
 function parseKalshiTicker(ticker: string): { label?: string; sub?: string } | null {
-  const m = ticker.match(/-([0-9]{2})([A-Z]{3})([0-9]{2})(?:-([TB].+))?$/);
+  const m = ticker.match(/-([0-9]{2})([A-Z]{3})([0-9]{2})(?:.*-([A-Z][A-Z0-9.]*))?$/);
   if (!m) return null;
   const [, yy, mon, dd, sub] = m;
   const month = MONTH_MAP[mon] || mon;
@@ -96,7 +96,23 @@ function extractNameFromKalshiTitle(title: string): string {
 }
 
 function getKalshiName(km: KalshiMarket): string {
-  // 1. Get a human-readable base name (custom_strike or extracted title)
+  // 1. For sport match-winner markets (custom_strike UUID + yes_sub_title), use yes_sub_title
+  if (km.yes_sub_title && km.no_sub_title) {
+    const cs = km.custom_strike;
+    if (cs) {
+      const values = Object.values(cs);
+      if (values.length > 0) {
+        const val = String(values[0]);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(val)) {
+          // Sport market with UUID custom_strike: entity name is in yes_sub_title, e.g. "Belgium", "Tie"
+          return km.yes_sub_title;
+        }
+      }
+    }
+  }
+
+  // 2. Otherwise, use custom_strike value (non-UUID) or extracted title
   let base = '';
   const cs = km.custom_strike;
   if (cs) {
@@ -111,18 +127,16 @@ function getKalshiName(km: KalshiMarket): string {
     base = extractNameFromKalshiTitle(km.title || km.ticker);
   }
 
-  // 2. ALWAYS append ticker-derived date/sub-code so identical bases stay distinct.
-  // Fixes "SpaceX" from custom_strike (all 13 markets same) and
-  // "the maximum temperature" from title (all 6 markets same).
+  // 3. Append ticker-derived date/sub-code so identical bases stay distinct.
   const parsed = parseKalshiTicker(km.ticker);
-  if (!parsed) return base; // ticker has no date suffix
+  if (!parsed) return base;
 
   if (parsed.sub) {
     // sub like T77  -> >77°F,  T70 -> <70°F,  B74.5 -> 74-75°F
     let detail = parsed.sub;
     if (detail.startsWith('T')) {
       const val = parseFloat(detail.slice(1));
-      // Temperature threshold:  T70 -> <70°, T77 -> >77° (heuristic: lower T = threshold, higher T = threshold)
+      // Temperature threshold:  T70 -> <70°, T77 -> >77°
       detail = (val <= 50 ? '\u003c' : '\u003e') + detail.slice(1) + '°F';
     } else if (detail.startsWith('B')) {
       const val = parseFloat(detail.slice(1));
@@ -130,7 +144,6 @@ function getKalshiName(km: KalshiMarket): string {
     }
     return `${base} (${detail}, ${parsed.label})`;
   }
-  // No sub-code — just month/year (e.g. SpaceX IPO markets)
   return `${base} (${parsed.label})`;
 }
 
