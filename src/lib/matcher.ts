@@ -28,6 +28,7 @@ export interface UnifiedOutcome {
     volume?: string;
     liquidity?: string;
     askDepth?: number;
+    noAskDepth?: number;
   } | null;
   arbitrage: {
     strategy: string;
@@ -257,64 +258,6 @@ export function calculateArbitrageMax(
   };
 }
 
-/** Legacy entry-point kept for callers that still pass a fixed capital */
-export function calculateArbitrage(kalshi: NonNullable<UnifiedOutcome['kalshi']>, pm: NonNullable<UnifiedOutcome['polymarket']>, capital = 1000) {
-  const kYes = kalshi.yesAsk;
-  const kNo = kalshi.noAsk;
-  const pYes = pm.bestAsk;
-  const pNo = pm.noPrice;
-
-  let bestRoi = 0;
-  let strategy = 'No arb';
-  let kalshiStake = 0;
-  let pmStake = 0;
-  let profit = 0;
-  let buyPlatform: 'kalshi' | 'polymarket' | null = null;
-  let buyPrice = 0;
-  let sellPlatform: 'kalshi' | 'polymarket' | null = null;
-  let sellPrice = 0;
-
-  if (kYes + pNo < 1) {
-    const r = 1 - (kYes + pNo);
-    if (r > bestRoi) {
-      bestRoi = r;
-      strategy = 'Buy YES Kalshi + NO PM';
-      kalshiStake = capital * kYes;
-      pmStake = capital * pNo;
-      profit = capital * r;
-      buyPlatform = 'kalshi';
-      buyPrice = kYes;
-      sellPlatform = 'polymarket';
-      sellPrice = pNo;
-    }
-  }
-  if (pYes + kNo < 1) {
-    const r = 1 - (pYes + kNo);
-    if (r > bestRoi) {
-      bestRoi = r;
-      strategy = 'Buy YES PM + NO Kalshi';
-      kalshiStake = capital * kNo;
-      pmStake = capital * pYes;
-      profit = capital * r;
-      buyPlatform = 'polymarket';
-      buyPrice = pYes;
-      sellPlatform = 'kalshi';
-      sellPrice = kNo;
-    }
-  }
-
-  return {
-    strategy,
-    kalshiStake,
-    pmStake,
-    expectedProfit: profit,
-    roiPct: bestRoi * 100,
-    buyPlatform,
-    buyPrice,
-    sellPlatform,
-    sellPrice,
-  };
-}
 
 /** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
 export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
@@ -328,17 +271,50 @@ export function computeApy(roiPct: number, expiryDate: string | null | undefined
 }
 
 function filterKalshiMarketsByEventTitle(kMarkets: KalshiMarket[], pmEventTitle: string): KalshiMarket[] {
-  if (kMarkets.length <= 20) return kMarkets;
-  const stopWords = new Set(['the', 'and', 'or', 'vs', 'at', 'in', 'on', 'by', 'to', 'of', 'for', 'a', 'an']);
-  const pmWords = normalizeName(pmEventTitle).split(' ').filter(w => w.length >= 3 && !stopWords.has(w));
-  if (pmWords.length === 0) return kMarkets.slice(0, 30);
-  const matches: KalshiMarket[] = [];
-  for (const km of kMarkets) {
-    const title = normalizeName(km.title || '');
-    const score = pmWords.filter(w => title.includes(w)).length;
-    if (score >= 2) matches.push(km);
+  // Fast path: small Kalshi sets don't need filtering
+  if (kMarkets.length <= 30) return kMarkets;
+
+  const stopWords = new Set(['the', 'and', 'or', 'vs', 'at', 'in', 'on', 'by', 'to', 'of', 'for', 'a', 'an', 'will', 'be', 'has', 'is', 'are', 'was', 'were']);
+
+  // Extract meaningful PM event words
+  const pmWords = normalizeName(pmEventTitle)
+    .split(' ')
+    .filter(w => w.length >= 3 && !stopWords.has(w));
+
+  // No meaningful PM words: return top markets ranked by volume/liquidity
+  if (pmWords.length === 0) {
+    return kMarkets
+      .slice()
+      .sort((a, b) => {
+        const depthA = (a.open_interest_fp ? Number(a.open_interest_fp) : 0);
+        const depthB = (b.open_interest_fp ? Number(b.open_interest_fp) : 0);
+        return depthB - depthA;
+      })
+      .slice(0, 60);
   }
-  return matches.length > 0 ? matches : kMarkets.slice(0, 30);
+
+  // Score ALL Kalshi markets against PM event title
+  const pmWordsSet = new Set(pmWords);
+  const scored = kMarkets.map(km => {
+    const title = normalizeName(km.title || '');
+    const titleWords = new Set(title.split(' '));
+    let score = 0;
+    for (const w of pmWordsSet) {
+      if (titleWords.has(w)) score += 1;
+    }
+    return { km, score };
+  });
+
+  // Sort by score descending, then by volume as tiebreaker
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const depthA = (a.km.open_interest_fp ? Number(a.km.open_interest_fp) : 0);
+    const depthB = (b.km.open_interest_fp ? Number(b.km.open_interest_fp) : 0);
+    return depthB - depthA;
+  });
+
+  // Take top markets (up to 100) to ensure we don't miss matches
+  return scored.slice(0, 100).map(s => s.km);
 }
 
 function isBinaryMarket(outcomes: string[]): boolean {
@@ -346,7 +322,7 @@ function isBinaryMarket(outcomes: string[]): boolean {
   return (lower.length === 2 && lower.includes('yes') && lower.includes('no'));
 }
 
-// --- Helper to build the PM shape used by calculateArbitrage ---
+// --- Helper to build the PM shape used by matching; scan route calculates arbitrage. ---
 function buildPmArbShape(market: PMMarket) {
   const { prices } = parseOutcomes(market);
   return {
@@ -360,6 +336,7 @@ function buildPmArbShape(market: PMMarket) {
     volume: market.volume,
     liquidity: market.liquidity,
     askDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
+    noAskDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 
@@ -429,6 +406,7 @@ export function matchOutcomes(
   const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
 
   // Exact match pass
+  const placeholderArb = noArbResult;
   for (let pi = 0; pi < pmOutcomes.length; pi++) {
     const pmo = pmOutcomes[pi];
     const pmNorm = normalizeName(pmo.title);
@@ -436,13 +414,11 @@ export function matchOutcomes(
     if (exact) {
       const kalshi = buildKalshiArbShape(exact);
       const pmShape = buildPmArbShape(pmo.market);
-      const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
-      const apyPct = computeApy(arbRaw.roiPct, expiryDate);
       matched.push({
         artist: getKalshiName(exact),
         kalshi,
         polymarket: pmShape,
-        arbitrage: { ...arbRaw, apyPct },
+        arbitrage: placeholderArb,
         source: 'auto' as const,
       });
       usedKalshi.add(exact.ticker);
@@ -469,13 +445,11 @@ export function matchOutcomes(
     if (bestKm) {
       const kalshi = buildKalshiArbShape(bestKm);
       const pmShape = buildPmArbShape(pmo.market);
-      const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
-      const apyPct = computeApy(arbRaw.roiPct, expiryDate);
       matched.push({
         artist: getKalshiName(bestKm),
         kalshi,
         polymarket: pmShape,
-        arbitrage: { ...arbRaw, apyPct },
+        arbitrage: placeholderArb,
         source: 'auto' as const,
       });
       usedKalshi.add(bestKm.ticker);
@@ -566,14 +540,14 @@ export function applyManualMatches(
       ? buildPmArbShape(pmMarket)
       : pmRaw;
 
-    const arbRaw = calculateArbitrage(kalshi, pmShape, capital);
-    const apyPct = computeApy(arbRaw.roiPct, expiryDate);
+    // Use placeholder - arbitrage will be calculated by caller with depth info
+    const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
 
     merged[kIdx] = {
       artist: `${outcomes[kIdx].artist} + ${outcomes[pIdx].artist}`,
       kalshi,
       polymarket: pmShape,
-      arbitrage: { ...arbRaw, apyPct },
+      arbitrage: noArbResult,
       source: 'manual' as const,
     };
     indicesToRemove.add(pIdx);

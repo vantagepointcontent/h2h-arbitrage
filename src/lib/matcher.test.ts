@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calculateArbitrage,
   calculateArbitrageMax,
   computeApy,
   parseDepth,
@@ -9,66 +8,6 @@ import {
   matchOutcomes,
 } from './matcher';
 import { getClobPrices } from './polymarket-clob';
-
-describe('calculateArbitrage', () => {
-  const kalshi = {
-    ticker: 'KXTEST',
-    yesBid: 0.40, yesAsk: 0.45,
-    noBid: 0.55, noAsk: 0.60,
-    lastPrice: 0.42,
-    volume24h: '', yesBidDepth: '', yesAskDepth: '', noBidDepth: '', noAskDepth: '',
-  };
-  const pm = {
-    marketId: 'pm-test', conditionId: 'c-test',
-    yesPrice: 0.50, noPrice: 0.50,
-    bestBid: 0.49, bestAsk: 0.51,
-    lastTradePrice: 0.50,
-    volume: '', liquidity: '', askDepth: 5000,
-  };
-
-  it('ger positiv ROI när kYes + pNo < 1', () => {
-    // kYes=0.45, pNo=0.50 → summa=0.95 < 1 → strategi: Buy YES K + NO PM
-    const r = calculateArbitrage(kalshi, { ...pm, noPrice: 0.50 }, 1000);
-    expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
-    expect(r.roiPct).toBeGreaterThan(0);
-    expect(r.expectedProfit).toBeGreaterThan(0);
-  });
-
-  it('ger No arb när summan är >= 1', () => {
-    // kYes=0.45, pNo=0.60 → summa=1.05 ≥ 1
-    const r = calculateArbitrage(kalshi, { ...pm, noPrice: 0.60 }, 1000);
-    expect(r.strategy).toBe('No arb');
-    expect(r.roiPct).toBe(0);
-  });
-
-  it('alternativ strategi när pYes + kNo < 1', () => {
-    // Strategi 2 högre arbitrage: pYes=0.40, kNo=0.50 → summa=0.90 < 1
-    // Strategi 1: kYes=0.45, pNo=0.50 → summa=0.95 < 1 men lägre ROI
-    // => Buy YES PM + NO Kalshi vinner (ROI 0.10 vs 0.05)
-    const r = calculateArbitrage(
-      { ...kalshi, noAsk: 0.50 },
-      { ...pm, bestAsk: 0.40, yesPrice: 0.40 },
-      1000
-    );
-    expect(r.strategy).toBe('Buy YES PM + NO Kalshi');
-    expect(r.roiPct).toBeGreaterThan(0);
-  });
-
-  it('ger högre profit vid högre capital', () => {
-    const r1k = calculateArbitrage(kalshi, { ...pm, noPrice: 0.50 }, 1000);
-    const r2k = calculateArbitrage(kalshi, { ...pm, noPrice: 0.50 }, 2000);
-    expect(r2k.expectedProfit).toBeGreaterThan(r1k.expectedProfit);
-  });
-
-  it('hanterar noll/edge-case värden utan att krascha', () => {
-    const r = calculateArbitrage(
-      { ...kalshi, yesAsk: 1, noAsk: 1 },
-      { ...pm, yesPrice: 1, noPrice: 1 },
-      1000
-    );
-    expect(r.strategy).toBe('No arb');
-  });
-});
 
 describe('calculateArbitrageMax', () => {
   const kalshi = {
@@ -218,8 +157,8 @@ describe('getClobPrices', () => {
       ],
       best_bid: 0.54, best_ask: 0.56, last_trade_price: 0.55,
     } as any);
-    expect(r?.yesPrice).toBe(0.56); // best_ask
-    expect(r?.noPrice).toBe(0.54);   // best_bid (efter fix)
+    expect(r?.yesPrice).toBe(0.56); // YES best_ask
+    expect(r?.noPrice).toBeCloseTo(0.44, 6);   // NO ask derived from 1 - YES best_bid
   });
 
   it('deriverar noPrice från yesPrice (1 - yes)', () => {

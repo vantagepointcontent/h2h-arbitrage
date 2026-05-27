@@ -39,6 +39,12 @@ export function extractPolymarketSlug(url: string): string | null {
   return match ? match[1] : null;
 }
 
+const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
+
+function debugLog(...args: unknown[]) {
+  if (DEBUG_H2H) console.log(...args);
+}
+
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
   const res = await fetch(
     `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
@@ -49,7 +55,7 @@ export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null
   );
   if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
   const data = await res.json();
-  console.log('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: any) => ({q: m.question?.slice(0, 20), p: m.outcomePrices})));
+  debugLog('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: PMMarket) => ({ q: m.question?.slice(0, 20), p: m.outcomePrices })));
   return data;
 }
 

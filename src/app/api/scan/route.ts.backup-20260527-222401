@@ -8,7 +8,6 @@ import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateArbitrageMax, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
-import { getSavedMarkets, updateSavedMarketScanResult } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 
@@ -212,38 +211,6 @@ export async function POST(request: NextRequest) {
         yesPrice: o.polymarket!.yesPrice,
         noPrice: o.polymarket!.noPrice,
       }));
-
-    // ---- UPDATE SAVED MARKET SCAN RESULT ----
-    try {
-      const allMarkets = await getSavedMarkets();
-      const market = allMarkets.find(m => m.kalshiUrl === kalshiUrl && m.polymarketUrl === polymarketUrl);
-      if (market) {
-        const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0);
-        const bestArb = positiveArbs.length > 0
-          ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
-          : null;
-        const scanResult = {
-          bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
-          bestProfit: bestArb ? bestArb.arbitrage!.expectedProfit : 0,
-          strategy: bestArb ? bestArb.arbitrage!.strategy : 'No arb',
-          outcomeCount: withArbitrage.length,
-          matchedCount,
-          kalshiCount,
-          pmCount,
-          scannedAt: new Date().toISOString(),
-          allArbs: positiveArbs.map(o => ({
-            artist: o.artist,
-            roiPct: o.arbitrage!.roiPct,
-            expectedProfit: o.arbitrage!.expectedProfit,
-            strategy: o.arbitrage!.strategy,
-            totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
-          })),
-        };
-        await updateSavedMarketScanResult(market.id, scanResult);
-      }
-    } catch (e) {
-      console.error('[save-scan-error]', e);
-    }
 
     return NextResponse.json({
       eventTitle: pmEvent.title,
