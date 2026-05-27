@@ -1,15 +1,13 @@
-// Node.js poller (ES module) - polls saved markets every ~30s
+// Node.js poller (ES module) - polls saved markets with bounded concurrency
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
 const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
+const POLL_CONCURRENCY = Math.max(1, Number(process.env.H2H_POLL_CONCURRENCY || 3));
+const POLL_INTERVAL_MS = Math.max(5000, Number(process.env.H2H_POLL_INTERVAL_MS || 30000));
+const SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 15000));
 const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
+const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathname;
 const fs = await import('fs');
-
-async function fetchJson(url, opts = {}) {
-  const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
-  return res.json();
-}
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -24,14 +22,29 @@ async function loadSavedMarkets() {
   }
 }
 
+async function writeJsonAtomic(path, data) {
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2));
+  await fs.promises.rename(tmp, path);
+}
+
 async function saveMarkets(markets) {
-  await fs.promises.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
+  await writeJsonAtomic(DATA_FILE, markets);
+}
+
+async function writeHealth(health) {
+  try {
+    await writeJsonAtomic(HEALTH_FILE, health);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Failed writing poller health:`, err.message);
+  }
 }
 
 async function scanMarket(market) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
+    const started = Date.now();
     const res = await fetch(`${BASE_URL}/api/scan?skipManual=1`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,14 +52,15 @@ async function scanMarket(market) {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
-    return res.json();
+    const durationMs = Date.now() - started;
+    if (!res.ok) {
+      return { ok: false, durationMs, error: `HTTP ${res.status}` };
+    }
+    return { ok: true, durationMs, result: await res.json() };
   } catch (e) {
     clearTimeout(timer);
-    if (e.name === 'AbortError') {
-      console.log(`[${new Date().toISOString()}] SCAN TIMEOUT for ${market.eventTitle}`);
-    }
-    return null;
+    const msg = e.name === 'AbortError' ? `timeout after ${SCAN_TIMEOUT_MS}ms` : (e.message || String(e));
+    return { ok: false, durationMs: SCAN_TIMEOUT_MS, error: msg };
   }
 }
 
@@ -106,72 +120,133 @@ function formatRoi(roi) {
   return roi > 0 ? `+${roi.toFixed(2)}%` : `${roi.toFixed(2)}%`;
 }
 
-async function pollOnce() {
-  const markets = await loadSavedMarkets();
-  if (markets.length === 0) {
-    console.log(`[${new Date().toISOString()}] No saved markets. Sleeping 30s...`);
-    return;
-  }
+function applyScanResultToMarket(market, result) {
+  const matchedOutcomes = (result.outcomes || []).filter(o => o.kalshi && o.polymarket);
+  const matchedCount = matchedOutcomes.length;
+  const { best, all } = extractAllArbitrages(result);
 
-  for (const market of markets) {
-    try {
-      const result = await scanMarket(market);
-      if (!result) {
-        console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}`);
-        continue;
-      }
-
-      // Only keep matched outcomes for storage (poller optimization)
-      const matchedOutcomes = (result.outcomes || []).filter(o => o.kalshi && o.polymarket);
-      const matchedCount = matchedOutcomes.length;
-
-      const { best, all } = extractAllArbitrages(result);
-      if (best) {
-        market.lastScanResult = {
-          bestRoiPct: best.roiPct,
-          bestProfit: best.profit,
-          strategy: best.strategy,
-          outcomeCount: matchedCount,  // store matched count only
-          matchedCount,
-          kalshiCount: result.kalshiCount,
-          pmCount: result.pmCount,
-          scannedAt: new Date().toISOString(),
-          allArbs: all,
-        };
-        if (result.expiryDate && !market.expiryDate) {
-          market.expiryDate = result.expiryDate;
-        }
-        const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
-        console.log(`[${new Date().toISOString()}] ${market.eventTitle} → Best: ${best.outcome} ${formatRoi(best.roiPct)} | ${all.length} profitable arb(s), total +$${profitSum.toFixed(2)}`);
-      } else {
-        market.lastScanResult = {
-          bestRoiPct: best ? best.roiPct : 0,
-          bestProfit: best ? best.profit : 0,
-          strategy: '',
-          outcomeCount: matchedCount,
-          matchedCount,
-          kalshiCount: result.kalshiCount,
-          pmCount: result.pmCount,
-          scannedAt: new Date().toISOString(),
-          allArbs: [],
-        };
-        console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb`);
-      }
-    } catch (err) {
-      console.error(`[${new Date().toISOString()}] Error scanning ${market.eventTitle}:`, err.message);
+  if (best) {
+    market.lastScanResult = {
+      bestRoiPct: best.roiPct,
+      bestProfit: best.profit,
+      strategy: best.strategy,
+      outcomeCount: matchedCount,
+      matchedCount,
+      kalshiCount: result.kalshiCount,
+      pmCount: result.pmCount,
+      scannedAt: new Date().toISOString(),
+      allArbs: all,
+    };
+    if (result.expiryDate && !market.expiryDate) {
+      market.expiryDate = result.expiryDate;
     }
-    // Small delay between each market to avoid slamming APIs
-    await sleep(1500);
+    return { best, all, matchedCount };
   }
+
+  market.lastScanResult = {
+    bestRoiPct: 0,
+    bestProfit: 0,
+    strategy: '',
+    outcomeCount: matchedCount,
+    matchedCount,
+    kalshiCount: result.kalshiCount,
+    pmCount: result.pmCount,
+    scannedAt: new Date().toISOString(),
+    allArbs: [],
+  };
+  return { best: null, all: [], matchedCount };
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+
+  async function runWorker() {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await worker(items[index], index);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, runWorker);
+  await Promise.all(workers);
+  return results;
+}
+
+async function pollOnce() {
+  const startedAt = new Date();
+  const cycleStart = Date.now();
+  const markets = await loadSavedMarkets();
+  const health = {
+    status: 'running',
+    baseUrl: BASE_URL,
+    concurrency: POLL_CONCURRENCY,
+    intervalMs: POLL_INTERVAL_MS,
+    marketCount: markets.length,
+    startedAt: startedAt.toISOString(),
+    finishedAt: null,
+    durationMs: null,
+    successCount: 0,
+    failureCount: 0,
+    avgScanMs: 0,
+    maxScanMs: 0,
+    errors: [],
+  };
+  await writeHealth(health);
+
+  if (markets.length === 0) {
+    console.log(`[${new Date().toISOString()}] No saved markets. Sleeping ${Math.round(POLL_INTERVAL_MS / 1000)}s...`);
+    health.status = 'idle';
+    health.finishedAt = new Date().toISOString();
+    health.durationMs = Date.now() - cycleStart;
+    await writeHealth(health);
+    return health;
+  }
+
+  const scanDurations = [];
+
+  await mapWithConcurrency(markets, POLL_CONCURRENCY, async (market) => {
+    const scan = await scanMarket(market);
+    scanDurations.push(scan.durationMs || 0);
+
+    if (!scan.ok || !scan.result) {
+      health.failureCount += 1;
+      const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
+      health.errors.push(err);
+      console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
+      return;
+    }
+
+    health.successCount += 1;
+    const { best, all } = applyScanResultToMarket(market, scan.result);
+    const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
+    if (best && best.roiPct > 0) {
+      console.log(`[${new Date().toISOString()}] ${market.eventTitle} → Best: ${best.outcome} ${formatRoi(best.roiPct)} | ${all.length} profitable arb(s), total +$${profitSum.toFixed(2)} (${scan.durationMs}ms)`);
+    } else {
+      console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms)`);
+    }
+  });
 
   await saveMarkets(markets);
+
+  health.status = health.failureCount > 0 ? 'degraded' : 'ok';
+  health.finishedAt = new Date().toISOString();
+  health.durationMs = Date.now() - cycleStart;
+  health.avgScanMs = scanDurations.length ? Math.round(scanDurations.reduce((s, n) => s + n, 0) / scanDurations.length) : 0;
+  health.maxScanMs = scanDurations.length ? Math.max(...scanDurations) : 0;
+  await writeHealth(health);
+
+  console.log(`[${new Date().toISOString()}] Poll cycle complete: ${health.successCount}/${markets.length} ok, ${health.failureCount} failed, ${health.durationMs}ms total`);
+  return health;
 }
 
 async function run() {
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    await pollOnce();
-    await sleep(30000);
+    const health = await pollOnce();
+    const elapsed = health.durationMs || 0;
+    const sleepMs = Math.max(1000, POLL_INTERVAL_MS - elapsed);
+    await sleep(sleepMs);
   }
 }
 

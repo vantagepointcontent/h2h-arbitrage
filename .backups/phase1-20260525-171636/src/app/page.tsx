@@ -74,7 +74,6 @@ interface UnifiedOutcome {
     volume?: string;
     liquidity?: string;
     askDepth?: number;
-    noAskDepth?: number;
   } | null;
   arbitrage: ArbitrageInfo;
   source?: "auto" | "manual";
@@ -116,12 +115,6 @@ interface ScanResult {
   kalshiCount: number;
   pmCount: number;
   matchedCount: number;
-  kalshiRawCount?: number;
-  pmRawCount?: number;
-  pmFilteredCount?: number;
-  kalshiFetchSource?: string;
-  clobHitCount?: number;
-  clobMissCount?: number;
   outcomes: UnifiedOutcome[];
   unmatchedKalshi: UnmatchedKalshi[];
   unmatchedPolymarket: UnmatchedPolymarket[];
@@ -175,10 +168,8 @@ export default function Home() {
   const [lastScanTime, setLastScanTime] = useState<number>(0);
   const previousPricesRef = useRef<Map<string, { kYes: number; pYes: number }>>(new Map());
   const [priceChanges, setPriceChanges] = useState<Map<string, "up" | "down" | null>>(new Map());
-  const [pollTimer, setPollTimer] = useState<number>(0);
+  const [pollTimer, setPollTimer] = useState<number>(Date.now());
   const pollRef = useRef<NodeJS.Timeout | null>(null);
-  const activeScanRef = useRef(false);
-  const pollingActiveRef = useRef(false);
 
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -186,18 +177,6 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview">("overview");
-
-  // Refs for values used inside useCallback — avoids stale closures and dependency-triggered re-renders
-  const savedMarketsRef = useRef<SavedMarket[]>(savedMarkets);
-  const kalshiUrlRef = useRef(kalshiUrl);
-  const pmUrlRef = useRef(pmUrl);
-  const activeMarketIdRef = useRef(activeMarketId);
-
-  // Keep refs in sync with state
-  useEffect(() => { savedMarketsRef.current = savedMarkets; }, [savedMarkets]);
-  useEffect(() => { kalshiUrlRef.current = kalshiUrl; }, [kalshiUrl]);
-  useEffect(() => { pmUrlRef.current = pmUrl; }, [pmUrl]);
-  useEffect(() => { activeMarketIdRef.current = activeMarketId; }, [activeMarketId]);
 
   // Save modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -363,17 +342,12 @@ export default function Home() {
   };
 
   const loadMarket = (market: SavedMarket) => {
-    stopPolling();               // ← stop old poll first
     setKalshiUrl(market.kalshiUrl);
     setPmUrl(market.polymarketUrl);
     setActiveMarketId(market.id);
     setViewMode("scan");
     setError("");
     setResult(null);            // ← wipe old result immediately
-    // Use refs to ensure URLs are set before scan fires
-    kalshiUrlRef.current = market.kalshiUrl;
-    pmUrlRef.current = market.polymarketUrl;
-    activeMarketIdRef.current = market.id;
     handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
   };
 
@@ -394,18 +368,13 @@ export default function Home() {
   };
 
   const scan = useCallback(async (silent = false, overrideKUrl?: string, overridePmUrl?: string) => {
-    if (activeScanRef.current) return false;
-    activeScanRef.current = true;
     if (!silent) setLoading(true);
     setError("");
     try {
       const res = await fetch(`/api/scan?_=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-        body: JSON.stringify({
-          kalshiUrl: overrideKUrl ?? kalshiUrlRef.current,
-          polymarketUrl: overridePmUrl ?? pmUrlRef.current,
-        }),
+        body: JSON.stringify({ kalshiUrl: overrideKUrl ?? kalshiUrl, polymarketUrl: overridePmUrl ?? pmUrl }),
         cache: 'no-store',
       });
       const data = await res.json();
@@ -436,59 +405,32 @@ export default function Home() {
       }
       previousPricesRef.current = newPrev;
       setResult(data);
-      if (activeMarketIdRef.current && data.expiryDate) {
-        const activeMarket = savedMarketsRef.current.find(m => m.id === activeMarketIdRef.current);
-        if (activeMarket && !activeMarket.expiryDate) {
-          updateMarketMeta(activeMarketIdRef.current, { expiryDate: data.expiryDate });
-        }
-      }
       setLastUpdated(new Date());
-      // Only refresh manual matches on the first scan, not every poll tick
-      if (!silent) loadManualMatches();
+      loadManualMatches();
       setLastScanTime(data._ts || Date.now());
-      return true;
     } catch (err: any) {
       if (!silent) setError(err.message || "Scan failed");
-      return false;
     } finally {
-      activeScanRef.current = false;
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [kalshiUrl, pmUrl]);
 
   const startPolling = useCallback(() => {
-    if (pollingActiveRef.current) return; // already polling — don't double-start
-    pollingActiveRef.current = true;
+    if (pollRef.current) clearInterval(pollRef.current);
     setIsPolling(true);
-    if (pollRef.current) clearTimeout(pollRef.current);
-
-    const runPoll = async () => {
-      if (!pollingActiveRef.current) return;
-      const started = Date.now();
-      await scan(true);
-      const elapsed = Date.now() - started;
-      if (pollingActiveRef.current) {
-        pollRef.current = setTimeout(runPoll, Math.max(1000, 5000 - elapsed));
-      }
-    };
-
-    pollRef.current = setTimeout(runPoll, 3000); // first poll after 3s
+    pollRef.current = setInterval(() => scan(true), 1000);
   }, [scan]);
 
   const stopPolling = useCallback(() => {
-    pollingActiveRef.current = false;
     if (pollRef.current) {
-      clearTimeout(pollRef.current);
+      clearInterval(pollRef.current);
       pollRef.current = null;
     }
     setIsPolling(false);
   }, []);
 
   useEffect(() => {
-    return () => {
-      pollingActiveRef.current = false;
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
   const handleScan = async (silent = false) => {
@@ -951,23 +893,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0) && (
-                    <div className="rounded-xl border border-[#eab308]/30 bg-[#eab308]/10 p-3 flex items-start gap-3 text-sm text-[#facc15]">
-                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                      <div className="space-y-1">
-                        <div className="font-semibold">Market data warning</div>
-                        <div className="text-xs text-[#d4d4d4]">
-                          {result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
-                          {result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
-                          {result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
-                        </div>
-                        <div className="text-[11px] text-[#a3a3a3]">
-                          Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
                       <h2 className="text-sm font-semibold">All Outcomes · {result.outcomes.filter(o => !!o.kalshi && !!o.polymarket).length} matched</h2>
@@ -1008,7 +933,7 @@ export default function Home() {
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.yesAsk)}</div>{outcome.kalshi.yesAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.yesAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.kalshi ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.kalshi.noAsk)}</div>{outcome.kalshi.noAskDepth && (<div className="text-[10px] text-[#737373]">({outcome.kalshi.noAskDepth})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.yesPrice)}</div>{(outcome.polymarket.askDepth ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
-                                <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.noPrice)}</div>{((outcome.polymarket.noAskDepth ?? outcome.polymarket.askDepth) ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round((outcome.polymarket.noAskDepth ?? outcome.polymarket.askDepth)!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
+                                <td className="px-4 py-3 text-center">{outcome.polymarket ? (<div><div className="text-[#e5e5e5] font-mono text-xs">{formatPrice(outcome.polymarket.noPrice)}</div>{(outcome.polymarket.askDepth ?? 0) > 0 && (<div className="text-[10px] text-[#737373]">(${Math.round(outcome.polymarket.askDepth!)})</div>)}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-center">{isMatched ? (<div className="flex flex-col items-center"><span className={`text-xs font-bold ${hasArb ? "text-[#22c55e]" : "text-[#737373]"}`}>{hasArb ? `+${arb.roiPct.toFixed(2)}%` : "No arb"}</span>{hasArb && <span className="text-[10px] text-[#737373]">{formatDollar(arb.expectedProfit)} profit</span>}</div>) : (<span className="text-[#404040]">—</span>)}</td>
                                 <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">{outcome.kalshi && (<a href={kalshiUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{outcome.polymarket && (<a href={pmUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>)}{isMatched && (<button onClick={() => setExpandedArtist(isExpanded ? null : outcome.artist)} className="p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-colors"><TrendingUp className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} /></button>)}</div></td>
                               </tr>

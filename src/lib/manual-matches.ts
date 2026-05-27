@@ -19,6 +19,13 @@ async function ensureDir() {
   try { await fs.mkdir(dir, { recursive: true }); } catch {}
 }
 
+async function writeMatchesAtomic(matches: ManualMatch[]): Promise<void> {
+  await ensureDir();
+  const tmpFile = `${DATA_FILE}.tmp`;
+  await fs.writeFile(tmpFile, JSON.stringify(matches, null, 2));
+  await fs.rename(tmpFile, DATA_FILE);
+}
+
 export async function getManualMatches(): Promise<ManualMatch[]> {
   try {
     await ensureDir();
@@ -43,8 +50,7 @@ export async function addManualMatch(match: Omit<ManualMatch, 'id' | 'createdAt'
     createdAt: new Date().toISOString(),
   };
   matches.push(newMatch);
-  await ensureDir();
-  await fs.writeFile(DATA_FILE, JSON.stringify(matches, null, 2));
+  await writeMatchesAtomic(matches);
   return newMatch;
 }
 
@@ -52,6 +58,6 @@ export async function deleteManualMatch(id: string): Promise<boolean> {
   const matches = await getManualMatches();
   const filtered = matches.filter(m => m.id !== id);
   if (filtered.length === matches.length) return false;
-  await fs.writeFile(DATA_FILE, JSON.stringify(filtered, null, 2));
+  await writeMatchesAtomic(filtered);
   return true;
 }

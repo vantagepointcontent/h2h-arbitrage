@@ -228,5 +228,45 @@
     "polymarketUrl": "https://polymarket.com/event/nba-playoffs-eastern-conference-champion/will-the-cleveland-cavaliers-win-the-nba-eastern-conference-finals",
     "id": "1779662422245-wl7486b",
     "createdAt": "2026-05-24T22:40:22.245Z"
+  },
+  {
+    "kalshiTicker": "KXSEOULMAYOR-26JUN03-OSEH",
+    "pmConditionId": "0xc587bda904f031a973ad3cb57128ca011bfab0f45e6cb3734ed2227c4d4be419",
+    "kalshiTitle": "KXSEOULMAYOR-26JUN03-OSEH",
+    "pmTitle": "Oh Se-hoon",
+    "kalshiUrl": "https://kalshi.com/markets/kxseoulmayor/who-will-win-the-seoul-mayoral-election/kxseoulmayor-26jun03",
+    "polymarketUrl": "https://polymarket.com/event/2026-seoul-mayoral-election-winner/will-oh-se-hoon-win-the-2026-seoul-mayoral-election",
+    "id": "1779738293216-jdir8mr",
+    "createdAt": "2026-05-25T19:44:53.216Z"
+  },
+  {
+    "kalshiTicker": "KXGROK-GROK5-26JUL01",
+    "pmConditionId": "0x0c61adaf2d0c903081573c305892a84c12701330258d912252eef226faa5c50f",
+    "kalshiTitle": "KXGROK-GROK5-26JUL01",
+    "pmTitle": "June 30, 2026",
+    "kalshiUrl": "https://kalshi.com/markets/kxgrok/grok/kxgrok-grok5",
+    "polymarketUrl": "https://polymarket.com/event/grok-5-released-by/grok-5-released-by-june-30-2026",
+    "id": "1779918293278-3gsxx71",
+    "createdAt": "2026-05-27T21:44:53.278Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AR02-26-R",
+    "pmConditionId": "0x2c3932e61938a4878fd60fbd1c3528a11f972ce8ec25bf8d33270490a1e6dfc0",
+    "kalshiTitle": "KXHOUSERACE-AR02-26-R",
+    "pmTitle": "Republican Party",
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar02-26",
+    "polymarketUrl": "https://polymarket.com/event/ar-02-house-election-winner/will-the-democratic-party-win-the-ar-02-house-seat",
+    "id": "1779919085141-kp83kid",
+    "createdAt": "2026-05-27T21:58:05.141Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AR02-26-D",
+    "pmConditionId": "0x07ed21c53502e59a3ec5455dc88878244e90a7c34e27e2a0ee3573a302452c79",
+    "kalshiTitle": "KXHOUSERACE-AR02-26-D",
+    "pmTitle": "Democratic Party",
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar02-26",
+    "polymarketUrl": "https://polymarket.com/event/ar-02-house-election-winner/will-the-democratic-party-win-the-ar-02-house-seat",
+    "id": "1779919087631-myyzik9",
+    "createdAt": "2026-05-27T21:58:07.631Z"
   }
 ]
