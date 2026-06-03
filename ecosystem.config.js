@@ -10,6 +10,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        PREDICTIONHUNT_API_KEY: "pmx_....hblkU"
       },
       log_file: '/home/scott/.pm2/logs/h2h-arbitrage.log',
       error_file: '/home/scott/.pm2/logs/h2h-arbitrage-error.log',
