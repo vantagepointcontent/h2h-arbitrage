@@ -1020,6 +1020,7 @@ export default function Home() {
           ) : viewMode === "marketfinder" ? (
             <MarketFinderPanel
               markets={mfMarkets}
+              savedMarketUrls={savedMarkets.map((m) => ({ kalshi: m.kalshiUrl || '', pm: m.polymarketUrl || '' }))}
               loading={mfLoading}
               syncing={mfSyncing}
               error={mfError}
@@ -2017,6 +2018,7 @@ function ManualMatchingPanel({
 /* ── MarketFinder Panel ── */
 function MarketFinderPanel({
   markets,
+  savedMarketUrls,
   loading,
   syncing,
   error,
@@ -2027,6 +2029,7 @@ function MarketFinderPanel({
   onSaveToH2H,
 }: {
   markets: any[];
+  savedMarketUrls: { kalshi: string; pm: string }[];
   loading: boolean;
   syncing: boolean;
   error: string;
@@ -2040,11 +2043,32 @@ function MarketFinderPanel({
     onFetch();
   }, []);
 
-  const sorted = [...markets].sort((a, b) => {
+  const sorted = [...markets].filter((m) => {
+    // Hide markets already saved — match normalized URLs (case-insensitive, strip query params)
+    const normalizeUrl = (url: string) => (url || '').split('?')[0].replace(/\/$/, '').toLowerCase();
+    const kUrl = normalizeUrl(m.kalshiUrl);
+    const pmUrl = normalizeUrl(m.polymarketUrl);
+    if (!kUrl && !pmUrl) return false;
+    return !savedMarketUrls.some(
+      (saved) => (kUrl && normalizeUrl(saved.kalshi) === kUrl) || (pmUrl && normalizeUrl(saved.pm) === pmUrl)
+    );
+  }).sort((a, b) => {
     const da = a.eventDate ? new Date(a.eventDate).getTime() : Infinity;
     const db = b.eventDate ? new Date(b.eventDate).getTime() : Infinity;
     return da - db;
   });
+
+  /* Check per-row if already saved (for button state) */
+  const isMarketSaved = (m: any) => {
+    const normalizeUrl = (url: string) => (url || '').split('?')[0].replace(/\/$/, '').toLowerCase();
+    const kUrl = normalizeUrl(m.kalshiUrl);
+    const pmUrl = normalizeUrl(m.polymarketUrl);
+    return savedMarketUrls.some(
+      (saved) => (kUrl && normalizeUrl(saved.kalshi) === kUrl) || (pmUrl && normalizeUrl(saved.pm) === pmUrl)
+    );
+  };
+
+  const hiddenCount = markets.length - sorted.length;
 
   return (
     <div className="space-y-5">
@@ -2075,6 +2099,13 @@ function MarketFinderPanel({
           </button>
         </div>
       </div>
+
+      {hiddenCount > 0 && (
+        <div className="text-xs text-[#737373] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1a1a]/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" className="text-[#22c55e]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in H2H)
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 text-sm text-[#ef4444]">
@@ -2134,13 +2165,20 @@ function MarketFinderPanel({
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => onSaveToH2H(m)}
-                        disabled={isSaving || !m.kalshiUrl || !m.polymarketUrl}
-                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors border border-[#22c55e]/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        {isSaving ? "Saving..." : "Add to H2H"}
-                      </button>
+                      {isMarketSaved(m) ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                          Added
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => onSaveToH2H(m)}
+                          disabled={isSaving || !m.kalshiUrl || !m.polymarketUrl}
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors border border-[#22c55e]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {isSaving ? "Saving..." : "Add to H2H"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
