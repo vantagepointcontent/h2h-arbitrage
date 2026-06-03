@@ -1,0 +1,15 @@
+{
+  "status": "ok",
+  "baseUrl": "http://100.86.7.30:3000",
+  "concurrency": 3,
+  "intervalMs": 30000,
+  "marketCount": 32,
+  "startedAt": "2026-06-03T11:09:27.036Z",
+  "finishedAt": "2026-06-03T11:09:46.182Z",
+  "durationMs": 19146,
+  "successCount": 32,
+  "failureCount": 0,
+  "avgScanMs": 1591,
+  "maxScanMs": 4671,
+  "errors": []
+}
