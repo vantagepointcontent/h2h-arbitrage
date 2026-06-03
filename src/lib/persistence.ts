@@ -36,6 +36,12 @@ async function ensureDir() {
   try { await fs.mkdir(dir, { recursive: true }); } catch {}
 }
 
+async function writeSavedMarkets(markets: SavedMarket[]): Promise<void> {
+  const tmp = `${DATA_FILE}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(markets, null, 2));
+  await fs.rename(tmp, DATA_FILE);
+}
+
 export async function getSavedMarkets(): Promise<SavedMarket[]> {
   try {
     await ensureDir();
@@ -59,8 +65,7 @@ export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt
     lastScanResult: null,
   };
   markets.push(newMarket);
-  await ensureDir();
-  await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
+  await writeSavedMarkets(markets);
   return newMarket;
 }
 
@@ -69,8 +74,7 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   const idx = markets.findIndex(m => m.id === id);
   if (idx >= 0) {
     markets[idx].lastScanResult = result;
-    await ensureDir();
-    await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
+    await writeSavedMarkets(markets);
   }
 }
 
@@ -81,8 +85,7 @@ export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedM
   if (updates.eventTitle !== undefined) markets[idx].eventTitle = updates.eventTitle;
   if (updates.expiryDate !== undefined) markets[idx].expiryDate = updates.expiryDate || null;
   if (updates.category !== undefined) markets[idx].category = updates.category;
-  await ensureDir();
-  await fs.writeFile(DATA_FILE, JSON.stringify(markets, null, 2));
+  await writeSavedMarkets(markets);
   return true;
 }
 
@@ -90,6 +93,6 @@ export async function deleteSavedMarket(id: string): Promise<boolean> {
   const markets = await getSavedMarkets();
   const filtered = markets.filter(m => m.id !== id);
   if (filtered.length === markets.length) return false;
-  await fs.writeFile(DATA_FILE, JSON.stringify(filtered, null, 2));
+  await writeSavedMarkets(filtered);
   return true;
 }
