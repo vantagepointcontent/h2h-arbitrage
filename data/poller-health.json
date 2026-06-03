@@ -1,15 +1,15 @@
 {
-  "status": "ok",
+  "status": "running",
   "baseUrl": "http://100.86.7.30:3000",
   "concurrency": 3,
   "intervalMs": 30000,
-  "marketCount": 32,
-  "startedAt": "2026-06-03T11:09:27.036Z",
-  "finishedAt": "2026-06-03T11:09:46.182Z",
-  "durationMs": 19146,
-  "successCount": 32,
+  "marketCount": 33,
+  "startedAt": "2026-06-03T13:10:57.187Z",
+  "finishedAt": null,
+  "durationMs": null,
+  "successCount": 0,
   "failureCount": 0,
-  "avgScanMs": 1591,
-  "maxScanMs": 4671,
+  "avgScanMs": 0,
+  "maxScanMs": 0,
   "errors": []
 }

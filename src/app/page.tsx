@@ -34,6 +34,7 @@ import {
   Rows3,
   Search,
   Filter,
+  Globe,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/DateTimePicker";
 
@@ -185,7 +186,7 @@ export default function Home() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder">("overview");
 
   // Refs for values used inside useCallback — avoids stale closures and dependency-triggered re-renders
   const savedMarketsRef = useRef<SavedMarket[]>(savedMarkets);
@@ -206,6 +207,10 @@ export default function Home() {
       if (state?.view === "overview") {
         stopPolling();
         setViewMode("overview");
+        setActiveMarketId(null);
+      } else if (state?.view === "marketfinder") {
+        stopPolling();
+        setViewMode("marketfinder");
         setActiveMarketId(null);
       } else if (state?.view === "scan") {
         if (state?.marketId) {
@@ -242,12 +247,10 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get("view");
-    if (view !== "scan" && view !== "overview") {
+    if (view !== "scan" && view !== "overview" && view !== "marketfinder") {
       window.history.replaceState({ view: "overview" }, "", "/?view=overview");
-    } else if (view === "scan") {
-      window.history.replaceState({ view: "scan" }, "", "/?view=scan");
     } else {
-      window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+      window.history.replaceState({ view }, "", `/?view=${view}`);
     }
   }, []);
 
@@ -278,6 +281,14 @@ export default function Home() {
 
   const [scanningAll, setScanningAll] = useState(false);
   const [scanAllError, setScanAllError] = useState<string>("");
+
+  // MarketFinder state
+  const [mfMarkets, setMfMarkets] = useState<any[]>([]);
+  const [mfLoading, setMfLoading] = useState(false);
+  const [mfSyncing, setMfSyncing] = useState(false);
+  const [mfError, setMfError] = useState("");
+  const [mfLastSync, setMfLastSync] = useState<any>(null);
+  const [mfSavingIds, setMfSavingIds] = useState<Set<string>>(new Set());
 
   // Sidebar sort
   type SidebarSort = "name" | "roi" | "expiry" | "apy";
@@ -484,6 +495,13 @@ export default function Home() {
     setViewMode("overview");
     setActiveMarketId(null);
     window.history.pushState({ view: "overview" }, "", "/?view=overview");
+  };
+
+  const goToMarketFinder = () => {
+    stopPolling();
+    setViewMode("marketfinder");
+    setActiveMarketId(null);
+    window.history.pushState({ view: "marketfinder" }, "", "/?view=marketfinder");
   };
 
   const scan = useCallback(async (silent = false, overrideKUrl?: string, overridePmUrl?: string) => {
@@ -783,6 +801,11 @@ export default function Home() {
           {sidebarOpen && <span>Overview</span>}
         </button>
 
+        <button onClick={goToMarketFinder} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+          <Globe className="w-4 h-4 shrink-0" />
+          {sidebarOpen && <span>MarketFinder</span>}
+        </button>
+
         {sidebarOpen && (
           <div className="mx-2 mt-2 relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#737373] pointer-events-none" />
@@ -956,6 +979,84 @@ export default function Home() {
               onScanAll={scanAllMarkets}
               scanningAll={scanningAll}
               scanAllError={scanAllError}
+            />
+          ) : viewMode === "marketfinder" ? (
+            <MarketFinderPanel
+              markets={mfMarkets}
+              loading={mfLoading}
+              syncing={mfSyncing}
+              error={mfError}
+              lastSync={mfLastSync}
+              savingIds={mfSavingIds}
+              onFetch={() => {
+                setMfLoading(true);
+                fetch("/api/predictionhunt/markets", { headers: { "Cache-Control": "no-store" } })
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (d.success) {
+                      setMfMarkets(d.markets || []);
+                      setMfLastSync(d.lastSync);
+                    }
+                    setMfError("");
+                  })
+                  .catch(() => setMfError("Failed to load MarketFinder data"))
+                  .finally(() => setMfLoading(false));
+              }}
+              onSync={() => {
+                setMfSyncing(true);
+                setMfError("");
+                fetch("/api/predictionhunt/markets?action=sync", { method: "POST" })
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (d.success) {
+                      setMfLastSync(d.synced);
+                      return fetch("/api/predictionhunt/markets", { headers: { "Cache-Control": "no-store" } })
+                        .then((r) => r.json())
+                        .then((d2) => {
+                          if (d2.success) {
+                            setMfMarkets(d2.markets || []);
+                            setMfLastSync(d2.lastSync);
+                          }
+                        });
+                    } else {
+                      setMfError(d.error || "Sync failed");
+                    }
+                  })
+                  .catch(() => setMfError("Sync request failed"))
+                  .finally(() => setMfSyncing(false));
+              }}
+              onSaveToH2H={(m) => {
+                if (!m.kalshiUrl || !m.polymarketUrl) return;
+                setMfSavingIds((prev) => new Set(prev).add(m.id));
+                fetch("/api/predictionhunt/markets?action=save-to-h2h", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    kalshiUrl: m.kalshiUrl,
+                    polymarketUrl: m.polymarketUrl,
+                    title: m.title,
+                    category: m.eventType,
+                    expiryDate: m.eventDate || null,
+                  }),
+                })
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (!d.success) {
+                      setMfError(d.error || "Failed to save");
+                    } else {
+                      // Refresh saved markets
+                      loadSavedMarkets();
+                    }
+                  })
+                  .catch(() => setMfError("Failed to save market"))
+                  .finally(() => {
+                    setMfSavingIds((prev) => {
+                      const n = new Set(prev);
+                      n.delete(m.id);
+                      return n;
+                    });
+                  });
+              }}
             />
           ) : (
             <>
@@ -1873,6 +1974,187 @@ function ManualMatchingPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+/* ── MarketFinder Panel ── */
+function MarketFinderPanel({
+  markets,
+  loading,
+  syncing,
+  error,
+  lastSync,
+  savingIds,
+  onFetch,
+  onSync,
+  onSaveToH2H,
+}: {
+  markets: any[];
+  loading: boolean;
+  syncing: boolean;
+  error: string;
+  lastSync: any;
+  savingIds: Set<string>;
+  onFetch: () => void;
+  onSync: () => void;
+  onSaveToH2H: (m: any) => void;
+}) {
+  useEffect(() => {
+    onFetch();
+  }, []);
+
+  const sorted = [...markets].sort((a, b) => {
+    const da = a.eventDate ? new Date(a.eventDate).getTime() : Infinity;
+    const db = b.eventDate ? new Date(b.eventDate).getTime() : Infinity;
+    return da - db;
+  });
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+            <Globe className="w-5 h-5 text-[#22c55e]" />
+            MarketFinder
+          </h2>
+          <p className="text-xs text-[#737373] mt-0.5">
+            PredictionHunt matched markets — sorted by expiry soonest
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastSync && (
+            <span className="text-[10px] text-[#525252]">
+              Last sync: {getTimeAgo(lastSync.finishedAt || lastSync.startedAt)}
+            </span>
+          )}
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#22c55e]/10 text-[#22c55e] text-sm font-medium hover:bg-[#22c55e]/20 transition-all border border-[#22c55e]/20 disabled:opacity-50"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {syncing ? "Syncing..." : "Sync All"}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-[#ef4444]">
+          <AlertCircle className="w-4 h-4" /> {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-20 text-center text-sm text-[#737373]">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
+          Loading markets...
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="py-20 text-center text-sm text-[#525252]">
+          No markets found. Try syncing to fetch from PredictionHunt.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-[#111111] border-b border-[#1a1a1a]">
+              <tr className="text-[10px] text-[#737373] uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-medium">Market</th>
+                <th className="text-left px-4 py-3 font-medium w-32">Category</th>
+                <th className="text-left px-4 py-3 font-medium w-36">Expiry</th>
+                <th className="text-left px-4 py-3 font-medium w-20">Platforms</th>
+                <th className="text-center px-4 py-3 font-medium w-40">Links</th>
+                <th className="text-center px-4 py-3 font-medium w-28">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1a1a1a]">
+              {sorted.map((m) => {
+                const daysLeft = m.eventDate
+                  ? Math.ceil((new Date(m.eventDate).getTime() - Date.now()) / 86400000)
+                  : null;
+                const isSaving = savingIds.has(m.id);
+                return (
+                  <tr key={m.id} className="hover:bg-[#1a1a1a]/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-[#e5e5e5] text-sm">{m.title}</div>
+                      {m.groupTitle && m.groupTitle !== m.title && (
+                        <div className="text-[10px] text-[#525252] mt-0.5">{m.groupTitle}</div>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${m.confidence === 'high' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-[#eab308]/10 text-[#eab308]'}`}>
+                          {m.confidence} match
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-[#a3a3a3] capitalize">{m.eventType}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs text-[#e5e5e5]">
+                        {m.eventDate
+                          ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : <span className="text-[#525252]">None</span>
+                        }
+                      </div>
+                      {daysLeft !== null && (
+                        <div className={`text-[10px] mt-0.5 ${daysLeft <= 7 ? 'text-[#ef4444]' : daysLeft <= 30 ? 'text-[#eab308]' : 'text-[#737373]'}`}>
+                          {daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {m.polymarketUrl && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#6366f1]/10 text-[#6366f1]">PM</span>
+                        )}
+                        {m.kalshiUrl && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#eab308]/10 text-[#eab308]">K</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {m.kalshiUrl && (
+                          <a
+                            href={m.kalshiUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] font-medium px-2 py-1 rounded bg-[#eab308]/10 text-[#eab308] hover:bg-[#eab308]/20 transition-colors"
+                          >
+                            Kalshi →
+                          </a>
+                        )}
+                        {m.polymarketUrl && (
+                          <a
+                            href={m.polymarketUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] font-medium px-2 py-1 rounded bg-[#6366f1]/10 text-[#6366f1] hover:bg-[#6366f1]/20 transition-colors"
+                          >
+                            PM →
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => onSaveToH2H(m)}
+                        disabled={isSaving || !m.kalshiUrl || !m.polymarketUrl}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors border border-[#22c55e]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? "Saving..." : "Add to H2H"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
