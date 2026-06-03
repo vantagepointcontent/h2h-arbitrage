@@ -268,5 +268,25 @@
     "polymarketUrl": "https://polymarket.com/event/ar-02-house-election-winner/will-the-democratic-party-win-the-ar-02-house-seat",
     "id": "1779919087631-myyzik9",
     "createdAt": "2026-05-27T21:58:07.631Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AR01-26-R",
+    "pmConditionId": "0x94fec7c18e1210413a4515fca3f7f38f8801929f34e59e69a91e1ee3df9737e3",
+    "kalshiTitle": "KXHOUSERACE-AR01-26-R",
+    "pmTitle": "Republican Party",
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar01-26",
+    "polymarketUrl": "https://polymarket.com/event/ar-01-house-election-winner/will-the-republican-party-win-the-ar-01-house-seat",
+    "id": "1779921489823-gahg807",
+    "createdAt": "2026-05-27T22:38:09.823Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AR01-26-D",
+    "pmConditionId": "0xce73664a88dbb8d87db3f337be1eff34dca81c20d980325c29729ae8d58cd28a",
+    "kalshiTitle": "KXHOUSERACE-AR01-26-D",
+    "pmTitle": "Democratic Party",
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar01-26",
+    "polymarketUrl": "https://polymarket.com/event/ar-01-house-election-winner/will-the-republican-party-win-the-ar-01-house-seat",
+    "id": "1779921492372-y9xstnq",
+    "createdAt": "2026-05-27T22:38:12.372Z"
   }
 ]

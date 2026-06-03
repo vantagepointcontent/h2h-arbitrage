@@ -199,6 +199,58 @@ export default function Home() {
   useEffect(() => { pmUrlRef.current = pmUrl; }, [pmUrl]);
   useEffect(() => { activeMarketIdRef.current = activeMarketId; }, [activeMarketId]);
 
+  // Handle browser back/forward via popstate
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state?.view === "overview") {
+        stopPolling();
+        setViewMode("overview");
+        setActiveMarketId(null);
+      } else if (state?.view === "scan") {
+        if (state?.marketId) {
+          const m = savedMarketsRef.current.find((m) => m.id === state.marketId);
+          if (m) {
+            setKalshiUrl(m.kalshiUrl);
+            setPmUrl(m.polymarketUrl);
+            setActiveMarketId(m.id);
+            kalshiUrlRef.current = m.kalshiUrl;
+            pmUrlRef.current = m.polymarketUrl;
+            activeMarketIdRef.current = m.id;
+            setResult(null);
+            previousPricesRef.current = new Map();
+            setPriceChanges(new Map());
+            handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+          } else {
+            setViewMode("scan");
+          }
+        } else {
+          setViewMode("scan");
+        }
+      } else {
+        // Default: overview
+        stopPolling();
+        setViewMode("overview");
+        setActiveMarketId(null);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // On first mount: check query param for direct links
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    if (view !== "scan" && view !== "overview") {
+      window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+    } else if (view === "scan") {
+      window.history.replaceState({ view: "scan" }, "", "/?view=scan");
+    } else {
+      window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+    }
+  }, []);
+
   // Save modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -223,6 +275,9 @@ export default function Home() {
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
   const [hideUnmatched, setHideUnmatched] = useState(false);
+
+  const [scanningAll, setScanningAll] = useState(false);
+  const [scanAllError, setScanAllError] = useState<string>("");
 
   // Sidebar sort
   type SidebarSort = "name" | "roi" | "expiry" | "apy";
@@ -263,6 +318,36 @@ export default function Home() {
         setManualMatches(data.matches || []);
       }
     } catch {}
+  };
+
+  // Scan ALL saved markets sequentially (manual trigger from Overview)
+  const scanAllMarkets = async () => {
+    if (scanningAll) return;
+    setScanningAll(true);
+    setScanAllError("");
+    const failed: string[] = [];
+
+    for (const market of savedMarketsRef.current) {
+      try {
+        await fetch(`/api/scan?_=${Date.now()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kalshiUrl: market.kalshiUrl,
+            polymarketUrl: market.polymarketUrl,
+          }),
+        });
+      } catch {
+        failed.push(market.eventTitle);
+      }
+    }
+
+    await loadSavedMarkets();
+    setScanningAll(false);
+    if (failed.length > 0) {
+      setScanAllError(`${failed.length} market(s) failed to scan.`);
+      setTimeout(() => setScanAllError(""), 4000);
+    }
   };
 
   const saveCurrentMarket = async () => {
@@ -370,6 +455,10 @@ export default function Home() {
     setViewMode("scan");
     setError("");
     setResult(null);            // ← wipe old result immediately
+    previousPricesRef.current = new Map(); // ← reset price tracking for new market
+    setPriceChanges(new Map());            // ← clear any stale flash indicators
+    // Push history state so back button works
+    window.history.pushState({ view: "scan", marketId: market.id }, "", `/?view=scan&id=${market.id}`);
     // Use refs to ensure URLs are set before scan fires
     kalshiUrlRef.current = market.kalshiUrl;
     pmUrlRef.current = market.polymarketUrl;
@@ -383,14 +472,18 @@ export default function Home() {
     setResult(null);
     setActiveMarketId(null);
     setError("");
+    previousPricesRef.current = new Map();
+    setPriceChanges(new Map());
     stopPolling();
     setViewMode("scan");
+    window.history.pushState({ view: "scan" }, "", "/?view=scan");
   };
 
   const goToOverview = () => {
     stopPolling();
     setViewMode("overview");
     setActiveMarketId(null);
+    window.history.pushState({ view: "overview" }, "", "/?view=overview");
   };
 
   const scan = useCallback(async (silent = false, overrideKUrl?: string, overridePmUrl?: string) => {
@@ -860,6 +953,9 @@ export default function Home() {
               onToggleLayout={setOverviewLayout}
               expiryFilter={overviewExpiryFilter}
               onSetExpiryFilter={setOverviewExpiryFilter}
+              onScanAll={scanAllMarkets}
+              scanningAll={scanningAll}
+              scanAllError={scanAllError}
             />
           ) : (
             <>
@@ -1189,6 +1285,9 @@ function OverviewPanel({
   onToggleLayout,
   expiryFilter,
   onSetExpiryFilter,
+  onScanAll,
+  scanningAll,
+  scanAllError,
 }: {
   markets: SavedMarket[];
   onSelectMarket: (m: SavedMarket) => void;
@@ -1202,6 +1301,9 @@ function OverviewPanel({
   onToggleLayout: (l: "grid" | "table") => void;
   expiryFilter: "all" | "lte7" | "lte14" | "lte30";
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
+  onScanAll?: () => void;
+  scanningAll?: boolean;
+  scanAllError?: string;
 }) {
   return (
     <div className="space-y-5">
@@ -1292,8 +1394,8 @@ function OverviewPanel({
         );
       })()}
 
-            {/* Header + sort controls + layout toggle */}
-      <div className="flex items-center justify-between">
+      {/* Header + sort controls + layout toggle + Scan All */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">Market Overview</h2>
         <div className="flex items-center gap-2">
           {(["expiry", "roi", "apy", "name"] as OverviewSort[]).map((field) => (
@@ -1322,8 +1424,25 @@ function OverviewPanel({
           >
             {layout === "grid" ? <><Rows3 className="w-3 h-3" /> List</> : <><LayoutGrid className="w-3 h-3" /> Grid</>}
           </button>
+          {onScanAll && (
+            <button
+              onClick={onScanAll}
+              disabled={scanningAll}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30 hover:bg-[#22c55e]/20 disabled:opacity-50"
+              title="Refresh all saved markets now"
+            >
+              {scanningAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              {scanningAll ? "Scanning…" : "Scan All"}
+            </button>
+          )}
         </div>
       </div>
+
+      {scanAllError && (
+        <div className="text-xs text-[#ef4444] flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" /> {scanAllError}
+        </div>
+      )}
 
       {/* Expiry filter toolbar */}
       <div className="flex items-center gap-2">
