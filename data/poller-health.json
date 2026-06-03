@@ -1,15 +1,151 @@
 {
-  "status": "running",
+  "status": "degraded",
   "baseUrl": "http://100.86.7.30:3000",
   "concurrency": 3,
   "intervalMs": 30000,
   "marketCount": 33,
-  "startedAt": "2026-06-03T13:10:57.187Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
-  "failureCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "startedAt": "2026-06-03T13:26:00.771Z",
+  "finishedAt": "2026-06-03T13:26:14.146Z",
+  "durationMs": 13375,
+  "successCount": 6,
+  "failureCount": 27,
+  "avgScanMs": 13136,
+  "maxScanMs": 15000,
+  "errors": [
+    {
+      "market": "CA-21 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Minnesota Republican Senate Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Tennessee Governor Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "2026 NHL Stanley Cup Champion ",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Wisconsin Governor Democratic Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "TN-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Who will Bernie endorse?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Top Spotify Artist 2026",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "NBA Playoffs: Eastern Conference Champion ",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "MLS Cup Winner 2026",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "FL-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "WA-03 Primary Winners",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "NY-13 Democratic Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Grok 5 released by...?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Alaska Governor Election Winner  ",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Who will win the 2026 Fields Medal?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "NY-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Pro Football: 2027 AFC Champion ",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "South Carolina Governor Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Which bills will become law in 2026?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "AR-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Which companies will the US take a stake in?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "AR-01 House Election Winner 1",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "WNBA: 2026 Champion",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Which countries will recognize Palestine before 2027?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Venezuela leader end of 2026?",
+      "error": "fetch failed",
+      "durationMs": 15000
+    },
+    {
+      "market": "Wealth Tax CA 2026",
+      "error": "fetch failed",
+      "durationMs": 15000
+    }
+  ]
 }

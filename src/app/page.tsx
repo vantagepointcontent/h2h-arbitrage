@@ -2060,83 +2060,41 @@ function MarketFinderPanel({
             <thead className="bg-[#111111] border-b border-[#1a1a1a]">
               <tr className="text-[10px] text-[#737373] uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-medium">Market</th>
-                <th className="text-left px-4 py-3 font-medium w-32">Category</th>
-                <th className="text-left px-4 py-3 font-medium w-36">Expiry</th>
-                <th className="text-left px-4 py-3 font-medium w-20">Platforms</th>
-                <th className="text-center px-4 py-3 font-medium w-40">Links</th>
-                <th className="text-center px-4 py-3 font-medium w-28">Actions</th>
+                <th className="text-left px-4 py-3 font-medium w-40">Expiry</th>
+                <th className="text-left px-4 py-3 font-medium w-24"></th>
+                <th className="text-left px-4 py-3 font-medium w-24"></th>
+                <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1a1a]">
               {sorted.map((m) => {
-                const daysLeft = m.eventDate
-                  ? Math.ceil((new Date(m.eventDate).getTime() - Date.now()) / 86400000)
-                  : null;
                 const isSaving = savingIds.has(m.id);
                 return (
                   <tr key={m.id} className="hover:bg-[#1a1a1a]/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#e5e5e5] text-sm">{m.title}</div>
-                      {m.groupTitle && m.groupTitle !== m.title && (
-                        <div className="text-[10px] text-[#525252] mt-0.5">{m.groupTitle}</div>
-                      )}
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${m.confidence === 'high' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-[#eab308]/10 text-[#eab308]'}`}>
-                          {m.confidence} match
-                        </span>
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{m.eventType}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-[#a3a3a3] capitalize">{m.eventType}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-xs text-[#e5e5e5]">
-                        {m.eventDate
-                          ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : <span className="text-[#525252]">None</span>
-                        }
+                        {m.eventDate ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
                       </div>
-                      {daysLeft !== null && (
-                        <div className={`text-[10px] mt-0.5 ${daysLeft <= 7 ? 'text-[#ef4444]' : daysLeft <= 30 ? 'text-[#eab308]' : 'text-[#737373]'}`}>
-                          {daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`}
-                        </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {m.kalshiUrl ? (
+                        <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#eab308] hover:underline">Kalshi →</a>
+                      ) : (
+                        <span className="text-xs text-[#525252]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {m.polymarketUrl && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#6366f1]/10 text-[#6366f1]">PM</span>
-                        )}
-                        {m.kalshiUrl && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#eab308]/10 text-[#eab308]">K</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {m.kalshiUrl && (
-                          <a
-                            href={m.kalshiUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[10px] font-medium px-2 py-1 rounded bg-[#eab308]/10 text-[#eab308] hover:bg-[#eab308]/20 transition-colors"
-                          >
-                            Kalshi →
-                          </a>
-                        )}
-                        {m.polymarketUrl && (
-                          <a
-                            href={m.polymarketUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[10px] font-medium px-2 py-1 rounded bg-[#6366f1]/10 text-[#6366f1] hover:bg-[#6366f1]/20 transition-colors"
-                          >
-                            PM →
-                          </a>
-                        )}
-                      </div>
+                      {m.polymarketUrl ? (
+                        <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#6366f1] hover:underline">Polymarket →</a>
+                      ) : (
+                        <span className="text-xs text-[#525252]">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button

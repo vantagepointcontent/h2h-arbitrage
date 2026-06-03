@@ -71,9 +71,12 @@ function extractMarketUrls(group: any): { pmUrl: string | null; pmId: string | n
   let kId: string | null = null;
 
   for (const m of markets) {
-    if (m.source === 'polymarket' && m.source_url && !pmUrl) {
-      pmUrl = m.source_url;
-      pmId = m.id || null;
+    if (m.source === 'polymarket' && m.source_url) {
+      // Only accept event URLs — individual market URLs don't have event-level outcomes
+      if (m.source_url.includes('/event/') && !pmUrl) {
+        pmUrl = m.source_url;
+        pmId = m.id || null;
+      }
     }
     if (m.source === 'kalshi' && m.source_url && !kUrl) {
       kUrl = m.source_url;
@@ -123,8 +126,17 @@ export async function fetchMatchingMarkets(term: string): Promise<PredictionHunt
     if (!Array.isArray(event.groups)) continue;
     for (const group of event.groups) {
       const { pmUrl, pmId, kUrl, kId, count } = extractMarketUrls(group);
-      // Skip if neither platform URL is present (unusable)
-      if (!pmUrl && !kUrl) continue;
+      // Skip unless both Kalshi AND Polymarket URLs are present
+      if (!pmUrl || !kUrl) continue;
+
+      // Skip if the market has already expired (event date is today or in the past)
+      const eventDateStr = event.event_date || null;
+      if (eventDateStr) {
+        const eventDate = new Date(eventDateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (eventDate < today) continue;
+      }
 
       results.push({
         id: hashMarket(event, group),
