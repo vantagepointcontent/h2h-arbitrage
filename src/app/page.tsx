@@ -243,15 +243,50 @@ export default function Home() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // On first mount: check query param for direct links
+  // On first mount: check query param for direct links and sync react state
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const view = params.get("view");
-    if (view !== "scan" && view !== "overview" && view !== "marketfinder") {
+    const syncFromUrl = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      const marketId = params.get("id");
+
+      const initialMarkets = await loadSavedMarkets();
+      savedMarketsRef.current = initialMarkets;
+
+      if (view === "scan" && marketId) {
+        const m = (initialMarkets as SavedMarket[]).find((m) => m.id === marketId);
+        if (m) {
+          setKalshiUrl(m.kalshiUrl);
+          setPmUrl(m.polymarketUrl);
+          setActiveMarketId(m.id);
+          kalshiUrlRef.current = m.kalshiUrl;
+          pmUrlRef.current = m.polymarketUrl;
+          activeMarketIdRef.current = m.id;
+          setViewMode("scan");
+          setResult(null);
+          previousPricesRef.current = new Map();
+          setPriceChanges(new Map());
+          handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+          return;
+        }
+      }
+
+      if (view === "overview" || view === "marketfinder") {
+        setViewMode(view);
+        stopPolling();
+        setActiveMarketId(null);
+        window.history.replaceState({ view }, "", `/?view=${view}`);
+        return;
+      }
+
+      // Default
+      setViewMode("overview");
+      stopPolling();
+      setActiveMarketId(null);
       window.history.replaceState({ view: "overview" }, "", "/?view=overview");
-    } else {
-      window.history.replaceState({ view }, "", `/?view=${view}`);
-    }
+    };
+
+    syncFromUrl();
   }, []);
 
   // Save modal state
@@ -317,8 +352,10 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setSavedMarkets(data.markets || []);
+        return data.markets || [];
       }
     } catch {}
+    return [];
   };
 
   const loadManualMatches = async () => {

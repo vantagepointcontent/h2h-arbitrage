@@ -227,7 +227,21 @@ async function pollOnce() {
     }
   });
 
-  await saveMarkets(markets);
+  // Re-read file from disk before saving, to merge scan results without losing
+  // markets that were added by the web app while poller was running.
+  const latestMarkets = await loadSavedMarkets();
+  for (const scannedMarket of markets) {
+    if (scannedMarket.lastScanResult) {
+      const live = latestMarkets.find(m => m.id === scannedMarket.id);
+      if (live) {
+        live.lastScanResult = scannedMarket.lastScanResult;
+        if (scannedMarket.expiryDate && !live.expiryDate) {
+          live.expiryDate = scannedMarket.expiryDate;
+        }
+      }
+    }
+  }
+  await saveMarkets(latestMarkets);
 
   health.status = health.failureCount > 0 ? 'degraded' : 'ok';
   health.finishedAt = new Date().toISOString();
