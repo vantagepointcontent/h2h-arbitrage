@@ -32,8 +32,8 @@ if (!API_KEY) {
   console.warn('[predictionhunt] PREDICTIONHUNT_API_KEY not set in env');
 }
 
-/* Search terms to iterate over. PredictionHunt requires a q param and    
-   returns max 10 hits. These cover the landscape pretty well.              */
+/* Search terms to iterate over. PredictionHunt requires a q param and
+   returns multiple pages. These cover the landscape pretty well. */
 const SEARCH_TERMS = [
   '2026', '2027', 'trump', 'election', 'president', 'congress',
   'biden', 'gdp', 'inflation', 'fed', 'rates', 'nasdaq', 'sp500',
@@ -46,6 +46,8 @@ const SEARCH_TERMS = [
   'meta', 'apple', 'google', 'amazon', 'microsoft',
   'oil', 'gas', 'energy', 'climate',
 ];
+
+const RATE_LIMIT_MS = 600; // 600ms between calls (safe for most free tiers)
 
 /* ──────────────────────────── Helpers ──────────────────────────── */
 
@@ -261,8 +263,8 @@ export async function runFullSync(): Promise<SyncLog> {
       log.termsFailed.push({ term, error: err.message });
     }
 
-    // Rate-limit respect: 150ms between calls
-    await new Promise(r => setTimeout(r, 150));
+    // Rate-limit respect: 600ms between calls
+    await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
   }
 
   const stats = await addPredictionHuntMarkets(allFetched);

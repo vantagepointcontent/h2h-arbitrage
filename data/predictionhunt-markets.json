@@ -160,6 +160,22 @@
     "fetchedAt": "2026-06-03T13:24:50.084Z"
   },
   {
+    "id": "547627631-11594",
+    "eventId": "547627631",
+    "groupId": 11594,
+    "title": "Who will Trump pardon before 2027?",
+    "eventType": "political",
+    "confidence": "high",
+    "eventDate": "2026-12-31",
+    "groupTitle": "Ghislaine Maxwell",
+    "polymarketUrl": "https://polymarket.com/event/who-will-trump-pardon-before-2027?r=predictionhunt",
+    "polymarketId": "687689",
+    "kalshiUrl": "https://kalshi.com/markets/KXTRUMPPARDON/KXTRUMPPARDON-27JAN01",
+    "kalshiId": "KXTRUMPPARDON-27JAN01-GMAX",
+    "marketCount": 2,
+    "fetchedAt": "2026-06-03T13:27:52.843Z"
+  },
+  {
     "id": "1347545784-152234",
     "eventId": "1347545784",
     "groupId": 152234,
