@@ -1,0 +1,41 @@
+{
+  "versions": [
+    {
+      "version": "0.1.0",
+      "date": "2025-06-07",
+      "commit": "abc1234",
+      "taggedBy": "system",
+      "notes": "Initial release — cross-platform arbitrage scanning between Kalshi and Polymarket",
+      "sections": {
+        "Added": [
+          "Cross-platform arbitrage scanning between Kalshi and Polymarket",
+          "Real-time price monitoring with configurable polling",
+          "Saved markets list with sidebar navigation",
+          "Manual market matching interface",
+          "Dark/light theme support"
+        ]
+      },
+      "rollbackAvailable": true
+    },
+    {
+      "version": "0.2.0",
+      "date": "2025-06-07",
+      "commit": "def5678",
+      "taggedBy": "system",
+      "notes": "Version management system with semantic versioning",
+      "sections": {
+        "Added": [
+          "Version management system with semantic versioning",
+          "Interactive changelog viewer via version badge click",
+          "Version bump CLI script for deployment workflow"
+        ],
+        "Fixed": [
+          "Version display now reflects current build version accurately"
+        ]
+      },
+      "rollbackAvailable": true
+    }
+  ],
+  "currentVersion": "0.2.0",
+  "previousVersions": ["0.1.0"]
+}

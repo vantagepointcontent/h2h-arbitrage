@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 import {
   extractKalshiEventTicker,
   fetchKalshiEventMarkets,
@@ -11,6 +12,7 @@ import { getManualMatches } from '@/lib/manual-matches';
 import { getSavedMarkets, updateSavedMarketScanResult } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
+const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -129,25 +131,59 @@ export async function POST(request: NextRequest) {
 
     // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
     const pmRawCount = (pmEvent.markets || []).length;
+    
+    // DEBUG: Log the raw markets
+    if (DEBUG_H2H) {
+      logger.debug('[scan] Raw PM markets', { count: pmRawCount, markets: pmEvent.markets?.map(m => ({ conditionId: m.conditionId?.slice(0, 12), group: m.groupItemTitle, q: m.question?.slice(0, 40) })) });
+    }
+    
     const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
     const pmFilteredCount = pmMarketsRaw.length;
+    
+    // DEBUG: Log the filtered markets
+    if (DEBUG_H2H) {
+      logger.debug('[scan] Filtered PM markets', { count: pmFilteredCount, markets: pmMarketsRaw.map(m => ({ conditionId: m.conditionId?.slice(0, 12), group: m.groupItemTitle, q: m.question?.slice(0, 40) })) });
+    }
+    
     const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
     const clobMap = await fetchClobMarkets(conditionIds);
 
-    const pmMarkets = pmMarketsRaw.map((m): any => {
-      const clob = clobMap.get(m.conditionId);
-      if (!clob) return m;
-      const live = getClobPrices(clob);
-      if (!live) return m;
-      return {
+    // Build a case-insensitive CLOB map (conditionIds are lowercase hex, but normalize defensively)
+    const clobMapLower = new Map<string, typeof clobMap extends Map<any, infer V> ? V : never>();
+    for (const [key, val] of clobMap) {
+      clobMapLower.set(key.toLowerCase(), val);
+    }
+
+    // Enrich markets with CLOB prices (async for neg-risk token orderbooks)
+    const pmMarkets: any[] = [];
+    for (const m of pmMarketsRaw) {
+      const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
+      if (!clob) {
+        pmMarkets.push(m);
+        continue;
+      }
+      const live = await getClobPrices(clob);
+      if (!live) {
+        pmMarkets.push(m);
+        continue;
+      }
+      
+      // DEBUG: Check neg_risk flag
+      if (DEBUG_H2H) {
+        logger.debug('[scan] CLOB neg_risk', { negRisk: clob.neg_risk, conditionId: m.conditionId?.slice(0, 12), question: m.question?.slice(0, 40) });
+      }
+      
+      pmMarkets.push({
         ...m,
+        // If CLOB has orderbook data, use it. Otherwise keep gamma's bestBid/bestAsk.
         outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
-        bestBid: live.bestBid,
-        bestAsk: live.bestAsk,
+        bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
+        bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
         lastTradePrice: live.lastTradePrice,
         noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
-      };
-    });
+        neg_risk: clob.neg_risk, // Preserve neg_risk flag for correct price handling
+      });
+    }
 
     // Step 1: auto-match
     const kalshiRawCount = kalshiMarkets.length;
@@ -162,6 +198,28 @@ export async function POST(request: NextRequest) {
         return {
           ...o,
           arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+        };
+      }
+
+      // Neg-risk markets: independent YES/NO prices — standard complementary
+      // arbitrage formula (YES_A + NO_B < 1) does not apply. Mark them separately.
+      if (o.polymarket.negRisk) {
+        return {
+          ...o,
+          negRisk: true,
+          arbitrage: {
+            strategy: 'Neg-risk',
+            kalshiStake: 0,
+            pmStake: 0,
+            expectedProfit: 0,
+            roiPct: 0,
+            maxCapital: 0,
+            apyPct: 0,
+            buyPlatform: null,
+            buyPrice: 0,
+            sellPlatform: null,
+            sellPrice: 0,
+          },
         };
       }
 
@@ -242,7 +300,7 @@ export async function POST(request: NextRequest) {
         await updateSavedMarketScanResult(market.id, scanResult);
       }
     } catch (e) {
-      console.error('[save-scan-error]', e);
+      logger.trackError(e, { service: 'scan', path: '/api/scan', marketId: market?.id });
     }
 
     return NextResponse.json({
@@ -274,7 +332,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (err: any) {
-    console.error('[scan-api-error]', err);
+    logger.trackError(err, { service: 'scan', path: '/api/scan' });
     const msg = err.message || 'Unknown error';
     const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
     return NextResponse.json(

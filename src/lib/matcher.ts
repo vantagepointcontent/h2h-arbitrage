@@ -29,6 +29,7 @@ export interface UnifiedOutcome {
     liquidity?: string;
     askDepth?: number;
     noAskDepth?: number;
+    negRisk?: boolean;
   } | null;
   arbitrage: {
     strategy: string;
@@ -43,6 +44,8 @@ export interface UnifiedOutcome {
     sellPrice: number;
   };
   source: 'auto' | 'manual';
+  /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
+  negRisk?: boolean;
 }
 
 export interface ManualMatch {
@@ -150,6 +153,98 @@ function getKalshiName(km: KalshiMarket): string {
 
 export function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Normalize a market name for display (preserves readability) while ensuring
+ * the comparison key is lowercase. Returns both the display name and the
+ * normalized comparison key.
+ */
+export function normalizeMarketName(name: string): { display: string; key: string } {
+  const key = normalizeName(name);
+  return { display: name, key };
+}
+
+/**
+ * Build a case-insensitive lookup map from market entries.
+ * Logs warnings when two distinct raw names collide to the same normalized key.
+ */
+export function buildCaseInsensitiveMap<V>(
+  entries: { raw: string; value: V }[],
+  logPrefix = '[matcher]',
+): Map<string, V> {
+  const result = new Map<string, V>();
+  const collisions = new Set<string>();
+
+  for (const e of entries) {
+    const key = normalizeName(e.raw);
+    const existing = result.get(key);
+    if (existing !== undefined && e.raw !== existing._raw) {
+      if (!collisions.has(key)) {
+        collisions.add(key);
+        console.warn(
+          `${logPrefix}: name collision on "${key}" — "${e.raw}" overlaps with "${existing._raw}"`,
+        );
+      }
+    }
+    result.set(key, { ...e, _raw: e.raw } as any);
+  }
+
+  // Strip internal _raw field from values
+  const clean = new Map<string, V>();
+  for (const [k, v] of result) {
+    const { _raw, ...rest } = v as any;
+    clean.set(k, rest as V);
+  }
+  return clean;
+}
+
+/**
+ * Build a Map of normalized name -> value, logging warnings when two
+ * distinct raw names collide to the same normalized key.
+ */
+export function buildNormalizedMap<K extends string, V>(
+  entries: { raw: K; rawLabel?: string; value: V }[],
+  logPrefix = '[matcher]',
+): Map<K, V> {
+  const normMap = new Map<string, { raw: K; value: V }>();
+  const collisions = new Set<string>();
+
+  for (const e of entries) {
+    const key = normalizeName(e.raw);
+    const existing = normMap.get(key);
+    if (existing && existing.raw !== e.raw) {
+      if (!collisions.has(key)) {
+        collisions.add(key);
+        console.warn(
+          `${logPrefix}: name collision on "${key}" — "${e.raw}" (${e.rawLabel ?? ''}) overlaps with "${existing.raw}" (${existing.rawLabel ?? ''})`,
+        );
+      }
+    }
+    normMap.set(key, e);
+  }
+
+  // Return raw->value map keyed by the original raw string
+  const result = new Map<K, V>();
+  for (const [, { raw, value }] of normMap) {
+    result.set(raw, value);
+  }
+  return result;
+}
+
+/**
+ * Given a normalized name, find the matching entry in a raw-keyed map.
+ * Handles the case where the raw key differs in casing from the lookup.
+ */
+export function findByNormalizedName<K extends string, V>(
+  rawMap: Map<K, V>,
+  lookupName: string,
+): V | undefined {
+  const normLookup = normalizeName(lookupName);
+  for (const [key, val] of rawMap) {
+    if (normalizeName(key) === normLookup) return val;
+  }
+  return undefined;
 }
 
 export function similarity(a: string, b: string): number {
@@ -323,20 +418,80 @@ function isBinaryMarket(outcomes: string[]): boolean {
 }
 
 // --- Helper to build the PM shape used by matching; scan route calculates arbitrage. ---
-function buildPmArbShape(market: PMMarket) {
+export function buildPmArbShape(market: PMMarket) {
   const { prices } = parseOutcomes(market);
+  const isNegRisk = market.neg_risk === true;
+  
+  // DEBUG
+  const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
+  if (DEBUG_H2H) {
+    console.log('[DEBUG] buildPmArbShape:', market.conditionId?.slice(0, 12), 'neg_risk:', market.neg_risk, 'prices:', prices);
+  }
+  
+  // Gamma API bestBid/bestAsk are YES-side orderbook prices.
+  // bestBid = what buyers offer for YES (so NO sell = 1 - bestBid).
+  // bestAsk = what sellers charge for YES (so YES buy = bestAsk).
+  //
+  // CRITICAL: gamma outcomePrices is aggressively cached and stale
+  // (e.g. outcomePrices=[0,1] while bestAsk=0.001 live). Never use
+  // outcomePrices when bestBid/bestAsk are present.
+  //
+  // When only one side has orderbook data, derive the other from it
+  // (binary YES/NO markets sum to 1). This avoids JS null coercion
+  // (1 - null = 1) which produced NO=$1 for every market with null bestBid.
+  // 
+  // FOR NEG-RISK MARKETS: outcomes are independent. The CLOB enrichment
+  // already fetched both YES and NO token orderbooks and provided the
+  // correct yesPrice/noPrice in outcomePrices. We should USE THOSE DIRECTLY
+  // instead of re-deriving from YES-side bestBid/bestAsk (which is wrong
+  // for neg-risk since NO has its own orderbook).
+  const rawBestAsk = market.bestAsk;
+  const rawBestBid = market.bestBid;
+
+  let yesPrice: number;
+  let noPrice: number;
+
+  // Detect "empty orderbook" — when bestAsk≈1 and bestBid≈0 there's no
+  // real liquidity. Use gamma outcomePrices instead.
+  const hasOrderbook = !(rawBestAsk != null && rawBestBid != null && rawBestAsk >= 0.99 && rawBestBid <= 0.01);
+
+  if (!hasOrderbook) {
+    yesPrice = prices[0] ?? 0;
+    noPrice = prices[1] ?? (1 - yesPrice);
+  } else if (isNegRisk) {
+    // Neg-risk: CLOB enrichment already provided correct prices in outcomePrices
+    // (fetched from YES token ask and NO token bid independently).
+    // The parsed `prices` array has [yesPrice, noPrice] from the live CLOB data.
+    // Just use them as-is — don't apply binary market derivation logic.
+    yesPrice = prices[0] ?? 0;
+    noPrice = prices[1] ?? 0;
+  } else if (rawBestAsk != null && rawBestBid != null) {
+    yesPrice = rawBestAsk;
+    noPrice = 1 - rawBestBid;
+  } else if (rawBestAsk != null) {
+    yesPrice = rawBestAsk;
+    noPrice = 1 - rawBestAsk;
+  } else if (rawBestBid != null) {
+    yesPrice = 1 - rawBestBid;
+    noPrice = rawBestBid;
+  } else {
+    yesPrice = prices[0] ?? 0;
+    noPrice = prices[1] ?? (1 - yesPrice);
+  }
+
   return {
     marketId: market.id,
     conditionId: market.conditionId,
-    yesPrice: prices[0] || 0,
-    noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
-    bestBid: market.bestBid ?? prices[0] ?? 0,
-    bestAsk: market.bestAsk ?? prices[0] ?? 0,
+    yesPrice,
+    noPrice,
+    bestBid: rawBestBid ?? prices[0] ?? 0,
+    bestAsk: rawBestAsk ?? prices[0] ?? 0,
     lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
     volume: market.volume,
     liquidity: market.liquidity,
     askDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
     noAskDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
+    negRisk: market.neg_risk === true,
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 
@@ -365,21 +520,41 @@ export function matchOutcomes(
 ): UnifiedOutcome[] {
   const kMarkets = pmEventTitle ? filterKalshiMarketsByEventTitle(kalshiMarkets, pmEventTitle) : kalshiMarkets;
 
+  // Build Kalshi name map with collision detection
   const kalshiMap = new Map<string, KalshiMarket>();
+  const kalshiCollisions = new Set<string>();
   for (const km of kMarkets) {
     const name = normalizeName(getKalshiName(km));
+    const existing = kalshiMap.get(name);
+    if (existing && existing !== km) {
+      if (!kalshiCollisions.has(name)) {
+        kalshiCollisions.add(name);
+        console.warn(
+          `[matcher]: Kalshi name collision on "${name}" — "${km.ticker}" overlaps with "${existing.ticker}"`,
+        );
+      }
+    }
     kalshiMap.set(name, km);
   }
 
   const pmOutcomes: { title: string; yesPrice: number; noPrice: number; market: PMMarket }[] = [];
+  const pmSeenNames = new Map<string, string>(); // normalized -> first raw title
   for (const pm of pmMarkets) {
     const { outcomes, prices } = parseOutcomes(pm);
     const hasNamedGroup = pm.groupItemTitle && pm.groupItemTitle.trim() !== '' && pm.groupItemTitle !== 'N/A';
     const isNamedBinary = hasNamedGroup && outcomes.length === 2 && outcomes[0].toLowerCase() === 'yes' && outcomes[1].toLowerCase() === 'no';
 
     if (isNamedBinary) {
+      const title = pm.groupItemTitle!;
+      const norm = normalizeName(title);
+      const prev = pmSeenNames.get(norm);
+      if (prev && prev !== title) {
+        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+      } else if (!prev) {
+        pmSeenNames.set(norm, title);
+      }
       pmOutcomes.push({
-        title: pm.groupItemTitle!,
+        title,
         yesPrice: prices[0] || 0,
         noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
         market: pm,
@@ -390,8 +565,16 @@ export function matchOutcomes(
     if (isBinaryMarket(outcomes)) continue;
 
     for (let i = 0; i < outcomes.length; i++) {
+      const title = outcomes[i] || pm.groupItemTitle || pm.question || '';
+      const norm = normalizeName(title);
+      const prev = pmSeenNames.get(norm);
+      if (prev && prev !== title) {
+        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+      } else if (!prev) {
+        pmSeenNames.set(norm, title);
+      }
       pmOutcomes.push({
-        title: outcomes[i] || pm.groupItemTitle || pm.question || '',
+        title,
         yesPrice: prices[i] || 0,
         noPrice: prices.length > i + 1 ? prices[i + 1] : (1 - prices[i]),
         market: pm,
@@ -420,6 +603,7 @@ export function matchOutcomes(
         polymarket: pmShape,
         arbitrage: placeholderArb,
         source: 'auto' as const,
+        negRisk: pmShape.negRisk,
       });
       usedKalshi.add(exact.ticker);
       usedPm.add(pi);
@@ -451,6 +635,7 @@ export function matchOutcomes(
         polymarket: pmShape,
         arbitrage: placeholderArb,
         source: 'auto' as const,
+        negRisk: pmShape.negRisk,
       });
       usedKalshi.add(bestKm.ticker);
       usedPm.add(pi);
@@ -474,12 +659,14 @@ export function matchOutcomes(
   for (const pi of unusedPm) {
     if (!usedPm.has(pi)) {
       const pmo = pmOutcomes[pi];
+      const pmShape = buildPmArbShape(pmo.market);
       matched.push({
         artist: pmo.title || 'Unknown',
         kalshi: null,
-        polymarket: buildPmArbShape(pmo.market),
+        polymarket: pmShape,
         arbitrage: noArbResult,
         source: 'auto' as const,
+        negRisk: pmShape.negRisk,
       });
     }
   }
@@ -549,6 +736,7 @@ export function applyManualMatches(
       polymarket: pmShape,
       arbitrage: noArbResult,
       source: 'manual' as const,
+      negRisk: pmShape.negRisk,
     };
     indicesToRemove.add(pIdx);
   }

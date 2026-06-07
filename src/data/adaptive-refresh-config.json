@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "tiers": [
+    { "label": "<1h", "maxSeconds": 3600, "defaultIntervalSec": 15 },
+    { "label": "1-6h", "maxSeconds": 21600, "defaultIntervalSec": 60 },
+    { "label": "6-24h", "maxSeconds": 86400, "defaultIntervalSec": 300 },
+    { "label": ">24h", "maxSeconds": -1, "defaultIntervalSec": 900 }
+  ],
+  "globalMultiplier": 1
+}

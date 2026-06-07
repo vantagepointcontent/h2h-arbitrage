@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-06-03T13:27:42.200Z",
-  "finishedAt": "2026-06-03T13:28:35.346Z",
+  "startedAt": "2026-06-03T16:18:14.008Z",
+  "finishedAt": "2026-06-03T16:19:37.361Z",
   "termsTried": [
     "2026",
     "2027",
@@ -65,6 +65,8 @@
     "congress",
     "biden",
     "gdp",
+    "inflation",
+    "fed",
     "rates",
     "nasdaq",
     "sp500",
@@ -77,9 +79,13 @@
     "nfl",
     "mlb",
     "soccer",
+    "world cup",
+    "tennis",
     "golf",
+    "oscars",
     "grammy",
     "emmy",
+    "bachelor",
     "california",
     "texas",
     "florida",
@@ -92,57 +98,23 @@
     "crypto",
     "ethereum",
     "weather",
+    "hurricane",
     "temperature",
+    "storm",
     "meta",
     "apple",
     "google",
     "amazon",
     "microsoft",
+    "oil",
     "gas",
     "energy",
     "climate"
   ],
-  "termsFailed": [
-    {
-      "term": "inflation",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "fed",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "world cup",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "tennis",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "oscars",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "bachelor",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "hurricane",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "storm",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    },
-    {
-      "term": "oil",
-      "error": "PredictionHunt API returned 429: {\"code\":\"rate_limit.exceeded_second\",\"doc_url\":\"https://predictionhunt.com/api/docs/errors#rate_limit-exceeded_second\",\"error\":\"Rate limit exceeded.\",\"message\":\"Per-second rate limit exceeded\",\"succes"
-    }
-  ],
-  "totalFetched": 198,
-  "added": 1,
+  "termsFailed": [],
+  "totalFetched": 218,
+  "added": 0,
   "updated": 0,
-  "duplicates": 197,
+  "duplicates": 218,
   "currentMarketCount": 13
 }
