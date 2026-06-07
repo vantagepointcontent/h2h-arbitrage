@@ -43,16 +43,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-html {
-  color-scheme: dark;
-}
-
-body {
-  background-color: #0a0a0a;
-  color: #e5e5e5;
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
-}
-
+/* ─── Dark theme (default) ─── */
 :root {
   --background: #0a0a0a;
   --foreground: #e5e5e5;
@@ -78,6 +69,85 @@ body {
   --chart-3: #eab308;
   --chart-4: #a855f7;
   --chart-5: #ef4444;
+
+  /* Semantic tokens for theme-aware surfaces */
+  --surface: #0a0a0a;
+  --surface-elevated: #111111;
+  --surface-hover: #1a1a1a;
+  --text: #e5e5e5;
+  --text-muted: #737373;
+  --text-faint: #525252;
+  --divider: #262626;
+  --header-bg: #0f0f0f;
+  --sidebar-bg: #0a0a0a;
+}
+
+/* ─── Light theme ─── */
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #f7f7f7;
+  --card-foreground: #1a1a1a;
+  --popover: #f7f7f7;
+  --popover-foreground: #1a1a1a;
+  --primary: #16a34a;
+  --primary-foreground: #ffffff;
+  --secondary: #e5e5e5;
+  --secondary-foreground: #1a1a1a;
+  --muted: #e5e5e5;
+  --muted-foreground: #737373;
+  --accent: #e5e5e5;
+  --accent-foreground: #1a1a1a;
+  --destructive: #dc2626;
+  --border: #d4d4d4;
+  --input: #d4d4d4;
+  --ring: #16a34a;
+  --chart-1: #16a34a;
+  --chart-2: #2563eb;
+  --chart-3: #ca8a04;
+  --chart-4: #9333ea;
+  --chart-5: #dc2626;
+
+  --surface: #ffffff;
+  --surface-elevated: #f7f7f7;
+  --surface-hover: #e5e5e5;
+  --text: #1a1a1a;
+  --text-muted: #737373;
+  --text-faint: #a3a3a3;
+  --divider: #d4d4d4;
+  --header-bg: #fafafa;
+  --sidebar-bg: #ffffff;
+}
+
+/* ─── Smooth theme transitions ─── */
+html {
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Transition all themed properties smoothly */
+html,
+body,
+header,
+aside,
+main,
+.card,
+.panel,
+[class*="bg-\["] {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
 @keyframes pulse-glow {
@@ -99,6 +169,224 @@ body {
 .price-neutral { color: #737373; }
 
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
+::-webkit-scrollbar-track { background: var(--surface-elevated); }
+::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ═══════════════════════════════════════
+   RESPONSIVE UTILITIES — GEN-6
+   Breakpoints: xs:320px (phone), md:768px (tablet), lg:1024px (desktop)
+   ═══════════════════════════════════════ */
+
+/* Touch target minimum 44×44px on mobile */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Safe area insets for notched phones */
+.safe-area-inset {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile overlay backdrop fade */
+.mobile-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+/* Prevent horizontal overflow on small screens */
+.overflow-safe {
+  overflow-x: hidden;
+  word-break: break-word;
+}
+
+/* Card stacking helper: vertical on mobile, grid on larger */
+.responsive-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 640px) {
+  .responsive-stack {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .responsive-stack {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Compact density for mobile tables */
+@media (max-width: 768px) {
+  .mobile-table th,
+  .mobile-table td {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+  .mobile-table th {
+    font-size: 0.6875rem !important; /* 11px */
+  }
+  .mobile-table td {
+    font-size: 0.75rem !important; /* 12px */
+  }
+}
+
+/* Ensure buttons and clickable areas meet WCAG touch target size */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a.btn,
+  .btn-touch {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
+
+/* Hide scrollbars on mobile drawers but keep scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile-optimized spacing */
+@media (max-width: 320px) {
+  .container-narrow {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+@media (min-width: 321px) and (max-width: 767px) {
+  .container-narrow {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+/* Toast slide-in animation */
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════
+   BOOKMAKER 1ON1 GRID — Gen-6
+   Dual-column betting board layout
+   ═══════════════════════════════════════ */
+
+/* Bookmaker grid: Platform A | Spread | Platform B */
+.grid-bookmaker {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+}
+
+.col-span-platform {
+  min-width: 0; /* Allow truncation */
+}
+
+.col-span-spread {
+  width: 100px;
+  min-width: 80px;
+}
+
+/* Tablet: narrower spread column */
+@media (max-width: 1024px) {
+  .col-span-spread {
+    width: 80px;
+    min-width: 64px;
+  }
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 768px) {
+  .grid-bookmaker {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .col-span-spread {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ═══════════════════════════════════════
+   PRICE FLASH ANIMATIONS — Gen-6
+   Green flash (price up), Red flash (price down)
+   ═══════════════════════════════════════ */
+
+@keyframes flash-green {
+  0% { background-color: rgba(34, 197, 94, 0.4); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.4); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-text-green {
+  0% { color: #22c55e; text-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  100% { color: inherit; text-shadow: none; }
+}
+
+@keyframes flash-text-red {
+  0% { color: #ef4444; text-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+  100% { color: inherit; text-shadow: none; }
+}
+
+.flash-green {
+  animation: flash-green 800ms ease-out, flash-text-green 800ms ease-out;
+}
+
+.flash-red {
+  animation: flash-red 800ms ease-out, flash-text-red 800ms ease-out;
+}
+
+/* ═══════════════════════════════════════
+   DEPTH OF MARKET BARS — Gen-6
+   Order book depth visualization
+   ═══════════════════════════════════════ */
+
+.depth-bar {
+  height: 3px;
+  border-radius: 1.5px;
+  transition: width 300ms ease-out;
+}
+
+.depth-bar-bid {
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(34, 197, 94, 0.2));
+}
+
+.depth-bar-ask {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.6));
+}
+
+/* Movement indicator arrow */
+.movement-arrow {
+  display: inline-block;
+  width: 8px;
+  text-align: center;
+  line-height: 1;
+  font-size: 9px;
+}

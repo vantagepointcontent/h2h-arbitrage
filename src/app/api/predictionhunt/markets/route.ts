@@ -4,7 +4,7 @@ import {
   runFullSync,
   getLatestSyncLog,
 } from '@/lib/predictionhunt';
-import { addSavedMarket } from '@/lib/persistence';
+import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    /* ── Save single market to H2H saved-markets ──── */
+    /* ── Save single market to H2H saved-markets ────
+     * Uses upsert: updates in-place if already saved (preserving favorite),
+     * creates new if not yet saved. */
     if (action === 'save-to-h2h') {
       const body = await request.json();
       if (!body.polymarketUrl || !body.kalshiUrl) {
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const market = await addSavedMarket({
+      const market = await upsertSavedMarket({
         kalshiUrl: body.kalshiUrl,
         polymarketUrl: body.polymarketUrl,
         eventTitle: body.title || 'Untitled',
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
         expiryDate: body.expiryDate || null,
       });
 
-      return NextResponse.json({ success: true, market }, { status: 201 });
+      return NextResponse.json({ success: true, market }, { status: 200 });
     }
 
     return NextResponse.json(

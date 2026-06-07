@@ -20,6 +20,7 @@ export interface PMMarket {
   active: boolean;
   closed: boolean;
   endDate?: string; // ISO 8601, market close date
+  neg_risk?: boolean; // true = independent binary outcomes (YES/NO don't sum to 1)
 }
 
 export interface PMEvent {
@@ -39,6 +40,8 @@ export function extractPolymarketSlug(url: string): string | null {
   return match ? match[1] : null;
 }
 
+import { rateLimiters } from '@/lib/rate-limiter';
+
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 function debugLog(...args: unknown[]) {
@@ -46,12 +49,14 @@ function debugLog(...args: unknown[]) {
 }
 
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
-  const res = await fetch(
-    `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
-    {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
-      cache: 'no-store',
-    }
+  const res = await rateLimiters.gamma.execute(() =>
+    fetch(
+      `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
+      {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+        cache: 'no-store',
+      },
+    ),
   );
   if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
   const data = await res.json();

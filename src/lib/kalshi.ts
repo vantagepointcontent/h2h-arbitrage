@@ -1,6 +1,8 @@
 // Kalshi API Client — no auth needed for market data
 // Base URL: https://external-api.kalshi.com/trade-api/v2
 
+import { rateLimiters } from '@/lib/rate-limiter';
+
 export interface KalshiMarket {
   ticker: string;
   event_ticker: string;
@@ -65,9 +67,11 @@ export function extractKalshiTicker(url: string): string | null {
 }
 
 export async function fetchKalshiEventMarkets(eventTicker: string): Promise<KalshiMarket[]> {
-  const res = await fetch(
-    `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&_t=${Date.now()}`,
-    { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&_t=${Date.now()}`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store' },
+    ),
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
@@ -75,9 +79,11 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
 }
 
 export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<KalshiMarket[]> {
-  const res = await fetch(
-    `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&_t=${Date.now()}`,
-    { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&_t=${Date.now()}`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store' },
+    ),
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
@@ -90,9 +96,11 @@ export interface KalshiFetchResult {
 }
 
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {
-  const res = await fetch(
-    `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}`,
-    { headers: { 'Accept': 'application/json' }, cache: 'no-store' }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store' },
+    ),
   );
   if (!res.ok) return null;
   const data = await res.json();

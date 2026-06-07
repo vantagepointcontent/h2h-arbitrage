@@ -1,0 +1,28 @@
+# CODEOWNERS for H2H Arbitrage
+# Requires two approvals for production infrastructure changes.
+# See docs/compliance/change-management.md for the full workflow.
+
+# Global fallback — require at least one h2h-ops approval for any change
+*                           @vantagepointcontent/h2h-ops
+
+# Production infrastructure — two approvals required (CODEOWNERS syntax enforces one;
+# branch protection enforces the second via GitHub settings)
+/terraform/                 @vantagepointcontent/h2h-ops
+/k8s/                       @vantagepointcontent/h2h-ops
+/helm/                      @vantagepointcontent/h2h-ops
+.github/workflows/terraform-apply.yaml  @vantagepointcontent/h2h-ops
+
+# Application code — backend and frontend leads
+/src/app/api/               @vantagepointcontent/h2h-backend @vantagepointcontent/h2h-ops
+/src/lib/                   @vantagepointcontent/h2h-backend @vantagepointcontent/h2h-ops
+/src/app/                   @vantagepointcontent/h2h-frontend @vantagepointcontent/h2h-backend
+
+# Compliance and security docs
+/docs/compliance/           @vantagepointcontent/h2h-ops @vantagepointcontent/security
+/scripts/compliance/        @vantagepointcontent/h2h-ops @vantagepointcontent/security
+
+# Data files — sensitive; ops must review
+/data/                      @vantagepointcontent/h2h-ops
+
+# CI/CD pipelines
+.github/workflows/          @vantagepointcontent/h2h-ops
