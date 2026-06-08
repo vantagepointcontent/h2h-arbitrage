@@ -161,9 +161,19 @@ export function useAlertSystem(): UseAlertSystemReturn {
     }
     setNotifPerm(Notification.permission);
     const handler = () => setNotifPerm(Notification.permission);
-    const notifAny = Notification as unknown as { addEventListener: (e: string, h: () => void) => void; removeEventListener: (e: string, h: () => void) => void };
-    notifAny.addEventListener("permissionchange", handler);
-    return () => notifAny.removeEventListener("permissionchange", handler);
+    try {
+      const notifAny = Notification as unknown as { addEventListener: (e: string, h: () => void) => void; removeEventListener: (e: string, h: () => void) => void };
+      if (typeof notifAny.addEventListener === "function") {
+        notifAny.addEventListener("permissionchange", handler);
+        return () => {
+          if (typeof notifAny.removeEventListener === "function") {
+            notifAny.removeEventListener("permissionchange", handler);
+          }
+        };
+      }
+    } catch {
+      // Browser doesn't support permissionchange events — skip
+    }
   }, []);
 
   const onRequestPermission = useCallback(async () => {
@@ -314,7 +324,7 @@ export function ToastContainer({
   toasts: ToastMessage[];
   onDismiss: (id: string) => void;
 }) {
-  if (toasts.length === 0) return null;
+  if (!toasts || toasts.length === 0) return null;
 
   const colorMap: Record<ToastMessage["type"], string> = {
     success: "border-[#22c55e]/40 bg-[#0f0f0f]",
