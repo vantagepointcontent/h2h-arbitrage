@@ -4,8 +4,8 @@ import React from 'react';
 
 interface Outcome {
   artist: string;
-  kalshi?: { yesAsk: number } | null;
-  polymarket?: { yesPrice: number } | null;
+  kalshi?: { yesAsk: number; noAsk: number } | null;
+  polymarket?: { yesPrice: number; noPrice: number } | null;
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
@@ -22,6 +22,7 @@ interface OutcomeTableBodyProps {
   formatCurrency: (n: number) => string;
   formatPercent: (n: number) => string;
   priceChanges?: Map<string, "up" | "down" | null>;
+  filterMode?: "all" | "matched" | "arb";
 }
 
 export function OutcomeTableBody({
@@ -31,7 +32,14 @@ export function OutcomeTableBody({
   formatCurrency,
   formatPercent,
   priceChanges,
+  filterMode,
 }: OutcomeTableBodyProps) {
+  const displayOutcomes = filterMode === "arb"
+    ? outcomes.filter(o => o.arbitrage.expectedProfit > 0)
+    : filterMode === "matched"
+      ? outcomes.filter(o => o.kalshi && o.polymarket)
+      : outcomes;
+
   const profitableOutcomes = outcomes.filter(o => o.arbitrage.expectedProfit > 0);
   const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
   const highestProfitOutcome = profitableOutcomes.length > 0
@@ -41,7 +49,7 @@ export function OutcomeTableBody({
 
   return (
     <tbody className="divide-y divide-[#182533]">
-      {outcomes.map((o) => {
+      {displayOutcomes.map((o) => {
         const spread = o.kalshi && o.polymarket ? (o.polymarket.yesPrice - o.kalshi.yesAsk) : 0;
         const profit = o.arbitrage.expectedProfit;
         const roiColor = o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
@@ -68,11 +76,13 @@ export function OutcomeTableBody({
                 {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
+              <td className="px-4 py-3 text-right text-[#5E6875]">{o.kalshi?.noAsk.toFixed(2) ?? "—"}</td>
               <td className="px-4 py-3 text-right text-[#FFFFFF]">
                 {o.polymarket?.yesPrice.toFixed(2) ?? "—"}
                 {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
+              <td className="px-4 py-3 text-right text-[#5E6875]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${spread > 0 ? "text-[#5DBE81]" : spread < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                 {spread > 0 ? "+" : ""}{spread.toFixed(2)}
               </td>
