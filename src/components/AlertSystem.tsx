@@ -327,10 +327,10 @@ export function ToastContainer({
   if (!toasts || toasts.length === 0) return null;
 
   const colorMap: Record<ToastMessage["type"], string> = {
-    success: "border-[#22c55e]/40 bg-[#0f0f0f]",
-    warning: "border-[#eab308]/40 bg-[#0f0f0f]",
-    info: "border-[#3b82f6]/40 bg-[#0f0f0f]",
-    alert: "border-[#ef4444]/40 bg-[#0f0f0f]",
+    success: "border-[#5DBE81]/40 bg-[#17212B]",
+    warning: "border-[#facc15]/40 bg-[#17212B]",
+    info: "border-[#5DBE81]/40 bg-[#17212B]",
+    alert: "border-[#ef4444]/40 bg-[#17212B]",
   };
 
   return (
@@ -342,12 +342,12 @@ export function ToastContainer({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-[#e5e5e5]">{toast.title}</div>
-              <div className="text-xs text-[#a3a3a3] mt-0.5">{toast.message}</div>
+              <div className="text-sm font-semibold text-[#FFFFFF]">{toast.title}</div>
+              <div className="text-xs text-[#8A9BA8] mt-0.5">{toast.message}</div>
             </div>
             <button
               onClick={() => onDismiss(toast.id)}
-              className="shrink-0 p-1 rounded hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+              className="shrink-0 p-1 rounded hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -381,13 +381,13 @@ export function AlertSettingsPanel({
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm"
          onClick={() => {/* close handled by parent */}}>
       <div
-        className="w-full max-w-lg rounded-xl border border-[#262626] bg-[#111111] shadow-2xl overflow-hidden"
+        className="w-full max-w-lg rounded-xl border border-[#232E3C] bg-[#17212B] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a1a1a]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#182533]">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-[#22c55e]" />
+            <Bell className="w-4 h-4 text-[#5DBE81]" />
             <h2 className="text-base font-semibold">Alert Settings</h2>
           </div>
           <div className="flex gap-1">
@@ -397,8 +397,8 @@ export function AlertSettingsPanel({
                 onClick={() => setTab(t)}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                   tab === t
-                    ? "bg-[#22c55e]/10 text-[#22c55e]"
-                    : "text-[#737373] hover:text-[#e5e5e5] hover:bg-[#1a1a1a]"
+                    ? "bg-[#5DBE81]/10 text-[#5DBE81]"
+                    : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
                 }`}
               >
                 {t === "settings" ? "Settings" : `History (${history.length})`}
@@ -412,19 +412,19 @@ export function AlertSettingsPanel({
           {tab === "settings" ? (
             <>
               {/* Master toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#1a1a1a]">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-[#182533]">
                 <div className="flex items-center gap-2">
                   {settings.enabled ? (
-                    <Bell className="w-4 h-4 text-[#22c55e]" />
+                    <Bell className="w-4 h-4 text-[#5DBE81]" />
                   ) : (
-                    <BellOff className="w-4 h-4 text-[#737373]" />
+                    <BellOff className="w-4 h-4 text-[#5E6875]" />
                   )}
                   <span className="text-sm font-medium">Enable Alerts</span>
                 </div>
                 <button
                   onClick={() => onSettingsChange((s) => ({ ...s, enabled: !s.enabled }))}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    settings.enabled ? "bg-[#22c55e]" : "bg-[#404040]"
+                    settings.enabled ? "bg-[#5DBE81]" : "bg-[#232E3C]"
                   }`}
                 >
                   <span
@@ -438,10 +438,10 @@ export function AlertSettingsPanel({
               {/* Min ROI Threshold */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-[#a3a3a3]">
+                  <label className="text-sm font-medium text-[#8A9BA8]">
                     Minimum ROI Threshold
                   </label>
-                  <span className="text-sm font-mono text-[#22c55e]">{settings.minRoiPct}%</span>
+                  <span className="text-sm font-mono text-[#5DBE81]">{settings.minRoiPct}%</span>
                 </div>
                 <input
                   type="range"
@@ -450,9 +450,9 @@ export function AlertSettingsPanel({
                   step={0.5}
                   value={settings.minRoiPct}
                   onChange={(e) => onSettingsChange((s) => ({ ...s, minRoiPct: Number(e.target.value) }))}
-                  className="w-full accent-[#22c55e]"
+                  className="w-full accent-[#5DBE81]"
                 />
-                <div className="flex justify-between text-[10px] text-[#525252]">
+                <div className="flex justify-between text-[10px] text-[#232E3C]">
                   <span>0%</span>
                   <span>Alert when ROI ≥ threshold</span>
                   <span>100%</span>
@@ -462,10 +462,10 @@ export function AlertSettingsPanel({
               {/* Max Spread Threshold */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-[#a3a3a3]">
+                  <label className="text-sm font-medium text-[#8A9BA8]">
                     Maximum Buy Price (cents)
                   </label>
-                  <span className="text-sm font-mono text-[#22c55e]">{settings.maxSpreadPct}¢</span>
+                  <span className="text-sm font-mono text-[#5DBE81]">{settings.maxSpreadPct}¢</span>
                 </div>
                 <input
                   type="range"
@@ -474,9 +474,9 @@ export function AlertSettingsPanel({
                   step={1}
                   value={settings.maxSpreadPct}
                   onChange={(e) => onSettingsChange((s) => ({ ...s, maxSpreadPct: Number(e.target.value) }))}
-                  className="w-full accent-[#22c55e]"
+                  className="w-full accent-[#5DBE81]"
                 />
-                <div className="flex justify-between text-[10px] text-[#525252]">
+                <div className="flex justify-between text-[10px] text-[#232E3C]">
                   <span>1¢</span>
                   <span>Alert when buy price ≤ threshold</span>
                   <span>50¢</span>
@@ -485,7 +485,7 @@ export function AlertSettingsPanel({
 
               {/* Notify on cross */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[#a3a3a3]">Notify When</label>
+                <label className="text-sm font-medium text-[#8A9BA8]">Notify When</label>
                 <div className="flex gap-2">
                   {(["enter", "exit", "both"] as const).map((mode) => (
                     <button
@@ -493,8 +493,8 @@ export function AlertSettingsPanel({
                       onClick={() => onSettingsChange((s) => ({ ...s, notifyOnCross: mode }))}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
                         settings.notifyOnCross === mode
-                          ? "bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e]"
-                          : "bg-[#1a1a1a] border-[#262626] text-[#737373] hover:text-[#e5e5e5]"
+                          ? "bg-[#5DBE81]/10 border-[#5DBE81]/30 text-[#5DBE81]"
+                          : "bg-[#182533] border-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF]"
                       }`}
                     >
                       {mode === "enter" ? "Enters zone" : mode === "exit" ? "Leaves zone" : "Both"}
@@ -504,19 +504,19 @@ export function AlertSettingsPanel({
               </div>
 
               {/* Sound toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#1a1a1a]">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-[#182533]">
                 <div className="flex items-center gap-2">
                   {settings.soundEnabled ? (
-                    <Volume2 className="w-4 h-4 text-[#22c55e]" />
+                    <Volume2 className="w-4 h-4 text-[#5DBE81]" />
                   ) : (
-                    <VolumeX className="w-4 h-4 text-[#737373]" />
+                    <VolumeX className="w-4 h-4 text-[#5E6875]" />
                   )}
                   <span className="text-sm font-medium">Sound Alerts</span>
                 </div>
                 <button
                   onClick={() => onSettingsChange((s) => ({ ...s, soundEnabled: !s.soundEnabled }))}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    settings.soundEnabled ? "bg-[#22c55e]" : "bg-[#404040]"
+                    settings.soundEnabled ? "bg-[#5DBE81]" : "bg-[#232E3C]"
                   }`}
                 >
                   <span
@@ -528,15 +528,15 @@ export function AlertSettingsPanel({
               </div>
 
               {/* Browser notifications */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#1a1a1a]">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-[#182533]">
                 <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-[#22c55e]" />
+                  <Bell className="w-4 h-4 text-[#5DBE81]" />
                   <span className="text-sm font-medium">Browser Notifications</span>
                 </div>
                 <button
                   onClick={() => onSettingsChange((s) => ({ ...s, browserNotifications: !s.browserNotifications }))}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    settings.browserNotifications ? "bg-[#22c55e]" : "bg-[#404040]"
+                    settings.browserNotifications ? "bg-[#5DBE81]" : "bg-[#232E3C]"
                   }`}
                 >
                   <span
@@ -548,7 +548,7 @@ export function AlertSettingsPanel({
               </div>
 
               {settings.browserNotifications && notificationPermission !== "granted" && (
-                <div className="p-3 rounded-lg bg-[#eab308]/10 border border-[#eab308]/30">
+                <div className="p-3 rounded-lg bg-[#facc15]/10 border border-[#facc15]/30">
                   <p className="text-xs text-[#facc15] mb-2">
                     {notificationPermission === "denied"
                       ? "Notifications blocked. Check browser settings."
@@ -559,7 +559,7 @@ export function AlertSettingsPanel({
                   {notificationPermission === "default" && (
                     <button
                       onClick={onRequestPermission}
-                      className="px-3 py-1.5 rounded-md bg-[#eab308] text-black text-xs font-semibold hover:bg-[#ca8a04] transition-colors"
+                      className="px-3 py-1.5 rounded-md bg-[#facc15] text-black text-xs font-semibold hover:bg-[#ca8a04] transition-colors"
                     >
                       Request Permission
                     </button>
@@ -571,17 +571,17 @@ export function AlertSettingsPanel({
             /* History Tab */
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#737373]">{history.length} alerts logged</span>
+                <span className="text-xs text-[#5E6875]">{history.length} alerts logged</span>
                 <button
                   onClick={onClearHistory}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[#737373] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[#5E6875] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" /> Clear
                 </button>
               </div>
 
               {history.length === 0 && (
-                <div className="py-8 text-center text-sm text-[#525252]">
+                <div className="py-8 text-center text-sm text-[#232E3C]">
                   No alerts yet. They&apos;ll appear when ROI crosses your threshold.
                 </div>
               )}
@@ -591,30 +591,30 @@ export function AlertSettingsPanel({
                   key={entry.id}
                   className={`p-3 rounded-lg border ${
                     entry.direction === "above"
-                      ? "border-[#22c55e]/20 bg-[#22c55e]/[0.03]"
-                      : "border-[#eab308]/20 bg-[#eab308]/[0.03]"
+                      ? "border-[#5DBE81]/20 bg-[#5DBE81]/[0.03]"
+                      : "border-[#facc15]/20 bg-[#facc15]/[0.03]"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs font-semibold ${
-                      entry.direction === "above" ? "text-[#22c55e]" : "text-[#eab308]"
+                      entry.direction === "above" ? "text-[#5DBE81]" : "text-[#facc15]"
                     }`}>
                       {entry.marketTitle}
                     </span>
-                    <span className="text-[10px] text-[#525252]">
+                    <span className="text-[10px] text-[#232E3C]">
                       {new Date(entry.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-[#a3a3a3]">
-                    <span className="font-mono font-bold text-[#e5e5e5]">
+                  <div className="flex items-center gap-3 text-xs text-[#8A9BA8]">
+                    <span className="font-mono font-bold text-[#FFFFFF]">
                       {entry.direction === "above" ? "+" : ""}{entry.roiPct.toFixed(2)}% ROI
                     </span>
-                    <span className="text-[#525252]">·</span>
+                    <span className="text-[#232E3C]">·</span>
                     <span>${entry.profit.toFixed(2)} profit</span>
-                    <span className="text-[#525252]">·</span>
-                    <span className="text-[#737373]">{entry.strategy}</span>
+                    <span className="text-[#232E3C]">·</span>
+                    <span className="text-[#5E6875]">{entry.strategy}</span>
                     {entry.notified && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#3b82f6]/10 text-[#3b82f6]">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#5DBE81]/10 text-[#5DBE81]">
                         notified
                       </span>
                     )}

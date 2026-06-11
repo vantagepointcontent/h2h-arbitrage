@@ -69,11 +69,11 @@ export function EmbeddedBrowserPanel({
 
   const accentClass =
     platformName === "Kalshi"
-      ? "border-[#eab308]/30 bg-[#eab308]/5"
+      ? "border-[#facc15]/30 bg-[#facc15]/5"
       : "border-[#a855f7]/30 bg-[#a855f7]/5";
 
   const accentTextClass =
-    platformName === "Kalshi" ? "text-[#eab308]" : "text-[#a855f7]";
+    platformName === "Kalshi" ? "text-[#facc15]" : "text-[#a855f7]";
 
   // Detect embed blocked: if iframe hasn't fired load within 5s, assume X-Frame-Options blocked
   useEffect(() => {
@@ -207,21 +207,21 @@ export function EmbeddedBrowserPanel({
           <span className={`text-xs font-semibold ${accentTextClass}`}>
             {platformName}
           </span>
-          <span className="text-[10px] text-[#525252] truncate max-w-[200px]">
+          <span className="text-[10px] text-[#232E3C] truncate max-w-[200px]">
             {url}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleRefresh}
-            className="p-1 rounded hover:bg-white/10 text-[#737373] hover:text-[#e5e5e5] transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={toggleFullscreen}
-            className="p-1 rounded hover:bg-white/10 text-[#737373] hover:text-[#e5e5e5] transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
             title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {fullscreen ? (
@@ -232,7 +232,7 @@ export function EmbeddedBrowserPanel({
           </button>
           <button
             onClick={toggleVisibility}
-            className="p-1 rounded hover:bg-white/10 text-[#737373] hover:text-[#e5e5e5] transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
             title="Hide panel"
           >
             <EyeOff className="w-3.5 h-3.5" />
@@ -248,9 +248,9 @@ export function EmbeddedBrowserPanel({
       >
         {embedBlocked ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-            <AlertTriangle className="w-8 h-8 text-[#eab308]" />
-            <div className="text-sm text-[#a3a3a3] text-center">
-              <span className="font-medium text-[#e5e5e5]">{platformName}</span>{" "}
+            <AlertTriangle className="w-8 h-8 text-[#facc15]" />
+            <div className="text-sm text-[#8A9BA8] text-center">
+              <span className="font-medium text-[#FFFFFF]">{platformName}</span>{" "}
               blocks embedded viewing (X-Frame-Options).
             </div>
             <a
@@ -259,7 +259,7 @@ export function EmbeddedBrowserPanel({
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
                 platformName === "Kalshi"
-                  ? "bg-[#eab308]/10 text-[#eab308] hover:bg-[#eab308]/20"
+                  ? "bg-[#facc15]/10 text-[#facc15] hover:bg-[#facc15]/20"
                   : "bg-[#a855f7]/10 text-[#a855f7] hover:bg-[#a855f7]/20"
               } transition-colors`}
             >
@@ -273,7 +273,7 @@ export function EmbeddedBrowserPanel({
               <div
                 className={`w-5 h-5 border-2 border-current rounded-full border-t-transparent animate-spin ${accentTextClass}`}
               />
-              <span className="text-xs text-[#737373]">
+              <span className="text-xs text-[#5E6875]">
                 Loading {platformName}...
               </span>
             </div>
@@ -295,11 +295,11 @@ export function EmbeddedBrowserPanel({
       {/* Resize handle */}
       {!fullscreen && !embedBlocked && (
         <div
-          className="h-1.5 cursor-ns-resize bg-transparent hover:bg-[#22c55e]/30 transition-colors group"
+          className="h-1.5 cursor-ns-resize bg-transparent hover:bg-[#5DBE81]/30 transition-colors group"
           onMouseDown={handleDragStart}
           title="Drag to resize"
         >
-          <div className="mx-auto w-8 h-0.5 bg-[#525252] rounded-full group-hover:bg-[#22c55e]" />
+          <div className="mx-auto w-8 h-0.5 bg-[#232E3C] rounded-full group-hover:bg-[#5DBE81]" />
         </div>
       )}
     </div>
@@ -318,14 +318,14 @@ export function ShowPanelButton({
   onClick: () => void;
 }) {
   const accentBg =
-    platformName === "Kalshi" ? "bg-[#eab308]/10" : "bg-[#a855f7]/10";
+    platformName === "Kalshi" ? "bg-[#facc15]/10" : "bg-[#a855f7]/10";
   const accentBorder =
-    platformName === "Kalshi" ? "border-[#eab308]/30" : "border-[#a855f7]/30";
+    platformName === "Kalshi" ? "border-[#facc15]/30" : "border-[#a855f7]/30";
 
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg ${accentBg} border ${accentBorder} text-xs font-medium text-[#a3a3a3] hover:text-[#e5e5e5] hover:brightness-125 transition-colors`}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg ${accentBg} border ${accentBorder} text-xs font-medium text-[#8A9BA8] hover:text-[#FFFFFF] hover:brightness-125 transition-colors`}
     >
       <Eye className="w-3.5 h-3.5" />
       <img
@@ -419,13 +419,13 @@ export function DualBrowserPanels({
           <>
             <div className="flex items-center gap-2 ml-auto">
               {/* Layout toggle */}
-              <div className="flex items-center rounded-lg bg-[#1a1a1a] border border-[#262626] overflow-hidden">
+              <div className="flex items-center rounded-lg bg-[#182533] border border-[#232E3C] overflow-hidden">
                 <button
                   onClick={() => onLayoutChange?.("stacked")}
                   className={`p-1.5 transition-colors ${
                     !isSideBySide
-                      ? "bg-[#22c55e]/15 text-[#22c55e]"
-                      : "text-[#737373] hover:text-[#e5e5e5]"
+                      ? "bg-[#5DBE81]/15 text-[#5DBE81]"
+                      : "text-[#5E6875] hover:text-[#FFFFFF]"
                   }`}
                   title="Stacked layout"
                 >
@@ -435,15 +435,15 @@ export function DualBrowserPanels({
                   onClick={() => onLayoutChange?.("sidebyside")}
                   className={`p-1.5 transition-colors ${
                     isSideBySide
-                      ? "bg-[#22c55e]/15 text-[#22c55e]"
-                      : "text-[#737373] hover:text-[#e5e5e5]"
+                      ? "bg-[#5DBE81]/15 text-[#5DBE81]"
+                      : "text-[#5E6875] hover:text-[#FFFFFF]"
                   }`}
                   title="Side-by-side layout"
                 >
                   <Columns2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <span className="text-[10px] text-[#525252]">Live embed</span>
+              <span className="text-[10px] text-[#232E3C]">Live embed</span>
             </div>
           </>
         )}

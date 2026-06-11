@@ -46,38 +46,38 @@
 /* ─── Dark theme (default) ─ EdgeFinder Navy ─── */
 :root {
   --background: #0B1120;
-  --foreground: #f8fafc;
+  --foreground: #FFFFFF;
   --card: #111827;
-  --card-foreground: #f8fafc;
+  --card-foreground: #FFFFFF;
   --popover: #111827;
-  --popover-foreground: #f8fafc;
-  --primary: #22c55e;
+  --popover-foreground: #FFFFFF;
+  --primary: #5DBE81;
   --primary-foreground: #000000;
   --secondary: #151d2e;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
-  --destructive: #f87171;
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #22c55e;
+  --secondary-foreground: #FFFFFF;
+  --muted: #17212B;
+  --muted-foreground: #8A9BA8;
+  --accent: #17212B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #ef4444;
+  --border: #17212B;
+  --input: #17212B;
+  --ring: #5DBE81;
   --radius: 0.625rem;
-  --chart-1: #22c55e;
-  --chart-2: #60a5fa;
-  --chart-3: #fbbf24;
-  --chart-4: #a78bfa;
-  --chart-5: #f87171;
+  --chart-1: #5DBE81;
+  --chart-2: #5DBE81;
+  --chart-3: #facc15;
+  --chart-4: #facc15;
+  --chart-5: #ef4444;
 
   /* Semantic tokens for theme-aware surfaces */
   --surface: #0B1120;
   --surface-elevated: #111827;
-  --surface-hover: #1e293b;
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-faint: #64748b;
-  --divider: #1e293b;
+  --surface-hover: #17212B;
+  --text: #FFFFFF;
+  --text-muted: #8A9BA8;
+  --text-faint: #5E6875;
+  --divider: #17212B;
   --header-bg: #0B1120;
   --sidebar-bg: #0B1120;
 }
@@ -85,24 +85,24 @@
 /* ─── Light theme ─── */
 [data-theme="light"] {
   --background: #ffffff;
-  --foreground: #1a1a1a;
+  --foreground: #182533;
   --card: #f7f7f7;
-  --card-foreground: #1a1a1a;
+  --card-foreground: #182533;
   --popover: #f7f7f7;
-  --popover-foreground: #1a1a1a;
-  --primary: #16a34a;
+  --popover-foreground: #182533;
+  --primary: #4DA66E;
   --primary-foreground: #ffffff;
-  --secondary: #e5e5e5;
-  --secondary-foreground: #1a1a1a;
-  --muted: #e5e5e5;
-  --muted-foreground: #737373;
-  --accent: #e5e5e5;
-  --accent-foreground: #1a1a1a;
+  --secondary: #FFFFFF;
+  --secondary-foreground: #182533;
+  --muted: #FFFFFF;
+  --muted-foreground: #5E6875;
+  --accent: #FFFFFF;
+  --accent-foreground: #182533;
   --destructive: #dc2626;
-  --border: #d4d4d4;
-  --input: #d4d4d4;
-  --ring: #16a34a;
-  --chart-1: #16a34a;
+  --border: #8A9BA8;
+  --input: #8A9BA8;
+  --ring: #4DA66E;
+  --chart-1: #4DA66E;
   --chart-2: #2563eb;
   --chart-3: #ca8a04;
   --chart-4: #9333ea;
@@ -110,11 +110,11 @@
 
   --surface: #ffffff;
   --surface-elevated: #f7f7f7;
-  --surface-hover: #e5e5e5;
-  --text: #1a1a1a;
-  --text-muted: #737373;
-  --text-faint: #a3a3a3;
-  --divider: #d4d4d4;
+  --surface-hover: #FFFFFF;
+  --text: #182533;
+  --text-muted: #5E6875;
+  --text-faint: #8A9BA8;
+  --divider: #8A9BA8;
   --header-bg: #fafafa;
   --sidebar-bg: #ffffff;
 }
@@ -151,8 +151,8 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
-  50% { box-shadow: 0 0 12px rgba(34, 197, 94, 0.3); }
+  0%, 100% { box-shadow: 0 0 0 rgba(93, 190, 129, 0); }
+  50% { box-shadow: 0 0 12px rgba(93, 190, 129, 0.3); }
 }
 
 .live-dot {
@@ -164,9 +164,9 @@ body {
   50% { opacity: 0.5; }
 }
 
-.price-up { color: #22c55e; }
+.price-up { color: #5DBE81; }
 .price-down { color: #ef4444; }
-.price-neutral { color: #737373; }
+.price-neutral { color: #5E6875; }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface-elevated); }
@@ -336,7 +336,7 @@ body {
    ═══════════════════════════════════════ */
 
 @keyframes flash-green {
-  0% { background-color: rgba(34, 197, 94, 0.4); }
+  0% { background-color: rgba(93, 190, 129, 0.4); }
   100% { background-color: transparent; }
 }
 
@@ -346,7 +346,7 @@ body {
 }
 
 @keyframes flash-text-green {
-  0% { color: #22c55e; text-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  0% { color: #5DBE81; text-shadow: 0 0 8px rgba(93, 190, 129, 0.6); }
   100% { color: inherit; text-shadow: none; }
 }
 
@@ -375,7 +375,7 @@ body {
 }
 
 .depth-bar-bid {
-  background: linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(34, 197, 94, 0.2));
+  background: linear-gradient(90deg, rgba(93, 190, 129, 0.6), rgba(93, 190, 129, 0.2));
 }
 
 .depth-bar-ask {

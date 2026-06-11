@@ -94,8 +94,8 @@ function SliderControl({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-[#e5e5e5]">{label}</div>
-          <div className="text-xs text-[#737373] mt-0.5">{description}</div>
+          <div className="text-sm font-medium text-[#FFFFFF]">{label}</div>
+          <div className="text-xs text-[#5E6875] mt-0.5">{description}</div>
         </div>
         <div className={`font-mono text-sm font-bold ${colorClass}`}>
           {msToSeconds(value)}
@@ -103,7 +103,7 @@ function SliderControl({
       </div>
       <div className="relative">
         {/* Track background */}
-        <div className="h-2 rounded-full bg-[#262626]" />
+        <div className="h-2 rounded-full bg-[#232E3C]" />
         {/* Filled track */}
         <div
           className={`absolute top-0 left-0 h-2 rounded-full ${colorClass.replace("text-", "bg-")} opacity-60`}
@@ -122,11 +122,11 @@ function SliderControl({
         />
         {/* Visible thumb indicator */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-[#0a0a0a] shadow-md ${colorClass.replace("text-", "bg-")}`}
+          className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-[#0E1621] shadow-md ${colorClass.replace("text-", "bg-")}`}
           style={{ left: `calc(${pct}% - 8px)` }}
         />
       </div>
-      <div className="flex justify-between text-[10px] text-[#525252]">
+      <div className="flex justify-between text-[10px] text-[#232E3C]">
         <span>{msToSeconds(min)}</span>
         <span>{msToSeconds(max)}</span>
       </div>
@@ -211,23 +211,23 @@ export default function AppSettingsDialog({
 
       {/* Dialog */}
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-xl mx-4 bg-[#18181b] border border-[#262626] rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="pointer-events-auto w-full max-w-xl mx-4 bg-[#18181b] border border-[#232E3C] rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#262626]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#232E3C]">
             <div className="flex items-center gap-2">
-              <SettingsIcon className="w-5 h-5 text-[#22c55e]" />
+              <SettingsIcon className="w-5 h-5 text-[#5DBE81]" />
               <h2 className="text-base font-semibold">Admin Dashboard</h2>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md hover:bg-[#262626] text-[#737373] hover:text-[#e5e5e5] transition-colors"
+              className="p-1.5 rounded-md hover:bg-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-[#262626] px-5">
+          <div className="flex border-b border-[#232E3C] px-5">
             {(
               [
                 { key: "performance", label: "Performance" },
@@ -241,8 +241,8 @@ export default function AppSettingsDialog({
                 onClick={() => setActiveTab(key)}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
                   activeTab === key
-                    ? "border-[#22c55e] text-[#e5e5e5]"
-                    : "border-transparent text-[#737373] hover:text-[#a3a3a3]"
+                    ? "border-[#5DBE81] text-[#FFFFFF]"
+                    : "border-transparent text-[#5E6875] hover:text-[#8A9BA8]"
                 }`}
               >
                 {label}
@@ -257,8 +257,8 @@ export default function AppSettingsDialog({
               <>
                 {/* Presets */}
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-[#e5e5e5]">Presets</div>
-                  <div className="text-xs text-[#737373] mb-2">Quick-select a configuration</div>
+                  <div className="text-sm font-medium text-[#FFFFFF]">Presets</div>
+                  <div className="text-xs text-[#5E6875] mb-2">Quick-select a configuration</div>
                   <div className="grid grid-cols-3 gap-2">
                     {PRESETS.map((preset) => {
                       const isActive =
@@ -271,8 +271,8 @@ export default function AppSettingsDialog({
                           onClick={() => applyPreset(preset)}
                           className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg border transition-all ${
                             isActive
-                              ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                              : "bg-[#0f0f0f] border-[#262626] text-[#a3a3a3] hover:border-[#3f3f3f] hover:text-[#e5e5e5]"
+                              ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                              : "bg-[#17212B] border-[#232E3C] text-[#8A9BA8] hover:border-[#232E3C] hover:text-[#FFFFFF]"
                           }`}
                         >
                           {preset.icon}
@@ -285,7 +285,7 @@ export default function AppSettingsDialog({
                 </div>
 
                 {/* Divider */}
-                <hr className="border-[#262626]" />
+                <hr className="border-[#232E3C]" />
 
                 {/* Sliders */}
                 <SliderControl
@@ -296,7 +296,7 @@ export default function AppSettingsDialog({
                   max={60000}
                   step={1000}
                   onChange={(v) => onUpdate({ globalRefreshInterval: v })}
-                  colorClass="text-[#22c55e]"
+                  colorClass="text-[#5DBE81]"
                 />
 
                 <SliderControl
@@ -307,7 +307,7 @@ export default function AppSettingsDialog({
                   max={30000}
                   step={500}
                   onChange={(v) => onUpdate({ shortTermInterval: v })}
-                  colorClass="text-[#3b82f6]"
+                  colorClass="text-[#5DBE81]"
                 />
 
                 <SliderControl
@@ -322,7 +322,7 @@ export default function AppSettingsDialog({
                 />
 
                 {/* Legacy refresh interval (kept for backward compat) */}
-                <div className="mt-4 px-3 py-2 rounded-lg bg-[#262626]/50 border border-[#3f3f3f] text-xs text-[#737373]">
+                <div className="mt-4 px-3 py-2 rounded-lg bg-[#232E3C]/50 border border-[#232E3C] text-xs text-[#5E6875]">
                   Tip: Changes apply immediately and persist across page reloads.
                 </div>
               </>
@@ -339,8 +339,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ theme: t })}
                         className={`px-4 py-2 rounded-lg text-sm font-medium capitalize border transition-colors ${
                           settings.theme === t
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {t}
@@ -357,8 +357,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ overviewLayout: l })}
                         className={`px-4 py-2 rounded-lg text-sm font-medium capitalize border transition-colors ${
                           settings.overviewLayout === l
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {l}
@@ -375,8 +375,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ sidebarOpen: v === "true" })}
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                           (settings.sidebarOpen ? "true" : "false") === v
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {v === "true" ? "Open" : "Closed"}
@@ -398,8 +398,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ sortField: sf })}
                         className={`px-4 py-2 rounded-lg text-sm font-medium capitalize border transition-colors ${
                           settings.sortField === sf
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {sf}
@@ -416,8 +416,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ sortDirection: sd })}
                         className={`px-4 py-2 rounded-lg text-sm font-medium capitalize border transition-colors ${
                           settings.sortDirection === sd
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {sd === "asc" ? "Ascending" : "Descending"}
@@ -434,8 +434,8 @@ export default function AppSettingsDialog({
                         onClick={() => onUpdate({ overviewExpiryFilter: ef })}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                           settings.overviewExpiryFilter === ef
-                            ? "bg-[#22c55e]/15 border-[#22c55e] text-[#22c55e]"
-                            : "border-[#262626] text-[#737373] hover:border-[#3f3f3f] hover:text-[#a3a3a3]"
+                            ? "bg-[#5DBE81]/15 border-[#5DBE81] text-[#5DBE81]"
+                            : "border-[#232E3C] text-[#5E6875] hover:border-[#232E3C] hover:text-[#8A9BA8]"
                         }`}
                       >
                         {ef === "all" ? "All" : `≤${ef.slice(3)}d`}
@@ -452,7 +452,7 @@ export default function AppSettingsDialog({
                 <SettingRow label="Export Settings" description="Download your settings as JSON">
                   <button
                     onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#22c55e]/15 text-[#22c55e] hover:bg-[#22c55e]/25 border border-[#22c55e]/20 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#5DBE81]/15 text-[#5DBE81] hover:bg-[#5DBE81]/25 border border-[#5DBE81]/20 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Export
@@ -463,7 +463,7 @@ export default function AppSettingsDialog({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleImportClick}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#262626] text-[#e5e5e5] hover:bg-[#3f3f3f] border border-[#3f3f3f] transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#232E3C] text-[#FFFFFF] hover:bg-[#232E3C] border border-[#232E3C] transition-colors"
                     >
                       <Upload className="w-4 h-4" />
                       Import
@@ -479,12 +479,12 @@ export default function AppSettingsDialog({
                 </SettingRow>
 
                 {importError && (
-                  <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  <div className="px-3 py-2 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444] text-sm">
                     {importError}
                   </div>
                 )}
                 {importSuccess && (
-                  <div className="px-3 py-2 rounded-lg bg-[#22c55e]/10 border border-[#22c55e]/20 text-[#22c55e] text-sm">
+                  <div className="px-3 py-2 rounded-lg bg-[#5DBE81]/10 border border-[#5DBE81]/20 text-[#5DBE81] text-sm">
                     Settings imported successfully.
                   </div>
                 )}
@@ -492,7 +492,7 @@ export default function AppSettingsDialog({
                 <SettingRow label="Reset to Defaults" description="Clear all custom settings">
                   <button
                     onClick={onReset}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#ef4444]/10 text-[#ef4444] hover:bg-[#ef4444]/20 border border-[#ef4444]/20 transition-colors"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reset
@@ -503,10 +503,10 @@ export default function AppSettingsDialog({
           </div>
 
           {/* Footer */}
-          <div className="px-5 py-3 border-t border-[#262626] flex justify-end">
+          <div className="px-5 py-3 border-t border-[#232E3C] flex justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-[#262626] text-[#e5e5e5] hover:bg-[#3f3f3f] transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-[#232E3C] text-[#FFFFFF] hover:bg-[#232E3C] transition-colors"
             >
               Done
             </button>
@@ -529,8 +529,8 @@ function SettingRow({
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <div className="text-sm font-medium text-[#e5e5e5]">{label}</div>
-        <div className="text-xs text-[#737373] mt-0.5">{description}</div>
+        <div className="text-sm font-medium text-[#FFFFFF]">{label}</div>
+        <div className="text-xs text-[#5E6875] mt-0.5">{description}</div>
       </div>
       {children}
     </div>

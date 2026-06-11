@@ -129,8 +129,8 @@ interface GenerousCouplingPanelProps {
 }
 
 function confidenceColor(score: number): string {
-  if (score >= CONFIDENCE_EXACT) return "#22c55e";
-  if (score >= CONFIDENCE_LOOSE) return "#eab308";
+  if (score >= CONFIDENCE_EXACT) return "#5DBE81";
+  if (score >= CONFIDENCE_LOOSE) return "#facc15";
   return "#ef4444";
 }
 
@@ -144,9 +144,9 @@ function confidenceLabel(score: number): string {
 function matchTypeBadge(type: "exact" | "loose" | "correlated"): { bg: string; text: string; label: string } {
   switch (type) {
     case "exact":
-      return { bg: "bg-[#22c55e]/10", text: "text-[#22c55e]", label: "Exact" };
+      return { bg: "bg-[#5DBE81]/10", text: "text-[#5DBE81]", label: "Exact" };
     case "loose":
-      return { bg: "bg-[#eab308]/10", text: "text-[#eab308]", label: "Loose" };
+      return { bg: "bg-[#facc15]/10", text: "text-[#facc15]", label: "Loose" };
     case "correlated":
       return { bg: "bg-[#ef4444]/10", text: "text-[#ef4444]", label: "Correlated" };
   }
@@ -318,15 +318,15 @@ export function GenerousCouplingPanel({
   }
 
   return (
-    <div className="rounded-xl border border-[#a855f7]/30 bg-[#0f0f0f] overflow-hidden">
+    <div className="rounded-xl border border-[#a855f7]/30 bg-[#17212B] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] bg-[#111111]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#182533] bg-[#17212B]">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[#a855f7]" />
-          <h3 className="text-sm font-semibold text-[#e5e5e5]">
+          <h3 className="text-sm font-semibold text-[#FFFFFF]">
             Generous Coupling
           </h3>
-          <span className="text-[10px] text-[#737373]">
+          <span className="text-[10px] text-[#5E6875]">
             ({kalshiMarkets.length}K &times; {pmMarkets.length}PM unmatched)
           </span>
         </div>
@@ -336,12 +336,12 @@ export function GenerousCouplingPanel({
           {stats.total > 0 && (
             <div className="hidden sm:flex items-center gap-1 mr-2">
               <span
-                className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#22c55e]/10 text-[#22c55e]"
+                className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#5DBE81]/10 text-[#5DBE81]"
               >
                 {stats.exact} exact
               </span>
               <span
-                className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#eab308]/10 text-[#eab308]"
+                className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#facc15]/10 text-[#facc15]"
               >
                 {stats.loose} loose
               </span>
@@ -359,7 +359,7 @@ export function GenerousCouplingPanel({
             className={`p-1.5 rounded-md transition-colors ${
               showCorrelatedOnly
                 ? "bg-[#ef4444]/20 text-[#ef4444]"
-                : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                : "bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
             }`}
             title={showCorrelatedOnly ? "Show all" : "Show correlated only"}
           >
@@ -374,15 +374,15 @@ export function GenerousCouplingPanel({
 
       {/* Search bar */}
       {finalCandidates.length > 0 && (
-        <div className="px-4 py-2 border-b border-[#1a1a1a]">
+        <div className="px-4 py-2 border-b border-[#182533]">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525252]" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#232E3C]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search markets..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]/30 transition-all"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]/30 transition-all"
             />
           </div>
         </div>
@@ -391,7 +391,7 @@ export function GenerousCouplingPanel({
       {/* Content */}
       <div className="p-4">
         {finalCandidates.length === 0 ? (
-          <div className="text-sm text-[#737373] text-center py-4">
+          <div className="text-sm text-[#5E6875] text-center py-4">
             {searchQuery
               ? `No matches for "${searchQuery}"`
               : "No coupling candidates found."}
@@ -406,17 +406,17 @@ export function GenerousCouplingPanel({
               return (
                 <div
                   key={kalshiId}
-                  className="border border-[#1a1a1a] rounded-lg bg-[#111111] overflow-hidden"
+                  className="border border-[#182533] rounded-lg bg-[#17212B] overflow-hidden"
                 >
                   {/* Expandable header */}
                   <button
                     onClick={() =>
                       setExpandedId(isExpanded ? null : kalshiId)
                     }
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#1a1a1a]/50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#182533]/50 transition-colors text-left"
                   >
                     <span
-                      className={`transition-transform text-[#737373] ${
+                      className={`transition-transform text-[#5E6875] ${
                         isExpanded ? "rotate-90" : ""
                       }`}
                     >
@@ -430,7 +430,7 @@ export function GenerousCouplingPanel({
                           alt=""
                           className="w-3.5 h-3.5 rounded-sm"
                         />
-                        <span className="text-xs text-[#e5e5e5] truncate">
+                        <span className="text-xs text-[#FFFFFF] truncate">
                           {kalshi.title}
                         </span>
                         <span
@@ -439,7 +439,7 @@ export function GenerousCouplingPanel({
                           {badge.label}
                         </span>
                       </div>
-                      <div className="text-[10px] text-[#525252] font-mono mt-0.5">
+                      <div className="text-[10px] text-[#232E3C] font-mono mt-0.5">
                         {suggestions.length} suggestion
                         {suggestions.length !== 1 ? "s" : ""}
                       </div>
@@ -459,7 +459,7 @@ export function GenerousCouplingPanel({
 
                   {/* Expanded suggestions */}
                   {isExpanded && (
-                    <div className="border-t border-[#1a1a1a] px-3 pb-2">
+                    <div className="border-t border-[#182533] px-3 pb-2">
                       {suggestions.map((s) => {
                         const pairId = `${s.kalshi.id}:${s.polymarket.id}`;
                         const isActing = actingId === pairId;
@@ -469,7 +469,7 @@ export function GenerousCouplingPanel({
                         return (
                           <div
                             key={pairId}
-                            className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#1a1a1a]/30 transition-colors"
+                            className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#182533]/30 transition-colors"
                           >
                             {/* Confidence */}
                             <div className="flex flex-col items-center gap-0.5 shrink-0 w-12">
@@ -479,7 +479,7 @@ export function GenerousCouplingPanel({
                               >
                                 {s.confidence}%
                               </span>
-                              <span className="text-[9px] text-[#737373]">
+                              <span className="text-[9px] text-[#5E6875]">
                                 {confidenceLabel(s.confidence)}
                               </span>
                             </div>
@@ -492,7 +492,7 @@ export function GenerousCouplingPanel({
                                   alt=""
                                   className="w-3.5 h-3.5 rounded-sm"
                                 />
-                                <span className="text-xs text-[#e5e5e5] truncate">
+                                <span className="text-xs text-[#FFFFFF] truncate">
                                   {s.polymarket.title}
                                 </span>
                               </div>
@@ -502,7 +502,7 @@ export function GenerousCouplingPanel({
                                 >
                                   {sBadge.label}
                                 </span>
-                                <span className="text-[9px] text-[#525252]">
+                                <span className="text-[9px] text-[#232E3C]">
                                   KW:{Math.round(s.scoreBreakdown.keywordSimilarity * 100)}%
                                   Exp:{Math.round(s.scoreBreakdown.expiryProximity * 100)}%
                                   Cat:{Math.round(s.scoreBreakdown.categoryOverlap * 100)}%
@@ -520,7 +520,7 @@ export function GenerousCouplingPanel({
                                   )
                                 }
                                 disabled={isActing}
-                                className="p-1.5 rounded-md bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded-md bg-[#5DBE81]/10 hover:bg-[#5DBE81]/20 text-[#5DBE81] transition-colors disabled:opacity-50"
                                 title="Accept pairing"
                               >
                                 {isActing ? (
@@ -561,12 +561,12 @@ export function GenerousCouplingPanel({
 
       {/* Footer info */}
       {finalCandidates.length > 0 && (
-        <div className="px-4 py-2 border-t border-[#1a1a1a] bg-[#111111] flex items-center justify-between">
-          <span className="text-[10px] text-[#525252]">
+        <div className="px-4 py-2 border-t border-[#182533] bg-[#17212B] flex items-center justify-between">
+          <span className="text-[10px] text-[#232E3C]">
             {finalCandidates.length} suggestion
             {finalCandidates.length !== 1 ? "s" : ""} &middot; click to expand
           </span>
-          <span className="text-[10px] text-[#525252]">
+          <span className="text-[10px] text-[#232E3C]">
             Sorted by {sortByConfidence ? "confidence" : "title"}
           </span>
         </div>

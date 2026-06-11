@@ -61,19 +61,19 @@ export function MarketRow({
   onToggleExpand,
 }: MarketRowProps) {
   const spread = (kalshi?.yesAsk ?? 0) - (polymarket?.yesPrice ?? 0);
-  const roiColor = arbitrage.roiPct > 5 ? "text-[#10b981]" : arbitrage.roiPct > 0 ? "text-[#fbbf24]" : "text-[#94a3b8]";
+  const roiColor = arbitrage.roiPct > 5 ? "text-[#5DBE81]" : arbitrage.roiPct > 0 ? "text-[#facc15]" : "text-[#8A9BA8]";
 
   return (
     <React.Fragment>
       <tr
-        className={`hover:bg-[#334155]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#334155]/30" : ""}`}
+        className={`hover:bg-[#17212B]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#17212B]/30" : ""}`}
         onClick={onToggleExpand}
       >
-        <td className="px-4 py-3 font-medium text-[#f1f5f9] flex items-center gap-1.5">
-          <span className={`transition-transform text-[#94a3b8] ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
+        <td className="px-4 py-3 font-medium text-[#FFFFFF] flex items-center gap-1.5">
+          <span className={`transition-transform text-[#8A9BA8] ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
           {artist}
         </td>
-        <td className="px-4 py-3 text-right text-[#f1f5f9]">
+        <td className="px-4 py-3 text-right text-[#FFFFFF]">
           <PriceCell
             price={kalshi?.yesAsk ?? null}
             depth={kalshi?.yesAskDepth}
@@ -81,7 +81,7 @@ export function MarketRow({
             depthLabel="Djup:"
           />
         </td>
-        <td className="px-4 py-3 text-right text-[#f1f5f9]">
+        <td className="px-4 py-3 text-right text-[#FFFFFF]">
           <PriceCell
             price={kalshi?.noAsk ?? null}
             depth={kalshi?.noAskDepth}
@@ -89,7 +89,7 @@ export function MarketRow({
             depthLabel="Djup:"
           />
         </td>
-        <td className="px-4 py-3 text-right text-[#f1f5f9]">
+        <td className="px-4 py-3 text-right text-[#FFFFFF]">
           <PriceCell
             price={polymarket?.yesPrice ?? null}
             depth={polymarket?.askDepth}
@@ -97,7 +97,7 @@ export function MarketRow({
             depthLabel="Likviditet:"
           />
         </td>
-        <td className="px-4 py-3 text-right text-[#f1f5f9]">
+        <td className="px-4 py-3 text-right text-[#FFFFFF]">
           <PriceCell
             price={polymarket?.noPrice ?? null}
             depth={polymarket?.noAskDepth}
@@ -115,20 +115,20 @@ export function MarketRow({
           {arbitrage.expectedProfit > 0 ? (
             isHighestProfit && totalProfit > 0 ? (
               <div className="group inline-block">
-                <span className="text-[#f1f5f9] cursor-help">
+                <span className="text-[#FFFFFF] cursor-help">
                   {formatCurrency(arbitrage.expectedProfit)}{' '}
-                  <span className="text-[#94a3b8]">({formatCurrency(totalProfit)} total)</span>
+                  <span className="text-[#8A9BA8]">({formatCurrency(totalProfit)} total)</span>
                 </span>
-                <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#1e293b] border border-[#475569] rounded-lg shadow-xl p-3 text-xs">
-                  <div className="font-bold text-[#f1f5f9] mb-2">Total Profit Potential</div>
-                  <div className="text-[#10b981] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
-                  <div className="text-[#94a3b8] text-xs">{arbitrage.strategy}</div>
-                  <div className="mt-2 pt-2 border-t border-[#475569]">
-                    <div className="flex justify-between text-[#94a3b8]">
+                <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
+                  <div className="font-bold text-[#FFFFFF] mb-2">Total Profit Potential</div>
+                  <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
+                  <div className="text-[#8A9BA8] text-xs">{arbitrage.strategy}</div>
+                  <div className="mt-2 pt-2 border-t border-[#232E3C]">
+                    <div className="flex justify-between text-[#8A9BA8]">
                       <span>ROI:</span>
-                      <span className="text-[#10b981]">{formatPercent(arbitrage.roiPct)}</span>
+                      <span className="text-[#5DBE81]">{formatPercent(arbitrage.roiPct)}</span>
                     </div>
-                    <div className="flex justify-between text-[#94a3b8]">
+                    <div className="flex justify-between text-[#8A9BA8]">
                       <span>Stake:</span>
                       <span>{formatCurrency(arbitrage.totalStake)}</span>
                     </div>
@@ -136,43 +136,43 @@ export function MarketRow({
                 </div>
               </div>
             ) : (
-              <span className="text-[#f1f5f9]">{formatCurrency(arbitrage.expectedProfit)}</span>
+              <span className="text-[#FFFFFF]">{formatCurrency(arbitrage.expectedProfit)}</span>
             )
           ) : (
-            <span className="text-[#94a3b8]">—</span>
+            <span className="text-[#8A9BA8]">—</span>
           )}
         </td>
         <td className={`px-4 py-3 text-right font-medium ${roiColor}`}>
           {formatPercent(arbitrage.apyPct)}
         </td>
-        <td className="px-4 py-3 text-right text-[#f1f5f9]">
+        <td className="px-4 py-3 text-right text-[#FFFFFF]">
           {formatCurrency(arbitrage.maxCapital)}
         </td>
-        <td className="px-4 py-3 text-right text-[#94a3b8] text-xs">
+        <td className="px-4 py-3 text-right text-[#8A9BA8] text-xs">
           {arbitrage.strategy === 'No arb' ? '-' : arbitrage.strategy.replace(/Buy\s+(YES|NO)\s+Kalshi\s+\+\s+(YES|NO)\s+PM/, '$1K+$2P')}
         </td>
       </tr>
       
       {/* Expanded detail row */}
       {isExpanded && arbitrage.strategy !== 'No arb' && (
-        <tr className="bg-[#1e293b]/50">
+        <tr className="bg-[#17212B]/50">
           <td colSpan={12} className="px-4 py-4">
             <div className="grid grid-cols-4 gap-4 text-sm">
               <div>
-                <div className="text-[#94a3b8] text-xs mb-1">Kalshi Stake</div>
-                <div className="text-[#f1f5f9] font-medium">{formatCurrency(arbitrage.kalshiStake)}</div>
+                <div className="text-[#8A9BA8] text-xs mb-1">Kalshi Stake</div>
+                <div className="text-[#FFFFFF] font-medium">{formatCurrency(arbitrage.kalshiStake)}</div>
               </div>
               <div>
-                <div className="text-[#94a3b8] text-xs mb-1">PM Stake</div>
-                <div className="text-[#f1f5f9] font-medium">{formatCurrency(arbitrage.pmStake)}</div>
+                <div className="text-[#8A9BA8] text-xs mb-1">PM Stake</div>
+                <div className="text-[#FFFFFF] font-medium">{formatCurrency(arbitrage.pmStake)}</div>
               </div>
               <div>
-                <div className="text-[#94a3b8] text-xs mb-1">Strategy</div>
-                <div className="text-[#f1f5f9] font-medium">{arbitrage.strategy}</div>
+                <div className="text-[#8A9BA8] text-xs mb-1">Strategy</div>
+                <div className="text-[#FFFFFF] font-medium">{arbitrage.strategy}</div>
               </div>
               <div>
-                <div className="text-[#94a3b8] text-xs mb-1">Capital</div>
-                <div className="text-[#f1f5f9] font-medium">{formatCurrency(arbitrage.maxCapital)}</div>
+                <div className="text-[#8A9BA8] text-xs mb-1">Capital</div>
+                <div className="text-[#FFFFFF] font-medium">{formatCurrency(arbitrage.maxCapital)}</div>
               </div>
             </div>
           </td>
