@@ -43,43 +43,43 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ─── Dark theme (default) ─── */
+/* ─── Dark theme (default) ─ EdgeFinder Navy ─── */
 :root {
-  --background: #0a0a0a;
-  --foreground: #e5e5e5;
-  --card: #111111;
-  --card-foreground: #e5e5e5;
-  --popover: #111111;
-  --popover-foreground: #e5e5e5;
+  --background: #0B1120;
+  --foreground: #f8fafc;
+  --card: #111827;
+  --card-foreground: #f8fafc;
+  --popover: #111827;
+  --popover-foreground: #f8fafc;
   --primary: #22c55e;
   --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #e5e5e5;
-  --muted: #1a1a1a;
-  --muted-foreground: #737373;
-  --accent: #1a1a1a;
-  --accent-foreground: #e5e5e5;
-  --destructive: #ef4444;
-  --border: #262626;
-  --input: #262626;
+  --secondary: #151d2e;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #f87171;
+  --border: #1e293b;
+  --input: #1e293b;
   --ring: #22c55e;
   --radius: 0.625rem;
   --chart-1: #22c55e;
-  --chart-2: #3b82f6;
-  --chart-3: #eab308;
-  --chart-4: #a855f7;
-  --chart-5: #ef4444;
+  --chart-2: #60a5fa;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f87171;
 
   /* Semantic tokens for theme-aware surfaces */
-  --surface: #0a0a0a;
-  --surface-elevated: #111111;
-  --surface-hover: #1a1a1a;
-  --text: #e5e5e5;
-  --text-muted: #737373;
-  --text-faint: #525252;
-  --divider: #262626;
-  --header-bg: #0f0f0f;
-  --sidebar-bg: #0a0a0a;
+  --surface: #0B1120;
+  --surface-elevated: #111827;
+  --surface-hover: #1e293b;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --divider: #1e293b;
+  --header-bg: #0B1120;
+  --sidebar-bg: #0B1120;
 }
 
 /* ─── Light theme ─── */
