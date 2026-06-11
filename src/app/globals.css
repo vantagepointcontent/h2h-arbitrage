@@ -45,7 +45,7 @@
 
 /* ─── Dark theme (default) ─ EdgeFinder Navy ─── */
 :root {
-  --background: #0E1621;
+  --background: #0D1117;
   --foreground: #FFFFFF;
   --card: #17212B;
   --card-foreground: #FFFFFF;
@@ -71,15 +71,15 @@
   --chart-5: #ef4444;
 
   /* Semantic tokens for theme-aware surfaces */
-  --surface: #0E1621;
+  --surface: #0D1117;
   --surface-elevated: #17212B;
   --surface-hover: #17212B;
   --text: #FFFFFF;
   --text-muted: #8A9BA8;
   --text-faint: #5E6875;
   --divider: #17212B;
-  --header-bg: #0E1621;
-  --sidebar-bg: #0E1621;
+  --header-bg: #0D1117;
+  --sidebar-bg: #0D1117;
 }
 
 /* ─── Light theme ─── */
