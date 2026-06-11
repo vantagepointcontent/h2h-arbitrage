@@ -1610,7 +1610,7 @@ export default function Home() {
                     )}
 
                     {/* Bookmaker 1on1 view */}
-                    {result && bookmakerView && (
+                    {result?.outcomes && bookmakerView && (
                       <Bookmaker1on1
                         outcomes={result.outcomes.map(o => ({
                           artist: o.artist,
@@ -1634,7 +1634,7 @@ export default function Home() {
                     )}
 
                     {/* Outcome table — expanded log/detail area */}
-                    {!bookmakerView && result.matchedCount > 0 && (
+                    {!bookmakerView && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
                       <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
                         {/* Filter toggles */}
                         <div className="flex items-center gap-1 p-2 border-b border-[#182533]">
