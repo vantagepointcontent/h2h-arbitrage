@@ -1349,7 +1349,7 @@ export default function Home() {
                 bulkSaving={mfBulkSaving}
                 bulkMsg={mfBulkMsg}
                 spreadThreshold={mfSpreadThreshold}
-                category={mfCategory}
+                categories={mfCategories}
                 autoRefreshEnabled={mfAutoRefreshEnabled}
                 onFetch={() => {
                   fetchFreshMfMarkets(true);
