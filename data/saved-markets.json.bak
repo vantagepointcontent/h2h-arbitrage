@@ -10,11 +10,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 4,
+      "outcomeCount": 16,
       "matchedCount": 4,
       "kalshiCount": 12,
       "pmCount": 8,
-      "scannedAt": "2026-06-11T13:48:01.332Z",
+      "scannedAt": "2026-06-11T19:12:18.670Z",
       "allArbs": []
     },
     "category": "Finances"
@@ -590,34 +590,15 @@
     "id": "1779918229304-wucayqb",
     "createdAt": "2026-05-27T21:43:49.304Z",
     "lastScanResult": {
-      "bestRoiPct": 2.0000000000000018,
-      "bestProfit": 11.846808510638308,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 7,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 9,
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-11T13:48:10.710Z",
-      "allArbs": [
-        {
-          "artist": "Adriano Espaillat",
-          "roiPct": 0.49999999999998945,
-          "expectedProfit": 1.2058695652173657,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 110.94,
-          "pmStake": 129.02804347826088,
-          "totalStake": 239.96804347826088
-        },
-        {
-          "artist": "Darializa Avila Chevalier",
-          "roiPct": 2.0000000000000018,
-          "expectedProfit": 11.846808510638308,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 278.4,
-          "pmStake": 302.0936170212766,
-          "totalStake": 580.4936170212766
-        }
-      ]
+      "scannedAt": "2026-06-11T19:05:41.511Z",
+      "allArbs": []
     }
   },
   {
