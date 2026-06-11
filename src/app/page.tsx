@@ -1424,7 +1424,7 @@ export default function Home() {
                               if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
                             }}
                             disabled={loading}
-                            className="flex items-center justify-center rounded bg-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#404040] transition-colors disabled:opacity-50 px-1.5 py-0.5"
+                            className="flex items-center justify-center rounded bg-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#232E3C] transition-colors disabled:opacity-50 px-1.5 py-0.5"
                             title="Refresh"
                           >
                             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -1530,7 +1530,7 @@ export default function Home() {
                     {!bookmakerView && result.matchedCount > 0 && (
                       <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead className="bg-[#111111] border-b border-[#182533]">
+                          <thead className="bg-[#17212B] border-b border-[#182533]">
                             <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                               <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi Yes</th>
@@ -1893,7 +1893,7 @@ function OverviewPanel({
       ) : (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#182533]">
+            <thead className="bg-[#17212B] border-b border-[#182533]">
               <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-medium">Market</th>
                 <th className="text-right px-4 py-3 font-medium">Expiry</th>
@@ -2089,7 +2089,7 @@ function MarketFinderPanel({
               className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
                 isActive
                   ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                  : "bg-[#182533] text-[#5E6875] border-[#232E3C] hover:text-[#8A9BA8] hover:border-[#404040]"
+                  : "bg-[#182533] text-[#5E6875] border-[#232E3C] hover:text-[#8A9BA8] hover:border-[#232E3C]"
               }`}
             >
               {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -2154,7 +2154,7 @@ function MarketFinderPanel({
       ) : (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
           {/* Bulk action bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#182533] bg-[#111111]">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#182533] bg-[#17212B]">
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#5E6875]">
                 {selectedVisibleCount}/{sorted.length} selected
@@ -2176,7 +2176,7 @@ function MarketFinderPanel({
           </div>
 
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#182533]">
+            <thead className="bg-[#17212B] border-b border-[#182533]">
               <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                 <th className="px-4 py-3 font-medium w-10">
                   <input
