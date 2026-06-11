@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Zap,
   Scan,
@@ -18,7 +18,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Bookmark,
+  Bell,
   Plus,
   BarChart3,
   X,
@@ -40,6 +40,9 @@ import {
   Moon,
   Check,
   Star,
+  Percent,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -47,14 +50,18 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
-import { CATEGORIES } from "@/lib/predictionhunt";
+import { CATEGORIES } from "@/lib/predictionhunt-categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
+import { parseDepth } from "@/lib/matcher";
 
 // ─── Selection storage key ───
 const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
 
 // ─── MF category filter storage key ───
 const MF_CATEGORIES_KEY = "h2h-mf-categories";
+
+type OverviewSort = "name" | "roi" | "expiry" | "apy" | "profit";
+type SidebarSort = "name" | "roi" | "expiry" | "apy";
 
 /** Read persisted selected categories from localStorage */
 function getStoredMfCategories(): string[] {
@@ -239,6 +246,8 @@ interface UnmatchedKalshi {
   title: string;
   yesPrice: number;
   noPrice: number;
+  yesAsk: number;
+  noAsk: number;
 }
 
 interface UnmatchedPolymarket {
@@ -260,6 +269,7 @@ interface ManualMatch {
 interface LastScanResult {
   bestRoiPct: number;
   bestProfit: number;
+  bestApyPct: number;
   strategy: string;
   outcomeCount: number;
   matchedCount: number;
@@ -270,6 +280,7 @@ interface LastScanResult {
     artist: string;
     roiPct: number;
     expectedProfit: number;
+    totalStake: number;
     strategy: string;
   }[];
 }
@@ -360,12 +371,22 @@ function formatExpiry(iso?: string | null): string {
 
 function timeUntilExpiry(iso?: string | null): string {
   if (!iso) return "";
-  const diff = new Date(iso).getTime() - Date.now();
+  const ts = parseDateToUTC(iso);
+  const diff = ts - Date.now();
   if (diff < 0) return "Expired";
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   if (days > 0) return `${days}d ${hours}h`;
   return `${hours}h`;
+}
+
+/** Parse ISO date string as UTC (handles YYYY-MM-DD by treating as midnight UTC) */
+function parseDateToUTC(iso: string): number {
+  // If it's just a date (YYYY-MM-DD), append midnight UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    return new Date(iso + "T00:00:00Z").getTime();
+  }
+  return new Date(iso).getTime();
 }
 
 /** Check whether a saved market has at least one matched outcome pair */
@@ -377,12 +398,12 @@ function isMatched(m: SavedMarket): boolean {
 /* ── Stat Card ── */
 function StatCard({ label, value, icon, color, valueSize, compact }: { label: string; value: string | number; icon: React.ReactNode; color: "green" | "blue" | "purple" | "yellow" | "orange" | "red"; valueSize?: "xs"; compact?: boolean }) {
   const colorMap = {
-    green: "text-[#22c55e]", blue: "text-[#3b82f6]", purple: "text-[#a855f7]",
-    yellow: "text-[#eab308]", orange: "text-[#f97316]", red: "text-[#ef4444]",
+    green: "text-[#10b981]", blue: "text-[#0ea5e9]", purple: "text-[#8b5cf6]",
+    yellow: "text-[#f59e0b]", orange: "text-[#f97316]", red: "text-[#ef4444]",
   };
   const bgMap = {
-    green: "bg-[#22c55e]/10", blue: "bg-[#3b82f6]/10", purple: "bg-[#a855f7]/10",
-    yellow: "bg-[#eab308]/10", orange: "bg-[#f97316]/10", red: "bg-[#ef4444]/10",
+    green: "bg-[#10b981]/10", blue: "bg-[#0ea5e9]/10", purple: "bg-[#8b5cf6]/10",
+    yellow: "bg-[#f59e0b]/10", orange: "bg-[#f97316]/10", red: "bg-[#ef4444]/10",
   };
   const padClass = compact ? "p-2.5" : "p-4";
   const labelGap = compact ? "mb-1" : "mb-2";
@@ -390,17 +411,53 @@ function StatCard({ label, value, icon, color, valueSize, compact }: { label: st
   const textSize = compact ? "text-xs" : (valueSize === "xs" ? "text-sm" : "text-2xl");
   const labelTextSize = compact ? "text-[10px]" : "text-xs";
   return (
-    <div className={`rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] ${padClass}`}>
+    <div className={`rounded-xl border border-[#334155] bg-[#1e293b] ${padClass}`}>
       <div className={`flex items-center gap-2 ${labelGap}`}>
         <span className={`${colorMap[color]} ${iconPad} rounded-lg ${bgMap[color]}`}>{icon}</span>
-        <span className={`${labelTextSize} text-[#737373]`}>{label}</span>
+        <span className={`${labelTextSize} text-[#94a3b8]`}>{label}</span>
       </div>
-      <div className={`${textSize} font-bold text-[#e5e5e5]`}>{value}</div>
+      <div className={`${textSize} font-bold text-[#f1f5f9]`}>{value}</div>
     </div>
   );
 }
 
-/* ── Swipe gesture hook ── */
+/* ── APY helper ── */
+function calculateAPY(roiPct: number, expiryDate?: string | null): number {
+  if (!roiPct || !expiryDate) return 0;
+  const days = (parseDateToUTC(expiryDate) - Date.now()) / 86400000;
+  if (days <= 0) return 0;
+  return roiPct * (365 / days);
+}
+
+function getWeightedAPY(markets: SavedMarket[]): number {
+  let totalProfit = 0;
+  let weightedSum = 0;
+  for (const m of markets) {
+    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+    const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+    if (roi > 0 && profit > 0) {
+      const apy = calculateAPY(roi, m.expiryDate);
+      totalProfit += profit;
+      weightedSum += apy * profit;
+    }
+  }
+  if (totalProfit === 0) return 0;
+  return weightedSum / totalProfit;
+}
+
+function getTotalProfitAll(markets: SavedMarket[]): number {
+  return markets.reduce((sum, m) => {
+    const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+    return sum + Math.max(0, profit);
+  }, 0);
+}
+
+function getTotalArbs(markets: SavedMarket[]): number {
+  return markets.reduce((sum, m) => {
+    const arbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
+    return sum + (arbs?.filter(a => a.expectedProfit > 0).length ?? 0);
+  }, 0);
+}
 function useSwipeGesture(onLeft: () => void, onRight: () => void) {
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -432,8 +489,10 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
 
 /* ── Main App ── */
 export default function Home() {
-  const [kalshiUrl, setKalshiUrl] = useState("https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake");
-  const [pmUrl, setPmUrl] = useState("https://polymarket.com/event/who-will-be-featured-on-iceman");
+  const DEFAULT_KALSHI_URL = "";
+  const DEFAULT_PM_URL = "";
+  const [kalshiUrl, setKalshiUrl] = useState(DEFAULT_KALSHI_URL);
+  const [pmUrl, setPmUrl] = useState(DEFAULT_PM_URL);
   const [capital, setCapital] = useState(1000);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -474,8 +533,9 @@ export default function Home() {
   );
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "dashboard">("overview");
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
@@ -499,6 +559,10 @@ export default function Home() {
       if (state?.view === "overview") {
         stopPolling();
         setViewMode("overview");
+        setActiveMarketId(null);
+      } else if (state?.view === "dashboard") {
+        stopPolling();
+        setViewMode("dashboard");
         setActiveMarketId(null);
       } else if (state?.view === "marketfinder") {
         stopPolling();
@@ -581,6 +645,18 @@ export default function Home() {
     syncFromUrl();
   }, []);
 
+  // Auto-scan every 10 seconds when viewing a specific market
+  useEffect(() => {
+    if (viewMode !== "scan" || !activeMarketId) return;
+    const interval = setInterval(() => {
+      const m = savedMarketsRef.current.find((sm) => sm.id === activeMarketId);
+      if (m) {
+        handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [viewMode, activeMarketId]);
+
   // Stop polling helper
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -600,21 +676,22 @@ export default function Home() {
 
   // Scan handler
   const handleScan = useCallback(async (useDefaults: boolean) => {
-    const kUrl = useDefaults
-      ? "https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake"
-      : kalshiUrlRef.current;
-    const pUrl = useDefaults
-      ? "https://polymarket.com/event/who-will-be-featured-on-iceman"
-      : pmUrlRef.current;
+    const kUrl = useDefaults ? DEFAULT_KALSHI_URL : kalshiUrlRef.current;
+    const pUrl = useDefaults ? DEFAULT_PM_URL : pmUrlRef.current;
     await handleScanWithUrls(kUrl, pUrl);
   }, []);
 
   const handleScanWithUrls = useCallback(async (kUrl: string, pUrl: string) => {
     setLoading(true);
     setError("");
-    setResult(null);
-    previousPricesRef.current = new Map();
-    setPriceChanges(new Map());
+    // Save previous prices for change detection
+    const oldPrices = new Map(previousPricesRef.current);
+    // Don't clear previousPricesRef here — we need it for comparison
+    // Only clear on first load (when no previous prices exist)
+    const isFirstLoad = previousPricesRef.current.size === 0;
+    if (isFirstLoad) {
+      setPriceChanges(new Map());
+    }
 
     try {
       const res = await fetch("/api/scan", {
@@ -624,19 +701,76 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok) {
-        setResult(data);
+        const normalizedData = {
+          ...data,
+          allOutcomes: data.allOutcomes ?? data.outcomes ?? [],
+          outcomes: data.outcomes ?? data.allOutcomes ?? [],
+          unmatchedKalshi: (data.unmatchedKalshi ?? []).map((k: UnmatchedKalshi) => ({
+            ...k,
+            yesAsk: k.yesPrice ?? 0,
+            noAsk: k.noPrice ?? 0,
+          })),
+          unmatchedPolymarket: data.unmatchedPolymarket ?? [],
+        };
+        setResult(normalizedData);
         setLastUpdated(new Date());
         setLastScanTime(Date.now());
         // Trigger embedded panel refresh on new scan
         setEmbedRefreshCounter((c) => c + 1);
-        // Record initial prices for change detection
+        // Detect price changes
+        const changes = new Map<string, "up" | "down" | null>();
         const prices = new Map<string, { kYes: number; pYes: number }>();
-        data.allOutcomes.forEach((o: UnifiedOutcome) => {
+        normalizedData.allOutcomes.forEach((o: UnifiedOutcome) => {
           if (o.kalshi && o.polymarket) {
             prices.set(o.artist, { kYes: o.kalshi.yesAsk, pYes: o.polymarket.yesPrice });
+            const old = oldPrices.get(o.artist);
+            if (old) {
+              const kDiff = o.kalshi.yesAsk - old.kYes;
+              const pDiff = o.polymarket.yesPrice - old.pYes;
+              // Only register if significant change (>0.01)
+              if (Math.abs(kDiff) > 0.01 || Math.abs(pDiff) > 0.01) {
+                const avgDiff = (kDiff + pDiff) / 2;
+                changes.set(o.artist, avgDiff > 0 ? "up" : "down");
+              } else {
+                changes.set(o.artist, null);
+              }
+            } else {
+              changes.set(o.artist, null);
+            }
           }
         });
+        setPriceChanges(changes);
         previousPricesRef.current = prices;
+
+        // Update savedMarkets with live result
+        const bestArb = (normalizedData.allOutcomes ?? [])
+          .map((o: any) => o.arbitrage)
+          .filter((a: any) => a && a.roiPct > 0)
+          .sort((a: any, b: any) => b.roiPct - a.roiPct)[0];
+        if (bestArb && activeMarketIdRef.current) {
+          setSavedMarkets(prev => prev.map(m => {
+            if (m.id !== activeMarketIdRef.current) return m;
+            return {
+              ...m,
+              liveResult: {
+                bestRoiPct: bestArb.roiPct ?? 0,
+                bestProfit: bestArb.expectedProfit ?? 0,
+                bestApyPct: calculateAPY(bestArb.roiPct ?? 0, m.expiryDate),
+                strategy: bestArb.strategy || "",
+                scannedAt: new Date().toISOString(),
+                allArbs: (normalizedData.allOutcomes ?? [])
+                  .filter((o: any) => o.arbitrage && o.arbitrage.roiPct > 0)
+                  .map((o: any) => ({
+                    artist: o.artist,
+                    roiPct: o.arbitrage.roiPct,
+                    expectedProfit: o.arbitrage.expectedProfit,
+                    strategy: o.arbitrage.strategy,
+                    totalStake: o.arbitrage.totalStake,
+                  })),
+              },
+            };
+          }));
+        }
       } else {
         setError(data.error || "Scan failed");
       }
@@ -648,7 +782,7 @@ export default function Home() {
   }, []);
 
   // Saved markets
-  const loadSavedMarkets = async (): Promise<SavedMarket[]> => {
+  const loadSavedMarkets = useCallback(async (): Promise<SavedMarket[]> => {
     try {
       const res = await fetch("/api/saved-markets");
       if (res.ok) {
@@ -658,7 +792,12 @@ export default function Home() {
       }
     } catch { /* ignore */ }
     return [];
-  };
+  }, []);
+
+  const refreshOverview = useCallback(() => {
+    setOverviewLoading(true);
+    loadSavedMarkets().finally(() => setOverviewLoading(false));
+  }, [loadSavedMarkets]);
 
   const loadManualMatches = async () => {
     try {
@@ -680,12 +819,13 @@ export default function Home() {
 
     for (const market of savedMarketsRef.current) {
       try {
-        const res = await fetch(`/api/refresh?_=${Date.now()}`, {
+        const res = await fetch(`/api/scan`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             kalshiUrl: market.kalshiUrl,
             polymarketUrl: market.polymarketUrl,
+            capital: capital,
           }),
         });
         if (res.ok) {
@@ -702,20 +842,27 @@ export default function Home() {
     setSavedMarkets(prev => prev.map(m => {
       const r = refreshed.find(x => x.id === m.id);
       if (!r) return m;
+      const bestArb = (r.result.allOutcomes ?? r.result.outcomes ?? [])
+        .map((o: any) => o.arbitrage)
+        .filter((a: any) => a && a.roiPct > 0)
+        .sort((a: any, b: any) => b.roiPct - a.roiPct)[0];
       return {
         ...m,
         liveResult: {
-          bestRoiPct: r.result.bestRoiPct ?? 0,
-          bestProfit: r.result.bestProfit ?? 0,
-          strategy: r.result.strategy || "",
-          scannedAt: r.result.scannedAt || new Date().toISOString(),
-          allArbs: (r.result.allArbs || []).map((a: any) => ({
-            artist: a.artist,
-            roiPct: a.roiPct,
-            expectedProfit: a.expectedProfit,
-            strategy: a.strategy,
-            totalStake: a.totalStake,
-          })),
+          bestRoiPct: bestArb?.roiPct ?? 0,
+          bestProfit: bestArb?.expectedProfit ?? 0,
+          bestApyPct: calculateAPY(bestArb?.roiPct ?? 0, m.expiryDate),
+          strategy: bestArb?.strategy || "",
+          scannedAt: new Date().toISOString(),
+          allArbs: (r.result.allOutcomes ?? r.result.outcomes ?? [])
+            .filter((o: any) => o.arbitrage && o.arbitrage.roiPct > 0)
+            .map((o: any) => ({
+              artist: o.artist,
+              roiPct: o.arbitrage.roiPct,
+              expectedProfit: o.arbitrage.expectedProfit,
+              strategy: o.arbitrage.strategy,
+              totalStake: o.arbitrage.totalStake,
+            })),
         },
       };
     }));
@@ -775,6 +922,7 @@ export default function Home() {
   const saveMarket = async () => {
     if (!result) return;
     setSaving(true);
+    setSaveError("");
     try {
       const res = await fetch("/api/saved-markets", {
         method: "POST",
@@ -788,8 +936,14 @@ export default function Home() {
       if (res.ok) {
         await loadSavedMarkets();
         setSaveModalOpen(false);
+        setSaveError("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error || "This market pair is already saved.");
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      setSaveError("Network error. Please try again.");
+    } finally {
       setSaving(false);
     }
   };
@@ -877,6 +1031,12 @@ export default function Home() {
     window.history.replaceState({ view: "overview" }, "", "/?view=overview");
   };
 
+  const goToDashboard = () => {
+    stopPolling();
+    setViewMode("dashboard");
+    window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
+  };
+
   const goToScan = () => {
     stopPolling();
     setViewMode("scan");
@@ -884,7 +1044,6 @@ export default function Home() {
   };
 
   // Sort helpers
-  type OverviewSort = "name" | "roi" | "expiry" | "apy";
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
@@ -894,6 +1053,7 @@ export default function Home() {
   const [scanningAll, setScanningAll] = useState(false);
   const [scanAllError, setScanAllError] = useState("");
   const [bookmakerView, setBookmakerView] = useState(false);
+  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
 
   // Favorites state (persisted to localStorage)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(getStoredFavoriteIds);
@@ -944,6 +1104,7 @@ export default function Home() {
   const [mfError, setMfError] = useState("");
   const [mfLastSync, setMfLastSync] = useState<any>(null);
   const [mfSavingIds, setMfSavingIds] = useState<Set<string>>(new Set());
+  const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [mfExpiryFilter, setMfExpiryFilter] = useState<"all" | "lt24h" | "lt1h" | "lt15m">("all");
   // MF category filter — multi-select (empty = all categories)
   const [mfCategories, setMfCategories] = useState<string[]>(getStoredMfCategories);
@@ -968,8 +1129,7 @@ export default function Home() {
   const alertSystem = useAlertSystem();
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
 
-  // Sidebar sort
-  type SidebarSort = "name" | "roi" | "expiry" | "apy";
+  // Sidebar / overview sort
   const [sidebarSort, setSidebarSort] = useState<SidebarSort>("name");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("asc");
 
@@ -1179,28 +1339,42 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5]">
-      <ToastContainer toast={alertSystem.toast} />
-      {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} alertSystem={alertSystem} />}
+    <div className="min-h-screen bg-[#0f172a] text-[#f1f5f9]">
+      <ToastContainer toasts={alertSystem.toasts} onDismiss={alertSystem.dismissToast} />
+      {alertSettingsOpen && (
+        <AlertSettingsPanel
+          settings={alertSystem.settings}
+          onSettingsChange={alertSystem.setSettings}
+          history={alertSystem.history}
+          onClearHistory={alertSystem.clearHistory}
+          notificationPermission={alertSystem.notificationPermission}
+          onRequestPermission={alertSystem.onRequestPermission}
+          onClose={() => setAlertSettingsOpen(false)}
+        />
+      )}
 
       {/* Top nav bar */}
-      <header className="sticky top-0 z-50 border-b border-[#1a1a1a] bg-[#0a0a0a]/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#334155] bg-[#0f172a]/90 backdrop-blur">
         <div className="flex items-center h-14 px-4 gap-3">
-          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#1a1a1a]">
+          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#334155]">
             <Rows3 className="w-5 h-5" />
           </button>
-          <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
+          <h1 className="text-base font-bold tracking-tight">EdgeFinder</h1>
 
           <nav className="flex items-center ml-4 gap-1">
-            <button onClick={goToOverview} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <button onClick={goToDashboard} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#0ea5e9]/10 text-[#0ea5e9]" : "bg-[#1e293b] text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9]"}`}>
+              <Activity className="w-4 h-4" />
+              {sidebarOpen && <span>Dashboard</span>}
+            </button>
+            <button onClick={goToOverview} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#0ea5e9]/10 text-[#0ea5e9]" : "bg-[#1e293b] text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9]"}`}>
               <BarChart3 className="w-4 h-4" />
               {sidebarOpen && <span>Overview</span>}
             </button>
-            <button onClick={goToScan} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <button onClick={goToScan} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#0ea5e9]/10 text-[#0ea5e9]" : "bg-[#1e293b] text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9]"}`}>
               <Scan className="w-4 h-4" />
               {sidebarOpen && <span>Scan</span>}
             </button>
-            <button onClick={goToMarketFinder} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <button onClick={goToMarketFinder} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#0ea5e9]/10 text-[#0ea5e9]" : "bg-[#1e293b] text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9]"}`}>
               <Globe className="w-4 h-4" />
               {sidebarOpen && <span>MarketFinder</span>}
             </button>
@@ -1208,11 +1382,11 @@ export default function Home() {
 
           {/* Category filter dropdown */}
           <div className="flex items-center gap-2 ml-4">
-            <Filter className="w-4 h-4 text-[#737373]" />
+            <Filter className="w-4 h-4 text-[#94a3b8]" />
             <select
               value={overviewCategory}
               onChange={(e) => setOverviewCategory(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]"
+              className="px-2 py-1.5 rounded-lg bg-[#1e293b] border border-[#334155] text-xs text-[#f1f5f9] focus:outline-none focus:border-[#0ea5e9]"
               title="Filter by category (press 1-0 or C to cycle)"
             >
               <option value="all">All categories</option>
@@ -1221,27 +1395,60 @@ export default function Home() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]" title="Alert settings">
-              <Bookmark className="w-4 h-4" />
+            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9]" title="Alert settings">
+              <Bell className="w-4 h-4" />
             </button>
-            <button onClick={() => theme.toggle()} className="p-2 rounded-lg hover:bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]" title="Toggle theme">
-              {theme.isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#475569] text-[#94a3b8] hover:text-[#f1f5f9] transition-colors" title="Toggle theme">
+              {theme.theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </div>
       </header>
 
       <main className="flex">
+        <MarketSidebar
+          markets={savedMarkets}
+          activeId={activeMarketId}
+          viewMode={viewMode}
+          onSelectMarket={loadMarket}
+          onEditMarket={openEditModal}
+          onDeleteMarket={deleteMarket}
+          onRefreshSingle={(m) => {
+            setScanningIds(prev => new Set(prev).add(m.id));
+            handleScanWithUrls(m.kalshiUrl, m.polymarketUrl).finally(() => {
+              setScanningIds(prev => {
+                const next = new Set(prev);
+                next.delete(m.id);
+                return next;
+              });
+            });
+          }}
+          scanningIds={scanningIds}
+          sort={sidebarSort}
+          sortDir={sidebarSortDir}
+          onToggleSort={toggleSidebarSort}
+          timeUntilExpiry={timeUntilExpiry}
+          layout={overviewLayout}
+          onToggleLayout={setOverviewLayout}
+          expiryFilter={overviewExpiryFilter}
+          onSetExpiryFilter={setOverviewExpiryFilter}
+          onScanAll={scanAllMarkets}
+          scanningAll={scanningAll}
+          scanAllError={scanAllError}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
+          showFavoritesOnly={sidebarFavoritesOnly}
+          onToggleFavoritesOnly={() => setSidebarFavoritesOnly(v => !v)}
+        />
         <div className="flex-1 min-h-[calc(100vh-3.5rem)]">
           <div className="max-w-7xl mx-auto p-6">
-            {viewMode === "overview" ? (
+            {viewMode === "dashboard" ? (
+              <DashboardPanel markets={savedMarkets} />
+            ) : viewMode === "overview" ? (
               <OverviewPanel
                 markets={savedMarkets}
                 loading={overviewLoading}
-                onLoad={() => {
-                  setOverviewLoading(true);
-                  loadSavedMarkets().finally(() => setOverviewLoading(false));
-                }}
+                onLoad={refreshOverview}
                 sort={overviewSort}
                 sortDir={overviewSortDir}
                 onToggleSort={toggleOverviewSort}
@@ -1251,6 +1458,11 @@ export default function Home() {
                 onSetExpiryFilter={setOverviewExpiryFilter}
                 timeUntilExpiry={timeUntilExpiry}
                 formatExpiry={formatExpiry}
+                onOpenMarket={loadMarket}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={toggleFavorite}
+                showFavoritesOnly={showFavoritesOnly}
+                onToggleFavoritesOnly={() => setShowFavoritesOnly(v => !v)}
               />
             ) : viewMode === "marketfinder" ? (
               <MarketFinderPanel
@@ -1265,7 +1477,7 @@ export default function Home() {
                 bulkSaving={mfBulkSaving}
                 bulkMsg={mfBulkMsg}
                 spreadThreshold={mfSpreadThreshold}
-                category={mfCategory}
+                categories={mfCategories}
                 autoRefreshEnabled={mfAutoRefreshEnabled}
                 onFetch={() => {
                   fetchFreshMfMarkets(true);
@@ -1339,38 +1551,55 @@ export default function Home() {
               <>
                 {/* Scan inputs */}
                 {!activeMarketId && (
-                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mb-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#a3a3a3]">
-                        <Link2 className="w-4 h-4" /> Kalshi URL
-                      </label>
-                      <input type="text" value={kalshiUrl} onChange={(e) => setKalshiUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] placeholder-[#525252] focus:outline-none focus:border-[#22c55e] focus:ring-1 focus:ring-[#22c55e]/30 transition-all" placeholder="https://kalshi.com/markets/..." />
+                <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5 mb-6">
+                  <h2 className="text-lg font-semibold tracking-tight mb-4">Scan Markets</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="text-xs text-[#94a3b8] mb-1.5 block">Kalshi URL</label>
+                      <input
+                        type="text"
+                        value={kalshiUrl}
+                        onChange={(e) => {
+                          setKalshiUrl(e.target.value);
+                          kalshiUrlRef.current = e.target.value;
+                        }}
+                        placeholder="https://kalshi.com/markets/..."
+                        className="w-full px-3 py-2.5 rounded-lg bg-[#1e293b] border border-[#334155] text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-[#0ea5e9] focus:ring-1 focus:ring-[#0ea5e9]/30 transition-all"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#a3a3a3]">
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#94a3b8]">
                         <Link2 className="w-4 h-4" /> Polymarket URL
                       </label>
-                      <input type="text" value={pmUrl} onChange={(e) => setPmUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] placeholder-[#525252] focus:outline-none focus:border-[#22c55e] focus:ring-1 focus:ring-[#22c55e]/30 transition-all" placeholder="https://polymarket.com/event/..." />
+                      <input
+                        type="text"
+                        value={pmUrl}
+                        onChange={(e) => {
+                          setPmUrl(e.target.value);
+                          pmUrlRef.current = e.target.value;
+                        }}
+                        className="w-full px-3 py-2.5 rounded-lg bg-[#1e293b] border border-[#334155] text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:border-[#0ea5e9] focus:ring-1 focus:ring-[#0ea5e9]/30 transition-all"
+                        placeholder="https://polymarket.com/event/..."
+                      />
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 flex-wrap">
-                    <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#22c55e] text-black font-semibold text-sm hover:bg-[#16a34a] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0ea5e9] text-[#0f172a] font-semibold text-sm hover:bg-[#0284c7] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
                       {loading ? "Scanning..." : "Scan Markets"}
                     </button>
 
                     {result && (
-                      <button onClick={openSaveModal} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] text-sm hover:bg-[#262626] transition-all disabled:opacity-50">
+                      <button onClick={openSaveModal} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#334155] border border-[#475569] text-[#f1f5f9] text-sm hover:bg-[#475569] transition-all disabled:opacity-50">
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving..." : "Save Market"}
                       </button>
                     )}
 
                     <div className="flex items-center gap-2 ml-auto">
-                      <label className="text-xs text-[#737373]">Capital:</label>
-                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-md bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]" />
+                      <label className="text-xs text-[#94a3b8]">Capital:</label>
+                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-md bg-[#1e293b] border border-[#334155] text-sm text-[#f1f5f9] focus:outline-none focus:border-[#0ea5e9]" />
                     </div>
                   </div>
 
@@ -1382,14 +1611,39 @@ export default function Home() {
                 </div>
                 )}
 
+                {activeMarketId && loading && !result && (
+                  <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-8 text-center text-sm text-[#64748b]">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-[#10b981]" />
+                    Loading market scan...
+                  </div>
+                )}
+
+                {activeMarketId && error && !loading && !result && (
+                  <div className="rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 p-5 text-sm text-[#fecaca]">
+                    <div className="flex items-center gap-2 font-semibold mb-2">
+                      <AlertCircle className="w-4 h-4" /> Market failed to load
+                    </div>
+                    <div className="text-xs text-[#fca5a5] mb-3">{error}</div>
+                    <button
+                      onClick={() => {
+                        const market = savedMarkets.find(m => m.id === activeMarketId);
+                        if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                      }}
+                      className="px-3 py-1.5 rounded-md bg-[#ef4444]/20 hover:bg-[#ef4444]/30 text-[#fecaca] text-xs transition-colors"
+                    >
+                      Retry scan
+                    </button>
+                  </div>
+                )}
+
                 {/* Results */}
                 {result && (
                   <div className="space-y-4">
                     {activeMarketId && (
                       <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-xl font-bold tracking-tight text-[#e5e5e5]">{result.eventTitle}</h2>
+                        <h2 className="text-xl font-bold tracking-tight text-[#f1f5f9]">{result.eventTitle}</h2>
                         {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#1a1a1a] text-[#737373]">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#334155] text-[#94a3b8]">
                             {savedMarkets.find(m => m.id === activeMarketId)?.category}
                           </span>
                         )}
@@ -1397,31 +1651,54 @@ export default function Home() {
                     )}
                     {/* Compact stats + platform bar */}
                     <div className="flex items-stretch gap-2 mb-2">
-                      {/* Platform box — ultra-compact (~29px, was ~48px, ~40% reduction) */}
-                      <div className="rounded-md border border-[#1a1a1a] bg-[#0f0f0f] p-1 flex items-center gap-1 shrink-0">
-                        <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#22c55e]/10 hover:bg-[#22c55e]/20 transition-colors px-1.5 py-0.5" title="Kalshi">
-                          <img src="/kalshi-icon.png" alt="" className="w-4 h-4 rounded-sm" />
-                          <span className="text-[8px] font-semibold text-[#22c55e] leading-none">K</span>
-                        </a>
-                        <a href={pmUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#a855f7]/10 hover:bg-[#a855f7]/20 transition-colors px-1.5 py-0.5" title="Polymarket">
-                          <img src="/polymarket-icon.png" alt="" className="w-4 h-4 rounded-sm" />
-                          <span className="text-[8px] font-semibold text-[#a855f7] leading-none">PM</span>
-                        </a>
-                        {activeMarketId && (
-                          <button
-                            onClick={() => {
-                              const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
-                            }}
-                            disabled={loading}
-                            className="flex items-center justify-center rounded bg-[#262626] text-[#737373] hover:text-[#e5e5e5] hover:bg-[#404040] transition-colors disabled:opacity-50 px-1.5 py-0.5"
-                            title="Refresh"
-                          >
-                            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                          </button>
-                        )}
-                      </div>
-                      {/* Stat cards — ultra-compact to match platform bar */}
+                      {/* Platform buttons — individual boxes matching StatCard height */}
+                      <a
+                        href={kalshiUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-xl border border-[#334155] bg-[#1e293b] p-2.5 flex flex-col items-center justify-center gap-1 hover:bg-[#334155] transition-colors"
+                        title="Kalshi"
+                      >
+                        <img src="/kalshi-icon.png" alt="Kalshi" className="w-6 h-6 rounded-sm" />
+                      </a>
+                      <a
+                        href={pmUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-xl border border-[#334155] bg-[#1e293b] p-2.5 flex flex-col items-center justify-center gap-1 hover:bg-[#334155] transition-colors"
+                        title="Polymarket"
+                      >
+                        <img src="/polymarket-icon.png" alt="Polymarket" className="w-6 h-6 rounded-sm" />
+                      </a>
+                      {activeMarketId && (
+                        <button
+                          onClick={() => {
+                            const market = savedMarkets.find(m => m.id === activeMarketId);
+                            if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                          }}
+                          disabled={loading}
+                          className="rounded-xl border border-[#334155] bg-[#1e293b] p-2.5 flex flex-col items-center justify-center gap-1 hover:bg-[#334155] transition-colors disabled:opacity-50"
+                          title="Refresh"
+                        >
+                          {loading ? <Loader2 className="w-6 h-6 animate-spin text-[#94a3b8]" /> : <RefreshCw className="w-6 h-6 text-[#94a3b8]" />}
+                        </button>
+                      )}
+                      {activeMarketId && (
+                        <button
+                          onClick={() => {
+                            if (confirm("Delete this saved market?")) {
+                              deleteMarket(activeMarketId);
+                            }
+                          }}
+                          className="rounded-xl border border-[#334155] bg-[#1e293b] p-2.5 flex flex-col items-center justify-center gap-1 hover:bg-[#ef4444]/10 hover:border-[#ef4444]/30 transition-colors"
+                          title="Delete market"
+                        >
+                          <Trash2 className="w-6 h-6 text-[#94a3b8] hover:text-[#ef4444]" />
+                        </button>
+                      )}
+                      {/* Stat cards */}
                       <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         <StatCard label="Kalshi" value={result.kalshiCount} icon={<Activity className="w-3 h-3" />} color="blue" compact />
                         <StatCard label="Polymarket" value={result.pmCount} icon={<Activity className="w-3 h-3" />} color="purple" compact />
@@ -1440,7 +1717,7 @@ export default function Home() {
                             {result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
                             {result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
                           </div>
-                          <div className="text-[11px] text-[#a3a3a3]">
+                          <div className="text-[11px] text-[#64748b]">
                             Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
                           </div>
                         </div>
@@ -1472,8 +1749,8 @@ export default function Home() {
                             onClick={() => setBookmakerView(false)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               !bookmakerView
-                                ? "bg-[#22c55e]/15 text-[#22c55e] ring-1 ring-[#22c55e]/30"
-                                : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                                ? "bg-[#10b981]/15 text-[#10b981] ring-1 ring-[#10b981]/30"
+                                : "bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9]"
                             }`}
                           >
                             <Rows3 className="w-3.5 h-3.5" /> Outcomes Table
@@ -1482,13 +1759,32 @@ export default function Home() {
                             onClick={() => setBookmakerView(true)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               bookmakerView
-                                ? "bg-[#22c55e]/15 text-[#22c55e] ring-1 ring-[#22c55e]/30"
-                                : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                                ? "bg-[#10b981]/15 text-[#10b981] ring-1 ring-[#10b981]/30"
+                                : "bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9]"
                             }`}
                           >
                             <BarChart3 className="w-3.5 h-3.5" /> 1on1 Bookmaker
                           </button>
                         </div>
+
+                        {/* Outcome filter toggle */}
+                        {!bookmakerView && (
+                          <div className="flex items-center gap-0.5 rounded-lg bg-[#334155] border border-[#475569] overflow-hidden">
+                            {(["all", "matched", "arb"] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                onClick={() => setOutcomeFilter(mode)}
+                                className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                                  outcomeFilter === mode
+                                    ? "bg-[#10b981]/10 text-[#10b981]"
+                                    : "text-[#94a3b8] hover:text-[#f1f5f9]"
+                                }`}
+                              >
+                                {mode === "all" ? "Show All" : mode === "matched" ? "Show Matched" : "Show Arb"}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1497,14 +1793,14 @@ export default function Home() {
                       <Bookmaker1on1
                         outcomes={result.allOutcomes.map(o => ({
                           artist: o.artist,
-                          kalshi: o.kalshi ? {
+                          platformA: o.kalshi ? {
                             yesBid: o.kalshi.yesBid,
                             yesAsk: o.kalshi.yesAsk,
                             noBid: o.kalshi.noBid,
                             noAsk: o.kalshi.noAsk,
                             lastPrice: o.kalshi.lastPrice,
                           } : null,
-                          polymarket: o.polymarket ? {
+                          platformB: o.polymarket ? {
                             yesPrice: o.polymarket.yesPrice,
                             noPrice: o.polymarket.noPrice,
                             bestBid: o.polymarket.bestBid,
@@ -1518,13 +1814,15 @@ export default function Home() {
 
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && result.matchedCount > 0 && (
-                      <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
+                      <div className="rounded-xl border border-[#334155] bg-[#1e293b] overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead className="bg-[#111111] border-b border-[#1a1a1a]">
-                            <tr className="text-[10px] text-[#737373] uppercase tracking-wider">
+                          <thead className="bg-[#1e293b] border-b border-[#334155]">
+                            <tr className="text-[10px] text-[#94a3b8] uppercase tracking-wider">
                               <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi Yes</th>
+                              <th className="text-right px-4 py-3.5 font-medium">Kalshi No</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
+                              <th className="text-right px-4 py-3.5 font-medium">PM No</th>
                               <th className="text-right px-4 py-3.5 font-medium">Spread</th>
                               <th className="text-right px-4 py-3.5 font-medium">ROI</th>
                               <th className="text-right px-4 py-3.5 font-medium">Profit</th>
@@ -1532,7 +1830,7 @@ export default function Home() {
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#1a1a1a]">
+                          <tbody className="divide-y divide-[#334155]">
                             {/* Pre-compute total profit and highest-profit outcome for this market */}
                             {(() => {
                               const profitableOutcomes = result.allOutcomes.filter(o => o.arbitrage.expectedProfit > 0);
@@ -1542,10 +1840,18 @@ export default function Home() {
                                 : null;
                               const showTotal = profitableOutcomes.length > 1;
 
-                              return result.allOutcomes.map((o) => {
+                              // Filter based on outcomeFilter
+                              const filteredOutcomes = result.allOutcomes.filter((o) => {
+                                if (outcomeFilter === "all") return true;
+                                if (outcomeFilter === "matched") return o.kalshi && o.polymarket;
+                                if (outcomeFilter === "arb") return o.arbitrage.expectedProfit > 0;
+                                return true;
+                              });
+
+                              return filteredOutcomes.map((o) => {
                                 const spread = o.kalshi && o.polymarket ? (o.polymarket.yesPrice - o.kalshi.yesAsk) : 0;
                                 const profit = o.arbitrage.expectedProfit;
-                                const roiColor = o.arbitrage.roiPct > 0 ? "text-[#22c55e]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#737373]";
+                                const roiColor = o.arbitrage.roiPct > 0 ? "text-[#10b981]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#94a3b8]";
                                 const isExpanded = expandedArtist === o.artist;
                                 const totalStake = (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0);
                                 const stakeRatio = totalStake > 0
@@ -1557,16 +1863,50 @@ export default function Home() {
                                 return (
                                   <React.Fragment key={o.artist}>
                                     <tr
-                                      className={`hover:bg-[#1a1a1a]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#1a1a1a]/30" : ""}`}
+                                      className={`hover:bg-[#334155]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#334155]/30" : ""}`}
                                       onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
                                     >
-                                      <td className="px-4 py-3 font-medium text-[#e5e5e5] flex items-center gap-1.5">
-                                        <span className={`transition-transform text-[#737373] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
+                                      <td className="px-4 py-3 font-medium text-[#f1f5f9] flex items-center gap-1.5">
+                                        <span className={`transition-transform text-[#94a3b8] ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
                                         {o.artist}
                                       </td>
-                                      <td className="px-4 py-3 text-right text-[#e5e5e5]">{o.kalshi?.yesAsk.toFixed(2) ?? "—"}</td>
-                                      <td className="px-4 py-3 text-right text-[#e5e5e5]">{o.polymarket?.yesPrice.toFixed(2) ?? "—"}</td>
-                                      <td className={`px-4 py-3 text-right font-medium ${spread > 0 ? "text-[#22c55e]" : spread < 0 ? "text-[#ef4444]" : "text-[#737373]"}`}>
+                                      <td className={`px-4 py-3 text-right text-[#f1f5f9] ${priceChanges.get(o.artist) === "up" ? "flash-green" : priceChanges.get(o.artist) === "down" ? "flash-red" : ""}`}>
+                                        <div className="flex flex-col items-end">
+                                          <span>{o.kalshi?.yesAsk.toFixed(2) ?? "—"}</span>
+                                          {o.kalshi?.yesAskDepth && (
+                                            <span className="text-[10px] text-[#64748b] mt-0.5">{o.kalshi.yesAskDepth}</span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-right text-[#f1f5f9] ${priceChanges.get(o.artist) === "up" ? "flash-green" : priceChanges.get(o.artist) === "down" ? "flash-red" : ""}`}>
+                                        <div className="flex flex-col items-end">
+                                          <span>{o.kalshi?.noAsk?.toFixed(2) ?? "—"}</span>
+                                          {o.kalshi?.noAskDepth && (
+                                            <span className="text-[10px] text-[#64748b] mt-0.5">{o.kalshi.noAskDepth}</span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-right text-[#f1f5f9] ${priceChanges.get(o.artist) === "up" ? "flash-green" : priceChanges.get(o.artist) === "down" ? "flash-red" : ""}`}>
+                                        <div className="flex flex-col items-end">
+                                          <span>{o.polymarket?.yesPrice.toFixed(2) ?? "—"}</span>
+                                          {o.polymarket?.askDepth !== undefined && (
+                                            <span className="text-[10px] text-[#64748b] mt-0.5">
+                                              ${(o.polymarket.askDepth || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-right text-[#f1f5f9] ${priceChanges.get(o.artist) === "up" ? "flash-green" : priceChanges.get(o.artist) === "down" ? "flash-red" : ""}`}>
+                                        <div className="flex flex-col items-end">
+                                          <span>{o.polymarket?.noPrice?.toFixed(2) ?? "—"}</span>
+                                          {o.polymarket?.noAskDepth !== undefined && (
+                                            <span className="text-[10px] text-[#64748b] mt-0.5">
+                                              ${(o.polymarket.noAskDepth || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-right font-medium ${spread > 0 ? "text-[#10b981]" : spread < 0 ? "text-[#ef4444]" : "text-[#94a3b8]"}`}>
                                         {spread > 0 ? "+" : ""}{spread.toFixed(2)}
                                       </td>
                                       <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{formatPercent(o.arbitrage.roiPct)}</td>
@@ -1575,54 +1915,54 @@ export default function Home() {
                                         {profit > 0 ? (
                                           isHighestProfit ? (
                                             <div className="group inline-block">
-                                              <span className="text-[#e5e5e5] cursor-help">
-                                                {formatCurrency(profit)} <span className="text-[#737373]">({formatCurrency(totalProfit)} total)</span>
+                                              <span className="text-[#f1f5f9] cursor-help">
+                                                {formatCurrency(profit)} <span className="text-[#94a3b8]">({formatCurrency(totalProfit)} total)</span>
                                               </span>
                                               {/* Hover tooltip with breakdown */}
-                                              <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#111111] border border-[#262626] rounded-lg shadow-xl p-3 text-xs">
-                                                <div className="font-bold text-[#e5e5e5] mb-2">Total Profit Potential</div>
-                                                <div className="text-[#22c55e] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
-                                                <div className="text-[#737373] text-[10px] mb-2">{profitableOutcomes.length} profitable outcome{profitableOutcomes.length > 1 ? "s" : ""}</div>
-                                                <div className="border-t border-[#1a1a1a] pt-2 space-y-1">
+                                              <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#1e293b] border border-[#475569] rounded-lg shadow-xl p-3 text-xs">
+                                                <div className="font-bold text-[#f1f5f9] mb-2">Total Profit Potential</div>
+                                                <div className="text-[#10b981] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
+                                                <div className="text-[#94a3b8] text-[10px] mb-2">{profitableOutcomes.length} profitable outcome{profitableOutcomes.length > 1 ? "s" : ""}</div>
+                                                <div className="border-t border-[#334155] pt-2 space-y-1">
                                                   {profitableOutcomes.map((po) => (
                                                     <div key={po.artist} className="flex justify-between items-center">
-                                                      <span className={po.artist === o.artist ? "text-[#e5e5e5] font-medium" : "text-[#737373]"}>{po.artist}</span>
-                                                      <span className={po.artist === o.artist ? "text-[#22c55e] font-bold" : "text-[#a3a3a3]"}>{formatCurrency(po.arbitrage.expectedProfit)}</span>
+                                                      <span className={po.artist === o.artist ? "text-[#f1f5f9] font-medium" : "text-[#94a3b8]"}>{po.artist}</span>
+                                                      <span className={po.artist === o.artist ? "text-[#10b981] font-bold" : "text-[#64748b]"}>{formatCurrency(po.arbitrage.expectedProfit)}</span>
                                                     </div>
                                                   ))}
                                                 </div>
                                               </div>
                                             </div>
                                           ) : (
-                                            <span className="text-[#e5e5e5]">{formatCurrency(profit)}</span>
+                                            <span className="text-[#f1f5f9]">{formatCurrency(profit)}</span>
                                           )
                                         ) : "—"}
                                       </td>
                                     <td className="px-4 py-3 text-right">
                                       {totalStake > 0 ? (
-                                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${isBalanced ? "text-[#22c55e]" : "text-[#f97316]"}`}>
-                                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${isBalanced ? "bg-[#22c55e]" : "bg-[#f97316]"}`}></span>
+                                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${isBalanced ? "text-[#10b981]" : "text-[#f97316]"}`}>
+                                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${isBalanced ? "bg-[#10b981]" : "bg-[#f97316]"}`}></span>
                                           {formatCurrency(totalStake * 100)}
                                         </span>
                                       ) : "—"}
                                     </td>
-                                    <td className="px-4 py-3 text-xs text-[#a3a3a3]">{o.arbitrage.strategy}</td>
+                                    <td className="px-4 py-3 text-xs text-[#64748b]">{o.arbitrage.strategy}</td>
                                   </tr>
                                   {isExpanded && (
-                                    <tr className="bg-[#111111]/50">
-                                      <td colSpan={8} className="px-4 py-3">
+                                    <tr className="bg-[#1e293b]/50">
+                                      <td colSpan={10} className="px-4 py-3">
                                         <div className="flex items-center gap-6 text-xs">
                                           <div className="flex items-center gap-2">
-                                            <span className="text-[#737373]">Total Stake:</span>
-                                            <span className="font-bold text-[#e5e5e5]">{formatCurrency(totalStake * 100)}</span>
+                                            <span className="text-[#94a3b8]">Total Stake:</span>
+                                            <span className="font-bold text-[#f1f5f9]">{formatCurrency(totalStake * 100)}</span>
                                           </div>
                                           <div className="flex items-center gap-2">
-                                            <span className="text-[#737373]">Breakdown:</span>
+                                            <span className="text-[#94a3b8]">Breakdown:</span>
                                             <span className="text-[#60a5fa]">Kalshi: {formatCurrency((o.arbitrage.kalshiStake ?? 0) * 100)}</span>
-                                            <span className="text-[#737373]">|</span>
+                                            <span className="text-[#94a3b8]">|</span>
                                             <span className="text-[#f472b6]">Polymarket: {formatCurrency((o.arbitrage.pmStake ?? 0) * 100)}</span>
                                           </div>
-                                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#f97316]/10 text-[#f97316]"}`}>
+                                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[#10b981]/10 text-[#10b981]" : "bg-[#f97316]/10 text-[#f97316]"}`}>
                                             {isBalanced ? "● Balanced" : "● Imbalanced"}
                                           </div>
                                         </div>
@@ -1631,7 +1971,8 @@ export default function Home() {
                                   )}
                                 </React.Fragment>
                               );
-                            })()}
+                            })})()}
+
                           </tbody>
                         </table>
                       </div>
@@ -1656,12 +1997,17 @@ export default function Home() {
       {/* Save modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSaveModalOpen(false)}>
-          <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold mb-4">Save Market</h3>
-            <p className="text-sm text-[#737373] mb-4">This will add the scanned market pair to your saved markets list.</p>
+            <p className="text-sm text-[#94a3b8] mb-4">This will add the scanned market pair to your saved markets list.</p>
+            {saveError && (
+              <div className="mb-4 p-3 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 text-sm text-[#ef4444]">
+                {saveError}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setSaveModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#1a1a1a] text-sm hover:bg-[#262626] transition-colors">Cancel</button>
-              <button onClick={saveMarket} disabled={saving} className="px-4 py-2 rounded-lg bg-[#22c55e] text-black text-sm font-semibold hover:bg-[#16a34a] transition-colors disabled:opacity-50">
+              <button onClick={() => { setSaveModalOpen(false); setSaveError(""); }} className="px-4 py-2 rounded-lg bg-[#334155] text-sm hover:bg-[#475569] transition-colors">Cancel</button>
+              <button onClick={saveMarket} disabled={saving} className="px-4 py-2 rounded-lg bg-[#10b981] text-black text-sm font-semibold hover:bg-[#16a34a] transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1672,23 +2018,23 @@ export default function Home() {
       {/* Edit modal */}
       {editModalOpen && editingMarket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setEditModalOpen(false)}>
-          <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold">Edit Market</h3>
             <div>
-              <label className="text-xs text-[#737373] block mb-1">Title</label>
-              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]" />
+              <label className="text-xs text-[#94a3b8] block mb-1">Title</label>
+              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#f1f5f9] focus:outline-none focus:border-[#10b981]" />
             </div>
             <div>
-              <label className="text-xs text-[#737373] block mb-1">Category</label>
-              <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]" placeholder="e.g. Politics, Crypto..." />
+              <label className="text-xs text-[#94a3b8] block mb-1">Category</label>
+              <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#f1f5f9] focus:outline-none focus:border-[#10b981]" placeholder="e.g. Politics, Crypto..." />
             </div>
             <div>
-              <label className="text-xs text-[#737373] block mb-1">Expiry date</label>
-              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]" />
+              <label className="text-xs text-[#94a3b8] block mb-1">Expiry date</label>
+              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#f1f5f9] focus:outline-none focus:border-[#10b981]" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#1a1a1a] text-sm hover:bg-[#262626] transition-colors">Cancel</button>
-              <button onClick={saveEdit} disabled={saving} className="px-4 py-2 rounded-lg bg-[#22c55e] text-black text-sm font-semibold hover:bg-[#16a34a] transition-colors disabled:opacity-50">
+              <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#334155] text-sm hover:bg-[#475569] transition-colors">Cancel</button>
+              <button onClick={saveEdit} disabled={saving} className="px-4 py-2 rounded-lg bg-[#10b981] text-black text-sm font-semibold hover:bg-[#16a34a] transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1707,6 +2053,8 @@ function MarketSidebar({
   onSelectMarket,
   onEditMarket,
   onDeleteMarket,
+  onRefreshSingle,
+  scanningIds,
   sort,
   sortDir,
   onToggleSort,
@@ -1718,6 +2066,10 @@ function MarketSidebar({
   onScanAll,
   scanningAll,
   scanAllError,
+  favoriteIds,
+  onToggleFavorite,
+  showFavoritesOnly,
+  onToggleFavoritesOnly,
 }: {
   markets: SavedMarket[];
   activeId: string | null;
@@ -1725,9 +2077,11 @@ function MarketSidebar({
   onSelectMarket: (m: SavedMarket) => void;
   onEditMarket: (m: SavedMarket) => void;
   onDeleteMarket: (id: string) => void;
-  sort: OverviewSort;
+  onRefreshSingle: (m: SavedMarket) => void;
+  scanningIds: Set<string>;
+  sort: SidebarSort;
   sortDir: "asc" | "desc";
-  onToggleSort: (f: OverviewSort) => void;
+  onToggleSort: (f: SidebarSort) => void;
   timeUntilExpiry: (iso?: string | null) => string;
   layout: "grid" | "table";
   onToggleLayout: (l: "grid" | "table") => void;
@@ -1736,15 +2090,28 @@ function MarketSidebar({
   onScanAll: () => void;
   scanningAll: boolean;
   scanAllError: string;
+  favoriteIds: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  showFavoritesOnly: boolean;
+  onToggleFavoritesOnly: () => void;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [contextMenu, setContextMenu] = useState<{x: number; y: number; market: SavedMarket} | null>(null);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
 
   // Filter + sort
   const filtered = markets.filter(m => {
+    if (showFavoritesOnly && !favoriteIds.has(m.id)) return false;
     if (expiryFilter !== "all") {
       if (!m.expiryDate) return true;
-      const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
+      const days = (parseDateToUTC(m.expiryDate) - Date.now()) / 86400000;
       if (expiryFilter === "lte7" && days > 7) return false;
       if (expiryFilter === "lte14" && days > 14) return false;
       if (expiryFilter === "lte30" && days > 30) return false;
@@ -1765,76 +2132,111 @@ function MarketSidebar({
       return mul * (rb - ra);
     }
     if (sort === "apy") {
-      const aa = a.lastScanResult?.bestRoiPct ?? 0;
-      const ab = b.lastScanResult?.bestRoiPct ?? 0;
+      const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
+      const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
+      const aa = calculateAPY(ra, a.expiryDate);
+      const ab = calculateAPY(rb, b.expiryDate);
       return mul * (ab - aa);
     }
     return 0;
   });
 
   return (
-    <aside className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden transition-all duration-200`}>
-      <div className="p-4 space-y-4 h-full flex flex-col">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[#e5e5e5]">Saved Markets ({markets.length})</h2>
-          <div className="flex items-center gap-1">
-            <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e] transition-colors disabled:opacity-50" title="Scan All">
-              {scanningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            </button>
+    <aside className={`${sidebarOpen ? "w-72" : "w-12"} shrink-0 border-r border-[#334155] bg-[#1e293b] overflow-hidden transition-all duration-200 flex flex-col relative`}>
+      {sidebarOpen ? (
+        <div className="p-4 space-y-4 h-full flex flex-col">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-[#f1f5f9]">Saved Markets ({markets.length})</h2>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-md hover:bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9] transition-colors" title="Collapse sidebar">
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+              <button onClick={onToggleFavoritesOnly} className={`p-1.5 rounded-md transition-colors ${showFavoritesOnly ? "text-[#f59e0b] bg-[#f59e0b]/10" : "text-[#94a3b8] hover:bg-[#334155] hover:text-[#f59e0b]"}`} title="Toggle favorites only">
+                <Star className={`w-4 h-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
+              </button>
+              <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#334155] text-[#94a3b8] hover:text-[#10b981] transition-colors disabled:opacity-50" title="Scan All">
+                {scanningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {scanAllError && <div className="text-xs text-[#ef4444]">{scanAllError}</div>}
+          {scanAllError && <div className="text-xs text-[#ef4444]">{scanAllError}</div>}
 
-        {/* Filters */}
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={sidebarSearch}
-            onChange={(e) => setSidebarSearch(e.target.value)}
-            placeholder="Search markets..."
-            className="w-full px-2 py-1.5 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none focus:border-[#22c55e]"
-          />
-          <div className="flex items-center gap-1">
-            <select
-              value={expiryFilter}
-              onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] focus:outline-none"
-            >
-              <option value="all">All expiries</option>
-              <option value="lte7">≤ 7 days</option>
-              <option value="lte14">≤ 14 days</option>
-              <option value="lte30">≤ 30 days</option>
-            </select>
+          {/* Search + Sort */}
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              placeholder="Search markets..."
+              className="w-full px-2 py-1.5 rounded-md bg-[#334155] border border-[#475569] text-xs text-[#f1f5f9] placeholder-[#525252] focus:outline-none focus:border-[#10b981]"
+            />
+            <div className="flex items-center gap-0.5">
+              {/* Sort buttons */}
+              {(["apy", "roi", "name", "expiry"] as const).map((field) => (
+                <button
+                  key={field}
+                  onClick={() => onToggleSort(field)}
+                  className={`px-1.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                    sort === field
+                      ? "bg-[#10b981]/10 text-[#10b981]"
+                      : "text-[#525252] hover:text-[#64748b] hover:bg-[#334155]"
+                  }`}
+                  title={`Sort by ${field}`}
+                >
+                  {field === "apy" ? "APY" : field === "roi" ? "ROI" : field === "name" ? "Name" : "Exp"}
+                  {sort === field && (sortDir === "asc" ? " ↑" : " ↓")}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
         {/* Market list */}
         <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
           {filtered.map((m) => {
             const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
             const isActive = activeId === m.id;
+            const isFav = favoriteIds.has(m.id);
             return (
               <div
                 key={m.id}
                 onClick={() => onSelectMarket(m)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, market: m });
+                }}
                 className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-                  isActive ? "bg-[#22c55e]/10 ring-1 ring-[#22c55e]/30" : "hover:bg-[#1a1a1a]"
+                  isActive ? "bg-[#10b981]/10 ring-1 ring-[#10b981]/30" : "hover:bg-[#334155]"
                 }`}
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(m.id);
+                  }}
+                  className={`shrink-0 p-0.5 rounded transition-colors ${isFav ? "text-[#f59e0b]" : "text-[#525252] hover:text-[#f59e0b]"}`}
+                  title={isFav ? "Remove favorite" : "Add favorite"}
+                >
+                  <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} />
+                </button>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-[#e5e5e5] truncate">{m.eventTitle}</div>
+                  <div className="text-xs font-medium text-[#f1f5f9] truncate">{m.eventTitle}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {m.category && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{m.category}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#334155] text-[#94a3b8]">{m.category}</span>
                     )}
-                    <span className="text-[9px] text-[#737373]">{timeUntilExpiry(m.expiryDate)}</span>
+                    <span className="text-[9px] text-[#94a3b8]">{timeUntilExpiry(m.expiryDate)}</span>
                   </div>
                 </div>
                 {roi !== 0 && (
-                  <span className={`text-xs font-bold ${roi > 0 ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
-                    {roi > 0 ? "+" : ""}{formatPercent(roi)}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className={`text-xs font-bold ${roi > 0 ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                      {roi > 0 ? "+" : ""}{formatPercent(roi)}
+                    </span>
+                    <span className="text-[9px] text-[#64748b]">
+                      ({calculateAPY(roi, m.expiryDate).toFixed(1)}% APY)
+                    </span>
+                  </div>
                 )}
               </div>
             );
@@ -1846,8 +2248,259 @@ function MarketSidebar({
             <div className="text-xs text-[#525252] text-center py-4">No saved markets yet.</div>
           )}
         </div>
+
+        {/* Context Menu */}
+        {contextMenu && (
+          <div
+            className="fixed z-[100] w-44 rounded-lg border border-[#475569] bg-[#1e293b] shadow-xl py-1"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                onRefreshSingle(contextMenu.market);
+                setContextMenu(null);
+              }}
+              disabled={scanningIds.has(contextMenu.market.id)}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-[#f1f5f9] hover:bg-[#334155] transition-colors disabled:opacity-50"
+            >
+              {scanningIds.has(contextMenu.market.id) ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              Refresh prices
+            </button>
+            <button
+              onClick={() => {
+                onDeleteMarket(contextMenu.market.id);
+                setContextMenu(null);
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete market
+            </button>
+          </div>
+        )}
       </div>
+    ) : (
+      <div className="flex flex-col items-center py-3 gap-3 h-full">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-md hover:bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9] transition-colors"
+          title="Expand sidebar"
+        >
+          <PanelLeftOpen className="w-5 h-5" />
+        </button>
+        <div className="flex-1 overflow-y-auto w-full flex flex-col items-center gap-2 min-h-0">
+          {filtered.slice(0, 30).map((m) => (
+            <button
+              key={m.id}
+              onClick={() => onSelectMarket(m)}
+              className={`p-1.5 rounded-md transition-colors ${activeId === m.id ? "bg-[#10b981]/20 text-[#10b981]" : "text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9]"}`}
+              title={`${m.eventTitle}${timeUntilExpiry(m.expiryDate) ? ` \u2022 ${timeUntilExpiry(m.expiryDate)}` : ""}`}
+            >
+              <Star className={`w-4 h-4 ${favoriteIds.has(m.id) ? "fill-[#f59e0b] text-[#f59e0b]" : ""}`} />
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
     </aside>
+  );
+}
+
+/* ── Strategy Badge ── */
+function StrategyBadge({ strategy }: { strategy: string }) {
+  if (!strategy || strategy === "No arb" || strategy === "—") {
+    return <span className="text-[#94a3b8]">—</span>;
+  }
+  // Parse strategy text like "Buy YES PM + NO Kalshi" or "Buy YES Kalshi + NO PM"
+  const parts = strategy.split(/\s*\+\s*/);
+  if (parts.length !== 2) {
+    return <span className="text-[#64748b] text-xs">{strategy}</span>;
+  }
+  const parseSide = (part: string) => {
+    const isBuy = part.includes("Buy");
+    const isYes = part.includes("YES");
+    const isNo = part.includes("NO");
+    const isKalshi = part.includes("Kalshi");
+    const isPm = part.includes("PM");
+    return { isBuy, isYes, isNo, isKalshi, isPm };
+  };
+  const side1 = parseSide(parts[0]);
+  const side2 = parseSide(parts[1]);
+  return (
+    <div className="inline-flex items-center gap-1.5 text-xs">
+      <span className="inline-flex items-center gap-0.5">
+        {side1.isPm && (
+          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm bg-[#8b5cf6] text-white text-[8px] font-bold">P</span>
+        )}
+        {side1.isKalshi && (
+          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm bg-[#10b981] text-black text-[8px] font-bold">K</span>
+        )}
+        <span className={`font-bold ${side1.isYes ? "text-[#10b981]" : "text-[#ef4444]"}`}>{side1.isYes ? "YES" : "NO"}</span>
+      </span>
+      <span className="text-[#525252]">+</span>
+      <span className="inline-flex items-center gap-0.5">
+        {side2.isPm && (
+          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm bg-[#8b5cf6] text-white text-[8px] font-bold">P</span>
+        )}
+        {side2.isKalshi && (
+          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm bg-[#10b981] text-black text-[8px] font-bold">K</span>
+        )}
+        <span className={`font-bold ${side2.isYes ? "text-[#10b981]" : "text-[#ef4444]"}`}>{side2.isYes ? "YES" : "NO"}</span>
+      </span>
+    </div>
+  );
+}
+
+/* ── Dashboard Panel ── */
+function DashboardPanel({ markets }: { markets: SavedMarket[] }) {
+  const totalProfit = getTotalProfitAll(markets);
+  const weightedAPY = getWeightedAPY(markets);
+  const activeMarkets = markets.length;
+  const totalArbs = getTotalArbs(markets);
+  const hasArb = (m: SavedMarket) => {
+    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+    const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+    return roi > 0 || profit > 0;
+  };
+  const arbMarkets = markets.filter(hasArb);
+  const avgRoi = arbMarkets.length > 0
+    ? arbMarkets.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / arbMarkets.length
+    : 0;
+  const bestMarket = arbMarkets.length > 0
+    ? arbMarkets.reduce((best, m) => {
+        const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+        return roi > (best.liveResult?.bestRoiPct ?? best.lastScanResult?.bestRoiPct ?? 0) ? m : best;
+      })
+    : null;
+  const bestRoi = bestMarket ? (bestMarket.liveResult?.bestRoiPct ?? bestMarket.lastScanResult?.bestRoiPct ?? 0) : 0;
+  const bestProfit = bestMarket ? (bestMarket.liveResult?.bestProfit ?? bestMarket.lastScanResult?.bestProfit ?? 0) : 0;
+
+  // Arbitrage Pulse score: 0-100 based on opportunities vs markets
+  const pulseScore = markets.length > 0 ? Math.round((arbMarkets.length / markets.length) * 100) : 0;
+  const pulseColor = pulseScore >= 30 ? "green" : pulseScore >= 10 ? "yellow" : "red";
+  const pulseLabel = pulseScore >= 30 ? "Hot" : pulseScore >= 10 ? "Warm" : "Cold";
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold tracking-tight">Dashboard</h2>
+
+      {/* Pulse + Key Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Arbitrage Pulse" value={`${pulseScore}%`} icon={<Activity className="w-4 h-4" />} color={pulseColor} />
+        <StatCard label="Total Profit" value={formatCurrency(totalProfit)} icon={<TrendingUp className="w-4 h-4" />} color="green" />
+        <StatCard label="Weighted APY" value={`${weightedAPY.toFixed(1)}%`} icon={<Percent className="w-4 h-4" />} color="blue" />
+        <StatCard label="Active Markets" value={activeMarkets} icon={<Activity className="w-4 h-4" />} color="purple" />
+      </div>
+
+      {/* Second row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <StatCard label="Total Arb Opportunities" value={totalArbs} icon={<Link2 className="w-4 h-4" />} color="yellow" />
+        <StatCard label="Avg ROI (arb only)" value={`${avgRoi.toFixed(1)}%`} icon={<Percent className="w-4 h-4" />} color="orange" />
+        <StatCard label="Best Opportunity" value={bestMarket ? `${bestRoi.toFixed(1)}%` : "—"} icon={<Zap className="w-4 h-4" />} color="green" />
+      </div>
+
+      {/* Market Efficiency + Status */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+          <h3 className="text-sm font-semibold text-[#f1f5f9] mb-4">Market Efficiency</h3>
+          <div className="flex items-center gap-4">
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 36 36">
+                <path className="text-[#334155]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                <path className={`${pulseScore >= 30 ? "text-[#10b981]" : pulseScore >= 10 ? "text-[#f59e0b]" : "text-[#ef4444]"}`} strokeDasharray={`${pulseScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold text-[#f1f5f9]">{pulseScore}</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-[#94a3b8]">Market status: <span className={`font-semibold ${pulseScore >= 30 ? "text-[#10b981]" : pulseScore >= 10 ? "text-[#f59e0b]" : "text-[#ef4444]"}`}>{pulseLabel}</span></p>
+              <p className="text-xs text-[#64748b] mt-1">{arbMarkets.length} of {markets.length} markets show arbitrage opportunities</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+          <h3 className="text-sm font-semibold text-[#f1f5f9] mb-4">Scanner Health</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#94a3b8]">Kalshi API</span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#10b981]">
+                <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Online
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#94a3b8]">Polymarket API</span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#10b981]">
+                <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Online
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#94a3b8]">CLOB Prices</span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#10b981]">
+                <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Online
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#94a3b8]">Auto-Poller</span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#10b981]">
+                <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Running
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Opportunities Table */}
+      <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+        <h3 className="text-sm font-semibold text-[#f1f5f9] mb-4">Top Arbitrage Opportunities</h3>
+        {arbMarkets.length === 0 ? (
+          <p className="text-sm text-[#64748b]">No arbitrage opportunities found right now.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-[#334155]">
+                <tr className="text-xs text-[#94a3b8] uppercase tracking-wider">
+                  <th className="text-left py-2 px-3">Market</th>
+                  <th className="text-right py-2 px-3">ROI</th>
+                  <th className="text-right py-2 px-3">APY</th>
+                  <th className="text-right py-2 px-3">Profit</th>
+                  <th className="text-right py-2 px-3">Expiry</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#334155]">
+                {arbMarkets
+                  .sort((a, b) => {
+                    const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
+                    const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
+                    return rb - ra;
+                  })
+                  .slice(0, 10)
+                  .map((m) => {
+                    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+                    const apy = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+                    const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+                    return (
+                      <tr key={m.id} className="hover:bg-[#334155]/50 transition-colors">
+                        <td className="py-2 px-3 text-[#f1f5f9] font-medium">{m.eventTitle}</td>
+                        <td className="py-2 px-3 text-right text-[#10b981] font-semibold">+{roi.toFixed(1)}%</td>
+                        <td className="py-2 px-3 text-right text-[#0ea5e9]">{apy.toFixed(1)}%</td>
+                        <td className="py-2 px-3 text-right text-[#f1f5f9]">{formatCurrency(profit)}</td>
+                        <td className="py-2 px-3 text-right text-[#94a3b8]">{timeUntilExpiry(m.expiryDate)}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1865,6 +2518,11 @@ function OverviewPanel({
   onSetExpiryFilter,
   timeUntilExpiry,
   formatExpiry,
+  onOpenMarket,
+  favoriteIds,
+  onToggleFavorite,
+  showFavoritesOnly,
+  onToggleFavoritesOnly,
 }: {
   markets: SavedMarket[];
   loading: boolean;
@@ -1878,8 +2536,25 @@ function OverviewPanel({
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
+  onOpenMarket: (m: SavedMarket) => void;
+  favoriteIds: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  showFavoritesOnly: boolean;
+  onToggleFavoritesOnly: () => void;
 }) {
+  const [showArbOnly, setShowArbOnly] = useState(true);
   useEffect(() => { onLoad(); }, [onLoad]);
+
+  const hasArb = (m: SavedMarket) => {
+    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+    const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+    return roi > 0 || profit > 0;
+  };
+
+  const daysToExpiry = (iso?: string | null): number => {
+    if (!iso) return Infinity;
+    return Math.floor((parseDateToUTC(iso) - Date.now()) / 86400000);
+  };
 
   const sortFn = (a: SavedMarket, b: SavedMarket) => {
     const mul = sortDir === "asc" ? 1 : -1;
@@ -1894,52 +2569,187 @@ function OverviewPanel({
       const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
       return mul * (rb - ra);
     }
+    if (sort === "apy") {
+      const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
+      const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
+      const aa = calculateAPY(ra, a.expiryDate);
+      const ab = calculateAPY(rb, b.expiryDate);
+      return mul * (ab - aa);
+    }
+    if (sort === "profit") {
+      const pa = a.liveResult?.bestProfit ?? a.lastScanResult?.bestProfit ?? 0;
+      const pb = b.liveResult?.bestProfit ?? b.lastScanResult?.bestProfit ?? 0;
+      return mul * (pb - pa);
+    }
     return 0;
   };
 
-  const sorted = [...markets].sort(sortFn);
+  const filtered = markets.filter(m => {
+    if (showFavoritesOnly && !favoriteIds.has(m.id)) return false;
+    if (showArbOnly && !hasArb(m)) return false;
+    if (expiryFilter !== "all") {
+      const days = daysToExpiry(m.expiryDate);
+      if (expiryFilter === "lte7" && days > 7) return false;
+      if (expiryFilter === "lte14" && days > 14) return false;
+      if (expiryFilter === "lte30" && days > 30) return false;
+    }
+    return true;
+  }).sort(sortFn);
+
+  const SortHeader = ({ field, label, align = "left" }: { field: OverviewSort; label: string; align?: "left" | "right" }) => (
+    <th
+      onClick={() => onToggleSort(field)}
+      className={`px-4 py-3 font-medium cursor-pointer hover:text-[#f1f5f9] transition-colors select-none ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {sort === field && (
+          sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+        )}
+      </span>
+    </th>
+  );
 
   return (
     <div className="space-y-5">
+      {/* Key value stat boxes */}
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard
+            label="Total Profit"
+            value={formatCurrency(getTotalProfitAll(filtered))}
+            icon={<TrendingUp className="w-4 h-4" />}
+            color="green"
+          />
+          <StatCard
+            label="Weighted APY"
+            value={`${getWeightedAPY(filtered).toFixed(1)}%`}
+            icon={<Percent className="w-4 h-4" />}
+            color="blue"
+          />
+          <StatCard
+            label="Active Markets"
+            value={filtered.length}
+            icon={<Activity className="w-4 h-4" />}
+            color="purple"
+          />
+          <StatCard
+            label="Total Arb Opportunities"
+            value={getTotalArbs(filtered)}
+            icon={<Link2 className="w-4 h-4" />}
+            color="yellow"
+          />
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Overview</h2>
         <div className="flex items-center gap-2">
-          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#1a1a1a] hover:bg-[#262626] text-[#737373] transition-colors" title="Toggle layout">
+          {/* Expiry filter buttons (replaced sort buttons) */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-[#334155] border border-[#475569] overflow-hidden">
+            {(["all", "lte7", "lte14", "lte30"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => onSetExpiryFilter(f === expiryFilter ? "all" : f)}
+                className={`px-2.5 py-1.5 text-[10px] font-medium transition-colors ${
+                  expiryFilter === f
+                    ? "bg-[#10b981]/10 text-[#10b981]"
+                    : "text-[#94a3b8] hover:text-[#f1f5f9]"
+                }`}
+              >
+                {f === "all" ? "All" : f === "lte7" ? "7d" : f === "lte14" ? "14d" : "30d"}
+              </button>
+            ))}
+          </div>
+          {/* Arb only toggle */}
+          <button
+            onClick={() => setShowArbOnly(v => !v)}
+            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors ${
+              showArbOnly
+                ? "bg-[#10b981]/10 text-[#10b981]"
+                : "bg-[#334155] text-[#94a3b8] hover:text-[#f1f5f9]"
+            }`}
+            title="Show only markets with arbitrage"
+          >
+            Arb only
+          </button>
+          {/* Favorites toggle */}
+          <button
+            onClick={onToggleFavoritesOnly}
+            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors flex items-center gap-1 ${
+              showFavoritesOnly
+                ? "bg-[#f59e0b]/10 text-[#f59e0b]"
+                : "bg-[#334155] text-[#94a3b8] hover:text-[#f59e0b]"
+            }`}
+            title="Show only favorites"
+          >
+            <Star className={`w-3 h-3 ${showFavoritesOnly ? "fill-current" : ""}`} />
+            Favs
+          </button>
+          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#334155] hover:bg-[#475569] text-[#94a3b8] transition-colors" title="Toggle layout">
             {layout === "grid" ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-[#737373]">
+        <div className="py-20 text-center text-sm text-[#94a3b8]">
           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
           Loading markets...
         </div>
-      ) : sorted.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="py-20 text-center text-sm text-[#525252]">
-          No saved markets. Go to Scan or MarketFinder to add some.
+          No saved markets match filters.
         </div>
       ) : layout === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sorted.map((m) => {
+          {filtered.map((m) => {
             const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
             const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
             const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
+            const isFav = favoriteIds.has(m.id);
             return (
-              <div key={m.id} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 space-y-3">
+              <div
+                key={m.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpenMarket(m)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onOpenMarket(m);
+                  }
+                }}
+                className="rounded-xl border border-[#334155] bg-[#1e293b] p-4 space-y-3 cursor-pointer hover:border-[#10b981]/40 hover:bg-[#1e293b] transition-colors"
+              >
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-sm text-[#e5e5e5]">{m.eventTitle}</h3>
-                  {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{m.category}</span>}
+                  <h3 className="font-semibold text-sm text-[#f1f5f9]">{m.eventTitle}</h3>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(m.id);
+                      }}
+                      className={`p-1 rounded transition-colors ${isFav ? "text-[#f59e0b]" : "text-[#525252] hover:text-[#f59e0b]"}`}
+                    >
+                      <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} />
+                    </button>
+                    {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#334155] text-[#94a3b8]">{m.category}</span>}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="text-[#737373]">Expiry</div>
-                  <div className="text-[#e5e5e5] text-right">{formatExpiry(m.expiryDate)}</div>
-                  <div className="text-[#737373]">Best ROI</div>
-                  <div className={`text-right font-bold ${roi > 0 ? "text-[#22c55e]" : roi < 0 ? "text-[#ef4444]" : "text-[#737373]"}`}>
+                  <div className="text-[#94a3b8]">Expiry</div>
+                  <div className="text-[#f1f5f9] text-right">{formatExpiry(m.expiryDate)}</div>
+                  <div className="text-[#94a3b8]">Best ROI</div>
+                  <div className={`text-right font-bold ${roi > 0 ? "text-[#10b981]" : roi < 0 ? "text-[#ef4444]" : "text-[#94a3b8]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                   </div>
-                  <div className="text-[#737373]">Est. Profit</div>
-                  <div className="text-[#e5e5e5] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
+                  <div className="text-[#94a3b8]">APY</div>
+                  <div className={`text-right font-bold ${calculateAPY(roi, m.expiryDate) > 0 ? "text-[#3b82f6]" : "text-[#94a3b8]"}`}>
+                    {roi !== 0 ? `${calculateAPY(roi, m.expiryDate).toFixed(1)}%` : "—"}
+                  </div>
+                  <div className="text-[#94a3b8]">Est. Profit</div>
+                  <div className="text-[#f1f5f9] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-[#525252]">
                   <Clock className="w-3 h-3" />
@@ -1950,32 +2760,54 @@ function OverviewPanel({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
+        <div className="rounded-xl border border-[#334155] bg-[#1e293b] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#1a1a1a]">
-              <tr className="text-[10px] text-[#737373] uppercase tracking-wider">
-                <th className="text-left px-4 py-3 font-medium">Market</th>
-                <th className="text-right px-4 py-3 font-medium">Expiry</th>
-                <th className="text-right px-4 py-3 font-medium">ROI</th>
-                <th className="text-right px-4 py-3 font-medium">Profit</th>
+            <thead className="bg-[#1e293b] border-b border-[#334155]">
+              <tr className="text-[10px] text-[#94a3b8] uppercase tracking-wider">
+                <SortHeader field="name" label="Market" />
+                <SortHeader field="expiry" label="Expiry" align="right" />
+                <SortHeader field="roi" label="ROI" align="right" />
+                <SortHeader field="apy" label="APY" align="right" />
+                <SortHeader field="profit" label="Profit" align="right" />
                 <th className="text-left px-4 py-3 font-medium">Strategy</th>
+                <th className="text-center px-4 py-3 font-medium">Fav</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1a1a1a]">
-              {sorted.map((m) => {
+            <tbody className="divide-y divide-[#334155]">
+              {filtered.map((m) => {
                 const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
+                const apy = calculateAPY(roi, m.expiryDate);
+                const isFav = favoriteIds.has(m.id);
                 return (
-                  <tr key={m.id} className="hover:bg-[#1a1a1a]/50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-[#e5e5e5]">{m.eventTitle}</td>
-                    <td className="px-4 py-3 text-right text-[#e5e5e5]">{formatExpiry(m.expiryDate)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#22c55e]" : roi < 0 ? "text-[#ef4444]" : "text-[#737373]"}`}>
+                  <tr
+                    key={m.id}
+                    onClick={() => onOpenMarket(m)}
+                    className="hover:bg-[#334155]/50 transition-colors cursor-pointer"
+                  >
+                    <td className="px-4 py-3 font-medium text-[#f1f5f9]">{m.eventTitle}</td>
+                    <td className="px-4 py-3 text-right text-[#f1f5f9]">{formatExpiry(m.expiryDate)}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#10b981]" : roi < 0 ? "text-[#ef4444]" : "text-[#94a3b8]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right text-[#e5e5e5]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-[#a3a3a3]">{strategy || "—"}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${apy > 0 ? "text-[#3b82f6]" : "text-[#94a3b8]"}`}>
+                      {roi !== 0 ? `${apy.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right text-[#f1f5f9]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className="px-4 py-3"><StrategyBadge strategy={strategy} /></td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavorite(m.id);
+                        }}
+                        className={`p-1 rounded transition-colors ${isFav ? "text-[#f59e0b]" : "text-[#525252] hover:text-[#f59e0b]"}`}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -2089,10 +2921,10 @@ function MarketFinderPanel({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Globe className="w-5 h-5 text-[#22c55e]" />
+            <Globe className="w-5 h-5 text-[#10b981]" />
             MarketFinder
           </h2>
-          <p className="text-xs text-[#737373] mt-0.5">
+          <p className="text-xs text-[#94a3b8] mt-0.5">
             PredictionHunt matched markets — sorted by spread ({spreadThreshold}% threshold)
           </p>
         </div>
@@ -2105,7 +2937,7 @@ function MarketFinderPanel({
           <button
             onClick={onSync}
             disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#22c55e]/10 text-[#22c55e] text-sm font-medium hover:bg-[#22c55e]/20 transition-all border border-[#22c55e]/20 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#10b981]/10 text-[#10b981] text-sm font-medium hover:bg-[#10b981]/20 transition-all border border-[#10b981]/20 disabled:opacity-50"
           >
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {syncing ? "Syncing..." : "Sync All"}
@@ -2114,9 +2946,9 @@ function MarketFinderPanel({
       </div>
 
       {/* Spread threshold control */}
-      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#1a1a1a]/50 border border-[#262626]">
-        <Filter className="w-3.5 h-3.5 text-[#737373]" />
-        <span className="text-xs text-[#737373]">Spread threshold:</span>
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#334155]/50 border border-[#475569]">
+        <Filter className="w-3.5 h-3.5 text-[#94a3b8]" />
+        <span className="text-xs text-[#94a3b8]">Spread threshold:</span>
         <input
           type="range"
           min="1"
@@ -2124,15 +2956,15 @@ function MarketFinderPanel({
           step="0.5"
           value={spreadThreshold}
           onChange={(e) => window.dispatchEvent(new CustomEvent('mf-spread-change', { detail: Number(e.target.value) }))}
-          className="flex-1 accent-[#22c55e] h-1"
+          className="flex-1 accent-[#10b981] h-1"
         />
-        <span className="text-xs font-mono text-[#22c55e] min-w-[3rem] text-right">{spreadThreshold}%</span>
+        <span className="text-xs font-mono text-[#10b981] min-w-[3rem] text-right">{spreadThreshold}%</span>
       </div>
 
       {/* Category filter — multi-select chips */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1a1a]/50 border border-[#262626]">
-        <Filter className="w-3.5 h-3.5 text-[#737373] shrink-0" />
-        <span className="text-xs text-[#737373]">Category:</span>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#334155]/50 border border-[#475569]">
+        <Filter className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" />
+        <span className="text-xs text-[#94a3b8]">Category:</span>
         {CATEGORIES.map(c => {
           const isActive = categories.includes(c);
           return (
@@ -2147,8 +2979,8 @@ function MarketFinderPanel({
               }}
               className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
                 isActive
-                  ? "bg-[#22c55e]/15 text-[#22c55e] border-[#22c55e]/30"
-                  : "bg-[#1a1a1a] text-[#737373] border-[#262626] hover:text-[#a3a3a3] hover:border-[#404040]"
+                  ? "bg-[#10b981]/15 text-[#10b981] border-[#10b981]/30"
+                  : "bg-[#334155] text-[#94a3b8] border-[#475569] hover:text-[#64748b] hover:border-[#404040]"
               }`}
             >
               {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -2158,7 +2990,7 @@ function MarketFinderPanel({
         {categories.length > 0 && (
           <button
             onClick={() => onSetCategories([])}
-            className="px-2 py-0.5 rounded-full text-[11px] text-[#525252] hover:text-[#a3a3a3] transition-colors"
+            className="px-2 py-0.5 rounded-full text-[11px] text-[#525252] hover:text-[#64748b] transition-colors"
           >
             Clear
           </button>
@@ -2171,8 +3003,8 @@ function MarketFinderPanel({
       </div>
 
       {hiddenCount > 0 && (
-        <div className="text-xs text-[#737373] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1a1a]/50">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#22c55e]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <div className="text-xs text-[#94a3b8] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#334155]/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#10b981]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in H2H)
         </div>
       )}
@@ -2184,25 +3016,25 @@ function MarketFinderPanel({
       )}
 
       {bulkMsg && (
-        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#eab308] bg-[#eab308]/10" : "text-[#22c55e] bg-[#22c55e]/10"}`}>
+        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#eab308] bg-[#eab308]/10" : "text-[#10b981] bg-[#10b981]/10"}`}>
           <Check className="w-4 h-4" /> {bulkMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
+        <div className="rounded-xl border border-[#334155] bg-[#1e293b] overflow-hidden">
           {/* Skeleton rows */}
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#1a1a1a] last:border-0 animate-pulse">
-              <div className="w-3.5 h-3.5 rounded bg-[#262626] shrink-0" />
+            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#334155] last:border-0 animate-pulse">
+              <div className="w-3.5 h-3.5 rounded bg-[#475569] shrink-0" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-4 w-48 rounded bg-[#262626]" />
-                <div className="h-3 w-16 rounded bg-[#1a1a1a]" />
+                <div className="h-4 w-48 rounded bg-[#475569]" />
+                <div className="h-3 w-16 rounded bg-[#334155]" />
               </div>
-              <div className="h-4 w-24 rounded bg-[#262626]" />
-              <div className="h-4 w-20 rounded bg-[#262626]" />
-              <div className="h-4 w-20 rounded bg-[#262626]" />
-              <div className="h-8 w-24 rounded bg-[#262626]" />
+              <div className="h-4 w-24 rounded bg-[#475569]" />
+              <div className="h-4 w-20 rounded bg-[#475569]" />
+              <div className="h-4 w-20 rounded bg-[#475569]" />
+              <div className="h-8 w-24 rounded bg-[#475569]" />
             </div>
           ))}
         </div>
@@ -2211,22 +3043,22 @@ function MarketFinderPanel({
           No markets found. Try syncing to fetch from PredictionHunt.
         </div>
       ) : (
-        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden">
+        <div className="rounded-xl border border-[#334155] bg-[#1e293b] overflow-hidden">
           {/* Bulk action bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1a1a1a] bg-[#111111]">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#334155] bg-[#1e293b]">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#737373]">
+              <span className="text-xs text-[#94a3b8]">
                 {selectedVisibleCount}/{sorted.length} selected
               </span>
               {selectedVisibleCount > 0 && (
-                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#525252] border border-[#262626]">⌘↵</kbd>
+                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#334155] text-[#525252] border border-[#475569]">⌘↵</kbd>
               )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onBulkSave()}
                 disabled={bulkSaving || selectedVisibleCount === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] text-xs font-medium hover:bg-[#22c55e]/20 transition-all border border-[#22c55e]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10b981]/10 text-[#10b981] text-xs font-medium hover:bg-[#10b981]/20 transition-all border border-[#10b981]/20 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {bulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 {bulkSaving ? "Saving..." : `Save Selected (${selectedVisibleCount})`}
@@ -2235,15 +3067,15 @@ function MarketFinderPanel({
           </div>
 
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#1a1a1a]">
-              <tr className="text-[10px] text-[#737373] uppercase tracking-wider">
+            <thead className="bg-[#1e293b] border-b border-[#334155]">
+              <tr className="text-[10px] text-[#94a3b8] uppercase tracking-wider">
                 <th className="px-4 py-3 font-medium w-10">
                   <input
                     type="checkbox"
                     checked={allSelected}
                     ref={cb => { if (cb) cb.indeterminate = indeterminate; }}
                     onChange={() => onToggleSelectAll(visibleIds)}
-                    className="w-3.5 h-3.5 rounded border-[#262626] bg-[#1a1a1a] text-[#22c55e] focus:ring-[#22c55e]/30 focus:ring-offset-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[#475569] bg-[#334155] text-[#10b981] focus:ring-[#10b981]/30 focus:ring-offset-0 cursor-pointer"
                   />
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Market</th>
@@ -2254,32 +3086,32 @@ function MarketFinderPanel({
                 <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1a1a1a]">
+            <tbody className="divide-y divide-[#334155]">
               {sorted.map((m) => {
                 const isSaving = savingIds.has(m.id);
                 const isChecked = selectedIds.has(m.id);
                 const spread = m.spreadPct;
                 const spreadClass = spread != null
-                  ? spread <= spreadThreshold ? "text-[#22c55e]" : "text-[#eab308]"
+                  ? spread <= spreadThreshold ? "text-[#10b981]" : "text-[#eab308]"
                   : "text-[#525252]";
                 return (
-                  <tr key={m.id} className={`hover:bg-[#1a1a1a]/50 transition-colors ${isChecked ? "bg-[#22c55e]/5" : ""}`}>
+                  <tr key={m.id} className={`hover:bg-[#334155]/50 transition-colors ${isChecked ? "bg-[#10b981]/5" : ""}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => onToggleSelected(m.id)}
-                        className="w-3.5 h-3.5 rounded border-[#262626] bg-[#1a1a1a] text-[#22c55e] focus:ring-[#22c55e]/30 focus:ring-offset-0 cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-[#475569] bg-[#334155] text-[#10b981] focus:ring-[#10b981]/30 focus:ring-offset-0 cursor-pointer"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-[#e5e5e5] text-sm">{m.title}</div>
+                      <div className="font-medium text-[#f1f5f9] text-sm">{m.title}</div>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#737373]">{m.eventType}</span>
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#334155] text-[#94a3b8]">{m.eventType}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs text-[#e5e5e5]">
+                      <div className="text-xs text-[#f1f5f9]">
                         {m.eventDate ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
                       </div>
                     </td>
@@ -2302,14 +3134,14 @@ function MarketFinderPanel({
                     </td>
                     <td className="px-4 py-3 text-center">
                       {isSaving ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-[#737373]">
+                        <span className="inline-flex items-center gap-1 text-xs text-[#94a3b8]">
                           <Loader2 className="w-3 h-3 animate-spin" /> Saving
                         </span>
                       ) : (
                         <button
                           onClick={() => onSaveToH2H(m)}
                           disabled={!m.kalshiUrl || !m.polymarketUrl}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors border border-[#22c55e]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#10b981]/10 text-[#10b981] hover:bg-[#10b981]/20 transition-colors border border-[#10b981]/20 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           Add to H2H
                         </button>
