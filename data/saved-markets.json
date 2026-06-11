@@ -2314,50 +2314,21 @@
     "id": "1780524938676-glx1ja0",
     "createdAt": "2026-06-03T22:15:38.676Z",
     "lastScanResult": {
-      "bestRoiPct": 21.500000000000004,
-      "bestProfit": 9.858870940170943,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 4,
+      "bestRoiPct": 8.699999999999996,
+      "bestProfit": 24.71590909090908,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 58,
       "matchedCount": 4,
       "kalshiCount": 56,
       "pmCount": 6,
-      "scannedAt": "2026-06-11T13:48:49.500Z",
+      "scannedAt": "2026-06-11T19:13:41.733Z",
       "allArbs": [
         {
-          "artist": "Phoebe Bridgers",
-          "roiPct": 3.6499999999999977,
-          "expectedProfit": 0.9996111950790854,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 3.0125268892794375,
-          "pmStake": 23.37447,
-          "totalStake": 26.386996889279438
-        },
-        {
-          "artist": "Billie Eilish",
-          "roiPct": 1.200000000000001,
-          "expectedProfit": 1.8750000000000018,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 150,
-          "pmStake": 4.375,
-          "totalStake": 154.375
-        },
-        {
-          "artist": "Addison Rae",
-          "roiPct": 21.500000000000004,
-          "expectedProfit": 9.858870940170943,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 9.171042735042736,
-          "pmStake": 26.8253,
-          "totalStake": 35.99634273504273
-        },
-        {
           "artist": "Lorde",
-          "roiPct": 9.850000000000003,
-          "expectedProfit": 1.7909090909090917,
+          "roiPct": 8.699999999999996,
+          "expectedProfit": 24.71590909090908,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 16,
-          "pmStake": 0.39090909090909093,
-          "totalStake": 16.39090909090909
+          "totalStake": 259.375
         }
       ]
     }

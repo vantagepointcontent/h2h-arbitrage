@@ -379,11 +379,11 @@ function isMatched(m: SavedMarket): boolean {
 /* ── Stat Card ── */
 function StatCard({ label, value, icon, color, valueSize, compact }: { label: string; value: string | number; icon: React.ReactNode; color: "green" | "blue" | "purple" | "yellow" | "orange" | "red"; valueSize?: "xs"; compact?: boolean }) {
   const colorMap = {
-    green: "text-[#10B981]", blue: "text-[#3b82f6]", purple: "text-[#a855f7]",
+    green: "text-[#5DBE81]", blue: "text-[#3b82f6]", purple: "text-[#a855f7]",
     yellow: "text-[#eab308]", orange: "text-[#f97316]", red: "text-[#ef4444]",
   };
   const bgMap = {
-    green: "bg-[#10B981]/10", blue: "bg-[#3b82f6]/10", purple: "bg-[#a855f7]/10",
+    green: "bg-[#5DBE81]/10", blue: "bg-[#3b82f6]/10", purple: "bg-[#a855f7]/10",
     yellow: "bg-[#eab308]/10", orange: "bg-[#f97316]/10", red: "bg-[#ef4444]/10",
   };
   const padClass = compact ? "p-2.5" : "p-4";
@@ -392,12 +392,12 @@ function StatCard({ label, value, icon, color, valueSize, compact }: { label: st
   const textSize = compact ? "text-xs" : (valueSize === "xs" ? "text-sm" : "text-2xl");
   const labelTextSize = compact ? "text-[10px]" : "text-xs";
   return (
-    <div className={`rounded-xl border border-[#334155] bg-[#1E293B] ${padClass}`}>
+    <div className={`rounded-xl border border-[#182533] bg-[#17212B] ${padClass}`}>
       <div className={`flex items-center gap-2 ${labelGap}`}>
         <span className={`${colorMap[color]} ${iconPad} rounded-lg ${bgMap[color]}`}>{icon}</span>
-        <span className={`${labelTextSize} text-[#64748B]`}>{label}</span>
+        <span className={`${labelTextSize} text-[#5E6875]`}>{label}</span>
       </div>
-      <div className={`${textSize} font-bold text-[#F8FAFC]`}>{value}</div>
+      <div className={`${textSize} font-bold text-[#FFFFFF]`}>{value}</div>
     </div>
   );
 }
@@ -1183,24 +1183,24 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#F8FAFC]">
+    <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
       <ToastContainer toast={alertSystem.toast} />
       {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} alertSystem={alertSystem} />}
 
       {/* Top nav bar */}
-      <header className="sticky top-0 z-50 border-b border-[#334155] bg-[#0F172A]/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
         <div className="flex items-center h-14 px-4 gap-3">
-          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#334155]">
+          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
             <Rows3 className="w-5 h-5" />
           </button>
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
 
           <div className="flex items-center gap-2 ml-4">
-            <Filter className="w-4 h-4 text-[#64748B]" />
+            <Filter className="w-4 h-4 text-[#5E6875]" />
             <select
               value={overviewCategory}
               onChange={(e) => setOverviewCategory(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-[#334155] border border-[#475569] text-xs text-[#F8FAFC] focus:outline-none focus:border-[#10B981]"
+              className="px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
               title="Filter by category"
             >
               <option value="all">All categories</option>
@@ -1209,10 +1209,10 @@ export default function Home() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#334155] text-[#64748B] hover:text-[#F8FAFC]" title="Alert settings">
+            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Alert settings">
               <Bookmark className="w-4 h-4" />
             </button>
-            <button onClick={() => theme.toggle()} className="p-2 rounded-lg hover:bg-[#334155] text-[#64748B] hover:text-[#F8FAFC]" title="Toggle theme">
+            <button onClick={() => theme.toggle()} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Toggle theme">
               {theme.isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
@@ -1349,38 +1349,38 @@ export default function Home() {
               <>
                 {/* Scan inputs */}
                 {!activeMarketId && (
-                <div className="rounded-xl border border-[#334155] bg-[#1E293B] p-5 mb-6">
+                <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5 mb-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#94A3B8]">
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
                         <Link2 className="w-4 h-4" /> Kalshi URL
                       </label>
-                      <input type="text" value={kalshiUrl} onChange={(e) => setKalshiUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]/30 transition-all" placeholder="https://kalshi.com/markets/..." />
+                      <input type="text" value={kalshiUrl} onChange={(e) => setKalshiUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all" placeholder="https://kalshi.com/markets/..." />
                     </div>
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#94A3B8]">
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
                         <Link2 className="w-4 h-4" /> Polymarket URL
                       </label>
-                      <input type="text" value={pmUrl} onChange={(e) => setPmUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]/30 transition-all" placeholder="https://polymarket.com/event/..." />
+                      <input type="text" value={pmUrl} onChange={(e) => setPmUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all" placeholder="https://polymarket.com/event/..." />
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 flex-wrap">
-                    <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#10B981] text-black font-semibold text-sm hover:bg-[#059669] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
                       {loading ? "Scanning..." : "Scan Markets"}
                     </button>
 
                     {result && (
-                      <button onClick={openSaveModal} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#334155] border border-[#475569] text-[#F8FAFC] text-sm hover:bg-[#475569] transition-all disabled:opacity-50">
+                      <button onClick={openSaveModal} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving..." : "Save Market"}
                       </button>
                     )}
 
                     <div className="flex items-center gap-2 ml-auto">
-                      <label className="text-xs text-[#64748B]">Capital:</label>
-                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-md bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981]" />
+                      <label className="text-xs text-[#5E6875]">Capital:</label>
+                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-md bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
                     </div>
                   </div>
 
@@ -1397,9 +1397,9 @@ export default function Home() {
                   <div className="space-y-4">
                     {activeMarketId && (
                       <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-xl font-bold tracking-tight text-[#F8FAFC]">{result.eventTitle}</h2>
+                        <h2 className="text-xl font-bold tracking-tight text-[#FFFFFF]">{result.eventTitle}</h2>
                         {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#334155] text-[#64748B]">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#182533] text-[#5E6875]">
                             {savedMarkets.find(m => m.id === activeMarketId)?.category}
                           </span>
                         )}
@@ -1408,10 +1408,10 @@ export default function Home() {
                     {/* Compact stats + platform bar */}
                     <div className="flex items-stretch gap-2 mb-2">
                       {/* Platform box — ultra-compact (~29px, was ~48px, ~40% reduction) */}
-                      <div className="rounded-md border border-[#334155] bg-[#1E293B] p-1 flex items-center gap-1 shrink-0">
-                        <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#10B981]/10 hover:bg-[#10B981]/20 transition-colors px-1.5 py-0.5" title="Kalshi">
+                      <div className="rounded-md border border-[#182533] bg-[#17212B] p-1 flex items-center gap-1 shrink-0">
+                        <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#5DBE81]/10 hover:bg-[#5DBE81]/20 transition-colors px-1.5 py-0.5" title="Kalshi">
                           <img src="/kalshi-icon.png" alt="" className="w-4 h-4 rounded-sm" />
-                          <span className="text-[8px] font-semibold text-[#10B981] leading-none">K</span>
+                          <span className="text-[8px] font-semibold text-[#5DBE81] leading-none">K</span>
                         </a>
                         <a href={pmUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#a855f7]/10 hover:bg-[#a855f7]/20 transition-colors px-1.5 py-0.5" title="Polymarket">
                           <img src="/polymarket-icon.png" alt="" className="w-4 h-4 rounded-sm" />
@@ -1424,7 +1424,7 @@ export default function Home() {
                               if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
                             }}
                             disabled={loading}
-                            className="flex items-center justify-center rounded bg-[#475569] text-[#64748B] hover:text-[#F8FAFC] hover:bg-[#404040] transition-colors disabled:opacity-50 px-1.5 py-0.5"
+                            className="flex items-center justify-center rounded bg-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#404040] transition-colors disabled:opacity-50 px-1.5 py-0.5"
                             title="Refresh"
                           >
                             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -1450,7 +1450,7 @@ export default function Home() {
                             {result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
                             {result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
                           </div>
-                          <div className="text-[11px] text-[#94A3B8]">
+                          <div className="text-[11px] text-[#8A9BA8]">
                             Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
                           </div>
                         </div>
@@ -1482,8 +1482,8 @@ export default function Home() {
                             onClick={() => setBookmakerView(false)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               !bookmakerView
-                                ? "bg-[#10B981]/15 text-[#10B981] ring-1 ring-[#10B981]/30"
-                                : "bg-[#334155] text-[#64748B] hover:text-[#F8FAFC]"
+                                ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+                                : "bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
                             }`}
                           >
                             <Rows3 className="w-3.5 h-3.5" /> Outcomes Table
@@ -1492,8 +1492,8 @@ export default function Home() {
                             onClick={() => setBookmakerView(true)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               bookmakerView
-                                ? "bg-[#10B981]/15 text-[#10B981] ring-1 ring-[#10B981]/30"
-                                : "bg-[#334155] text-[#64748B] hover:text-[#F8FAFC]"
+                                ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+                                : "bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
                             }`}
                           >
                             <BarChart3 className="w-3.5 h-3.5" /> 1on1 Bookmaker
@@ -1528,10 +1528,10 @@ export default function Home() {
 
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && result.matchedCount > 0 && (
-                      <div className="rounded-xl border border-[#334155] bg-[#1E293B] overflow-hidden">
+                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead className="bg-[#111111] border-b border-[#334155]">
-                            <tr className="text-[10px] text-[#64748B] uppercase tracking-wider">
+                          <thead className="bg-[#111111] border-b border-[#182533]">
+                            <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                               <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi Yes</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
@@ -1542,7 +1542,7 @@ export default function Home() {
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#334155]">
+                          <tbody className="divide-y divide-[#182533]">
                             <OutcomeTableBody
                               outcomes={result.allOutcomes}
                               expandedArtist={expandedArtist}
@@ -1574,12 +1574,12 @@ export default function Home() {
       {/* Save modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSaveModalOpen(false)}>
-          <div className="bg-[#1E293B] border border-[#334155] rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#17212B] border border-[#182533] rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold mb-4">Save Market</h3>
-            <p className="text-sm text-[#64748B] mb-4">This will add the scanned market pair to your saved markets list.</p>
+            <p className="text-sm text-[#5E6875] mb-4">This will add the scanned market pair to your saved markets list.</p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setSaveModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#334155] text-sm hover:bg-[#475569] transition-colors">Cancel</button>
-              <button onClick={saveMarket} disabled={saving} className="px-4 py-2 rounded-lg bg-[#10B981] text-black text-sm font-semibold hover:bg-[#059669] transition-colors disabled:opacity-50">
+              <button onClick={() => setSaveModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#182533] text-sm hover:bg-[#232E3C] transition-colors">Cancel</button>
+              <button onClick={saveMarket} disabled={saving} className="px-4 py-2 rounded-lg bg-[#5DBE81] text-black text-sm font-semibold hover:bg-[#4DA66E] transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1590,23 +1590,23 @@ export default function Home() {
       {/* Edit modal */}
       {editModalOpen && editingMarket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setEditModalOpen(false)}>
-          <div className="bg-[#1E293B] border border-[#334155] rounded-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#17212B] border border-[#182533] rounded-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold">Edit Market</h3>
             <div>
-              <label className="text-xs text-[#64748B] block mb-1">Title</label>
-              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981]" />
+              <label className="text-xs text-[#5E6875] block mb-1">Title</label>
+              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
             </div>
             <div>
-              <label className="text-xs text-[#64748B] block mb-1">Category</label>
-              <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981]" placeholder="e.g. Politics, Crypto..." />
+              <label className="text-xs text-[#5E6875] block mb-1">Category</label>
+              <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" placeholder="e.g. Politics, Crypto..." />
             </div>
             <div>
-              <label className="text-xs text-[#64748B] block mb-1">Expiry date</label>
-              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#334155] border border-[#475569] text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981]" />
+              <label className="text-xs text-[#5E6875] block mb-1">Expiry date</label>
+              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#334155] text-sm hover:bg-[#475569] transition-colors">Cancel</button>
-              <button onClick={saveEdit} disabled={saving} className="px-4 py-2 rounded-lg bg-[#10B981] text-black text-sm font-semibold hover:bg-[#059669] transition-colors disabled:opacity-50">
+              <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#182533] text-sm hover:bg-[#232E3C] transition-colors">Cancel</button>
+              <button onClick={saveEdit} disabled={saving} className="px-4 py-2 rounded-lg bg-[#5DBE81] text-black text-sm font-semibold hover:bg-[#4DA66E] transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1697,28 +1697,28 @@ function MarketSidebar({
   });
 
   return (
-    <aside className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-[#334155] bg-[#1E293B] overflow-hidden transition-all duration-200`}>
+    <aside className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
       <div className="p-4 space-y-4 h-full flex flex-col">
         {/* ── Navigation (moved from header) ── */}
         <div className="space-y-1">
-          <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#10B981]/10 text-[#10B981]" : "bg-[#334155] text-[#94A3B8] hover:bg-[#475569] hover:text-[#F8FAFC]"}`}>
+          <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <BarChart3 className="w-4 h-4" />
             Overview
           </button>
-          <button onClick={onGoScan} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#10B981]/10 text-[#10B981]" : "bg-[#334155] text-[#94A3B8] hover:bg-[#475569] hover:text-[#F8FAFC]"}`}>
+          <button onClick={onGoScan} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Scan className="w-4 h-4" />
             Scan
           </button>
-          <button onClick={onGoMarketFinder} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#10B981]/10 text-[#10B981]" : "bg-[#334155] text-[#94A3B8] hover:bg-[#475569] hover:text-[#F8FAFC]"}`}>
+          <button onClick={onGoMarketFinder} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Globe className="w-4 h-4" />
             MarketFinder
           </button>
         </div>
 
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[#F8FAFC]">Saved Markets ({markets.length})</h2>
+          <h2 className="text-sm font-bold text-[#FFFFFF]">Saved Markets ({markets.length})</h2>
           <div className="flex items-center gap-1">
-            <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#334155] text-[#64748B] hover:text-[#10B981] transition-colors disabled:opacity-50" title="Scan All">
+            <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan All">
               {scanningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </button>
           </div>
@@ -1733,13 +1733,13 @@ function MarketSidebar({
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
             placeholder="Search markets..."
-            className="w-full px-2 py-1.5 rounded-md bg-[#334155] border border-[#475569] text-xs text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:border-[#10B981]"
+            className="w-full px-2 py-1.5 rounded-md bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
           />
           <div className="flex items-center gap-1">
             <select
               value={expiryFilter}
               onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2 py-1 rounded-md bg-[#334155] border border-[#475569] text-xs text-[#F8FAFC] focus:outline-none"
+              className="px-2 py-1 rounded-md bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none"
             >
               <option value="all">All expiries</option>
               <option value="lte7">≤ 7 days</option>
@@ -1759,20 +1759,20 @@ function MarketSidebar({
                 key={m.id}
                 onClick={() => onSelectMarket(m)}
                 className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-                  isActive ? "bg-[#10B981]/10 ring-1 ring-[#10B981]/30" : "hover:bg-[#334155]"
+                  isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
                 }`}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-[#F8FAFC] truncate">{m.eventTitle}</div>
+                  <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {m.category && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#334155] text-[#64748B]">{m.category}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>
                     )}
-                    <span className="text-[9px] text-[#64748B]">{timeUntilExpiry(m.expiryDate)}</span>
+                    <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
                   </div>
                 </div>
                 {roi !== 0 && (
-                  <span className={`text-xs font-bold ${roi > 0 ? "text-[#10B981]" : "text-[#ef4444]"}`}>
+                  <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
                     {roi > 0 ? "+" : ""}{formatPercent(roi)}
                   </span>
                 )}
@@ -1780,10 +1780,10 @@ function MarketSidebar({
             );
           })}
           {filtered.length === 0 && markets.length > 0 && (
-            <div className="text-xs text-[#475569] text-center py-4">No markets match filters.</div>
+            <div className="text-xs text-[#232E3C] text-center py-4">No markets match filters.</div>
           )}
           {markets.length === 0 && (
-            <div className="text-xs text-[#475569] text-center py-4">No saved markets yet.</div>
+            <div className="text-xs text-[#232E3C] text-center py-4">No saved markets yet.</div>
           )}
         </div>
       </div>
@@ -1845,19 +1845,19 @@ function OverviewPanel({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Overview</h2>
         <div className="flex items-center gap-2">
-          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#334155] hover:bg-[#475569] text-[#64748B] transition-colors" title="Toggle layout">
+          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#182533] hover:bg-[#232E3C] text-[#5E6875] transition-colors" title="Toggle layout">
             {layout === "grid" ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-[#64748B]">
+        <div className="py-20 text-center text-sm text-[#5E6875]">
           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
           Loading markets...
         </div>
       ) : sorted.length === 0 ? (
-        <div className="py-20 text-center text-sm text-[#475569]">
+        <div className="py-20 text-center text-sm text-[#232E3C]">
           No saved markets. Go to Scan or MarketFinder to add some.
         </div>
       ) : layout === "grid" ? (
@@ -1867,22 +1867,22 @@ function OverviewPanel({
             const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
             const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
             return (
-              <div key={m.id} className="rounded-xl border border-[#334155] bg-[#1E293B] p-4 space-y-3">
+              <div key={m.id} className="rounded-xl border border-[#182533] bg-[#17212B] p-4 space-y-3">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-sm text-[#F8FAFC]">{m.eventTitle}</h3>
-                  {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#334155] text-[#64748B]">{m.category}</span>}
+                  <h3 className="font-semibold text-sm text-[#FFFFFF]">{m.eventTitle}</h3>
+                  {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="text-[#64748B]">Expiry</div>
-                  <div className="text-[#F8FAFC] text-right">{formatExpiry(m.expiryDate)}</div>
-                  <div className="text-[#64748B]">Best ROI</div>
-                  <div className={`text-right font-bold ${roi > 0 ? "text-[#10B981]" : roi < 0 ? "text-[#ef4444]" : "text-[#64748B]"}`}>
+                  <div className="text-[#5E6875]">Expiry</div>
+                  <div className="text-[#FFFFFF] text-right">{formatExpiry(m.expiryDate)}</div>
+                  <div className="text-[#5E6875]">Best ROI</div>
+                  <div className={`text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                   </div>
-                  <div className="text-[#64748B]">Est. Profit</div>
-                  <div className="text-[#F8FAFC] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
+                  <div className="text-[#5E6875]">Est. Profit</div>
+                  <div className="text-[#FFFFFF] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-[#475569]">
+                <div className="flex items-center gap-1 text-[10px] text-[#232E3C]">
                   <Clock className="w-3 h-3" />
                   {timeUntilExpiry(m.expiryDate)}
                 </div>
@@ -1891,10 +1891,10 @@ function OverviewPanel({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-[#334155] bg-[#1E293B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#334155]">
-              <tr className="text-[10px] text-[#64748B] uppercase tracking-wider">
+            <thead className="bg-[#111111] border-b border-[#182533]">
+              <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-medium">Market</th>
                 <th className="text-right px-4 py-3 font-medium">Expiry</th>
                 <th className="text-right px-4 py-3 font-medium">ROI</th>
@@ -1902,21 +1902,21 @@ function OverviewPanel({
                 <th className="text-left px-4 py-3 font-medium">Strategy</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]">
+            <tbody className="divide-y divide-[#182533]">
               {sorted.map((m) => {
                 const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
                 return (
-                  <tr key={m.id} className="hover:bg-[#334155]/50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-[#F8FAFC]">{m.eventTitle}</td>
-                    <td className="px-4 py-3 text-right text-[#F8FAFC]">{formatExpiry(m.expiryDate)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#10B981]" : roi < 0 ? "text-[#ef4444]" : "text-[#64748B]"}`}>
+                  <tr key={m.id} className="hover:bg-[#182533]/50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-[#FFFFFF]">{m.eventTitle}</td>
+                    <td className="px-4 py-3 text-right text-[#FFFFFF]">{formatExpiry(m.expiryDate)}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right text-[#F8FAFC]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-[#94A3B8]">{strategy || "—"}</td>
+                    <td className="px-4 py-3 text-right text-[#FFFFFF]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-[#8A9BA8]">{strategy || "—"}</td>
                   </tr>
                 );
               })}
@@ -2030,23 +2030,23 @@ function MarketFinderPanel({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Globe className="w-5 h-5 text-[#10B981]" />
+            <Globe className="w-5 h-5 text-[#5DBE81]" />
             MarketFinder
           </h2>
-          <p className="text-xs text-[#64748B] mt-0.5">
+          <p className="text-xs text-[#5E6875] mt-0.5">
             PredictionHunt matched markets — sorted by spread ({spreadThreshold}% threshold)
           </p>
         </div>
         <div className="flex items-center gap-2">
           {lastSync && (
-            <span className="text-[10px] text-[#475569]">
+            <span className="text-[10px] text-[#232E3C]">
               Last sync: {getTimeAgo(lastSync.finishedAt || lastSync.startedAt)}
             </span>
           )}
           <button
             onClick={onSync}
             disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#10B981]/10 text-[#10B981] text-sm font-medium hover:bg-[#10B981]/20 transition-all border border-[#10B981]/20 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] text-sm font-medium hover:bg-[#5DBE81]/20 transition-all border border-[#5DBE81]/20 disabled:opacity-50"
           >
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {syncing ? "Syncing..." : "Sync All"}
@@ -2055,9 +2055,9 @@ function MarketFinderPanel({
       </div>
 
       {/* Spread threshold control */}
-      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#334155]/50 border border-[#475569]">
-        <Filter className="w-3.5 h-3.5 text-[#64748B]" />
-        <span className="text-xs text-[#64748B]">Spread threshold:</span>
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
+        <Filter className="w-3.5 h-3.5 text-[#5E6875]" />
+        <span className="text-xs text-[#5E6875]">Spread threshold:</span>
         <input
           type="range"
           min="1"
@@ -2065,15 +2065,15 @@ function MarketFinderPanel({
           step="0.5"
           value={spreadThreshold}
           onChange={(e) => window.dispatchEvent(new CustomEvent('mf-spread-change', { detail: Number(e.target.value) }))}
-          className="flex-1 accent-[#10B981] h-1"
+          className="flex-1 accent-[#5DBE81] h-1"
         />
-        <span className="text-xs font-mono text-[#10B981] min-w-[3rem] text-right">{spreadThreshold}%</span>
+        <span className="text-xs font-mono text-[#5DBE81] min-w-[3rem] text-right">{spreadThreshold}%</span>
       </div>
 
       {/* Category filter — multi-select chips */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#334155]/50 border border-[#475569]">
-        <Filter className="w-3.5 h-3.5 text-[#64748B] shrink-0" />
-        <span className="text-xs text-[#64748B]">Category:</span>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
+        <Filter className="w-3.5 h-3.5 text-[#5E6875] shrink-0" />
+        <span className="text-xs text-[#5E6875]">Category:</span>
         {CATEGORIES.map(c => {
           const isActive = categories.includes(c);
           return (
@@ -2088,8 +2088,8 @@ function MarketFinderPanel({
               }}
               className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
                 isActive
-                  ? "bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30"
-                  : "bg-[#334155] text-[#64748B] border-[#475569] hover:text-[#94A3B8] hover:border-[#404040]"
+                  ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
+                  : "bg-[#182533] text-[#5E6875] border-[#232E3C] hover:text-[#8A9BA8] hover:border-[#404040]"
               }`}
             >
               {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -2099,21 +2099,21 @@ function MarketFinderPanel({
         {categories.length > 0 && (
           <button
             onClick={() => onSetCategories([])}
-            className="px-2 py-0.5 rounded-full text-[11px] text-[#475569] hover:text-[#94A3B8] transition-colors"
+            className="px-2 py-0.5 rounded-full text-[11px] text-[#232E3C] hover:text-[#8A9BA8] transition-colors"
           >
             Clear
           </button>
         )}
         {categories.length > 0 && (
-          <span className="text-[10px] text-[#475569] ml-auto">
+          <span className="text-[10px] text-[#232E3C] ml-auto">
             {sorted.length} of {filtered.length} markets
           </span>
         )}
       </div>
 
       {hiddenCount > 0 && (
-        <div className="text-xs text-[#64748B] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#334155]/50">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#10B981]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <div className="text-xs text-[#5E6875] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#5DBE81]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in H2H)
         </div>
       )}
@@ -2125,49 +2125,49 @@ function MarketFinderPanel({
       )}
 
       {bulkMsg && (
-        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#eab308] bg-[#eab308]/10" : "text-[#10B981] bg-[#10B981]/10"}`}>
+        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#eab308] bg-[#eab308]/10" : "text-[#5DBE81] bg-[#5DBE81]/10"}`}>
           <Check className="w-4 h-4" /> {bulkMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-[#334155] bg-[#1E293B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
           {/* Skeleton rows */}
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#334155] last:border-0 animate-pulse">
-              <div className="w-3.5 h-3.5 rounded bg-[#475569] shrink-0" />
+            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#182533] last:border-0 animate-pulse">
+              <div className="w-3.5 h-3.5 rounded bg-[#232E3C] shrink-0" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-4 w-48 rounded bg-[#475569]" />
-                <div className="h-3 w-16 rounded bg-[#334155]" />
+                <div className="h-4 w-48 rounded bg-[#232E3C]" />
+                <div className="h-3 w-16 rounded bg-[#182533]" />
               </div>
-              <div className="h-4 w-24 rounded bg-[#475569]" />
-              <div className="h-4 w-20 rounded bg-[#475569]" />
-              <div className="h-4 w-20 rounded bg-[#475569]" />
-              <div className="h-8 w-24 rounded bg-[#475569]" />
+              <div className="h-4 w-24 rounded bg-[#232E3C]" />
+              <div className="h-4 w-20 rounded bg-[#232E3C]" />
+              <div className="h-4 w-20 rounded bg-[#232E3C]" />
+              <div className="h-8 w-24 rounded bg-[#232E3C]" />
             </div>
           ))}
         </div>
       ) : sorted.length === 0 ? (
-        <div className="py-20 text-center text-sm text-[#475569]">
+        <div className="py-20 text-center text-sm text-[#232E3C]">
           No markets found. Try syncing to fetch from PredictionHunt.
         </div>
       ) : (
-        <div className="rounded-xl border border-[#334155] bg-[#1E293B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
           {/* Bulk action bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#334155] bg-[#111111]">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#182533] bg-[#111111]">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#64748B]">
+              <span className="text-xs text-[#5E6875]">
                 {selectedVisibleCount}/{sorted.length} selected
               </span>
               {selectedVisibleCount > 0 && (
-                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#334155] text-[#475569] border border-[#475569]">⌘↵</kbd>
+                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#182533] text-[#232E3C] border border-[#232E3C]">⌘↵</kbd>
               )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onBulkSave()}
                 disabled={bulkSaving || selectedVisibleCount === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10B981]/10 text-[#10B981] text-xs font-medium hover:bg-[#10B981]/20 transition-all border border-[#10B981]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] text-xs font-medium hover:bg-[#5DBE81]/20 transition-all border border-[#5DBE81]/20 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {bulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 {bulkSaving ? "Saving..." : `Save Selected (${selectedVisibleCount})`}
@@ -2176,15 +2176,15 @@ function MarketFinderPanel({
           </div>
 
           <table className="w-full text-sm">
-            <thead className="bg-[#111111] border-b border-[#334155]">
-              <tr className="text-[10px] text-[#64748B] uppercase tracking-wider">
+            <thead className="bg-[#111111] border-b border-[#182533]">
+              <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                 <th className="px-4 py-3 font-medium w-10">
                   <input
                     type="checkbox"
                     checked={allSelected}
                     ref={cb => { if (cb) cb.indeterminate = indeterminate; }}
                     onChange={() => onToggleSelectAll(visibleIds)}
-                    className="w-3.5 h-3.5 rounded border-[#475569] bg-[#334155] text-[#10B981] focus:ring-[#10B981]/30 focus:ring-offset-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[#232E3C] bg-[#182533] text-[#5DBE81] focus:ring-[#5DBE81]/30 focus:ring-offset-0 cursor-pointer"
                   />
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Market</th>
@@ -2195,32 +2195,32 @@ function MarketFinderPanel({
                 <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]">
+            <tbody className="divide-y divide-[#182533]">
               {sorted.map((m) => {
                 const isSaving = savingIds.has(m.id);
                 const isChecked = selectedIds.has(m.id);
                 const spread = m.spreadPct;
                 const spreadClass = spread != null
-                  ? spread <= spreadThreshold ? "text-[#10B981]" : "text-[#eab308]"
-                  : "text-[#475569]";
+                  ? spread <= spreadThreshold ? "text-[#5DBE81]" : "text-[#eab308]"
+                  : "text-[#232E3C]";
                 return (
-                  <tr key={m.id} className={`hover:bg-[#334155]/50 transition-colors ${isChecked ? "bg-[#10B981]/5" : ""}`}>
+                  <tr key={m.id} className={`hover:bg-[#182533]/50 transition-colors ${isChecked ? "bg-[#5DBE81]/5" : ""}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => onToggleSelected(m.id)}
-                        className="w-3.5 h-3.5 rounded border-[#475569] bg-[#334155] text-[#10B981] focus:ring-[#10B981]/30 focus:ring-offset-0 cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-[#232E3C] bg-[#182533] text-[#5DBE81] focus:ring-[#5DBE81]/30 focus:ring-offset-0 cursor-pointer"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-[#F8FAFC] text-sm">{m.title}</div>
+                      <div className="font-medium text-[#FFFFFF] text-sm">{m.title}</div>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#334155] text-[#64748B]">{m.eventType}</span>
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.eventType}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs text-[#F8FAFC]">
+                      <div className="text-xs text-[#FFFFFF]">
                         {m.eventDate ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
                       </div>
                     </td>
@@ -2231,26 +2231,26 @@ function MarketFinderPanel({
                       {m.kalshiUrl ? (
                         <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#eab308] hover:underline">Kalshi →</a>
                       ) : (
-                        <span className="text-xs text-[#475569]">—</span>
+                        <span className="text-xs text-[#232E3C]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {m.polymarketUrl ? (
                         <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#6366f1] hover:underline">Polymarket →</a>
                       ) : (
-                        <span className="text-xs text-[#475569]">—</span>
+                        <span className="text-xs text-[#232E3C]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {isSaving ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-[#64748B]">
+                        <span className="inline-flex items-center gap-1 text-xs text-[#5E6875]">
                           <Loader2 className="w-3 h-3 animate-spin" /> Saving
                         </span>
                       ) : (
                         <button
                           onClick={() => onSaveToH2H(m)}
                           disabled={!m.kalshiUrl || !m.polymarketUrl}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#10B981]/10 text-[#10B981] hover:bg-[#10B981]/20 transition-colors border border-[#10B981]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] hover:bg-[#5DBE81]/20 transition-colors border border-[#5DBE81]/20 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           Add to H2H
                         </button>
