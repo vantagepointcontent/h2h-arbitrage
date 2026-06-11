@@ -75,7 +75,7 @@ export function MarketTable({
 
   if (outcomes.length === 0) {
     return (
-      <div className="text-center py-12 text-[#94a3b8]">
+      <div className="text-center py-12 text-[#8A9BA8]">
         Inga matchade outcomes hittades.
       </div>
     );
@@ -85,19 +85,19 @@ export function MarketTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#475569] text-[#94a3b8] text-xs uppercase tracking-wider">
+          <tr className="border-b border-[#232E3C] text-[#8A9BA8] text-xs uppercase tracking-wider">
             {SORTABLE_FIELDS.map((field) => (
               <th
                 key={field.key}
-                className={`px-4 py-3 text-left font-semibold cursor-pointer hover:text-[#f1f5f9] transition-colors ${
-                  sortField === field.key ? 'text-[#f1f5f9]' : ''
+                className={`px-4 py-3 text-left font-semibold cursor-pointer hover:text-[#FFFFFF] transition-colors ${
+                  sortField === field.key ? 'text-[#FFFFFF]' : ''
                 }`}
                 onClick={() => handleSort(field.key)}
               >
                 <div className="flex items-center gap-1">
                   {field.label}
                   {sortField === field.key && (
-                    <span className="text-[#f1f5f9]">
+                    <span className="text-[#FFFFFF]">
                       {sortDirection === 'asc' ? ' ↑' : ' ↓'}
                     </span>
                   )}
@@ -106,7 +106,7 @@ export function MarketTable({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#334155]">
+        <tbody className="divide-y divide-[#17212B]">
           {outcomes.map((outcome) => (
             <MarketRow
               key={outcome.artist}

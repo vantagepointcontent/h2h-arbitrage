@@ -69,24 +69,24 @@ interface Bookmaker1on1Props {
 /** Determine spread color class based on thresholds */
 function spreadColorClass(spread: number, thresholds: SpreadThresholds): string {
   const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "text-emerald-400";
-  if (abs >= thresholds.yellow) return "text-yellow-400";
-  return "text-red-400";
+  if (abs >= thresholds.green) return "text-[#5DBE81]";
+  if (abs >= thresholds.yellow) return "text-[#facc15]";
+  return "text-[#ef4444]";
 }
 
 /** Background tint for spread badge */
 function spreadBgClass(spread: number, thresholds: SpreadThresholds): string {
   const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "bg-emerald-400/15 ring-emerald-400/30";
-  if (abs >= thresholds.yellow) return "bg-yellow-400/15 ring-yellow-400/30";
-  return "bg-red-400/15 ring-red-400/30";
+  if (abs >= thresholds.green) return "bg-[#5DBE81]/15 ring-[#5DBE81]/30";
+  if (abs >= thresholds.yellow) return "bg-[#facc15]/15 ring-[#facc15]/30";
+  return "bg-[#ef4444]/15 ring-[#ef4444]/30";
 }
 
 /** Bar fill color */
 function spreadBarClass(spread: number, thresholds: SpreadThresholds): string {
   const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "bg-emerald-400";
-  if (abs >= thresholds.yellow) return "bg-yellow-400";
+  if (abs >= thresholds.green) return "bg-[#5DBE81]";
+  if (abs >= thresholds.yellow) return "bg-[#facc15]";
   return "bg-red-400";
 }
 
@@ -126,11 +126,11 @@ function priceDelta(current: number, previous: number | null): "up" | "down" | "
 function movementArrow(direction: "up" | "down" | "stable" | null): React.ReactNode {
   switch (direction) {
     case "up":
-      return <ArrowUp className="w-2.5 h-2.5 text-emerald-400" />;
+      return <ArrowUp className="w-2.5 h-2.5 text-[#5DBE81]" />;
     case "down":
-      return <ArrowDown className="w-2.5 h-2.5 text-red-400" />;
+      return <ArrowDown className="w-2.5 h-2.5 text-[#ef4444]" />;
     case "stable":
-      return <Minus className="w-2.5 h-2.5 text-zinc-600" />;
+      return <Minus className="w-2.5 h-2.5 text-[#5E6875]" />;
     default:
       return null;
   }
@@ -352,8 +352,8 @@ export function Bookmaker1on1({
 
   if (validOutcomes.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-8 text-center">
-        <p className="text-zinc-500 text-sm">No matched outcomes to display.</p>
+      <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] p-8 text-center">
+        <p className="text-[#8A9BA8] text-sm">No matched outcomes to display.</p>
       </div>
     );
   }
@@ -373,9 +373,9 @@ export function Bookmaker1on1({
   }, [onRefreshIntervalChange]);
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
+    <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] overflow-hidden">
       {/* ── Header Row ── */}
-      <div className="grid grid-cols-[1fr_auto_1fr] bg-zinc-900 border-b border-zinc-800">
+      <div className="grid grid-cols-[1fr_auto_1fr] bg-[#17212B] border-b border-[#232E3C]">
         {/* Platform A header */}
         <div className="col-span-1 px-3 py-2.5">
           <div className="flex items-center gap-2">
@@ -384,15 +384,15 @@ export function Bookmaker1on1({
               alt={platformAName}
               className="w-5 h-5 rounded-sm"
             />
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium">
               {platformAName}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-1 mt-1">
-            <span className="text-[9px] text-zinc-600 uppercase text-center">
+            <span className="text-[9px] text-[#5E6875] uppercase text-center">
               Yes Bid
             </span>
-            <span className="text-[9px] text-zinc-600 uppercase text-center">
+            <span className="text-[9px] text-[#5E6875] uppercase text-center">
               Yes Ask
             </span>
           </div>
@@ -400,12 +400,12 @@ export function Bookmaker1on1({
 
         {/* Spread header */}
         <div className="col-auto px-1 py-2.5 text-center flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium">
             Spread
           </span>
           <button
             onClick={() => setShowThresholds((v) => !v)}
-            className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-zinc-800 text-zinc-600 hover:text-zinc-400 transition-colors"
+            className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-[#232E3C] text-[#5E6875] hover:text-[#8A9BA8] transition-colors"
             title="Configure thresholds"
           >
             <Settings2 className="w-3 h-3" />
@@ -420,15 +420,15 @@ export function Bookmaker1on1({
               alt={platformBName}
               className="w-5 h-5 rounded-sm"
             />
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium">
               {platformBName}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-1 mt-1">
-            <span className="text-[9px] text-zinc-600 uppercase text-center">
+            <span className="text-[9px] text-[#5E6875] uppercase text-center">
               Best Bid
             </span>
-            <span className="text-[9px] text-zinc-600 uppercase text-center">
+            <span className="text-[9px] text-[#5E6875] uppercase text-center">
               Best Ask
             </span>
           </div>
@@ -437,13 +437,13 @@ export function Bookmaker1on1({
 
       {/* ── Threshold Configuration Panel ── */}
       {showThresholds && (
-        <div className="border-b border-zinc-800 bg-zinc-900/80 px-3 py-2.5 flex items-center gap-4 flex-wrap">
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+        <div className="border-b border-[#232E3C] bg-[#17212B]/80 px-3 py-2.5 flex items-center gap-4 flex-wrap">
+          <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
             Thresholds:
           </span>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-[10px] text-zinc-400">&ge;</span>
+            <span className="inline-block w-2 h-2 rounded-full bg-[#5DBE81]" />
+            <span className="text-[10px] text-[#8A9BA8]">&ge;</span>
             <input
               type="number"
               min={0}
@@ -455,20 +455,20 @@ export function Bookmaker1on1({
                   green: parseFloat(e.target.value) || 0,
                 }))
               }
-              className="w-12 px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[10px] text-zinc-300 text-center focus:outline-none focus:border-emerald-500"
+              className="w-12 px-1.5 py-0.5 rounded bg-[#232E3C] border border-[#3f3f3f] text-[10px] text-[#8A9BA8] text-center focus:outline-none focus:border-[#5DBE81]"
             />
-            <span className="text-[10px] text-zinc-500">&#8270; great</span>
+            <span className="text-[10px] text-[#8A9BA8]">&#8270; great</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />
-            <span className="text-[10px] text-zinc-400">{editableThresholds.yellow}&#8211;</span>
-            <span className="text-[10px] text-zinc-500">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#facc15]" />
+            <span className="text-[10px] text-[#8A9BA8]">{editableThresholds.yellow}&#8211;</span>
+            <span className="text-[10px] text-[#8A9BA8]">
               {editableThresholds.green - 1}&cent; ok
             </span>
           </div>
           <button
             onClick={handleThresholdSave}
-            className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
+            className="px-2 py-0.5 rounded bg-[#5DBE81]/20 text-[#5DBE81] text-[10px] font-medium hover:bg-[#5DBE81]/30 transition-colors"
           >
             Apply
           </button>
@@ -476,10 +476,10 @@ export function Bookmaker1on1({
       )}
 
       {/* ── Auto-Refresh Controls ── */}
-      <div className="border-b border-zinc-800 bg-zinc-900/60 px-3 py-1.5 flex items-center gap-2">
+      <div className="border-b border-[#232E3C] bg-[#17212B]/60 px-3 py-1.5 flex items-center gap-2">
         <button
           onClick={() => setShowRefreshControls((v) => !v)}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#232E3C] transition-colors"
         >
           <Zap className="w-3 h-3" />
           {autoRefreshInterval > 0
@@ -489,16 +489,16 @@ export function Bookmaker1on1({
 
         {showRefreshControls && (
           <>
-            <span className="text-[10px] text-zinc-600">|</span>
-            <span className="text-[10px] text-zinc-500">Interval:</span>
+            <span className="text-[10px] text-[#5E6875]">|</span>
+            <span className="text-[10px] text-[#8A9BA8]">Interval:</span>
             {REFRESH_PRESETS.map((preset, idx) => (
               <button
                 key={preset.ms}
                 onClick={() => handleRefreshIntervalChange(idx)}
                 className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                   selectedRefreshIdx === idx
-                    ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+                    ? "bg-[#5DBE81]/20 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+                    : "bg-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-zinc-700"
                 }`}
               >
                 {preset.label}
@@ -508,18 +508,18 @@ export function Bookmaker1on1({
               onClick={() => handleRefreshIntervalChange(-1)}
               className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
                 selectedRefreshIdx === -1
-                  ? "bg-zinc-700 text-zinc-200"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "bg-zinc-700 text-[#FFFFFF]"
+                  : "text-[#8A9BA8] hover:text-[#8A9BA8]"
               }`}
             >
               Off
             </button>
             {onRefresh && (
               <>
-                <span className="text-[10px] text-zinc-600">|</span>
+                <span className="text-[10px] text-[#5E6875]">|</span>
                 <button
                   onClick={onRefresh}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#232E3C] text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-zinc-700 transition-colors"
                 >
                   <RefreshCw className="w-3 h-3" /> Now
                 </button>
@@ -550,7 +550,7 @@ export function Bookmaker1on1({
             <div
               key={outcome.artist}
               className={`grid grid-cols-[1fr_auto_1fr] transition-colors duration-150 ${
-                isHovered ? "bg-zinc-800/60" : ""
+                isHovered ? "bg-[#232E3C]/60" : ""
               }`}
               onMouseEnter={() => setHoveredRow(outcome.artist)}
               onMouseLeave={() => {
@@ -562,7 +562,7 @@ export function Bookmaker1on1({
               <div className="col-span-1 px-3 py-2">
                 {/* Outcome label */}
                 <div className="mb-1.5">
-                  <span className="text-[11px] font-medium text-zinc-200 truncate block">
+                  <span className="text-[11px] font-medium text-[#FFFFFF] truncate block">
                     {outcome.artist}
                   </span>
                 </div>
@@ -638,7 +638,7 @@ export function Bookmaker1on1({
                 </div>
 
                 {/* Visual spread bar */}
-                <div className="w-full max-w-[48px] h-1 rounded-full bg-zinc-800 overflow-hidden">
+                <div className="w-full max-w-[48px] h-1 rounded-full bg-[#232E3C] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${spreadBarClass(spread, thresholds)}`}
                     style={{
@@ -649,11 +649,11 @@ export function Bookmaker1on1({
 
                 {/* Spread detail tooltip */}
                 <div className="relative group">
-                  <Info className="w-3 h-3 text-zinc-600 cursor-help" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded bg-zinc-800 text-[10px] text-zinc-400 whitespace-nowrap z-10 hidden group-hover:block border border-zinc-700 shadow-lg">
+                  <Info className="w-3 h-3 text-[#5E6875] cursor-help" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded bg-[#232E3C] text-[10px] text-[#8A9BA8] whitespace-nowrap z-10 hidden group-hover:block border border-[#3f3f3f] shadow-lg">
                     <div>{platformAName} ask: {fmtPrice(a.yesAsk)}</div>
                     <div>{platformBName} price: {fmtPrice(b.yesPrice)}</div>
-                    <div className="border-t border-zinc-700 my-1" />
+                    <div className="border-t border-[#3f3f3f] my-1" />
                     <div className="font-bold">
                       Diff: {fmtSpread(spread)}&#8270;
                     </div>
@@ -719,14 +719,14 @@ export function Bookmaker1on1({
       </div>
 
       {/* ── Footer Legend ── */}
-      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 bg-zinc-900">
-        <div className="flex items-center gap-4 text-[10px] text-zinc-600">
+      <div className="flex items-center justify-between px-3 py-2 border-t border-[#232E3C] bg-[#17212B]">
+        <div className="flex items-center gap-4 text-[10px] text-[#5E6875]">
           <span className="flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="inline-block w-2 h-2 rounded-full bg-[#5DBE81]" />
             &#8805;{thresholds.green}&cent;
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />
+            <span className="inline-block w-2 h-2 rounded-full bg-[#facc15]" />
             {thresholds.yellow}&#8211;{thresholds.green - 1}&cent;
           </span>
           <span className="flex items-center gap-1">
@@ -734,7 +734,7 @@ export function Bookmaker1on1({
             &#60;{thresholds.yellow}&cent;
           </span>
         </div>
-        <div className="text-[10px] text-zinc-600">
+        <div className="text-[10px] text-[#5E6875]">
           {validOutcomes.length} outcome{validOutcomes.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -780,8 +780,8 @@ function PriceCellWithFlash({
       <div
         className={`text-center py-1.5 px-1 rounded font-mono transition-colors flex flex-col items-center gap-0.5 ${flashCls} ${
           primary
-            ? "bg-zinc-800 text-sm text-zinc-200"
-            : "bg-zinc-800/50 text-[11px] text-zinc-400"
+            ? "bg-[#232E3C] text-sm text-[#FFFFFF]"
+            : "bg-[#232E3C]/50 text-[11px] text-[#8A9BA8]"
         }`}
       >
         {/* Price value with movement arrow */}
@@ -801,7 +801,7 @@ function PriceCellWithFlash({
         )}
       </div>
       {isHovered && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-400 whitespace-nowrap z-10 pointer-events-none border border-zinc-700 shadow-lg">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#232E3C] text-[10px] text-[#8A9BA8] whitespace-nowrap z-10 pointer-events-none border border-[#3f3f3f] shadow-lg">
           <Clock className="w-3 h-3 inline mr-1" />
           Updated {timeAgo(lastUpdated)}
         </div>

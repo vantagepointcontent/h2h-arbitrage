@@ -379,12 +379,12 @@ function isMatched(m: SavedMarket): boolean {
 /* ── Stat Card ── */
 function StatCard({ label, value, icon, color, valueSize, compact }: { label: string; value: string | number; icon: React.ReactNode; color: "green" | "blue" | "purple" | "yellow" | "orange" | "red"; valueSize?: "xs"; compact?: boolean }) {
   const colorMap = {
-    green: "text-[#5DBE81]", blue: "text-[#3b82f6]", purple: "text-[#a855f7]",
-    yellow: "text-[#eab308]", orange: "text-[#f97316]", red: "text-[#ef4444]",
+    green: "text-[#5DBE81]", blue: "text-[#5DBE81]", purple: "text-[#a855f7]",
+    yellow: "text-[#facc15]", orange: "text-[#ef4444]", red: "text-[#ef4444]",
   };
   const bgMap = {
-    green: "bg-[#5DBE81]/10", blue: "bg-[#3b82f6]/10", purple: "bg-[#a855f7]/10",
-    yellow: "bg-[#eab308]/10", orange: "bg-[#f97316]/10", red: "bg-[#ef4444]/10",
+    green: "bg-[#5DBE81]/10", blue: "bg-[#5DBE81]/10", purple: "bg-[#a855f7]/10",
+    yellow: "bg-[#facc15]/10", orange: "bg-[#ef4444]/10", red: "bg-[#ef4444]/10",
   };
   const padClass = compact ? "p-2.5" : "p-4";
   const labelGap = compact ? "mb-1" : "mb-2";
@@ -1441,11 +1441,11 @@ export default function Home() {
                     </div>
 
                     {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0) && (
-                      <div className="rounded-xl border border-[#eab308]/30 bg-[#eab308]/10 p-3 flex items-start gap-3 text-sm text-[#facc15]">
+                      <div className="rounded-xl border border-[#facc15]/30 bg-[#facc15]/10 p-3 flex items-start gap-3 text-sm text-[#facc15]">
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <div className="space-y-1">
                           <div className="font-semibold">Market data warning</div>
-                          <div className="text-xs text-[#d4d4d4]">
+                          <div className="text-xs text-[#8A9BA8]">
                             {result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
                             {result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
                             {result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
@@ -2125,7 +2125,7 @@ function MarketFinderPanel({
       )}
 
       {bulkMsg && (
-        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#eab308] bg-[#eab308]/10" : "text-[#5DBE81] bg-[#5DBE81]/10"}`}>
+        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#facc15] bg-[#facc15]/10" : "text-[#5DBE81] bg-[#5DBE81]/10"}`}>
           <Check className="w-4 h-4" /> {bulkMsg}
         </div>
       )}
@@ -2201,7 +2201,7 @@ function MarketFinderPanel({
                 const isChecked = selectedIds.has(m.id);
                 const spread = m.spreadPct;
                 const spreadClass = spread != null
-                  ? spread <= spreadThreshold ? "text-[#5DBE81]" : "text-[#eab308]"
+                  ? spread <= spreadThreshold ? "text-[#5DBE81]" : "text-[#facc15]"
                   : "text-[#232E3C]";
                 return (
                   <tr key={m.id} className={`hover:bg-[#182533]/50 transition-colors ${isChecked ? "bg-[#5DBE81]/5" : ""}`}>
@@ -2229,14 +2229,14 @@ function MarketFinderPanel({
                     </td>
                     <td className="px-4 py-3">
                       {m.kalshiUrl ? (
-                        <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#eab308] hover:underline">Kalshi →</a>
+                        <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#facc15] hover:underline">Kalshi →</a>
                       ) : (
                         <span className="text-xs text-[#232E3C]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {m.polymarketUrl ? (
-                        <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#6366f1] hover:underline">Polymarket →</a>
+                        <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#5DBE81] hover:underline">Polymarket →</a>
                       ) : (
                         <span className="text-xs text-[#232E3C]">—</span>
                       )}

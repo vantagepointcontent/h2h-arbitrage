@@ -83,16 +83,16 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#1a1a1a] border text-sm transition-all ${
-          open || value ? "border-[#22c55e] ring-1 ring-[#22c55e]/30" : "border-[#262626]"
-        } text-[#e5e5e5] hover:border-[#22c55e]/50`}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#182533] border text-sm transition-all ${
+          open || value ? "border-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "border-[#232E3C]"
+        } text-[#FFFFFF] hover:border-[#5DBE81]/50`}
       >
-        <CalendarIcon className="w-4 h-4 text-[#737373]" />
-        <span className={value ? "text-[#e5e5e5]" : "text-[#525252]"}>{displayValue}</span>
+        <CalendarIcon className="w-4 h-4 text-[#5E6875]" />
+        <span className={value ? "text-[#FFFFFF]" : "text-[#232E3C]"}>{displayValue}</span>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 w-80 rounded-xl border border-[#262626] bg-[#111111] shadow-xl shadow-black/60 p-4 space-y-4">
+        <div className="absolute z-50 mt-2 w-80 rounded-xl border border-[#232E3C] bg-[#17212B] shadow-xl shadow-black/60 p-4 space-y-4">
           {/* Month / Year nav */}
           <div className="flex items-center justify-between">
             <button
@@ -101,11 +101,11 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
                 if (month === 0) { setMonth(11); setYear(y => y - 1); }
                 else setMonth(m => m - 1);
               }}
-              className="p-1 rounded hover:bg-[#1a1a1a] text-[#a3a3a3]"
+              className="p-1 rounded hover:bg-[#182533] text-[#8A9BA8]"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm font-semibold text-[#e5e5e5]">
+            <span className="text-sm font-semibold text-[#FFFFFF]">
               {monthNames[month]} {year}
             </span>
             <button
@@ -114,7 +114,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
                 if (month === 11) { setMonth(0); setYear(y => y + 1); }
                 else setMonth(m => m + 1);
               }}
-              className="p-1 rounded hover:bg-[#1a1a1a] text-[#a3a3a3]"
+              className="p-1 rounded hover:bg-[#182533] text-[#8A9BA8]"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -123,7 +123,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
           {/* Day grid */}
           <div className="grid grid-cols-7 gap-1 text-center text-xs">
             {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
-              <div key={d} className="text-[#525252] py-1">{d}</div>
+              <div key={d} className="text-[#232E3C] py-1">{d}</div>
             ))}
             {Array.from({ length: firstDay }, (_, i) => (
               <div key={`pad-${i}`} />
@@ -138,8 +138,8 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
                   onClick={() => handleDayClick(day)}
                   className={`py-1.5 rounded-md text-sm transition-colors ${
                     isSelected
-                      ? "bg-[#22c55e] text-black font-semibold"
-                      : "text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#e5e5e5]"
+                      ? "bg-[#5DBE81] text-black font-semibold"
+                      : "text-[#8A9BA8] hover:bg-[#182533] hover:text-[#FFFFFF]"
                   }`}
                 >
                   {day}
@@ -150,12 +150,12 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
 
           {/* Time picker */}
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#737373]" />
+            <Clock className="w-4 h-4 text-[#5E6875]" />
             <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="flex-1 px-2 py-1.5 rounded-md bg-[#1a1a1a] border border-[#262626] text-sm text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]"
+              className="flex-1 px-2 py-1.5 rounded-md bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
 
@@ -164,14 +164,14 @@ export function DateTimePicker({ value, onChange, placeholder = "Select expiryâ€
             <button
               type="button"
               onClick={handleClear}
-              className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-[#737373] hover:text-[#e5e5e5] hover:bg-[#1a1a1a] transition-colors"
+              className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533] transition-colors"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="flex-1 px-3 py-2 rounded-lg bg-[#22c55e] text-black text-xs font-semibold hover:bg-[#16a34a] transition-colors"
+              className="flex-1 px-3 py-2 rounded-lg bg-[#5DBE81] text-black text-xs font-semibold hover:bg-[#4DA66E] transition-colors"
             >
               Apply
             </button>

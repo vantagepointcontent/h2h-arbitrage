@@ -26,7 +26,7 @@ export function PriceCell({ price, depth, priceChange, depthLabel }: PriceCellPr
     <div className={`flex flex-col items-end ${flashClass}`}>
       <span>{price != null ? price.toFixed(2) : "—"}</span>
       {depth !== undefined && depth !== null && depth !== '' && (
-        <span className="text-[10px] text-[#64748b] mt-0.5">
+        <span className="text-[10px] text-[#5E6875] mt-0.5">
           {depthLabel ? `${depthLabel} ${formatDepth(depth)}` : formatDepth(depth)}
         </span>
       )}
@@ -40,7 +40,7 @@ interface SpreadCellProps {
 }
 
 export function SpreadCell({ spread }: SpreadCellProps) {
-  const color = spread > 0 ? "text-[#10b981]" : spread < 0 ? "text-[#ef4444]" : "text-[#94a3b8]";
+  const color = spread > 0 ? "text-[#5DBE81]" : spread < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]";
   return (
     <span className={`font-medium ${color}`}>
       {spread > 0 ? "+" : ""}{spread.toFixed(2)}
@@ -66,7 +66,7 @@ export function ArbitrageCell({
   isHighestProfit,
   totalProfit,
 }: ArbitrageCellProps) {
-  const roiColor = roiPct > 5 ? "text-[#10b981]" : roiPct > 0 ? "text-[#fbbf24]" : "text-[#94a3b8]";
+  const roiColor = roiPct > 5 ? "text-[#5DBE81]" : roiPct > 0 ? "text-[#facc15]" : "text-[#8A9BA8]";
   
   const formatCurrency = (n: number) =>
     `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -79,21 +79,21 @@ export function ArbitrageCell({
       {expectedProfit > 0 ? (
         isHighestProfit && totalProfit != null ? (
           <div className="group inline-block">
-            <span className="text-[#f1f5f9] cursor-help">
+            <span className="text-[#FFFFFF] cursor-help">
               {formatCurrency(expectedProfit)}{' '}
-              <span className="text-[#94a3b8]">({formatCurrency(totalProfit)} total)</span>
+              <span className="text-[#8A9BA8]">({formatCurrency(totalProfit)} total)</span>
             </span>
             {/* Tooltip */}
-            <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#1e293b] border border-[#475569] rounded-lg shadow-xl p-3 text-xs">
-              <div className="font-bold text-[#f1f5f9] mb-2">Total Profit Potential</div>
-              <div className="text-[#10b981] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
-              <div className="text-[#94a3b8] text-xs">{strategy}</div>
-              <div className="mt-2 pt-2 border-t border-[#475569]">
-                <div className="flex justify-between text-[#94a3b8]">
+            <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
+              <div className="font-bold text-[#FFFFFF] mb-2">Total Profit Potential</div>
+              <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
+              <div className="text-[#8A9BA8] text-xs">{strategy}</div>
+              <div className="mt-2 pt-2 border-t border-[#232E3C]">
+                <div className="flex justify-between text-[#8A9BA8]">
                   <span>ROI:</span>
-                  <span className="text-[#10b981]">{formatPercent(roiPct)}</span>
+                  <span className="text-[#5DBE81]">{formatPercent(roiPct)}</span>
                 </div>
-                <div className="flex justify-between text-[#94a3b8]">
+                <div className="flex justify-between text-[#8A9BA8]">
                   <span>Stake:</span>
                   <span>{formatCurrency(totalStake)}</span>
                 </div>
@@ -101,10 +101,10 @@ export function ArbitrageCell({
             </div>
           </div>
         ) : (
-          <span className="text-[#f1f5f9]">{formatCurrency(expectedProfit)}</span>
+          <span className="text-[#FFFFFF]">{formatCurrency(expectedProfit)}</span>
         )
       ) : (
-        <span className="text-[#94a3b8]">—</span>
+        <span className="text-[#8A9BA8]">—</span>
       )}
     </td>
   );
