@@ -1395,50 +1395,80 @@ export default function Home() {
                 {/* Results */}
                 {result && (
                   <div className="space-y-4">
+                    {/* ── Market Header Bar (single-row, compact) ── */}
                     {activeMarketId && (
-                      <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-xl font-bold tracking-tight text-[#FFFFFF]">{result.eventTitle}</h2>
-                        {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#182533] text-[#5E6875]">
-                            {savedMarkets.find(m => m.id === activeMarketId)?.category}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3 min-h-[44px] rounded-xl border border-[#182533] bg-[#17212B] px-3 py-2">
+                        {/* Title + category */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h2 className="text-sm font-bold text-[#FFFFFF] truncate">{result.eventTitle}</h2>
+                          {savedMarkets.find(m => m.id === activeMarketId)?.category && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[#182533] text-[#5E6875]">
+                              {savedMarkets.find(m => m.id === activeMarketId)?.category}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Spacer */}
+                        <div className="flex-1" />
+
+                        {/* Platform icons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center justify-center w-6 h-6 rounded bg-[#5DBE81]/15 hover:bg-[#5DBE81]/25 transition-colors" title="Kalshi">
+                            <span className="text-[10px] font-bold text-[#5DBE81]">K</span>
+                          </a>
+                          <a href={pmUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center justify-center w-6 h-6 rounded bg-[#a855f7]/15 hover:bg-[#a855f7]/25 transition-colors" title="Polymarket">
+                            <span className="text-[10px] font-bold text-[#a855f7]">PM</span>
+                          </a>
+                        </div>
+
+                        {/* Refresh button */}
+                        <button
+                          onClick={() => {
+                            const market = savedMarkets.find(m => m.id === activeMarketId);
+                            if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                          }}
+                          disabled={loading}
+                          className="flex items-center gap-1 text-[10px] text-[#5E6875] hover:text-[#FFFFFF] shrink-0 p-1 rounded hover:bg-[#232E3C] transition-colors disabled:opacity-50"
+                          title="Refresh"
+                        >
+                          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                          <span>{lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                        </button>
+
+                        {/* Data chips */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
+                            <Activity className="w-3 h-3 text-[#5DBE81]" />
+                            <span className="text-[10px] text-[#5E6875]">Kalshi</span>
+                            <span className="text-xs font-bold text-[#FFFFFF]">{result.kalshiCount}</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
+                            <Activity className="w-3 h-3 text-[#a855f7]" />
+                            <span className="text-[10px] text-[#5E6875]">Polymarket</span>
+                            <span className="text-xs font-bold text-[#FFFFFF]">{result.pmCount}</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
+                            <Link2 className="w-3 h-3 text-[#5DBE81]" />
+                            <span className="text-[10px] text-[#5E6875]">Matched</span>
+                            <span className="text-xs font-bold text-[#FFFFFF]">{result.matchedCount}</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
+                            <Calendar className="w-3 h-3 text-[#facc15]" />
+                            <span className="text-[10px] text-[#5E6875]">Exp</span>
+                            <span className="text-xs font-bold text-[#FFFFFF]">{formatExpiry(result.expiryDate)}</span>
+                          </div>
+                        </div>
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
+                          className="shrink-0 p-1.5 rounded-md hover:bg-[#ef4444]/10 text-[#5E6875] hover:text-[#ef4444] transition-colors"
+                          title="Delete market"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
-                    {/* Compact stats + platform bar */}
-                    <div className="flex items-stretch gap-2 mb-2">
-                      {/* Platform box — ultra-compact (~29px, was ~48px, ~40% reduction) */}
-                      <div className="rounded-md border border-[#182533] bg-[#17212B] p-1 flex items-center gap-1 shrink-0">
-                        <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#5DBE81]/10 hover:bg-[#5DBE81]/20 transition-colors px-1.5 py-0.5" title="Kalshi">
-                          <img src="/kalshi-icon.png" alt="" className="w-4 h-4 rounded-sm" />
-                          <span className="text-[8px] font-semibold text-[#5DBE81] leading-none">K</span>
-                        </a>
-                        <a href={pmUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-0.5 rounded bg-[#a855f7]/10 hover:bg-[#a855f7]/20 transition-colors px-1.5 py-0.5" title="Polymarket">
-                          <img src="/polymarket-icon.png" alt="" className="w-4 h-4 rounded-sm" />
-                          <span className="text-[8px] font-semibold text-[#a855f7] leading-none">PM</span>
-                        </a>
-                        {activeMarketId && (
-                          <button
-                            onClick={() => {
-                              const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
-                            }}
-                            disabled={loading}
-                            className="flex items-center justify-center rounded bg-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#232E3C] transition-colors disabled:opacity-50 px-1.5 py-0.5"
-                            title="Refresh"
-                          >
-                            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                          </button>
-                        )}
-                      </div>
-                      {/* Stat cards — ultra-compact to match platform bar */}
-                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                        <StatCard label="Kalshi" value={result.kalshiCount} icon={<Activity className="w-3 h-3" />} color="blue" compact />
-                        <StatCard label="Polymarket" value={result.pmCount} icon={<Activity className="w-3 h-3" />} color="purple" compact />
-                        <StatCard label="Matched" value={result.matchedCount} icon={<Link2 className="w-3 h-3" />} color="green" compact />
-                        <StatCard label="Expiry" value={formatExpiry(result.expiryDate)} icon={<Calendar className="w-3 h-3" />} color="yellow" compact />
-                      </div>
-                    </div>
 
                     {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0) && (
                       <div className="rounded-xl border border-[#facc15]/30 bg-[#facc15]/10 p-3 flex items-start gap-3 text-sm text-[#facc15]">
