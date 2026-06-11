@@ -976,34 +976,15 @@
     "id": "1779918781059-h64swoj",
     "createdAt": "2026-05-27T21:53:01.060Z",
     "lastScanResult": {
-      "bestRoiPct": 0.5000000000000006,
-      "bestProfit": 33.96913333333337,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 2,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 6,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 6,
-      "scannedAt": "2026-06-11T13:48:15.032Z",
-      "allArbs": [
-        {
-          "artist": "Pamela Evette",
-          "roiPct": 0.5000000000000006,
-          "expectedProfit": 33.96913333333337,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 5095.37,
-          "pmStake": 1664.4875333333334,
-          "totalStake": 6759.857533333334
-        },
-        {
-          "artist": "Alan Wilson",
-          "roiPct": 0.20000000000000018,
-          "expectedProfit": 9.329786666666676,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 3498.67,
-          "pmStake": 1156.8935466666667,
-          "totalStake": 4655.563546666666
-        }
-      ]
+      "scannedAt": "2026-06-11T18:51:52.461Z",
+      "allArbs": []
     }
   },
   {
@@ -1817,11 +1798,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 0,
+      "outcomeCount": 16,
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 16,
-      "scannedAt": "2026-06-11T13:48:30.991Z",
+      "scannedAt": "2026-06-11T18:51:46.450Z",
       "allArbs": []
     }
   },
@@ -3850,34 +3831,15 @@
     "id": "1781019440010-qbaajhj",
     "createdAt": "2026-06-09T15:37:20.010Z",
     "lastScanResult": {
-      "bestRoiPct": 5.000000000000004,
-      "bestProfit": 87.90000000000008,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 11,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 12,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 12,
-      "scannedAt": "2026-06-11T13:49:15.055Z",
-      "allArbs": [
-        {
-          "artist": "Jackson Lahmeyer",
-          "roiPct": 5.000000000000004,
-          "expectedProfit": 87.90000000000008,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 369.18,
-          "pmStake": 1300.92,
-          "totalStake": 1670.1000000000001
-        },
-        {
-          "artist": "Mark Tedford",
-          "roiPct": 2.499999999999991,
-          "expectedProfit": 4.210526315789459,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 32,
-          "pmStake": 132.21052631578948,
-          "totalStake": 164.21052631578948
-        }
-      ]
+      "scannedAt": "2026-06-11T18:51:59.207Z",
+      "allArbs": []
     }
   },
   {
@@ -3909,34 +3871,15 @@
     "id": "1781177114636-to4vbr9",
     "createdAt": "2026-06-11T11:25:14.636Z",
     "lastScanResult": {
-      "bestRoiPct": 0.5000000000000004,
-      "bestProfit": 7.5693604651162865,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 2,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 20,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 20,
-      "scannedAt": "2026-06-11T13:49:15.519Z",
-      "allArbs": [
-        {
-          "artist": "Abelardo de la Espriella",
-          "roiPct": 0.5000000000000004,
-          "expectedProfit": 7.5693604651162865,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 1301.93,
-          "pmStake": 204.37273255813957,
-          "totalStake": 1506.3027325581397
-        },
-        {
-          "artist": "Iván Cepeda Castro",
-          "roiPct": 0.5000000000000004,
-          "expectedProfit": 2.8029069767441883,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 482.09999999999997,
-          "pmStake": 75.67848837209303,
-          "totalStake": 557.778488372093
-        }
-      ]
+      "scannedAt": "2026-06-11T18:52:06.786Z",
+      "allArbs": []
     }
   },
   {
