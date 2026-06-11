@@ -339,7 +339,7 @@ export function Bookmaker1on1({
   // Compute max volumes for depth normalization
   const maxVolumes = useMemo(() => {
     let maxBid = 0, maxAsk = 0;
-    outcomes.forEach((o) => {
+    (outcomes ?? []).forEach((o) => {
       if (o.platformA?.bidVolume) maxBid = Math.max(maxBid, o.platformA.bidVolume);
       if (o.platformA?.askVolume) maxBid = Math.max(maxBid, o.platformA.askVolume);
       if (o.platformB?.bidVolume) maxBid = Math.max(maxBid, o.platformB.bidVolume);
@@ -348,7 +348,7 @@ export function Bookmaker1on1({
     return { maxBid: maxBid || 1, maxAsk: maxAsk || 1 };
   }, [outcomes]);
 
-  const validOutcomes = outcomes.filter((o) => o.platformA && o.platformB);
+  const validOutcomes = (outcomes ?? []).filter((o) => o.platformA && o.platformB);
 
   if (validOutcomes.length === 0) {
     return (

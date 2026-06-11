@@ -34,13 +34,15 @@ export function OutcomeTableBody({
   priceChanges,
   filterMode,
 }: OutcomeTableBodyProps) {
-  const displayOutcomes = filterMode === "arb"
-    ? outcomes.filter(o => o.arbitrage.expectedProfit > 0)
-    : filterMode === "matched"
-      ? outcomes.filter(o => o.kalshi && o.polymarket)
-      : outcomes;
+  const safeOutcomes = outcomes ?? [];
 
-  const profitableOutcomes = outcomes.filter(o => o.arbitrage.expectedProfit > 0);
+  const displayOutcomes = filterMode === "arb"
+    ? safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0)
+    : filterMode === "matched"
+      ? safeOutcomes.filter(o => o.kalshi && o.polymarket)
+      : safeOutcomes;
+
+  const profitableOutcomes = safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0);
   const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
   const highestProfitOutcome = profitableOutcomes.length > 0
     ? profitableOutcomes.reduce((best, o) => o.arbitrage.expectedProfit > best.arbitrage.expectedProfit ? o : best)
