@@ -2315,20 +2315,34 @@
     "createdAt": "2026-06-03T22:15:38.676Z",
     "lastScanResult": {
       "bestRoiPct": 8.699999999999996,
-      "bestProfit": 24.71590909090908,
+      "bestProfit": 26.001136363636355,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 58,
       "matchedCount": 4,
       "kalshiCount": 56,
       "pmCount": 6,
-      "scannedAt": "2026-06-11T19:13:41.733Z",
+      "scannedAt": "2026-06-11T21:16:45.095Z",
       "allArbs": [
+        {
+          "artist": "Billie Eilish",
+          "roiPct": 0.40000000000000036,
+          "expectedProfit": 0.20833333333333354,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 51.875
+        },
+        {
+          "artist": "Addison Rae",
+          "roiPct": 6.999999999999995,
+          "expectedProfit": 22.57303370786515,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 299.8988764044944
+        },
         {
           "artist": "Lorde",
           "roiPct": 8.699999999999996,
-          "expectedProfit": 24.71590909090908,
+          "expectedProfit": 26.001136363636355,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 259.375
+          "totalStake": 272.8625
         }
       ]
     }
