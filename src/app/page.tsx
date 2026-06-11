@@ -486,6 +486,9 @@ export default function Home() {
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
   const [embedRefreshCounter, setEmbedRefreshCounter] = useState(0);
 
+  // Outcome table filter
+  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
+
   // Refs for values used inside useCallback
   const savedMarketsRef = useRef<SavedMarket[]>(savedMarkets);
   const kalshiUrlRef = useRef(kalshiUrl);
@@ -780,6 +783,7 @@ export default function Home() {
   const saveMarket = async () => {
     if (!result) return;
     setSaving(true);
+    setError("");
     try {
       const res = await fetch("/api/saved-markets", {
         method: "POST",
@@ -790,11 +794,21 @@ export default function Home() {
           eventTitle: result.eventTitle,
         }),
       });
-      if (res.ok) {
-        await loadSavedMarkets();
-        setSaveModalOpen(false);
+      if (res.status === 409 || res.status === 400 || !res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error?.includes("already exists") || res.status === 409) {
+          setError(`⚠️ "${result.eventTitle}" is already saved.`);
+          setTimeout(() => setError(""), 4000);
+          return;
+        }
+        setError(data.error || "Failed to save market");
+        return;
       }
-    } catch { /* ignore */ } finally {
+      await loadSavedMarkets();
+      setSaveModalOpen(false);
+    } catch (err: any) {
+      setError(err.message || "Network error");
+    } finally {
       setSaving(false);
     }
   };
@@ -973,8 +987,7 @@ export default function Home() {
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
 
   // Sidebar sort
-  type SidebarSort = "name" | "roi" | "expiry" | "apy";
-  const [sidebarSort, setSidebarSort] = useState<SidebarSort>("name");
+  const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy">("name");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("asc");
 
   // Load saved markets on mount
@@ -1213,7 +1226,7 @@ export default function Home() {
   }, []);
 
   // Toggle sidebar sort
-  const toggleSidebarSort = (field: SidebarSort) => {
+  const toggleSidebarSort = (field: "name" | "roi" | "expiry" | "apy") => {
     if (sidebarSort === field) {
       setSidebarSortDir(d => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -1288,9 +1301,9 @@ export default function Home() {
           onSelectMarket={loadMarket}
           onEditMarket={() => {}}
           onDeleteMarket={(id) => { if (confirm("Delete market?")) deleteMarket(id); }}
-          sort={overviewSort}
-          sortDir={overviewSortDir}
-          onToggleSort={toggleOverviewSort}
+          sort={sidebarSort}
+          sortDir={sidebarSortDir}
+          onToggleSort={toggleSidebarSort}
           timeUntilExpiry={timeUntilExpiry}
           layout={overviewLayout}
           onToggleLayout={setOverviewLayout}
@@ -1623,12 +1636,30 @@ export default function Home() {
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && result.matchedCount > 0 && (
                       <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+                        {/* Filter toggles */}
+                        <div className="flex items-center gap-1 p-2 border-b border-[#182533]">
+                          {(["all", "matched", "arb"] as const).map(mode => (
+                            <button
+                              key={mode}
+                              onClick={() => setOutcomeFilter(mode)}
+                              className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                                outcomeFilter === mode
+                                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                                  : "text-[#5E6875] hover:text-[#FFFFFF]"
+                              }`}
+                            >
+                              {mode === "all" ? "Show All" : mode === "matched" ? "Matched Only" : "Arb Only"}
+                            </button>
+                          ))}
+                        </div>
                         <table className="w-full text-sm">
                           <thead className="bg-[#17212B] border-b border-[#182533]">
                             <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                               <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi Yes</th>
+                              <th className="text-right px-4 py-3.5 font-medium">Kalshi No</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
+                              <th className="text-right px-4 py-3.5 font-medium">PM No</th>
                               <th className="text-right px-4 py-3.5 font-medium">Spread</th>
                               <th className="text-right px-4 py-3.5 font-medium">ROI</th>
                               <th className="text-right px-4 py-3.5 font-medium">Profit</th>
@@ -1644,6 +1675,7 @@ export default function Home() {
                               formatCurrency={formatCurrency}
                               formatPercent={formatPercent}
                               priceChanges={priceChanges}
+                              filterMode={outcomeFilter}
                             />
                           </tbody>
                         </table>
@@ -1741,9 +1773,9 @@ function MarketSidebar({
   onSelectMarket: (m: SavedMarket) => void;
   onEditMarket: (m: SavedMarket) => void;
   onDeleteMarket: (id: string) => void;
-  sort: OverviewSort;
+  sort: "name" | "roi" | "expiry" | "apy";
   sortDir: "asc" | "desc";
-  onToggleSort: (f: OverviewSort) => void;
+  onToggleSort: (f: "name" | "roi" | "expiry" | "apy") => void;
   timeUntilExpiry: (iso?: string | null) => string;
   layout: "grid" | "table";
   onToggleLayout: (l: "grid" | "table") => void;
@@ -1813,6 +1845,35 @@ function MarketSidebar({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-[#FFFFFF]">Saved Markets ({markets.length})</h2>
           <div className="flex items-center gap-1">
+            {/* Sort toggles */}
+            <button
+              onClick={() => onToggleSort("apy")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                sort === "apy" ? "bg-[#5DBE81]/20 text-[#5DBE81]" : "text-[#5E6875] hover:text-[#FFFFFF]"
+              }`}
+              title="Sort by APY"
+            >
+              APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")}
+            </button>
+            <button
+              onClick={() => onToggleSort("roi")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                sort === "roi" ? "bg-[#5DBE81]/20 text-[#5DBE81]" : "text-[#5E6875] hover:text-[#FFFFFF]"
+              }`}
+              title="Sort by ROI"
+            >
+              ROI{sort === "roi" && (sortDir === "asc" ? " ↑" : " ↓")}
+            </button>
+            <button
+              onClick={() => onToggleSort("name")}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                sort === "name" ? "bg-[#5DBE81]/20 text-[#5DBE81]" : "text-[#5E6875] hover:text-[#FFFFFF]"
+              }`}
+              title="Sort by Name"
+            >
+              A-Z{sort === "name" && (sortDir === "asc" ? " ↑" : " ↓")}
+            </button>
+            <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
             <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan All">
               {scanningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </button>
@@ -1940,6 +2001,28 @@ function OverviewPanel({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Overview</h2>
         <div className="flex items-center gap-2">
+          {/* Sort toggles */}
+          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+            {([
+              { key: "apy", label: "APY" },
+              { key: "roi", label: "ROI" },
+              { key: "expiry", label: "EXP" },
+              { key: "name", label: "NAME" },
+            ] as { key: OverviewSort; label: string }[]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => onToggleSort(key)}
+                className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                  sort === key
+                    ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                    : "text-[#5E6875] hover:text-[#FFFFFF]"
+                }`}
+              >
+                {label}{sort === key && (sortDir === "asc" ? " ↑" : " ↓")}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-4 bg-[#232E3C]" />
           <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#182533] hover:bg-[#232E3C] text-[#5E6875] transition-colors" title="Toggle layout">
             {layout === "grid" ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
           </button>
