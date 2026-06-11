@@ -1786,7 +1786,8 @@ function OverviewPanel({
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
 }) {
-  useEffect(() => { onLoad(); }, [onLoad]);
+  // Removed: auto-load useEffect that caused infinite loop.
+  // onLoad is now only triggered manually (e.g., refresh button or parent interval).
 
   const sortFn = (a: SavedMarket, b: SavedMarket) => {
     const mul = sortDir === "asc" ? 1 : -1;
