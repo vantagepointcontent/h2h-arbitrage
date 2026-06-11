@@ -19,7 +19,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Bookmark,
+  Bell,
   Plus,
   BarChart3,
   X,
@@ -1239,7 +1239,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
       <ToastContainer toast={alertSystem.toast} />
-      {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} alertSystem={alertSystem} />}
+      {alertSettingsOpen && <AlertSettingsPanel
+        settings={alertSystem.settings}
+        onSettingsChange={alertSystem.setSettings}
+        history={alertSystem.history}
+        onClearHistory={alertSystem.clearHistory}
+        notificationPermission={alertSystem.notificationPermission}
+        onRequestPermission={alertSystem.onRequestPermission}
+      />}
 
       {/* Top nav bar */}
       <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
@@ -1264,10 +1271,10 @@ export default function Home() {
 
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Alert settings">
-              <Bookmark className="w-4 h-4" />
+              <Bell className="w-4 h-4" />
             </button>
-            <button onClick={() => theme.toggle()} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Toggle theme">
-              {theme.isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Toggle theme">
+              {theme.theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -1636,6 +1643,7 @@ export default function Home() {
                               setExpandedArtist={setExpandedArtist}
                               formatCurrency={formatCurrency}
                               formatPercent={formatPercent}
+                              priceChanges={priceChanges}
                             />
                           </tbody>
                         </table>
