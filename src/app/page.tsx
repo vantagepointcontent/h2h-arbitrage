@@ -1195,29 +1195,13 @@ export default function Home() {
           </button>
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
 
-          <nav className="flex items-center ml-4 gap-1">
-            <button onClick={goToOverview} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
-              <BarChart3 className="w-4 h-4" />
-              {sidebarOpen && <span>Overview</span>}
-            </button>
-            <button onClick={goToScan} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
-              <Scan className="w-4 h-4" />
-              {sidebarOpen && <span>Scan</span>}
-            </button>
-            <button onClick={goToMarketFinder} className={`flex items-center gap-2 px-3 py-2.5 mx-2 mt-1 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
-              <Globe className="w-4 h-4" />
-              {sidebarOpen && <span>MarketFinder</span>}
-            </button>
-          </nav>
-
-          {/* Category filter dropdown */}
           <div className="flex items-center gap-2 ml-4">
             <Filter className="w-4 h-4 text-[#737373]" />
             <select
               value={overviewCategory}
               onChange={(e) => setOverviewCategory(e.target.value)}
               className="px-2 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-xs text-[#e5e5e5] focus:outline-none focus:border-[#22c55e]"
-              title="Filter by category (press 1-0 or C to cycle)"
+              title="Filter by category"
             >
               <option value="all">All categories</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
@@ -1236,6 +1220,28 @@ export default function Home() {
       </header>
 
       <main className="flex">
+        <MarketSidebar
+          markets={savedMarkets}
+          activeId={activeMarketId}
+          viewMode={viewMode}
+          onSelectMarket={loadMarket}
+          onEditMarket={() => {}}
+          onDeleteMarket={(id) => { if (confirm("Delete market?")) deleteMarket(id); }}
+          sort={overviewSort}
+          sortDir={overviewSortDir}
+          onToggleSort={toggleOverviewSort}
+          timeUntilExpiry={timeUntilExpiry}
+          layout={overviewLayout}
+          onToggleLayout={setOverviewLayout}
+          expiryFilter={overviewExpiryFilter}
+          onSetExpiryFilter={setOverviewExpiryFilter}
+          onScanAll={scanAllMarkets}
+          scanningAll={scanningAll}
+          scanAllError={scanAllError}
+          onGoOverview={goToOverview}
+          onGoScan={goToScan}
+          onGoMarketFinder={goToMarketFinder}
+        />
         <div className="flex-1 min-h-[calc(100vh-3.5rem)]">
           <div className="max-w-7xl mx-auto p-6">
             {viewMode === "overview" ? (
@@ -1630,6 +1636,9 @@ function MarketSidebar({
   onScanAll,
   scanningAll,
   scanAllError,
+  onGoOverview,
+  onGoScan,
+  onGoMarketFinder,
 }: {
   markets: SavedMarket[];
   activeId: string | null;
@@ -1648,6 +1657,9 @@ function MarketSidebar({
   onScanAll: () => void;
   scanningAll: boolean;
   scanAllError: string;
+  onGoOverview: () => void;
+  onGoScan: () => void;
+  onGoMarketFinder: () => void;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -1687,6 +1699,22 @@ function MarketSidebar({
   return (
     <aside className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-[#1a1a1a] bg-[#0f0f0f] overflow-hidden transition-all duration-200`}>
       <div className="p-4 space-y-4 h-full flex flex-col">
+        {/* ── Navigation (moved from header) ── */}
+        <div className="space-y-1">
+          <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <BarChart3 className="w-4 h-4" />
+            Overview
+          </button>
+          <button onClick={onGoScan} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <Scan className="w-4 h-4" />
+            Scan
+          </button>
+          <button onClick={onGoMarketFinder} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#a3a3a3] hover:bg-[#262626] hover:text-[#e5e5e5]"}`}>
+            <Globe className="w-4 h-4" />
+            MarketFinder
+          </button>
+        </div>
+
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-[#e5e5e5]">Saved Markets ({markets.length})</h2>
           <div className="flex items-center gap-1">
