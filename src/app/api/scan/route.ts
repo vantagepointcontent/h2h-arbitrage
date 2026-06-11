@@ -300,7 +300,7 @@ export async function POST(request: NextRequest) {
         await updateSavedMarketScanResult(market.id, scanResult);
       }
     } catch (e) {
-      logger.trackError(e, { service: 'scan', path: '/api/scan', marketId: market?.id });
+      logger.trackError(e, { service: 'scan', path: '/api/scan' });
     }
 
     return NextResponse.json({

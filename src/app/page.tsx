@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Zap,
   Scan,
@@ -47,9 +48,9 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
-import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { CATEGORIES } from "@/lib/categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
+import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 
 // ─── Selection storage key ───
 const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
@@ -432,6 +433,9 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
 }
 
 /* ── Main App ── */
+// ─── Types used across components ───
+type OverviewSort = "name" | "roi" | "expiry" | "apy";
+
 export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake");
   const [pmUrl, setPmUrl] = useState("https://polymarket.com/event/who-will-be-featured-on-iceman");
@@ -885,7 +889,6 @@ export default function Home() {
   };
 
   // Sort helpers
-  type OverviewSort = "name" | "roi" | "expiry" | "apy";
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
@@ -1533,13 +1536,15 @@ export default function Home() {
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
                             </tr>
                           </thead>
-                          <OutcomeTableBody
-                            outcomes={result.allOutcomes}
-                            expandedArtist={expandedArtist}
-                            setExpandedArtist={setExpandedArtist}
-                            formatCurrency={formatCurrency}
-                            formatPercent={formatPercent}
-                          ></OutcomeTableBody>
+                          <tbody className="divide-y divide-[#1a1a1a]">
+                            <OutcomeTableBody
+                              outcomes={result.allOutcomes}
+                              expandedArtist={expandedArtist}
+                              setExpandedArtist={setExpandedArtist}
+                              formatCurrency={formatCurrency}
+                              formatPercent={formatPercent}
+                            />
+                          </tbody>
                         </table>
                       </div>
                     )}
@@ -1786,8 +1791,8 @@ function OverviewPanel({
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
 }) {
-  // Removed: auto-load useEffect that caused infinite loop.
-  // onLoad is now only triggered manually (e.g., refresh button or parent interval).
+  // Auto-load on mount only — prevents infinite loop if parent re-creates callback
+  useEffect(() => { onLoad(); }, []);
 
   const sortFn = (a: SavedMarket, b: SavedMarket) => {
     const mul = sortDir === "asc" ? 1 : -1;

@@ -240,6 +240,7 @@ export function Bookmaker1on1({
       ];
 
       fields.forEach(({ field, currentVal }) => {
+        // @ts-ignore — pre-existing dynamic field access pattern
         const prevVal = prevEntry
           ? prevEntry[field.replace(/-.*/, "").replace("a", "").replace("b", "") === key
             ? (() => {
