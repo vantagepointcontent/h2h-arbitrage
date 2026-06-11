@@ -1532,6 +1532,13 @@ export default function Home() {
                             <span className="text-xs font-bold text-[#FFFFFF]">{result.matchedCount}</span>
                           </div>
 
+                          {/* Total Profit chip */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                            <TrendingUp className="w-3 h-3 text-[#5DBE81]" />
+                            <span className="text-[10px] text-[#5E6875]">Total Profit</span>
+                            <span className="text-xs font-bold text-[#5DBE81]">{formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0))}</span>
+                          </div>
+
                           {/* Expiry chip */}
                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
                             <Clock className="w-3 h-3 text-[#facc15]" />
