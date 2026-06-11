@@ -21,6 +21,7 @@ interface OutcomeTableBodyProps {
   setExpandedArtist: (artist: string | null) => void;
   formatCurrency: (n: number) => string;
   formatPercent: (n: number) => string;
+  priceChanges?: Map<string, "up" | "down" | null>;
 }
 
 export function OutcomeTableBody({
@@ -29,6 +30,7 @@ export function OutcomeTableBody({
   setExpandedArtist,
   formatCurrency,
   formatPercent,
+  priceChanges,
 }: OutcomeTableBodyProps) {
   const profitableOutcomes = outcomes.filter(o => o.arbitrage.expectedProfit > 0);
   const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
@@ -61,8 +63,16 @@ export function OutcomeTableBody({
                 <span className={`transition-transform text-[#5E6875] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                 {o.artist}
               </td>
-              <td className="px-4 py-3 text-right text-[#FFFFFF]">{o.kalshi?.yesAsk.toFixed(2) ?? "—"}</td>
-              <td className="px-4 py-3 text-right text-[#FFFFFF]">{o.polymarket?.yesPrice.toFixed(2) ?? "—"}</td>
+              <td className="px-4 py-3 text-right text-[#FFFFFF]">
+                {o.kalshi?.yesAsk.toFixed(2) ?? "—"}
+                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
+                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
+              </td>
+              <td className="px-4 py-3 text-right text-[#FFFFFF]">
+                {o.polymarket?.yesPrice.toFixed(2) ?? "—"}
+                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
+                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
+              </td>
               <td className={`px-4 py-3 text-right font-medium ${spread > 0 ? "text-[#5DBE81]" : spread < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                 {spread > 0 ? "+" : ""}{spread.toFixed(2)}
               </td>
