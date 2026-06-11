@@ -986,9 +986,9 @@ export default function Home() {
   const alertSystem = useAlertSystem();
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
 
-  // Sidebar sort
-  const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy">("name");
-  const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("asc");
+  // Sidebar sort — default APY desc (highest first)
+  const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy">("apy");
+  const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("desc");
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
@@ -1315,6 +1315,10 @@ export default function Home() {
           onGoOverview={goToOverview}
           onGoScan={goToScan}
           onGoMarketFinder={goToMarketFinder}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
+          sidebarFavoritesOnly={sidebarFavoritesOnly}
+          onToggleSidebarFavorites={() => setSidebarFavoritesOnly(v => !v)}
         />
         <div className="flex-1 min-h-[calc(100vh-3.5rem)]">
           <div className="max-w-7xl mx-auto p-6">
@@ -1766,6 +1770,10 @@ function MarketSidebar({
   onGoOverview,
   onGoScan,
   onGoMarketFinder,
+  favoriteIds,
+  onToggleFavorite,
+  sidebarFavoritesOnly,
+  onToggleSidebarFavorites,
 }: {
   markets: SavedMarket[];
   activeId: string | null;
@@ -1787,6 +1795,10 @@ function MarketSidebar({
   onGoOverview: () => void;
   onGoScan: () => void;
   onGoMarketFinder: () => void;
+  favoriteIds: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  sidebarFavoritesOnly: boolean;
+  onToggleSidebarFavorites: () => void;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -1801,6 +1813,7 @@ function MarketSidebar({
       if (expiryFilter === "lte30" && days > 30) return false;
     }
     if (sidebarSearch && !m.eventTitle.toLowerCase().includes(sidebarSearch.toLowerCase())) return false;
+    if (sidebarFavoritesOnly && !favoriteIds.has(m.id)) return false;
     return true;
   }).sort((a, b) => {
     const mul = sortDir === "asc" ? 1 : -1;
@@ -1843,7 +1856,18 @@ function MarketSidebar({
         </div>
 
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[#FFFFFF]">Saved Markets ({markets.length})</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-bold text-[#FFFFFF]">Saved Markets ({markets.length})</h2>
+            <button
+              onClick={onToggleSidebarFavorites}
+              className={`p-1 rounded transition-colors ${
+                sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#232E3C] hover:text-[#5E6875]"
+              }`}
+              title={sidebarFavoritesOnly ? "Show all markets" : "Show favorites only"}
+            >
+              <Star className="w-3.5 h-3.5" fill={sidebarFavoritesOnly ? "currentColor" : "none"} />
+            </button>
+          </div>
           <div className="flex items-center gap-1">
             {/* Sort toggles */}
             <button
@@ -1914,10 +1938,24 @@ function MarketSidebar({
               <div
                 key={m.id}
                 onClick={() => onSelectMarket(m)}
-                className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
                   isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
                 }`}
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(m.id);
+                  }}
+                  className={`shrink-0 p-0.5 rounded transition-colors ${
+                    favoriteIds.has(m.id)
+                      ? "text-[#facc15]"
+                      : "text-[#232E3C] group-hover:text-[#5E6875]"
+                  }`}
+                  title={favoriteIds.has(m.id) ? "Remove favorite" : "Add favorite"}
+                >
+                  <Star className="w-3 h-3" fill={favoriteIds.has(m.id) ? "currentColor" : "none"} />
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
