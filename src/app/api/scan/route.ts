@@ -9,7 +9,7 @@ import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateArbitrageMax, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
-import { getSavedMarkets, updateSavedMarketScanResult } from '@/lib/persistence';
+import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -298,6 +298,15 @@ export async function POST(request: NextRequest) {
           })),
         };
         await updateSavedMarketScanResult(market.id, scanResult);
+        // Record in global scan history
+        await appendScanHistory({
+          scanTimestamp: new Date().toISOString(),
+          marketId: market.id,
+          totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
+          bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
+          positiveArbCount: positiveArbs.length,
+          matchedCount,
+        });
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });

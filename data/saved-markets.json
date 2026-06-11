@@ -2284,14 +2284,14 @@
       "matchedCount": 4,
       "kalshiCount": 56,
       "pmCount": 6,
-      "scannedAt": "2026-06-11T23:02:27.268Z",
+      "scannedAt": "2026-06-11T23:50:54.335Z",
       "allArbs": [
         {
           "artist": "Billie Eilish",
-          "roiPct": 0.5000000000000004,
-          "expectedProfit": 0.2604166666666669,
+          "roiPct": 2.100000000000002,
+          "expectedProfit": 1.093750000000001,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 51.822916666666664
+          "totalStake": 50.989583333333336
         },
         {
           "artist": "Addison Rae",

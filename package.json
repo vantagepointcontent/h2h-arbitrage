@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@libsql/client": "^0.17.3",
     "@sentry/nextjs": "^10.56.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
