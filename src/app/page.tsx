@@ -987,6 +987,60 @@ export default function Home() {
     return () => clearInterval(iv);
   }, []);
 
+  // Auto-refresh ACTIVE market prices every 10s when viewing a market
+  useEffect(() => {
+    if (!activeMarketId || viewMode !== "scan") return;
+
+    const market = savedMarketsRef.current.find(m => m.id === activeMarketId);
+    if (!market) return;
+
+    const iv = setInterval(() => {
+      // Compare prices AFTER scan completes
+      fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kalshiUrl: market.kalshiUrl, polymarketUrl: market.polymarketUrl, capital }),
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.outcomes) return;
+
+        // Compare with previous prices
+        const oldPrices = previousPricesRef.current;
+        const changes = new Map<string, "up" | "down" | null>();
+        const newPrices = new Map<string, { kYes: number; pYes: number }>();
+
+        data.outcomes.forEach((o: UnifiedOutcome) => {
+          if (o.kalshi && o.polymarket) {
+            newPrices.set(o.artist, { kYes: o.kalshi.yesAsk, pYes: o.polymarket.yesPrice });
+
+            const old = oldPrices.get(o.artist);
+            if (old) {
+              const kDiff = o.kalshi.yesAsk - old.kYes;
+              const pDiff = o.polymarket.yesPrice - old.pYes;
+              if (kDiff !== 0 || pDiff !== 0) {
+                changes.set(o.artist, (kDiff + pDiff) > 0 ? "up" : "down");
+              }
+            }
+          }
+        });
+
+        previousPricesRef.current = newPrices;
+        setPriceChanges(changes);
+        setResult(data);
+        setLastUpdated(new Date());
+        setLastScanTime(Date.now());
+        setEmbedRefreshCounter(c => c + 1);
+
+        // Auto-clear blink after 3 seconds
+        setTimeout(() => setPriceChanges(new Map()), 3000);
+      })
+      .catch(err => console.error("Auto-refresh failed:", err));
+    }, 10000);
+
+    return () => clearInterval(iv);
+  }, [activeMarketId, viewMode]);
+
   // Auto-fetch MarketFinder data when entering marketfinder view
   useEffect(() => {
     if (viewMode !== "marketfinder") return;
