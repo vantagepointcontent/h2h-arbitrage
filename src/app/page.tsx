@@ -1183,12 +1183,12 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#121212] text-[#FFFFFF]">
+    <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
       <ToastContainer toast={alertSystem.toast} />
       {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} alertSystem={alertSystem} />}
 
       {/* Top nav bar */}
-      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#121212]/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
         <div className="flex items-center h-14 px-4 gap-3">
           <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
             <Rows3 className="w-5 h-5" />
@@ -1380,7 +1380,7 @@ export default function Home() {
 
                     <div className="flex items-center gap-2 ml-auto">
                       <label className="text-xs text-[#5E6875]">Capital:</label>
-                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-md bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
+                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
                     </div>
                   </div>
 
@@ -1397,7 +1397,7 @@ export default function Home() {
                   <div className="space-y-4">
                     {/* ── Market Header Bar (single-row, compact) ── */}
                     {activeMarketId && (
-                      <div className="flex items-center gap-3 min-h-[44px] rounded-xl border border-[#182533] bg-[#17212B] px-3 py-2">
+                      <div className="flex items-center gap-2 min-h-[44px] rounded-xl border border-[#182533] bg-[#17212B] px-3 py-2">
                         {/* Title + category */}
                         <div className="flex items-center gap-2 min-w-0">
                           <h2 className="text-sm font-bold text-[#FFFFFF] truncate">{result.eventTitle}</h2>
@@ -1411,62 +1411,65 @@ export default function Home() {
                         {/* Spacer */}
                         <div className="flex-1" />
 
-                        {/* Platform icons */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center justify-center w-6 h-6 rounded bg-[#5DBE81]/15 hover:bg-[#5DBE81]/25 transition-colors" title="Kalshi">
-                            <span className="text-[10px] font-bold text-[#5DBE81]">K</span>
-                          </a>
-                          <a href={pmUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center justify-center w-6 h-6 rounded bg-[#a855f7]/15 hover:bg-[#a855f7]/25 transition-colors" title="Polymarket">
-                            <span className="text-[10px] font-bold text-[#a855f7]">PM</span>
-                          </a>
-                        </div>
+                        {/* Data chips — separate rounded boxes */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Refresh chip */}
+                          <button
+                            onClick={() => {
+                              const market = savedMarkets.find(m => m.id === activeMarketId);
+                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                            }}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
+                            title="Refresh"
+                          >
+                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[#5E6875]" /> : <RefreshCw className="w-3 h-3 text-[#5E6875]" />}
+                            <span className="text-[10px] text-[#FFFFFF]">{lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                          </button>
 
-                        {/* Refresh button */}
-                        <button
-                          onClick={() => {
-                            const market = savedMarkets.find(m => m.id === activeMarketId);
-                            if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
-                          }}
-                          disabled={loading}
-                          className="flex items-center gap-1 text-[10px] text-[#5E6875] hover:text-[#FFFFFF] shrink-0 p-1 rounded hover:bg-[#232E3C] transition-colors disabled:opacity-50"
-                          title="Refresh"
-                        >
-                          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                          <span>{lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
-                        </button>
-
-                        {/* Data chips */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
-                            <Activity className="w-3 h-3 text-[#5DBE81]" />
+                          {/* Kalshi chip */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]">
+                              <span className="text-[8px] font-bold text-[#FFFFFF]">K</span>
+                            </div>
                             <span className="text-[10px] text-[#5E6875]">Kalshi</span>
                             <span className="text-xs font-bold text-[#FFFFFF]">{result.kalshiCount}</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
-                            <Activity className="w-3 h-3 text-[#a855f7]" />
+
+                          {/* PM chip */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]">
+                              <span className="text-[7px] font-bold text-[#FFFFFF]">PM</span>
+                            </div>
                             <span className="text-[10px] text-[#5E6875]">Polymarket</span>
                             <span className="text-xs font-bold text-[#FFFFFF]">{result.pmCount}</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
-                            <Link2 className="w-3 h-3 text-[#5DBE81]" />
+
+                          {/* Matched chip */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]">
+                              <Check className="w-2.5 h-2.5 text-[#FFFFFF]" />
+                            </div>
                             <span className="text-[10px] text-[#5E6875]">Matched</span>
                             <span className="text-xs font-bold text-[#FFFFFF]">{result.matchedCount}</span>
                           </div>
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#182533]">
-                            <Calendar className="w-3 h-3 text-[#facc15]" />
-                            <span className="text-[10px] text-[#5E6875]">Exp</span>
+
+                          {/* Expiry chip */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                            <Clock className="w-3 h-3 text-[#facc15]" />
+                            <span className="text-[10px] text-[#5E6875]">Expiry</span>
                             <span className="text-xs font-bold text-[#FFFFFF]">{formatExpiry(result.expiryDate)}</span>
                           </div>
-                        </div>
 
-                        {/* Delete */}
-                        <button
-                          onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
-                          className="shrink-0 p-1.5 rounded-md hover:bg-[#ef4444]/10 text-[#5E6875] hover:text-[#ef4444] transition-colors"
-                          title="Delete market"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {/* Delete chip */}
+                          <button
+                            onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
+                            className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#ef4444]/10 transition-colors"
+                            title="Delete market"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-[#5E6875] hover:text-[#ef4444]" />
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -1763,13 +1766,13 @@ function MarketSidebar({
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
             placeholder="Search markets..."
-            className="w-full px-2 py-1.5 rounded-md bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
+            className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
           />
           <div className="flex items-center gap-1">
             <select
               value={expiryFilter}
               onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2 py-1 rounded-md bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none"
+              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none"
             >
               <option value="all">All expiries</option>
               <option value="lte7">≤ 7 days</option>
