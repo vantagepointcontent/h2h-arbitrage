@@ -51,6 +51,7 @@ import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
 import { CATEGORIES } from "@/lib/categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
+import { DashboardPanel } from "@/app/components/DashboardPanel";
 
 // ─── Selection storage key ───
 const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
@@ -1283,6 +1284,9 @@ export default function Home() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => setViewMode("dashboard")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "dashboard" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#5E6875] hover:text-[#FFFFFF]"}`} title="Dashboard">
+              <BarChart3 className="w-4 h-4" />
+            </button>
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
@@ -1423,6 +1427,8 @@ export default function Home() {
                   persistMfAutoRefresh(enabled);
                 }}
               />
+            ) : viewMode === "dashboard" ? (
+              <DashboardPanel />
             ) : (
               <>
                 {/* Scan inputs */}
