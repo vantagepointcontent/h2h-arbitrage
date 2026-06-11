@@ -263,52 +263,15 @@
     "id": "1779617150327-ntzesfy",
     "createdAt": "2026-05-24T10:05:50.327Z",
     "lastScanResult": {
-      "bestRoiPct": 2.500000000000002,
-      "bestProfit": 20.339473684210546,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 8,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 16,
       "matchedCount": 8,
       "kalshiCount": 11,
       "pmCount": 13,
-      "scannedAt": "2026-06-11T13:48:03.239Z",
-      "allArbs": [
-        {
-          "artist": "Sara Rodriguez",
-          "roiPct": 2.500000000000002,
-          "expectedProfit": 20.339473684210546,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 77.29,
-          "pmStake": 715.9494736842106,
-          "totalStake": 793.2394736842106
-        },
-        {
-          "artist": "Kelda Roys",
-          "roiPct": 0.6000000000000005,
-          "expectedProfit": 0.2978723404255322,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 49,
-          "pmStake": 0.3475177304964539,
-          "totalStake": 49.347517730496456
-        },
-        {
-          "artist": "Joel Brennan",
-          "roiPct": 0.2500000000000058,
-          "expectedProfit": 0.004195979899497584,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 1.67,
-          "pmStake": 0.004195979899497488,
-          "totalStake": 1.6741959798994974
-        },
-        {
-          "artist": "Mandela Barnes",
-          "roiPct": 1.4999999999999902,
-          "expectedProfit": 5.217391304347792,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 160,
-          "pmStake": 182.60869565217394,
-          "totalStake": 342.60869565217394
-        }
-      ]
+      "scannedAt": "2026-06-11T22:03:34.037Z",
+      "allArbs": []
     }
   },
   {
@@ -1370,7 +1333,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 16,
-      "scannedAt": "2026-06-11T19:49:05.456Z",
+      "scannedAt": "2026-06-11T22:06:15.257Z",
       "allArbs": []
     }
   },
@@ -1783,7 +1746,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 16,
-      "scannedAt": "2026-06-11T18:51:46.450Z",
+      "scannedAt": "2026-06-11T22:03:21.369Z",
       "allArbs": []
     }
   },
@@ -2321,14 +2284,14 @@
       "matchedCount": 4,
       "kalshiCount": 56,
       "pmCount": 6,
-      "scannedAt": "2026-06-11T21:16:45.095Z",
+      "scannedAt": "2026-06-11T22:03:49.945Z",
       "allArbs": [
         {
           "artist": "Billie Eilish",
-          "roiPct": 0.40000000000000036,
-          "expectedProfit": 0.20833333333333354,
+          "roiPct": 0.9000000000000008,
+          "expectedProfit": 0.46875000000000044,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 51.875
+          "totalStake": 51.614583333333336
         },
         {
           "artist": "Addison Rae",
