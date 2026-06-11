@@ -313,7 +313,7 @@ interface ScanResult {
   kalshiFetchSource?: string;
   clobHitCount?: number;
   clobMissCount?: number;
-  allOutcomes: UnifiedOutcome[];
+  outcomes: UnifiedOutcome[];
   unmatchedKalshi: UnmatchedKalshi[];
   unmatchedPolymarket: UnmatchedPolymarket[];
 }
@@ -636,7 +636,7 @@ export default function Home() {
         setEmbedRefreshCounter((c) => c + 1);
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
-        data.allOutcomes.forEach((o: UnifiedOutcome) => {
+        data.outcomes.forEach((o: UnifiedOutcome) => {
           if (o.kalshi && o.polymarket) {
             prices.set(o.artist, { kYes: o.kalshi.yesAsk, pYes: o.polymarket.yesPrice });
           }
@@ -1505,7 +1505,7 @@ export default function Home() {
                     {/* Bookmaker 1on1 view */}
                     {result && bookmakerView && (
                       <Bookmaker1on1
-                        outcomes={result.allOutcomes.map(o => ({
+                        outcomes={result.outcomes.map(o => ({
                           artist: o.artist,
                           kalshi: o.kalshi ? {
                             yesBid: o.kalshi.yesBid,
@@ -1544,7 +1544,7 @@ export default function Home() {
                           </thead>
                           <tbody className="divide-y divide-[#182533]">
                             <OutcomeTableBody
-                              outcomes={result.allOutcomes}
+                              outcomes={result.outcomes}
                               expandedArtist={expandedArtist}
                               setExpandedArtist={setExpandedArtist}
                               formatCurrency={formatCurrency}
