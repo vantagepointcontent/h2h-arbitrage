@@ -1183,12 +1183,12 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
+    <div className="min-h-screen bg-[#121212] text-[#FFFFFF]">
       <ToastContainer toast={alertSystem.toast} />
       {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} alertSystem={alertSystem} />}
 
       {/* Top nav bar */}
-      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#121212]/90 backdrop-blur">
         <div className="flex items-center h-14 px-4 gap-3">
           <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
             <Rows3 className="w-5 h-5" />
