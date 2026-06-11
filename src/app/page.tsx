@@ -604,7 +604,7 @@ export default function Home() {
   }, [stopPolling]);
 
   // Scan handler
-  const handleScan = useCallback(async (useDefaults: boolean) => {
+  const handleScan = async (useDefaults: boolean) => {
     const kUrl = useDefaults
       ? "https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake"
       : kalshiUrlRef.current;
@@ -612,9 +612,9 @@ export default function Home() {
       ? "https://polymarket.com/event/who-will-be-featured-on-iceman"
       : pmUrlRef.current;
     await handleScanWithUrls(kUrl, pUrl);
-  }, []);
+  };
 
-  const handleScanWithUrls = useCallback(async (kUrl: string, pUrl: string) => {
+  const handleScanWithUrls = async (kUrl: string, pUrl: string) => {
     setLoading(true);
     setError("");
     setResult(null);
@@ -650,7 +650,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   // Saved markets
   const loadSavedMarkets = async (): Promise<SavedMarket[]> => {
