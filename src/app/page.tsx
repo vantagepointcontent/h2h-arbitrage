@@ -322,16 +322,16 @@ interface ScanResult {
 }
 
 /* ── Utility helpers ── */
-function formatPercent(n: number): string {
+export function formatPercent(n: number): string {
   return Intl.NumberFormat("en-US", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n / 100);
 }
 
-function formatCurrency(dollars: number): string {
+export function formatCurrency(dollars: number): string {
   return Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(dollars);
 }
 
 /** Sum of all positive expected profits from allArbs */
-function getTotalProfit(allArbs?: { expectedProfit: number }[] | null): number {
+export function getTotalProfit(allArbs?: { expectedProfit: number }[] | null): number {
   if (!allArbs) return 0;
   return allArbs
     .filter(a => a.expectedProfit > 0)
@@ -339,7 +339,7 @@ function getTotalProfit(allArbs?: { expectedProfit: number }[] | null): number {
 }
 
 /** Format profit display: "$15.00" for single position, "$15.00 ($24.00 total)" for multiple */
-function formatProfitDisplay(bestProfit: number, allArbs?: { expectedProfit: number }[] | null): string {
+export function formatProfitDisplay(bestProfit: number, allArbs?: { expectedProfit: number }[] | null): string {
   if (bestProfit === 0) return "";
   const profitableCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
   if (profitableCount <= 1) {
@@ -356,14 +356,14 @@ function getTotalProfitFromOutcomes(outcomes: UnifiedOutcome[]): number {
     .reduce((sum, o) => sum + o.arbitrage.expectedProfit, 0);
 }
 
-function formatExpiry(iso?: string | null): string {
+export function formatExpiry(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function timeUntilExpiry(iso?: string | null): string {
+export function timeUntilExpiry(iso?: string | null): string {
   if (!iso) return "";
   const diff = new Date(iso).getTime() - Date.now();
   if (diff < 0) return "Expired";
