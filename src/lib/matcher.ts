@@ -263,6 +263,7 @@ export function parseDepth(val: string | number | null | undefined): number {
   if (val === null || val === undefined) return 0;
   if (typeof val === 'number') return val;
   const s = String(val).trim().replace(/^\$/, '');
+  if (s === 'Infinity') return Infinity;
   const m = s.match(/^([\d.,]+)\s*([KMB]?)/i);
   if (!m) return 0;
   let num = parseFloat(m[1].replace(/,/g, ''));
@@ -301,15 +302,17 @@ export function calculateArbitrageMax(
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
     const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
     const capital = Math.min(capK, capP);
-    if (isFinite(capital) && capital > 0) {
+    // Allow infinite capital (no depth constraint) up to a sensible max
+    const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+    if (effectiveCapital > 0) {
       const roi = 1 - (kYes + pNo);
-      const profit = capital * roi;
+      const profit = effectiveCapital * roi;
       if (profit > maxProfit) {
         maxProfit = profit;
         strategy = 'Buy YES Kalshi + NO PM';
-        bestCapital = capital;
-        kalshiStakeResult = capital * kYes;
-        pmStakeResult = capital * pNo;
+        bestCapital = effectiveCapital;
+        kalshiStakeResult = effectiveCapital * kYes;
+        pmStakeResult = effectiveCapital * pNo;
         buyPlatform = 'kalshi';
         buyPrice = kYes;
         sellPlatform = 'polymarket';
@@ -322,15 +325,16 @@ export function calculateArbitrageMax(
     const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
     const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
     const capital = Math.min(capP, capK);
-    if (isFinite(capital) && capital > 0) {
+    const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+    if (effectiveCapital > 0) {
       const roi = 1 - (pYes + kNo);
-      const profit = capital * roi;
+      const profit = effectiveCapital * roi;
       if (profit > maxProfit) {
         maxProfit = profit;
         strategy = 'Buy YES PM + NO Kalshi';
-        bestCapital = capital;
-        kalshiStakeResult = capital * kNo;
-        pmStakeResult = capital * pYes;
+        bestCapital = effectiveCapital;
+        kalshiStakeResult = effectiveCapital * kNo;
+        pmStakeResult = effectiveCapital * pYes;
         buyPlatform = 'polymarket';
         buyPrice = pYes;
         sellPlatform = 'kalshi';
@@ -562,7 +566,24 @@ export function matchOutcomes(
       continue;
     }
 
-    if (isBinaryMarket(outcomes)) continue;
+    if (isBinaryMarket(outcomes) && !hasNamedGroup) {
+      // Binary market without groupItemTitle: use event title as artist
+      const title = pm.question || 'Unknown';
+      const norm = normalizeName(title);
+      const prev = pmSeenNames.get(norm);
+      if (prev && prev !== title) {
+        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+      } else if (!prev) {
+        pmSeenNames.set(norm, title);
+      }
+      pmOutcomes.push({
+        title,
+        yesPrice: prices[0] || 0,
+        noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
+        market: pm,
+      });
+      continue;
+    }
 
     for (let i = 0; i < outcomes.length; i++) {
       const title = outcomes[i] || pm.groupItemTitle || pm.question || '';
