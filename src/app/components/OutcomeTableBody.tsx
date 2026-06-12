@@ -69,9 +69,11 @@ export function OutcomeTableBody({
               className={`hover:bg-[#182533]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#182533]/30" : ""}`}
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
             >
-              <td className="px-4 py-3 font-medium text-[#FFFFFF] flex items-center gap-1.5">
-                <span className={`transition-transform text-[#5E6875] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                {o.artist}
+              <td className="px-4 py-3 font-medium text-[#FFFFFF]">
+                <div className="flex items-center gap-1.5">
+                  <span className={`transition-transform text-[#5E6875] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
+                  {o.artist}
+                </div>
               </td>
               <td className="px-4 py-3 text-right text-[#FFFFFF]">
                 {o.kalshi?.yesAsk.toFixed(2) ?? "—"}
@@ -119,7 +121,7 @@ export function OutcomeTableBody({
                 {totalStake > 0 ? (
                   <span className={`inline-flex items-center gap-1 text-xs font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${isBalanced ? "bg-[#5DBE81]" : "bg-[#ef4444]"}`}></span>
-                    {formatCurrency(totalStake * 100)}
+                    {formatCurrency(totalStake)}
                   </span>
                 ) : "—"}
               </td>
@@ -131,13 +133,13 @@ export function OutcomeTableBody({
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Total Stake:</span>
-                      <span className="font-bold text-[#FFFFFF]">{formatCurrency(totalStake * 100)}</span>
+                      <span className="font-bold text-[#FFFFFF]">{formatCurrency(totalStake)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Breakdown:</span>
-                      <span className="text-[#5DBE81]">Kalshi: {formatCurrency((o.arbitrage.kalshiStake ?? 0) * 100)}</span>
+                      <span className="text-[#5DBE81]">Kalshi: {formatCurrency(o.arbitrage.kalshiStake ?? 0)}</span>
                       <span className="text-[#5E6875]">|</span>
-                      <span className="text-[#ef4444]">Polymarket: {formatCurrency((o.arbitrage.pmStake ?? 0) * 100)}</span>
+                      <span className="text-[#ef4444]">Polymarket: {formatCurrency(o.arbitrage.pmStake ?? 0)}</span>
                     </div>
                     <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
                       {isBalanced ? "● Balanced" : "● Imbalanced"}
