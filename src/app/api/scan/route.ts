@@ -225,8 +225,10 @@ export async function POST(request: NextRequest) {
 
       const depthKYes = parseDepth(o.kalshi.yesAskDepth);
       const depthKNo = parseDepth(o.kalshi.noAskDepth) || parseDepth(o.kalshi.yesAskDepth);
-      const depthPYes = o.polymarket.askDepth || 0;
-      const depthPNo = o.polymarket.noAskDepth ?? o.polymarket.askDepth ?? 0;
+      // PM liquidityNum is NOT order depth — only Kalshi depth limits capital.
+      // Use Infinity for PM so profit isn't artificially capped.
+      const depthPYes = o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
+      const depthPNo = o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
 
       const arbResult = calculateArbitrageMax(
         o.kalshi,
