@@ -3230,5 +3230,21 @@
     "bestRoiPct": 1.0000000000000009,
     "positiveArbCount": 1,
     "matchedCount": 11
+  },
+  {
+    "scanTimestamp": "2026-06-12T13:05:23.738Z",
+    "marketId": "1779565498134-v5tij6n",
+    "totalProfit": 1.357142857142858,
+    "bestRoiPct": 1.0000000000000009,
+    "positiveArbCount": 1,
+    "matchedCount": 11
+  },
+  {
+    "scanTimestamp": "2026-06-12T13:21:32.713Z",
+    "marketId": "1779565498134-v5tij6n",
+    "totalProfit": 1.4285714285714295,
+    "bestRoiPct": 1.0000000000000009,
+    "positiveArbCount": 1,
+    "matchedCount": 11
   }
 ]

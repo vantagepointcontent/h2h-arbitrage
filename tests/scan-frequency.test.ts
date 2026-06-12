@@ -4,91 +4,98 @@ import {
   isMarketDueForScan,
   sortMarketsByScanPriority,
   getScanPlanSummary,
-  DEFAULT_SCAN_CONFIG,
+  DEFAULT_TIERS,
 } from "../src/lib/scan-frequency";
 
 describe("scan-frequency", () => {
+  const TIERS = DEFAULT_TIERS;
+
   describe("getTierForMarket", () => {
     it("returns Hot tier for markets expiring within 7 days", () => {
       const tier = getTierForMarket(
         new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        TIERS,
       );
       expect(tier?.label).toBe("Hot");
-      expect(tier?.intervalRuns).toBe(1);
+      expect(tier?.intervalMs).toBe(5 * 60 * 1000);
     });
 
-    it("returns Warm tier for markets expiring in 8–14 days", () => {
+    it("returns Warm tier for markets expiring in 8–30 days", () => {
       const tier = getTierForMarket(
         new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+        TIERS,
       );
       expect(tier?.label).toBe("Warm");
-      expect(tier?.intervalRuns).toBe(2);
-    });
-
-    it("returns Cool tier for markets expiring in 15–30 days", () => {
-      const tier = getTierForMarket(
-        new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-      );
-      expect(tier?.label).toBe("Cool");
-      expect(tier?.intervalRuns).toBe(4);
+      expect(tier?.intervalMs).toBe(15 * 60 * 1000);
     });
 
     it("returns Cold tier for markets expiring after 30 days", () => {
       const tier = getTierForMarket(
         new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+        TIERS,
       );
       expect(tier?.label).toBe("Cold");
-      expect(tier?.intervalRuns).toBe(8);
+      expect(tier?.intervalMs).toBe(60 * 60 * 1000);
     });
 
     it("returns Cold tier for null expiry", () => {
-      const tier = getTierForMarket(null);
+      const tier = getTierForMarket(null, TIERS);
       expect(tier?.label).toBe("Cold");
     });
 
-    it("returns Hot tier for expired markets", () => {
+    it("returns null for expired markets", () => {
       const tier = getTierForMarket(
         new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        TIERS,
       );
-      expect(tier?.label).toBe("Hot");
+      expect(tier).toBeNull();
     });
   });
 
   describe("isMarketDueForScan", () => {
-    it("always due for hot markets", () => {
+    it("is due for hot markets scanned 10 min ago", () => {
       expect(
         isMarketDueForScan(
-          new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // scanned 1h ago
-          0,
+          {
+            expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            lastScannedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 min ago
+          },
+          TIERS,
+        ),
+      ).toBe(true); // hot = 5 min interval
+    });
+
+    it("is due if never scanned", () => {
+      expect(
+        isMarketDueForScan(
+          { expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() },
+          TIERS,
         ),
       ).toBe(true);
     });
 
-    it("due if never scanned before", () => {
-      expect(isMarketDueForScan(null, null, 0)).toBe(true);
-    });
-
-    it("not due for cold markets scanned recently", () => {
-      const recently = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // 2h ago
+    it("is NOT due for cold markets scanned 30 min ago", () => {
       expect(
         isMarketDueForScan(
-          new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-          recently,
-          0,
+          {
+            expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+            lastScannedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 min ago
+          },
+          TIERS,
         ),
-      ).toBe(false); // cold tier minHours is 4, so 2h ago = not due
+      ).toBe(false); // cold = 60 min interval
     });
 
-    it("due for cold markets after enough time", () => {
-      const longAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(); // 6h ago
+    it("IS due for cold markets scanned 2 hours ago", () => {
       expect(
         isMarketDueForScan(
-          new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-          longAgo,
-          0,
+          {
+            expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+            lastScannedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
+          },
+          TIERS,
         ),
-      ).toBe(true); // > 4h minHours for cold tier
+      ).toBe(true); // > 60 min interval
     });
   });
 
@@ -98,7 +105,7 @@ describe("scan-frequency", () => {
         { id: "1", expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() }, // cold
         { id: "2", expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },   // hot
       ];
-      const sorted = sortMarketsByScanPriority(markets);
+      const sorted = sortMarketsByScanPriority(markets, TIERS);
       expect(sorted[0].id).toBe("2"); // hot first
       expect(sorted[1].id).toBe("1"); // cold second
     });
@@ -108,15 +115,15 @@ describe("scan-frequency", () => {
         {
           id: "1",
           expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          lastScanResult: { scannedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+          lastScannedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
         },
         {
           id: "2",
           expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          lastScanResult: { scannedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString() },
+          lastScannedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
         },
       ];
-      const sorted = sortMarketsByScanPriority(markets);
+      const sorted = sortMarketsByScanPriority(markets, TIERS);
       expect(sorted[0].id).toBe("2"); // scanned 5h ago = more urgent
       expect(sorted[1].id).toBe("1"); // scanned 1h ago
     });
@@ -125,16 +132,30 @@ describe("scan-frequency", () => {
   describe("getScanPlanSummary", () => {
     it("correctly buckets markets by tier", () => {
       const markets = [
-        { id: "1", eventTitle: "Hot", expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), lastScanResult: null },
-        { id: "2", eventTitle: "Warm", expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), lastScanResult: null },
-        { id: "3", eventTitle: "Cool", expiryDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(), lastScanResult: null },
-        { id: "4", eventTitle: "Cold", expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), lastScanResult: null },
+        { id: "1", expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), lastScannedAt: null },
+        { id: "2", expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), lastScannedAt: null },
+        { id: "3", expiryDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(), lastScannedAt: null },
+        { id: "4", expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), lastScannedAt: null },
       ];
-      const summary = getScanPlanSummary(markets);
+      const summary = getScanPlanSummary(markets, TIERS);
       expect(summary.total).toBe(4);
       expect(summary.hot).toBe(1);
-      expect(summary.warm).toBe(1);
-      expect(summary.cool).toBe(1);
+      expect(summary.warm).toBe(2); // 10d + 20d
+      expect(summary.cold).toBe(1); // 60d
+      expect(summary.dueNow.hot).toBe(1);
+      expect(summary.dueNow.warm).toBe(2); // 10d + 20d
+      expect(summary.dueNow.cold).toBe(1); // 60d
+    });
+
+    it("expired markets are excluded", () => {
+      const markets = [
+        { id: "1", expiryDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: "2", expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() },
+      ];
+      const summary = getScanPlanSummary(markets, TIERS);
+      expect(summary.total).toBe(2);
+      expect(summary.hot).toBe(0);
+      expect(summary.warm).toBe(0);
       expect(summary.cold).toBe(1);
     });
   });

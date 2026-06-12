@@ -1,0 +1,20 @@
+{
+  "tiers": [
+    {
+      "label": "Hot",
+      "maxDays": 7,
+      "intervalMs": 300000
+    },
+    {
+      "label": "Warm",
+      "maxDays": 30,
+      "intervalMs": 900000
+    },
+    {
+      "label": "Cold",
+      "maxDays": 365,
+      "intervalMs": 3600000
+    }
+  ],
+  "lastUpdated": "2026-06-12T13:10:00.023Z"
+}
