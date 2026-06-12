@@ -94,20 +94,20 @@
     "createdAt": "2026-05-23T19:44:58.134Z",
     "lastScanResult": {
       "bestRoiPct": 1.0000000000000009,
-      "bestProfit": 1.4285714285714295,
+      "bestProfit": 87.14285714285721,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 11,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 11,
-      "scannedAt": "2026-06-12T13:21:32.710Z",
+      "scannedAt": "2026-06-12T13:38:14.151Z",
       "allArbs": [
         {
           "artist": "Mercedes AMG Motorsport + Mercedes",
           "roiPct": 1.0000000000000009,
-          "expectedProfit": 1.4285714285714295,
+          "expectedProfit": 87.14285714285721,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 141.4285714285714
+          "totalStake": 8627.142857142857
         }
       ]
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Settings as SettingsIcon,
   X,
@@ -14,6 +14,12 @@ import {
 import type { AppSettings } from "@/hooks/useAppSettings";
 
 // ── Types ──
+
+interface ScanTier {
+  label: string;
+  maxDays: number;
+  intervalMin: number;
+}
 
 interface Props {
   open: boolean;
@@ -145,12 +151,23 @@ export default function AppSettingsDialog({
   onExport,
   onImport,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<"performance" | "appearance" | "sorting" | "data">(
+  const [activeTab, setActiveTab] = useState<"performance" | "appearance" | "sorting" | "data" | "scanner">(
     "performance",
   );
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Scanner state ──
+
+  const [tiers, setTiers] = useState<ScanTier[]>([
+    { label: "hot", maxDays: 7, intervalMin: 5 },
+    { label: "warm", maxDays: 30, intervalMin: 15 },
+    { label: "cold", maxDays: 365, intervalMin: 60 },
+  ]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanSaving, setScanSaving] = useState(false);
+  const [scanSaved, setScanSaved] = useState(false);
 
   if (!open) return null;
 
@@ -199,6 +216,54 @@ export default function AppSettingsDialog({
     });
   };
 
+  // ── Scan config fetch/save ──
+
+  useEffect(() => {
+    if (!open) return;
+    setScanLoading(true);
+    setScanSaved(false);
+    fetch("/api/scan-config")
+      .then((r) => r.json())
+      .then((data) => {
+        const tiersArr = data.config?.tiers ?? data.tiers;
+        if (Array.isArray(tiersArr)) {
+          setTiers(
+            tiersArr.map((t: { label: string; maxDays?: number; intervalMs?: number }) => ({
+              label: t.label.toLowerCase(),
+              maxDays: t.maxDays ?? 7,
+              intervalMin: t.intervalMs ? Math.round(t.intervalMs / 60000) : 1,
+            })),
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setScanLoading(false));
+  }, [open]);
+
+  const handleScanSave = async () => {
+    setScanSaving(true);
+    setScanSaved(false);
+    try {
+      await fetch("/api/scan-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tiers: tiers.map((t) => ({
+            label: t.label,
+            maxDays: t.maxDays,
+            intervalMs: t.intervalMin * 60000,
+          })),
+        }),
+      });
+      setScanSaved(true);
+      setTimeout(() => setScanSaved(false), 2000);
+    } catch {
+      /* ignore */
+    } finally {
+      setScanSaving(false);
+    }
+  };
+
   // ── Render ──
 
   return (
@@ -234,6 +299,7 @@ export default function AppSettingsDialog({
                 { key: "appearance", label: "Appearance" },
                 { key: "sorting", label: "Sorting" },
                 { key: "data", label: "Data" },
+                { key: "scanner", label: "Scanner" },
               ] as const
             ).map(({ key, label }) => (
               <button
@@ -498,6 +564,89 @@ export default function AppSettingsDialog({
                     Reset
                   </button>
                 </SettingRow>
+              </>
+            )}
+
+            {/* ═══ SCANNER TAB ═══ */}
+            {activeTab === "scanner" && (
+              <>
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm font-medium text-[#FFFFFF]">Scan Tiers</div>
+                    <div className="text-xs text-[#5E6875] mt-0.5">Configure scan frequency per tier based on asset age</div>
+                  </div>
+
+                  {scanLoading && (
+                    <div className="px-3 py-2 rounded-lg bg-[#232E3C]/50 border border-[#232E3C] text-xs text-[#5E6875]">
+                      Loading…
+                    </div>
+                  )}
+
+                  {(tiers.length ? tiers : [
+                    { label: "hot", maxDays: 7, intervalMin: 5 },
+                    { label: "warm", maxDays: 30, intervalMin: 15 },
+                    { label: "cold", maxDays: 365, intervalMin: 60 },
+                  ]).map((tier, idx) => {
+                    const emoji = tier.label === "hot" ? "🔥" : tier.label === "cold" ? "❄️" : "🌡️";
+                    const desc = tier.label === "hot" ? "≤7 days" : tier.label === "cold" ? ">30 days" : "≤30 days";
+                    return (
+                      <div key={tier.label} className="rounded-lg bg-[#0E1621] border border-[#232E3C] p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{emoji}</span>
+                          <span className="text-sm font-semibold text-[#FFFFFF] capitalize">{tier.label}</span>
+                          <span className="text-xs text-[#5E6875]">{desc}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-[#5E6875]">Max days</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={tier.maxDays}
+                              onChange={(e) => {
+                                const updated = [...tiers];
+                                updated[idx] = { ...updated[idx], maxDays: Number(e.target.value) };
+                                setTiers(updated);
+                              }}
+                              className="w-full px-3 py-2 rounded-lg bg-[#18181b] border border-[#232E3C] text-white text-sm focus:border-[#5DBE81] outline-none transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-[#5E6875]">Interval (min)</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={tier.intervalMin}
+                              onChange={(e) => {
+                                const updated = [...tiers];
+                                updated[idx] = { ...updated[idx], intervalMin: Number(e.target.value) };
+                                setTiers(updated);
+                              }}
+                              className="w-full px-3 py-2 rounded-lg bg-[#18181b] border border-[#232E3C] text-white text-sm focus:border-[#5DBE81] outline-none transition-colors"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={handleScanSave}
+                      disabled={scanSaving}
+                      className={`px-5 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        scanSaving
+                          ? "bg-[#232E3C] text-[#5E6875] border-[#232E3C] cursor-not-allowed"
+                          : "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/20 hover:bg-[#5DBE81]/25"
+                      }`}
+                    >
+                      {scanSaving ? "Saving…" : "Save"}
+                    </button>
+                    {scanSaved && (
+                      <span className="text-sm text-[#5DBE81] font-medium animate-pulse">Saved!</span>
+                    )}
+                  </div>
+                </div>
               </>
             )}
           </div>
