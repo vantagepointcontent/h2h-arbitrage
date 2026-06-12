@@ -201,28 +201,6 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      // Neg-risk markets: independent YES/NO prices — standard complementary
-      // arbitrage formula (YES_A + NO_B < 1) does not apply. Mark them separately.
-      if (o.polymarket.negRisk) {
-        return {
-          ...o,
-          negRisk: true,
-          arbitrage: {
-            strategy: 'Neg-risk',
-            kalshiStake: 0,
-            pmStake: 0,
-            expectedProfit: 0,
-            roiPct: 0,
-            maxCapital: 0,
-            apyPct: 0,
-            buyPlatform: null,
-            buyPrice: 0,
-            sellPlatform: null,
-            sellPrice: 0,
-          },
-        };
-      }
-
       const depthKYes = parseDepth(o.kalshi.yesAskDepth);
       const depthKNo = parseDepth(o.kalshi.noAskDepth) || parseDepth(o.kalshi.yesAskDepth);
       // PM liquidityNum is NOT order depth — only Kalshi depth limits capital.

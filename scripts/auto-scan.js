@@ -1,5 +1,6 @@
 /**
  * Auto-scan all saved markets every 15 minutes
+ * Uses /api/saved-markets/refresh endpoint (saves to DB)
  * Runs as a cron job via Hermes scheduler
  */
 const BASE_URL = process.env.APP_URL || "http://100.86.7.30:3000";
@@ -9,59 +10,40 @@ async function autoScanAll() {
   console.log(`[${timestamp}] Starting auto-scan of all saved markets...`);
 
   try {
-    // 1. Fetch all saved markets
-    const marketsRes = await fetch(`${BASE_URL}/api/saved-markets`);
-    if (!marketsRes.ok) throw new Error(`Failed to fetch saved markets: ${marketsRes.status}`);
-    const markets = await marketsRes.json();
+    const scanRes = await fetch(`${BASE_URL}/api/saved-markets/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
 
-    console.log(`[${timestamp}] Found ${markets.length} saved markets`);
-
-    // 2. Scan each market sequentially (to avoid rate limiting)
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const market of markets) {
-      try {
-        const scanRes = await fetch(`${BASE_URL}/api/scan`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kalshiUrl: market.kalshiUrl,
-            polymarketUrl: market.polymarketUrl,
-          }),
-        });
-
-        if (!scanRes.ok) {
-          console.error(`[${timestamp}] Scan failed for ${market.id}: ${scanRes.status}`);
-          failCount++;
-          continue;
-        }
-
-        const result = await scanRes.json();
-        successCount++;
-
-        // Log summary
-        const bestRoi = result.outcomes
-          ?.filter((o) => o.arbitrage?.expectedProfit > 0)
-          ?.sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct)[0];
-
-        if (bestRoi) {
-          console.log(
-            `[${timestamp}] ✅ ${market.eventTitle}: +${bestRoi.arbitrage.roiPct}% ROI, $${(bestRoi.arbitrage.expectedProfit / 100).toFixed(2)} profit`
-          );
-        } else {
-          console.log(`[${timestamp}] ⚪ ${market.eventTitle}: No arb found`);
-        }
-      } catch (err) {
-        console.error(`[${timestamp}] ❌ Error scanning ${market.id}: ${err.message}`);
-        failCount++;
-      }
-
-      // Small delay between scans to be nice to the APIs
-      await new Promise((r) => setTimeout(r, 2000));
+    if (!scanRes.ok) {
+      throw new Error(`Refresh endpoint returned ${scanRes.status}: ${await scanRes.text()}`);
     }
 
-    console.log(`[${timestamp}] Auto-scan complete: ${successCount} succeeded, ${failCount} failed`);
+    const results = await scanRes.json();
+
+    const total = results.length;
+    const succeeded = results.filter(r => !r.error).length;
+    const failed = total - succeeded;
+    const withArb = results.filter(r => r.bestRoiPct > 0).length;
+
+    console.log(`[${timestamp}] Auto-scan complete: ${succeeded}/${total} succeeded, ${failed} failed, ${withArb} with arbitrage`);
+
+    // Log top 5 opportunities
+    const top5 = results
+      .filter(r => r.bestRoiPct > 0)
+      .sort((a, b) => b.bestRoiPct - a.bestRoiPct)
+      .slice(0, 5);
+
+    for (const r of top5) {
+      console.log(
+        `[${timestamp}] ✅ ${r.eventTitle}: +${r.bestRoiPct.toFixed(2)}% ROI, $${r.bestProfit.toFixed(2)} profit`
+      );
+    }
+
+    if (failed > 0) {
+      const errors = results.filter(r => r.error).map(r => `${r.eventTitle}: ${r.error}`).join("; ");
+      console.error(`[${timestamp}] ❌ Failures: ${errors}`);
+    }
   } catch (err) {
     console.error(`[${timestamp}] Auto-scan CRITICAL ERROR: ${err.message}`);
     process.exit(1);

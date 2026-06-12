@@ -367,6 +367,7 @@ export function AlertSettingsPanel({
   onClearHistory,
   notificationPermission,
   onRequestPermission,
+  onClose,
 }: {
   settings: AlertSettings;
   onSettingsChange: React.Dispatch<React.SetStateAction<AlertSettings>>;
@@ -374,12 +375,13 @@ export function AlertSettingsPanel({
   onClearHistory: () => void;
   notificationPermission: "default" | "granted" | "denied" | "unsupported";
   onRequestPermission: () => Promise<void>;
+  onClose: () => void;
 }) {
   const [tab, setTab] = useState<"settings" | "history">("settings");
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-         onClick={() => {/* close handled by parent */}}>
+         onClick={onClose}>
       <div
         className="w-full max-w-lg rounded-xl border border-[#232E3C] bg-[#17212B] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -390,20 +392,29 @@ export function AlertSettingsPanel({
             <Bell className="w-4 h-4 text-[#5DBE81]" />
             <h2 className="text-base font-semibold">Alert Settings</h2>
           </div>
-          <div className="flex gap-1">
-            {(["settings", "history"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  tab === t
-                    ? "bg-[#5DBE81]/10 text-[#5DBE81]"
-                    : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
-                }`}
-              >
-                {t === "settings" ? "Settings" : `History (${history.length})`}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {(["settings", "history"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    tab === t
+                      ? "bg-[#5DBE81]/10 text-[#5DBE81]"
+                      : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                  }`}
+                >
+                  {t === "settings" ? "Settings" : `History (${history.length})`}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={onClose}
+              className="ml-2 p-1.5 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
