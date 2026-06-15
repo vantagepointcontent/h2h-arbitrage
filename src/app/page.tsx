@@ -1895,8 +1895,8 @@ function MarketSidebar({
   });
 
   return (
-    <aside className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
-      <div className="p-4 space-y-4 h-full flex flex-col">
+    <aside className={`${sidebarOpen ? "w-[345px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
+      <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
         {/* ── Navigation (moved from header) ── */}
         <div className="space-y-1">
           <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
@@ -1997,12 +1997,13 @@ function MarketSidebar({
         <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
           {filtered.map((m) => {
             const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+            const apy = computeApy(roi, m.expiryDate);
             const isActive = activeId === m.id;
             return (
               <div
                 key={m.id}
                 onClick={() => onSelectMarket(m)}
-                className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
                   isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
                 }`}
                 title={`Latest scanned: ${(() => {
@@ -2041,11 +2042,16 @@ function MarketSidebar({
                     <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
                   </div>
                 </div>
-                {roi !== 0 && (
-                  <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                    {roi > 0 ? "+" : ""}{formatPercent(roi)}
-                  </span>
-                )}
+                <div className="flex items-center shrink-0">
+                  {roi !== 0 && (
+                    <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                      {roi > 0 ? "+" : ""}{formatPercent(roi)}
+                    </span>
+                  )}
+                  {apy > 0 && (
+                    <span className="text-[10px] text-[#5E6875] ml-1">({formatPercent(apy)})</span>
+                  )}
+                </div>
               </div>
             );
           })}

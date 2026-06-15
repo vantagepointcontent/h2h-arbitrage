@@ -84,23 +84,23 @@
 
 /* ─── Light theme ─── */
 [data-theme="light"] {
-  --background: #ffffff;
-  --foreground: #182533;
-  --card: #f7f7f7;
-  --card-foreground: #182533;
-  --popover: #f7f7f7;
-  --popover-foreground: #182533;
+  --background: #faf5ec;
+  --foreground: #1a1a2e;
+  --card: #f0e8dc;
+  --card-foreground: #1a1a2e;
+  --popover: #f0e8dc;
+  --popover-foreground: #1a1a2e;
   --primary: #4DA66E;
   --primary-foreground: #ffffff;
-  --secondary: #FFFFFF;
-  --secondary-foreground: #182533;
-  --muted: #FFFFFF;
+  --secondary: #efe8dc;
+  --secondary-foreground: #1a1a2e;
+  --muted: #efe8dc;
   --muted-foreground: #5E6875;
-  --accent: #FFFFFF;
-  --accent-foreground: #182533;
+  --accent: #e8ddd0;
+  --accent-foreground: #1a1a2e;
   --destructive: #dc2626;
-  --border: #8A9BA8;
-  --input: #8A9BA8;
+  --border: #d4c8b8;
+  --input: #d4c8b8;
   --ring: #4DA66E;
   --chart-1: #4DA66E;
   --chart-2: #2563eb;
@@ -108,15 +108,15 @@
   --chart-4: #9333ea;
   --chart-5: #dc2626;
 
-  --surface: #ffffff;
-  --surface-elevated: #f7f7f7;
-  --surface-hover: #FFFFFF;
-  --text: #182533;
+  --surface: #faf5ec;
+  --surface-elevated: #f0e8dc;
+  --surface-hover: #e8ddd0;
+  --text: #1a1a2e;
   --text-muted: #5E6875;
   --text-faint: #8A9BA8;
-  --divider: #8A9BA8;
-  --header-bg: #fafafa;
-  --sidebar-bg: #ffffff;
+  --divider: #d4c8b8;
+  --header-bg: #f0e8dc;
+  --sidebar-bg: #faf5ec;
 }
 
 /* ─── Smooth theme transitions ─── */
@@ -128,27 +128,28 @@ html {
   color-scheme: light;
 }
 
-/* ═══════════════════════════════════════
+/* ═══════════════════════════════════════════
    LIGHT-MODE OVERRIDES for hardcoded dark colors
    Tailwind generates .bg-\[#0E1621\] etc.
    We override them when data-theme="light" is active.
-   ═══════════════════════════════════════ */
-[data-theme="light"] .bg-\[\#0E1621\]  { background-color: #f5f5f5 !important; }
-[data-theme="light"] .bg-\[\#17212B\]  { background-color: #ffffff !important; }
-[data-theme="light"] .bg-\[\#121E2B\]  { background-color: #f0f0f0 !important; }
-[data-theme="light"] .bg-\[\#182533\]  { background-color: #e8e8e8 !important; }
-[data-theme="light"] .bg-\[\#232E3C\]  { background-color: #dddddd !important; }
-[data-theme="light"] .bg-\[\#334155\]  { background-color: #eeeeee !important; }
+   ═══════════════════════════════════════════ */
+[data-theme="light"] .bg-\[\#0E1621\]  { background-color: #faf5ec !important; }
+[data-theme="light"] .bg-\[\#0E1621\]\/90 { background-color: rgba(240, 232, 220, 0.9) !important; }
+[data-theme="light"] .bg-\[\#17212B\]  { background-color: #f0e8dc !important; }
+[data-theme="light"] .bg-\[\#121E2B\]  { background-color: #e8ddd0 !important; }
+[data-theme="light"] .bg-\[\#182533\]  { background-color: #e8ddd0 !important; }
+[data-theme="light"] .bg-\[\#232E3C\]  { background-color: #d4c8b8 !important; }
+[data-theme="light"] .bg-\[\#334155\]  { background-color: #e8ddd0 !important; }
 [data-theme="light"] .text-\[\#FFFFFF\]  { color: #1a1a2e !important; }
 [data-theme="light"] .text-\[\#8A9BA8\]  { color: #666677 !important; }
 [data-theme="light"] .text-\[\#5E6875\]  { color: #888899 !important; }
-[data-theme="light"] .border-\[\#182533\] { border-color: #dddddd !important; }
-[data-theme="light"] .border-\[\#232E3C\] { border-color: #cccccc !important; }
-[data-theme="light"] .border-\[\#0E1621\]  { border-color: #e0e0e0 !important; }
+[data-theme="light"] .border-\[\#182533\] { border-color: #d4c8b8 !important; }
+[data-theme="light"] .border-\[\#232E3C\] { border-color: #c4b8a8 !important; }
+[data-theme="light"] .border-\[\#0E1621\]  { border-color: #e0d8cc !important; }
 /* Ring/border accent overrides */
 [data-theme="light"] .ring-\[\#5DBE81\]\/30 { --tw-ring-color: rgba(77, 166, 110, 0.3) !important; }
-[data-theme="light"] .hover\:bg-\[\#182533\]:hover { background-color: #e8e8e8 !important; }
-[data-theme="light"] .hover\:bg-\[\#232E3C\]:hover { background-color: #dddddd !important; }
+[data-theme="light"] .hover\:bg-\[\#182533\]:hover { background-color: #e8ddd0 !important; }
+[data-theme="light"] .hover\:bg-\[\#232E3C\]:hover { background-color: #d4c8b8 !important; }
 [data-theme="light"] .hover\:text-\[\#FFFFFF\]:hover { color: #1a1a2e !important; }
 
 /* Transition all themed properties smoothly */
