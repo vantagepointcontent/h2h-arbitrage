@@ -987,6 +987,7 @@ export default function Home() {
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
   const [showExpired, setShowExpired] = useState(false);
+  const [showArbOnly, setShowArbOnly] = useState(false);
   const [overviewCategory, setOverviewCategory] = useState<string>("all");
   const [hideUnmatched, setHideUnmatched] = useState(getStoredHideUnmatched);
   const [scanningAll, setScanningAll] = useState(false);
@@ -1446,6 +1447,8 @@ export default function Home() {
           onSetExpiryFilter={setOverviewExpiryFilter}
           showExpired={showExpired}
           onToggleShowExpired={() => setShowExpired(v => !v)}
+          showArbOnly={showArbOnly}
+          onToggleShowArbOnly={() => setShowArbOnly(v => !v)}
           onScanAll={scanAllMarkets}
           scanningAll={scanningAll}
           scanProgress={scanProgress}
@@ -1475,6 +1478,8 @@ export default function Home() {
                 onToggleLayout={setOverviewLayout}
                 expiryFilter={overviewExpiryFilter}
                 onSetExpiryFilter={setOverviewExpiryFilter}
+                showArbOnly={showArbOnly}
+                onToggleShowArbOnly={() => setShowArbOnly(v => !v)}
                 timeUntilExpiry={timeUntilExpiry}
                 formatExpiry={formatExpiry}
                 onSelectMarket={loadMarket}
@@ -1971,6 +1976,8 @@ function MarketSidebar({
   onSetExpiryFilter,
   showExpired,
   onToggleShowExpired,
+  showArbOnly,
+  onToggleShowArbOnly,
   onScanAll,
   scanningAll,
   scanProgress,
@@ -1999,6 +2006,8 @@ function MarketSidebar({
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
   showExpired: boolean;
   onToggleShowExpired: () => void;
+  showArbOnly: boolean;
+  onToggleShowArbOnly: () => void;
   onScanAll: (markets: SavedMarket[]) => void;
   scanningAll: boolean;
   scanProgress: { current: number; total: number };
@@ -2028,6 +2037,10 @@ function MarketSidebar({
     }
     if (sidebarSearch && !m.eventTitle.toLowerCase().includes(sidebarSearch.toLowerCase())) return false;
     if (sidebarFavoritesOnly && !favoriteIds.has(m.id)) return false;
+    if (showArbOnly) {
+      const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+      if (roi <= 0) return false;
+    }
     return true;
   }).sort((a, b) => {
     const mul = sortDir === "asc" ? 1 : -1;
@@ -2157,6 +2170,17 @@ function MarketSidebar({
             >
               {showExpired ? "Show Expired: On" : "Show Expired: Off"}
             </button>
+            <button
+              onClick={onToggleShowArbOnly}
+              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                showArbOnly
+                  ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+                  : "bg-[#0E1621] text-[#5E6875] border border-[#232E3C] hover:text-[#FFFFFF]"
+              }`}
+              title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
+            >
+              {showArbOnly ? "Show Arb: On" : "Show Arb: Off"}
+            </button>
           </div>
         </div>
 
@@ -2246,6 +2270,8 @@ function OverviewPanel({
   onToggleLayout,
   expiryFilter,
   onSetExpiryFilter,
+  showArbOnly,
+  onToggleShowArbOnly,
   timeUntilExpiry,
   formatExpiry,
   onSelectMarket,
@@ -2260,6 +2286,8 @@ function OverviewPanel({
   onToggleLayout: (l: "grid" | "table") => void;
   expiryFilter: "all" | "lte7" | "lte14" | "lte30";
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
+  showArbOnly: boolean;
+  onToggleShowArbOnly: () => void;
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
   onSelectMarket: (m: SavedMarket) => void;
@@ -2304,13 +2332,17 @@ function OverviewPanel({
     if (expiryFilter === "lte14") return days <= 14;
     if (expiryFilter === "lte30") return days <= 30;
     return true;
+  }).filter(m => {
+    if (!showArbOnly) return true;
+    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+    return roi > 0;
   });
 
-  // Aggregate stats
-  const totalMarkets = markets.length;
-  const totalProfit = markets.reduce((sum, m) => sum + (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0), 0);
-  const avgRoi = totalMarkets > 0 ? markets.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
-  const arbOpportunities = markets.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
+  // Aggregate stats (respect current filter)
+  const totalMarkets = filteredByExpiry.length;
+  const totalProfit = filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0), 0);
+  const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
+  const arbOpportunities = filteredByExpiry.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
 
   return (
     <div className="space-y-5">
@@ -2336,6 +2368,21 @@ function OverviewPanel({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Overview</h2>
         <div className="flex items-center gap-2">
+          {/* Arb-only toggle */}
+          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+            <button
+              onClick={() => onToggleShowArbOnly()}
+              className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                showArbOnly
+                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                  : "text-[#5E6875] hover:text-[#FFFFFF]"
+              }`}
+              title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
+            >
+              {showArbOnly ? "Arb: On" : "Arb: Off"}
+            </button>
+          </div>
+          <div className="w-px h-4 bg-[#232E3C]" />
           {/* Expiry filter buttons */}
           <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
             {([
