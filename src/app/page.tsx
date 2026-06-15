@@ -734,7 +734,7 @@ export default function Home() {
             await fetch(`/api/saved-markets/scan-result`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: market.id, lastScanResult: scanResult }),
+              body: JSON.stringify({ id: market.id, lastScanResult: scanResult, expiryDate: data.expiryDate }),
             });
           } catch (e) {
             console.error(`Failed to persist scan result for ${market.id}`, e);

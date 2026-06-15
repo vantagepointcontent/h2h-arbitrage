@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
           })),
         };
-        await updateSavedMarketScanResult(market.id, scanResult);
+        await updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate);
         // Record in global scan history
         await appendScanHistory({
           scanTimestamp: new Date().toISOString(),
