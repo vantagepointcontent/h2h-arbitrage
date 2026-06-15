@@ -680,7 +680,7 @@
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-15T15:30:09.742Z",
+      "scannedAt": "2026-06-15T15:35:12.654Z",
       "allArbs": []
     }
   },
@@ -909,27 +909,27 @@
     "createdAt": "2026-05-27T21:53:01.060Z",
     "lastScanResult": {
       "bestRoiPct": 1.0000000000000009,
-      "bestProfit": 3.0798484848484877,
+      "bestProfit": 7.625303030303037,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 6,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 6,
-      "scannedAt": "2026-06-15T15:31:08.332Z",
+      "scannedAt": "2026-06-15T15:32:14.892Z",
       "allArbs": [
         {
           "artist": "Pamela Evette",
           "roiPct": 1.0000000000000009,
-          "expectedProfit": 3.0798484848484877,
+          "expectedProfit": 7.625303030303037,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 304.90500000000003
+          "totalStake": 754.905
         },
         {
           "artist": "Alan Wilson",
-          "roiPct": 0.9000000000000008,
-          "expectedProfit": 55.809681818181865,
+          "roiPct": 0.8999999999999897,
+          "expectedProfit": 59.55968181818113,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 6145.266075757576
+          "totalStake": 6558.182742424242
         }
       ]
     }
