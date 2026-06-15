@@ -2010,7 +2010,7 @@ function MarketSidebar({
   // Filter + sort
   const filtered = markets.filter(m => {
     if (expiryFilter !== "all") {
-      if (!m.expiryDate) return true;
+      if (!m.expiryDate) return false;
       const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
       if (expiryFilter === "lte7" && days > 7) return false;
       if (expiryFilter === "lte14" && days > 14) return false;
@@ -2122,7 +2122,7 @@ function MarketSidebar({
             type="text"
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
-            placeholder="Search markets..."
+            placeholder="Filter by name..."
             className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
           />
           <div className="flex items-center gap-1">
