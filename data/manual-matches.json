@@ -420,5 +420,13 @@
     "pmTitle": "Republican Party",
     "id": "1781559597581-mlyuazu",
     "createdAt": "2026-06-15T21:39:57.581Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-PA12-26-D",
+    "pmConditionId": "0x2fb6fc5f23f19908324012acc701150dd9a6c97ede04a2653b408e26f213abe8",
+    "kalshiTitle": "KXHOUSERACE-PA12-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1781560720786-r4bpski",
+    "createdAt": "2026-06-15T21:58:40.786Z"
   }
 ]

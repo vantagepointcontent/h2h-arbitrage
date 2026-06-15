@@ -4,15 +4,63 @@ import {
   runFullSync,
   getLatestSyncLog,
   fetchAllPlatformMarkets,
+  CATEGORIES,
+  fetchPlatformMarkets,
+  buildMatches,
+  RATE_LIMIT_MS,
+  PhV2Market,
 } from '@/lib/predictionhunt';
 import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
-   Return all cached PredictionHunt markets + last sync log.
+   Return cached markets OR fetch fresh by category + expiry window.
+   Query params:
+     - category: comma-separated list (e.g. sports,politics)
+     - maxDays: number 1-365, filters eventDate <= now + maxDays
    ═══════════════════════════════════════════════════════════════ */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const categoryParam = searchParams.get('category');
+    const maxDaysParam = searchParams.get('maxDays');
+
+    // Fresh fetch requested for specific categories/expiry
+    if (categoryParam || maxDaysParam) {
+      const categories = categoryParam
+        ? categoryParam.split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
+        : CATEGORIES;
+      const maxDays = maxDaysParam ? Math.min(365, Math.max(1, parseInt(maxDaysParam, 10))) : 365;
+
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + maxDays);
+
+      const [pmMarkets, kMarkets] = await Promise.all([
+        fetchCategories('polymarket', categories),
+        fetchCategories('kalshi', categories),
+      ]);
+
+      const matches = buildMatches(pmMarkets, kMarkets).filter(m => {
+        if (!m.eventDate) return true;
+        return new Date(m.eventDate).getTime() <= cutoff.getTime();
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: matches.length,
+        markets: matches,
+        fresh: true,
+        categories,
+        maxDays,
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+    }
+
+    // Default: return cached markets + last sync log
     const [markets, syncLog] = await Promise.all([
       getPredictionHuntMarkets(),
       getLatestSyncLog(),
@@ -33,6 +81,21 @@ export async function GET() {
     console.error('[api/predictionhunt/markets GET]', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
+}
+
+/** Fetch a subset of categories for a platform. */
+async function fetchCategories(platform: string, categories: string[]): Promise<PhV2Market[]> {
+  const all: PhV2Market[] = [];
+  for (const cat of categories) {
+    try {
+      const ms = await fetchPlatformMarkets(platform, cat);
+      all.push(...ms);
+    } catch (e: any) {
+      console.warn(`[ph] ${platform}/${cat} failed: ${e.message}`);
+    }
+    await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
+  }
+  return all;
 }
 
 /* ═══════════════════════════════════════════════════════════════

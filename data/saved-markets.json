@@ -1899,102 +1899,226 @@
     "polymarketUrl": "https://polymarket.com/event/who-will-trump-announce-as-next-director-of-national-intelligence?r=predictionhunt",
     "eventTitle": "Who will be Trump's next Director of National Intelligence?",
     "category": "Politics",
-    "expiryDate": "2026-12-31",
+    "expiryDate": "2026-12-31T00:00:00Z",
     "id": "1780524935254-y4p559m",
     "createdAt": "2026-06-03T22:15:35.254Z",
     "lastScanResult": {
-      "bestRoiPct": 4.400000000000004,
-      "bestProfit": 84656.00000000007,
+      "bestRoiPct": 4.276045,
+      "bestProfit": 9621.10125,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 17,
+      "outcomeCount": 57,
       "matchedCount": 17,
       "kalshiCount": 23,
       "pmCount": 51,
-      "scannedAt": "2026-06-12T11:39:05.797Z",
+      "scannedAt": "2026-06-15T21:55:07.174Z",
       "allArbs": [
         {
-          "artist": "Aaron Lukas",
-          "roiPct": 3.8000000000000034,
-          "expectedProfit": 3.954214360041627,
-          "strategy": "Buy YES PM + NO Kalshi"
-        },
-        {
           "artist": "Chris Stewart",
-          "roiPct": 0.40000000000000036,
-          "expectedProfit": 7.609264853977852,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "roiPct": 0.18504500000000002,
+          "expectedProfit": 908.57095,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 490018,
+          "fees": {
+            "kalshiFee": 34.34,
+            "pmFee": 73.42905,
+            "kalshiFeeDetails": "Kalshi YES buy 491000 @ $0.00 + NO sell Infinity @ $0.00 = $34.34",
+            "pmFeeDetails": "Polymarket NO buy 491000 @ $1.00 (θ=0.05) = $73.43",
+            "netProfitIfKalshiWins": 947.66,
+            "netProfitIfPmWins": 908.57095,
+            "worstCaseNetProfit": 908.57095
+          }
         },
         {
           "artist": "Sebastian Gorka",
-          "roiPct": 1.9000000000000017,
-          "expectedProfit": 55410.93500000004,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 1.8972050000118559,
+          "expectedProfit": 400058.87534,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 20665015,
+          "fees": {
+            "kalshiFee": 1474.6,
+            "pmFee": 21676.12466,
+            "kalshiFeeDetails": "Kalshi YES buy 21086750 @ $0.00 + NO sell Infinity @ $0.00 = $1474.60",
+            "pmFeeDetails": "Polymarket NO buy 21086750 @ $0.98 (θ=0.05) = $21676.12",
+            "netProfitIfKalshiWins": 420260.4,
+            "netProfitIfPmWins": 400058.87534,
+            "worstCaseNetProfit": 400058.87534
+          }
+        },
+        {
+          "artist": "Elise Stefanik",
+          "roiPct": 0.10243750000000292,
+          "expectedProfit": 292.67857142857974,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 285142.8571428571,
+          "fees": {
+            "kalshiFee": 278.75,
+            "pmFee": 127.41429,
+            "kalshiFeeDetails": "Kalshi YES buy 285714 @ $0.01 + NO sell 1000000 @ $0.00 = $278.75",
+            "pmFeeDetails": "Polymarket NO buy 285714 @ $0.99 (θ=0.05) = $127.41",
+            "netProfitIfKalshiWins": 292.67857142857974,
+            "netProfitIfPmWins": 444.01428142857975,
+            "worstCaseNetProfit": 292.67857142857974
+          }
         },
         {
           "artist": "Richard Grenell",
-          "roiPct": 4.400000000000004,
-          "expectedProfit": 84656.00000000007,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 4.276045,
+          "expectedProfit": 9621.10125,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 214875,
+          "fees": {
+            "kalshiFee": 31.44,
+            "pmFee": 503.89875,
+            "kalshiFeeDetails": "Kalshi YES buy 225000 @ $0.00 + NO sell Infinity @ $0.00 = $31.44",
+            "pmFeeDetails": "Polymarket NO buy 225000 @ $0.95 (θ=0.05) = $503.90",
+            "netProfitIfKalshiWins": 10093.56,
+            "netProfitIfPmWins": 9621.10125,
+            "worstCaseNetProfit": 9621.10125
+          }
         },
         {
           "artist": "Tom Cotton",
-          "roiPct": 0.10000000000000009,
-          "expectedProfit": 3029.3700000000026,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 0.18504499993026574,
+          "expectedProfit": 7962.005229999516,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 4294134.5200000005,
+          "fees": {
+            "kalshiFee": 300.9,
+            "pmFee": 643.47477,
+            "kalshiFeeDetails": "Kalshi YES buy 4302740 @ $0.00 + NO sell Infinity @ $0.00 = $300.90",
+            "pmFeeDetails": "Polymarket NO buy 4302740 @ $1.00 (θ=0.05) = $643.47",
+            "netProfitIfKalshiWins": 8304.579999999516,
+            "netProfitIfPmWins": 7962.005229999516,
+            "worstCaseNetProfit": 7962.005229999516
+          }
         },
         {
           "artist": "John Ratcliffe",
-          "roiPct": 0.7000000000000007,
-          "expectedProfit": 1283.3333333333346,
-          "strategy": "Buy YES Kalshi + NO PM"
-        },
-        {
-          "artist": "Amaryllis Fox Kennedy",
-          "roiPct": 0.20000000000000018,
-          "expectedProfit": 1000.0000000000009,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 1.135845,
+          "expectedProfit": 4543.38,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 395200,
+          "fees": {
+            "kalshiFee": 27.98,
+            "pmFee": 256.62,
+            "kalshiFeeDetails": "Kalshi YES buy 400000 @ $0.00 + NO sell Infinity @ $0.00 = $27.98",
+            "pmFeeDetails": "Polymarket NO buy 400000 @ $0.99 (θ=0.05) = $256.62",
+            "netProfitIfKalshiWins": 4772.02,
+            "netProfitIfPmWins": 4543.38,
+            "worstCaseNetProfit": 4543.38
+          }
         },
         {
           "artist": "Derek Harvey",
-          "roiPct": 2.300000000000002,
-          "expectedProfit": 10350.00000000001,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 2.4686449998861884,
+          "expectedProfit": 21689.021240000075,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 855736.9199999999,
+          "fees": {
+            "kalshiFee": 61.44,
+            "pmFee": 1154.05876,
+            "kalshiFeeDetails": "Kalshi YES buy 878580 @ $0.00 + NO sell Infinity @ $0.00 = $61.44",
+            "pmFeeDetails": "Polymarket NO buy 878580 @ $0.97 (θ=0.05) = $1154.06",
+            "netProfitIfKalshiWins": 22781.640000000076,
+            "netProfitIfPmWins": 21689.021240000075,
+            "worstCaseNetProfit": 21689.021240000075
+          }
         },
         {
           "artist": "Devin Nunes",
-          "roiPct": 2.200000000000002,
-          "expectedProfit": 7966.255000000007,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 1.9733799997155081,
+          "expectedProfit": 2774.7301499999817,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 137655.23200000002,
+          "fees": {
+            "kalshiFee": 48.97,
+            "pmFee": 178.03785,
+            "kalshiFeeDetails": "Kalshi YES buy 140608 @ $0.01 + NO sell Infinity @ $0.00 = $48.97",
+            "pmFeeDetails": "Polymarket NO buy 140608 @ $0.97 (θ=0.05) = $178.04",
+            "netProfitIfKalshiWins": 2903.797999999982,
+            "netProfitIfPmWins": 2774.7301499999817,
+            "worstCaseNetProfit": 2774.7301499999817
+          }
         },
         {
           "artist": "Kash Patel",
-          "roiPct": 0.10000000000000009,
-          "expectedProfit": 3370.330000000003,
-          "strategy": "Buy YES Kalshi + NO PM"
-        },
-        {
-          "artist": "Michael Ellis",
-          "roiPct": 1.0000000000000009,
-          "expectedProfit": 0.2913880445795342,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "roiPct": 0.185045,
+          "expectedProfit": 740.18,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 399200,
+          "fees": {
+            "kalshiFee": 27.98,
+            "pmFee": 59.82,
+            "kalshiFeeDetails": "Kalshi YES buy 400000 @ $0.00 + NO sell Infinity @ $0.00 = $27.98",
+            "pmFeeDetails": "Polymarket NO buy 400000 @ $1.00 (θ=0.05) = $59.82",
+            "netProfitIfKalshiWins": 772.02,
+            "netProfitIfPmWins": 740.18,
+            "worstCaseNetProfit": 740.18
+          }
         },
         {
           "artist": "Mike Flynn",
-          "roiPct": 0.6000000000000005,
-          "expectedProfit": 35723.79000000003,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 0.45807800000000587,
+          "expectedProfit": 763.463333333343,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 165833.3333333333,
+          "fees": {
+            "kalshiFee": 69.87,
+            "pmFee": 66.13333,
+            "kalshiFeeDetails": "Kalshi YES buy 166667 @ $0.00 + NO sell 500000 @ $0.00 = $69.87",
+            "pmFeeDetails": "Polymarket NO buy 166667 @ $0.99 (θ=0.05) = $66.13",
+            "netProfitIfKalshiWins": 763.463333333343,
+            "netProfitIfPmWins": 767.200003333343,
+            "worstCaseNetProfit": 763.463333333343
+          }
+        },
+        {
+          "artist": "Mike Waltz",
+          "roiPct": 0.185045,
+          "expectedProfit": 92.5225,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 49900,
+          "fees": {
+            "kalshiFee": 3.5,
+            "pmFee": 7.4775,
+            "kalshiFeeDetails": "Kalshi YES buy 50000 @ $0.00 + NO sell Infinity @ $0.00 = $3.50",
+            "pmFeeDetails": "Polymarket NO buy 50000 @ $1.00 (θ=0.05) = $7.48",
+            "netProfitIfKalshiWins": 96.5,
+            "netProfitIfPmWins": 92.5225,
+            "worstCaseNetProfit": 92.5225
+          }
         },
         {
           "artist": "Stacey Dixon",
-          "roiPct": 0.20000000000000018,
-          "expectedProfit": 24756.600000000017,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 0.18504500000769977,
+          "expectedProfit": 24055.88701000097,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 12974019.959999999,
+          "fees": {
+            "kalshiFee": 909.1,
+            "pmFee": 1944.15299,
+            "kalshiFeeDetails": "Kalshi YES buy 13000020 @ $0.00 + NO sell Infinity @ $0.00 = $909.10",
+            "pmFeeDetails": "Polymarket NO buy 13000020 @ $1.00 (θ=0.05) = $1944.15",
+            "netProfitIfKalshiWins": 25090.94000000097,
+            "netProfitIfPmWins": 24055.88701000097,
+            "worstCaseNetProfit": 24055.88701000097
+          }
         },
         {
           "artist": "Stephen Miller",
-          "roiPct": 0.20000000000000018,
-          "expectedProfit": 11194.60000000001,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "roiPct": 0.1850449999347016,
+          "expectedProfit": 14167.60033000056,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 7640987.399999999,
+          "fees": {
+            "kalshiFee": 535.41,
+            "pmFee": 1144.99967,
+            "kalshiFeeDetails": "Kalshi YES buy 7656300 @ $0.00 + NO sell Infinity @ $0.00 = $535.41",
+            "pmFeeDetails": "Polymarket NO buy 7656300 @ $1.00 (θ=0.05) = $1145.00",
+            "netProfitIfKalshiWins": 14777.190000000559,
+            "netProfitIfPmWins": 14167.60033000056,
+            "worstCaseNetProfit": 14167.60033000056
+          }
         }
       ]
     }
@@ -3588,6 +3712,53 @@
     "expiryDate": null,
     "id": "1781559572788-4zmyegc",
     "createdAt": "2026-06-15T21:39:32.788Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-pa12-26",
+    "polymarketUrl": "https://polymarket.com/event/pa-12-house-election-winner/",
+    "eventTitle": "PA-12 House Election Winner",
+    "category": "",
+    "expiryDate": "2026-11-03T00:00:00Z",
+    "id": "1781560715538-upp66c6",
+    "createdAt": "2026-06-15T21:58:35.538Z",
+    "lastScanResult": {
+      "bestRoiPct": 3.718,
+      "bestProfit": 92.95,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-06-15T22:01:22.357Z",
+      "allArbs": [
+        {
+          "artist": "Summer Lee + Democratic Party",
+          "roiPct": 3.718,
+          "expectedProfit": 92.95,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 2400,
+          "fees": {
+            "kalshiFee": 3.43,
+            "pmFee": 7.05,
+            "kalshiFeeDetails": "Kalshi NO sell 2500 @ $0.02 = $3.43",
+            "pmFeeDetails": "Polymarket YES buy 2500 @ $0.94 (θ=0.05) = $7.05",
+            "netProfitIfKalshiWins": 96.57,
+            "netProfitIfPmWins": 92.95,
+            "worstCaseNetProfit": 92.95
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ca32-26",
+    "polymarketUrl": "https://polymarket.com/event/ca-32-house-election-winner/",
+    "eventTitle": "CA-32 House Election Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781560966860-c4tye1g",
+    "createdAt": "2026-06-15T22:02:46.860Z",
     "lastScanResult": null
   }
 ]

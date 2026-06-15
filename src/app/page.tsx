@@ -61,6 +61,7 @@ const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
 
 // ─── MF category filter storage key ───
 const MF_CATEGORIES_KEY = "h2h-mf-categories";
+const MF_EXPIRY_DAYS_KEY = "h2h-mf-expiry-days";
 
 /** Read persisted selected categories from localStorage */
 function getStoredMfCategories(): string[] {
@@ -78,6 +79,26 @@ function persistMfCategories(cats: string[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(MF_CATEGORIES_KEY, JSON.stringify(cats));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+/** Read persisted expiry days from localStorage */
+function getStoredMfExpiryDays(): number {
+  if (typeof window === "undefined") return 365;
+  try {
+    const raw = localStorage.getItem(MF_EXPIRY_DAYS_KEY);
+    const n = raw ? parseInt(raw, 10) : 365;
+    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : 365;
+  } catch {
+    return 365;
+  }
+}
+
+/** Persist expiry days to localStorage */
+function persistMfExpiryDays(days: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(MF_EXPIRY_DAYS_KEY, String(days));
   } catch { /* quota exceeded – ignore */ }
 }
 
@@ -589,6 +610,13 @@ export default function Home() {
         } else if (legacyCat && CATEGORIES.includes(legacyCat)) {
           setMfCategories([legacyCat]);
         }
+        const maxDays = params.get("maxDays");
+        if (maxDays) {
+          const n = parseInt(maxDays, 10);
+          if (Number.isFinite(n) && n >= 1 && n <= 365) {
+            setMfExpiryDays(n);
+          }
+        }
       } else {
         setViewMode("overview");
       }
@@ -969,6 +997,17 @@ export default function Home() {
     window.history.replaceState({ view: "marketfinder" }, "", `/?${params.toString()}`);
   }, []);
 
+  // MF expiry days slider — updates state + URL
+  const setMfExpiryDaysUrl = useCallback((days: number) => {
+    const clamped = Math.min(365, Math.max(1, days));
+    setMfExpiryDays(clamped);
+    persistMfExpiryDays(clamped);
+    const params = new URLSearchParams(window.location.search);
+    params.set("view", "marketfinder");
+    params.set("maxDays", String(clamped));
+    window.history.replaceState({ view: "marketfinder" }, "", `/?${params.toString()}`);
+  }, []);
+
   const goToOverview = () => {
     stopPolling();
     setViewMode("overview");
@@ -1056,6 +1095,7 @@ export default function Home() {
 
   // MF spread threshold (configurable, default 14%)
   const [mfSpreadThreshold, setMfSpreadThreshold] = useState(14);
+  const [mfExpiryDays, setMfExpiryDays] = useState(getStoredMfExpiryDays);
 
   // ── MF matched/unmatched filter (all | matched | unmatched) ──
   const [mfMatchFilter, setMfMatchFilter] = useState<"all" | "matched" | "unmatched">("all");
@@ -1148,7 +1188,8 @@ export default function Home() {
     if (viewMode !== "marketfinder") return;
 
     const isCacheValid = mfCacheRef.current.fetchedAt > 0 && 
-      (Date.now() - mfCacheRef.current.fetchedAt) < MF_CACHE_TTL_MS;
+      (Date.now() - mfCacheRef.current.fetchedAt) < MF_CACHE_TTL_MS &&
+      !window.location.search.includes("fresh=true");
 
     if (isCacheValid && mfCacheRef.current.data.length > 0) {
       // Use cached data instantly
@@ -1158,7 +1199,7 @@ export default function Home() {
     } else {
       fetchFreshMfMarkets(true);
     }
-  }, [viewMode]);
+  }, [viewMode, mfCategories, mfExpiryDays]);
 
   // Auto-refresh interval for MarketFinder (60s polling)
   useEffect(() => {
@@ -1270,17 +1311,19 @@ export default function Home() {
     setTimeout(() => setMfBulkMsg(""), 3000);
   }, [mfSelectedIds, mfBulkSaving, mfMarkets]);
 
-  /** Fetch fresh MF markets from API, optionally showing loading state */
+  /** Fetch fresh MF markets from API with current category + expiry filters */
   const fetchFreshMfMarkets = useCallback((showLoading: boolean) => {
     if (showLoading) setMfLoading(true);
     setMfError("");
-    fetch("/api/predictionhunt/markets", { headers: { "Cache-Control": "no-store" } })
+    const cats = mfCategories.join(",");
+    const url = `/api/predictionhunt/markets?${cats ? `category=${encodeURIComponent(cats)}&` : ""}maxDays=${mfExpiryDays}`;
+    fetch(url, { headers: { "Cache-Control": "no-store" } })
       .then((r) => r.json())
       .then((d) => {
         if (d.success) {
           const markets = d.markets || [];
           setMfMarkets(markets);
-          setMfLastSync(d.lastSync);
+          if (d.lastSync) setMfLastSync(d.lastSync);
           // Update cache
           mfCacheRef.current = { data: markets, fetchedAt: Date.now() };
         }
@@ -1288,7 +1331,7 @@ export default function Home() {
       })
       .catch(() => setMfError("Failed to load MarketFinder data"))
       .finally(() => { if (showLoading) setMfLoading(false); });
-  }, []);
+  }, [mfCategories, mfExpiryDays]);
 
   /** Fetch ALL markets from both platforms (raw, unmatched) */
   const fetchAllMfMarkets = useCallback(() => {
@@ -1497,6 +1540,7 @@ export default function Home() {
                 bulkSaving={mfBulkSaving}
                 bulkMsg={mfBulkMsg}
                 spreadThreshold={mfSpreadThreshold}
+                expiryDays={mfExpiryDays}
                 categories={mfCategories}
                 autoRefreshEnabled={mfAutoRefreshEnabled}
                 onFetch={() => {
@@ -1510,16 +1554,8 @@ export default function Home() {
                     .then((d) => {
                       if (d.success) {
                         setMfLastSync(d.synced);
-                        return fetch("/api/predictionhunt/markets", { headers: { "Cache-Control": "no-store" } })
-                          .then((r) => r.json())
-                          .then((d2) => {
-                            if (d2.success) {
-                              const markets = d2.markets || [];
-                              setMfMarkets(markets);
-                              setMfLastSync(d2.lastSync);
-                              mfCacheRef.current = { data: markets, fetchedAt: Date.now() };
-                            }
-                          });
+                        // After full sync, refresh with current filters
+                        fetchFreshMfMarkets(false);
                       } else {
                         setMfError(d.error || "Sync failed");
                       }
@@ -1562,6 +1598,7 @@ export default function Home() {
                 onToggleSelectAll={toggleMfSelectAll}
                 onBulkSave={mfBulkSave}
                 onSetCategories={setMfCategoriesUrl}
+                onSetExpiryDays={setMfExpiryDaysUrl}
                 onToggleAutoRefresh={(enabled) => {
                   setMfAutoRefreshEnabled(enabled);
                   persistMfAutoRefresh(enabled);
@@ -2541,6 +2578,7 @@ function MarketFinderPanel({
   bulkSaving,
   bulkMsg,
   spreadThreshold,
+  expiryDays,
   categories,
   autoRefreshEnabled,
   onFetch,
@@ -2550,6 +2588,7 @@ function MarketFinderPanel({
   onToggleSelectAll,
   onBulkSave,
   onSetCategories,
+  onSetExpiryDays,
   onToggleAutoRefresh,
   allMarkets,
   showAllPlatforms,
@@ -2569,6 +2608,7 @@ function MarketFinderPanel({
   bulkSaving: boolean;
   bulkMsg: string;
   spreadThreshold: number;
+  expiryDays: number;
   categories: string[];
   autoRefreshEnabled: boolean;
   onFetch: () => void;
@@ -2578,6 +2618,7 @@ function MarketFinderPanel({
   onToggleSelectAll: (visibleIds: string[]) => void;
   onBulkSave: () => void;
   onSetCategories: (cats: string[]) => void;
+  onSetExpiryDays: (days: number) => void;
   onToggleAutoRefresh: (enabled: boolean) => void;
   allMarkets: any[];
   showAllPlatforms: boolean;
@@ -2657,7 +2698,7 @@ function MarketFinderPanel({
           <p className="text-xs text-[#5E6875] mt-0.5">
             {showAllPlatforms
               ? `All platforms — ${allMarkets.length} markets`
-              : `PredictionHunt matched markets — sorted by spread (${spreadThreshold}% threshold)`}
+              : `PredictionHunt matched markets — ≤${expiryDays} ${expiryDays === 1 ? "day" : "days"} expiry, ${categories.length > 0 ? categories.length + " categories" : "all categories"}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -2734,6 +2775,22 @@ function MarketFinderPanel({
         <span className="text-xs font-mono text-[#5DBE81] min-w-[3rem] text-right">{spreadThreshold}%</span>
       </div>
 
+      {/* Expiry days control */}
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
+        <Calendar className="w-3.5 h-3.5 text-[#5E6875]" />
+        <span className="text-xs text-[#5E6875]">Expiry within:</span>
+        <input
+          type="range"
+          min="1"
+          max="365"
+          step="1"
+          value={expiryDays}
+          onChange={(e) => onSetExpiryDays(Number(e.target.value))}
+          className="flex-1 accent-[#5DBE81] h-1"
+        />
+        <span className="text-xs font-mono text-[#5DBE81] min-w-[3rem] text-right">{expiryDays}d</span>
+      </div>
+
       {/* Category filter — multi-select chips */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
         <Filter className="w-3.5 h-3.5 text-[#5E6875] shrink-0" />
@@ -2749,6 +2806,8 @@ function MarketFinderPanel({
                 } else {
                   onSetCategories([...categories, c]);
                 }
+                // Changing categories fetches fresh filtered markets
+                onFetch();
               }}
               className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
                 isActive
@@ -2762,7 +2821,10 @@ function MarketFinderPanel({
         })}
         {categories.length > 0 && (
           <button
-            onClick={() => onSetCategories([])}
+            onClick={() => {
+              onSetCategories([]);
+              onFetch();
+            }}
             className="px-2 py-0.5 rounded-full text-[11px] text-[#232E3C] hover:text-[#8A9BA8] transition-colors"
           >
             Clear
