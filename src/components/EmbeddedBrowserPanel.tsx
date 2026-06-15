@@ -63,6 +63,7 @@ export function EmbeddedBrowserPanel({
   const [fullscreen, setFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingRef = useRef(loading);
   const dragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
@@ -85,7 +86,8 @@ export function EmbeddedBrowserPanel({
 
     const checkBlocked = () => {
       timerRef.current = setTimeout(() => {
-        if (loading && iframeRef.current) {
+        // Use ref to avoid stale closure
+        if (loadingRef.current) {
           setEmbedBlocked(true);
           setLoading(false);
         }
@@ -109,6 +111,11 @@ export function EmbeddedBrowserPanel({
     setEmbedBlocked(true);
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
+
+  // Sync loadingRef with loading state
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   // Force refresh by toggling key
   const [refreshKey, setRefreshKey] = useState(0);
