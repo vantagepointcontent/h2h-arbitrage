@@ -688,13 +688,13 @@ export default function Home() {
   };
 
   // Scan ALL saved markets with LIVE prices
-  const scanAllMarkets = async () => {
+  const scanAllMarkets = async (marketsToScan?: SavedMarket[]) => {
     if (scanningAll) return;
     setScanningAll(true);
     setScanAllError("");
     const failed: string[] = [];
     const refreshed: { id: string; result: any }[] = [];
-    const markets = savedMarketsRef.current;
+    const markets = marketsToScan ?? savedMarketsRef.current;
     const total = markets.length;
     setScanProgress({ current: 0, total });
 
@@ -1999,7 +1999,7 @@ function MarketSidebar({
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
   showExpired: boolean;
   onToggleShowExpired: () => void;
-  onScanAll: () => void;
+  onScanAll: (markets: SavedMarket[]) => void;
   scanningAll: boolean;
   scanProgress: { current: number; total: number };
   scanAllError: string;
@@ -2112,7 +2112,7 @@ function MarketSidebar({
               A-Z{sort === "name" && (sortDir === "asc" ? " ↑" : " ↓")}
             </button>
             <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
-            <button onClick={onScanAll} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan All">
+            <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
               {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             </button>
           </div>

@@ -3,18 +3,18 @@
     "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
     "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
     "eventTitle": "SpaceX IPO by ___ ?",
-    "expiryDate": "2026-12-30T23:00:00.000Z",
+    "expiryDate": "2026-12-31T00:00:00Z",
     "id": "1779543785453-0b5xeq5",
     "createdAt": "2026-05-23T13:43:05.453Z",
     "lastScanResult": {
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 4,
-      "matchedCount": 4,
-      "kalshiCount": 12,
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 0,
       "pmCount": 8,
-      "scannedAt": "2026-06-12T11:35:12.302Z",
+      "scannedAt": "2026-06-15T21:42:05.332Z",
       "allArbs": []
     },
     "category": "Finances"
@@ -680,23 +680,15 @@
     "id": "1779918229304-wucayqb",
     "createdAt": "2026-05-27T21:43:49.304Z",
     "lastScanResult": {
-      "bestRoiPct": 2.0000000000000018,
-      "bestProfit": 12.46818181818183,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 9,
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-15T20:57:39.049Z",
-      "allArbs": [
-        {
-          "artist": "Darializa Avila Chevalier",
-          "roiPct": 2.0000000000000018,
-          "expectedProfit": 12.46818181818183,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 610.9409090909091
-        }
-      ]
+      "scannedAt": "2026-06-15T21:39:03.301Z",
+      "allArbs": []
     }
   },
   {
@@ -708,21 +700,30 @@
     "id": "1779918307860-isszlh4",
     "createdAt": "2026-05-27T21:45:07.860Z",
     "lastScanResult": {
-      "bestRoiPct": 1.100000000000001,
-      "bestProfit": 7.371134020618563,
+      "bestRoiPct": 0.8955538461538511,
+      "bestProfit": 6.001134020618591,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 5,
       "matchedCount": 1,
       "kalshiCount": 3,
       "pmCount": 3,
-      "scannedAt": "2026-06-15T20:58:22.170Z",
+      "scannedAt": "2026-06-15T21:33:09.554Z",
       "allArbs": [
         {
           "artist": "xAI release Grok 5 (Jul 2026) + June 30, 2026",
-          "roiPct": 1.100000000000001,
-          "expectedProfit": 7.371134020618563,
+          "roiPct": 0.8955538461538511,
+          "expectedProfit": 6.001134020618591,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 662.7319587628866
+          "totalStake": 662.7319587628866,
+          "fees": {
+            "kalshiFee": 1.37,
+            "pmFee": 0.6245,
+            "kalshiFeeDetails": "Kalshi NO sell 670 @ $0.97 = $1.37",
+            "pmFeeDetails": "Polymarket YES buy 670 @ $0.02 (θ=0.05) = $0.62",
+            "netProfitIfKalshiWins": 6.001134020618591,
+            "netProfitIfPmWins": 6.746634020618591,
+            "worstCaseNetProfit": 6.001134020618591
+          }
         }
       ]
     }
@@ -1609,7 +1610,7 @@
       "matchedCount": 0,
       "kalshiCount": 7,
       "pmCount": 15,
-      "scannedAt": "2026-06-15T20:57:57.554Z",
+      "scannedAt": "2026-06-15T21:34:05.837Z",
       "allArbs": []
     }
   },
@@ -3009,7 +3010,7 @@
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 12,
-      "scannedAt": "2026-06-15T20:56:35.225Z",
+      "scannedAt": "2026-06-15T21:34:05.340Z",
       "allArbs": []
     }
   },
@@ -3049,7 +3050,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 20,
-      "scannedAt": "2026-06-15T20:56:59.022Z",
+      "scannedAt": "2026-06-15T21:33:38.136Z",
       "allArbs": []
     }
   },
@@ -3577,6 +3578,16 @@
     "expiryDate": null,
     "id": "1781557550759-0npner8",
     "createdAt": "2026-06-15T21:05:50.759Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxufcflyweighttitle/ufc-flyweight-title/kxufcflyweighttitle-26",
+    "polymarketUrl": "https://polymarket.com/event/who-will-be-ufc-flyweight-champion-at-the-end-of-2026",
+    "eventTitle": "Who will be UFC Flyweight champion at the end of 2026?",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781559572788-4zmyegc",
+    "createdAt": "2026-06-15T21:39:32.788Z",
     "lastScanResult": null
   }
 ]
