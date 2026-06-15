@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       if (!o.kalshi || !o.polymarket) {
         return {
           ...o,
-          arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+          arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, fees: undefined },
         };
       }
 
@@ -205,8 +205,8 @@ export async function POST(request: NextRequest) {
       const depthKNo = parseDepth(o.kalshi.noAskDepth) || parseDepth(o.kalshi.yesAskDepth);
       // PM liquidityNum is NOT order depth — only Kalshi depth limits capital.
       // Use Infinity for PM so profit isn't artificially capped.
-      const depthPYes = o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
-      const depthPNo = o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
+      const depthPYes = o.polymarket.askDepth != null && o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
+      const depthPNo = o.polymarket.noAskDepth != null && o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
 
       const arbResult = calculateArbitrageMax(
         o.kalshi,
@@ -215,6 +215,7 @@ export async function POST(request: NextRequest) {
         depthKNo,
         depthPYes,
         depthPNo,
+        pmEvent.title,
       );
 
       return {
@@ -275,6 +276,7 @@ export async function POST(request: NextRequest) {
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
+            fees: o.arbitrage!.fees,
           })),
         };
         await updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate);

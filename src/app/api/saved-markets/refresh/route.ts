@@ -65,6 +65,15 @@ interface MarketRefreshResult {
     expectedProfit: number;
     strategy: string;
     totalStake: number;
+    fees?: {
+      kalshiFee: number;
+      pmFee: number;
+      kalshiFeeDetails: string;
+      pmFeeDetails: string;
+      netProfitIfKalshiWins: number;
+      netProfitIfPmWins: number;
+      worstCaseNetProfit: number;
+    };
   }[];
   error?: string;
 }
@@ -162,15 +171,15 @@ async function refreshSingleMarket(market: SavedMarket, manualMatches: any[]): P
 
   const withArbitrage = outcomes.map(o => {
     if (!o.kalshi || !o.polymarket) {
-      return { ...o, arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 } };
+      return { ...o, arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, fees: undefined } };
     }
     const depthKYes = parseDepth(o.kalshi.yesAskDepth);
     const depthKNo = parseDepth(o.kalshi.noAskDepth) || parseDepth(o.kalshi.yesAskDepth);
     // PM liquidityNum is NOT order depth — only Kalshi depth limits capital.
     // Use Infinity for PM so profit isn't artificially capped.
-    const depthPYes = o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
-    const depthPNo = o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
-    const arbResult = calculateArbitrageMax(o.kalshi, o.polymarket, depthKYes, depthKNo, depthPYes, depthPNo);
+    const depthPYes = o.polymarket.askDepth != null && o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
+    const depthPNo = o.polymarket.noAskDepth != null && o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
+    const arbResult = calculateArbitrageMax(o.kalshi, o.polymarket, depthKYes, depthKNo, depthPYes, depthPNo, market.category || pmEvent.title);
     return { ...o, arbitrage: { ...arbResult, apyPct: computeApy(arbResult.roiPct, pmEvent.endDate) } };
   });
 
@@ -201,6 +210,7 @@ async function refreshSingleMarket(market: SavedMarket, manualMatches: any[]): P
       expectedProfit: o.arbitrage!.expectedProfit,
       strategy: o.arbitrage!.strategy,
       totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
+      fees: o.arbitrage!.fees,
     })),
   };
 }
@@ -245,6 +255,8 @@ export async function GET(_: NextRequest) {
           roiPct: a.roiPct,
           expectedProfit: a.expectedProfit,
           strategy: a.strategy,
+          totalStake: a.totalStake,
+          fees: a.fees,
         })),
       };
       await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);

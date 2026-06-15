@@ -7,6 +7,8 @@ import {
   similarity,
   matchOutcomes,
   buildPmArbShape,
+  calcKalshiFee,
+  calcPolymarketFee,
 } from './matcher';
 import { getClobPrices } from './polymarket-clob';
 

@@ -42,10 +42,135 @@ export interface UnifiedOutcome {
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket' | null;
     sellPrice: number;
+    /** Fee-adjusted profit per winning platform for the buy side */
+    fees?: {
+      kalshiFee: number;
+      pmFee: number;
+      kalshiFeeDetails: string;
+      pmFeeDetails: string;
+      netProfitIfKalshiWins: number;
+      netProfitIfPmWins: number;
+      worstCaseNetProfit: number;
+    };
   };
   source: 'auto' | 'manual';
   /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
   negRisk?: boolean;
+}
+
+export interface FeeInputs {
+  /** Kalshi taker fee rate (default 0.07) */
+  kalshiTakerRate?: number;
+  /** Kalshi maker fee rate (default 0.0175) */
+  kalshiMakerRate?: number;
+  /** Polymarket theta coefficient by category (default 0.05) */
+  pmTheta?: number;
+}
+
+/** Default fee parameters per platform. Polymarket theta varies by category. */
+export function getPolymarketTheta(category?: string): number {
+  const c = (category || 'other').toLowerCase();
+  if (c.includes('crypto')) return 0.07;
+  if (c.includes('sport')) return 0.03;
+  if (c.includes('finance')) return 0.04;
+  if (c.includes('politic')) return 0.04;
+  if (c.includes('econom')) return 0.05;
+  if (c.includes('culture')) return 0.05;
+  if (c.includes('weather')) return 0.05;
+  if (c.includes('mention')) return 0.04;
+  if (c.includes('tech')) return 0.04;
+  if (c.includes('geopol')) return 0;
+  return 0.05;
+}
+
+/** Kalshi fee: round up to nearest cent. Default taker rate 0.07. */
+export function calcKalshiFee(contracts: number, price: number, rate = 0.07): number {
+  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
+  const raw = rate * contracts * price * (1 - price);
+  return Math.ceil(raw * 100) / 100;
+}
+
+/** Polymarket fee: theta * contracts * price * (1 - price). Rounded to 5 decimals. */
+export function calcPolymarketFee(contracts: number, price: number, theta = 0.05): number {
+  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
+  const raw = theta * contracts * price * (1 - price);
+  return Math.round(raw * 100000) / 100000;
+}
+
+/** Format a fee value with 2 decimals and a concise note. */
+export function formatFee(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+/** Compute gross profit and fee-adjusted net profit for a two-leg arbitrage. */
+export function computeArbitrageFees(
+  strategy: string,
+  capital: number,
+  kalshiStake: number,
+  pmStake: number,
+  kalshiBuyPrice: number,
+  kalshiSellPrice: number,
+  pmBuyPrice: number,
+  pmSellPrice: number,
+  category?: string,
+): {
+  grossProfit: number;
+  kalshiFee: number;
+  pmFee: number;
+  netProfitIfKalshiWins: number;
+  netProfitIfPmWins: number;
+  worstCaseNetProfit: number;
+  kalshiFeeDetails: string;
+  pmFeeDetails: string;
+} {
+  const grossProfit = capital - kalshiStake - pmStake;
+
+  let kalshiFeeAmount = 0;
+  let kalshiFeeDetails = 'Kalshi: no fee (0 contracts or settled)';
+  let pmFeeAmount = 0;
+  let pmFeeDetails = 'Polymarket: no fee (0 contracts or settled)';
+
+  if (strategy.includes('YES Kalshi')) {
+    // Buy YES on Kalshi at kalshiBuyPrice, sell NO on Kalshi at 1 - kalshiSellPrice
+    const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
+    const kalshiNoContracts = kalshiStake / (1 - kalshiSellPrice);
+    kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice) + calcKalshiFee(kalshiNoContracts, 1 - kalshiSellPrice);
+    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${kalshiBuyPrice.toFixed(2)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${(1 - kalshiSellPrice).toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+  } else if (strategy.includes('NO Kalshi')) {
+    // Buy YES on PM, sell NO on Kalshi
+    const kalshiNoContracts = kalshiStake / kalshiSellPrice;
+    kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice);
+    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${kalshiSellPrice.toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+  }
+
+  if (strategy.includes('YES PM')) {
+    const pmYesContracts = pmStake / pmBuyPrice;
+    const pmTheta = getPolymarketTheta(category);
+    pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
+    pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${pmBuyPrice.toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+  } else if (strategy.includes('NO PM')) {
+    const pmNoContracts = pmStake / (1 - pmBuyPrice);
+    const pmTheta = getPolymarketTheta(category);
+    pmFeeAmount = calcPolymarketFee(pmNoContracts, 1 - pmBuyPrice, pmTheta);
+    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${(1 - pmBuyPrice).toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+  }
+
+  // Net profit if Kalshi side wins (Kalshi YES pays $1 per contract, PM NO loses)
+  const netProfitIfKalshiWins = capital - kalshiStake - pmStake - kalshiFeeAmount;
+  // Net profit if PM side wins (PM YES pays $1 per contract, Kalshi NO loses)
+  const netProfitIfPmWins = capital - kalshiStake - pmStake - pmFeeAmount;
+  const worstCaseNetProfit = Math.min(netProfitIfKalshiWins, netProfitIfPmWins);
+
+  return {
+    grossProfit,
+    kalshiFee: kalshiFeeAmount,
+    pmFee: pmFeeAmount,
+    netProfitIfKalshiWins,
+    netProfitIfPmWins,
+    worstCaseNetProfit,
+    kalshiFeeDetails,
+    pmFeeDetails,
+  };
 }
 
 export interface ManualMatch {
@@ -282,6 +407,7 @@ export function calculateArbitrageMax(
   depthKNo: number,
   depthPYes: number,
   depthPNo: number,
+  category?: string,
 ) {
   const kYes = kalshi.yesAsk;
   const kNo = kalshi.noAsk;
@@ -297,6 +423,7 @@ export function calculateArbitrageMax(
   let buyPrice = 0;
   let sellPlatform: 'kalshi' | 'polymarket' | null = null;
   let sellPrice = 0;
+  let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
 
   if (kYes + pNo < 1) {
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
@@ -308,7 +435,18 @@ export function calculateArbitrageMax(
       const roi = 1 - (kYes + pNo);
       const profit = effectiveCapital * roi;
       if (profit > maxProfit) {
-        maxProfit = profit;
+        const fees = computeArbitrageFees(
+          'Buy YES Kalshi + NO PM',
+          effectiveCapital,
+          effectiveCapital * kYes,
+          effectiveCapital * pNo,
+          kYes,
+          kNo,
+          pYes,
+          pNo,
+          category,
+        );
+        maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES Kalshi + NO PM';
         bestCapital = effectiveCapital;
         kalshiStakeResult = effectiveCapital * kYes;
@@ -317,6 +455,15 @@ export function calculateArbitrageMax(
         buyPrice = kYes;
         sellPlatform = 'polymarket';
         sellPrice = pNo;
+        feeInfo = {
+          kalshiFee: fees.kalshiFee,
+          pmFee: fees.pmFee,
+          kalshiFeeDetails: fees.kalshiFeeDetails,
+          pmFeeDetails: fees.pmFeeDetails,
+          netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
+          netProfitIfPmWins: fees.netProfitIfPmWins,
+          worstCaseNetProfit: fees.worstCaseNetProfit,
+        };
       }
     }
   }
@@ -330,7 +477,18 @@ export function calculateArbitrageMax(
       const roi = 1 - (pYes + kNo);
       const profit = effectiveCapital * roi;
       if (profit > maxProfit) {
-        maxProfit = profit;
+        const fees = computeArbitrageFees(
+          'Buy YES PM + NO Kalshi',
+          effectiveCapital,
+          effectiveCapital * kNo,
+          effectiveCapital * pYes,
+          kYes,
+          kNo,
+          pYes,
+          pNo,
+          category,
+        );
+        maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES PM + NO Kalshi';
         bestCapital = effectiveCapital;
         kalshiStakeResult = effectiveCapital * kNo;
@@ -339,6 +497,15 @@ export function calculateArbitrageMax(
         buyPrice = pYes;
         sellPlatform = 'kalshi';
         sellPrice = kNo;
+        feeInfo = {
+          kalshiFee: fees.kalshiFee,
+          pmFee: fees.pmFee,
+          kalshiFeeDetails: fees.kalshiFeeDetails,
+          pmFeeDetails: fees.pmFeeDetails,
+          netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
+          netProfitIfPmWins: fees.netProfitIfPmWins,
+          worstCaseNetProfit: fees.worstCaseNetProfit,
+        };
       }
     }
   }
@@ -354,6 +521,7 @@ export function calculateArbitrageMax(
     buyPrice,
     sellPlatform,
     sellPrice,
+    fees: feeInfo,
   };
 }
 

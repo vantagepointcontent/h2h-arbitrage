@@ -147,7 +147,7 @@
     "polymarketUrl": "https://polymarket.com/event/2026-nhl-stanley-cup-champion",
     "eventTitle": "2026 NHL Stanley Cup Champion ",
     "category": "Sports",
-    "expiryDate": "2026-06-29T22:00:00.000Z",
+    "expiryDate": "2026-06-30T00:00:00Z",
     "id": "1779615862125-hsu3w3r",
     "createdAt": "2026-05-24T09:44:22.125Z",
     "lastScanResult": {
@@ -158,7 +158,7 @@
       "matchedCount": 31,
       "kalshiCount": 32,
       "pmCount": 32,
-      "scannedAt": "2026-06-15T20:50:20.854Z",
+      "scannedAt": "2026-06-15T21:00:14.950Z",
       "allArbs": [
         {
           "artist": "Carolina Hurricanes",
@@ -359,9 +359,9 @@
         {
           "artist": "Buffalo Sabres",
           "roiPct": 0.9000000000000008,
-          "expectedProfit": 0.37800000000000034,
+          "expectedProfit": 0.2636363636363639,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 41.622
+          "totalStake": 29.02929292929293
         },
         {
           "artist": "Pittsburgh Penguins",
@@ -680,21 +680,21 @@
     "id": "1779918229304-wucayqb",
     "createdAt": "2026-05-27T21:43:49.304Z",
     "lastScanResult": {
-      "bestRoiPct": 3.000000000000002,
-      "bestProfit": 20.93023255813955,
+      "bestRoiPct": 2.0000000000000018,
+      "bestProfit": 12.46818181818183,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 9,
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-15T17:45:15.760Z",
+      "scannedAt": "2026-06-15T20:57:39.049Z",
       "allArbs": [
         {
           "artist": "Darializa Avila Chevalier",
-          "roiPct": 3.000000000000002,
-          "expectedProfit": 20.93023255813955,
+          "roiPct": 2.0000000000000018,
+          "expectedProfit": 12.46818181818183,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 676.7441860465117
+          "totalStake": 610.9409090909091
         }
       ]
     }
@@ -708,15 +708,23 @@
     "id": "1779918307860-isszlh4",
     "createdAt": "2026-05-27T21:45:07.860Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 1,
+      "bestRoiPct": 1.100000000000001,
+      "bestProfit": 7.371134020618563,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 5,
       "matchedCount": 1,
       "kalshiCount": 3,
       "pmCount": 3,
-      "scannedAt": "2026-06-12T11:36:18.464Z",
-      "allArbs": []
+      "scannedAt": "2026-06-15T20:58:22.170Z",
+      "allArbs": [
+        {
+          "artist": "xAI release Grok 5 (Jul 2026) + June 30, 2026",
+          "roiPct": 1.100000000000001,
+          "expectedProfit": 7.371134020618563,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 662.7319587628866
+        }
+      ]
     }
   },
   {
@@ -1590,18 +1598,18 @@
     "polymarketUrl": "https://polymarket.com/event/which-company-has-the-best-coding-ai-model-end-of-june?r=predictionhunt",
     "eventTitle": "Top Coding AI this month",
     "category": "general",
-    "expiryDate": "2026-06-30",
+    "expiryDate": "2026-06-30T00:00:00Z",
     "id": "1780524922637-3s9i0ii",
     "createdAt": "2026-06-03T22:15:22.637Z",
     "lastScanResult": {
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 0,
+      "outcomeCount": 22,
       "matchedCount": 0,
       "kalshiCount": 7,
       "pmCount": 15,
-      "scannedAt": "2026-06-12T11:38:21.589Z",
+      "scannedAt": "2026-06-15T20:57:57.554Z",
       "allArbs": []
     }
   },
@@ -2994,23 +3002,15 @@
     "id": "1781019440010-qbaajhj",
     "createdAt": "2026-06-09T15:37:20.010Z",
     "lastScanResult": {
-      "bestRoiPct": 3.0000000000000027,
-      "bestProfit": 1.0533333333333343,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 12,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 12,
-      "scannedAt": "2026-06-15T15:30:33.091Z",
-      "allArbs": [
-        {
-          "artist": "Jackson Lahmeyer",
-          "roiPct": 3.0000000000000027,
-          "expectedProfit": 1.0533333333333343,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 34.05777777777778
-        }
-      ]
+      "scannedAt": "2026-06-15T20:56:35.225Z",
+      "allArbs": []
     }
   },
   {
@@ -3049,7 +3049,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 20,
-      "scannedAt": "2026-06-12T16:13:57.102Z",
+      "scannedAt": "2026-06-15T20:56:59.022Z",
       "allArbs": []
     }
   },
@@ -3450,7 +3450,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-15T20:55:42.437Z",
+      "scannedAt": "2026-06-15T20:56:12.296Z",
       "allArbs": [
         {
           "artist": "Republican party",
@@ -3468,5 +3468,115 @@
         }
       ]
     }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxethmaxy/how-high-will-ethereum-get-this-year/kxethmaxy-27jan01",
+    "polymarketUrl": "https://polymarket.com/event/what-price-will-ethereum-hit-before-2027",
+    "eventTitle": "What price will Ethereum hit in 2026?",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557279002-a6i4f2p",
+    "createdAt": "2026-06-15T21:01:19.002Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26a",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-a-winner",
+    "eventTitle": "World Cup Group A Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557348754-ps4tta8",
+    "createdAt": "2026-06-15T21:02:28.754Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26c",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-c-winner",
+    "eventTitle": "World Cup Group C Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557375920-ss0ytvx",
+    "createdAt": "2026-06-15T21:02:55.920Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26d",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-d-winner",
+    "eventTitle": "World Cup Group D Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557423946-kc9wkka",
+    "createdAt": "2026-06-15T21:03:43.946Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26f",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-f-winner",
+    "eventTitle": "World Cup Group F Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557450628-ck8xv9h",
+    "createdAt": "2026-06-15T21:04:10.628Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26g",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-g-winner",
+    "eventTitle": "World Cup Group G Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557467371-ab6zvw1",
+    "createdAt": "2026-06-15T21:04:27.371Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26h",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-h-winner",
+    "eventTitle": "World Cup Group H Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557479689-bbje5t2",
+    "createdAt": "2026-06-15T21:04:39.689Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26i",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-i-winner",
+    "eventTitle": "World Cup Group I Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557511105-uh1dits",
+    "createdAt": "2026-06-15T21:05:11.105Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26j",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-j-winner",
+    "eventTitle": "World Cup Group J Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557523602-in6vb3w",
+    "createdAt": "2026-06-15T21:05:23.602Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26k",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-k-winner",
+    "eventTitle": "World Cup Group K Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557537034-8s3wxws",
+    "createdAt": "2026-06-15T21:05:37.034Z",
+    "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxwcgroupwin/world-cup-group-winner/kxwcgroupwin-26l",
+    "polymarketUrl": "https://polymarket.com/event/world-cup-group-l-winner",
+    "eventTitle": "World Cup Group L Winner",
+    "category": "",
+    "expiryDate": null,
+    "id": "1781557550759-0npner8",
+    "createdAt": "2026-06-15T21:05:50.759Z",
+    "lastScanResult": null
   }
 ]
