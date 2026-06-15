@@ -295,6 +295,9 @@ interface SavedMarket {
     bestProfit: number;
     strategy: string;
     scannedAt: string;
+    kalshiCount?: number;
+    pmCount?: number;
+    matchedCount?: number;
     allArbs?: {
       artist: string;
       roiPct: number;
@@ -621,10 +624,12 @@ export default function Home() {
     await handleScanWithUrls(kUrl, pUrl);
   };
 
-  const handleScanWithUrls = async (kUrl: string, pUrl: string) => {
-    setLoading(true);
+  const handleScanWithUrls = async (kUrl: string, pUrl: string, silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setResult(null);
+    }
     setError("");
-    setResult(null);
     previousPricesRef.current = new Map();
     setPriceChanges(new Map());
 
@@ -655,7 +660,7 @@ export default function Home() {
     } catch (err: any) {
       setError(err.message || "Network error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -752,6 +757,9 @@ export default function Home() {
           bestProfit: r.result.bestProfit ?? 0,
           strategy: r.result.strategy || "",
           scannedAt: r.result.scannedAt || new Date().toISOString(),
+          kalshiCount: r.result.kalshiCount ?? 0,
+          pmCount: r.result.pmCount ?? 0,
+          matchedCount: r.result.matchedCount ?? 0,
           allArbs: (r.result.allArbs || []).map((a: any) => ({
             artist: a.artist,
             roiPct: a.roiPct,
@@ -905,7 +913,42 @@ export default function Home() {
     activeMarketIdRef.current = m.id;
     setViewMode("scan");
     window.history.pushState({ view: "scan", marketId: m.id }, "", `/?view=scan&id=${m.id}`);
-    handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+
+    // Build cached result from lastScanResult/liveResult to show instantly
+    const cached = m.liveResult ?? m.lastScanResult;
+    if (cached) {
+      const cachedResult: ScanResult = {
+        eventTitle: m.eventTitle,
+        kalshiCount: cached.kalshiCount ?? 0,
+        pmCount: cached.pmCount ?? 0,
+        matchedCount: cached.matchedCount ?? 0,
+        expiryDate: m.expiryDate ?? undefined,
+        outcomes: (cached.allArbs ?? []).map((a: any) => ({
+          artist: a.artist,
+          kalshi: null,
+          polymarket: null,
+          arbitrage: {
+            strategy: a.strategy,
+            kalshiStake: 0,
+            pmStake: 0,
+            expectedProfit: a.expectedProfit ?? 0,
+            roiPct: a.roiPct ?? 0,
+            apyPct: a.roiPct ?? 0,
+            buyPlatform: null,
+            buyPrice: 0,
+            sellPlatform: null,
+            sellPrice: 0,
+          },
+        })),
+        unmatchedKalshi: [],
+        unmatchedPolymarket: [],
+      };
+      setResult(cachedResult);
+      setLastUpdated(new Date(cached.scannedAt));
+    }
+
+    // Background refresh (silent)
+    handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
   };
 
   // View mode switcher
