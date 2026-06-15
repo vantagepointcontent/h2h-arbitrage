@@ -360,7 +360,7 @@ export function calculateArbitrageMax(
 
 /** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
 export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
-  if (!expiryDate) return 0;
+  if (!expiryDate) return roiPct; // No expiry = return raw ROI
   const expiry = new Date(expiryDate).getTime();
   const now = Date.now();
   if (expiry <= now) return 0;

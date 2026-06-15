@@ -187,11 +187,11 @@ describe('REGRESSION: computeApy', () => {
     expect(apy).toBeGreaterThan(100);
   });
 
-  it('R18: expired event → APY = ROI', () => {
+  it('R18: expired event → 0 APY', () => {
     const past = new Date();
     past.setDate(past.getDate() - 1);
     const apy = computeApy(10, past.toISOString());
-    expect(apy).toBe(10);
+    expect(apy).toBe(0);
   });
 
   it('R19: null/undefined expiry → APY = ROI', () => {

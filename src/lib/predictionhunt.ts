@@ -101,7 +101,7 @@ async function fetchPlatformMarkets(platform: string, category?: string, limit =
 }
 
 /* Fetch all categories for a platform, paginate via next_cursor */
-async function fetchAllPlatformMarkets(platform: string): Promise<PhV2Market[]> {
+export async function fetchAllPlatformMarkets(platform: string): Promise<PhV2Market[]> {
   const all: PhV2Market[] = [];
   for (const cat of CATEGORIES) {
     try {
@@ -129,8 +129,8 @@ function normalizeTitle(t: string): string {
  * Positive spread means arb opportunity (PM ask < Kalshi bid, or vice versa).
  */
 function calcSpreadPct(pmPrice: PhV2Market['price'], kalshiPrice: PhV2Market['price']): number | undefined {
-  const pmAsk = pmPrice?.yesAsk;
-  const kalshiBid = kalshiPrice?.yesBid;
+  const pmAsk = pmPrice?.yes_ask;
+  const kalshiBid = kalshiPrice?.yes_bid;
   if (pmAsk == null || kalshiBid == null || pmAsk <= 0 || kalshiBid <= 0) return undefined;
   const avg = (pmAsk + kalshiBid) / 2;
   if (avg === 0) return undefined;
@@ -173,8 +173,8 @@ function buildMatches(pmMarkets: PhV2Market[], kMarkets: PhV2Market[]): Predicti
       kalshiId: String(match.id),
       marketCount: 2,
       fetchedAt: new Date().toISOString(),
-      pmPrice: pm.price ?? undefined,
-      kalshiPrice: match.price ?? undefined,
+      pmPrice: { yesBid: pm.price.yes_bid, yesAsk: pm.price.yes_ask },
+      kalshiPrice: { yesBid: match.price.yes_bid, yesAsk: match.price.yes_ask },
       spreadPct,
     });
   }

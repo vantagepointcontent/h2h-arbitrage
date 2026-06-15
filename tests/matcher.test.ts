@@ -167,8 +167,8 @@ describe("calculateArbitrageMax", () => {
 });
 
 describe("computeApy", () => {
-  it("returns 0 for null expiry", () => {
-    expect(computeApy(10, null)).toBe(0);
+  it("returns ROI for null expiry (no annualization possible)", () => {
+    expect(computeApy(10, null)).toBe(10);
   });
 
   it("annualises ROI correctly for 30 days", () => {

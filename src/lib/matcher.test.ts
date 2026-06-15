@@ -56,9 +56,9 @@ describe('calculateArbitrageMax', () => {
 });
 
 describe('computeApy', () => {
-  it('ger 0 om ingen expiryDate', () => {
-    expect(computeApy(10, null)).toBe(0);
-    expect(computeApy(10, undefined)).toBe(0);
+  it('ger ROI som APY om ingen expiryDate (kan inte annualisera)', () => {
+    expect(computeApy(10, null)).toBe(10);
+    expect(computeApy(10, undefined)).toBe(10);
   });
 
   it('linjär annualisering: 10% på 30 dagar', () => {

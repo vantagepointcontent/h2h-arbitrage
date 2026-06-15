@@ -388,5 +388,13 @@
     "polymarketUrl": "https://polymarket.com/event/pa-16-house-election-winner/will-the-republican-party-win-the-pa-16-house-seat",
     "id": "1780612599981-gnde89z",
     "createdAt": "2026-06-04T22:36:39.981Z"
+  },
+  {
+    "kalshiTicker": "KXDEMCOREFOURSENATESWEEP-26NOV03",
+    "pmConditionId": "0x096f26b2abcfde3ee7863e7916ca17682522715f7631debd4878a43ee6c797a9",
+    "kalshiTitle": "KXDEMCOREFOURSENATESWEEP-26NOV03",
+    "pmTitle": "Will Democrats win all \"core four\" senate races?",
+    "id": "1781520173988-as9b8wt",
+    "createdAt": "2026-06-15T10:42:53.988Z"
   }
 ]
