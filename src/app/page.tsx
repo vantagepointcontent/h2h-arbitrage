@@ -986,6 +986,7 @@ export default function Home() {
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
+  const [showExpired, setShowExpired] = useState(false);
   const [overviewCategory, setOverviewCategory] = useState<string>("all");
   const [hideUnmatched, setHideUnmatched] = useState(getStoredHideUnmatched);
   const [scanningAll, setScanningAll] = useState(false);
@@ -1443,6 +1444,8 @@ export default function Home() {
           onToggleLayout={setOverviewLayout}
           expiryFilter={overviewExpiryFilter}
           onSetExpiryFilter={setOverviewExpiryFilter}
+          showExpired={showExpired}
+          onToggleShowExpired={() => setShowExpired(v => !v)}
           onScanAll={scanAllMarkets}
           scanningAll={scanningAll}
           scanProgress={scanProgress}
@@ -1966,6 +1969,8 @@ function MarketSidebar({
   onToggleLayout,
   expiryFilter,
   onSetExpiryFilter,
+  showExpired,
+  onToggleShowExpired,
   onScanAll,
   scanningAll,
   scanProgress,
@@ -1992,6 +1997,8 @@ function MarketSidebar({
   onToggleLayout: (l: "grid" | "table") => void;
   expiryFilter: "all" | "lte7" | "lte14" | "lte30";
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
+  showExpired: boolean;
+  onToggleShowExpired: () => void;
   onScanAll: () => void;
   scanningAll: boolean;
   scanProgress: { current: number; total: number };
@@ -2009,6 +2016,9 @@ function MarketSidebar({
 
   // Filter + sort
   const filtered = markets.filter(m => {
+    const isExpired = m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false;
+    if (!showExpired && isExpired) return false;
+
     if (expiryFilter !== "all") {
       if (!m.expiryDate) return false;
       const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
@@ -2136,6 +2146,17 @@ function MarketSidebar({
               <option value="lte14">≤ 14 days</option>
               <option value="lte30">≤ 30 days</option>
             </select>
+            <button
+              onClick={onToggleShowExpired}
+              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                showExpired
+                  ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+                  : "bg-[#0E1621] text-[#5E6875] border border-[#232E3C] hover:text-[#FFFFFF]"
+              }`}
+              title={showExpired ? "Hide expired markets" : "Show expired markets"}
+            >
+              {showExpired ? "Show Expired: On" : "Show Expired: Off"}
+            </button>
           </div>
         </div>
 
