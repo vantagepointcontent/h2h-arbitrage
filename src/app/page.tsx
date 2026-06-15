@@ -708,6 +708,32 @@ export default function Home() {
         if (res.ok) {
           const data = await res.json();
           refreshed.push({ id: market.id, result: data });
+          // Persist scan result to disk so tooltip shows correct time after reload
+          const scanResult = {
+            bestRoiPct: data.bestRoiPct ?? 0,
+            bestProfit: data.bestProfit ?? 0,
+            strategy: data.strategy || "",
+            outcomeCount: data.matchedCount ?? 0,
+            matchedCount: data.matchedCount ?? 0,
+            kalshiCount: data.kalshiCount ?? 0,
+            pmCount: data.pmCount ?? 0,
+            scannedAt: data.scannedAt || new Date().toISOString(),
+            allArbs: (data.allArbs || []).map((a: any) => ({
+              artist: a.artist,
+              roiPct: a.roiPct,
+              expectedProfit: a.expectedProfit,
+              strategy: a.strategy,
+            })),
+          };
+          try {
+            await fetch(`/api/saved-markets/scan-result`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: market.id, lastScanResult: scanResult }),
+            });
+          } catch (e) {
+            console.error(`Failed to persist scan result for ${market.id}`, e);
+          }
         } else {
           failed.push(market.eventTitle);
         }

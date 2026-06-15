@@ -396,5 +396,21 @@
     "pmTitle": "Will Democrats win all \"core four\" senate races?",
     "id": "1781520173988-as9b8wt",
     "createdAt": "2026-06-15T10:42:53.988Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-NC09-26-R",
+    "pmConditionId": "0x31727e0e298757e552661f62733cc401c6066b80a7d2607d2ac56b729eb15a00",
+    "kalshiTitle": "KXHOUSERACE-NC09-26-R",
+    "pmTitle": "Republican Party",
+    "id": "1781522216692-1eika22",
+    "createdAt": "2026-06-15T11:16:56.692Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-NC09-26-D",
+    "pmConditionId": "0xdc23b5a54616abf57d7f89f57a29dbacc0d836ab6f3994f5533c8c41ba929ebb",
+    "kalshiTitle": "KXHOUSERACE-NC09-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1781522218098-167a0vg",
+    "createdAt": "2026-06-15T11:16:58.098Z"
   }
 ]
