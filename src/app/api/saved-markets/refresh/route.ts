@@ -58,6 +58,7 @@ interface MarketRefreshResult {
   pmCount: number;
   scannedAt: string;
   totalStake: number;
+  expiryDate?: string | null;
   allArbs: {
     artist: string;
     roiPct: number;
@@ -193,6 +194,7 @@ async function refreshSingleMarket(market: SavedMarket, manualMatches: any[]): P
     pmCount,
     scannedAt: new Date().toISOString(),
     totalStake: bestArb ? (bestArb.arbitrage!.kalshiStake ?? 0) + (bestArb.arbitrage!.pmStake ?? 0) : 0,
+    expiryDate: pmEvent.endDate,
     allArbs: positiveArbs.map(o => ({
       artist: o.artist,
       roiPct: o.arbitrage!.roiPct,
@@ -245,7 +247,7 @@ export async function GET(_: NextRequest) {
           strategy: a.strategy,
         })),
       };
-      await updateSavedMarketScanResult(market.id, scanResult);
+      await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
     }
 
     return NextResponse.json({

@@ -250,17 +250,17 @@ export async function upsertSavedMarket(input: {
   );
 
   if (idx >= 0) {
-    // Update in-place — preserve favorite status
-    const existing = markets[idx];
-    markets[idx] = {
-      ...existing,
-      eventTitle: input.eventTitle,
-      category: input.category ?? existing.category,
-      expiryDate: input.expiryDate ?? existing.expiryDate,
-      lastScanResult: input.lastScanResult ?? existing.lastScanResult,
-    };
-    await writeSavedMarkets(markets);
-    return markets[idx];
+  // Update in-place — preserve favorite status and update expiryDate if fetched live
+  const existing = markets[idx];
+  markets[idx] = {
+    ...existing,
+    eventTitle: input.eventTitle,
+    category: input.category ?? existing.category,
+    expiryDate: input.expiryDate ?? existing.expiryDate,
+    lastScanResult: input.lastScanResult ?? existing.lastScanResult,
+  };
+  await writeSavedMarkets(markets);
+  return markets[idx];
   }
 
   // New market — create
@@ -280,11 +280,14 @@ export async function upsertSavedMarket(input: {
   return newMarket;
 }
 
-export async function updateSavedMarketScanResult(id: string, result: LastScanResult): Promise<void> {
+export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<void> {
   const markets = await getSavedMarkets();
   const idx = markets.findIndex(m => m.id === id);
   if (idx >= 0) {
     markets[idx].lastScanResult = result;
+    if (expiryDate !== undefined) {
+      markets[idx].expiryDate = expiryDate;
+    }
     await writeSavedMarkets(markets);
   }
 }
