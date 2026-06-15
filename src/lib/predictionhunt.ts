@@ -25,7 +25,7 @@ export interface PredictionHuntMarket {
   spreadPct?: number;
 }
 
-interface PhV2Market {
+export interface PhV2Market {
   id: number;
   title: string;
   platform: string;
@@ -45,6 +45,8 @@ const API_KEY = (process.env.PREDICTIONHUNT_API_KEY || '').trim();
 const BASE_URL = 'https://www.predictionhunt.com/api/v2';
 
 const RATE_LIMIT_MS = 600;
+
+export { RATE_LIMIT_MS };
 
 export const CATEGORIES = [
   'sports', 'politics', 'election', 'entertainment', 'economics',
@@ -66,7 +68,7 @@ function hashMarket(title: string, cat: string): string {
   return `ph-${Math.abs(h)}`;
 }
 
-async function fetchPlatformMarkets(platform: string, category?: string, limit = 500): Promise<PhV2Market[]> {
+export async function fetchPlatformMarkets(platform: string, category?: string, limit = 500): Promise<PhV2Market[]> {
   const url = new URL(`${BASE_URL}/markets`);
   url.searchParams.set('platform', platform);
   url.searchParams.set('status', 'active');
@@ -137,7 +139,7 @@ function calcSpreadPct(pmPrice: PhV2Market['price'], kalshiPrice: PhV2Market['pr
   return Math.abs(pmAsk - kalshiBid) / avg * 100;
 }
 
-function buildMatches(pmMarkets: PhV2Market[], kMarkets: PhV2Market[]): PredictionHuntMarket[] {
+export function buildMatches(pmMarkets: PhV2Market[], kMarkets: PhV2Market[]): PredictionHuntMarket[] {
   const kMap = new Map<string, PhV2Market>();
   for (const k of kMarkets) {
     const nt = normalizeTitle(k.title);
