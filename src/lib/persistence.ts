@@ -125,6 +125,15 @@ export interface LastScanResult {
     roiPct: number;
     expectedProfit: number;
     strategy: string;
+    fees?: {
+      kalshiFee: number;
+      pmFee: number;
+      kalshiFeeDetails: string;
+      pmFeeDetails: string;
+      netProfitIfKalshiWins: number;
+      netProfitIfPmWins: number;
+      worstCaseNetProfit: number;
+    };
   }[];
 }
 

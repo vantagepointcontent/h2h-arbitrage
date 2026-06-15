@@ -12,6 +12,15 @@ interface Outcome {
     kalshiStake?: number;
     pmStake?: number;
     strategy: string;
+    fees?: {
+      kalshiFee: number;
+      pmFee: number;
+      kalshiFeeDetails: string;
+      pmFeeDetails: string;
+      netProfitIfKalshiWins: number;
+      netProfitIfPmWins: number;
+      worstCaseNetProfit: number;
+    };
   };
 }
 
@@ -91,17 +100,27 @@ export function OutcomeTableBody({
                 {spread > 0 ? "+" : ""}{spread.toFixed(2)}
               </td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{formatPercent(o.arbitrage.roiPct)}</td>
-              <td className="relative px-4 py-3 text-right">
+              <td className="relative px-4 py-3 text-right group">
                 {profit > 0 ? (
                   isHighestProfit ? (
                     <div className="group inline-block">
                       <span className="text-[#FFFFFF] cursor-help">
                         {formatCurrency(profit)} <span className="text-[#5E6875]">({formatCurrency(totalProfit)} total)</span>
                       </span>
-                      <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                        <div className="font-bold text-[#FFFFFF] mb-2">Total Profit Potential</div>
+                      <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
+                        <div className="font-bold text-[#FFFFFF] mb-2">Total Profit Potential (after fees)</div>
                         <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
                         <div className="text-[#5E6875] text-[10px] mb-2">{profitableOutcomes.length} profitable outcome{profitableOutcomes.length > 1 ? "s" : ""}</div>
+                        {o.arbitrage.fees && (
+                          <div className="border-t border-[#182533] pt-2 mb-2 space-y-1">
+                            <div className="text-[#5E6875]">{o.arbitrage.fees.kalshiFeeDetails}</div>
+                            <div className="text-[#5E6875]">{o.arbitrage.fees.pmFeeDetails}</div>
+                            <div className="flex justify-between text-[#FFFFFF] font-medium">
+                              <span>Worst-case net profit</span>
+                              <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
+                            </div>
+                          </div>
+                        )}
                         <div className="border-t border-[#182533] pt-2 space-y-1">
                           {profitableOutcomes.map((po) => (
                             <div key={po.artist} className="flex justify-between items-center">
@@ -113,7 +132,23 @@ export function OutcomeTableBody({
                       </div>
                     </div>
                   ) : (
-                    <span className="text-[#FFFFFF]">{formatCurrency(profit)}</span>
+                    <div className="group inline-block">
+                      <span className="text-[#FFFFFF] cursor-help">{formatCurrency(profit)}</span>
+                      {o.arbitrage.fees && (
+                        <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
+                          <div className="font-bold text-[#FFFFFF] mb-2">Profit after fees</div>
+                          <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(profit)}</div>
+                          <div className="border-t border-[#182533] pt-2 space-y-1">
+                            <div className="text-[#5E6875]">{o.arbitrage.fees.kalshiFeeDetails}</div>
+                            <div className="text-[#5E6875]">{o.arbitrage.fees.pmFeeDetails}</div>
+                            <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-1">
+                              <span>Worst-case net profit</span>
+                              <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )
                 ) : "—"}
               </td>
