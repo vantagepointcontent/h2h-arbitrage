@@ -1,702 +1,70 @@
 [
   {
-    "scanTimestamp": "2026-06-11T13:40:41.054Z",
-    "marketId": "1780492135393-p2nh6km",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:00.818Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 116.33715517241377,
-    "bestRoiPct": 8.499999999999996,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:01.007Z",
-    "marketId": "1779565414697-01jpgss",
-    "totalProfit": 293.2649836956514,
-    "bestRoiPct": 2.9999999999999916,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:01.203Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 0.6547619047619053,
-    "bestRoiPct": 2.500000000000002,
-    "positiveArbCount": 2,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:02.396Z",
-    "marketId": "1779566094057-vc90yk8",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:02.443Z",
-    "marketId": "1779615907120-tt0fab0",
-    "totalProfit": 5.8302325581395404,
-    "bestRoiPct": 2.0000000000000018,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:02.452Z",
-    "marketId": "1779615862125-hsu3w3r",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:02.911Z",
-    "marketId": "1779615969341-4z00t8d",
-    "totalProfit": 3.185852272727268,
-    "bestRoiPct": 2.3499999999999965,
-    "positiveArbCount": 2,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:03.301Z",
-    "marketId": "1779617202499-qdhtrsj",
-    "totalProfit": 75.34246575342473,
-    "bestRoiPct": 2.200000000000002,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:03.422Z",
-    "marketId": "1779623504015-bdtl4y9",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:04.175Z",
-    "marketId": "1779626444294-dlx66jv",
-    "totalProfit": 15.845318681318654,
-    "bestRoiPct": 4.399999999999993,
-    "positiveArbCount": 3,
-    "matchedCount": 9
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:04.266Z",
-    "marketId": "1779634961428-qpr7mwb",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:05.552Z",
-    "marketId": "1779652505195-fchs4a3",
-    "totalProfit": 1105.152670491802,
-    "bestRoiPct": 5.499999999999994,
-    "positiveArbCount": 6,
-    "matchedCount": 20
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:06.560Z",
-    "marketId": "1779652525824-sl6nqkx",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:06.635Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 27.29999999999999,
-    "bestRoiPct": 13.649999999999995,
-    "positiveArbCount": 3,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:10.732Z",
-    "marketId": "1779918307860-isszlh4",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 1
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:12.293Z",
-    "marketId": "1779918332608-3at7dls",
-    "totalProfit": 81.25000000000007,
-    "bestRoiPct": 6.500000000000005,
-    "positiveArbCount": 8,
-    "matchedCount": 14
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:12.473Z",
-    "marketId": "1779918706058-tmlnj5g",
-    "totalProfit": 0.7199999999999998,
-    "bestRoiPct": 8.999999999999996,
-    "positiveArbCount": 6,
-    "matchedCount": 10
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:13.524Z",
-    "marketId": "1779918733862-343d7rs",
-    "totalProfit": 74.99999999999989,
-    "bestRoiPct": 4.499999999999993,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:13.763Z",
-    "marketId": "1779918758511-quuqz22",
-    "totalProfit": 999.5452307692317,
-    "bestRoiPct": 2.8000000000000025,
-    "positiveArbCount": 11,
-    "matchedCount": 16
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:15.227Z",
-    "marketId": "1779919046827-q0xag5o",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:15.279Z",
-    "marketId": "1779919093391-fr9unes",
-    "totalProfit": 8.838000000000008,
-    "bestRoiPct": 3.0000000000000027,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:16.544Z",
-    "marketId": "1779921336154-7b5vbc9",
-    "totalProfit": 56.65219999999994,
-    "bestRoiPct": 5.499999999999994,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:16.622Z",
-    "marketId": "1779921562727-iiuccgm",
-    "totalProfit": 531.4636185945931,
-    "bestRoiPct": 2.899999999999992,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:17.846Z",
-    "marketId": "1779921598922-8sg17v8",
-    "totalProfit": 156.83291445086718,
-    "bestRoiPct": 1.5000000000000013,
+    "scanTimestamp": "2026-06-12T15:00:40.241Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 82.84355137000728,
+    "bestRoiPct": 10.899999999999999,
     "positiveArbCount": 4,
-    "matchedCount": 15
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:17.961Z",
-    "marketId": "1779921626235-sb1i94e",
-    "totalProfit": 0.1724999999999997,
-    "bestRoiPct": 4.499999999999993,
-    "positiveArbCount": 3,
-    "matchedCount": 9
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:19.728Z",
-    "marketId": "1779921654262-2v6vexr",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:22.085Z",
-    "marketId": "1780515853312-g26foit",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:24.929Z",
-    "marketId": "1780515890597-uyepmew",
-    "totalProfit": 158.62734743589718,
-    "bestRoiPct": 4.399999999999993,
-    "positiveArbCount": 7,
-    "matchedCount": 23
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:25.490Z",
-    "marketId": "1780515968723-d0aycj7",
-    "totalProfit": 194.16649497427082,
-    "bestRoiPct": 9.549999999999992,
-    "positiveArbCount": 9,
-    "matchedCount": 28
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:26.595Z",
-    "marketId": "1780516036144-j6f7e3q",
-    "totalProfit": 0.3060664523043941,
-    "bestRoiPct": 2.949999999999997,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:27.931Z",
-    "marketId": "1780516066111-3yx3lkb",
-    "totalProfit": 0.3932926829268293,
-    "bestRoiPct": 6.45,
-    "positiveArbCount": 3,
-    "matchedCount": 7
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:28.288Z",
-    "marketId": "1780516130290-bbhg6o1",
-    "totalProfit": 385.92662962962993,
-    "bestRoiPct": 2.9000000000000026,
-    "positiveArbCount": 4,
-    "matchedCount": 20
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:28.397Z",
-    "marketId": "1780516372802-ky4zbp8",
-    "totalProfit": 5.311839999999999,
-    "bestRoiPct": 12,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:29.507Z",
-    "marketId": "1780516397432-3b2kipd",
-    "totalProfit": 131.24999999999997,
-    "bestRoiPct": 8.999999999999996,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:29.608Z",
-    "marketId": "1780519207901-3l3z1ms",
-    "totalProfit": 128.7878787878789,
-    "bestRoiPct": 5.100000000000005,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:29.780Z",
-    "marketId": "1780521673191-sxsf08c",
-    "totalProfit": 20.95412371134027,
-    "bestRoiPct": 2.650000000000008,
-    "positiveArbCount": 3,
     "matchedCount": 4
   },
   {
-    "scanTimestamp": "2026-06-11T13:48:30.964Z",
-    "marketId": "1780524610133-tw8c996",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:31.091Z",
-    "marketId": "1780524625975-g8nio57",
-    "totalProfit": 2.941176470588238,
-    "bestRoiPct": 1.0000000000000009,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:31.358Z",
-    "marketId": "1780524643165-9gqgu9w",
-    "totalProfit": 1.9200000000000017,
-    "bestRoiPct": 3.0000000000000027,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:32.701Z",
-    "marketId": "1780524922637-3s9i0ii",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:34.992Z",
-    "marketId": "1780524926370-3vyo1f4",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:38.172Z",
-    "marketId": "1780524929760-fwvrvx2",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:38.416Z",
-    "marketId": "1780524931543-1ms8ehk",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:39.675Z",
-    "marketId": "1780524932582-mo61zk3",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:40.891Z",
-    "marketId": "1780524933713-p2pvjrr",
-    "totalProfit": 3.0741176470588263,
-    "bestRoiPct": 3.0000000000000027,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:43.050Z",
-    "marketId": "1780524934509-v5fbs4t",
-    "totalProfit": 1.3291139240506327,
-    "bestRoiPct": 20.999999999999996,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:44.574Z",
-    "marketId": "1780524935254-y4p559m",
-    "totalProfit": 251.45377065217394,
-    "bestRoiPct": 15.500000000000004,
-    "positiveArbCount": 17,
-    "matchedCount": 17
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:46.177Z",
-    "marketId": "1780524936003-j3wfgf1",
-    "totalProfit": 29.327805909451957,
-    "bestRoiPct": 26.050000000000008,
-    "positiveArbCount": 7,
-    "matchedCount": 12
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:49.338Z",
-    "marketId": "1780524936688-qhq0fuy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:49.602Z",
-    "marketId": "1780525241216-nevhd9n",
-    "totalProfit": 97.64583333333333,
-    "bestRoiPct": 64.5,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:49.818Z",
-    "marketId": "1780525145160-9gggiip",
-    "totalProfit": 494.4867345685304,
-    "bestRoiPct": 1.3500000000000068,
+    "scanTimestamp": "2026-06-12T15:00:50.142Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 82.84355137000728,
+    "bestRoiPct": 10.899999999999999,
     "positiveArbCount": 4,
-    "matchedCount": 11
+    "matchedCount": 4
   },
   {
-    "scanTimestamp": "2026-06-11T13:48:51.018Z",
-    "marketId": "1780525313250-w5tc0vr",
-    "totalProfit": 117.1562500000001,
-    "bestRoiPct": 2.300000000000002,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:51.118Z",
-    "marketId": "1780612480164-f2g2y12",
-    "totalProfit": 6.972222222222384,
-    "bestRoiPct": 0.5000000000000115,
-    "positiveArbCount": 1,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:51.280Z",
-    "marketId": "1780612499359-fuv0rf2",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:51.443Z",
-    "marketId": "1780612579960-z55igki",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:51.539Z",
-    "marketId": "1780612655773-jlma0t4",
-    "totalProfit": 54.68749999999987,
-    "bestRoiPct": 3.499999999999992,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:56.863Z",
-    "marketId": "1780616584214-jghi7cb",
-    "totalProfit": 46.14730497109824,
-    "bestRoiPct": 3.849999999999998,
+    "scanTimestamp": "2026-06-12T15:01:00.172Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 82.84355137000728,
+    "bestRoiPct": 10.899999999999999,
     "positiveArbCount": 4,
-    "matchedCount": 18
+    "matchedCount": 4
   },
   {
-    "scanTimestamp": "2026-06-11T13:48:56.991Z",
-    "marketId": "1780616607472-xeyo79g",
-    "totalProfit": 4.807692307692312,
-    "bestRoiPct": 0.5000000000000004,
+    "scanTimestamp": "2026-06-12T15:01:12.973Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 77.02686342312269,
+    "bestRoiPct": 10.899999999999999,
+    "positiveArbCount": 4,
+    "matchedCount": 4
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:01:19.986Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 77.02686342312269,
+    "bestRoiPct": 10.899999999999999,
+    "positiveArbCount": 4,
+    "matchedCount": 4
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:01:30.162Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 77.02686342312269,
+    "bestRoiPct": 10.899999999999999,
+    "positiveArbCount": 4,
+    "matchedCount": 4
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:01:40.349Z",
+    "marketId": "1780524938676-glx1ja0",
+    "totalProfit": 77.02686342312269,
+    "bestRoiPct": 10.899999999999999,
+    "positiveArbCount": 4,
+    "matchedCount": 4
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:01:42.745Z",
+    "marketId": "1779918781059-h64swoj",
+    "totalProfit": 0.4400000000000004,
+    "bestRoiPct": 0.40000000000000036,
     "positiveArbCount": 1,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-11T13:48:57.193Z",
-    "marketId": "1780847015213-ve7fub9",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:57.397Z",
-    "marketId": "1780847050215-jgd6b9j",
-    "totalProfit": 132.78571428571382,
-    "bestRoiPct": 2.599999999999991,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:57.604Z",
-    "marketId": "1780847136705-mzwudir",
-    "totalProfit": 186.0465116279065,
-    "bestRoiPct": 3.1999999999999917,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:58.141Z",
-    "marketId": "1780616663733-gqtyl8u",
-    "totalProfit": 17.976190476190492,
-    "bestRoiPct": 2.0000000000000018,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:59.774Z",
-    "marketId": "1780847172667-074k8yx",
-    "totalProfit": 9.49652777777778,
-    "bestRoiPct": 27.35000000000001,
-    "positiveArbCount": 16,
-    "matchedCount": 26
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:59.888Z",
-    "marketId": "1780947278371-y59zkfv",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:48:59.912Z",
-    "marketId": "1780947200921-we4dqtn",
-    "totalProfit": 21.752873563218408,
-    "bestRoiPct": 2.500000000000002,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:00.293Z",
-    "marketId": "1780947342746-x2ck9fp",
-    "totalProfit": 0.6896551724137938,
-    "bestRoiPct": 2.0000000000000018,
-    "positiveArbCount": 2,
-    "matchedCount": 15
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:01.448Z",
-    "marketId": "1780947421842-zt9wcq8",
-    "totalProfit": 5.833333333333328,
-    "bestRoiPct": 6.2999999999999945,
-    "positiveArbCount": 1,
-    "matchedCount": 3
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:02.782Z",
-    "marketId": "1780947485064-f22ikcd",
-    "totalProfit": 232.49999999999994,
-    "bestRoiPct": 30.999999999999993,
-    "positiveArbCount": 18,
-    "matchedCount": 21
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:02.795Z",
-    "marketId": "1780947501139-sokb0fh",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:03.010Z",
-    "marketId": "1780947518057-wjbasjw",
-    "totalProfit": 101.54261904761914,
-    "bestRoiPct": 8.500000000000007,
-    "positiveArbCount": 2,
-    "matchedCount": 3
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:03.535Z",
-    "marketId": "1780947627959-pno7zuk",
-    "totalProfit": 7.183908045977018,
-    "bestRoiPct": 2.500000000000002,
-    "positiveArbCount": 1,
-    "matchedCount": 1
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:04.096Z",
-    "marketId": "1780947664765-4rsimhq",
-    "totalProfit": 32.35294117647055,
-    "bestRoiPct": 5.499999999999994,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:06.937Z",
-    "marketId": "1780947685278-vey4gcm",
-    "totalProfit": 4.754166666666672,
-    "bestRoiPct": 2.800000000000003,
-    "positiveArbCount": 11,
-    "matchedCount": 19
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:08.099Z",
-    "marketId": "1780947716562-o5zvv8j",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:08.468Z",
-    "marketId": "1780947734818-qz3g6z6",
-    "totalProfit": 10.982142857142785,
-    "bestRoiPct": 1.4999999999999902,
-    "positiveArbCount": 1,
-    "matchedCount": 5
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:09.692Z",
-    "marketId": "1780947788335-qp3d590",
-    "totalProfit": 52.91581609195403,
-    "bestRoiPct": 27.500000000000004,
-    "positiveArbCount": 12,
-    "matchedCount": 14
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:09.778Z",
-    "marketId": "1780947797849-nffy5ll",
-    "totalProfit": 380.55412887700464,
-    "bestRoiPct": 4.0999999999999925,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:13.132Z",
-    "marketId": "1780948856309-6gn9bpu",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:13.942Z",
-    "marketId": "1781019400325-tw15kt1",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:15.194Z",
-    "marketId": "1781019471065-dn821p5",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:18.059Z",
-    "marketId": "1781177131219-rbowt9m",
-    "totalProfit": 3.300000000000003,
-    "bestRoiPct": 1.100000000000001,
-    "positiveArbCount": 1,
-    "matchedCount": 10
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:18.147Z",
-    "marketId": "1781177142975-bdj657w",
-    "totalProfit": 91.66666666666657,
-    "bestRoiPct": 5.499999999999994,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:18.247Z",
-    "marketId": "1781177159070-vy9ba59",
-    "totalProfit": 500.3314413756619,
-    "bestRoiPct": 3.1000000000000028,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:18.375Z",
-    "marketId": "1781177175128-t3m3emq",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-11T13:49:18.493Z",
-    "marketId": "1781177189235-6heq6ti",
-    "totalProfit": 0.009375000000000008,
-    "bestRoiPct": 7.500000000000007,
-    "positiveArbCount": 6,
-    "matchedCount": 10
-  },
-  {
-    "scanTimestamp": "2026-06-11T18:52:06.786Z",
-    "marketId": "1781177114636-to4vbr9",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-11T19:05:41.511Z",
+    "scanTimestamp": "2026-06-12T15:01:46.942Z",
     "marketId": "1779918229304-wucayqb",
     "totalProfit": 0,
     "bestRoiPct": 0,
@@ -704,2555 +72,3931 @@
     "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-11T19:12:18.670Z",
-    "marketId": "1779543785453-0b5xeq5",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-11T19:54:59.143Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-11T22:03:21.369Z",
-    "marketId": "1780524567744-y6seyod",
+    "scanTimestamp": "2026-06-12T15:01:52.206Z",
+    "marketId": "1779634961428-qpr7mwb",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 0
   },
   {
-    "scanTimestamp": "2026-06-11T22:03:34.037Z",
-    "marketId": "1779617150327-ntzesfy",
+    "scanTimestamp": "2026-06-12T15:01:56.449Z",
+    "marketId": "1779918229304-wucayqb",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
-    "matchedCount": 8
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-11T22:06:15.257Z",
-    "marketId": "1780515920421-kjxp164",
+    "scanTimestamp": "2026-06-12T15:02:07.674Z",
+    "marketId": "1779918229304-wucayqb",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
-    "matchedCount": 0
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-11T22:16:37.912Z",
-    "marketId": "1779918781059-h64swoj",
+    "scanTimestamp": "2026-06-12T15:02:16.340Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:02:26.159Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:02:36.279Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:02:46.169Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:02:56.232Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:06.679Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:16.153Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:26.172Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:36.181Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:46.222Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:03:56.212Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:06.445Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:16.227Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:26.139Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:36.968Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:46.129Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:04:57.120Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:06.514Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:16.343Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:26.213Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:36.107Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:46.179Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:05:56.214Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:06.193Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:16.148Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:26.270Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:36.171Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:46.170Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:06:56.200Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:06.300Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:16.222Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:26.317Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:36.124Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:46.094Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:07:56.380Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:06.264Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:16.235Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:26.237Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:36.138Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:46.223Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:08:56.157Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:06.209Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:16.142Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:26.146Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:36.097Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:46.185Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:09:56.226Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:10:06.176Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:10:16.152Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:10:26.351Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:10:36.321Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:10:46.237Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:01.153Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:06.141Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:16.135Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:26.305Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:36.198Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:46.164Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:11:56.202Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:06.170Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:16.238Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:26.146Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:36.290Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:46.171Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:12:56.187Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:06.182Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:16.432Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:26.750Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:36.207Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:46.123Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:13:56.429Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:06.088Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:16.158Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:26.147Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:37.452Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:46.220Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:14:56.180Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:06.177Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:16.232Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:26.256Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:36.244Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:46.358Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:15:56.833Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:06.226Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:16.191Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:26.194Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:36.229Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:47.203Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:16:57.259Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:06.270Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:16.348Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:26.212Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:36.243Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:46.189Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:17:56.216Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:06.219Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:16.122Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:26.301Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:36.208Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:46.268Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:18:56.196Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:06.271Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:16.156Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:26.175Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:36.321Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:47.597Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:19:56.196Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:06.370Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:16.243Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:26.289Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:36.179Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:46.336Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:20:56.149Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:06.264Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:16.122Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:26.196Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:36.782Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:46.507Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:21:56.209Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:06.228Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:16.234Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:26.969Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:36.349Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:46.323Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:22:56.167Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:06.319Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:17.015Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:26.229Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:36.179Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:46.226Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:23:56.180Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:06.232Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:16.175Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:26.131Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:36.851Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:46.139Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:24:56.185Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:06.223Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:16.262Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:26.145Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:36.248Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:46.249Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:25:56.157Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:06.214Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:16.142Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:26.182Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:36.381Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:46.200Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:26:56.309Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:06.217Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:16.248Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:26.213Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:46.276Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:46.483Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:27:56.139Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:06.214Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:16.159Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:26.237Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:36.173Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:46.458Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:28:56.307Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:06.267Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:16.264Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:26.156Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:36.252Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:46.248Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:29:56.191Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:06.341Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:16.341Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:26.417Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:37.311Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:46.696Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:30:56.442Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:06.163Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:16.236Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:26.203Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:36.530Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:47.608Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:31:58.524Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:06.361Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:16.215Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:26.180Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:36.199Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:46.272Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:32:56.301Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:06.349Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:17.697Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:26.211Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:36.241Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0,
+    "bestRoiPct": 0,
+    "positiveArbCount": 0,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:46.233Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:33:56.230Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:06.208Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:16.207Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:26.288Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:36.207Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:46.212Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:34:57.999Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:06.508Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:16.178Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:26.294Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:36.279Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:46.289Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:35:56.155Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:06.266Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:16.166Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:27.510Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:36.206Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:46.150Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:36:56.198Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:06.225Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:16.381Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:26.190Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 147.36000000000013,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:36.211Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:46.182Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:37:56.232Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:06.898Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:18.012Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:26.256Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:36.210Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:46.174Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:38:56.236Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:06.230Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:16.323Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:26.300Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:36.663Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:46.271Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:39:56.895Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:06.849Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:17.231Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:26.242Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:37.088Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:46.194Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:40:56.187Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:06.196Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:16.391Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:26.200Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:37.868Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 0.14571428571428585,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:46.314Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:41:56.324Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:06.861Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:16.163Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:29.133Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:36.269Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:46.305Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:42:56.243Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:06.236Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:16.386Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:26.295Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:36.277Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:46.392Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:43:56.268Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:06.287Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:16.756Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:26.660Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:36.482Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:46.260Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:44:56.192Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:06.337Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:16.643Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:26.235Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:36.262Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:46.306Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:45:56.426Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:06.285Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:16.252Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:26.341Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:36.282Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:48.151Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:46:56.260Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:06.247Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:16.325Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:26.282Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:36.199Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:46.268Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:47:56.361Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:06.299Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:16.251Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:26.403Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:36.458Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:47.402Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:48:56.256Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:06.330Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:16.296Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:27.521Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:36.258Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:47.902Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:49:57.876Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:06.402Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:16.302Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:26.231Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:36.208Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:48.870Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:50:56.387Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:06.241Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:16.396Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:26.238Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:36.315Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:46.275Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:51:56.516Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:52:06.269Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:52:16.283Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:52:26.314Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:52:36.752Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:52:46.374Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:06.222Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:06.333Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:17.189Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:26.374Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:36.267Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:46.342Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:53:56.240Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:06.205Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:16.215Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:26.348Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:37.200Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:56.286Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:54:56.381Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:06.302Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:16.290Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:27.305Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:36.258Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:46.363Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:55:56.289Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:06.200Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:16.323Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:26.259Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:36.262Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:46.998Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:56:56.225Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:06.314Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:16.265Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:26.252Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:36.282Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:46.292Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:57:56.236Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:06.451Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:16.299Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:26.236Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:36.201Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:46.251Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:58:56.260Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 1.2164285714285725,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:06.276Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:16.225Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:26.287Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:36.292Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:46.260Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T15:59:56.301Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:06.663Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:16.291Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:28.105Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:36.355Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:46.262Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:00:56.485Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:06.903Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:17.959Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:26.359Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:36.348Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:46.230Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:01:56.394Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:06.273Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:16.363Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:26.396Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:36.251Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:46.271Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:02:59.443Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:10.582Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:16.308Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:26.339Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:36.328Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.190000000000002,
+    "bestRoiPct": 3.000000000000003,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:50.466Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:03:56.345Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:06.541Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:16.320Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:26.401Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:36.359Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:46.293Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:04:56.298Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:07.182Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:17.628Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:26.272Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:36.343Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:46.258Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:05:56.371Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:07.071Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:16.961Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:26.325Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:36.198Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:46.294Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:06:56.341Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:06.523Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:18.203Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:26.287Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:36.408Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:46.310Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:07:56.256Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:07.605Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:16.355Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:26.405Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:36.296Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:46.289Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:08:56.321Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:06.234Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:16.272Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:26.274Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:36.354Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:47.275Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:09:56.689Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:06.483Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:12.878Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-11T23:02:27.268Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 26.001136363636355,
-    "bestRoiPct": 8.699999999999996,
-    "positiveArbCount": 3,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:53:14.375Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:53:24.332Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:53:34.334Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:53:44.370Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:53:54.310Z",
-    "marketId": "1781019440010-qbaajhj",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:55:59.227Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:09.036Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:19.049Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:20.491Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:31.035Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:40.936Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:56:50.975Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:00.903Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:10.985Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:20.870Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:30.968Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:40.977Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:57:51.053Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:11.008Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:11.211Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:20.905Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:30.959Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:40.875Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:58:51.010Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:00.957Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:11.039Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:20.994Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:30.874Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:41.084Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T09:59:50.870Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:00.982Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:11.049Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:21.054Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:30.901Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:41.017Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:00:51.080Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:00.951Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:10.887Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:20.994Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:30.892Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:41.118Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:01:50.889Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:01.010Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:10.901Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:21.010Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:30.867Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:44.716Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:02:50.972Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:00.923Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:11.019Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:20.898Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:31.253Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:40.919Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:03:51.020Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:00.906Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:10.996Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:20.885Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:30.957Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:40.915Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:04:50.975Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:00.909Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:11.219Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:20.950Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:31.005Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:40.923Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:05:50.994Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:00.990Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:10.974Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:20.913Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:30.995Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:40.886Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:06:52.458Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:00.892Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:10.968Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:20.897Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:30.969Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:40.866Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:07:51.036Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:00.922Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:11.055Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:23.379Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:31.222Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:41.228Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:08:51.174Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:01.139Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:11.177Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:21.209Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:31.555Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:41.624Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:09:51.589Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:10:01.929Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:10:11.529Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:10:21.517Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:10:54.589Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:11:55.148Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:12:54.581Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:13:54.608Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:14:54.761Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:06.553Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:11.202Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:21.193Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:31.313Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:41.144Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:15:51.213Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:01.271Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:11.245Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:21.188Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:31.200Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:41.145Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:16:51.221Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:01.192Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:11.187Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:21.159Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:31.191Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:41.205Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:17:51.166Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:01.249Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:11.155Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:21.159Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:31.203Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:41.156Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:18:51.202Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:01.194Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:11.198Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:21.193Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:31.134Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:41.158Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:19:52.873Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:01.198Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:11.232Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:21.151Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:31.231Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:41.161Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:20:51.201Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:01.187Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:11.214Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:21.144Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:31.182Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:41.199Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:21:52.389Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:01.176Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:11.197Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:21.173Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:31.142Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:41.141Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:22:51.205Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:01.212Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:11.230Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:21.182Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:31.178Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:41.202Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:23:51.181Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:01.197Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 81.55832409727999,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:11.165Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:21.166Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:31.196Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:41.185Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:24:51.187Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:33:23.813Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:33:33.342Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:33:43.526Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:33:53.321Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:03.308Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:13.289Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:23.358Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:33.185Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:33.423Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:43.259Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:43.910Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:52.800Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:34:53.172Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:02.667Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:03.210Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:12.642Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:13.158Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 82.84355137000728,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:23.356Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:33.184Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:34.609Z",
-    "marketId": "1779617150327-ntzesfy",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 8
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:43.315Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:35:53.285Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:03.302Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:13.305Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:23.319Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:33.338Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:43.299Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:49.264Z",
-    "marketId": "1780947734818-qz3g6z6",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 5
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:53.329Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:36:59.698Z",
-    "marketId": "1780947734818-qz3g6z6",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 5
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:37:03.507Z",
-    "marketId": "1780524938676-glx1ja0",
-    "totalProfit": 78.31209069584997,
-    "bestRoiPct": 10.899999999999999,
-    "positiveArbCount": 4,
-    "matchedCount": 4
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:45:41.096Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:10:16.288Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:26.407Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:36.417Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:47.122Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:10:53.481Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:45:50.995Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:10:57.242Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:07.215Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:17.606Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:24.467Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:00.998Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:11:29.178Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:34.492Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:11.039Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:11:38.781Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:44.514Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:21.021Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:11:47.696Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:11:54.384Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:31.110Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:11:57.604Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:04.500Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:39.769Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:12:08.973Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:14.375Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:40.698Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:12:18.255Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:24.448Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:46:51.003Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:12:27.726Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:34.254Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:01.037Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:12:37.526Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:44.383Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:11.124Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:12:49.135Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:12:54.389Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:30.999Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:01.084Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:07.092Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:31.293Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:07.858Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:14.673Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:41.008Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:17.834Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:27.747Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:38.919Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:47:50.996Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:39.041Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:39.750Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:48:00.995Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:44.317Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:48:10.980Z",
-    "marketId": "1779565300940-jqb54rc",
+    "scanTimestamp": "2026-06-12T16:13:47.593Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
+    "positiveArbCount": 1,
+    "matchedCount": 7
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:52.722Z",
+    "marketId": "1779918706058-tmlnj5g",
+    "totalProfit": 2.7181760869565847,
+    "bestRoiPct": 0.5000000000000115,
+    "positiveArbCount": 1,
+    "matchedCount": 10
+  },
+  {
+    "scanTimestamp": "2026-06-12T16:13:57.106Z",
+    "marketId": "1781177114636-to4vbr9",
     "totalProfit": 0,
     "bestRoiPct": 0,
     "positiveArbCount": 0,
     "matchedCount": 2
   },
   {
-    "scanTimestamp": "2026-06-12T10:48:21.832Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:48:31.842Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:48:41.005Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:48:51.846Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:49:03.563Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 823.0653333333341,
-    "bestRoiPct": 6.000000000000006,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:49:12.689Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:49:21.838Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:49:31.830Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:49:51.997Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 823.0653333333341,
-    "bestRoiPct": 6.000000000000006,
-    "positiveArbCount": 2,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:01.347Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:10.995Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:21.035Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:31.016Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:41.009Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:50:51.086Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T10:51:00.992Z",
-    "marketId": "1779565300940-jqb54rc",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:20:46.758Z",
-    "marketId": "1780524567744-y6seyod",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 0
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:20:55.065Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:04.789Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:14.756Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:25.548Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:34.752Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:44.753Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:21:54.757Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:04.759Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:15.476Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:24.832Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:34.746Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:44.739Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:45.766Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:22:56.517Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:23:06.561Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:23:16.502Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:23:26.500Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:23:36.501Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:23:56.961Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:24:40.683Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:24:45.975Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:24:55.994Z",
-    "marketId": "1779918190243-xbh0u7e",
-    "totalProfit": 0.40000000000000036,
-    "bestRoiPct": 0.20000000000000018,
-    "positiveArbCount": 1,
-    "matchedCount": 6
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:08.576Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:16.219Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:26.162Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:38.791Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:46.419Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:25:56.157Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:06.961Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:16.283Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:26.280Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:38.511Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:46.466Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:26:56.066Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:06.589Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:16.267Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:26.377Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:36.294Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:46.371Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:27:56.058Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:06.458Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:16.441Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:26.423Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:36.270Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:46.280Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:28:56.189Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:29:10.597Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:29:16.345Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:29:26.087Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:29:36.293Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
-    "positiveArbCount": 1,
-    "matchedCount": 11
-  },
-  {
-    "scanTimestamp": "2026-06-12T11:29:46.279Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:13:57.841Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:29:56.111Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:02.726Z",
+    "marketId": "1779918706058-tmlnj5g",
+    "totalProfit": 2.7181760869565847,
+    "bestRoiPct": 0.5000000000000115,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 10
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:06.383Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:07.827Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:16.090Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:12.641Z",
+    "marketId": "1779918706058-tmlnj5g",
+    "totalProfit": 2.7181760869565847,
+    "bestRoiPct": 0.5000000000000115,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 10
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:26.283Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:18.535Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:36.158Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:21.860Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:46.190Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:29.889Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:30:56.382Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:31.925Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:06.304Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:40.783Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:16.271Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:42.057Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:26.992Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:50.440Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:36.272Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:51.640Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:46.302Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:14:59.388Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:31:57.727Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:15:00.716Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:32:06.287Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1743.636363636365,
-    "bestRoiPct": 4.0000000000000036,
+    "scanTimestamp": "2026-06-12T16:15:12.131Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:42:44.231Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1.4285714285714295,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:20.377Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:42:44.694Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1.4285714285714295,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:21.109Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T11:42:48.548Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1.4285714285714295,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:21.736Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:35:35.338Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:30.078Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:35:45.511Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:40.677Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:35:55.378Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:41.047Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:36:05.395Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:41.292Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:36:15.373Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:49.909Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:36:25.401Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:15:51.118Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:37:25.354Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:02.090Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:38:25.643Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:02.347Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:39:25.422Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:09.189Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:40:25.337Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:12.247Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:41:25.413Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:19.948Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:42:25.498Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:21.756Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:43:25.461Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:31.166Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:44:27.211Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:31.669Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:45:25.734Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:39.142Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.4214285714285735,
+    "bestRoiPct": 3.0000000000000027,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:46:25.382Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:40.850Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:47:33.652Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:49.136Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T12:48:25.276Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 342.78571428571456,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:16:52.669Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T13:05:23.738Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1.357142857142858,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:17:02.054Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T13:21:32.713Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 1.4285714285714295,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:17:10.104Z",
+    "marketId": "1779918229304-wucayqb",
+    "totalProfit": 2.079285714285716,
+    "bestRoiPct": 3.000000000000002,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   },
   {
-    "scanTimestamp": "2026-06-12T13:38:14.154Z",
-    "marketId": "1779565498134-v5tij6n",
-    "totalProfit": 87.14285714285721,
-    "bestRoiPct": 1.0000000000000009,
+    "scanTimestamp": "2026-06-12T16:17:10.514Z",
+    "marketId": "1780516066111-3yx3lkb",
+    "totalProfit": 2.3170731707317094,
+    "bestRoiPct": 1.9000000000000017,
     "positiveArbCount": 1,
-    "matchedCount": 11
+    "matchedCount": 7
   }
 ]

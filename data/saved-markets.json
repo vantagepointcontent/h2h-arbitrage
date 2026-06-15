@@ -358,11 +358,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 0,
+      "outcomeCount": 16,
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 16,
-      "scannedAt": "2026-06-12T11:36:11.511Z",
+      "scannedAt": "2026-06-12T15:01:52.203Z",
       "allArbs": []
     }
   },
@@ -467,15 +467,23 @@
     "id": "1779918229304-wucayqb",
     "createdAt": "2026-05-27T21:43:49.304Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 7,
+      "bestRoiPct": 3.000000000000002,
+      "bestProfit": 2.079285714285716,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 9,
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-12T11:36:16.944Z",
-      "allArbs": []
+      "scannedAt": "2026-06-12T16:17:10.102Z",
+      "allArbs": [
+        {
+          "artist": "Darializa Avila Chevalier",
+          "roiPct": 3.000000000000002,
+          "expectedProfit": 2.079285714285716,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 67.2302380952381
+        }
+      ]
     }
   },
   {
@@ -576,38 +584,21 @@
     "id": "1779918706058-tmlnj5g",
     "createdAt": "2026-05-27T21:51:46.059Z",
     "lastScanResult": {
-      "bestRoiPct": 3.7999999999999923,
-      "bestProfit": 1.1728395061728372,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 10,
+      "bestRoiPct": 0.5000000000000115,
+      "bestProfit": 2.7181760869565847,
+      "strategy": "Buy YES Kalshi + NO PM",
+      "outcomeCount": 11,
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 11,
-      "scannedAt": "2026-06-12T11:36:20.514Z",
+      "scannedAt": "2026-06-12T16:14:12.638Z",
       "allArbs": [
         {
-          "artist": "Yu Deng",
-          "roiPct": 3.499999999999992,
-          "expectedProfit": 0.10447761194029825,
-          "strategy": "Buy YES PM + NO Kalshi"
-        },
-        {
           "artist": "Jack Thorne",
-          "roiPct": 1.000000000000001,
-          "expectedProfit": 0.03333333333333337,
-          "strategy": "Buy YES Kalshi + NO PM"
-        },
-        {
-          "artist": "Hong Wang",
-          "roiPct": 0.20000000000000018,
-          "expectedProfit": 1.0675675675675687,
-          "strategy": "Buy YES PM + NO Kalshi"
-        },
-        {
-          "artist": "Jacob Tsimerman",
-          "roiPct": 3.7999999999999923,
-          "expectedProfit": 1.1728395061728372,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "roiPct": 0.5000000000000115,
+          "expectedProfit": 2.7181760869565847,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 540.9170413043479
         }
       ]
     }
@@ -711,15 +702,23 @@
     "id": "1779918781059-h64swoj",
     "createdAt": "2026-05-27T21:53:01.060Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
+      "bestRoiPct": 0.40000000000000036,
+      "bestProfit": 0.4400000000000004,
+      "strategy": "Buy YES Kalshi + NO PM",
+      "outcomeCount": 6,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 6,
-      "scannedAt": "2026-06-12T11:36:37.683Z",
-      "allArbs": []
+      "scannedAt": "2026-06-12T15:01:42.742Z",
+      "allArbs": [
+        {
+          "artist": "Alan Wilson",
+          "roiPct": 0.40000000000000036,
+          "expectedProfit": 0.4400000000000004,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 109.56
+        }
+      ]
     }
   },
   {
@@ -1097,17 +1096,18 @@
       "bestRoiPct": 1.9000000000000017,
       "bestProfit": 2.3170731707317094,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 7,
+      "outcomeCount": 15,
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 14,
-      "scannedAt": "2026-06-12T11:37:54.745Z",
+      "scannedAt": "2026-06-12T16:17:10.512Z",
       "allArbs": [
         {
           "artist": "Joseph Chaplik",
           "roiPct": 1.9000000000000017,
           "expectedProfit": 2.3170731707317094,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 119.63414634146342
         }
       ]
     }
@@ -1717,37 +1717,41 @@
     "createdAt": "2026-06-03T22:15:36.003Z",
     "lastScanResult": {
       "bestRoiPct": 5.000000000000004,
-      "bestProfit": 3.4057928571428606,
+      "bestProfit": 6.670621428571436,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 12,
+      "outcomeCount": 46,
       "matchedCount": 12,
       "kalshiCount": 31,
       "pmCount": 27,
-      "scannedAt": "2026-06-12T11:39:11.858Z",
+      "scannedAt": "2026-06-12T14:55:34.431Z",
       "allArbs": [
         {
           "artist": "Sam Bankman-Fried (SBF, Jan 2027)",
-          "roiPct": 3.300000000000003,
-          "expectedProfit": 3.227551724137934,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "roiPct": 3.400000000000003,
+          "expectedProfit": 12.928988505747137,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 367.3353793103448
         },
         {
           "artist": "Derek Chauvin (DCHAU, Jan 2027)",
           "roiPct": 0.20000000000000018,
           "expectedProfit": 0.010672358591248675,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 5.325506937033084
         },
         {
           "artist": "Steve Bannon (SBAN, Jan 2027)",
           "roiPct": 2.9999999999999916,
-          "expectedProfit": 25.63184444444437,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "expectedProfit": 23.92715925925919,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 773.6448160493828
         },
         {
           "artist": "Keonne Rodriguez (KROD, Jan 2027)",
           "roiPct": 5.000000000000004,
-          "expectedProfit": 3.4057928571428606,
-          "strategy": "Buy YES Kalshi + NO PM"
+          "expectedProfit": 6.670621428571436,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 126.74180714285717
         }
       ]
     }
@@ -1782,37 +1786,41 @@
     "createdAt": "2026-06-03T22:15:38.676Z",
     "lastScanResult": {
       "bestRoiPct": 10.899999999999999,
-      "bestProfit": 35.14943820224718,
+      "bestProfit": 30.617977528089884,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 4,
+      "outcomeCount": 58,
       "matchedCount": 4,
       "kalshiCount": 56,
       "pmCount": 6,
-      "scannedAt": "2026-06-12T11:39:07.227Z",
+      "scannedAt": "2026-06-12T15:01:40.347Z",
       "allArbs": [
         {
           "artist": "Phoebe Bridgers",
           "roiPct": 2.9000000000000026,
           "expectedProfit": 7.4742268041237185,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 250.25773195876292
         },
         {
           "artist": "Billie Eilish",
           "roiPct": 3.9000000000000035,
           "expectedProfit": 14.218750000000014,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 350.3645833333333
         },
         {
           "artist": "Addison Rae",
           "roiPct": 10.899999999999999,
-          "expectedProfit": 35.14943820224718,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "expectedProfit": 30.617977528089884,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 250.2808988764045
         },
         {
           "artist": "Lorde",
           "roiPct": 8.699999999999996,
           "expectedProfit": 24.71590909090908,
-          "strategy": "Buy YES PM + NO Kalshi"
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 259.375
         }
       ]
     }
@@ -2727,22 +2735,15 @@
     "id": "1781019440010-qbaajhj",
     "createdAt": "2026-06-09T15:37:20.010Z",
     "lastScanResult": {
-      "bestRoiPct": 2.9999999999999916,
-      "bestProfit": 9.425624999999973,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 11,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 12,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 12,
-      "scannedAt": "2026-06-12T11:42:08.337Z",
-      "allArbs": [
-        {
-          "artist": "Jackson Lahmeyer",
-          "roiPct": 2.9999999999999916,
-          "expectedProfit": 9.425624999999973,
-          "strategy": "Buy YES PM + NO Kalshi"
-        }
-      ]
+      "scannedAt": "2026-06-12T14:03:36.337Z",
+      "allArbs": []
     }
   },
   {
@@ -2777,11 +2778,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 2,
+      "outcomeCount": 20,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 20,
-      "scannedAt": "2026-06-12T11:42:09.561Z",
+      "scannedAt": "2026-06-12T16:13:57.102Z",
       "allArbs": []
     }
   },
