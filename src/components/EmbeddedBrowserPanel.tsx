@@ -62,7 +62,7 @@ export function EmbeddedBrowserPanel({
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
@@ -352,16 +352,16 @@ export function DualBrowserPanels({
   maxHeight = 600,
   refreshTrigger,
 }: DualPanelProps) {
-  const [kalshiVisible, setKalshiVisible] = useState(false);
-  const [pmVisible, setPmVisible] = useState(false);
+  const [kalshiVisible, setKalshiVisible] = useState(true);
+  const [pmVisible, setPmVisible] = useState(true);
 
   // Scroll sync state
   const [kalshiScroll, setKalshiScroll] = useState<number | null>(null);
   const [pmScroll, setPmScroll] = useState<number | null>(null);
 
   // Debounce scroll propagation to avoid infinite loops
-  const kalshiScrollTimer = useRef<ReturnType<typeof setTimeout>>();
-  const pmScrollTimer = useRef<ReturnType<typeof setTimeout>>();
+  const kalshiScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pmScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleKalshiScroll = useCallback((top: number) => {
     if (kalshiScrollTimer.current) clearTimeout(kalshiScrollTimer.current);

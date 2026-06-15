@@ -154,8 +154,8 @@ describe('REGRESSION: computeApy', () => {
     expect(computeApy(50, '2020-01-01')).toBe(0);
   });
 
-  it('R19: null expiry → 0 APY', () => {
-    expect(computeApy(10, null)).toBe(0);
+  it('R19: null expiry → APY = ROI (kan inte annualisera)', () => {
+    expect(computeApy(10, null)).toBe(10);
   });
 });
 

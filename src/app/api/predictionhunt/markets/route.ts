@@ -3,6 +3,7 @@ import {
   getPredictionHuntMarkets,
   runFullSync,
   getLatestSyncLog,
+  fetchAllPlatformMarkets,
 } from '@/lib/predictionhunt';
 import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
 
@@ -42,6 +43,20 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
+
+    /* ── Fetch all markets from both platforms (raw, unmatched) ── */
+    if (action === 'fetch-all') {
+      const [pmMarkets, kMarkets] = await Promise.all([
+        fetchAllPlatformMarkets('polymarket'),
+        fetchAllPlatformMarkets('kalshi'),
+      ]);
+      return NextResponse.json({
+        success: true,
+        polymarket: pmMarkets,
+        kalshi: kMarkets,
+        total: pmMarkets.length + kMarkets.length,
+      });
+    }
 
     /* ── Sync all markets ─────────────────────────── */
     if (action === 'sync') {
