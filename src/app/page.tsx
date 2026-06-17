@@ -49,7 +49,7 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, CategoryName } from "@/lib/categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { DashboardPanel } from "@/app/components/DashboardPanel";
@@ -1516,6 +1516,8 @@ export default function Home() {
                 onSetExpiryFilter={setOverviewExpiryFilter}
                 showArbOnly={showArbOnly}
                 onToggleShowArbOnly={() => setShowArbOnly(v => !v)}
+                showExpired={showExpired}
+                onToggleShowExpired={() => setShowExpired(v => !v)}
                 timeUntilExpiry={timeUntilExpiry}
                 formatExpiry={formatExpiry}
                 onSelectMarket={loadMarket}
@@ -2330,6 +2332,8 @@ function OverviewPanel({
   onSetExpiryFilter,
   showArbOnly,
   onToggleShowArbOnly,
+  showExpired,
+  onToggleShowExpired,
   timeUntilExpiry,
   formatExpiry,
   onSelectMarket,
@@ -2346,6 +2350,8 @@ function OverviewPanel({
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
   showArbOnly: boolean;
   onToggleShowArbOnly: () => void;
+  showExpired: boolean;
+  onToggleShowExpired: () => void;
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
   onSelectMarket: (m: SavedMarket) => void;
@@ -2382,10 +2388,14 @@ function OverviewPanel({
   const sorted = [...markets].sort(sortFn);
 
   // Apply expiry filter
-  const filteredByExpiry = sorted.filter(m => {
+  const filteredByExpiry = markets.filter(m => {
+    if (!showExpired) {
+      const isExpired = m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false;
+      if (isExpired) return false;
+    }
     if (expiryFilter === "all") return true;
     if (!m.expiryDate) return false;
-    const days = (new Date(m.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
     if (expiryFilter === "lte7") return days <= 7;
     if (expiryFilter === "lte14") return days <= 14;
     if (expiryFilter === "lte30") return days <= 30;
@@ -2426,7 +2436,6 @@ function OverviewPanel({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Overview</h2>
         <div className="flex items-center gap-2">
-          {/* Arb-only toggle */}
           <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
             <button
               onClick={() => onToggleShowArbOnly()}
@@ -2438,6 +2447,19 @@ function OverviewPanel({
               title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
             >
               {showArbOnly ? "Arb: On" : "Arb: Off"}
+            </button>
+          </div>
+          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+            <button
+              onClick={() => onToggleShowExpired()}
+              className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                showExpired
+                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                  : "text-[#5E6875] hover:text-[#FFFFFF]"
+              }`}
+              title={showExpired ? "Hide expired markets" : "Show expired markets"}
+            >
+              {showExpired ? "Expired: On" : "Expired: Off"}
             </button>
           </div>
           <div className="w-px h-4 bg-[#232E3C]" />
