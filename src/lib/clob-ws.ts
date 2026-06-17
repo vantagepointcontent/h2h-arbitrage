@@ -8,6 +8,10 @@ export interface WsPriceUpdate {
   bestBid: number | null;
   bestAsk: number | null;
   lastTradePrice: number | null;
+  book?: {
+    bids: { price: number; size: number }[];
+    asks: { price: number; size: number }[];
+  };
   ts: number;
 }
 
@@ -256,8 +260,8 @@ export class ClobWsService {
       const assetId = msg.asset_id;
       if (!assetId) return;
 
-      const bids = msg.bids as { price: string }[] | undefined;
-      const asks = msg.asks as { price: string }[] | undefined;
+      const bids = msg.bids as { price: string; size: string }[] | undefined;
+      const asks = msg.asks as { price: string; size: string }[] | undefined;
 
       let bestBid: number | null = null;
       let bestAsk: number | null = null;
@@ -269,7 +273,16 @@ export class ClobWsService {
         bestAsk = Math.min(...asks.map((a: any) => parseFloat(a.price)));
       }
 
-      if (bestBid != null || bestAsk != null) {
+      const parsedBids = bids
+        ?.map((b: any) => ({ price: parseFloat(b.price), size: parseFloat(b.size) }))
+        .filter((b) => b.price > 0 && b.size > 0)
+        .sort((a, b) => b.price - a.price) ?? [];
+      const parsedAsks = asks
+        ?.map((a: any) => ({ price: parseFloat(a.price), size: parseFloat(a.size) }))
+        .filter((a) => a.price > 0 && a.size > 0)
+        .sort((a, b) => a.price - b.price) ?? [];
+
+      if (bestBid != null || bestAsk != null || parsedBids.length > 0 || parsedAsks.length > 0) {
         priceCache.set(assetId, {
           bestBid: bestBid ?? priceCache.get(assetId)?.bestBid ?? 0,
           bestAsk: bestAsk ?? priceCache.get(assetId)?.bestAsk ?? 0,
@@ -283,6 +296,7 @@ export class ClobWsService {
         bestBid,
         bestAsk,
         lastTradePrice: null,
+        book: { bids: parsedBids, asks: parsedAsks },
         ts: msg.timestamp ?? Date.now(),
       });
     }
