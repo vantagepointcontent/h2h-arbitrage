@@ -466,8 +466,8 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
 type OverviewSort = "name" | "roi" | "expiry" | "apy";
 
 export default function Home() {
-  const [kalshiUrl, setKalshiUrl] = useState("https://kalshi.com/markets/kxfeaturedrake/who-will-be-featured-on-drake-album/kxfeaturedrake");
-  const [pmUrl, setPmUrl] = useState("https://polymarket.com/event/who-will-be-featured-on-iceman");
+  const [kalshiUrl, setKalshiUrl] = useState("");
+  const [pmUrl, setPmUrl] = useState("");
   const [capital, setCapital] = useState(1000);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1625,13 +1625,25 @@ export default function Home() {
                       <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
                         <Link2 className="w-4 h-4" /> Kalshi URL
                       </label>
-                      <input type="text" value={kalshiUrl} onChange={(e) => setKalshiUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all" placeholder="https://kalshi.com/markets/..." />
+                      <input
+                        type="text"
+                        value={kalshiUrl}
+                        onChange={(e) => setKalshiUrl(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#48555F] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all"
+                        placeholder="https://kalshi.com/markets/..."
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
                         <Link2 className="w-4 h-4" /> Polymarket URL
                       </label>
-                      <input type="text" value={pmUrl} onChange={(e) => setPmUrl(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all" placeholder="https://polymarket.com/event/..." />
+                      <input
+                        type="text"
+                        value={pmUrl}
+                        onChange={(e) => setPmUrl(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#48555F] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all"
+                        placeholder="https://polymarket.com/event/..."
+                      />
                     </div>
                   </div>
 
