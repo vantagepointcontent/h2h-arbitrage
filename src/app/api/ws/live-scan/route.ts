@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { clobWs } from '@/lib/clob-ws';
-import { kalshiWs } from '@/lib/kalshi-ws';
+import { kalshiWs, KalshiWsMessage } from '@/lib/kalshi-ws';
 import { orderbookState } from '@/lib/orderbook-state';
 import { computeLiveArbitrage, applyPolymarketBook } from '@/lib/live-arb-engine';
 import { makeKalshiAuthHeaders } from '@/lib/kalshi-auth';
@@ -101,17 +101,18 @@ export async function GET(req: NextRequest) {
       send({ type: 'status', message: 'Connecting to exchanges...' });
 
       // Seed books from REST so UI shows prices immediately, then WS deltas keep them fresh.
-      seedKalshiBook(kalshiTicker).catch(() => {});
-      seedPmBook(pmYesTokenId).catch(() => {});
-      seedPmBook(pmNoTokenId).catch(() => {});
-      maybeSendResult();
+      seedKalshiBook(kalshiTicker)
+        .then(() => seedPmBook(pmYesTokenId))
+        .then(() => seedPmBook(pmNoTokenId))
+        .then(() => maybeSendResult())
+        .catch(() => {});
 
       // ── Kalshi WS ──
       const kalshiSubKey = `live-scan-${kalshiTicker}-${Date.now()}`;
       kalshiWs.connect();
       kalshiWs.subscribe(
         kalshiTicker,
-        (msg) => {
+        (msg: KalshiWsMessage) => {
           if (session.closed) return;
           if (msg.type === 'orderbook_snapshot') {
             orderbookState.setBook(kalshiTicker, msg.yes, msg.no, msg.seq);
@@ -137,7 +138,6 @@ export async function GET(req: NextRequest) {
         }
         maybeSendResult();
       }, pmSubKey);
-
 
       function maybeSendResult() {
         const now = Date.now();
@@ -205,11 +205,16 @@ async function seedKalshiBook(ticker: string) {
       { headers: makeKalshiAuthHeaders('GET', `/trade-api/v2/markets/${ticker}/orderbook`), cache: 'no-store' },
     );
     if (!res.ok) return;
-    const data = await res.json() as { orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] } };
-    const yes = (data.orderbook?.yes_dollars_fp || [])
+    const data = await res.json() as {
+      orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] };
+      orderbook_fp?: { yes_dollars?: [string, string][]; no_dollars?: [string, string][] };
+    };
+    const yesRaw = data.orderbook?.yes_dollars_fp ?? data.orderbook_fp?.yes_dollars ?? [];
+    const noRaw = data.orderbook?.no_dollars_fp ?? data.orderbook_fp?.no_dollars ?? [];
+    const yes = yesRaw
       .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
       .filter((lvl) => lvl.quantity > 0);
-    const no = (data.orderbook?.no_dollars_fp || [])
+    const no = noRaw
       .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
       .filter((lvl) => lvl.quantity > 0);
     orderbookState.setBook(ticker, yes, no);

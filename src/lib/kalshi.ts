@@ -62,6 +62,11 @@ export function extractKalshiMarketTicker(url: string): string | null {
 }
 
 export function extractKalshiTicker(url: string): string | null {
+  // Prefer explicit operational market ticker from query param if present
+  // e.g. ?op_market_ticker=KXWCGAME-26JUN17ENGCRO-ENG
+  const op = new URL(url, 'https://kalshi.com').searchParams.get('op_market_ticker');
+  if (op) return op.toUpperCase();
+
   const match = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([^\/\?]+)/);
   return match ? match[1].toUpperCase() : null;
 }
