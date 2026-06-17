@@ -723,29 +723,29 @@
     "id": "1779918229304-wucayqb",
     "createdAt": "2026-05-27T21:43:49.304Z",
     "lastScanResult": {
-      "bestRoiPct": 1.2009925558312657,
-      "bestProfit": 0.19360000000000005,
+      "bestRoiPct": 1.2326951399116346,
+      "bestProfit": 0.1674,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 8,
       "matchedCount": 8,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-06-17T13:58:40.480Z",
+      "scannedAt": "2026-06-17T14:07:10.897Z",
       "allArbs": [
         {
           "artist": "Darializa Avila Chevalier",
-          "roiPct": 1.2009925558312657,
-          "expectedProfit": 0.19360000000000005,
+          "roiPct": 1.2326951399116346,
+          "expectedProfit": 0.1674,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 15.636400000000002,
+          "totalStake": 13.1726,
           "fees": {
-            "kalshiFee": 0.29,
-            "pmFee": 0.20077,
-            "kalshiFeeDetails": "Kalshi NO sell 16 @ $0.50 = $0.29",
-            "pmFeeDetails": "Polymarket YES buy 16 @ $0.47 (θ=0.05) = $0.20",
-            "netProfitIfKalshiWins": 0.19360000000000005,
-            "netProfitIfPmWins": 0.28283,
-            "worstCaseNetProfit": 0.19360000000000005
+            "kalshiFee": 0.24,
+            "pmFee": 0.16914,
+            "kalshiFeeDetails": "Kalshi NO sell 14 @ $0.50 = $0.24",
+            "pmFeeDetails": "Polymarket YES buy 14 @ $0.47 (θ=0.05) = $0.17",
+            "netProfitIfKalshiWins": 0.1674,
+            "netProfitIfPmWins": 0.23825999999999997,
+            "worstCaseNetProfit": 0.1674
           }
         },
         {

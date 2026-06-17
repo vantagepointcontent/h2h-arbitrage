@@ -1449,16 +1449,6 @@ export default function Home() {
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
 
           <div className="flex items-center gap-2 ml-4">
-            <Filter className="w-4 h-4 text-[#5E6875]" />
-            <select
-              value={overviewCategory}
-              onChange={(e) => setOverviewCategory(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
-              title="Filter by category"
-            >
-              <option value="all">All categories</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-            </select>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
@@ -2074,6 +2064,7 @@ function MarketSidebar({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [sidebarCategory, setSidebarCategory] = useState<"all" | CategoryName>("all");
 
   // Filter + sort
   const filtered = markets.filter(m => {
@@ -2087,6 +2078,7 @@ function MarketSidebar({
       if (expiryFilter === "lte14" && days > 14) return false;
       if (expiryFilter === "lte30" && days > 30) return false;
     }
+    if (sidebarCategory !== "all" && m.category?.toLowerCase() !== sidebarCategory) return false;
     if (sidebarSearch && !m.eventTitle.toLowerCase().includes(sidebarSearch.toLowerCase())) return false;
     if (sidebarFavoritesOnly && !favoriteIds.has(m.id)) return false;
     if (showArbOnly) {
@@ -2208,12 +2200,22 @@ function MarketSidebar({
             <select
               value={expiryFilter}
               onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none"
+              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] text-xs text-[#FFFFFF] focus:outline-none"
             >
               <option value="all">All expiries</option>
               <option value="lte7">≤ 7 days</option>
               <option value="lte14">≤ 14 days</option>
               <option value="lte30">≤ 30 days</option>
+            </select>
+            <select
+              value={sidebarCategory}
+              onChange={(e) => setSidebarCategory(e.target.value as "all" | CategoryName)}
+              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] text-xs text-[#FFFFFF] focus:outline-none"
+            >
+              <option value="all">All categories</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+              ))}
             </select>
             <button
               onClick={onToggleShowExpired}
