@@ -38,7 +38,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '3000',
-        PREDICTIONHUNT_API_KEY: 'pmx_....hblkU',
+        PREDICTIONHUNT_API_KEY: 'pmx_U46EX9BAvyqxGoq9kinrYIqRt3KTWoWTrOU9B-I8VGQ',
         LOG_DIR: '/home/scott/.pm2/logs',
         LOG_LEVEL: 'info',
         // SENTRY_DSN: 'https://...',  // uncomment and set your Sentry DSN
