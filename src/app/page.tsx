@@ -343,6 +343,8 @@ interface ScanResult {
   kalshiFetchSource?: string;
   clobHitCount?: number;
   clobMissCount?: number;
+  expired?: boolean;
+  noPrices?: boolean;
   outcomes: UnifiedOutcome[];
   unmatchedKalshi: UnmatchedKalshi[];
   unmatchedPolymarket: UnmatchedPolymarket[];
@@ -946,9 +948,13 @@ export default function Home() {
     setViewMode("scan");
     window.history.pushState({ view: "scan", marketId: m.id }, "", `/?view=scan&id=${m.id}`);
 
+    const now = Date.now();
+    const expiryMs = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
+    const isExpired = expiryMs > 0 && expiryMs <= now;
+
     // Build cached result from lastScanResult/liveResult to show instantly
     const cached = m.liveResult ?? m.lastScanResult;
-    if (cached) {
+    if (cached && !isExpired) {
       const cachedResult: ScanResult = {
         eventTitle: m.eventTitle,
         kalshiCount: cached.kalshiCount ?? 0,
@@ -977,6 +983,20 @@ export default function Home() {
       };
       setResult(cachedResult);
       setLastUpdated(new Date(cached.scannedAt));
+    } else {
+      // Expired market: show empty result with clear state
+      setResult({
+        eventTitle: m.eventTitle,
+        kalshiCount: cached?.kalshiCount ?? 0,
+        pmCount: cached?.pmCount ?? 0,
+        matchedCount: 0,
+        expiryDate: m.expiryDate ?? undefined,
+        outcomes: [],
+        unmatchedKalshi: [],
+        unmatchedPolymarket: [],
+        expired: true,
+      } as ScanResult);
+      setLastUpdated(null);
     }
 
     // Background refresh (silent)
@@ -1768,10 +1788,10 @@ export default function Home() {
                           </div>
 
                           {/* Total Profit chip */}
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${result.expired ? 'opacity-50' : ''}`}>
                             <TrendingUp className="w-3 h-3 text-[#5DBE81]" />
                             <span className="text-[10px] text-[#5E6875]">Total Profit</span>
-                            <span className="text-xs font-bold text-[#5DBE81]">{formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0))}</span>
+                            <span className="text-xs font-bold text-[#5DBE81]">{result.expired ? '—' : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0))}</span>
                           </div>
 
                           {/* Expiry chip */}
@@ -1793,25 +1813,29 @@ export default function Home() {
                       </>
                     )}
 
-                    {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0) && (
-                      <div className="rounded-xl border border-[#facc15]/30 bg-[#facc15]/10 p-3 flex items-start gap-3 text-sm text-[#facc15]">
+                    {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices) && (
+                      <div className={`rounded-xl border p-3 flex items-start gap-3 text-sm ${result.expired ? 'border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444]' : 'border-[#facc15]/30 bg-[#facc15]/10 text-[#facc15]'}`}>
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <div className="space-y-1">
-                          <div className="font-semibold">Market data warning</div>
+                          <div className="font-semibold">{result.expired ? 'Market expired' : result.noPrices ? 'No live prices' : 'Market data warning'}</div>
                           <div className="text-xs text-[#8A9BA8]">
-                            {result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
-                            {result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
-                            {result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
+                            {result.expired && <span className="mr-3">This market has expired. Prices and arbitrage calculations are no longer valid.</span>}
+                            {result.noPrices && <span className="mr-3">No live prices available. Refresh or check the market URLs.</span>}
+                            {!result.expired && !result.noPrices && result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
+                            {!result.expired && !result.noPrices && result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
+                            {!result.expired && !result.noPrices && result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
                           </div>
-                          <div className="text-[11px] text-[#8A9BA8]">
-                            Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
-                          </div>
+                          {!result.expired && !result.noPrices && (
+                            <div className="text-[11px] text-[#8A9BA8]">
+                              Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
 
                     {/* Stake Calculator */}
-                    {result.matchedCount > 0 && result.outcomes && (
+                    {!result.expired && !result.noPrices && result.matchedCount > 0 && result.outcomes && (
                       <StakeCalculator
                         suggestions={result.outcomes
                           .filter(o => o.arbitrage && o.arbitrage.expectedProfit > 0)
@@ -1831,7 +1855,7 @@ export default function Home() {
                     )}
 
                     {/* View toggle: outcome table <-> 1on1 bookmaker view */}
-                    {result.matchedCount > 0 && (
+                    {!result.expired && !result.noPrices && result.matchedCount > 0 && (
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <button

@@ -129,6 +129,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check expiry: if event end date has passed, return empty result with expired flag
+    const expiryDate = pmEvent.endDate;
+    if (expiryDate) {
+      const expiryMs = new Date(expiryDate).getTime();
+      if (expiryMs > 0 && expiryMs <= Date.now()) {
+        return NextResponse.json({
+          eventTitle: pmEvent.title,
+          kalshiEventTicker: kalshiTicker,
+          pmEventSlug: pmSlug,
+          pmEventId: pmEvent.id,
+          expiryDate,
+          kalshiCount: 0,
+          pmCount: 0,
+          matchedCount: 0,
+          kalshiRawCount: 0,
+          pmRawCount: 0,
+          pmFilteredCount: 0,
+          kalshiFetchSource,
+          clobHitCount: 0,
+          clobMissCount: 0,
+          outcomes: [],
+          unmatchedKalshi: [],
+          unmatchedPolymarket: [],
+          expired: true,
+          _ts: Date.now(),
+          _kalshiFetchedAt: new Date().toISOString(),
+          _pmFetchedAt: new Date().toISOString(),
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        });
+      }
+    }
+
     // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
     const pmRawCount = (pmEvent.markets || []).length;
     
