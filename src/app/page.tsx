@@ -42,6 +42,7 @@ import {
   Check,
   Star,
   DollarSign,
+  Hash,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -1100,6 +1101,9 @@ export default function Home() {
   const [mfSpreadThreshold, setMfSpreadThreshold] = useState(14);
   const [mfExpiryDays, setMfExpiryDays] = useState(getStoredMfExpiryDays);
 
+  // MF fetch count — caps PredictionHunt API usage (default 3)
+  const [mfFetchCount, setMfFetchCount] = useState(3);
+
   // ── MF matched/unmatched filter (all | matched | unmatched) ──
   const [mfMatchFilter, setMfMatchFilter] = useState<"all" | "matched" | "unmatched">("all");
 
@@ -1202,7 +1206,7 @@ export default function Home() {
     } else {
       fetchFreshMfMarkets(true);
     }
-  }, [viewMode, mfCategories, mfExpiryDays]);
+  }, [viewMode, mfCategories, mfExpiryDays, mfFetchCount]);
 
   // Auto-refresh interval for MarketFinder (60s polling)
   useEffect(() => {
@@ -1314,12 +1318,12 @@ export default function Home() {
     setTimeout(() => setMfBulkMsg(""), 3000);
   }, [mfSelectedIds, mfBulkSaving, mfMarkets]);
 
-  /** Fetch fresh MF markets from API with current category + expiry filters */
+  /** Fetch fresh MF markets from API with current category + expiry + fetchCount filters */
   const fetchFreshMfMarkets = useCallback((showLoading: boolean) => {
     if (showLoading) setMfLoading(true);
     setMfError("");
     const cats = mfCategories.join(",");
-    const url = `/api/predictionhunt/markets?${cats ? `category=${encodeURIComponent(cats)}&` : ""}maxDays=${mfExpiryDays}`;
+    const url = `/api/predictionhunt/markets?${cats ? `category=${encodeURIComponent(cats)}&` : ""}maxDays=${mfExpiryDays}&fetchCount=${mfFetchCount}`;
     fetch(url, { headers: { "Cache-Control": "no-store" } })
       .then((r) => r.json())
       .then((d) => {
@@ -1334,7 +1338,7 @@ export default function Home() {
       })
       .catch(() => setMfError("Failed to load MarketFinder data"))
       .finally(() => { if (showLoading) setMfLoading(false); });
-  }, [mfCategories, mfExpiryDays]);
+  }, [mfCategories, mfExpiryDays, mfFetchCount]);
 
   /** Fetch ALL markets from both platforms (raw, unmatched) */
   const fetchAllMfMarkets = useCallback(() => {
@@ -1536,8 +1540,10 @@ export default function Home() {
                 bulkMsg={mfBulkMsg}
                 spreadThreshold={mfSpreadThreshold}
                 expiryDays={mfExpiryDays}
+                fetchCount={mfFetchCount}
                 categories={mfCategories}
                 autoRefreshEnabled={mfAutoRefreshEnabled}
+                onSetFetchCount={setMfFetchCount}
                 onFetch={() => {
                   fetchFreshMfMarkets(true);
                 }}
@@ -2622,6 +2628,7 @@ function MarketFinderPanel({
   bulkMsg,
   spreadThreshold,
   expiryDays,
+  fetchCount,
   categories,
   autoRefreshEnabled,
   onFetch,
@@ -2632,6 +2639,7 @@ function MarketFinderPanel({
   onBulkSave,
   onSetCategories,
   onSetExpiryDays,
+  onSetFetchCount,
   onToggleAutoRefresh,
   allMarkets,
   showAllPlatforms,
@@ -2652,6 +2660,7 @@ function MarketFinderPanel({
   bulkMsg: string;
   spreadThreshold: number;
   expiryDays: number;
+  fetchCount: number;
   categories: string[];
   autoRefreshEnabled: boolean;
   onFetch: () => void;
@@ -2662,6 +2671,7 @@ function MarketFinderPanel({
   onBulkSave: () => void;
   onSetCategories: (cats: string[]) => void;
   onSetExpiryDays: (days: number) => void;
+  onSetFetchCount: (count: number) => void;
   onToggleAutoRefresh: (enabled: boolean) => void;
   allMarkets: any[];
   showAllPlatforms: boolean;
@@ -2681,6 +2691,9 @@ function MarketFinderPanel({
 
   // Local spread threshold (defaults to prop, user-adjustable via slider)
   const [localThreshold, setLocalThreshold] = useState(spreadThreshold);
+
+  // Local fetch count (defaults to prop, user-adjustable via slider)
+  const [localFetchCount, setLocalFetchCount] = useState(fetchCount);
 
   const normalized = (url: string) => (url || '').split('?')[0].replace(/\/$/, '').toLowerCase();
 
@@ -2741,7 +2754,7 @@ function MarketFinderPanel({
           <p className="text-xs text-[#5E6875] mt-0.5">
             {showAllPlatforms
               ? `All platforms — ${allMarkets.length} markets`
-              : `PredictionHunt matched markets — ≤${expiryDays} ${expiryDays === 1 ? "day" : "days"} expiry, ${categories.length > 0 ? categories.length + " categories" : "all categories"}`}
+              : `PredictionHunt matched events — Kalshi + Polymarket only`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -2832,6 +2845,26 @@ function MarketFinderPanel({
           className="flex-1 accent-[#5DBE81] h-1"
         />
         <span className="text-xs font-mono text-[#5DBE81] min-w-[3rem] text-right">{expiryDays}d</span>
+      </div>
+
+      {/* Fetch count control */}
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
+        <Hash className="w-3.5 h-3.5 text-[#5E6875]" />
+        <span className="text-xs text-[#5E6875]">Fetch count:</span>
+        <input
+          type="range"
+          min="1"
+          max="20"
+          step="1"
+          value={localFetchCount}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            setLocalFetchCount(n);
+            onSetFetchCount(n);
+          }}
+          className="flex-1 accent-[#5DBE81] h-1"
+        />
+        <span className="text-xs font-mono text-[#5DBE81] min-w-[3rem] text-right">{localFetchCount}</span>
       </div>
 
       {/* Category filter — multi-select chips */}
@@ -2956,12 +2989,9 @@ function MarketFinderPanel({
                     className="w-3.5 h-3.5 rounded border-[#232E3C] bg-[#182533] text-[#5DBE81] focus:ring-[#5DBE81]/30 focus:ring-offset-0 cursor-pointer"
                   />
                 </th>
-                <th className="text-left px-4 py-3 font-medium">Market</th>
+                <th className="text-left px-4 py-3 font-medium">Matched Event</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Expiry</th>
-                <th className="text-right px-4 py-3 font-medium w-20">Spread</th>
-                <th className="text-right px-4 py-3 font-medium w-24">Arbitrage</th>
-                <th className="text-left px-4 py-3 font-medium w-24">Platform</th>
-                <th className="text-left px-4 py-3 font-medium w-24"></th>
+                <th className="text-left px-4 py-3 font-medium w-40">Links</th>
                 <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
             </thead>
@@ -3035,36 +3065,24 @@ function MarketFinderPanel({
                         {m.eventDate ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 text-right font-mono text-xs ${spreadClass}`} title={spreadTooltip}>
-                      {spread != null ? `${spread.toFixed(1)}%` : "—"}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-xs ${arbClass}`} title={arbStrategy || undefined}>
-                      {arbPct != null ? `${arbPct.toFixed(1)}%` : "—"}
-                    </td>
                     <td className="px-4 py-3">
                       {showAllPlatforms ? (
                         <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${m.platform === 'polymarket' ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#facc15]/15 text-[#facc15]'}`}>
                           {m.platform}
                         </span>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           {m.kalshiUrl ? (
                             <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#facc15] hover:underline">Kalshi →</a>
                           ) : (
                             <span className="text-xs text-[#232E3C]">—</span>
                           )}
+                          {m.polymarketUrl ? (
+                            <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#5DBE81] hover:underline">Polymarket →</a>
+                          ) : (
+                            <span className="text-xs text-[#232E3C]">—</span>
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {showAllPlatforms ? (
-                        <span className="text-xs text-[#232E3C]">—</span>
-                      ) : (
-                        m.polymarketUrl ? (
-                          <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#5DBE81] hover:underline">Polymarket →</a>
-                        ) : (
-                          <span className="text-xs text-[#232E3C]">—</span>
-                        )
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">

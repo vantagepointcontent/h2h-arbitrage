@@ -9,6 +9,9 @@ import {
   buildMatches,
   RATE_LIMIT_MS,
   PhV2Market,
+  CATEGORY_SEARCH_TERMS,
+  fetchMatchingMarkets,
+  buildMatchedMarketsFromSearch,
 } from '@/lib/predictionhunt';
 import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
 
@@ -19,39 +22,100 @@ import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
      - category: comma-separated list (e.g. sports,politics)
      - maxDays: number 1-365, filters eventDate <= now + maxDays
    ═══════════════════════════════════════════════════════════════ */
+let phQuotaExhausted = false;
+let phQuotaResetAt = 0;
+
+function isPhQuotaExhausted(): boolean {
+  if (!phQuotaExhausted) return false;
+  // Cooldown: 6 hours after first monthly-exceeded hit
+  if (Date.now() > phQuotaResetAt) {
+    phQuotaExhausted = false;
+    return false;
+  }
+  return true;
+}
+
+function markPhQuotaExhausted(e: any) {
+  const msg = e?.message || '';
+  if (msg.includes('rate_limit.exceeded_month')) {
+    phQuotaExhausted = true;
+    phQuotaResetAt = Date.now() + 6 * 60 * 60 * 1000; // 6h cooldown
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryParam = searchParams.get('category');
     const maxDaysParam = searchParams.get('maxDays');
+    const fetchCountParam = searchParams.get('fetchCount');
 
-    // Fresh fetch requested for specific categories/expiry
-    if (categoryParam || maxDaysParam) {
-      const categories = categoryParam
-        ? categoryParam.split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
-        : CATEGORIES;
-      const maxDays = maxDaysParam ? Math.min(365, Math.max(1, parseInt(maxDaysParam, 10))) : 365;
+    const categories = categoryParam
+      ? categoryParam.split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
+      : CATEGORIES;
+    const maxDays = maxDaysParam ? Math.min(365, Math.max(1, parseInt(maxDaysParam, 10))) : 365;
+    const fetchCount = fetchCountParam ? Math.min(50, Math.max(1, parseInt(fetchCountParam, 10))) : 3;
 
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() + maxDays);
-
-      const [pmMarkets, kMarkets] = await Promise.all([
-        fetchCategories('polymarket', categories),
-        fetchCategories('kalshi', categories),
-      ]);
-
-      const matches = buildMatches(pmMarkets, kMarkets).filter(m => {
-        if (!m.eventDate) return true;
-        return new Date(m.eventDate).getTime() <= cutoff.getTime();
+    // If quota is exhausted, skip fresh calls entirely and return cached data
+    if (isPhQuotaExhausted()) {
+      const cached = await getPredictionHuntMarkets();
+      return NextResponse.json({
+        success: true,
+        count: cached.length,
+        markets: cached,
+        fresh: false,
+        cached: true,
+        quotaWarning: 'PredictionHunt monthly quota exceeded. Showing cached markets only.',
+        categories,
+        maxDays,
+        fetchCount,
+      }, {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
       });
+    }
+
+    // Fresh fetch requested for specific categories/expiry/fetchCount (or default view)
+    if (categoryParam || maxDaysParam || fetchCountParam) {
+      // Use PredictionHunt /v2/matching-markets with category-specific search terms
+      const allEvents: any[] = [];
+      for (const cat of categories) {
+        const terms = CATEGORY_SEARCH_TERMS[cat] || [cat];
+        for (const term of terms) {
+          try {
+            const result = await fetchMatchingMarkets(term, { maxDays, limit: 200 });
+            allEvents.push(...result.events);
+          } catch (e: any) {
+            console.warn(`[ph matching-markets] ${cat}/${term} failed: ${e.message}`);
+            markPhQuotaExhausted(e);
+            if (isPhQuotaExhausted()) break;
+          }
+          await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
+        }
+        if (isPhQuotaExhausted()) break;
+      }
+
+      let matches: PredictionHuntMarket[] = [];
+      let cachedFallback = false;
+      let warning: string | undefined;
+
+      if (!isPhQuotaExhausted()) {
+        matches = buildMatchedMarketsFromSearch(allEvents, fetchCount);
+      } else {
+        matches = await getPredictionHuntMarkets();
+        cachedFallback = true;
+        warning = 'PredictionHunt monthly quota exceeded during fetch. Showing cached markets only.';
+      }
 
       return NextResponse.json({
         success: true,
         count: matches.length,
         markets: matches,
-        fresh: true,
+        fresh: !cachedFallback,
+        cached: cachedFallback,
+        warning,
         categories,
         maxDays,
+        fetchCount,
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -71,6 +135,7 @@ export async function GET(request: NextRequest) {
       count: markets.length,
       markets,
       lastSync: syncLog,
+      cached: true,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
