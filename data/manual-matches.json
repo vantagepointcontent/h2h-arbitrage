@@ -436,5 +436,21 @@
     "pmTitle": "Jaleel Amador",
     "id": "1781703334817-620gijp",
     "createdAt": "2026-06-17T13:35:34.817Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-IA02-26-R",
+    "pmConditionId": "0xbc6530ac376b0e2f5bc07bc1c34884295d378fd694383a36714b85350520ab12",
+    "kalshiTitle": "KXHOUSERACE-IA02-26-R",
+    "pmTitle": "Republican Party",
+    "id": "1781822727380-b4euec2",
+    "createdAt": "2026-06-18T22:45:27.380Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-IA02-26-D",
+    "pmConditionId": "0xf4051fc690cc6d64fb5132f0d1a50b864a41820ebf2bc82192858628d4015430",
+    "kalshiTitle": "KXHOUSERACE-IA02-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1781822733881-wuba0aw",
+    "createdAt": "2026-06-18T22:45:33.881Z"
   }
 ]

@@ -3863,5 +3863,58 @@
     "id": "1781560966860-c4tye1g",
     "createdAt": "2026-06-15T22:02:46.860Z",
     "lastScanResult": null
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ia02-26",
+    "polymarketUrl": "https://polymarket.com/event/ia-02-house-election-winner/will-the-republican-party-win-the-ia-02-house-seat",
+    "eventTitle": "IA-02 House Election Winner",
+    "category": "",
+    "expiryDate": "2026-11-03T00:00:00Z",
+    "id": "1781822780605-l1k0kx5",
+    "createdAt": "2026-06-18T22:46:20.605Z",
+    "lastScanResult": {
+      "bestRoiPct": 3.2741999840395852,
+      "bestProfit": 18.649545454545475,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-06-18T22:46:39.032Z",
+      "allArbs": [
+        {
+          "artist": "Joe Mitchell + Republican Party",
+          "roiPct": 3.2741999840395852,
+          "expectedProfit": 18.649545454545475,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 541.1113636363636,
+          "fees": {
+            "kalshiFee": 9.83,
+            "pmFee": 7.11704,
+            "kalshiFeeDetails": "Kalshi NO sell 570 @ $0.44 = $9.83",
+            "pmFeeDetails": "Polymarket YES buy 570 @ $0.51 (θ=0.05) = $7.12",
+            "netProfitIfKalshiWins": 18.649545454545475,
+            "netProfitIfPmWins": 21.362505454545474,
+            "worstCaseNetProfit": 18.649545454545475
+          }
+        },
+        {
+          "artist": "Lindsay James + Democratic Party",
+          "roiPct": 2.4561142857142877,
+          "expectedProfit": 19.537272727272747,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 747.7272727272727,
+          "fees": {
+            "kalshiFee": 28.19,
+            "pmFee": 10.14205,
+            "kalshiFeeDetails": "Kalshi YES buy 795 @ $0.44 + NO sell 854 @ $0.41 = $28.19",
+            "pmFeeDetails": "Polymarket NO buy 812 @ $0.49 (θ=0.05) = $10.14",
+            "netProfitIfKalshiWins": 19.537272727272747,
+            "netProfitIfPmWins": 37.58522272727275,
+            "worstCaseNetProfit": 19.537272727272747
+          }
+        }
+      ]
+    }
   }
 ]
