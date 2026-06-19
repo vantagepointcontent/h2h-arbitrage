@@ -183,7 +183,17 @@ export async function POST(request: NextRequest) {
     }
     
     const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
-    const clobMap = await fetchClobMarkets(conditionIds);
+    let clobMap: Map<string, any>;
+    try {
+      clobMap = await withTimeout(
+        fetchClobMarkets(conditionIds.slice(0, 6)),
+        API_TIMEOUT_MS,
+        'CLOB metadata',
+      );
+    } catch (e: any) {
+      if (DEBUG_H2H) logger.debug('[scan] CLOB metadata unavailable, falling back to gamma prices', { error: e.message });
+      clobMap = new Map();
+    }
 
     // Build a case-insensitive CLOB map (conditionIds are lowercase hex, but normalize defensively)
     const clobMapLower = new Map<string, typeof clobMap extends Map<any, infer V> ? V : never>();
