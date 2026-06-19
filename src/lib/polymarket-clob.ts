@@ -100,6 +100,8 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
 
   // Acquire semaphore to limit concurrent requests
   await clobSemaphore.acquire();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
     for (let attempt = 0; attempt < CLOB_RETRIES; attempt++) {
       try {
@@ -114,6 +116,7 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
                 'Accept-Encoding': 'gzip, deflate',
               },
               cache: 'no-store',
+              signal: controller.signal,
             },
           ),
         );
@@ -133,6 +136,7 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
     debugLog('[CLOB] giving up on', conditionId.slice(0, 12));
     return null;
   } finally {
+    clearTimeout(timer);
     clobSemaphore.release();
   }
 }
@@ -142,6 +146,8 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
  */
 async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
   await clobSemaphore.acquire();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await rateLimiters.clobBook.execute(() =>
       fetch(
@@ -153,6 +159,7 @@ async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
             'Accept-Encoding': 'gzip, deflate',
           },
           cache: 'no-store',
+          signal: controller.signal,
         },
       ),
     );
@@ -161,6 +168,7 @@ async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
   } catch {
     return null;
   } finally {
+    clearTimeout(timer);
     clobSemaphore.release();
   }
 }

@@ -721,107 +721,53 @@ export default function Home() {
     } catch { /* ignore */ }
   };
 
-  // Scan ALL saved markets with LIVE prices
+  // Scan ALL saved markets with LIVE prices — async background refresh with progress polling
   const scanAllMarkets = async (marketsToScan?: SavedMarket[]) => {
     if (scanningAll) return;
     setScanningAll(true);
     setScanAllError("");
-    const failed: string[] = [];
-    const refreshed: { id: string; result: any }[] = [];
-    const markets = marketsToScan ?? savedMarketsRef.current;
-    const total = markets.length;
-    setScanProgress({ current: 0, total });
 
-    for (let i = 0; i < markets.length; i++) {
-      const market = markets[i];
-      setScanProgress({ current: i + 1, total });
-      try {
-        const res = await fetch(`/api/refresh?_=${Date.now()}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kalshiUrl: market.kalshiUrl,
-            polymarketUrl: market.polymarketUrl,
-          }),
+    try {
+      const startRes = await fetch(`/api/saved-markets/refresh?start=true&_=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-store' },
+      });
+      if (!startRes.ok) {
+        const err = await startRes.text();
+        throw new Error(err || 'Failed to start refresh job');
+      }
+
+      let status: any = {};
+      let attempts = 0;
+      const maxAttempts = 600; // ~10 min at 1s polling
+
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 1000));
+        const statusRes = await fetch(`/api/saved-markets/refresh?_=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-store' },
         });
-        if (res.ok) {
-          const data = await res.json();
-          refreshed.push({ id: market.id, result: data });
-          // Persist scan result to disk so tooltip shows correct time after reload
-          const scanResult = {
-            bestRoiPct: data.bestRoiPct ?? 0,
-            bestProfit: data.bestProfit ?? 0,
-            strategy: data.strategy || "",
-            outcomeCount: data.matchedCount ?? 0,
-            matchedCount: data.matchedCount ?? 0,
-            kalshiCount: data.kalshiCount ?? 0,
-            pmCount: data.pmCount ?? 0,
-            scannedAt: data.scannedAt || new Date().toISOString(),
-            allArbs: (data.allArbs || []).map((a: any) => ({
-              artist: a.artist,
-              roiPct: a.roiPct,
-              expectedProfit: a.expectedProfit,
-              strategy: a.strategy,
-            })),
-          };
-          try {
-            await fetch(`/api/saved-markets/scan-result`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: market.id, lastScanResult: scanResult, expiryDate: data.expiryDate }),
-            });
-          } catch (e) {
-            console.error(`Failed to persist scan result for ${market.id}`, e);
-          }
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          status = data.status || {};
+          setScanProgress({ current: status.processed ?? 0, total: status.total ?? 0 });
+          if (!status.running) break;
         } else {
-          failed.push(market.eventTitle);
+          // If status endpoint fails, keep scanning locally; break after 30s to avoid spinning
+          if (attempts > 30) break;
         }
-      } catch {
-        failed.push(market.eventTitle);
+        attempts++;
       }
-    }
 
-    setSavedMarkets(prev => prev.map(m => {
-      const r = refreshed.find(x => x.id === m.id);
-      if (!r) return m;
-      return {
-        ...m,
-        liveResult: {
-          bestRoiPct: r.result.bestRoiPct ?? 0,
-          bestProfit: r.result.bestProfit ?? 0,
-          strategy: r.result.strategy || "",
-          scannedAt: r.result.scannedAt || new Date().toISOString(),
-          kalshiCount: r.result.kalshiCount ?? 0,
-          pmCount: r.result.pmCount ?? 0,
-          matchedCount: r.result.matchedCount ?? 0,
-          allArbs: (r.result.allArbs || []).map((a: any) => ({
-            artist: a.artist,
-            roiPct: a.roiPct,
-            expectedProfit: a.expectedProfit,
-            strategy: a.strategy,
-            totalStake: a.totalStake,
-          })),
-        },
-      };
-    }));
+      await loadSavedMarkets();
 
-    for (const r of refreshed) {
-      const market = savedMarketsRef.current.find(m => m.id === r.id);
-      if (market && r.result.bestRoiPct > 0) {
-        alertSystem.checkAndFire(
-          market.eventTitle,
-          market.id,
-          r.result.bestRoiPct,
-          r.result.strategy || "",
-          r.result.bestProfit ?? 0,
-        );
+      if (status.failed > 0) {
+        setScanAllError(`${status.failed} market${status.failed > 1 ? 's' : ''} failed to refresh`);
       }
-    }
-
-    setScanningAll(false);
-    setScanProgress({ current: 0, total: 0 });
-    if (failed.length > 0) {
-      setScanAllError(`${failed.length} market${failed.length > 1 ? "s" : ""} failed to refresh`);
+    } catch (e: any) {
+      console.error('[scanAllMarkets]', e);
+      setScanAllError(e.message || 'Refresh failed');
+    } finally {
+      setScanningAll(false);
+      setScanProgress({ current: 0, total: 0 });
     }
   };
 

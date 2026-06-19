@@ -49,19 +49,26 @@ function debugLog(...args: unknown[]) {
 }
 
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
-  const res = await rateLimiters.gamma.execute(() =>
-    fetch(
-      `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
-      {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
-        cache: 'no-store',
-      },
-    ),
-  );
-  if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
-  const data = await res.json();
-  debugLog('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: PMMarket) => ({ q: m.question?.slice(0, 20), p: m.outcomePrices })));
-  return data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await rateLimiters.gamma.execute(() =>
+      fetch(
+        `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
+        {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+          cache: 'no-store',
+          signal: controller.signal,
+        },
+      ),
+    );
+    if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
+    const data = await res.json();
+    debugLog('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: PMMarket) => ({ q: m.question?.slice(0, 20), p: m.outcomePrices })));
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function parseOutcomes(market: PMMarket): { outcomes: string[]; prices: number[] } {

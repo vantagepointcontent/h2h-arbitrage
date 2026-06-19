@@ -1,0 +1,10 @@
+{
+  "running": false,
+  "startedAt": "2026-06-19T00:06:40.315Z",
+  "total": 125,
+  "processed": 125,
+  "succeeded": 125,
+  "failed": 0,
+  "errors": [],
+  "finishedAt": "2026-06-19T00:09:02.672Z"
+}
