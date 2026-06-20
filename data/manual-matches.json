@@ -452,5 +452,45 @@
     "pmTitle": "Democratic Party",
     "id": "1781822733881-wuba0aw",
     "createdAt": "2026-06-18T22:45:33.881Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-OK03-26-R",
+    "pmConditionId": "0x89cbcdb241e13650e512d26b959e332820f65706553a92b0b39e394b256ba0b7",
+    "kalshiTitle": "KXHOUSERACE-OK03-26-R",
+    "pmTitle": "Republican Party",
+    "id": "1781993125813-rbdkjdg",
+    "createdAt": "2026-06-20T22:05:25.813Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-OK03-26-D",
+    "pmConditionId": "0x7b6c8d4306c7d590c25e49b7e7f70f42d9185c2ca3932dd4b580d4bf7f2e5b4e",
+    "kalshiTitle": "KXHOUSERACE-OK03-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1781993130887-g2c2jw4",
+    "createdAt": "2026-06-20T22:05:30.887Z"
+  },
+  {
+    "kalshiTicker": "SENATEMT-26-R",
+    "pmConditionId": "0xd103195d48bf6183e28c4140bd374dd3e907e8f8d411374cb4d2d124ec4c216d",
+    "kalshiTitle": "SENATEMT-26-R",
+    "pmTitle": "Republican",
+    "id": "1781993213533-63csa97",
+    "createdAt": "2026-06-20T22:06:53.533Z"
+  },
+  {
+    "kalshiTicker": "SENATEMT-26-D",
+    "pmConditionId": "0x1bbb01c67b1520c5db8e02c65b395176b7e2b43d16cc8f8810beb64d70f6e69b",
+    "kalshiTitle": "SENATEMT-26-D",
+    "pmTitle": "Democrat",
+    "id": "1781993218139-6tut8nr",
+    "createdAt": "2026-06-20T22:06:58.139Z"
+  },
+  {
+    "kalshiTicker": "KXNY7D-26-JGUT",
+    "pmConditionId": "0x1fcbb222f49bb80d4d54f5004d44c6c7dfc808fd01bc17455c9178e57aaa4744",
+    "kalshiTitle": "KXNY7D-26-JGUT",
+    "pmTitle": "Jennifer Gútierrez",
+    "id": "1781993365267-mlo0ge0",
+    "createdAt": "2026-06-20T22:09:25.267Z"
   }
 ]
