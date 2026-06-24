@@ -37,7 +37,8 @@ export interface UnifiedOutcome {
     pmStake: number;
     expectedProfit: number;
     roiPct: number;
-    apyPct: number;
+    apyPct?: number;
+    maxCapital?: number;
     buyPlatform: 'kalshi' | 'polymarket' | null;
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket' | null;
@@ -56,6 +57,8 @@ export interface UnifiedOutcome {
   source: 'auto' | 'manual';
   /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
   negRisk?: boolean;
+  /** True when this outcome is a virtual cross-outcome arbitrage row */
+  isCrossOutcome?: boolean;
 }
 
 export interface FeeInputs {
@@ -119,6 +122,7 @@ export function computeArbitrageFees(
   pmFee: number;
   netProfitIfKalshiWins: number;
   netProfitIfPmWins: number;
+  netProfitIfBothYes?: number;
   worstCaseNetProfit: number;
   kalshiFeeDetails: string;
   pmFeeDetails: string;
@@ -159,7 +163,16 @@ export function computeArbitrageFees(
   const netProfitIfKalshiWins = capital - kalshiStake - pmStake - kalshiFeeAmount;
   // Net profit if PM side wins (PM YES pays $1 per contract, Kalshi NO loses)
   const netProfitIfPmWins = capital - kalshiStake - pmStake - pmFeeAmount;
-  const worstCaseNetProfit = Math.min(netProfitIfKalshiWins, netProfitIfPmWins);
+  // Cross-outcome: buy YES on both platforms, one side will win and pay $1
+  const netProfitIfBothYes = capital - kalshiStake - pmStake - kalshiFeeAmount - pmFeeAmount;
+
+  let worstCaseNetProfit: number;
+  if (strategy.includes('YES both sides')) {
+    // Exactly one leg wins; both legs pay fees; net is deterministic after fees
+    worstCaseNetProfit = netProfitIfBothYes;
+  } else {
+    worstCaseNetProfit = Math.min(netProfitIfKalshiWins, netProfitIfPmWins);
+  }
 
   return {
     grossProfit,
@@ -167,6 +180,7 @@ export function computeArbitrageFees(
     pmFee: pmFeeAmount,
     netProfitIfKalshiWins,
     netProfitIfPmWins,
+    netProfitIfBothYes,
     worstCaseNetProfit,
     kalshiFeeDetails,
     pmFeeDetails,
@@ -522,6 +536,180 @@ export function calculateArbitrageMax(
     sellPlatform,
     sellPrice,
     fees: feeInfo,
+  };
+}
+
+/** Compute the best arbitrage for a single outcome, including cross-outcome with a complement. */
+export function calculateBestArbitrageForOutcome(
+  current: UnifiedOutcome,
+  complement: UnifiedOutcome | null,
+  category?: string,
+): UnifiedOutcome['arbitrage'] {
+  if (!current.kalshi || !current.polymarket) {
+    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
+
+  const depthKYes = parseDepth(current.kalshi.yesAskDepth);
+  const depthKNo = parseDepth(current.kalshi.noAskDepth) || parseDepth(current.kalshi.yesAskDepth);
+  const depthPYes = current.polymarket.askDepth != null && current.polymarket.askDepth > 0 ? current.polymarket.askDepth : Infinity;
+  const depthPNo = current.polymarket.noAskDepth != null && current.polymarket.noAskDepth > 0 ? current.polymarket.noAskDepth : Infinity;
+
+  // Base: within-outcome arbitrages (existing yellow methods)
+  let best = calculateArbitrageMax(
+    current.kalshi,
+    current.polymarket,
+    depthKYes,
+    depthKNo,
+    depthPYes,
+    depthPNo,
+    category,
+  );
+
+  // Cross-outcome: buy YES on both platforms. Only valid for strict binary markets.
+  if (complement?.kalshi && complement?.polymarket) {
+    const kYesA = current.kalshi.yesAsk;
+    const pYesB = complement.polymarket.bestAsk;
+    if (kYesA + pYesB < 1) {
+      const compAskDepth = complement.polymarket.askDepth ?? 0;
+      const capKA = depthKYes > 0 ? depthKYes / kYesA : Infinity;
+      const capPB = parseDepth(compAskDepth) > 0 ? compAskDepth / pYesB : Infinity;
+      const compKalshiYesDepth = parseDepth(complement.kalshi.yesAskDepth ?? 0);
+      const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : Infinity;
+      const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : Infinity;
+      // Capital limited by all four legs because we buy YES on both platforms across both outcomes
+      const capital = Math.min(capKA, capPB, capKB, capPA);
+      const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+      if (effectiveCapital > 0) {
+        const grossRoi = 1 - (kYesA + pYesB);
+        const grossProfit = effectiveCapital * grossRoi;
+        // Cross-outcome stake: buy YES Kalshi on current, buy YES PM on complement
+        const kalshiStake = effectiveCapital * kYesA;
+        const pmStake = effectiveCapital * pYesB;
+        const fees = computeArbitrageFees(
+          `Buy YES both sides: Kalshi ${current.artist} + Polymarket ${complement.artist}`,
+          effectiveCapital,
+          kalshiStake,
+          pmStake,
+          kYesA,
+          current.kalshi.noAsk,
+          pYesB,
+          complement.polymarket.noPrice,
+          category,
+        );
+        if (fees.worstCaseNetProfit > best.expectedProfit) {
+          best = {
+            strategy: `Buy YES both sides: Kalshi ${current.artist} + PM ${complement.artist}`,
+            kalshiStake,
+            pmStake,
+            expectedProfit: fees.worstCaseNetProfit,
+            roiPct: effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0,
+            maxCapital: effectiveCapital,
+            buyPlatform: 'kalshi',
+            buyPrice: kYesA,
+            sellPlatform: 'polymarket',
+            sellPrice: pYesB,
+            fees: {
+              kalshiFee: fees.kalshiFee,
+              pmFee: fees.pmFee,
+              kalshiFeeDetails: fees.kalshiFeeDetails,
+              pmFeeDetails: fees.pmFeeDetails,
+              netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
+              netProfitIfPmWins: fees.netProfitIfPmWins,
+              worstCaseNetProfit: fees.worstCaseNetProfit,
+            },
+          };
+        }
+      }
+    }
+  }
+
+  return best;
+}
+
+/** For a list of matched outcomes, compute the best arbitrage per outcome including cross-outcome.
+ *  Cross-outcome YES+YES is only considered for strict binary markets (exactly two matched outcomes),
+ *  and is assigned to the outcome where Kalshi YES is bought so each arb appears once. */
+export function calculateAllArbitrages(
+  outcomes: UnifiedOutcome[],
+  category?: string,
+): UnifiedOutcome[] {
+  const matched = outcomes.filter(o => o.kalshi && o.polymarket);
+  const isStrictBinary = matched.length === 2;
+  const [a, b] = isStrictBinary ? matched : [null, null];
+
+  return outcomes.map(o => {
+    let complement: UnifiedOutcome | null = null;
+    if (isStrictBinary && a && b) {
+      complement = o.artist === a.artist ? b : o.artist === b.artist ? a : null;
+    }
+    return {
+      ...o,
+      arbitrage: calculateBestArbitrageForOutcome(o, complement, category),
+    };
+  });
+}
+
+function calculateCrossOutcomeArbitrage(
+  outcomeA: UnifiedOutcome,
+  outcomeB: UnifiedOutcome,
+  category?: string,
+): UnifiedOutcome['arbitrage'] {
+  if (!outcomeA.kalshi || !outcomeA.polymarket || !outcomeB.kalshi || !outcomeB.polymarket) {
+    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
+
+  const kYesA = outcomeA.kalshi.yesAsk;
+  const pYesB = outcomeB.polymarket.bestAsk;
+  if (kYesA + pYesB >= 1) {
+    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
+
+  const depthKYesA = parseDepth(outcomeA.kalshi.yesAskDepth);
+  const depthPYesB = outcomeB.polymarket.askDepth != null && outcomeB.polymarket.askDepth > 0 ? outcomeB.polymarket.askDepth : Infinity;
+  const depthKYesB = parseDepth(outcomeB.kalshi.yesAskDepth);
+  const depthPYesA = outcomeA.polymarket.askDepth != null && outcomeA.polymarket.askDepth > 0 ? outcomeA.polymarket.askDepth : Infinity;
+
+  const capKA = depthKYesA > 0 ? depthKYesA / kYesA : Infinity;
+  const capPB = depthPYesB > 0 ? depthPYesB / pYesB : Infinity;
+  const capKB = depthKYesB > 0 ? depthKYesB / outcomeB.kalshi.yesAsk : Infinity;
+  const capPA = depthPYesA > 0 ? depthPYesA / outcomeA.polymarket.bestAsk : Infinity;
+  const capital = Math.min(capKA, capPB, capKB, capPA);
+  const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+
+  const kalshiStake = effectiveCapital * kYesA;
+  const pmStake = effectiveCapital * pYesB;
+  const fees = computeArbitrageFees(
+    `Buy YES both sides: Kalshi ${outcomeA.artist} + Polymarket ${outcomeB.artist}`,
+    effectiveCapital,
+    kalshiStake,
+    pmStake,
+    kYesA,
+    outcomeA.kalshi.noAsk,
+    pYesB,
+    outcomeB.polymarket.noPrice,
+    category,
+  );
+
+  return {
+    strategy: `Buy YES both sides: Kalshi ${outcomeA.artist} + PM ${outcomeB.artist}`,
+    kalshiStake,
+    pmStake,
+    expectedProfit: fees.worstCaseNetProfit,
+    roiPct: effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0,
+    maxCapital: effectiveCapital,
+    buyPlatform: 'kalshi',
+    buyPrice: kYesA,
+    sellPlatform: 'polymarket',
+    sellPrice: pYesB,
+    fees: {
+      kalshiFee: fees.kalshiFee,
+      pmFee: fees.pmFee,
+      kalshiFeeDetails: fees.kalshiFeeDetails,
+      pmFeeDetails: fees.pmFeeDetails,
+      netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
+      netProfitIfPmWins: fees.netProfitIfPmWins,
+      worstCaseNetProfit: fees.worstCaseNetProfit,
+    },
   };
 }
 

@@ -1578,7 +1578,7 @@ export default function Home() {
                 onSetMatchFilter={setMfMatchFilter}
               />
             ) : viewMode === "live" ? (
-              <LiveScanPanel capital={capital} />
+              <LiveScanPanel capital={capital} savedMarkets={savedMarkets} />
             ) : (
               <>
                 {/* Scan inputs */}
@@ -2364,7 +2364,7 @@ function OverviewPanel({
   const sorted = [...markets].sort(sortFn);
 
   // Apply expiry filter
-  const filteredByExpiry = markets.filter(m => {
+  const filteredByExpiry = [...markets].filter(m => {
     if (!showExpired) {
       const isExpired = m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false;
       if (isExpired) return false;
@@ -2380,7 +2380,7 @@ function OverviewPanel({
     if (!showArbOnly) return true;
     const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
     return roi > 0;
-  });
+  }).sort(sortFn);
 
   // Aggregate stats (respect current filter)
   const totalMarkets = filteredByExpiry.length;
