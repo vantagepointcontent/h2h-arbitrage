@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateArbitrageMax,
   calculateBestArbitrageForOutcome,
+  calculateAllArbitrages,
   computeApy,
   parseDepth,
   normalizeName,
@@ -41,10 +42,10 @@ describe('calculateArbitrageMax', () => {
     expect(r.kalshiStake).toBeGreaterThan(0);
   });
 
-  it('ger No arb om ingen depth', () => {
+  it('ger No arb om priserna inte ger någon edge', () => {
     const r = calculateArbitrageMax(
-      { ...kalshi, yesAskDepth: '0', noAskDepth: '0' },
-      { ...pm, askDepth: 0 },
+      { ...kalshi, yesAsk: 0.60, noAsk: 0.45, yesAskDepth: '0', noAskDepth: '0' },
+      { ...pm, bestAsk: 0.60, noPrice: 0.45, askDepth: 0 },
       0, 0, 0, 0
     );
     expect(r.strategy).toBe('No arb');
@@ -139,8 +140,8 @@ describe('similarity', () => {
 });
 
 describe('getClobPrices', () => {
-  it(' YES/NO från tokens', () => {
-    const r = getClobPrices({
+  it(' YES/NO från tokens', async () => {
+    const r = await getClobPrices({
       condition_id: 'c1',
       tokens: [
         { token_id: 't1', outcome: 'Yes', price: 0.55 },
@@ -148,12 +149,12 @@ describe('getClobPrices', () => {
       ],
       best_bid: 0.54, best_ask: 0.56, last_trade_price: 0.55,
     } as any);
-    expect(r?.yesPrice).toBe(0.55);
-    expect(r?.noPrice).toBe(0.45);
+    expect(r?.yesPrice).toBe(0.56); // YES best_ask
+    expect(r?.noPrice).toBeCloseTo(0.46, 6);   // 1 - best_bid
   });
 
-  it('fallback till best_bid/best_ask om token saknar price', () => {
-    const r = getClobPrices({
+  it('fallback till best_bid/best_ask om token saknar price', async () => {
+    const r = await getClobPrices({
       condition_id: 'c1',
       tokens: [
         { token_id: 't1', outcome: 'Yes' },
@@ -162,11 +163,11 @@ describe('getClobPrices', () => {
       best_bid: 0.54, best_ask: 0.56, last_trade_price: 0.55,
     } as any);
     expect(r?.yesPrice).toBe(0.56); // YES best_ask
-    expect(r?.noPrice).toBeCloseTo(0.44, 6);   // NO ask derived from 1 - YES best_bid
+    expect(r?.noPrice).toBeCloseTo(0.46, 6);   // NO ask derived from 1 - YES best_bid
   });
 
-  it('deriverar noPrice från yesPrice (1 - yes)', () => {
-    const r = getClobPrices({
+  it('deriverar noPrice från yesPrice (1 - yes)', async () => {
+    const r = await getClobPrices({
       condition_id: 'c1',
       tokens: [
         { token_id: 't1', outcome: 'Yes', price: 0.60 },
@@ -174,11 +175,11 @@ describe('getClobPrices', () => {
       ],
       best_bid: 0.59, best_ask: 0.61,
     } as any);
-    expect(r?.noPrice).toBeCloseTo(0.40, 2);
+    expect(r?.noPrice).toBeCloseTo(0.41, 2);
   });
 
-  it('returnerar null vid total avsaknad av data', () => {
-    const r = getClobPrices({
+  it('returnerar null vid total avsaknad av data', async () => {
+    const r = await getClobPrices({
       condition_id: 'c1',
       tokens: [],
     } as any);
@@ -478,17 +479,19 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
   });
 
   it('cross-outcome YES+YES wins when it beats within-outcome arbs', () => {
-    // Republican: Kalshi YES cheap (0.20), PM YES expensive (0.81) → gul B poor
-    // Democratic: Kalshi YES expensive (0.89), PM YES cheap (0.18)
-    // Cross: buy Rep Kalshi YES 0.20 + Dem PM YES 0.18 = 0.38 gross ROI 62%
+    // Both yellow arbs are unprofitable (>1 cost), but cross-outcome is cheap.
+    // current: K YES 0.30 + PM NO 0.72 = 1.02 → no yellow A
+    // current: PM YES 0.30 + K NO 0.72 = 1.02 → no yellow B
+    // cross: K YES current 0.30 + PM YES complement 0.30 = 0.60 → gross ROI 40%
+    const base = makeOutcome();
     const current = makeOutcome({
-      kalshi: { ...current.kalshi, yesAsk: 0.20, noAsk: 0.82 },
-      polymarket: { ...current.polymarket, bestAsk: 0.85, yesPrice: 0.85, noPrice: 0.15 },
+      kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.72, yesBid: 0.28, noBid: 0.70 },
+      polymarket: { ...base.polymarket, bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
     });
     const complement = makeOutcome({
       artist: 'Democratic',
-      kalshi: { ...current.kalshi, ticker: 'KXDEM', yesAsk: 0.89, noAsk: 0.13 },
-      polymarket: { ...current.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.18, yesPrice: 0.18, noPrice: 0.86 },
+      kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.30, noAsk: 0.72 },
+      polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
     });
     const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
     expect(r.strategy).toContain('both sides');
@@ -501,23 +504,60 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
     expect(r.strategy).not.toContain('both sides');
   });
 
-  it('cross-outcome worst-case net profit can flip sign after fees', () => {
-    // Very small gross edge: 1 - 0.99 = 0.01 gross, fees eat it.
+  it('cross-outcome not created when combined YES cost is >= 1', () => {
+    // No yellow arb and cross would cost exactly $1 → no edge at all.
+    const base = makeOutcome();
     const current = makeOutcome({
-      kalshi: { ...current.kalshi, yesAsk: 0.50, noAsk: 0.50 },
-      polymarket: { ...current.polymarket, bestAsk: 0.50, yesPrice: 0.50, noPrice: 0.50 },
+      kalshi: { ...base.kalshi, yesAsk: 0.50, noAsk: 0.52 },
+      polymarket: { ...base.polymarket, bestAsk: 0.50, yesPrice: 0.50, noPrice: 0.52, bestBid: 0.48 },
     });
     const complement = makeOutcome({
       artist: 'Democratic',
-      kalshi: { ...current.kalshi, ticker: 'KXDEM', yesAsk: 0.50, noAsk: 0.50 },
-      polymarket: { ...current.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.49, yesPrice: 0.49, noPrice: 0.51 },
+      kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.50, noAsk: 0.52 },
+      polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.50, yesPrice: 0.50, noPrice: 0.52, bestBid: 0.48 },
     });
     const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
-    // Cross edge is tiny: cost 0.99, gross 0.01. After fees it should be negative.
-    if (r.strategy.includes('both sides')) {
-      expect(r.expectedProfit).toBeLessThanOrEqual(0);
-    } else {
-      expect(r.strategy).toBe('No arb');
-    }
+    expect(r.strategy).not.toContain('both sides');
+    expect(r.strategy).toBe('No arb');
+  });
+});
+
+describe('calculateAllArbitrages — cross-outcome guard', () => {
+  it('does NOT create cross-outcome arbs when market has more than two outcomes', () => {
+    // Two matched outcomes (like Saudi + North Korea) plus many Kalshi-only outcomes.
+    const matchedA = makeOutcome({ artist: 'Saudi Arabia' });
+    const matchedB = makeOutcome({
+      artist: 'North Korea',
+      kalshi: { ...matchedA.kalshi, ticker: 'KXNK', yesAsk: 0.06, noAsk: 0.95 },
+      polymarket: { ...matchedA.polymarket, marketId: 'pm-nk', conditionId: 'c-nk', bestAsk: 0.19, yesPrice: 0.19, noPrice: 0.89 },
+    });
+    const extra = Array.from({ length: 5 }, (_, i) => ({
+      artist: `Extra ${i}`,
+      source: 'kalshi',
+      kalshi: matchedA.kalshi,
+      polymarket: null,
+      arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+    }));
+
+    const outcomes = [matchedA, matchedB, ...extra];
+    const result = calculateAllArbitrages(outcomes, 'politics');
+    const strategies = result.map(o => o.arbitrage.strategy);
+    expect(strategies.some(s => s.includes('both sides'))).toBe(false);
+  });
+
+  it('allows cross-outcome arbs for strictly binary markets (exactly two outcomes)', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.72, yesBid: 0.28, noBid: 0.70 },
+      polymarket: { ...base.polymarket, bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
+    });
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.30, noAsk: 0.72 },
+      polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
+    });
+    const result = calculateAllArbitrages([current, complement], 'politics');
+    const cross = result.find(o => o.arbitrage.strategy.includes('both sides'));
+    expect(cross).toBeDefined();
   });
 });

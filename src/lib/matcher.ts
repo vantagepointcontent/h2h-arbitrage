@@ -633,8 +633,9 @@ export function calculateAllArbitrages(
   outcomes: UnifiedOutcome[],
   category?: string,
 ): UnifiedOutcome[] {
+  // Cross-outcome YES+YES is only valid for a strictly binary market: exactly two possible outcomes.
+  const isStrictBinary = outcomes.length === 2;
   const matched = outcomes.filter(o => o.kalshi && o.polymarket);
-  const isStrictBinary = matched.length === 2;
   const [a, b] = isStrictBinary ? matched : [null, null];
 
   return outcomes.map(o => {
