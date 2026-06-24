@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
 
     // If ?start=true, kick off background refresh and return immediately
     if (searchParams.get('start') === 'true') {
-      const status = await startRefreshJob();
+      const idsParam = searchParams.get('ids');
+      const marketIds = idsParam ? idsParam.split(',').filter(Boolean) : undefined;
+      const status = await startRefreshJob(marketIds);
       return NextResponse.json({ started: !!status, status }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

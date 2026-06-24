@@ -33,11 +33,15 @@ async function writeState(state: RefreshJobState) {
   await fs.writeFile(REFRESH_STATE_FILE, JSON.stringify(state, null, 2));
 }
 
-async function runRefreshJob() {
+async function runRefreshJob(marketIds?: string[]) {
   const state = await readState();
   if (state.running) return;
 
-  const markets = await getSavedMarkets();
+  const allMarkets = await getSavedMarkets();
+  const markets = marketIds && marketIds.length > 0
+    ? allMarkets.filter((m) => marketIds.includes(m.id))
+    : allMarkets;
+
   if (markets.length === 0) {
     await writeState({ running: false, startedAt: new Date().toISOString(), total: 0, processed: 0, succeeded: 0, failed: 0, errors: [] });
     return;
@@ -98,12 +102,12 @@ export async function getRefreshStatus(): Promise<RefreshJobState> {
   return readState();
 }
 
-export async function startRefreshJob(): Promise<RefreshJobState | null> {
+export async function startRefreshJob(marketIds?: string[]): Promise<RefreshJobState | null> {
   if (activeJob) {
     const state = await readState();
     return state.running ? state : null;
   }
-  activeJob = runRefreshJob();
+  activeJob = runRefreshJob(marketIds);
   activeJob.finally(() => {
     activeJob = null;
   });
