@@ -3072,7 +3072,7 @@ function MarketFinderPanel({
                           disabled={!m.kalshiUrl || !m.polymarketUrl}
                           className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] hover:bg-[#5DBE81]/20 transition-colors border border-[#5DBE81]/20 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          Add to H2H
+                          Add
                         </button>
                       )}
                     </td>
