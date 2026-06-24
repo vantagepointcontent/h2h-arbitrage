@@ -160,7 +160,18 @@ export function OutcomeTableBody({
                   </span>
                 ) : "—"}
               </td>
-              <td className="px-4 py-3 text-xs text-[#8A9BA8]">{o.arbitrage.strategy}</td>
+              <td className="px-4 py-3 text-xs">
+                {o.arbitrage.strategy === 'No arb' ? (
+                  <span className="text-[#5E6875]">No arb</span>
+                ) : o.arbitrage.strategy.startsWith('Buy YES both sides') ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
+                    <span className="text-[#8A9BA8]">{o.arbitrage.strategy.replace(/^Buy YES both sides: Kalshi (.+?) \+ PM (.+)$/, '$1 + $2')}</span>
+                  </span>
+                ) : (
+                  <span className="text-[#8A9BA8]">{o.arbitrage.strategy}</span>
+                )}
+              </td>
             </tr>
             {isExpanded && (
               <tr className="bg-[#17212B]/50">

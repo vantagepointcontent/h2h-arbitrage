@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateArbitrageMax,
+  calculateBestArbitrageForOutcome,
   computeApy,
   parseDepth,
   normalizeName,
@@ -431,5 +432,92 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
       expect(shape.noPrice).toBeCloseTo(0.40, 6);
       expect(shape.noPrice).not.toBe(1);
     });
+  });
+});
+
+// =====================================================================
+// Cross-outcome arbitrage (red method) for strict binary markets
+// =====================================================================
+
+function makeOutcome(overrides: Partial<any> = {}): any {
+  return {
+    artist: 'Republican',
+    source: 'auto',
+    kalshi: {
+      ticker: 'KXREP',
+      yesBid: 0.85, yesAsk: 0.87,
+      noBid: 0.15, noAsk: 0.17,
+      lastPrice: 0.86,
+      volume24h: '', yesBidDepth: '$10K', yesAskDepth: '$5K', noBidDepth: '$2K', noAskDepth: '$3K',
+    },
+    polymarket: {
+      marketId: 'pm-rep', conditionId: 'c-rep',
+      yesPrice: 0.80, noPrice: 0.20,
+      bestBid: 0.79, bestAsk: 0.81,
+      lastTradePrice: 0.80,
+      volume: '', liquidity: '', askDepth: 5000, noAskDepth: 1000,
+    },
+    arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+    ...overrides,
+  };
+}
+
+describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
+  it('within-outcome gul A wins when cross-outcome is worse', () => {
+    const current = makeOutcome();
+    // PM NO = 0.20, Kalshi YES = 0.87 → gul A cost 1.07 (no arb)
+    // PM YES = 0.81, Kalshi NO = 0.17 → gul B cost 0.98 → 2% gross arb
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...current.kalshi, ticker: 'KXDEM', yesAsk: 0.13, noAsk: 0.89, yesBid: 0.12, noBid: 0.88 },
+      polymarket: { ...current.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.18, yesPrice: 0.18, noPrice: 0.86 },
+    });
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    expect(r.strategy).toBe('Buy YES PM + NO Kalshi');
+    expect(r.expectedProfit).toBeGreaterThan(0);
+  });
+
+  it('cross-outcome YES+YES wins when it beats within-outcome arbs', () => {
+    // Republican: Kalshi YES cheap (0.20), PM YES expensive (0.81) → gul B poor
+    // Democratic: Kalshi YES expensive (0.89), PM YES cheap (0.18)
+    // Cross: buy Rep Kalshi YES 0.20 + Dem PM YES 0.18 = 0.38 gross ROI 62%
+    const current = makeOutcome({
+      kalshi: { ...current.kalshi, yesAsk: 0.20, noAsk: 0.82 },
+      polymarket: { ...current.polymarket, bestAsk: 0.85, yesPrice: 0.85, noPrice: 0.15 },
+    });
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...current.kalshi, ticker: 'KXDEM', yesAsk: 0.89, noAsk: 0.13 },
+      polymarket: { ...current.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.18, yesPrice: 0.18, noPrice: 0.86 },
+    });
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    expect(r.strategy).toContain('both sides');
+    expect(r.expectedProfit).toBeGreaterThan(0);
+  });
+
+  it('cross-outcome not considered without complement', () => {
+    const current = makeOutcome();
+    const r = calculateBestArbitrageForOutcome(current, null, 'politics');
+    expect(r.strategy).not.toContain('both sides');
+  });
+
+  it('cross-outcome worst-case net profit can flip sign after fees', () => {
+    // Very small gross edge: 1 - 0.99 = 0.01 gross, fees eat it.
+    const current = makeOutcome({
+      kalshi: { ...current.kalshi, yesAsk: 0.50, noAsk: 0.50 },
+      polymarket: { ...current.polymarket, bestAsk: 0.50, yesPrice: 0.50, noPrice: 0.50 },
+    });
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...current.kalshi, ticker: 'KXDEM', yesAsk: 0.50, noAsk: 0.50 },
+      polymarket: { ...current.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.49, yesPrice: 0.49, noPrice: 0.51 },
+    });
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    // Cross edge is tiny: cost 0.99, gross 0.01. After fees it should be negative.
+    if (r.strategy.includes('both sides')) {
+      expect(r.expectedProfit).toBeLessThanOrEqual(0);
+    } else {
+      expect(r.strategy).toBe('No arb');
+    }
   });
 });

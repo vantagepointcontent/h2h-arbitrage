@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Play, Square, Activity, RefreshCw, ArrowRight, AlertCircle } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown } from "lucide-react";
+import { SavedMarket } from "@/lib/persistence";
 
 interface LiveMarketResult {
   kalshiYesAsk: number | null;
@@ -27,17 +28,43 @@ interface LiveMarketResult {
 
 interface Props {
   capital: number;
+  savedMarkets: SavedMarket[];
 }
 
-export function LiveScanPanel({ capital }: Props) {
-  const [kalshiUrl, setKalshiUrl] = useState("");
-  const [pmUrl, setPmUrl] = useState("");
+export function LiveScanPanel({ capital, savedMarkets }: Props) {
+  const [selectedId, setSelectedId] = useState<string>("");
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<LiveMarketResult | null>(null);
   const [status, setStatus] = useState("Idle");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  const selectedMarket = useMemo(
+    () => savedMarkets.find((m) => m.id === selectedId) || null,
+    [savedMarkets, selectedId]
+  );
+
+  const marketOptions = useMemo(() => {
+    return [...savedMarkets]
+      .map((m) => ({
+        ...m,
+        roiPct: m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0,
+      }))
+      .sort((a, b) => b.roiPct - a.roiPct);
+  }, [savedMarkets]);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   const stop = useCallback(() => {
     eventSourceRef.current?.close();
@@ -51,8 +78,16 @@ export function LiveScanPanel({ capital }: Props) {
     setResult(null);
     stop();
 
-    if (!kalshiUrl.trim() || !pmUrl.trim()) {
-      setError("Paste both a Kalshi URL and a Polymarket URL.");
+    if (!selectedMarket) {
+      setError("Select a saved market from the dropdown.");
+      return;
+    }
+
+    const kalshiUrl = selectedMarket.kalshiUrl?.trim();
+    const pmUrl = selectedMarket.polymarketUrl?.trim();
+
+    if (!kalshiUrl || !pmUrl) {
+      setError("Selected market is missing Kalshi or Polymarket URL.");
       return;
     }
 
@@ -61,8 +96,8 @@ export function LiveScanPanel({ capital }: Props) {
 
     try {
       const params = new URLSearchParams();
-      params.set("kalshiUrl", kalshiUrl.trim());
-      params.set("pmUrl", pmUrl.trim());
+      params.set("kalshiUrl", kalshiUrl);
+      params.set("pmUrl", pmUrl);
       params.set("capital", String(capital));
       const es = new EventSource(`/api/ws/live-scan?${params.toString()}`);
       eventSourceRef.current = es;
@@ -97,7 +132,7 @@ export function LiveScanPanel({ capital }: Props) {
       setLoading(false);
       setError(String(err));
     }
-  }, [kalshiUrl, pmUrl, capital, stop]);
+  }, [selectedMarket, capital, stop]);
 
   useEffect(() => {
     return () => {
@@ -122,32 +157,57 @@ export function LiveScanPanel({ capital }: Props) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-[#8A9BA8]">
-              <Link2 className="w-3.5 h-3.5" /> Kalshi URL
-            </label>
-            <input
-              type="text"
-              value={kalshiUrl}
-              onChange={(e) => setKalshiUrl(e.target.value)}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-[#8A9BA8] mb-2">Select saved market</label>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
               disabled={running}
-              placeholder="https://kalshi.com/markets/..."
-              className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#5E6875] focus:outline-none focus:border-[#5DBE81] disabled:opacity-60"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-[#8A9BA8]">
-              <Link2 className="w-3.5 h-3.5" /> Polymarket URL
-            </label>
-            <input
-              type="text"
-              value={pmUrl}
-              onChange={(e) => setPmUrl(e.target.value)}
-              disabled={running}
-              placeholder="https://polymarket.com/event/..."
-              className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#5E6875] focus:outline-none focus:border-[#5DBE81] disabled:opacity-60"
-            />
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81] disabled:opacity-60"
+            >
+              {selectedMarket ? (
+                <span className="flex items-center gap-2 truncate">
+                  <span className="truncate">{selectedMarket.eventTitle}</span>
+                  <span className={`text-xs font-medium ${(selectedMarket.liveResult?.bestRoiPct ?? selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                    {(() => {
+                      const roi = selectedMarket.liveResult?.bestRoiPct ?? selectedMarket.lastScanResult?.bestRoiPct ?? 0;
+                      return `${roi > 0 ? "+" : ""}${roi.toFixed(1)}%`;
+                    })()}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-[#5E6875]">Choose a market...</span>
+              )}
+              <ChevronDown className={`w-4 h-4 text-[#5E6875] transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border border-[#232E3C] bg-[#182533] shadow-lg">
+                {marketOptions.length === 0 ? (
+                  <div className="px-3 py-2.5 text-xs text-[#5E6875]">No saved markets. Save one from Scan or MarketFinder.</div>
+                ) : (
+                  marketOptions.map((m) => {
+                    const roi = m.roiPct;
+                    const isPositive = roi > 0;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedId(m.id);
+                          setDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[#232E3C] transition-colors ${selectedId === m.id ? "bg-[#5DBE81]/10" : ""}`}
+                      >
+                        <span className="truncate text-[#FFFFFF] text-left pr-2">{m.eventTitle}</span>
+                        <span className={`shrink-0 text-xs font-medium ${isPositive ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                          {isPositive ? "+" : ""}{roi.toFixed(1)}%
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -155,7 +215,7 @@ export function LiveScanPanel({ capital }: Props) {
           {!running ? (
             <button
               onClick={start}
-              disabled={loading}
+              disabled={loading || !selectedMarket}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}

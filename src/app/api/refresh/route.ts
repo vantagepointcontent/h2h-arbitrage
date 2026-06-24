@@ -6,7 +6,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateArbitrageMax, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
 
 const API_TIMEOUT_MS = 15000;
@@ -133,19 +133,10 @@ export async function POST(request: NextRequest) {
     const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
     const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
 
-    const withArbitrage = outcomes.map(o => {
-      if (!o.kalshi || !o.polymarket) {
-        return { ...o, arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, maxCapital: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, fees: undefined } };
-      }
-      const depthKYes = parseDepth(o.kalshi.yesAskDepth);
-      const depthKNo = parseDepth(o.kalshi.noAskDepth) || parseDepth(o.kalshi.yesAskDepth);
-      // PM liquidityNum is NOT order depth — only Kalshi depth limits capital.
-      // Use Infinity for PM so profit isn't artificially capped.
-      const depthPYes = o.polymarket.askDepth != null && o.polymarket.askDepth > 0 ? o.polymarket.askDepth : Infinity;
-      const depthPNo = o.polymarket.noAskDepth != null && o.polymarket.noAskDepth > 0 ? o.polymarket.noAskDepth : Infinity;
-      const arbResult = calculateArbitrageMax(o.kalshi, o.polymarket, depthKYes, depthKNo, depthPYes, depthPNo, pmEvent.title);
-      return { ...o, arbitrage: { ...arbResult, apyPct: computeApy(arbResult.roiPct, pmEvent.endDate) } };
-    });
+    const withArbitrage = calculateAllArbitrages(outcomes, pmEvent.title).map(o => ({
+      ...o,
+      arbitrage: { ...o.arbitrage, apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate) },
+    }));
 
     const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
     const pmCount = withArbitrage.filter(o => o.polymarket).length;
