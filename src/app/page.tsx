@@ -43,6 +43,7 @@ import {
   Star,
   DollarSign,
   Hash,
+  PanelRight,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -50,6 +51,7 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
+import { CouplingPanel } from "@/app/components/CouplingPanel";
 import { ManualMatchPanel } from "@/app/components/ManualMatchPanel";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
@@ -495,6 +497,8 @@ export default function Home() {
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
   const [manualMatches, setManualMatches] = useState<ManualMatch[]>([]);
   const [manualMatchMsg, setManualMatchMsg] = useState("");
+  const [couplingPanelOpen, setCouplingPanelOpen] = useState(false);
+  const [decoupledPairs, setDecoupledPairs] = useState<any[]>([]);
   const [sortField, setSortField] = useState<"roi" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [lastScanTime, setLastScanTime] = useState<number>(0);
@@ -734,6 +738,34 @@ export default function Home() {
         const data = await res.json();
         setManualMatches(data.matches || []);
       }
+    } catch { /* ignore */ }
+  };
+
+  const loadDecoupledPairs = async () => {
+    try {
+      const res = await fetch("/api/decoupled-pairs");
+      if (res.ok) {
+        const data = await res.json();
+        setDecoupledPairs(data.pairs || []);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleDecouple = async (kalshiTicker: string, pmConditionId: string, kalshiTitle: string, pmTitle: string) => {
+    try {
+      await fetch("/api/decoupled-pairs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kalshiTicker, pmConditionId, kalshiTitle, pmTitle }),
+      });
+      await loadDecoupledPairs();
+    } catch { /* ignore */ }
+  };
+
+  const handleRecouple = async (decoupledPairId: string) => {
+    try {
+      await fetch(`/api/decoupled-pairs?id=${decoupledPairId}`, { method: "DELETE" });
+      await loadDecoupledPairs();
     } catch { /* ignore */ }
   };
 
@@ -1006,6 +1038,7 @@ export default function Home() {
 
   const goToOverview = () => {
     stopPolling();
+    setCouplingPanelOpen(false);
     setViewMode("overview");
     window.history.replaceState({ view: "overview" }, "", "/?view=overview");
   };
@@ -1129,7 +1162,7 @@ export default function Home() {
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
-  useEffect(() => { loadManualMatches(); }, []);
+  useEffect(() => { loadManualMatches(); loadDecoupledPairs(); }, []);
 
   // Auto-refresh saved markets every 60s (gentle — poller handles scanning)
   useEffect(() => {
@@ -1698,6 +1731,18 @@ export default function Home() {
                     <div className="flex items-center gap-2 ml-auto">
                       <label className="text-xs text-[#5E6875]">Capital:</label>
                       <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
+                      <button
+                        onClick={() => setCouplingPanelOpen(v => !v)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                          couplingPanelOpen
+                            ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
+                            : "border-[#182533] bg-[#121E2B] text-[#5E6875] hover:text-[#FFFFFF]"
+                        }`}
+                        title="Toggle coupling panel"
+                      >
+                        <PanelRight className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Couplings</span>
+                      </button>
                     </div>
                   </div>
 
@@ -1825,6 +1870,20 @@ export default function Home() {
                             title="Delete market"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-[#5E6875] hover:text-[#ef4444]" />
+                          </button>
+
+                          {/* Coupling panel toggle */}
+                          <button
+                            onClick={() => setCouplingPanelOpen(v => !v)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                              couplingPanelOpen
+                                ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
+                                : "border-[#182533] bg-[#121E2B] text-[#5E6875] hover:text-[#FFFFFF]"
+                            }`}
+                            title="Toggle coupling panel"
+                          >
+                            <PanelRight className="w-3.5 h-3.5" />
+                            <span className="text-[10px]">Couplings</span>
                           </button>
                         </div>
                       </>
@@ -2090,6 +2149,36 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Coupling Panel — right-side expandable */}
+      <CouplingPanel
+        open={couplingPanelOpen}
+        onClose={() => setCouplingPanelOpen(false)}
+        outcomes={result?.outcomes ?? []}
+        unmatchedKalshi={result?.unmatchedKalshi ?? []}
+        unmatchedPolymarket={result?.unmatchedPolymarket ?? []}
+        manualMatches={manualMatches}
+        decoupledPairs={decoupledPairs}
+        onRescan={() => {
+          if (kalshiUrlRef.current && pmUrlRef.current) {
+            handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+          }
+        }}
+        onDecouple={handleDecouple}
+        onRemoveManualMatch={async (matchId: string) => {
+          await fetch(`/api/manual-matches/${matchId}`, { method: "DELETE" });
+          await loadManualMatches();
+        }}
+        onReconcple={handleRecouple}
+        onCreateMatch={async (kt: string, pcid: string, ktTitle: string, pmTitle: string) => {
+          await fetch("/api/manual-matches", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle }),
+          });
+          await loadManualMatches();
+        }}
+      />
 
       {/* Save modal */}
       {saveModalOpen && (

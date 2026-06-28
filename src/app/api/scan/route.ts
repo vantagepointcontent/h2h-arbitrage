@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Kalshi: try event_ticker first, fallback to series_ticker
     let kalshiFetchSource: 'event_ticker' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
-    const [kalshiMarkets, pmEvent, manualMatches] = await Promise.all([
+    const [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
       (async () => {
         try {
           const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi event markets');
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         API_TIMEOUT_MS, 'Polymarket event',
       ),
       getManualMatches(),
+      getDecoupledPairs(),
     ]);
 
     if (!pmEvent) {
