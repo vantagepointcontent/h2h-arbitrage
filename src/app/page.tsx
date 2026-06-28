@@ -1424,10 +1424,10 @@ export default function Home() {
       setOverviewSort(field);
       // Text columns default to asc (A→Z), numeric columns default to desc (high→low)
       const textFields: OverviewSort[] = ["name", "strategy"];
-      const ascFields: OverviewSort[] = ["expiry", "scanned"];
+      const ascFields: OverviewSort[] = ["expiry"];
       if (textFields.includes(field)) setOverviewSortDir("asc");
       else if (ascFields.includes(field)) setOverviewSortDir("asc");
-      else setOverviewSortDir("desc");
+      else setOverviewSortDir("desc"); // "scanned" desc = most recent first (matches sidebar)
     }
   };
 
