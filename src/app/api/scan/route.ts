@@ -5,10 +5,11 @@ import {
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
+import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
@@ -118,7 +119,12 @@ export async function POST(request: NextRequest) {
         }
         return [] as any[];
       })(),
-      withTimeout(fetchPolymarketEvent(pmSlug), API_TIMEOUT_MS, 'Polymarket event'),
+      withTimeout(
+        isPolymarketMarketUrl(polymarketUrl)
+          ? fetchPolymarketMarketAsEvent(pmSlug)
+          : fetchPolymarketEvent(pmSlug),
+        API_TIMEOUT_MS, 'Polymarket event',
+      ),
       getManualMatches(),
     ]);
 
@@ -129,11 +135,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check expiry: if event end date has passed, return empty result with expired flag
+    // Check expiry: if event end date has passed AND market is no longer active,
+    // return empty result with expired flag. Note: for sports markets, endDate
+    // is often the match start time — the market stays live until resolution.
     const expiryDate = pmEvent.endDate;
     if (expiryDate) {
       const expiryMs = new Date(expiryDate).getTime();
-      if (expiryMs > 0 && expiryMs <= Date.now()) {
+      const isMarketLive = pmEvent.active && !pmEvent.closed;
+      if (expiryMs > 0 && expiryMs <= Date.now() && !isMarketLive) {
         return NextResponse.json({
           eventTitle: pmEvent.title,
           kalshiEventTicker: kalshiTicker,
@@ -239,8 +248,11 @@ export async function POST(request: NextRequest) {
     // Step 2: apply manual matches to merge auto-unmatched pairs
     const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
 
+    // Step 2b: split decoupled pairs — user has explicitly unlinked these
+    const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
+
     // Step 3: compute arbitrage (with depth awareness) for all matched items, including cross-outcome
-    const withArbitrage = calculateAllArbitrages(outcomes, pmEvent.title).map(o => ({
+    const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title).map(o => ({
       ...o,
       arbitrage: {
         ...o.arbitrage,

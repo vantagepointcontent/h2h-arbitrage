@@ -35,9 +35,13 @@ export interface PMEvent {
 }
 
 export function extractPolymarketSlug(url: string): string | null {
-  // Accept both /event/{slug} and /sports/{category}/{slug}
-  const match = url.match(/polymarket\.com\/(?:event|(?:sports(?:\/[^/]+)+))\/([^\/\s\?\#]+)/);
+  // Accept /event/{slug}, /sports/{category}/{slug}, and /market/{slug}
+  const match = url.match(/polymarket\.com\/(?:event|(?:sports(?:\/[^/]+)+)|market)\/([^\/\s\?\#]+)/);
   return match ? match[1] : null;
+}
+
+export function isPolymarketMarketUrl(url: string): boolean {
+  return /polymarket\.com\/market\//.test(url);
 }
 
 import { rateLimiters } from '@/lib/rate-limiter';
@@ -66,6 +70,45 @@ export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null
     const data = await res.json();
     debugLog('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: PMMarket) => ({ q: m.question?.slice(0, 20), p: m.outcomePrices })));
     return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Fetch a single Polymarket market by its slug (from /market/ URLs).
+ * Wraps it in a PMEvent-like structure so downstream code works unchanged.
+ */
+export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEvent | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await rateLimiters.gamma.execute(() =>
+      fetch(
+        `https://gamma-api.polymarket.com/markets?slug=${slug}&_t=${Date.now()}`,
+        {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+          cache: 'no-store',
+          signal: controller.signal,
+        },
+      ),
+    );
+    if (!res.ok) throw new Error(`Polymarket markets API error: ${res.status}`);
+    const markets = await res.json() as PMMarket[];
+    if (!markets || markets.length === 0) return null;
+
+    const m = markets[0];
+    // Wrap single market in an event-like structure
+    return {
+      id: m.id,
+      title: m.question,
+      slug: m.slug,
+      description: '',
+      active: m.active,
+      closed: m.closed,
+      markets: markets,
+      endDate: m.endDate,
+    } as PMEvent;
   } finally {
     clearTimeout(timer);
   }

@@ -1,11 +1,10 @@
 {
-  "running": true,
-  "startedAt": "2026-06-24T15:52:27.534Z",
-  "total": 131,
-  "processed": 105,
-  "succeeded": 105,
+  "running": false,
+  "startedAt": "2026-06-26T20:44:11.477Z",
+  "total": 15,
+  "processed": 15,
+  "succeeded": 15,
   "failed": 0,
   "errors": [],
-  "currentMarketId": "1781522252009-181a6ca",
-  "currentMarketTitle": "MLB: Doubles Leader"
+  "finishedAt": "2026-06-26T20:44:31.612Z"
 }

@@ -60,7 +60,7 @@ export function OutcomeTableBody({
 
   return (
     <tbody className="divide-y divide-[#182533]">
-      {displayOutcomes.map((o) => {
+      {displayOutcomes.map((o, idx) => {
         const spread = o.kalshi && o.polymarket ? (o.polymarket.yesPrice - o.kalshi.yesAsk) : 0;
         const profit = o.arbitrage.expectedProfit;
         const roiColor = o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
@@ -73,7 +73,7 @@ export function OutcomeTableBody({
         const isHighestProfit = highestProfitOutcome !== null && o.artist === highestProfitOutcome.artist && showTotal;
 
         return (
-          <React.Fragment key={o.artist}>
+          <React.Fragment key={`${idx}-${o.artist}`}>
             <tr
               className={`hover:bg-[#182533]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#182533]/30" : ""}`}
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
@@ -122,8 +122,8 @@ export function OutcomeTableBody({
                           </div>
                         )}
                         <div className="border-t border-[#182533] pt-2 space-y-1">
-                          {profitableOutcomes.map((po) => (
-                            <div key={po.artist} className="flex justify-between items-center">
+                          {profitableOutcomes.map((po, pidx) => (
+                            <div key={`${pidx}-${po.artist}`} className="flex justify-between items-center">
                               <span className={po.artist === o.artist ? "text-[#FFFFFF] font-medium" : "text-[#5E6875]"}>{po.artist}</span>
                               <span className={po.artist === o.artist ? "text-[#5DBE81] font-bold" : "text-[#8A9BA8]"}>{formatCurrency(po.arbitrage.expectedProfit)}</span>
                             </div>

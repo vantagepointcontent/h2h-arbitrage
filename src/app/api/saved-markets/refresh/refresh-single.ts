@@ -3,9 +3,10 @@ import {
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
+import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 3000;
@@ -108,7 +109,12 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
       return [] as any[];
     })(),
-    withTimeout(fetchPolymarketEvent(pmSlug), PM_TIMEOUT_MS, 'Polymarket event'),
+    withTimeout(
+      isPolymarketMarketUrl(market.polymarketUrl)
+        ? fetchPolymarketMarketAsEvent(pmSlug)
+        : fetchPolymarketEvent(pmSlug),
+      PM_TIMEOUT_MS, 'Polymarket event',
+    ),
   ]);
 
   if (!pmEvent) {
@@ -171,8 +177,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
 
   const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
   const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+  const decoupledPairs = await getDecoupledPairs();
+  const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
 
-  const withArbitrage = calculateAllArbitrages(outcomes, market.category || pmEvent.title).map(o => ({
+  const withArbitrage = calculateAllArbitrages(splitOutcomes, market.category || pmEvent.title).map(o => ({
     ...o,
     arbitrage: { ...o.arbitrage, apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate) },
   }));

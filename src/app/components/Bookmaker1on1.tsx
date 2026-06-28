@@ -531,7 +531,7 @@ export function Bookmaker1on1({
 
       {/* ── Outcome Rows ── */}
       <div className="divide-y divide-zinc-800">
-        {validOutcomes.map((outcome) => {
+        {validOutcomes.map((outcome, oidx) => {
           const spread = spreads.get(outcome.artist) ?? 0;
           const isHovered = hoveredRow === outcome.artist;
           const a = outcome.platformA!;
@@ -548,7 +548,7 @@ export function Bookmaker1on1({
 
           return (
             <div
-              key={outcome.artist}
+              key={`${oidx}-${outcome.artist}`}
               className={`grid grid-cols-[1fr_auto_1fr] transition-colors duration-150 ${
                 isHovered ? "bg-[#232E3C]/60" : ""
               }`}
