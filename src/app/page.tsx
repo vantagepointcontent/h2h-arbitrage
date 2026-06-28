@@ -402,6 +402,19 @@ export function timeUntilExpiry(iso?: string | null): string {
   return `${hours}h`;
 }
 
+/** Compact relative time: "2min", "1h", "3d". No "ago" suffix. */
+export function formatRelativeTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diffSec < 60) return `${diffSec}s`;
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}min`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+  const diffDay = Math.round(diffHr / 24);
+  return `${diffDay}d`;
+}
+
 /** Check whether a saved market has at least one matched outcome pair */
 function isMatched(m: SavedMarket): boolean {
   if (m.liveResult && m.liveResult.allArbs && m.liveResult.allArbs.length > 0) return true;
@@ -466,7 +479,7 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
 
 /* ── Main App ── */
 // ─── Types used across components ───
-type OverviewSort = "name" | "roi" | "expiry" | "apy";
+type OverviewSort = "name" | "roi" | "expiry" | "apy" | "profit" | "strategy" | "matched" | "arbs" | "scanned";
 
 export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("");
@@ -876,8 +889,12 @@ export default function Home() {
       });
       if (res.ok) {
         await loadManualMatches();
-        setManualMatchMsg("Linked!");
+        setManualMatchMsg("Linked! Re-scanning...");
         setTimeout(() => setManualMatchMsg(""), 2000);
+        // Auto re-scan the current market so the new pairing shows up immediately
+        if (kalshiUrlRef.current && pmUrlRef.current) {
+          handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+        }
       }
     } catch { /* ignore */ }
   };
@@ -992,6 +1009,15 @@ export default function Home() {
 
   const goToScan = () => {
     stopPolling();
+    setActiveMarketId(null);
+    activeMarketIdRef.current = null;
+    setResult(null);
+    setKalshiUrl("");
+    setPmUrl("");
+    kalshiUrlRef.current = "";
+    pmUrlRef.current = "";
+    previousPricesRef.current = new Map();
+    setPriceChanges(new Map());
     setViewMode("scan");
     window.history.replaceState({ view: "scan" }, "", "/?view=scan");
   };
@@ -1095,20 +1121,20 @@ export default function Home() {
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
 
   // Sidebar sort — default APY desc (highest first)
-  const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy">("apy");
+  const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy" | "scanned">("apy");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("desc");
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
   useEffect(() => { loadManualMatches(); }, []);
 
-  // Auto-refresh saved markets every 10s
+  // Auto-refresh saved markets every 60s (gentle — poller handles scanning)
   useEffect(() => {
-    const iv = setInterval(() => loadSavedMarkets(), 10000);
+    const iv = setInterval(() => loadSavedMarkets(), 60000);
     return () => clearInterval(iv);
   }, []);
 
-  // Auto-refresh ACTIVE market prices every 10s when viewing a market
+  // Auto-refresh ACTIVE market prices every 60s when viewing a market
   useEffect(() => {
     if (!activeMarketId || viewMode !== "scan") return;
 
@@ -1157,7 +1183,7 @@ export default function Home() {
         setTimeout(() => setPriceChanges(new Map()), 3000);
       })
       .catch(err => console.error("Auto-refresh failed:", err));
-    }, 10000);
+    }, 60000);
 
     return () => clearInterval(iv);
   }, [activeMarketId, viewMode]);
@@ -1380,12 +1406,13 @@ export default function Home() {
   }, []);
 
   // Toggle sidebar sort
-  const toggleSidebarSort = (field: "name" | "roi" | "expiry" | "apy") => {
+  const toggleSidebarSort = (field: "name" | "roi" | "expiry" | "apy" | "scanned") => {
     if (sidebarSort === field) {
       setSidebarSortDir(d => (d === "asc" ? "desc" : "asc"));
     } else {
       setSidebarSort(field);
-      setSidebarSortDir("asc");
+      // For "scanned": desc = stalest first (longest since last scan), asc = most recent first
+      setSidebarSortDir(field === "scanned" ? "desc" : "asc");
     }
   };
 
@@ -1395,7 +1422,12 @@ export default function Home() {
       setOverviewSortDir(d => (d === "asc" ? "desc" : "asc"));
     } else {
       setOverviewSort(field);
-      setOverviewSortDir(field === "expiry" ? "asc" : "desc");
+      // Text columns default to asc (A→Z), numeric columns default to desc (high→low)
+      const textFields: OverviewSort[] = ["name", "strategy"];
+      const ascFields: OverviewSort[] = ["expiry", "scanned"];
+      if (textFields.includes(field)) setOverviewSortDir("asc");
+      else if (ascFields.includes(field)) setOverviewSortDir("asc");
+      else setOverviewSortDir("desc");
     }
   };
 
@@ -1922,6 +1954,57 @@ export default function Home() {
                       />
                     )}
 
+                    {/* Active couplings for this market — with unlink capability */}
+                    {manualMatches.length > 0 && (() => {
+                      const marketCouplings = manualMatches.filter(mm => {
+                        const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
+                          o.kalshi && o.kalshi.ticker === mm.kalshiTicker
+                        );
+                        const pmMatch = result.outcomes?.some((o: UnifiedOutcome) =>
+                          o.polymarket && o.polymarket.conditionId === mm.pmConditionId
+                        );
+                        return kMatch || pmMatch;
+                      });
+                      if (marketCouplings.length === 0) return null;
+                      return (
+                        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+                          <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
+                            <Link2 className="w-4 h-4 text-[#5DBE81]" />
+                            <h3 className="text-sm font-semibold text-[#FFFFFF]">Active Couplings</h3>
+                            <span className="text-[10px] text-[#5E6875]">({marketCouplings.length})</span>
+                          </div>
+                          <div className="p-3 space-y-2">
+                            {marketCouplings.map(mm => (
+                              <div key={mm.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533]">
+                                <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-[10px] text-[#5DBE81]">K:</span>
+                                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-[#a855f7]">PM:</span>
+                                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.pmTitle}>{mm.pmTitle}</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    onDeleteMatch(mm.id);
+                                    if (kalshiUrlRef.current && pmUrlRef.current) {
+                                      handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-md bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] transition-colors"
+                                  title="Unlink this coupling"
+                                >
+                                  <Unlink className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Embedded platform browsers */}
                     <DualBrowserPanels
                       kalshiUrl={kalshiUrl}
@@ -2022,9 +2105,9 @@ function MarketSidebar({
   onSelectMarket: (m: SavedMarket) => void;
   onEditMarket: (m: SavedMarket) => void;
   onDeleteMarket: (id: string) => void;
-  sort: "name" | "roi" | "expiry" | "apy";
+  sort: "name" | "roi" | "expiry" | "apy" | "scanned";
   sortDir: "asc" | "desc";
-  onToggleSort: (f: "name" | "roi" | "expiry" | "apy") => void;
+  onToggleSort: (field: "name" | "roi" | "expiry" | "apy" | "scanned") => void;
   timeUntilExpiry: (iso?: string | null) => string;
   layout: "grid" | "table";
   onToggleLayout: (l: "grid" | "table") => void;
@@ -2088,11 +2171,17 @@ function MarketSidebar({
       const ab = computeApy(b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0, b.expiryDate);
       return mul * (ab - aa);
     }
+    if (sort === "scanned") {
+      // desc = stalest first (longest since last scan), asc = most recent first
+      const sa = a.lastScanResult?.scannedAt ? new Date(a.lastScanResult.scannedAt).getTime() : 0;
+      const sb = b.lastScanResult?.scannedAt ? new Date(b.lastScanResult.scannedAt).getTime() : 0;
+      return mul * (sa - sb);
+    }
     return 0;
   });
 
   return (
-    <aside className={`${sidebarOpen ? "w-[345px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
+    <aside className={`${sidebarOpen ? "w-[380px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
       <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
         {/* ── Navigation (moved from header) ── */}
         <div className="space-y-1">
@@ -2156,6 +2245,15 @@ function MarketSidebar({
             >
               A-Z{sort === "name" && (sortDir === "asc" ? " ↑" : " ↓")}
             </button>
+            <button
+              onClick={() => onToggleSort("scanned")}
+              className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+                sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+              }`}
+              title="Sort by last scan time (stalest first)"
+            >
+              Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
+            </button>
             <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
             <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
               {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -2180,11 +2278,11 @@ function MarketSidebar({
             placeholder="Filter by name..."
             className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
           />
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <select
               value={expiryFilter}
               onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] text-xs text-[#FFFFFF] focus:outline-none"
+              className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
             >
               <option value="all">All expiries</option>
               <option value="lte7">≤ 7 days</option>
@@ -2194,7 +2292,7 @@ function MarketSidebar({
             <select
               value={sidebarCategory}
               onChange={(e) => setSidebarCategory(e.target.value as "all" | CategoryName)}
-              className="px-2 py-1 rounded-lg border border-[#232E3C] bg-[#0E1621] text-xs text-[#FFFFFF] focus:outline-none"
+              className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
             >
               <option value="all">All categories</option>
               {CATEGORIES.map((c) => (
@@ -2203,25 +2301,25 @@ function MarketSidebar({
             </select>
             <button
               onClick={onToggleShowExpired}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                 showExpired
-                  ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                  : "bg-[#0E1621] text-[#5E6875] border border-[#232E3C] hover:text-[#FFFFFF]"
+                  ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
+                  : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
               }`}
               title={showExpired ? "Hide expired markets" : "Show expired markets"}
             >
-              {showExpired ? "Show Expired: On" : "Show Expired: Off"}
+              Expired
             </button>
             <button
               onClick={onToggleShowArbOnly}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                 showArbOnly
-                  ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                  : "bg-[#0E1621] text-[#5E6875] border border-[#232E3C] hover:text-[#FFFFFF]"
+                  ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
+                  : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
               }`}
               title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
             >
-              {showArbOnly ? "Show Arb: On" : "Show Arb: Off"}
+              Arb Only
             </button>
           </div>
         </div>
@@ -2511,6 +2609,9 @@ function OverviewPanel({
             const apy = getMarketApy(m);
             const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
             const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
+            const matchedCount = m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0;
+            const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
+            const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
             return (
               <div
                 key={m.id}
@@ -2519,11 +2620,16 @@ function OverviewPanel({
               >
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-sm text-[#FFFFFF]">{m.eventTitle}</h3>
-                  {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>}
+                  <div className="flex items-center gap-1.5">
+                    {arbCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#5DBE81]/10 text-[#5DBE81] font-medium">{arbCount} arb{arbCount > 1 ? "s" : ""}</span>}
+                    {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="text-[#5E6875]">Expiry</div>
                   <div className="text-[#FFFFFF] text-right">{formatExpiry(m.expiryDate)}</div>
+                  <div className="text-[#5E6875]">Matched</div>
+                  <div className="text-[#8A9BA8] text-right">{matchedCount > 0 ? matchedCount : "—"}</div>
                   <div className="text-[#5E6875]">ROI</div>
                   <div className={`text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
@@ -2535,9 +2641,12 @@ function OverviewPanel({
                   <div className="text-[#5E6875]">Est. Profit</div>
                   <div className="text-[#FFFFFF] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-[#232E3C]">
-                  <Clock className="w-3 h-3" />
-                  {timeUntilExpiry(m.expiryDate)}
+                <div className="flex items-center justify-between text-[10px] text-[#5E6875]">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {timeUntilExpiry(m.expiryDate)}
+                  </div>
+                  <span>{formatRelativeTime(scannedAt)}</span>
                 </div>
               </div>
             );
@@ -2550,10 +2659,13 @@ function OverviewPanel({
               <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-medium">Market</th>
                 <th className="text-right px-4 py-3 font-medium">Expiry</th>
+                <th className="text-right px-4 py-3 font-medium">Matched</th>
+                <th className="text-right px-4 py-3 font-medium">Arbs</th>
                 <th className="text-right px-4 py-3 font-medium">ROI</th>
                 <th className="text-right px-4 py-3 font-medium">APY</th>
                 <th className="text-right px-4 py-3 font-medium">Profit</th>
                 <th className="text-left px-4 py-3 font-medium">Strategy</th>
+                <th className="text-right px-4 py-3 font-medium">Scanned</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#182533]">
@@ -2563,6 +2675,9 @@ function OverviewPanel({
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
+                const matchedCount = m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0;
+                const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
+                const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
                 return (
                   <tr
                     key={m.id}
@@ -2571,6 +2686,8 @@ function OverviewPanel({
                   >
                     <td className="px-4 py-3 font-medium text-[#FFFFFF]">{m.eventTitle}</td>
                     <td className="px-4 py-3 text-right text-[#FFFFFF]">{formatExpiry(m.expiryDate)}</td>
+                    <td className="px-4 py-3 text-right text-[#8A9BA8]">{matchedCount > 0 ? matchedCount : "—"}</td>
+                    <td className="px-4 py-3 text-right font-bold text-[#5DBE81]">{arbCount > 0 ? arbCount : "—"}</td>
                     <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
@@ -2579,6 +2696,7 @@ function OverviewPanel({
                     </td>
                     <td className="px-4 py-3 text-right text-[#FFFFFF]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-[#8A9BA8]">{strategy || "—"}</td>
+                    <td className="px-4 py-3 text-right text-xs text-[#5E6875]">{formatRelativeTime(scannedAt)}</td>
                   </tr>
                 );
               })}
