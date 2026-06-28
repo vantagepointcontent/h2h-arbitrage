@@ -4,10 +4,11 @@ import {
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent } from '@/lib/polymarket';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
+import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 
 const API_TIMEOUT_MS = 15000;
 
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     let kalshiFetchSource: 'event_ticker' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
-    const [kalshiMarkets, pmEvent, manualMatches] = await Promise.all([
+    const [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
       (async () => {
         try {
           const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi event markets');
@@ -89,8 +90,14 @@ export async function POST(request: NextRequest) {
         } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
         return [] as any[];
       })(),
-      withTimeout(fetchPolymarketEvent(pmSlug), API_TIMEOUT_MS, 'Polymarket event'),
+      withTimeout(
+        isPolymarketMarketUrl(polymarketUrl)
+          ? fetchPolymarketMarketAsEvent(pmSlug)
+          : fetchPolymarketEvent(pmSlug),
+        API_TIMEOUT_MS, 'Polymarket event',
+      ),
       getManualMatches(),
+      getDecoupledPairs(),
     ]);
 
     if (!pmEvent) {
@@ -132,8 +139,9 @@ export async function POST(request: NextRequest) {
     // Matching & arbitrage
     const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
     const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+    const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
 
-    const withArbitrage = calculateAllArbitrages(outcomes, pmEvent.title).map(o => ({
+    const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title).map(o => ({
       ...o,
       arbitrage: { ...o.arbitrage, apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate) },
     }));

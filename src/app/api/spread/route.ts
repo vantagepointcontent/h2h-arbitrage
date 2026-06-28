@@ -5,7 +5,7 @@ import {
   fetchKalshiSeriesMarkets,
   KalshiMarket,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent, PMMarket, parseOutcomes } from '@/lib/polymarket';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket, parseOutcomes } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 
 const API_TIMEOUT_MS = 15000;
@@ -134,7 +134,12 @@ async function fetchPolymarketMarket(pmUrl: string): Promise<{ markets: PMMarket
   const slug = extractPolymarketSlug(pmUrl);
   if (!slug) return { markets: [], eventTitle: '' };
   
-  const event = await withTimeout(fetchPolymarketEvent(slug), API_TIMEOUT_MS, 'Polymarket event');
+  const event = await withTimeout(
+    isPolymarketMarketUrl(pmUrl)
+      ? fetchPolymarketMarketAsEvent(slug)
+      : fetchPolymarketEvent(slug),
+    API_TIMEOUT_MS, 'Polymarket event',
+  );
   if (!event) return { markets: [], eventTitle: '' };
   return { markets: event.markets || [], eventTitle: event.title };
 }

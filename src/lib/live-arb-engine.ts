@@ -13,6 +13,7 @@ export interface LiveArbInputs {
 }
 
 export interface LiveArbResult {
+  artist: string;
   kalshiYesAsk: number | null;
   kalshiNoAsk: number | null;
   kalshiYesDepth: number;
@@ -34,8 +35,21 @@ export interface LiveArbResult {
   lastUpdate: string;
 }
 
-export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
-  const { kalshiTicker, pmYesTokenId, pmNoTokenId, capital, category } = inputs;
+/** A single matched outcome for live scanning. */
+export interface LiveMatchedOutcome {
+  artist: string;
+  kalshiTicker: string;
+  pmYesTokenId: string;
+  pmNoTokenId: string;
+}
+
+/** Compute arbitrage for a single matched outcome. */
+function computeSingleOutcome(
+  outcome: LiveMatchedOutcome,
+  capital: number,
+  category?: string,
+): LiveArbResult {
+  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId } = outcome;
 
   const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', capital);
   const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', capital);
@@ -102,6 +116,7 @@ export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
   }
 
   return {
+    artist,
     kalshiYesAsk,
     kalshiNoAsk,
     kalshiYesDepth,
@@ -118,6 +133,29 @@ export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
     fees,
     lastUpdate: new Date().toISOString(),
   };
+}
+
+/** Compute arbitrage for all matched outcomes in one pass. */
+export function computeAllLiveArbitrages(
+  outcomes: LiveMatchedOutcome[],
+  capital: number,
+  category?: string,
+): LiveArbResult[] {
+  return outcomes.map((o) => computeSingleOutcome(o, capital, category));
+}
+
+// Legacy wrapper kept for backward compatibility
+export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
+  return computeSingleOutcome(
+    {
+      artist: inputs.category || '',
+      kalshiTicker: inputs.kalshiTicker,
+      pmYesTokenId: inputs.pmYesTokenId,
+      pmNoTokenId: inputs.pmNoTokenId,
+    },
+    inputs.capital,
+    inputs.category,
+  );
 }
 
 // Helpers for direct Polymarket book updates from the WS message format

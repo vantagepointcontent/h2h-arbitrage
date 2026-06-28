@@ -107,9 +107,9 @@ export function MarketTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-[#17212B]">
-          {outcomes.map((outcome) => (
+          {outcomes.map((outcome, oidx) => (
             <MarketRow
-              key={outcome.artist}
+              key={`${oidx}-${outcome.artist}`}
               artist={outcome.artist}
               kalshi={outcome.kalshi}
               polymarket={outcome.polymarket}

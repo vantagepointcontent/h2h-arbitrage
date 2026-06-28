@@ -492,5 +492,45 @@
     "pmTitle": "Jennifer Gútierrez",
     "id": "1781993365267-mlo0ge0",
     "createdAt": "2026-06-20T22:09:25.267Z"
+  },
+  {
+    "kalshiTicker": "HOUSEPA17-26-R",
+    "pmConditionId": "0x6e03f8d81538931a0206e0cdb2bed775e8a87dec72963b6716755fcd0cd0b7f2",
+    "kalshiTitle": "HOUSEPA17-26-R",
+    "pmTitle": "Republican Party",
+    "id": "1782650576878-ylzoei4",
+    "createdAt": "2026-06-28T12:42:56.878Z"
+  },
+  {
+    "kalshiTicker": "HOUSEPA17-26-R",
+    "pmConditionId": "0x5e70e03590538410218c1a7641f741fd6480d6a9ca1951feb497210514dbee27",
+    "kalshiTitle": "HOUSEPA17-26-R",
+    "pmTitle": "Democratic Party",
+    "id": "1782650581250-wb3lqec",
+    "createdAt": "2026-06-28T12:43:01.251Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AL05-26-R",
+    "pmConditionId": "0xd75ce5a2e0255ab0be626ab545199179e6b4e31cb0ae8a091912b1c15e0ce9f0",
+    "kalshiTitle": "KXHOUSERACE-AL05-26-R",
+    "pmTitle": "Republican Party",
+    "id": "1782650760893-2pchfoy",
+    "createdAt": "2026-06-28T12:46:00.893Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-AL05-26-D",
+    "pmConditionId": "0x983d15d52f8780293cfb996daee22ce1327bf5349ac473b02c6ef07829ffb6f0",
+    "kalshiTitle": "KXHOUSERACE-AL05-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1782650763425-7gq60qu",
+    "createdAt": "2026-06-28T12:46:03.425Z"
+  },
+  {
+    "kalshiTicker": "KXGROK-GROK5-27JAN01",
+    "pmConditionId": "0xc274a9b32eb25394b720734b045820b7109e3ddd0de16ba577b10225fe924146",
+    "kalshiTitle": "KXGROK-GROK5-27JAN01",
+    "pmTitle": "December 31, 2025",
+    "id": "1782653391599-bupy2df",
+    "createdAt": "2026-06-28T13:29:51.599Z"
   }
 ]

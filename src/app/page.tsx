@@ -50,6 +50,7 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
+import { ManualMatchPanel } from "@/app/components/ManualMatchPanel";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -266,8 +267,9 @@ interface UnifiedOutcome {
 interface UnmatchedKalshi {
   ticker: string;
   title: string;
-  yesPrice: number;
-  noPrice: number;
+  artist?: string;
+  yesAsk: number;
+  noAsk: number;
 }
 
 interface UnmatchedPolymarket {
@@ -492,8 +494,6 @@ export default function Home() {
   const [isPolling, setIsPolling] = useState(false);
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
   const [manualMatches, setManualMatches] = useState<ManualMatch[]>([]);
-  const [selectedKalshi, setSelectedKalshi] = useState<UnmatchedKalshi | null>(null);
-  const [selectedPM, setSelectedPM] = useState<UnmatchedPolymarket | null>(null);
   const [manualMatchMsg, setManualMatchMsg] = useState("");
   const [sortField, setSortField] = useState<"roi" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -533,6 +533,9 @@ export default function Home() {
 
   // Outcome table filter
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
+
+  // Match mode: auto (default) or manual
+  const [matchMode, setMatchMode] = useState<"auto" | "manual">("auto");
 
   // Refs for values used inside useCallback
   const savedMarketsRef = useRef<SavedMarket[]>(savedMarkets);
@@ -1649,6 +1652,36 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* Auto/Manual match toggle */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xs text-[#5E6875]">Match Mode:</span>
+                    <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
+                      <button
+                        onClick={() => setMatchMode("auto")}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          matchMode === "auto"
+                            ? "bg-[#5DBE81] text-black"
+                            : "text-[#5E6875] hover:text-[#FFFFFF]"
+                        }`}
+                      >
+                        Auto Match
+                      </button>
+                      <button
+                        onClick={() => setMatchMode("manual")}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          matchMode === "manual"
+                            ? "bg-[#a855f7] text-white"
+                            : "text-[#5E6875] hover:text-[#FFFFFF]"
+                        }`}
+                      >
+                        Manual Match
+                      </button>
+                    </div>
+                    {matchMode === "manual" && (
+                      <span className="text-[10px] text-[#a855f7]/70">Link markets manually after scan</span>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-3 flex-wrap">
                     <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
@@ -1937,8 +1970,45 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Coupling suggestions for unmatched markets */}
-                    {result.unmatchedKalshi.length > 0 && result.unmatchedPolymarket.length > 0 && (
+                    {/* Manual matching panel — two-list pairing interface */}
+                    {matchMode === "manual" && result && (result.unmatchedKalshi.length > 0 || result.unmatchedPolymarket.length > 0 || manualMatches.length > 0) && (() => {
+                      const marketCouplings = manualMatches.filter(mm => {
+                        const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
+                          o.kalshi && o.kalshi.ticker === mm.kalshiTicker
+                        );
+                        const pmMatch = result.outcomes?.some((o: UnifiedOutcome) =>
+                          o.polymarket && o.polymarket.conditionId === mm.pmConditionId
+                        );
+                        return kMatch || pmMatch;
+                      });
+                      return (
+                        <ManualMatchPanel
+                          unmatchedKalshi={result.unmatchedKalshi}
+                          unmatchedPolymarket={result.unmatchedPolymarket}
+                          activeMatches={marketCouplings.map(mm => ({
+                            id: mm.id,
+                            kalshiTicker: mm.kalshiTicker,
+                            kalshiTitle: mm.kalshiTitle,
+                            pmConditionId: mm.pmConditionId,
+                            pmTitle: mm.pmTitle,
+                          }))}
+                          kalshiUrl={kalshiUrl}
+                          polymarketUrl={pmUrl}
+                          onPair={(kalshiTicker, pmConditionId, kalshiTitle, pmTitle) => {
+                            onCreateMatch(kalshiTicker, pmConditionId, kalshiTitle, pmTitle);
+                          }}
+                          onUnpair={(matchId) => {
+                            onDeleteMatch(matchId);
+                            if (kalshiUrlRef.current && pmUrlRef.current) {
+                              handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+                            }
+                          }}
+                        />
+                      );
+                    })()}
+
+                    {/* Auto mode: Coupling suggestions for unmatched markets */}
+                    {matchMode === "auto" && result.unmatchedKalshi.length > 0 && result.unmatchedPolymarket.length > 0 && (
                       <CouplingSuggestions
                         unmatchedKalshi={result.unmatchedKalshi}
                         unmatchedPolymarket={result.unmatchedPolymarket}
@@ -1954,8 +2024,8 @@ export default function Home() {
                       />
                     )}
 
-                    {/* Active couplings for this market — with unlink capability */}
-                    {manualMatches.length > 0 && (() => {
+                    {/* Auto mode: Active couplings for this market — with unlink capability */}
+                    {matchMode === "auto" && manualMatches.length > 0 && (() => {
                       const marketCouplings = manualMatches.filter(mm => {
                         const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
                           o.kalshi && o.kalshi.ticker === mm.kalshiTicker
