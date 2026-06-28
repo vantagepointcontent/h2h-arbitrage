@@ -2444,9 +2444,40 @@ function OverviewPanel({
     return computeApy(roi, m.expiryDate);
   };
 
+  // Helper: check if a market's numeric value is missing (shows as "—")
+  const hasNoValue = (m: SavedMarket, field: OverviewSort): boolean => {
+    switch (field) {
+      case "roi": return (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) === 0;
+      case "apy": return getMarketApy(m) === 0;
+      case "profit": return (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0) === 0;
+      case "matched": return (m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0) === 0;
+      case "arbs": {
+        const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
+        const cnt = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
+        return cnt === 0;
+      }
+      case "scanned": return !(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt);
+      default: return false;
+    }
+  };
+
   const sortFn = (a: SavedMarket, b: SavedMarket) => {
     const mul = sortDir === "asc" ? 1 : -1;
+    // For numeric columns: rows with "—" (no data) always sort to bottom
+    const numericFields: OverviewSort[] = ["roi", "apy", "profit", "matched", "arbs", "scanned"];
+    if (numericFields.includes(sort)) {
+      const aEmpty = hasNoValue(a, sort);
+      const bEmpty = hasNoValue(b, sort);
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;   // a goes to bottom
+      if (bEmpty) return -1;  // b goes to bottom
+    }
     if (sort === "name") return mul * a.eventTitle.localeCompare(b.eventTitle);
+    if (sort === "strategy") {
+      const sa = a.liveResult?.strategy ?? a.lastScanResult?.strategy ?? "";
+      const sb = b.liveResult?.strategy ?? b.lastScanResult?.strategy ?? "";
+      return mul * sa.localeCompare(sb);
+    }
     if (sort === "expiry") {
       const ea = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
       const eb = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
@@ -2458,9 +2489,29 @@ function OverviewPanel({
       return mul * (rb - ra);
     }
     if (sort === "apy") {
-      const aa = getMarketApy(a);
-      const ab = getMarketApy(b);
-      return mul * (ab - aa);
+      return mul * (getMarketApy(b) - getMarketApy(a));
+    }
+    if (sort === "profit") {
+      const pa = a.liveResult?.bestProfit ?? a.lastScanResult?.bestProfit ?? 0;
+      const pb = b.liveResult?.bestProfit ?? b.lastScanResult?.bestProfit ?? 0;
+      return mul * (pb - pa);
+    }
+    if (sort === "matched") {
+      const ma = a.liveResult?.matchedCount ?? a.lastScanResult?.matchedCount ?? 0;
+      const mb = b.liveResult?.matchedCount ?? b.lastScanResult?.matchedCount ?? 0;
+      return mul * (mb - ma);
+    }
+    if (sort === "arbs") {
+      const aa = a.liveResult?.allArbs ?? a.lastScanResult?.allArbs;
+      const ab = b.liveResult?.allArbs ?? b.lastScanResult?.allArbs;
+      const ca = aa ? aa.filter(x => x.expectedProfit > 0).length : 0;
+      const cb = ab ? ab.filter(x => x.expectedProfit > 0).length : 0;
+      return mul * (cb - ca);
+    }
+    if (sort === "scanned") {
+      const ta = a.liveResult?.scannedAt ?? a.lastScanResult?.scannedAt ?? 0;
+      const tb = b.liveResult?.scannedAt ?? b.lastScanResult?.scannedAt ?? 0;
+      return mul * (tb - ta);
     }
     return 0;
   };
@@ -2570,8 +2621,10 @@ function OverviewPanel({
             {([
               { key: "apy", label: "APY" },
               { key: "roi", label: "ROI" },
+              { key: "profit", label: "PROFIT" },
               { key: "expiry", label: "EXP" },
               { key: "name", label: "NAME" },
+              { key: "scanned", label: "SCANNED" },
             ] as { key: OverviewSort; label: string }[]).map(({ key, label }) => (
               <button
                 key={key}
@@ -2657,15 +2710,30 @@ function OverviewPanel({
           <table className="w-full text-sm">
             <thead className="bg-[#17212B] border-b border-[#182533]">
               <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
-                <th className="text-left px-4 py-3 font-medium">Market</th>
-                <th className="text-right px-4 py-3 font-medium">Expiry</th>
-                <th className="text-right px-4 py-3 font-medium">Matched</th>
-                <th className="text-right px-4 py-3 font-medium">Arbs</th>
-                <th className="text-right px-4 py-3 font-medium">ROI</th>
-                <th className="text-right px-4 py-3 font-medium">APY</th>
-                <th className="text-right px-4 py-3 font-medium">Profit</th>
-                <th className="text-left px-4 py-3 font-medium">Strategy</th>
-                <th className="text-right px-4 py-3 font-medium">Scanned</th>
+                {([
+                  { key: "name", label: "Market", align: "left" },
+                  { key: "expiry", label: "Expiry", align: "right" },
+                  { key: "matched", label: "Matched", align: "right" },
+                  { key: "arbs", label: "Arbs", align: "right" },
+                  { key: "roi", label: "ROI", align: "right" },
+                  { key: "apy", label: "APY", align: "right" },
+                  { key: "profit", label: "Profit", align: "right" },
+                  { key: "strategy", label: "Strategy", align: "left" },
+                  { key: "scanned", label: "Scanned", align: "right" },
+                ] as { key: OverviewSort; label: string; align: "left" | "right" }[]).map(({ key, label, align }) => (
+                  <th
+                    key={key}
+                    onClick={() => onToggleSort(key)}
+                    className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+                  >
+                    <span className={align === "right" ? "inline-flex items-center gap-1 flex-row-reverse" : "inline-flex items-center gap-1"}>
+                      {label}
+                      <span className={`text-[8px] transition-opacity ${sort === key ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                        {sort === key && sortDir === "asc" ? "▲" : "▼"}
+                      </span>
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#182533]">
