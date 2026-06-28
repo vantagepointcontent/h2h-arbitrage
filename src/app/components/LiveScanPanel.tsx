@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 
-interface LiveMarketResult {
+interface LiveArbOutcome {
+  artist: string;
   kalshiYesAsk: number | null;
   kalshiNoAsk: number | null;
   kalshiYesDepth: number;
@@ -26,21 +27,100 @@ interface LiveMarketResult {
   lastUpdate: string;
 }
 
+interface LiveScanResult {
+  outcomes: LiveArbOutcome[];
+  lastUpdate: string;
+}
+
 interface Props {
   capital: number;
   savedMarkets: SavedMarket[];
 }
+
+/* ── Flash animation helpers ────────────────────────────────────── */
+
+interface PrevCellValues {
+  kalshiYesAsk: number | null;
+  kalshiNoAsk: number | null;
+  pmYesAsk: number | null;
+  pmNoAsk: number | null;
+  spread: number | null;
+  roiPct: number;
+  expectedProfit: number;
+}
+
+type FlashColor = "green" | "red";
+
+interface FlashEntry {
+  color: FlashColor;
+  nonce: number;
+}
+
+/** Compute the spread value for comparison (mirrors the render logic). */
+function computeSpread(o: LiveArbOutcome): number | null {
+  if (o.kalshiYesAsk != null && o.pmNoAsk != null) {
+    return (1 - (o.kalshiYesAsk + o.pmNoAsk)) * 100;
+  }
+  if (o.pmYesAsk != null && o.kalshiNoAsk != null) {
+    return (1 - (o.pmYesAsk + o.kalshiNoAsk)) * 100;
+  }
+  return null;
+}
+
+/**
+ * A <td> that flashes green/red when its `flash.nonce` changes.
+ * Uses the Web Animations API so rapid successive changes restart
+ * the animation cleanly without DOM manipulation hacks.
+ */
+function FlashCell({
+  flash,
+  className,
+  children,
+}: {
+  flash: FlashEntry | undefined;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const cellRef = useRef<HTMLTableCellElement>(null);
+  const lastNonceRef = useRef(0);
+
+  useEffect(() => {
+    if (flash && flash.nonce !== lastNonceRef.current && cellRef.current) {
+      lastNonceRef.current = flash.nonce;
+      const color =
+        flash.color === "green" ? "rgba(93, 190, 129, 0.30)" : "rgba(239, 68, 68, 0.30)";
+      cellRef.current.animate(
+        [{ backgroundColor: color }, { backgroundColor: "transparent" }],
+        { duration: 1500, easing: "ease-out", fill: "forwards" }
+      );
+    }
+  }, [flash?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <td ref={cellRef} className={className}>
+      {children}
+    </td>
+  );
+}
+
+/* ── Main component ─────────────────────────────────────────────── */
 
 export function LiveScanPanel({ capital, savedMarkets }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<LiveMarketResult | null>(null);
+  const [result, setResult] = useState<LiveScanResult | null>(null);
   const [status, setStatus] = useState("Idle");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Flash state
+  const [flashes, setFlashes] = useState<Record<string, FlashEntry>>({});
+  const flashesRef = useRef<Record<string, FlashEntry>>({});
+  const prevValuesRef = useRef<Map<string, PrevCellValues>>(new Map());
+  const flashTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const selectedMarket = useMemo(
     () => savedMarkets.find((m) => m.id === selectedId) || null,
@@ -51,7 +131,7 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
     return [...savedMarkets]
       .map((m) => ({
         ...m,
-        roiPct: m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0,
+        roiPct: m.lastScanResult?.bestRoiPct ?? 0,
       }))
       .sort((a, b) => b.roiPct - a.roiPct);
   }, [savedMarkets]);
@@ -66,6 +146,14 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  // Cleanup flash timers on unmount
+  useEffect(() => {
+    return () => {
+      flashTimersRef.current.forEach((t) => clearTimeout(t));
+      flashTimersRef.current.clear();
+    };
+  }, []);
+
   const stop = useCallback(() => {
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
@@ -73,9 +161,113 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
     setStatus("Stopped");
   }, []);
 
+  /**
+   * Compute flash diffs between previous and new outcome values.
+   * Updates prevValuesRef, flashesRef, and schedules flash cleanup.
+   */
+  const computeFlashDiffs = useCallback((newOutcomes: LiveArbOutcome[]) => {
+    const prevMap = prevValuesRef.current;
+    const newFlashes: Record<string, FlashEntry> = {};
+    const flashRef = flashesRef.current;
+
+    newOutcomes.forEach((o, idx) => {
+      const prev = prevMap.get(String(idx));
+
+      if (prev) {
+        // Fields where lower = better (buying cheaper)
+        const priceFields: Array<{
+          name: string;
+          newVal: number | null;
+          prevVal: number | null;
+        }> = [
+          { name: "kYes", newVal: o.kalshiYesAsk, prevVal: prev.kalshiYesAsk },
+          { name: "kNo", newVal: o.kalshiNoAsk, prevVal: prev.kalshiNoAsk },
+          { name: "pmYes", newVal: o.pmYesAsk, prevVal: prev.pmYesAsk },
+          { name: "pmNo", newVal: o.pmNoAsk, prevVal: prev.pmNoAsk },
+        ];
+
+        priceFields.forEach((f) => {
+          if (f.prevVal != null && f.newVal != null && f.prevVal !== f.newVal) {
+            const improved = f.newVal < f.prevVal; // lower price = better
+            const cellKey = `${idx}-${f.name}`;
+            const currentNonce = flashRef[cellKey]?.nonce ?? 0;
+            newFlashes[cellKey] = {
+              color: improved ? "green" : "red",
+              nonce: currentNonce + 1,
+            };
+          }
+        });
+
+        // Fields where higher = better (more arb potential)
+        const derivedFields: Array<{
+          name: string;
+          newVal: number | null;
+          prevVal: number | null;
+        }> = [
+          { name: "spread", newVal: computeSpread(o), prevVal: prev.spread },
+          { name: "roi", newVal: o.roiPct, prevVal: prev.roiPct },
+          { name: "profit", newVal: o.expectedProfit, prevVal: prev.expectedProfit },
+        ];
+
+        derivedFields.forEach((f) => {
+          if (f.prevVal != null && f.newVal != null && f.prevVal !== f.newVal) {
+            const improved = f.newVal > f.prevVal; // higher = better
+            const cellKey = `${idx}-${f.name}`;
+            const currentNonce = flashRef[cellKey]?.nonce ?? 0;
+            newFlashes[cellKey] = {
+              color: improved ? "green" : "red",
+              nonce: currentNonce + 1,
+            };
+          }
+        });
+      }
+
+      // Store current values for next comparison
+      prevMap.set(String(idx), {
+        kalshiYesAsk: o.kalshiYesAsk,
+        kalshiNoAsk: o.kalshiNoAsk,
+        pmYesAsk: o.pmYesAsk,
+        pmNoAsk: o.pmNoAsk,
+        spread: computeSpread(o),
+        roiPct: o.roiPct,
+        expectedProfit: o.expectedProfit,
+      });
+    });
+
+    if (Object.keys(newFlashes).length > 0) {
+      // Update ref
+      flashesRef.current = { ...flashRef, ...newFlashes };
+      setFlashes(flashesRef.current);
+
+      // Schedule cleanup for each flashed cell
+      Object.keys(newFlashes).forEach((cellKey) => {
+        const existing = flashTimersRef.current.get(cellKey);
+        if (existing) clearTimeout(existing);
+        flashTimersRef.current.set(
+          cellKey,
+          setTimeout(() => {
+            setFlashes((prev) => {
+              const next = { ...prev };
+              delete next[cellKey];
+              flashesRef.current = next;
+              return next;
+            });
+            flashTimersRef.current.delete(cellKey);
+          }, 1500)
+        );
+      });
+    }
+  }, []);
+
   const start = useCallback(async () => {
     setError("");
     setResult(null);
+    // Clear flash state for a fresh session
+    prevValuesRef.current = new Map();
+    flashesRef.current = {};
+    setFlashes({});
+    flashTimersRef.current.forEach((t) => clearTimeout(t));
+    flashTimersRef.current.clear();
     stop();
 
     if (!selectedMarket) {
@@ -120,6 +312,8 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
           return;
         }
         if (data.type === "result") {
+          // Compute flash diffs before setting result
+          computeFlashDiffs(data.result.outcomes as LiveArbOutcome[]);
           setResult(data.result);
         }
       };
@@ -132,7 +326,7 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
       setLoading(false);
       setError(String(err));
     }
-  }, [selectedMarket, capital, stop]);
+  }, [selectedMarket, capital, stop, computeFlashDiffs]);
 
   useEffect(() => {
     return () => {
@@ -146,8 +340,19 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
   const fmtUsd = (n: number) =>
     n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
+  const roiColor = (roi: number) => {
+    if (roi > 0) return "text-[#5DBE81]";
+    return "text-[#FFFFFF]";
+  };
+
+  const strategyColor = (s: string) => {
+    if (s !== "No arb") return "text-[#5DBE81]";
+    return "text-[#FFFFFF]";
+  };
+
   return (
     <div className="space-y-5">
+      {/* Header / Controls */}
       <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-5 h-5 text-[#5DBE81]" />
@@ -168,9 +373,9 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
               {selectedMarket ? (
                 <span className="flex items-center gap-2 truncate">
                   <span className="truncate">{selectedMarket.eventTitle}</span>
-                  <span className={`text-xs font-medium ${(selectedMarket.liveResult?.bestRoiPct ?? selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                  <span className={`text-xs font-medium ${(selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
                     {(() => {
-                      const roi = selectedMarket.liveResult?.bestRoiPct ?? selectedMarket.lastScanResult?.bestRoiPct ?? 0;
+                      const roi = selectedMarket.lastScanResult?.bestRoiPct ?? 0;
                       return `${roi > 0 ? "+" : ""}${roi.toFixed(1)}%`;
                     })()}
                   </span>
@@ -244,96 +449,128 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
         )}
       </div>
 
-      {result && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Kalshi card */}
-          <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center justify-center w-5 h-5 rounded-sm bg-[#5DBE81]">
-                <span className="text-[10px] font-bold text-[#FFFFFF]">K</span>
-              </div>
-              <h3 className="text-sm font-bold text-[#FFFFFF]">Kalshi Orderbook</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875] mb-1">YES Ask (buy)</div>
-                <div className="text-lg font-bold text-[#5DBE81]">{fmt(result.kalshiYesAsk)}</div>
-                <div className="text-[10px] text-[#5E6875]">Depth: ${result.kalshiYesDepth.toFixed(2)}</div>
-              </div>
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875] mb-1">NO Ask (buy)</div>
-                <div className="text-lg font-bold text-[#5DBE81]">{fmt(result.kalshiNoAsk)}</div>
-                <div className="text-[10px] text-[#5E6875]">Depth: ${result.kalshiNoDepth.toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Polymarket card */}
-          <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center justify-center w-5 h-5 rounded-sm bg-[#a855f7]">
-                <span className="text-[9px] font-bold text-[#FFFFFF]">PM</span>
-              </div>
-              <h3 className="text-sm font-bold text-[#FFFFFF]">Polymarket Orderbook</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875] mb-1">YES Ask (buy)</div>
-                <div className="text-lg font-bold text-[#a855f7]">{fmt(result.pmYesAsk)}</div>
-                <div className="text-[10px] text-[#5E6875]">Depth: ${result.pmYesDepth.toFixed(2)}</div>
-              </div>
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875] mb-1">NO Ask (buy)</div>
-                <div className="text-lg font-bold text-[#a855f7]">{fmt(result.pmNoAsk)}</div>
-                <div className="text-[10px] text-[#5E6875]">Depth: ${result.pmNoDepth.toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {result && (
+      {/* Outcomes Table */}
+      {result && result.outcomes.length > 0 && (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5">
-          <h3 className="text-sm font-bold text-[#FFFFFF] mb-4">Arbitrage Signal</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-              <div className="text-[10px] text-[#5E6875]">Strategy</div>
-              <div className={`text-sm font-semibold ${result.strategy !== "No arb" ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
-                {result.strategy}
-              </div>
-            </div>
-            <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-              <div className="text-[10px] text-[#5E6875]">Net ROI</div>
-              <div className={`text-lg font-bold ${result.roiPct > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
-                {result.roiPct.toFixed(2)}%
-              </div>
-            </div>
-            <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-              <div className="text-[10px] text-[#5E6875]">Expected Net Profit</div>
-              <div className={`text-lg font-bold ${result.expectedProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
-                {fmtUsd(result.expectedProfit)}
-              </div>
-            </div>
+          <h3 className="text-sm font-bold text-[#FFFFFF] mb-4">
+            Matched Outcomes ({result.outcomes.length})
+          </h3>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[#182533]">
+                  <th className="text-left py-2 px-2 text-[#5E6875] font-medium">OUTCOME</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">K YES</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">K NO</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PM YES</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PM NO</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">SPREAD</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">ROI</th>
+                  <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PROFIT</th>
+                  <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.outcomes.map((o, idx) => (
+                  <tr
+                    key={`${o.artist}-${idx}`}
+                    className="border-b border-[#182533]/50 hover:bg-[#182533] transition-colors"
+                  >
+                    <td className="py-2 px-2 text-[#FFFFFF] font-medium">{o.artist}</td>
+                    <FlashCell
+                      flash={flashes[`${idx}-kYes`]}
+                      className="py-2 px-2 text-right text-[#5DBE81] font-mono"
+                    >
+                      {fmt(o.kalshiYesAsk)}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-kNo`]}
+                      className="py-2 px-2 text-right text-[#5DBE81] font-mono"
+                    >
+                      {fmt(o.kalshiNoAsk)}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-pmYes`]}
+                      className="py-2 px-2 text-right text-[#a855f7] font-mono"
+                    >
+                      {fmt(o.pmYesAsk)}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-pmNo`]}
+                      className="py-2 px-2 text-right text-[#a855f7] font-mono"
+                    >
+                      {fmt(o.pmNoAsk)}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-spread`]}
+                      className="py-2 px-2 text-right font-mono text-[#FFFFFF]"
+                    >
+                      {(() => {
+                        if (o.kalshiYesAsk != null && o.pmNoAsk != null) {
+                          return `${((1 - (o.kalshiYesAsk + o.pmNoAsk)) * 100).toFixed(2)}%`;
+                        }
+                        if (o.pmYesAsk != null && o.kalshiNoAsk != null) {
+                          return `${((1 - (o.pmYesAsk + o.kalshiNoAsk)) * 100).toFixed(2)}%`;
+                        }
+                        return "—";
+                      })()}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-roi`]}
+                      className={`py-2 px-2 text-right font-mono font-bold ${roiColor(o.roiPct)}`}
+                    >
+                      {o.roiPct > 0 ? `+${o.roiPct.toFixed(2)}%` : `${o.roiPct.toFixed(2)}%`}
+                    </FlashCell>
+                    <FlashCell
+                      flash={flashes[`${idx}-profit`]}
+                      className={`py-2 px-2 text-right font-mono font-bold ${o.expectedProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}
+                    >
+                      {fmtUsd(o.expectedProfit)}
+                    </FlashCell>
+                    <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
+                      {o.strategy}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          {result.strategy !== "No arb" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875]">Kalshi Stake</div>
-                <div className="text-sm font-semibold text-[#FFFFFF]">{fmtUsd(result.kalshiStake)}</div>
-              </div>
-              <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                <div className="text-[10px] text-[#5E6875]">Polymarket Stake</div>
-                <div className="text-sm font-semibold text-[#FFFFFF]">{fmtUsd(result.pmStake)}</div>
-              </div>
-            </div>
-          )}
-
-          {result.fees && (
-            <div className="mt-4 text-xs text-[#5E6875]">
-              Fees — Kalshi: {fmtUsd(result.fees.kalshiFee)} · Polymarket: {fmtUsd(result.fees.pmFee)} · Worst-case net: {fmtUsd(result.fees.worstCaseNetProfit)}
-            </div>
-          )}
+          {/* Summary stats */}
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {(() => {
+              const positiveArbs = result.outcomes.filter((o) => o.roiPct > 0);
+              const bestRoi = positiveArbs.length > 0
+                ? Math.max(...positiveArbs.map((o) => o.roiPct))
+                : 0;
+              const totalProfit = result.outcomes.reduce((s, o) => s + o.expectedProfit, 0);
+              return (
+                <>
+                  <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
+                    <div className="text-[10px] text-[#5E6875]">Total Outcomes</div>
+                    <div className="text-lg font-bold text-[#FFFFFF]">{result.outcomes.length}</div>
+                  </div>
+                  <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
+                    <div className="text-[10px] text-[#5E6875]">Positive Arbs</div>
+                    <div className={`text-lg font-bold ${positiveArbs.length > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>{positiveArbs.length}</div>
+                  </div>
+                  <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
+                    <div className="text-[10px] text-[#5E6875]">Best ROI</div>
+                    <div className={`text-lg font-bold ${bestRoi > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
+                      {bestRoi > 0 ? `+${bestRoi.toFixed(2)}%` : "0.00%"}
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
+                    <div className="text-[10px] text-[#5E6875]">Combined Profit</div>
+                    <div className={`text-lg font-bold ${totalProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
+                      {fmtUsd(totalProfit)}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
     </div>
