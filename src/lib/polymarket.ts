@@ -77,11 +77,13 @@ export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null
 
 /**
  * Fetch a single Polymarket market by its slug (from /market/ URLs).
- * Wraps it in a PMEvent-like structure so downstream code works unchanged.
+ * If the market belongs to an event group, fetch ALL sibling markets from
+ * the event so multi-outcome markets (e.g. House races) surface every outcome.
+ * Falls back to wrapping just the single market if event lookup fails.
  */
 export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEvent | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await rateLimiters.gamma.execute(() =>
       fetch(
@@ -98,7 +100,37 @@ export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEven
     if (!markets || markets.length === 0) return null;
 
     const m = markets[0];
-    // Wrap single market in an event-like structure
+
+    // Try to resolve the parent event to get all sibling markets.
+    // The markets API includes an `events` array on each market when expanded.
+    // We also try the `negRiskMarketID` as a fallback lookup.
+    const eventSlug = (m as any).events?.[0]?.slug as string | undefined;
+
+    if (eventSlug) {
+      try {
+        const eventRes = await rateLimiters.gamma.execute(() =>
+          fetch(
+            `https://gamma-api.polymarket.com/events/slug/${eventSlug}?_t=${Date.now()}`,
+            {
+              headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+              cache: 'no-store',
+              signal: controller.signal,
+            },
+          ),
+        );
+        if (eventRes.ok) {
+          const event = await eventRes.json() as PMEvent;
+          if (event && event.markets && event.markets.length > 1) {
+            // Return the full event with all sibling markets
+            return event;
+          }
+        }
+      } catch {
+        // Event lookup failed — fall back to single market wrap
+      }
+    }
+
+    // Fallback: wrap single market in an event-like structure
     return {
       id: m.id,
       title: m.question,

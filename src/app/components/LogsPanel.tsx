@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Search,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -35,6 +36,7 @@ type SortDir = "asc" | "desc";
 
 export function LogsPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [savedMarkets, setSavedMarkets] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -81,16 +83,37 @@ export function LogsPanel() {
     fetchLogs();
   }, [fetchLogs]);
 
-  // Filter by search query (market_id or strategy)
+  // Fetch saved markets for market name lookup
+  useEffect(() => {
+    fetch("/api/saved-markets")
+      .then((res) => res.json())
+      .then((data) => {
+        const m = new Map<string, string>();
+        if (Array.isArray(data)) {
+          for (const mk of data) {
+            if (mk.eventTitle) m.set(mk.id, mk.eventTitle);
+          }
+        }
+        setSavedMarkets(m);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Filter by search query (market_id, market name, or strategy)
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return logs;
     const q = searchQuery.toLowerCase();
     return logs.filter(
-      (l) =>
-        l.market_id?.toLowerCase().includes(q) ||
-        l.strategy?.toLowerCase().includes(q)
+      (l) => {
+        const marketName = savedMarkets.get(l.market_id);
+        return (
+          l.market_id?.toLowerCase().includes(q) ||
+          marketName?.toLowerCase().includes(q) ||
+          l.strategy?.toLowerCase().includes(q)
+        );
+      }
     );
-  }, [logs, searchQuery]);
+  }, [logs, searchQuery, savedMarkets]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -219,7 +242,7 @@ export function LogsPanel() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {/* Search */}
           <div className="md:col-span-2">
-            <label className="block text-[10px] text-[#5E6875] mb-1">Search (market ID or strategy)</label>
+            <label className="block text-[10px] text-[#5E6875] mb-1">Search (market name, ID, or strategy)</label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5E6875]" />
               <input
@@ -314,7 +337,7 @@ export function LogsPanel() {
                     Scan Time <SortIcon col="scanned_at" />
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
-                    Market ID
+                    Market Name
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Strategy
@@ -349,11 +372,12 @@ export function LogsPanel() {
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Stake
                   </th>
+                  <th className="px-3 py-2.5 text-center text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((log, i) => (
-                  <LogRow key={log.id ?? i} log={log} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} />
+                  <LogRow key={log.id ?? i} log={log} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
               </tbody>
             </table>
@@ -378,6 +402,7 @@ function LogRow({
   fmtPct,
   fmtUsd,
   fmtTime,
+  savedMarkets,
 }: {
   log: LogEntry;
   expanded: boolean;
@@ -385,9 +410,18 @@ function LogRow({
   fmtPct: (n: number) => string;
   fmtUsd: (n: number) => string;
   fmtTime: (s: string) => string;
+  savedMarkets: Map<string, string>;
 }) {
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#5E6875]";
+
+  const marketName = savedMarkets.get(log.market_id);
+  const hasMarketName = !!marketName;
+
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.location.href = `/?view=scan&id=${encodeURIComponent(log.market_id)}`;
+  };
 
   // Parse raw_result for expanded view
   let rawArbs: any[] = [];
@@ -407,18 +441,37 @@ function LogRow({
         onClick={onToggle}
       >
         <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap font-mono">{fmtTime(log.scanned_at)}</td>
-        <td className="px-3 py-2 text-xs text-[#FFFFFF] truncate max-w-[180px]" title={log.market_id}>{log.market_id}</td>
-        <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={log.strategy}>{log.strategy || "—"}</td>
+        <td className="px-3 py-2 text-xs truncate max-w-[180px]" title={log.market_id}>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={handleNavigate}
+            onKeyDown={(e) => { if (e.key === "Enter") handleNavigate(e as unknown as React.MouseEvent); }}
+            className={`cursor-pointer hover:underline ${hasMarketName ? "text-[#5DBE81]" : "text-[#5E6875]"}`}
+          >
+            {hasMarketName ? marketName : log.market_id}
+          </span>
+        </td>
+        <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={log.strategy}>{log.strategy || "\u2014"}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#5E6875]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#5E6875]">{log.total_stake ? fmtUsd(log.total_stake) : "—"}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#5E6875]">{log.total_stake ? fmtUsd(log.total_stake) : "\u2014"}</td>
+        <td className="px-3 py-2 text-center">
+          <button
+            onClick={handleNavigate}
+            title="Open in Scan"
+            className="p-1 rounded text-[#5E6875] hover:text-[#5DBE81] transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        </td>
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={9} className="px-4 py-3">
+          <td colSpan={10} className="px-4 py-3">
             {rawArbs.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
@@ -426,7 +479,7 @@ function LogRow({
                   {rawArbs.map((arb: any, i: number) => (
                     <div key={i} className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-[#FFFFFF]">{arb.artist || arb.strategy || "—"}</span>
+                        <span className="text-xs font-medium text-[#FFFFFF]">{arb.artist || arb.strategy || "\u2014"}</span>
                         <span className={`text-xs font-mono font-semibold ${arb.roiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
                           {fmtPct(arb.roiPct)}
                         </span>

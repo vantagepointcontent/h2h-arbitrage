@@ -236,7 +236,7 @@ export function DashboardPanel() {
                 className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                   range === opt.key
                     ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                    : "text-[#5E6875] hover:text-[#FFFFFF]"
+                    : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                 }`}
               >
                 {opt.label}
@@ -305,7 +305,7 @@ export function DashboardPanel() {
               title="Arb Discovery Timeline"
               icon={<Activity className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
-                <span className="text-xs text-[#5E6875]">
+                <span className="text-xs text-[#8A9BA8]">
                   Scans &amp; ROI trend
                 </span>
               }
@@ -315,7 +315,7 @@ export function DashboardPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
                     dataKey="time"
-                    tick={{ fontSize: 10, fill: "#5E6875" }}
+                    tick={{ fontSize: 10, fill: "#8A9BA8" }}
                     tickFormatter={(val: string) => val.slice(5)}
                     interval="preserveStartEnd"
                   />
@@ -330,7 +330,7 @@ export function DashboardPanel() {
                     domain={[0, "dataMax"]}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend />
+                  <Legend wrapperStyle={{ color: '#8A9BA8', fontSize: '11px' }} />
                   <Line
                     yAxisId="left"
                     type="monotone"
@@ -360,7 +360,7 @@ export function DashboardPanel() {
               title="Scans Per Day"
               icon={<BarChart3 className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
-                <span className="text-xs text-[#5E6875]">
+                <span className="text-xs text-[#8A9BA8]">
                   Last 30 days
                 </span>
               }
@@ -370,10 +370,10 @@ export function DashboardPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: "#5E6875" }}
+                    tick={{ fontSize: 10, fill: "#8A9BA8" }}
                     interval="preserveStartEnd"
                   />
-                  <YAxis tick={{ fontSize: 10, fill: "#5E6875" }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload, label }: any) => {
                       if (!active || !payload?.length) return null;
@@ -409,7 +409,7 @@ export function DashboardPanel() {
             title="ROI Distribution"
             icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
             rightElement={
-              <span className="text-xs text-[#5E6875]">
+              <span className="text-xs text-[#8A9BA8]">
                 Net of fees
               </span>
             }
@@ -433,7 +433,7 @@ export function DashboardPanel() {
                   dataKey="label"
                   tick={{ fontSize: 11, fill: "#8A9BA8" }}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#5E6875" }} allowDecimals={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
                 <Tooltip
                   content={({ active, payload }: any) => {
                     if (!active || !payload?.length) return null;
@@ -471,7 +471,7 @@ export function DashboardPanel() {
             title="Top Active Arbs"
             icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
             rightElement={
-              <span className="text-xs text-[#5E6875]">
+              <span className="text-xs text-[#8A9BA8]">
                 Sorted by ROI ↓ · Click to open scan
               </span>
             }
@@ -554,7 +554,7 @@ export function DashboardPanel() {
 
       {/* Footer note */}
       {hasData && (
-        <div className="flex items-center justify-between text-xs text-[#5E6875]">
+        <div className="flex items-center justify-between text-xs text-[#8A9BA8]">
           <span>All values net of fees</span>
           <span>
             Data range: {RANGE_OPTIONS.find((r) => r.key === range)?.label}
@@ -581,7 +581,7 @@ function KPICard({
     <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         {icon}
-        <span className="text-[10px] text-[#5E6875]">{label}</span>
+        <span className="text-[10px] text-[#8A9BA8]">{label}</span>
       </div>
       <div className="text-lg font-bold" style={{ color }}>
         {value}

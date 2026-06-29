@@ -1079,12 +1079,12 @@ export default function Home() {
   };
 
   // Sort helpers
-  const [overviewSort, setOverviewSort] = useState<OverviewSort>("expiry");
-  const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("asc");
+  const [overviewSort, setOverviewSort] = useState<OverviewSort>("apy");
+  const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("desc");
   const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
-  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
+  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("lte30");
   const [showExpired, setShowExpired] = useState(false);
-  const [showArbOnly, setShowArbOnly] = useState(false);
+  const [showArbOnly, setShowArbOnly] = useState(true);
   const [overviewCategory, setOverviewCategory] = useState<string>("all");
   const [hideUnmatched, setHideUnmatched] = useState(getStoredHideUnmatched);
   const [scanningAll, setScanningAll] = useState(false);
