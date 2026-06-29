@@ -9,6 +9,7 @@ import {
   buildMatches,
   RATE_LIMIT_MS,
   PhV2Market,
+  PredictionHuntMarket,
   CATEGORY_SEARCH_TERMS,
   fetchMatchingMarkets,
   buildMatchedMarketsFromSearch,
