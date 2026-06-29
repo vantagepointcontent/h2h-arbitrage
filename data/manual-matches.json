@@ -532,5 +532,13 @@
     "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
     "id": "1782688598016-ur1sfah",
     "createdAt": "2026-06-28T23:16:38.016Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-PA03-26-D",
+    "pmConditionId": "0x4275738d1eb217ee77c4404f74b41988ad1640c17b8fe0fd0aec3d5614873b23",
+    "kalshiTitle": "KXHOUSERACE-PA03-26-D",
+    "pmTitle": "Democratic Party",
+    "id": "1782739234956-ltam258",
+    "createdAt": "2026-06-29T13:20:34.956Z"
   }
 ]
