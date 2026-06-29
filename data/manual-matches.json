@@ -1,15 +1,5 @@
 [
   {
-    "kalshiTicker": "KXIPOSPACEX-26JUL01",
-    "pmConditionId": "0x3dbeee81527f6d4868a6e500fca15d8905a6dda0e9b1f525145a4ad813bac98e",
-    "kalshiTitle": "KXIPOSPACEX-26JUL01",
-    "pmTitle": "June 30",
-    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
-    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
-    "id": "1779552204821-swex21g",
-    "createdAt": "2026-05-23T16:03:24.821Z"
-  },
-  {
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B70.5",
     "pmConditionId": "0x17f4f170236f32b8cf3acd28282cd24bf308a06f0c165fd28c3234bbc71475fe",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B70.5",
@@ -532,5 +522,15 @@
     "pmTitle": "December 31, 2025",
     "id": "1782653391599-bupy2df",
     "createdAt": "2026-06-28T13:29:51.599Z"
+  },
+  {
+    "kalshiTicker": "KXIPOSPACEX-26JUL01",
+    "pmConditionId": "0x3dbeee81527f6d4868a6e500fca15d8905a6dda0e9b1f525145a4ad813bac98e",
+    "kalshiTitle": "KXIPOSPACEX-26JUL01",
+    "pmTitle": "June 30",
+    "kalshiUrl": "https://kalshi.com/markets/kxipospacex/when-will-spacex-ipo/kxipospacex",
+    "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
+    "id": "1782688598016-ur1sfah",
+    "createdAt": "2026-06-28T23:16:38.016Z"
   }
 ]
