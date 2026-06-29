@@ -122,6 +122,8 @@ export async function GET(req: NextRequest) {
   const liveMatched: LiveMatchedOutcome[] = [];
   const allKalshiTickers = new Set<string>();
   const allPmTokenIds = new Set<string>();
+  // Track which outcome side (yes/no) each PM token_id represents
+  const pmTokenSides = new Map<string, 'yes' | 'no'>();
 
   for (const o of matched) {
     const cid = o.polymarket!.conditionId;
@@ -138,6 +140,9 @@ export async function GET(req: NextRequest) {
     allKalshiTickers.add(o.kalshi!.ticker);
     allPmTokenIds.add(tokens.yes);
     allPmTokenIds.add(tokens.no);
+    // Track which side each token represents
+    pmTokenSides.set(tokens.yes, 'yes');
+    pmTokenSides.set(tokens.no, 'no');
   }
 
   if (liveMatched.length === 0) {
@@ -167,7 +172,7 @@ export async function GET(req: NextRequest) {
       send({ type: 'status', message: 'Connecting to exchanges...' });
 
       // Seed ALL books from REST so UI shows prices immediately
-      seedAllBooks(session.kalshiTickers, session.pmTokenIds)
+      seedAllBooks(session.kalshiTickers, session.pmTokenIds, pmTokenSides)
         .then(() => maybeSendResults())
         .catch(() => {});
 
@@ -212,10 +217,33 @@ export async function GET(req: NextRequest) {
       clobWs.subscribe(session.pmTokenIds, (updates) => {
         if (session.closed) return;
         for (const u of updates) {
+          const side = pmTokenSides.get(u.tokenId) ?? 'yes';
           if (u.type === 'book' && u.book) {
-            applyPolymarketBook(u.tokenId, u.book.asks.map((a) => ({ price: String(a.price), size: String(a.size) })));
-          } else if (u.bestAsk != null) {
-            orderbookState.setBook(u.tokenId, [{ price: u.bestAsk, quantity: Infinity }], [], u.ts);
+            // Full book snapshot — replace the side with the full orderbook
+            applyPolymarketBook(u.tokenId, u.book.asks.map((a) => ({ price: String(a.price), size: String(a.size) })), side);
+          } else if (u.bestAsk != null && u.bestAsk > 0) {
+            // best_bid_ask or price_change update — update the top of book
+            // without destroying the full book that was seeded from REST
+            const existing = orderbookState.getBook(u.tokenId);
+            if (existing) {
+              // Update only the relevant side with the new best ask
+              const asks = side === 'yes' ? existing.yes.asks : existing.no.asks;
+              // If the best ask changed, replace the top level
+              const newAsks = asks.filter((a) => a.price < u.bestAsk! - 1e-9);
+              newAsks.unshift({ price: u.bestAsk!, quantity: Infinity });
+              if (side === 'yes') {
+                orderbookState.setBook(u.tokenId, newAsks, existing.no.asks, u.ts);
+              } else {
+                orderbookState.setBook(u.tokenId, existing.yes.asks, newAsks, u.ts);
+              }
+            } else {
+              // No existing book — seed with single level
+              if (side === 'yes') {
+                orderbookState.setBook(u.tokenId, [{ price: u.bestAsk, quantity: Infinity }], [], u.ts);
+              } else {
+                orderbookState.setBook(u.tokenId, [], [{ price: u.bestAsk, quantity: Infinity }], u.ts);
+              }
+            }
           }
         }
         maybeSendResults();
@@ -275,19 +303,19 @@ export async function GET(req: NextRequest) {
 
 // ── Seeding helpers ──
 
-async function seedAllBooks(tickers: string[], tokenIds: string[]): Promise<void> {
+async function seedAllBooks(tickers: string[], tokenIds: string[], tokenSides: Map<string, 'yes' | 'no'>): Promise<void> {
   await Promise.all([
     ...tickers.map(seedKalshiBook),
-    ...tokenIds.map(seedPmBook),
+    ...tokenIds.map((tid) => seedPmBook(tid, tokenSides.get(tid) ?? 'yes')),
   ]);
 }
 
-async function seedPmBook(tokenId: string) {
+async function seedPmBook(tokenId: string, side: 'yes' | 'no') {
   try {
     const res = await fetch(`https://clob.polymarket.com/book?token_id=${tokenId}`, { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
-    applyPolymarketBook(tokenId, (data.asks || []).map((a: any) => ({ price: String(a.price), size: String(a.size) })));
+    applyPolymarketBook(tokenId, (data.asks || []).map((a: any) => ({ price: String(a.price), size: String(a.size) })), side);
   } catch (err) {
     logger.warn('[live-scan] failed to seed PM book', { tokenId, err });
   }
