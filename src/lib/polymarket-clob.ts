@@ -144,7 +144,7 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
 /**
  * Fetch orderbook for a specific token (used for neg-risk markets).
  */
-async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
+export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
   await clobSemaphore.acquire();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);

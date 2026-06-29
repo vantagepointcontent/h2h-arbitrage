@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory } from '@/lib/persistence';
+import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
+import { classifyMarket } from '@/lib/market-classification';
 
 /**
  * GET /api/dashboard/stats
@@ -137,6 +138,81 @@ export async function GET(request: NextRequest) {
         scanned_at: r.scanned_at,
       }));
 
+    // ── Market Coverage (pie chart data) ───────────────────────
+    const savedMarkets = await getSavedMarkets();
+    const marketCategoryCounts: Record<string, number> = {
+      Politics: 0,
+      Sports: 0,
+      Crypto: 0,
+      Economics: 0,
+      Entertainment: 0,
+      Other: 0,
+    };
+    for (const m of savedMarkets) {
+      const title = m.eventTitle || '';
+      const cls = classifyMarket(title);
+      const map: Record<string, keyof typeof marketCategoryCounts> = {
+        politics: 'Politics',
+        sports: 'Sports',
+        crypto: 'Crypto',
+        finance: 'Economics',
+        entertainment: 'Entertainment',
+      };
+      const mapped = map[cls.domain] || 'Other';
+      marketCategoryCounts[mapped]++;
+    }
+    const marketCoverage = Object.entries(marketCategoryCounts).map(([name, value]) => ({
+      name,
+      value,
+    }));
+
+    // ── Profit Timeline (area chart data) ──────────────────────
+    const profitHourlyMap = new Map<string, number>();
+    rows.forEach((r: any) => {
+      const ts = r.scanned_at ?? '';
+      const bucket = ts.slice(0, 13) + ':00:00';
+      profitHourlyMap.set(bucket, (profitHourlyMap.get(bucket) ?? 0) + (r.best_profit ?? 0));
+    });
+    const profitTimeline = [...profitHourlyMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, profit]) => ({
+        time,
+        profit: +profit.toFixed(2),
+      }));
+
+    // ── Lifecycle Funnel ────────────────────────────────────────
+    // Count how many times each market appears in scan history
+    const marketScanCounts = new Map<string, number>();
+    rows.forEach((r: any) => {
+      marketScanCounts.set(r.market_id, (marketScanCounts.get(r.market_id) ?? 0) + 1);
+    });
+    const recurringArbs = [...marketScanCounts.values()].filter(c => c > 1).length;
+
+    // Vanished: markets that had arbs historically but not in recent scans
+    const recentWindow = new Date(Date.now() - 24 * 3600000).toISOString();
+    const recentMarkets = new Set(
+      rows.filter((r: any) => (r.scanned_at ?? '') >= recentWindow).map((r: any) => r.market_id)
+    );
+    const allMarketsWithArbs = new Set(
+      rows.filter((r: any) => (r.positive_arb_count ?? 0) > 0).map((r: any) => r.market_id)
+    );
+    const vanishedArbs = [...allMarketsWithArbs].filter(
+      (mid) => !recentMarkets.has(mid)
+    ).length;
+
+    // Expired: saved markets past their expiry date
+    const expiredArbs = savedMarkets.filter(
+      (m) => m.expiryDate && new Date(m.expiryDate) < now
+    ).length;
+
+    const lifecycleFunnel = {
+      found: totalArbsFound,
+      active: activeArbs,
+      recurring: recurringArbs,
+      vanished: vanishedArbs,
+      expired: expiredArbs,
+    };
+
     return NextResponse.json({
       kpis: {
         totalArbsFound,
@@ -150,6 +226,9 @@ export async function GET(request: NextRequest) {
       roiDistribution: roiBuckets,
       timeline: timelineData,
       topActiveArbs,
+      marketCoverage,
+      profitTimeline,
+      lifecycleFunnel,
       range,
     }, {
       headers: {

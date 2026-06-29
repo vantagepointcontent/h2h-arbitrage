@@ -51,6 +51,8 @@ export interface PlatformAdapter {
   fetchMarkets(query?: string): Promise<NormalizedMarket[]>;
   fetchOrderbook(marketId: string): Promise<NormalizedOrderbook | null>;
   fetchPrice(marketId: string): Promise<{ yesPrice: number; noPrice: number } | null>;
+  normalizeMarket(raw: any): NormalizedMarket;
+  normalizeOrderbook(raw: any): NormalizedOrderbook;
 }
 
 // ─── Multi-Leg Arb Detection ─────────────────────────────────────
