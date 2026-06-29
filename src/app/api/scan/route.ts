@@ -195,9 +195,11 @@ export async function POST(request: NextRequest) {
     const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
     let clobMap: Map<string, any>;
     try {
+      // Allow more time for large multi-outcome events (CLOB has 10-concurrent semaphore)
+      const clobTimeout = Math.max(API_TIMEOUT_MS, conditionIds.length * 2000);
       clobMap = await withTimeout(
-        fetchClobMarkets(conditionIds.slice(0, 6)),
-        API_TIMEOUT_MS,
+        fetchClobMarkets(conditionIds),
+        clobTimeout,
         'CLOB metadata',
       );
     } catch (e: any) {

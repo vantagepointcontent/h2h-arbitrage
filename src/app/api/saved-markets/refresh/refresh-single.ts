@@ -135,12 +135,13 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
 
   const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
   const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
-  // Limit concurrent CLOB metadata calls per market to avoid CLOB overload / timeout storms
+  // Fetch CLOB for ALL condition IDs — fetchClobMarkets has its own concurrency limiter (10 concurrent)
   let clobMap: Map<string, any>;
   try {
+    const clobTimeout = Math.max(CLOB_TIMEOUT_MS, conditionIds.length * 2000);
     clobMap = await withTimeout(
-      fetchClobMarkets(conditionIds.slice(0, 6)),
-      CLOB_TIMEOUT_MS,
+      fetchClobMarkets(conditionIds),
+      clobTimeout,
       'CLOB metadata',
     );
   } catch (e: any) {
