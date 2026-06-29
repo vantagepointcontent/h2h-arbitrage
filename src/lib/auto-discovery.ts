@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fs, writeFileSync as _writeFileSync, readFileSync as _readFileSync, existsSync as _existsSync, mkdirSync as _mkdirSync } from 'fs';
 import path from 'path';
 import { getPredictionHuntMarkets, PredictionHuntMarket } from './predictionhunt';
 import { getSavedMarkets, addSavedMarket, upsertSavedMarket } from './persistence';
@@ -43,7 +43,7 @@ async function ensureDir() {
 
 function loadState(): AutoDiscoveryState {
   try {
-    const raw = fs.readFileSync(STATE_FILE, 'utf-8');
+    const raw = _readFileSync(STATE_FILE, 'utf-8');
     return JSON.parse(raw);
   } catch {
     return {
@@ -56,7 +56,7 @@ function loadState(): AutoDiscoveryState {
 }
 
 function saveState(state: AutoDiscoveryState): void {
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  _writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
 /** Pick a random category that hasn't been scanned recently.

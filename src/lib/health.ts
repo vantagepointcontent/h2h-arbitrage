@@ -42,8 +42,9 @@ async function probeWithTimeout(url: string, timeoutMs: number): Promise<{ ok: b
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    // Use GET instead of HEAD — many APIs (Kalshi) return 404 for HEAD
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
       headers: { 'Accept': 'application/json' },

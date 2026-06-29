@@ -5,8 +5,13 @@
       "category": "science",
       "lastScannedAt": "2026-06-08T17:44:05.326Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "weather",
+      "lastScannedAt": "2026-06-29T21:23:08.042Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-06-08T17:44:05.326Z",
+  "lastScanAt": "2026-06-29T21:23:08.042Z",
   "totalMarketsAdded": 0
 }
