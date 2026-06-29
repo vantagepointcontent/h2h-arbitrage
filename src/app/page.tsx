@@ -1047,6 +1047,13 @@ export default function Home() {
     window.history.replaceState({ view: "overview" }, "", "/?view=overview");
   };
 
+  const goToLogs = () => {
+    stopPolling();
+    setCouplingPanelOpen(false);
+    setViewMode("logs");
+    window.history.replaceState({ view: "logs" }, "", "/?view=logs");
+  };
+
   const goToScan = () => {
     stopPolling();
     setActiveMarketId(null);
@@ -1540,6 +1547,7 @@ export default function Home() {
           onGoOverview={goToOverview}
           onGoScan={goToScan}
           onGoMarketFinder={goToMarketFinder}
+          onGoLogs={goToLogs}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
@@ -2259,6 +2267,7 @@ function MarketSidebar({
   onGoOverview,
   onGoScan,
   onGoMarketFinder,
+  onGoLogs,
   favoriteIds,
   onToggleFavorite,
   sidebarFavoritesOnly,
@@ -2289,6 +2298,7 @@ function MarketSidebar({
   onGoOverview: () => void;
   onGoScan: () => void;
   onGoMarketFinder: () => void;
+  onGoLogs: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   sidebarFavoritesOnly: boolean;
@@ -2366,7 +2376,7 @@ function MarketSidebar({
             <Activity className="w-4 h-4" />
             Live WS
           </button>
-          <button onClick={() => { setViewMode("logs"); window.history.replaceState({ view: "logs" }, "", "/?view=logs"); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
+          <button onClick={onGoLogs} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <FileText className="w-4 h-4" />
             Logs
           </button>
@@ -2419,7 +2429,7 @@ function MarketSidebar({
               className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
                 sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
               }`}
-              title="Sort by last scan time (stalest first)"
+              title="Sort by last scan time (click to toggle asc/desc)"
             >
               Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
             </button>

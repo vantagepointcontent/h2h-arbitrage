@@ -1582,45 +1582,45 @@
     "id": "1779921562727-iiuccgm",
     "createdAt": "2026-05-27T22:39:22.728Z",
     "lastScanResult": {
-      "bestRoiPct": 0.5999999999999968,
-      "bestProfit": 18.449691991786345,
+      "bestRoiPct": 0.29999999999999705,
+      "bestProfit": 9.224845995893133,
       "strategy": "Buy YES both sides: Kalshi Rick Crawford + Republican Party + PM Terri Yarbrough Green + Democratic Party",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-28T22:48:35.455Z",
+      "scannedAt": "2026-06-29T18:12:04.109Z",
       "allArbs": [
         {
           "artist": "Rick Crawford + Republican Party",
-          "roiPct": 0.5999999999999968,
-          "expectedProfit": 18.449691991786345,
+          "roiPct": 0.29999999999999705,
+          "expectedProfit": 9.224845995893133,
           "strategy": "Buy YES both sides: Kalshi Rick Crawford + Republican Party + PM Terri Yarbrough Green + Democratic Party",
-          "totalStake": 3056.4989733059547,
+          "totalStake": 3065.723819301848,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 18.449691991786345,
-            "netProfitIfPmWins": 18.449691991786345,
-            "worstCaseNetProfit": 18.449691991786345
+            "netProfitIfKalshiWins": 9.224845995893133,
+            "netProfitIfPmWins": 9.224845995893133,
+            "worstCaseNetProfit": 9.224845995893133
           }
         },
         {
           "artist": "Terri Yarbrough Green + Democratic Party",
-          "roiPct": 0.4222449999999956,
-          "expectedProfit": 5.202197125256619,
+          "roiPct": 0.12224499999999591,
+          "expectedProfit": 1.5060985626282863,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 1224.640657084189,
+          "totalStake": 1228.3367556468172,
           "fees": {
             "kalshiFee": 2.19,
-            "pmFee": 1.20739,
+            "pmFee": 1.38425,
             "kalshiFeeDetails": "Kalshi NO sell 1232 @ $0.97 = $2.19",
-            "pmFeeDetails": "Polymarket YES buy 1232 @ $0.02 (θ=0.05) = $1.21",
-            "netProfitIfKalshiWins": 5.202197125256619,
-            "netProfitIfPmWins": 6.184807125256619,
-            "worstCaseNetProfit": 5.202197125256619
+            "pmFeeDetails": "Polymarket YES buy 1232 @ $0.02 (θ=0.05) = $1.38",
+            "netProfitIfKalshiWins": 1.5060985626282863,
+            "netProfitIfPmWins": 2.3118485626282865,
+            "worstCaseNetProfit": 1.5060985626282863
           }
         }
       ]
@@ -3613,11 +3613,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 0,
+      "outcomeCount": 21,
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 20,
-      "scannedAt": "2026-06-28T14:09:49.457Z",
+      "scannedAt": "2026-06-29T18:02:23.813Z",
       "allArbs": []
     }
   },
@@ -7770,11 +7770,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
+      "outcomeCount": 3,
+      "matchedCount": 1,
       "kalshiCount": 3,
       "pmCount": 1,
-      "scannedAt": "2026-06-28T22:45:00.931Z",
+      "scannedAt": "2026-06-29T18:00:00.148Z",
       "allArbs": []
     }
   },
