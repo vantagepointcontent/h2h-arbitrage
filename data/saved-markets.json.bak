@@ -14,7 +14,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 8,
-      "scannedAt": "2026-06-29T21:11:26.345Z",
+      "scannedAt": "2026-06-29T21:42:19.801Z",
       "allArbs": []
     },
     "category": "Finances"
@@ -27,23 +27,23 @@
     "id": "1779565300940-jqb54rc",
     "createdAt": "2026-05-23T19:41:40.940Z",
     "lastScanResult": {
-      "bestRoiPct": 1.000000000000006,
-      "bestProfit": 60.75779661016986,
+      "bestRoiPct": 0.9999999999999983,
+      "bestProfit": 58.263720930232466,
       "strategy": "Buy YES both sides: Kalshi Graham Platner + Democrat + PM Susan Collins + Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-29T21:11:26.827Z",
+      "scannedAt": "2026-06-29T21:42:19.954Z",
       "allArbs": [
         {
           "artist": "Graham Platner + Democrat",
-          "roiPct": 1.000000000000006,
-          "expectedProfit": 60.75779661016986,
+          "roiPct": 0.9999999999999983,
+          "expectedProfit": 58.263720930232466,
           "strategy": "Buy YES both sides: Kalshi Graham Platner + Democrat + PM Susan Collins + Republican",
-          "kalshiStake": 3584.71,
-          "pmStake": 2430.31186440678,
-          "totalStake": 6015.02186440678
+          "kalshiStake": 3437.5595348837214,
+          "pmStake": 2330.5488372093027,
+          "totalStake": 5768.108372093024
         }
       ]
     },
@@ -64,7 +64,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-29T21:11:26.656Z",
+      "scannedAt": "2026-06-29T21:42:19.938Z",
       "allArbs": [
         {
           "artist": "Democratic party + Democrat",
@@ -87,23 +87,23 @@
     "id": "1779565498134-v5tij6n",
     "createdAt": "2026-05-23T19:44:58.134Z",
     "lastScanResult": {
-      "bestRoiPct": 0.030503336220597595,
-      "bestProfit": 1.294808080807985,
+      "bestRoiPct": 0.030645027867108723,
+      "bestProfit": 1.1974343434344314,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 11,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 11,
-      "scannedAt": "2026-06-29T21:11:32.673Z",
+      "scannedAt": "2026-06-29T21:42:30.495Z",
       "allArbs": [
         {
           "artist": "Red Bull Racing",
-          "roiPct": 0.030503336220597595,
-          "expectedProfit": 1.294808080807985,
+          "roiPct": 0.030645027867108723,
+          "expectedProfit": 1.1974343434344314,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 4202.36,
-          "pmStake": 38.20327272727272,
-          "totalStake": 4240.563272727272
+          "kalshiStake": 3868.36,
+          "pmStake": 35.16690909090909,
+          "totalStake": 3903.526909090909
         }
       ]
     },
@@ -145,7 +145,7 @@
       "matchedCount": 31,
       "kalshiCount": 32,
       "pmCount": 32,
-      "scannedAt": "2026-06-29T21:24:20.921Z",
+      "scannedAt": "2026-06-29T21:36:00.554Z",
       "allArbs": [
         {
           "artist": "Carolina Hurricanes",
@@ -391,7 +391,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-29T21:11:34.396Z",
+      "scannedAt": "2026-06-29T21:42:23.724Z",
       "allArbs": [
         {
           "artist": "Republican party",
@@ -421,7 +421,7 @@
       "matchedCount": 8,
       "kalshiCount": 9,
       "pmCount": 12,
-      "scannedAt": "2026-06-29T21:11:39.377Z",
+      "scannedAt": "2026-06-29T21:42:30.781Z",
       "allArbs": []
     }
   },
@@ -471,7 +471,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-06-29T21:11:46.324Z",
+      "scannedAt": "2026-06-29T21:42:36.778Z",
       "allArbs": []
     }
   },
@@ -491,7 +491,7 @@
       "matchedCount": 0,
       "kalshiCount": 15,
       "pmCount": 7,
-      "scannedAt": "2026-06-29T21:11:47.371Z",
+      "scannedAt": "2026-06-29T21:42:37.879Z",
       "allArbs": []
     }
   },
@@ -568,7 +568,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:24:02.645Z",
+      "scannedAt": "2026-06-29T21:40:54.864Z",
       "allArbs": []
     }
   },
@@ -723,7 +723,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:24:02.603Z",
+      "scannedAt": "2026-06-29T21:40:54.823Z",
       "allArbs": []
     }
   },
@@ -743,7 +743,7 @@
       "matchedCount": 1,
       "kalshiCount": 3,
       "pmCount": 3,
-      "scannedAt": "2026-06-29T21:24:03.210Z",
+      "scannedAt": "2026-06-29T21:40:55.217Z",
       "allArbs": []
     }
   },
@@ -953,7 +953,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:24:03.838Z",
+      "scannedAt": "2026-06-29T21:40:55.236Z",
       "allArbs": []
     }
   },
@@ -1277,7 +1277,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:24:03.773Z",
+      "scannedAt": "2026-06-29T21:40:55.982Z",
       "allArbs": []
     }
   },
@@ -1506,7 +1506,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:22:01.197Z",
+      "scannedAt": "2026-06-29T21:39:31.900Z",
       "allArbs": []
     }
   },
@@ -1586,7 +1586,7 @@
       "matchedCount": 0,
       "kalshiCount": 7,
       "pmCount": 15,
-      "scannedAt": "2026-06-29T21:24:13.767Z",
+      "scannedAt": "2026-06-29T21:35:56.489Z",
       "allArbs": []
     }
   },
@@ -1703,7 +1703,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:22:01.164Z",
+      "scannedAt": "2026-06-29T21:39:31.943Z",
       "allArbs": []
     }
   },
@@ -1887,7 +1887,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:22:01.463Z",
+      "scannedAt": "2026-06-29T21:39:32.078Z",
       "allArbs": []
     }
   },
@@ -2801,7 +2801,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 12,
-      "scannedAt": "2026-06-29T21:25:05.953Z",
+      "scannedAt": "2026-06-29T21:37:15.624Z",
       "allArbs": []
     }
   },
@@ -2841,7 +2841,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:23:01.630Z",
+      "scannedAt": "2026-06-29T21:39:32.579Z",
       "allArbs": []
     }
   },
@@ -3072,7 +3072,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 23,
-      "scannedAt": "2026-06-29T21:25:16.853Z",
+      "scannedAt": "2026-06-29T21:37:12.161Z",
       "allArbs": [
         {
           "artist": "Roberto Sánchez Palomino",
@@ -3198,7 +3198,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:25:08.227Z",
+      "scannedAt": "2026-06-29T21:37:01.653Z",
       "allArbs": []
     }
   },
@@ -3218,7 +3218,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:25:08.401Z",
+      "scannedAt": "2026-06-29T21:37:02.044Z",
       "allArbs": []
     }
   },
@@ -3290,50 +3290,78 @@
     "id": "1781520373665-ku233qk",
     "createdAt": "2026-06-15T10:46:13.665Z",
     "lastScanResult": {
-      "bestRoiPct": 1.4028851581105926,
-      "bestProfit": 2730.687209062839,
+      "bestRoiPct": 1.402882405288654,
+      "bestProfit": 1015.023995880534,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 29,
+      "outcomeCount": 51,
       "matchedCount": 29,
       "kalshiCount": 30,
       "pmCount": 50,
-      "scannedAt": "2026-06-29T20:42:41.900Z",
+      "scannedAt": "2026-06-29T21:28:40.438Z",
       "allArbs": [
         {
           "artist": "USA",
-          "roiPct": 0.863569611634607,
-          "expectedProfit": 1586.1486424870384,
+          "roiPct": 0.8635726399982373,
+          "expectedProfit": 1152.2831398963756,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 177244.94,
-          "pmStake": 4408.164310880829,
-          "totalStake": 181653.10431088082
+          "totalStake": 131964.35048704664,
+          "fees": {
+            "kalshiFee": 315.47,
+            "pmFee": 156.27568,
+            "kalshiFeeDetails": "Kalshi NO sell 133432 @ $0.96 = $315.47",
+            "pmFeeDetails": "Polymarket YES buy 133432 @ $0.02 (θ=0.05) = $156.28",
+            "netProfitIfKalshiWins": 1152.2831398963756,
+            "netProfitIfPmWins": 1311.4774598963756,
+            "worstCaseNetProfit": 1152.2831398963756
+          }
         },
         {
           "artist": "Mexico",
-          "roiPct": 1.4028851581105926,
-          "expectedProfit": 2730.687209062839,
+          "roiPct": 1.402882405288654,
+          "expectedProfit": 1015.023995880534,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 189003.16,
-          "pmStake": 2530.423357363543,
-          "totalStake": 191533.58335736353
+          "totalStake": 71195.10574665295,
+          "fees": {
+            "kalshiFee": 142.62,
+            "pmFee": 46.41791,
+            "kalshiFeeDetails": "Kalshi NO sell 72353 @ $0.97 = $142.62",
+            "pmFeeDetails": "Polymarket YES buy 72353 @ $0.01 (θ=0.05) = $46.42",
+            "netProfitIfKalshiWins": 1015.023995880534,
+            "netProfitIfPmWins": 1111.2260858805341,
+            "worstCaseNetProfit": 1015.023995880534
+          }
         },
         {
           "artist": "Norway",
-          "roiPct": 0.1524093903268265,
-          "expectedProfit": 2728.779413537988,
+          "roiPct": 0.052409498975686544,
+          "expectedProfit": 970.6120503370839,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 32227.692360920246,
-          "pmStake": 1751037.95161,
-          "totalStake": 1783265.6439709202
+          "totalStake": 1846421.4180620224,
+          "fees": {
+            "kalshiFee": 4585.32,
+            "pmFee": 1994.39441,
+            "kalshiFeeDetails": "Kalshi YES buy 1851977 @ $0.02 + NO sell 1960917 @ $0.02 = $4585.32",
+            "pmFeeDetails": "Polymarket NO buy 1853871 @ $0.98 (θ=0.05) = $1994.39",
+            "netProfitIfKalshiWins": 970.6120503370839,
+            "netProfitIfPmWins": 3561.5376403370838,
+            "worstCaseNetProfit": 970.6120503370839
+          }
         },
         {
           "artist": "Belgium",
-          "roiPct": 0.0476169039608519,
-          "expectedProfit": 3298.6582163936273,
+          "roiPct": 0.04761687340063861,
+          "expectedProfit": 3243.6493592903025,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 76202.43519016211,
-          "pmStake": 6837436.68479,
-          "totalStake": 6913639.119980162
+          "totalStake": 6798350.730286099,
+          "fees": {
+            "kalshiFee": 10380.3,
+            "pmFee": 4706.39331,
+            "kalshiFeeDetails": "Kalshi YES buy 6811975 @ $0.01 + NO sell 7493172 @ $0.01 = $10380.30",
+            "pmFeeDetails": "Polymarket NO buy 6818883 @ $0.99 (θ=0.05) = $4706.39",
+            "netProfitIfKalshiWins": 3243.6493592903025,
+            "netProfitIfPmWins": 8917.556049290302,
+            "worstCaseNetProfit": 3243.6493592903025
+          }
         }
       ]
     }
@@ -3516,7 +3544,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:25:17.088Z",
+      "scannedAt": "2026-06-29T21:37:02.974Z",
       "allArbs": []
     }
   },
@@ -3635,7 +3663,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:25:38.934Z",
+      "scannedAt": "2026-06-29T21:37:03.682Z",
       "allArbs": []
     }
   },
@@ -3655,7 +3683,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 5,
-      "scannedAt": "2026-06-29T21:27:02.384Z",
+      "scannedAt": "2026-06-29T21:38:21.683Z",
       "allArbs": []
     }
   },
@@ -3675,7 +3703,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:02.533Z",
+      "scannedAt": "2026-06-29T21:38:20.224Z",
       "allArbs": []
     }
   },
@@ -3695,7 +3723,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:02.667Z",
+      "scannedAt": "2026-06-29T21:38:19.733Z",
       "allArbs": []
     }
   },
@@ -3715,7 +3743,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:02.820Z",
+      "scannedAt": "2026-06-29T21:38:20.958Z",
       "allArbs": []
     }
   },
@@ -3735,7 +3763,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:03.589Z",
+      "scannedAt": "2026-06-29T21:38:21.555Z",
       "allArbs": []
     }
   },
@@ -3755,7 +3783,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:05.613Z",
+      "scannedAt": "2026-06-29T21:38:21.727Z",
       "allArbs": []
     }
   },
@@ -3775,7 +3803,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:04.636Z",
+      "scannedAt": "2026-06-29T21:38:23.169Z",
       "allArbs": []
     }
   },
@@ -3795,7 +3823,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:05.316Z",
+      "scannedAt": "2026-06-29T21:38:23.713Z",
       "allArbs": []
     }
   },
@@ -3815,7 +3843,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:06.444Z",
+      "scannedAt": "2026-06-29T21:38:23.702Z",
       "allArbs": []
     }
   },
@@ -4003,7 +4031,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-06-29T21:27:12.758Z",
+      "scannedAt": "2026-06-29T21:38:24.512Z",
       "allArbs": []
     }
   },
@@ -7676,7 +7704,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:56:51.140Z",
+      "scannedAt": "2026-06-29T21:28:30.432Z",
       "allArbs": []
     }
   },
@@ -7696,7 +7724,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:56:51.243Z",
+      "scannedAt": "2026-06-29T21:28:30.672Z",
       "allArbs": []
     }
   },
@@ -7716,7 +7744,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:56:52.070Z",
+      "scannedAt": "2026-06-29T21:28:31.669Z",
       "allArbs": []
     }
   },
@@ -7736,7 +7764,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:06.381Z",
+      "scannedAt": "2026-06-29T21:28:31.912Z",
       "allArbs": []
     }
   },
@@ -7756,7 +7784,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:06.487Z",
+      "scannedAt": "2026-06-29T21:28:32.957Z",
       "allArbs": []
     }
   },
@@ -7776,7 +7804,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:07.242Z",
+      "scannedAt": "2026-06-29T21:28:33.211Z",
       "allArbs": []
     }
   },
@@ -7796,7 +7824,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:21.601Z",
+      "scannedAt": "2026-06-29T21:28:34.199Z",
       "allArbs": []
     }
   },
@@ -7816,7 +7844,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:21.705Z",
+      "scannedAt": "2026-06-29T21:28:34.445Z",
       "allArbs": []
     }
   },
@@ -7836,7 +7864,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:22.424Z",
+      "scannedAt": "2026-06-29T21:28:35.448Z",
       "allArbs": []
     }
   },
@@ -7856,7 +7884,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:36.857Z",
+      "scannedAt": "2026-06-29T21:28:35.694Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -7886,7 +7914,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:36.901Z",
+      "scannedAt": "2026-06-29T21:28:36.555Z",
       "allArbs": []
     }
   },
@@ -7916,7 +7944,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:37.786Z",
+      "scannedAt": "2026-06-29T21:28:37.061Z",
       "allArbs": []
     }
   },
@@ -7936,7 +7964,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:52.108Z",
+      "scannedAt": "2026-06-29T21:28:37.531Z",
       "allArbs": []
     }
   },
@@ -7956,7 +7984,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:52.144Z",
+      "scannedAt": "2026-06-29T21:28:37.897Z",
       "allArbs": []
     }
   },
@@ -7976,7 +8004,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:57:52.974Z",
+      "scannedAt": "2026-06-29T21:28:38.214Z",
       "allArbs": []
     }
   },
@@ -7996,7 +8024,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:07.363Z",
+      "scannedAt": "2026-06-29T21:28:38.683Z",
       "allArbs": []
     }
   },
@@ -8016,7 +8044,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:07.390Z",
+      "scannedAt": "2026-06-29T21:28:39.046Z",
       "allArbs": []
     }
   },
@@ -8036,7 +8064,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:08.165Z",
+      "scannedAt": "2026-06-29T21:28:39.291Z",
       "allArbs": []
     }
   },
@@ -8056,7 +8084,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:22.575Z",
+      "scannedAt": "2026-06-29T21:29:49.362Z",
       "allArbs": []
     }
   },
@@ -8076,7 +8104,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:22.632Z",
+      "scannedAt": "2026-06-29T21:29:50.719Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8099,23 +8127,23 @@
     "createdAt": "2026-06-28T13:26:22.595735Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 1.662500012787834,
-      "bestProfit": 357.51774200000153,
+      "bestRoiPct": 1.6624999941356022,
+      "bestProfit": 354.36204000000305,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:23.331Z",
+      "scannedAt": "2026-06-29T21:29:52.087Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 1.662500012787834,
-          "expectedProfit": 357.51774200000153,
+          "roiPct": 1.6624999941356022,
+          "expectedProfit": 354.36204000000305,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 666.6496190526316,
-          "pmStake": 20429.5851,
-          "totalStake": 21096.23471905263
+          "kalshiStake": 660.7653100000001,
+          "pmStake": 20249.2595,
+          "totalStake": 20910.02481
         }
       ]
     }
@@ -8136,7 +8164,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:37.774Z",
+      "scannedAt": "2026-06-29T21:29:53.426Z",
       "allArbs": []
     }
   },
@@ -8156,7 +8184,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:37.866Z",
+      "scannedAt": "2026-06-29T21:29:54.649Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8186,7 +8214,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:38.513Z",
+      "scannedAt": "2026-06-29T21:29:54.886Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8216,7 +8244,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:52.970Z",
+      "scannedAt": "2026-06-29T21:29:55.920Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8246,7 +8274,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:53.115Z",
+      "scannedAt": "2026-06-29T21:29:56.156Z",
       "allArbs": []
     }
   },
@@ -8266,7 +8294,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:58:53.704Z",
+      "scannedAt": "2026-06-29T21:29:57.153Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8296,7 +8324,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:08.248Z",
+      "scannedAt": "2026-06-29T21:29:57.368Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8326,7 +8354,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:08.370Z",
+      "scannedAt": "2026-06-29T21:29:58.162Z",
       "allArbs": []
     }
   },
@@ -8346,7 +8374,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:08.880Z",
+      "scannedAt": "2026-06-29T21:29:58.405Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8376,7 +8404,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:23.704Z",
+      "scannedAt": "2026-06-29T21:29:58.916Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8399,23 +8427,23 @@
     "createdAt": "2026-06-28T13:26:22.595800Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 46.55049985359936,
-      "bestProfit": 620.0347028571429,
+      "bestRoiPct": 34.61049994813792,
+      "bestProfit": 467.1494924590165,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:23.668Z",
+      "scannedAt": "2026-06-29T21:29:59.296Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 46.55049985359936,
-          "expectedProfit": 620.0347028571429,
+          "roiPct": 34.61049994813792,
+          "expectedProfit": 467.1494924590165,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 42.62276571428572,
-          "pmStake": 652.6611,
-          "totalStake": 695.2838657142858
+          "kalshiStake": 43.191470163934426,
+          "pmStake": 823.3374,
+          "totalStake": 866.5288701639345
         }
       ]
     }
@@ -8436,7 +8464,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:24.054Z",
+      "scannedAt": "2026-06-29T21:29:59.538Z",
       "allArbs": []
     }
   },
@@ -8456,7 +8484,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:38.882Z",
+      "scannedAt": "2026-06-29T21:30:00.046Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8486,7 +8514,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:39.025Z",
+      "scannedAt": "2026-06-29T21:30:00.467Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8516,7 +8544,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:39.274Z",
+      "scannedAt": "2026-06-29T21:30:00.714Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8546,7 +8574,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:54.089Z",
+      "scannedAt": "2026-06-29T21:31:11.591Z",
       "allArbs": []
     }
   },
@@ -8559,23 +8587,23 @@
     "createdAt": "2026-06-28T13:26:22.595836Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 37.581999856642454,
-      "bestProfit": 1232.1318913793102,
+      "bestRoiPct": 32.63450004986326,
+      "bestProfit": 719.927742063492,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:54.341Z",
+      "scannedAt": "2026-06-29T21:31:12.849Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 37.581999856642454,
-          "expectedProfit": 1232.1318913793102,
+          "roiPct": 32.63450004986326,
+          "expectedProfit": 719.927742063492,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 104.91251310344828,
-          "pmStake": 1901.5393,
-          "totalStake": 2006.451813103448
+          "kalshiStake": 70.59304634920636,
+          "pmStake": 1389.8006000000003,
+          "totalStake": 1460.3936463492066
         }
       ]
     }
@@ -8596,7 +8624,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T20:59:54.445Z",
+      "scannedAt": "2026-06-29T21:31:13.117Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8626,7 +8654,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:09.308Z",
+      "scannedAt": "2026-06-29T21:31:14.182Z",
       "allArbs": []
     }
   },
@@ -8646,7 +8674,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:09.505Z",
+      "scannedAt": "2026-06-29T21:31:14.436Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8676,7 +8704,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:09.684Z",
+      "scannedAt": "2026-06-29T21:31:15.181Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8706,7 +8734,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:24.753Z",
+      "scannedAt": "2026-06-29T21:31:15.594Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8736,7 +8764,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:24.720Z",
+      "scannedAt": "2026-06-29T21:31:15.844Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -8766,7 +8794,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:24.881Z",
+      "scannedAt": "2026-06-29T21:31:16.349Z",
       "allArbs": []
     }
   },
@@ -8786,7 +8814,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:39.924Z",
+      "scannedAt": "2026-06-29T21:31:16.719Z",
       "allArbs": []
     }
   },
@@ -8806,7 +8834,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:40.003Z",
+      "scannedAt": "2026-06-29T21:31:16.971Z",
       "allArbs": []
     }
   },
@@ -8826,7 +8854,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:40.137Z",
+      "scannedAt": "2026-06-29T21:31:17.507Z",
       "allArbs": []
     }
   },
@@ -8846,7 +8874,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:55.140Z",
+      "scannedAt": "2026-06-29T21:31:17.894Z",
       "allArbs": []
     }
   },
@@ -8866,7 +8894,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:55.215Z",
+      "scannedAt": "2026-06-29T21:31:18.143Z",
       "allArbs": []
     }
   },
@@ -8886,7 +8914,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:00:55.330Z",
+      "scannedAt": "2026-06-29T21:31:18.522Z",
       "allArbs": []
     }
   },
@@ -8906,7 +8934,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:10.358Z",
+      "scannedAt": "2026-06-29T21:32:23.976Z",
       "allArbs": []
     }
   },
@@ -8926,7 +8954,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:10.428Z",
+      "scannedAt": "2026-06-29T21:32:24.405Z",
       "allArbs": []
     }
   },
@@ -8946,7 +8974,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:10.519Z",
+      "scannedAt": "2026-06-29T21:32:24.803Z",
       "allArbs": []
     }
   },
@@ -8966,7 +8994,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:25.561Z",
+      "scannedAt": "2026-06-29T21:32:25.313Z",
       "allArbs": []
     }
   },
@@ -8986,7 +9014,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:25.666Z",
+      "scannedAt": "2026-06-29T21:32:25.698Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9016,7 +9044,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:25.723Z",
+      "scannedAt": "2026-06-29T21:32:25.961Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9039,23 +9067,23 @@
     "createdAt": "2026-06-28T13:26:22.595957Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 78.06199991623036,
-      "bestProfit": 4659.32562,
+      "bestRoiPct": 81.16250002094242,
+      "bestProfit": 4844.38672,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:40.964Z",
+      "scannedAt": "2026-06-29T21:32:26.454Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 78.06199991623036,
-          "expectedProfit": 4659.32562,
+          "roiPct": 81.16250002094242,
+          "expectedProfit": 4844.38672,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 191,
-          "pmStake": 1074.375,
-          "totalStake": 1265.375
+          "pmStake": 895.3125,
+          "totalStake": 1086.3125
         }
       ]
     }
@@ -9076,7 +9104,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:40.877Z",
+      "scannedAt": "2026-06-29T21:32:26.843Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9106,7 +9134,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:40.914Z",
+      "scannedAt": "2026-06-29T21:32:27.087Z",
       "allArbs": []
     }
   },
@@ -9126,7 +9154,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:56.102Z",
+      "scannedAt": "2026-06-29T21:32:27.579Z",
       "allArbs": []
     }
   },
@@ -9139,23 +9167,23 @@
     "createdAt": "2026-06-28T13:26:22.595981Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 49.55799996879319,
-      "bestProfit": 1429.2455008695654,
+      "bestRoiPct": 27.71200037639557,
+      "bestProfit": 353.3984258823529,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:56.287Z",
+      "scannedAt": "2026-06-29T21:32:27.950Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 49.55799996879319,
-          "expectedProfit": 1429.2455008695654,
+          "roiPct": 27.71200037639557,
+          "expectedProfit": 353.3984258823529,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 92.28753391304348,
-          "pmStake": 1326.6333,
-          "totalStake": 1418.9208339130435
+          "kalshiStake": 40.808131764705884,
+          "pmStake": 867.1728,
+          "totalStake": 907.9809317647059
         }
       ]
     }
@@ -9176,7 +9204,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:01:56.174Z",
+      "scannedAt": "2026-06-29T21:32:28.188Z",
       "allArbs": []
     }
   },
@@ -9196,7 +9224,7 @@
       "matchedCount": 0,
       "kalshiCount": 3,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:11.335Z",
+      "scannedAt": "2026-06-29T21:32:28.852Z",
       "allArbs": []
     }
   },
@@ -9216,7 +9244,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:11.599Z",
+      "scannedAt": "2026-06-29T21:32:29.099Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9246,7 +9274,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:11.503Z",
+      "scannedAt": "2026-06-29T21:32:29.336Z",
       "allArbs": []
     }
   },
@@ -9266,7 +9294,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:26.773Z",
+      "scannedAt": "2026-06-29T21:33:31.100Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9296,7 +9324,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:26.738Z",
+      "scannedAt": "2026-06-29T21:33:32.126Z",
       "allArbs": []
     }
   },
@@ -9309,25 +9337,15 @@
     "createdAt": "2026-06-28T13:26:22.596023Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 14.061999916230366,
-      "bestProfit": 839.32562,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:26.821Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 14.061999916230366,
-          "expectedProfit": 839.32562,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 4894.375,
-          "totalStake": 5085.375
-        }
-      ]
+      "scannedAt": "2026-06-29T21:33:33.391Z",
+      "allArbs": []
     }
   },
   {
@@ -9346,7 +9364,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:42.084Z",
+      "scannedAt": "2026-06-29T21:33:32.514Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9369,25 +9387,15 @@
     "createdAt": "2026-06-28T13:26:22.596035Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 8.75312502617801,
-      "bestProfit": 522.45215,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:42.172Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 8.75312502617801,
-          "expectedProfit": 522.45215,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 5222.65625,
-          "totalStake": 5413.65625
-        }
-      ]
+      "scannedAt": "2026-06-29T21:33:34.228Z",
+      "allArbs": []
     }
   },
   {
@@ -9406,7 +9414,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:42.012Z",
+      "scannedAt": "2026-06-29T21:33:33.036Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9436,7 +9444,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:57.233Z",
+      "scannedAt": "2026-06-29T21:33:33.870Z",
       "allArbs": []
     }
   },
@@ -9456,7 +9464,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:57.294Z",
+      "scannedAt": "2026-06-29T21:33:34.460Z",
       "allArbs": []
     }
   },
@@ -9476,7 +9484,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:02:57.395Z",
+      "scannedAt": "2026-06-29T21:33:34.961Z",
       "allArbs": []
     }
   },
@@ -9496,7 +9504,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:12.454Z",
+      "scannedAt": "2026-06-29T21:33:35.308Z",
       "allArbs": []
     }
   },
@@ -9516,7 +9524,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:12.680Z",
+      "scannedAt": "2026-06-29T21:33:35.561Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9546,7 +9554,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:12.614Z",
+      "scannedAt": "2026-06-29T21:33:36.003Z",
       "allArbs": []
     }
   },
@@ -9559,23 +9567,23 @@
     "createdAt": "2026-06-28T13:26:22.596087Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 16.970499991447692,
-      "bestProfit": 892.9441232911388,
+      "bestRoiPct": 16.97049993753631,
+      "bestProfit": 896.563412531645,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:27.880Z",
+      "scannedAt": "2026-06-29T21:33:36.355Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 16.970499991447692,
-          "expectedProfit": 892.9441232911388,
+          "roiPct": 16.97049993753631,
+          "expectedProfit": 896.563412531645,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 168.3757812658228,
-          "pmStake": 4156.7771,
-          "totalStake": 4325.152881265823
+          "kalshiStake": 169.0582440506329,
+          "pmStake": 4173.6254,
+          "totalStake": 4342.683644050633
         }
       ]
     }
@@ -9596,7 +9604,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:27.804Z",
+      "scannedAt": "2026-06-29T21:33:36.587Z",
       "allArbs": []
     }
   },
@@ -9616,7 +9624,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:27.987Z",
+      "scannedAt": "2026-06-29T21:33:36.981Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9646,7 +9654,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:43.018Z",
+      "scannedAt": "2026-06-29T21:34:37.663Z",
       "allArbs": []
     }
   },
@@ -9666,7 +9674,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:43.072Z",
+      "scannedAt": "2026-06-29T21:34:38.172Z",
       "allArbs": []
     }
   },
@@ -9686,7 +9694,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:43.209Z",
+      "scannedAt": "2026-06-29T21:34:38.554Z",
       "allArbs": []
     }
   },
@@ -9706,7 +9714,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:58.286Z",
+      "scannedAt": "2026-06-29T21:34:38.804Z",
       "allArbs": []
     }
   },
@@ -9726,7 +9734,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:58.427Z",
+      "scannedAt": "2026-06-29T21:34:39.312Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9756,7 +9764,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:03:58.470Z",
+      "scannedAt": "2026-06-29T21:34:39.694Z",
       "allArbs": []
     }
   },
@@ -9776,7 +9784,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:13.517Z",
+      "scannedAt": "2026-06-29T21:34:39.943Z",
       "allArbs": []
     }
   },
@@ -9796,7 +9804,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:13.652Z",
+      "scannedAt": "2026-06-29T21:34:40.462Z",
       "allArbs": []
     }
   },
@@ -9816,7 +9824,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:13.753Z",
+      "scannedAt": "2026-06-29T21:34:40.829Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -9839,23 +9847,23 @@
     "createdAt": "2026-06-28T13:26:22.596162Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 12.128000076240395,
-      "bestProfit": 127.26063523809535,
+      "bestRoiPct": 12.12800008182524,
+      "bestProfit": 118.57467714285727,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:28.945Z",
+      "scannedAt": "2026-06-29T21:34:41.080Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 12.128000076240395,
-          "expectedProfit": 127.26063523809535,
+          "roiPct": 12.12800008182524,
+          "expectedProfit": 118.57467714285727,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 33.578003809523814,
-          "pmStake": 881.4226,
-          "totalStake": 915.0006038095238
+          "kalshiStake": 31.28619428571429,
+          "pmStake": 821.2626,
+          "totalStake": 852.5487942857143
         }
       ]
     }
@@ -9876,7 +9884,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:28.868Z",
+      "scannedAt": "2026-06-29T21:34:41.592Z",
       "allArbs": []
     }
   },
@@ -9896,7 +9904,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:28.953Z",
+      "scannedAt": "2026-06-29T21:34:41.854Z",
       "allArbs": []
     }
   },
@@ -9916,7 +9924,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:44.074Z",
+      "scannedAt": "2026-06-29T21:35:52.030Z",
       "allArbs": []
     }
   },
@@ -9936,7 +9944,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:44.189Z",
+      "scannedAt": "2026-06-29T21:35:53.378Z",
       "allArbs": []
     }
   },
@@ -9956,7 +9964,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:44.216Z",
+      "scannedAt": "2026-06-29T21:35:54.800Z",
       "allArbs": []
     }
   },
@@ -9976,7 +9984,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:59.293Z",
+      "scannedAt": "2026-06-29T21:35:56.223Z",
       "allArbs": []
     }
   },
@@ -9996,7 +10004,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:59.382Z",
+      "scannedAt": "2026-06-29T21:35:57.502Z",
       "allArbs": []
     }
   },
@@ -10016,7 +10024,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:04:59.443Z",
+      "scannedAt": "2026-06-29T21:35:57.740Z",
       "allArbs": []
     }
   },
@@ -10036,7 +10044,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:14.524Z",
+      "scannedAt": "2026-06-29T21:35:58.780Z",
       "allArbs": []
     }
   },
@@ -10056,7 +10064,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:14.637Z",
+      "scannedAt": "2026-06-29T21:35:59.023Z",
       "allArbs": []
     }
   },
@@ -10076,7 +10084,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:14.652Z",
+      "scannedAt": "2026-06-29T21:36:00.072Z",
       "allArbs": []
     }
   },
@@ -10096,7 +10104,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:29.757Z",
+      "scannedAt": "2026-06-29T21:36:00.306Z",
       "allArbs": []
     }
   },
@@ -10109,23 +10117,23 @@
     "createdAt": "2026-06-28T13:26:22.596245Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 31.64799990209783,
-      "bestProfit": 969.7844687499997,
+      "bestRoiPct": 31.648000000000003,
+      "bestProfit": 884.9992325000001,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:29.931Z",
+      "scannedAt": "2026-06-29T21:36:01.151Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 31.64799990209783,
-          "expectedProfit": 969.7844687499997,
+          "roiPct": 31.648000000000003,
+          "expectedProfit": 884.9992325000001,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 98.057075,
-          "pmStake": 1961.1415,
-          "totalStake": 2059.198575
+          "kalshiStake": 89.48425,
+          "pmStake": 1789.685,
+          "totalStake": 1879.16925
         }
       ]
     }
@@ -10146,7 +10154,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:29.967Z",
+      "scannedAt": "2026-06-29T21:36:01.355Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -10176,7 +10184,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:45.253Z",
+      "scannedAt": "2026-06-29T21:37:12.686Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -10206,7 +10214,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:45.186Z",
+      "scannedAt": "2026-06-29T21:37:13.284Z",
       "allArbs": []
     }
   },
@@ -10226,7 +10234,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:05:45.154Z",
+      "scannedAt": "2026-06-29T21:37:13.953Z",
       "allArbs": []
     }
   },
@@ -10239,23 +10247,23 @@
     "createdAt": "2026-06-28T13:26:22.596276Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 8.272,
-      "bestProfit": 493.735,
+      "bestRoiPct": 9.23450002094241,
+      "bestProfit": 551.18422,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:00.513Z",
+      "scannedAt": "2026-06-29T21:37:14.613Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 8.272,
-          "expectedProfit": 493.735,
+          "roiPct": 9.23450002094241,
+          "expectedProfit": 551.18422,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 191,
-          "pmStake": 5252.5,
-          "totalStake": 5443.5
+          "pmStake": 5192.8125,
+          "totalStake": 5383.8125
         }
       ]
     }
@@ -10276,7 +10284,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:00.472Z",
+      "scannedAt": "2026-06-29T21:37:15.244Z",
       "allArbs": []
     }
   },
@@ -10296,7 +10304,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:00.631Z",
+      "scannedAt": "2026-06-29T21:37:15.880Z",
       "allArbs": []
     }
   },
@@ -10316,7 +10324,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:15.719Z",
+      "scannedAt": "2026-06-29T21:37:16.407Z",
       "allArbs": []
     }
   },
@@ -10329,23 +10337,23 @@
     "createdAt": "2026-06-28T13:26:22.596302Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 22.814500943948886,
-      "bestProfit": 27.79459397260274,
+      "bestRoiPct": 23.791997757378628,
+      "bestProfit": 29.70523444444445,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:15.851Z",
+      "scannedAt": "2026-06-29T21:37:16.858Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 22.814500943948886,
-          "expectedProfit": 27.79459397260274,
+          "roiPct": 23.791997757378628,
+          "expectedProfit": 29.70523444444445,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 3.8985161643835617,
-          "pmStake": 88.9349,
-          "totalStake": 92.83341616438356
+          "kalshiStake": 3.995324444444445,
+          "pmStake": 89.8948,
+          "totalStake": 93.89012444444445
         }
       ]
     }
@@ -10366,7 +10374,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:15.871Z",
+      "scannedAt": "2026-06-29T21:37:17.242Z",
       "allArbs": []
     }
   },
@@ -10386,7 +10394,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:30.932Z",
+      "scannedAt": "2026-06-29T21:37:17.488Z",
       "allArbs": []
     }
   },
@@ -10406,7 +10414,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:31.066Z",
+      "scannedAt": "2026-06-29T21:37:18.012Z",
       "allArbs": []
     }
   },
@@ -10426,7 +10434,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:31.082Z",
+      "scannedAt": "2026-06-29T21:37:18.414Z",
       "allArbs": []
     }
   },
@@ -10446,7 +10454,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:46.207Z",
+      "scannedAt": "2026-06-29T21:37:18.660Z",
       "allArbs": []
     }
   },
@@ -10466,7 +10474,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:46.319Z",
+      "scannedAt": "2026-06-29T21:37:19.192Z",
       "allArbs": []
     }
   },
@@ -10486,7 +10494,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:06:46.345Z",
+      "scannedAt": "2026-06-29T21:37:19.433Z",
       "allArbs": []
     }
   },
@@ -10506,7 +10514,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:01.409Z",
+      "scannedAt": "2026-06-29T21:38:25.036Z",
       "allArbs": []
     }
   },
@@ -10519,25 +10527,15 @@
     "createdAt": "2026-06-28T13:26:22.596378Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 38.57449992085379,
-      "bestProfit": 1486.5172831578952,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:01.701Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 38.57449992085379,
-          "expectedProfit": 1486.5172831578952,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 123.31605894736845,
-          "pmStake": 2196.5673,
-          "totalStake": 2319.883358947369
-        }
-      ]
+      "scannedAt": "2026-06-29T21:38:26.545Z",
+      "allArbs": []
     }
   },
   {
@@ -10556,7 +10554,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:01.550Z",
+      "scannedAt": "2026-06-29T21:38:25.620Z",
       "allArbs": []
     }
   },
@@ -10576,7 +10574,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:16.630Z",
+      "scannedAt": "2026-06-29T21:38:27.093Z",
       "allArbs": []
     }
   },
@@ -10596,7 +10594,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:16.799Z",
+      "scannedAt": "2026-06-29T21:38:26.313Z",
       "allArbs": []
     }
   },
@@ -10616,7 +10614,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:16.901Z",
+      "scannedAt": "2026-06-29T21:38:27.327Z",
       "allArbs": []
     }
   },
@@ -10636,7 +10634,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:32.010Z",
+      "scannedAt": "2026-06-29T21:38:27.802Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -10666,7 +10664,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:31.978Z",
+      "scannedAt": "2026-06-29T21:38:28.152Z",
       "allArbs": []
     }
   },
@@ -10686,7 +10684,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:32.146Z",
+      "scannedAt": "2026-06-29T21:38:28.383Z",
       "allArbs": []
     }
   },
@@ -10706,7 +10704,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:47.214Z",
+      "scannedAt": "2026-06-29T21:38:28.858Z",
       "allArbs": []
     }
   },
@@ -10726,7 +10724,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:47.247Z",
+      "scannedAt": "2026-06-29T21:38:29.211Z",
       "allArbs": []
     }
   },
@@ -10746,7 +10744,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:07:47.382Z",
+      "scannedAt": "2026-06-29T21:38:29.446Z",
       "allArbs": []
     }
   },
@@ -10766,7 +10764,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:02.420Z",
+      "scannedAt": "2026-06-29T21:38:29.922Z",
       "allArbs": []
     }
   },
@@ -10786,7 +10784,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:02.477Z",
+      "scannedAt": "2026-06-29T21:38:30.289Z",
       "allArbs": []
     }
   },
@@ -10806,7 +10804,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:02.603Z",
+      "scannedAt": "2026-06-29T21:38:30.547Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -10836,7 +10834,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:17.631Z",
+      "scannedAt": "2026-06-29T21:38:31.033Z",
       "allArbs": []
     }
   },
@@ -10856,7 +10854,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:17.698Z",
+      "scannedAt": "2026-06-29T21:38:31.392Z",
       "allArbs": []
     }
   },
@@ -10876,7 +10874,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:17.804Z",
+      "scannedAt": "2026-06-29T21:38:31.625Z",
       "allArbs": []
     }
   },
@@ -10889,25 +10887,15 @@
     "createdAt": "2026-06-28T13:26:22.596497Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 8.272,
-      "bestProfit": 493.735,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:33.034Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 8.272,
-          "expectedProfit": 493.735,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 5252.5,
-          "totalStake": 5443.5
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:35.163Z",
+      "allArbs": []
     }
   },
   {
@@ -10926,7 +10914,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:32.911Z",
+      "scannedAt": "2026-06-29T21:39:34.024Z",
       "allArbs": []
     }
   },
@@ -10946,7 +10934,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:32.972Z",
+      "scannedAt": "2026-06-29T21:39:34.391Z",
       "allArbs": []
     }
   },
@@ -10966,7 +10954,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:48.140Z",
+      "scannedAt": "2026-06-29T21:39:34.912Z",
       "allArbs": []
     }
   },
@@ -10986,7 +10974,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:48.209Z",
+      "scannedAt": "2026-06-29T21:39:35.663Z",
       "allArbs": []
     }
   },
@@ -11006,7 +10994,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:08:48.251Z",
+      "scannedAt": "2026-06-29T21:39:36.041Z",
       "allArbs": []
     }
   },
@@ -11026,7 +11014,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:03.380Z",
+      "scannedAt": "2026-06-29T21:39:36.296Z",
       "allArbs": []
     }
   },
@@ -11046,7 +11034,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:03.645Z",
+      "scannedAt": "2026-06-29T21:39:36.788Z",
       "allArbs": []
     }
   },
@@ -11066,7 +11054,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:03.661Z",
+      "scannedAt": "2026-06-29T21:39:37.141Z",
       "allArbs": []
     }
   },
@@ -11086,7 +11074,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:04.165Z",
+      "scannedAt": "2026-06-29T21:39:37.375Z",
       "allArbs": []
     }
   },
@@ -11106,7 +11094,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:04.184Z",
+      "scannedAt": "2026-06-29T21:39:37.854Z",
       "allArbs": []
     }
   },
@@ -11126,7 +11114,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:04.294Z",
+      "scannedAt": "2026-06-29T21:39:38.215Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -11156,7 +11144,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:04.659Z",
+      "scannedAt": "2026-06-29T21:39:38.452Z",
       "allArbs": []
     }
   },
@@ -11176,7 +11164,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:04.628Z",
+      "scannedAt": "2026-06-29T21:39:38.971Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -11206,7 +11194,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.105Z",
+      "scannedAt": "2026-06-29T21:39:39.331Z",
       "allArbs": []
     }
   },
@@ -11226,7 +11214,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.442Z",
+      "scannedAt": "2026-06-29T21:39:39.582Z",
       "allArbs": []
     }
   },
@@ -11246,7 +11234,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.424Z",
+      "scannedAt": "2026-06-29T21:39:40.069Z",
       "allArbs": []
     }
   },
@@ -11266,7 +11254,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.566Z",
+      "scannedAt": "2026-06-29T21:39:40.432Z",
       "allArbs": []
     }
   },
@@ -11286,7 +11274,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.977Z",
+      "scannedAt": "2026-06-29T21:39:40.677Z",
       "allArbs": []
     }
   },
@@ -11299,23 +11287,23 @@
     "createdAt": "2026-06-28T13:26:22.596619Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 19.887999999999998,
-      "bestProfit": 1023.7439589473684,
+      "bestRoiPct": 19.887999919212632,
+      "bestProfit": 1181.6499900000003,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:05.991Z",
+      "scannedAt": "2026-06-29T21:39:41.213Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 19.887999999999998,
-          "expectedProfit": 1023.7439589473684,
+          "roiPct": 19.887999919212632,
+          "expectedProfit": 1181.6499900000003,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 164.72147368421054,
-          "pmStake": 3912.135,
-          "totalStake": 4076.856473684211
+          "kalshiStake": 190.12872000000002,
+          "pmStake": 4515.5571,
+          "totalStake": 4705.68582
         }
       ]
     }
@@ -11329,23 +11317,23 @@
     "createdAt": "2026-06-28T13:26:22.596625Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 37.5820000153119,
-      "bestProfit": 2208.987604482759,
+      "bestRoiPct": 37.58200004993947,
+      "bestProfit": 2107.142913448276,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:06.144Z",
+      "scannedAt": "2026-06-29T21:39:41.588Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 37.5820000153119,
-          "expectedProfit": 2208.987604482759,
+          "roiPct": 37.58200004993947,
+          "expectedProfit": 2107.142913448276,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 188.0889875862069,
-          "pmStake": 3409.1129,
-          "totalStake": 3597.201887586207
+          "kalshiStake": 179.4172027586207,
+          "pmStake": 3251.9368,
+          "totalStake": 3431.3540027586205
         }
       ]
     }
@@ -11366,7 +11354,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:06.432Z",
+      "scannedAt": "2026-06-29T21:39:41.824Z",
       "allArbs": []
     }
   },
@@ -11379,23 +11367,23 @@
     "createdAt": "2026-06-28T13:26:22.596637Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 24.770499936439133,
-      "bestProfit": 1032.7394633802821,
+      "bestRoiPct": 24.77050004184805,
+      "bestProfit": 1391.001140845071,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:07.312Z",
+      "scannedAt": "2026-06-29T21:39:42.352Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 24.770499936439133,
-          "expectedProfit": 1032.7394633802821,
+          "roiPct": 24.77050004184805,
+          "expectedProfit": 1391.001140845071,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 133.41540507042254,
-          "pmStake": 2960.1542999999997,
-          "totalStake": 3093.569705070422
+          "kalshiStake": 179.69777126760565,
+          "pmStake": 3987.0443000000005,
+          "totalStake": 4166.742071267606
         }
       ]
     }
@@ -11416,7 +11404,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:06.712Z",
+      "scannedAt": "2026-06-29T21:39:42.771Z",
       "allArbs": []
     }
   },
@@ -11436,7 +11424,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:06.890Z",
+      "scannedAt": "2026-06-29T21:39:43.027Z",
       "allArbs": []
     }
   },
@@ -11456,7 +11444,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:07.143Z",
+      "scannedAt": "2026-06-29T21:39:43.515Z",
       "allArbs": []
     }
   },
@@ -11476,7 +11464,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:07.545Z",
+      "scannedAt": "2026-06-29T21:39:43.876Z",
       "allArbs": []
     }
   },
@@ -11489,15 +11477,25 @@
     "createdAt": "2026-06-28T13:26:22.596674Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
-      "kalshiCount": 0,
+      "bestRoiPct": 8.272,
+      "bestProfit": 493.735,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 1,
+      "matchedCount": 1,
+      "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:09.551Z",
-      "allArbs": []
+      "scannedAt": "2026-06-29T21:39:44.219Z",
+      "allArbs": [
+        {
+          "artist": "Democratic party",
+          "roiPct": 8.272,
+          "expectedProfit": 493.735,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 191,
+          "pmStake": 5252.5,
+          "totalStake": 5443.5
+        }
+      ]
     }
   },
   {
@@ -11509,25 +11507,15 @@
     "createdAt": "2026-06-28T13:26:22.596682Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0.5830366492146596,
-      "bestProfit": 34.8,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 1,
       "matchedCount": 1,
-      "kalshiCount": 56,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:08.590Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 0.5830366492146596,
-          "expectedProfit": 34.8,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 5730,
-          "totalStake": 5921
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:44.714Z",
+      "allArbs": []
     }
   },
   {
@@ -11546,7 +11534,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:08.035Z",
+      "scannedAt": "2026-06-29T21:39:45.081Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -11576,7 +11564,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:08.490Z",
+      "scannedAt": "2026-06-29T21:39:45.322Z",
       "allArbs": []
     }
   },
@@ -11596,7 +11584,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:08.949Z",
+      "scannedAt": "2026-06-29T21:39:45.806Z",
       "allArbs": []
     }
   },
@@ -11616,7 +11604,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:09.031Z",
+      "scannedAt": "2026-06-29T21:39:46.167Z",
       "allArbs": []
     }
   },
@@ -11636,7 +11624,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:09.376Z",
+      "scannedAt": "2026-06-29T21:39:46.421Z",
       "allArbs": []
     }
   },
@@ -11649,25 +11637,15 @@
     "createdAt": "2026-06-28T13:26:22.596720Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 85.31050002094241,
-      "bestProfit": 5091.97047,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:10.410Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 85.31050002094241,
-          "expectedProfit": 5091.97047,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 656.5625,
-          "totalStake": 847.5625
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:46.892Z",
+      "allArbs": []
     }
   },
   {
@@ -11686,7 +11664,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:09.833Z",
+      "scannedAt": "2026-06-29T21:39:47.314Z",
       "allArbs": []
     }
   },
@@ -11706,7 +11684,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:10.785Z",
+      "scannedAt": "2026-06-29T21:39:47.546Z",
       "allArbs": []
     }
   },
@@ -11726,7 +11704,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:10.243Z",
+      "scannedAt": "2026-06-29T21:39:48.072Z",
       "allArbs": []
     }
   },
@@ -11746,7 +11724,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:10.705Z",
+      "scannedAt": "2026-06-29T21:39:48.448Z",
       "allArbs": []
     }
   },
@@ -11766,7 +11744,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:11.540Z",
+      "scannedAt": "2026-06-29T21:39:48.690Z",
       "allArbs": []
     }
   },
@@ -11786,7 +11764,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:11.150Z",
+      "scannedAt": "2026-06-29T21:39:49.187Z",
       "allArbs": []
     }
   },
@@ -11806,7 +11784,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:11.298Z",
+      "scannedAt": "2026-06-29T21:39:49.578Z",
       "allArbs": []
     }
   },
@@ -11826,7 +11804,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:12.423Z",
+      "scannedAt": "2026-06-29T21:39:49.830Z",
       "allArbs": []
     }
   },
@@ -11839,25 +11817,15 @@
     "createdAt": "2026-06-28T13:26:22.596780Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 81.16250002094242,
-      "bestProfit": 4844.38672,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 1,
       "matchedCount": 1,
-      "kalshiCount": 56,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:12.608Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 81.16250002094242,
-          "expectedProfit": 4844.38672,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 895.3125,
-          "totalStake": 1086.3125
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:50.355Z",
+      "allArbs": []
     }
   },
   {
@@ -11876,7 +11844,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:12.019Z",
+      "scannedAt": "2026-06-29T21:39:50.717Z",
       "allArbs": []
     }
   },
@@ -11896,7 +11864,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:12.560Z",
+      "scannedAt": "2026-06-29T21:39:50.950Z",
       "allArbs": []
     }
   },
@@ -11909,25 +11877,15 @@
     "createdAt": "2026-06-28T13:26:22.596801Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 89.4745000209424,
-      "bestProfit": 5340.50922,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:14.092Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 89.4745000209424,
-          "expectedProfit": 5340.50922,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 417.81250000000006,
-          "totalStake": 608.8125
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:51.436Z",
+      "allArbs": []
     }
   },
   {
@@ -11946,7 +11904,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:12.983Z",
+      "scannedAt": "2026-06-29T21:39:51.821Z",
       "allArbs": []
     }
   },
@@ -11966,7 +11924,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:13.080Z",
+      "scannedAt": "2026-06-29T21:39:52.059Z",
       "allArbs": []
     }
   },
@@ -11986,7 +11944,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:13.417Z",
+      "scannedAt": "2026-06-29T21:39:52.793Z",
       "allArbs": []
     }
   },
@@ -12006,7 +11964,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:13.554Z",
+      "scannedAt": "2026-06-29T21:39:53.042Z",
       "allArbs": []
     }
   },
@@ -12019,25 +11977,15 @@
     "createdAt": "2026-06-28T13:26:22.596831Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 86.55802002094241,
-      "bestProfit": 5166.43182,
-      "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 1,
-      "matchedCount": 1,
-      "kalshiCount": 56,
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 0,
+      "matchedCount": 0,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:14.785Z",
-      "allArbs": [
-        {
-          "artist": "Democratic party",
-          "roiPct": 86.55802002094241,
-          "expectedProfit": 5166.43182,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 584.9375,
-          "totalStake": 775.9375
-        }
-      ]
+      "scannedAt": "2026-06-29T21:39:53.290Z",
+      "allArbs": []
     }
   },
   {
@@ -12056,7 +12004,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:13.996Z",
+      "scannedAt": "2026-06-29T21:39:53.842Z",
       "allArbs": []
     }
   },
@@ -12096,7 +12044,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:15.501Z",
+      "scannedAt": "2026-06-29T21:39:54.263Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12126,7 +12074,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:15.210Z",
+      "scannedAt": "2026-06-29T21:39:54.505Z",
       "allArbs": []
     }
   },
@@ -12179,15 +12127,25 @@
     "createdAt": "2026-06-28T13:26:22.596877Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
-      "kalshiCount": 2,
+      "bestRoiPct": 88.432,
+      "bestProfit": 5278.285,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 1,
+      "matchedCount": 1,
+      "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:44.556Z",
-      "allArbs": []
+      "scannedAt": "2026-06-29T21:40:57.417Z",
+      "allArbs": [
+        {
+          "artist": "Democratic party",
+          "roiPct": 88.432,
+          "expectedProfit": 5278.285,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 191,
+          "pmStake": 477.5,
+          "totalStake": 668.5
+        }
+      ]
     }
   },
   {
@@ -12206,7 +12164,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:45.013Z",
+      "scannedAt": "2026-06-29T21:40:57.805Z",
       "allArbs": []
     }
   },
@@ -12226,7 +12184,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:45.592Z",
+      "scannedAt": "2026-06-29T21:40:58.335Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12256,7 +12214,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:45.718Z",
+      "scannedAt": "2026-06-29T21:40:58.690Z",
       "allArbs": []
     }
   },
@@ -12276,7 +12234,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:45.952Z",
+      "scannedAt": "2026-06-29T21:40:58.934Z",
       "allArbs": []
     }
   },
@@ -12296,7 +12254,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.090Z",
+      "scannedAt": "2026-06-29T21:40:59.425Z",
       "allArbs": []
     }
   },
@@ -12316,7 +12274,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.146Z",
+      "scannedAt": "2026-06-29T21:40:59.784Z",
       "allArbs": []
     }
   },
@@ -12336,7 +12294,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.407Z",
+      "scannedAt": "2026-06-29T21:41:00.034Z",
       "allArbs": []
     }
   },
@@ -12376,7 +12334,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.598Z",
+      "scannedAt": "2026-06-29T21:41:00.556Z",
       "allArbs": []
     }
   },
@@ -12396,7 +12354,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.851Z",
+      "scannedAt": "2026-06-29T21:41:00.933Z",
       "allArbs": []
     }
   },
@@ -12416,7 +12374,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:46.975Z",
+      "scannedAt": "2026-06-29T21:41:01.175Z",
       "allArbs": []
     }
   },
@@ -12436,7 +12394,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.026Z",
+      "scannedAt": "2026-06-29T21:41:01.677Z",
       "allArbs": []
     }
   },
@@ -12456,7 +12414,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.280Z",
+      "scannedAt": "2026-06-29T21:41:02.040Z",
       "allArbs": []
     }
   },
@@ -12469,23 +12427,23 @@
     "createdAt": "2026-06-28T13:26:22.596968Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 18.914500447500927,
-      "bestProfit": 173.2945057142857,
+      "bestRoiPct": 18.914500529455108,
+      "bestProfit": 146.47030571428567,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.410Z",
+      "scannedAt": "2026-06-29T21:41:02.294Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 18.914500447500927,
-          "expectedProfit": 173.2945057142857,
+          "roiPct": 18.914500529455108,
+          "expectedProfit": 146.47030571428567,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 29.31837506493506,
-          "pmStake": 705.4734,
-          "totalStake": 734.791775064935
+          "kalshiStake": 24.780193246753246,
+          "pmStake": 596.2734,
+          "totalStake": 621.0535932467533
         }
       ]
     }
@@ -12506,7 +12464,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.534Z",
+      "scannedAt": "2026-06-29T21:41:02.792Z",
       "allArbs": []
     }
   },
@@ -12526,7 +12484,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.698Z",
+      "scannedAt": "2026-06-29T21:41:03.180Z",
       "allArbs": []
     }
   },
@@ -12546,7 +12504,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:47.885Z",
+      "scannedAt": "2026-06-29T21:41:03.426Z",
       "allArbs": []
     }
   },
@@ -12566,7 +12524,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:49.271Z",
+      "scannedAt": "2026-06-29T21:41:03.930Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12596,7 +12554,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:48.178Z",
+      "scannedAt": "2026-06-29T21:41:04.297Z",
       "allArbs": []
     }
   },
@@ -12609,15 +12567,25 @@
     "createdAt": "2026-06-28T13:26:22.597007Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
-      "kalshiCount": 0,
+      "bestRoiPct": 25.749999916230365,
+      "bestProfit": 1536.95312,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 1,
+      "matchedCount": 1,
+      "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:49.454Z",
-      "allArbs": []
+      "scannedAt": "2026-06-29T21:41:04.540Z",
+      "allArbs": [
+        {
+          "artist": "Democratic party",
+          "roiPct": 25.749999916230365,
+          "expectedProfit": 1536.95312,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 191,
+          "pmStake": 4178.125,
+          "totalStake": 4369.125
+        }
+      ]
     }
   },
   {
@@ -12629,15 +12597,25 @@
     "createdAt": "2026-06-28T13:26:22.597016Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
-      "kalshiCount": 0,
+      "bestRoiPct": 50.56249991054178,
+      "bestProfit": 2402.1336953333334,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 1,
+      "matchedCount": 1,
+      "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:50.627Z",
-      "allArbs": []
+      "scannedAt": "2026-06-29T21:41:05.098Z",
+      "allArbs": [
+        {
+          "artist": "Democratic party",
+          "roiPct": 50.56249991054178,
+          "expectedProfit": 2402.1336953333334,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 152.02626133333334,
+          "pmStake": 2137.8693,
+          "totalStake": 2289.8955613333333
+        }
+      ]
     }
   },
   {
@@ -12656,7 +12634,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:49.713Z",
+      "scannedAt": "2026-06-29T21:41:05.452Z",
       "allArbs": []
     }
   },
@@ -12676,7 +12654,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:49.909Z",
+      "scannedAt": "2026-06-29T21:41:05.697Z",
       "allArbs": []
     }
   },
@@ -12696,7 +12674,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:50.177Z",
+      "scannedAt": "2026-06-29T21:41:06.205Z",
       "allArbs": []
     }
   },
@@ -12709,15 +12687,25 @@
     "createdAt": "2026-06-28T13:26:22.597042Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 0,
-      "matchedCount": 0,
-      "kalshiCount": 0,
+      "bestRoiPct": 5.390500020942408,
+      "bestProfit": 321.74547,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "outcomeCount": 1,
+      "matchedCount": 1,
+      "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:52.024Z",
-      "allArbs": []
+      "scannedAt": "2026-06-29T21:41:06.660Z",
+      "allArbs": [
+        {
+          "artist": "Democratic party",
+          "roiPct": 5.390500020942408,
+          "expectedProfit": 321.74547,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 191,
+          "pmStake": 5431.5625,
+          "totalStake": 5622.5625
+        }
+      ]
     }
   },
   {
@@ -12736,7 +12724,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:51.511Z",
+      "scannedAt": "2026-06-29T21:41:07.060Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12766,7 +12754,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:51.203Z",
+      "scannedAt": "2026-06-29T21:41:07.284Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12796,7 +12784,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:51.685Z",
+      "scannedAt": "2026-06-29T21:41:07.806Z",
       "allArbs": []
     }
   },
@@ -12809,23 +12797,23 @@
     "createdAt": "2026-06-28T13:26:22.597066Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 21.837999916230366,
-      "bestProfit": 1303.45562,
+      "bestRoiPct": 20.862500020942406,
+      "bestProfit": 1245.23047,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:52.266Z",
+      "scannedAt": "2026-06-29T21:41:08.166Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 21.837999916230366,
-          "expectedProfit": 1303.45562,
+          "roiPct": 20.862500020942406,
+          "expectedProfit": 1245.23047,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 191,
-          "pmStake": 4416.875,
-          "totalStake": 4607.875
+          "pmStake": 4476.5625,
+          "totalStake": 4667.5625
         }
       ]
     }
@@ -12846,7 +12834,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:52.848Z",
+      "scannedAt": "2026-06-29T21:41:08.414Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12876,7 +12864,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:52.478Z",
+      "scannedAt": "2026-06-29T21:41:08.912Z",
       "allArbs": []
     }
   },
@@ -12896,7 +12884,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:52.729Z",
+      "scannedAt": "2026-06-29T21:41:09.290Z",
       "allArbs": []
     }
   },
@@ -12916,7 +12904,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:53.158Z",
+      "scannedAt": "2026-06-29T21:41:09.541Z",
       "allArbs": []
     }
   },
@@ -12936,7 +12924,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:53.399Z",
+      "scannedAt": "2026-06-29T21:41:10.057Z",
       "allArbs": []
     }
   },
@@ -12956,7 +12944,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:54.469Z",
+      "scannedAt": "2026-06-29T21:41:10.425Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -12986,7 +12974,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:53.859Z",
+      "scannedAt": "2026-06-29T21:41:10.676Z",
       "allArbs": []
     }
   },
@@ -12999,23 +12987,23 @@
     "createdAt": "2026-06-28T13:26:22.597114Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 89.4745000209424,
-      "bestProfit": 5340.50922,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 2.4660000000000055,
+      "bestProfit": 0.7954838709677438,
+      "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 1,
       "matchedCount": 1,
-      "kalshiCount": 56,
+      "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:54.614Z",
+      "scannedAt": "2026-06-29T21:41:11.215Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 89.4745000209424,
-          "expectedProfit": 5340.50922,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 191,
-          "pmStake": 417.81250000000006,
-          "totalStake": 608.8125
+          "roiPct": 2.4660000000000055,
+          "expectedProfit": 0.7954838709677438,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "kalshiStake": 1,
+          "pmStake": 30.32258064516129,
+          "totalStake": 31.32258064516129
         }
       ]
     }
@@ -13036,7 +13024,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:54.936Z",
+      "scannedAt": "2026-06-29T21:41:11.602Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -13066,7 +13054,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:55.164Z",
+      "scannedAt": "2026-06-29T21:41:11.834Z",
       "allArbs": []
     }
   },
@@ -13116,7 +13104,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:55.375Z",
+      "scannedAt": "2026-06-29T21:41:12.334Z",
       "allArbs": []
     }
   },
@@ -13136,7 +13124,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:55.623Z",
+      "scannedAt": "2026-06-29T21:41:12.704Z",
       "allArbs": []
     }
   },
@@ -13186,7 +13174,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:56.124Z",
+      "scannedAt": "2026-06-29T21:41:12.945Z",
       "allArbs": []
     }
   },
@@ -13206,7 +13194,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:56.631Z",
+      "scannedAt": "2026-06-29T21:41:13.463Z",
       "allArbs": []
     }
   },
@@ -13226,7 +13214,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:57.132Z",
+      "scannedAt": "2026-06-29T21:41:13.845Z",
       "allArbs": []
     }
   },
@@ -13246,7 +13234,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:57.625Z",
+      "scannedAt": "2026-06-29T21:41:14.096Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -13276,7 +13264,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:58.141Z",
+      "scannedAt": "2026-06-29T21:41:14.596Z",
       "allArbs": []
     }
   },
@@ -13296,7 +13284,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:58.580Z",
+      "scannedAt": "2026-06-29T21:41:15.028Z",
       "allArbs": []
     }
   },
@@ -13316,7 +13304,7 @@
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:58.988Z",
+      "scannedAt": "2026-06-29T21:41:15.271Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -13346,7 +13334,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:59.451Z",
+      "scannedAt": "2026-06-29T21:41:15.776Z",
       "allArbs": []
     }
   },
@@ -13359,23 +13347,23 @@
     "createdAt": "2026-06-28T13:26:22.597214Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 28.694500041934738,
-      "bestProfit": 1300.104369701492,
+      "bestRoiPct": 28.69450006552538,
+      "bestProfit": 1467.0126971641787,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 56,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:09:59.909Z",
+      "scannedAt": "2026-06-29T21:41:16.143Z",
       "allArbs": [
         {
           "artist": "Democratic party",
-          "roiPct": 28.694500041934738,
-          "expectedProfit": 1300.104369701492,
+          "roiPct": 28.69450006552538,
+          "expectedProfit": 1467.0126971641787,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 144.98715701492534,
-          "pmStake": 3035.6686,
-          "totalStake": 3180.6557570149253
+          "kalshiStake": 163.60071164179104,
+          "pmStake": 3425.3899,
+          "totalStake": 3588.990611641791
         }
       ]
     }
@@ -13396,7 +13384,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:00.334Z",
+      "scannedAt": "2026-06-29T21:41:16.394Z",
       "allArbs": []
     }
   },
@@ -13416,7 +13404,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:00.767Z",
+      "scannedAt": "2026-06-29T21:41:16.906Z",
       "allArbs": []
     }
   },
@@ -13436,7 +13424,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:01.173Z",
+      "scannedAt": "2026-06-29T21:41:17.268Z",
       "allArbs": []
     }
   },
@@ -13456,7 +13444,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:01.623Z",
+      "scannedAt": "2026-06-29T21:41:17.505Z",
       "allArbs": [
         {
           "artist": "Democratic party",
@@ -13486,7 +13474,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:02.159Z",
+      "scannedAt": "2026-06-29T21:41:18.003Z",
       "allArbs": []
     }
   },
@@ -13506,7 +13494,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:02.603Z",
+      "scannedAt": "2026-06-29T21:41:18.385Z",
       "allArbs": []
     }
   },
@@ -13526,7 +13514,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 1,
-      "scannedAt": "2026-06-29T21:10:03.066Z",
+      "scannedAt": "2026-06-29T21:41:18.627Z",
       "allArbs": []
     }
   },

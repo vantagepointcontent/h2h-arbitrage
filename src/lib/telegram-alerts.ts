@@ -78,6 +78,12 @@ export function getConfigFromEnv(): TelegramAlertConfig | null {
   };
 }
 
+/** Check if alerts are paused via env var. */
+export function isPaused(): boolean {
+  return process.env.TELEGRAM_ALERTS_PAUSED === 'true' ||
+         process.env.TELEGRAM_ALERTS_PAUSED === '1';
+}
+
 // ─── Message formatting ───────────────────────────────────────────
 
 /**
@@ -198,6 +204,10 @@ export async function checkAndSendAlert(
   const envConfig = getConfigFromEnv();
   if (!envConfig) {
     return { sent: false, reason: 'Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)' };
+  }
+
+  if (isPaused()) {
+    return { sent: false, reason: 'Alerts paused (TELEGRAM_ALERTS_PAUSED=true)' };
   }
 
   const config: TelegramAlertConfig = { ...envConfig, ...configOverride };
