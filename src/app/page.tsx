@@ -645,6 +645,8 @@ export default function Home() {
         }
       } else if (view === "live") {
         setViewMode("live");
+      } else if (view === "dashboard") {
+        setViewMode("dashboard");
       } else if (view === "logs") {
         setViewMode("logs");
       } else {
@@ -1052,6 +1054,13 @@ export default function Home() {
     setCouplingPanelOpen(false);
     setViewMode("logs");
     window.history.replaceState({ view: "logs" }, "", "/?view=logs");
+  };
+
+  const goToDashboard = () => {
+    stopPolling();
+    setCouplingPanelOpen(false);
+    setViewMode("dashboard");
+    window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
   };
 
   const goToScan = () => {
@@ -1548,6 +1557,7 @@ export default function Home() {
           onGoScan={goToScan}
           onGoMarketFinder={goToMarketFinder}
           onGoLogs={goToLogs}
+          onGoDashboard={goToDashboard}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
@@ -1665,6 +1675,8 @@ export default function Home() {
               />
             ) : viewMode === "live" ? (
               <LiveScanPanel capital={capital} savedMarkets={savedMarkets} />
+            ) : viewMode === "dashboard" ? (
+              <DashboardPanel />
             ) : viewMode === "logs" ? (
               <LogsPanel />
             ) : (
@@ -2268,6 +2280,7 @@ function MarketSidebar({
   onGoScan,
   onGoMarketFinder,
   onGoLogs,
+  onGoDashboard,
   favoriteIds,
   onToggleFavorite,
   sidebarFavoritesOnly,
@@ -2299,6 +2312,7 @@ function MarketSidebar({
   onGoScan: () => void;
   onGoMarketFinder: () => void;
   onGoLogs: () => void;
+  onGoDashboard: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   sidebarFavoritesOnly: boolean;
@@ -2375,6 +2389,10 @@ function MarketSidebar({
           <button onClick={() => window.location.href = '/?view=live'} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "live" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Activity className="w-4 h-4" />
             Live WS
+          </button>
+          <button onClick={onGoDashboard} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
+            <BarChart3 className="w-4 h-4" />
+            Dashboard
           </button>
           <button onClick={onGoLogs} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <FileText className="w-4 h-4" />
