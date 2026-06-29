@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUN30MEXECU-ECU",
+    "pmConditionId": "0xa0f4d15ca1f25a095760f56ba63d7f99bad977a33ae93003d86d58fda3ba3da4",
+    "kalshiTitle": "KXWCADVANCE-26JUN30MEXECU-ECU",
+    "pmTitle": "Ecuador advances",
+    "id": "1782756421539-932en3o",
+    "decoupledAt": "2026-06-29T18:07:01.539Z"
+  },
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUN30MEXECU-MEX",
+    "pmConditionId": "0x65f5760095b3b903c895b320765ccdd4074b72750458b09fde516f6254bcec67",
+    "kalshiTitle": "KXWCADVANCE-26JUN30MEXECU-MEX",
+    "pmTitle": "Mexico advances",
+    "id": "1782756422237-awav4ps",
+    "decoupledAt": "2026-06-29T18:07:02.237Z"
+  }
+]
