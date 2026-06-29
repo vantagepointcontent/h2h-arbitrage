@@ -531,7 +531,7 @@ export default function Home() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "logs">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs">("overview");
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");

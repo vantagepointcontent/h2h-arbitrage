@@ -238,8 +238,50 @@ function extractNameFromKalshiTitle(title: string): string {
   return title.slice(0, 30);
 }
 
+/** Extract a bet-type keyword from a Kalshi market title to prevent cross-bet-type matching */
+function extractBetTypeFromTitle(title: string): string {
+  const lower = title.toLowerCase();
+  if (/top\s*scorer|anytime\s*scorer/i.test(lower)) return 'top-scorer';
+  if (/mvp|most\s*valuable/i.test(lower)) return 'mvp';
+  if (/winner|will\s+win|champion/i.test(lower)) return 'winner';
+  if (/over|under/i.test(lower)) return 'totals';
+  if (/spread|cover/i.test(lower)) return 'spread';
+  if (/first\s*(goal|touch|down|score)/i.test(lower)) return 'first';
+  if (/anytime/i.test(lower)) return 'anytime';
+  if (/series\s*price|series\s*winner/i.test(lower)) return 'series';
+  if (/game\s*props|player\s*props/i.test(lower)) return 'props';
+  return '';
+}
+
+/** Extract a bet-type keyword from a Polymarket question to prevent cross-bet-type matching */
+function extractBetTypeFromQuestion(question: string): string {
+  const lower = question.toLowerCase();
+  if (/top\s*scorer|anytime\s*scorer/i.test(lower)) return 'top-scorer';
+  if (/mvp|most\s*valuable/i.test(lower)) return 'mvp';
+  if (/winner|will\s+win|champion/i.test(lower)) return 'winner';
+  if (/over|under/i.test(lower)) return 'totals';
+  if (/spread|cover/i.test(lower)) return 'spread';
+  if (/first\s*(goal|touch|down|score)/i.test(lower)) return 'first';
+  if (/anytime/i.test(lower)) return 'anytime';
+  if (/series\s*price|series\s*winner/i.test(lower)) return 'series';
+  if (/game\s*props|player\s*props/i.test(lower)) return 'props';
+  return '';
+}
+
+/** Strip a bet-type prefix (added for matching) from the display name */
+const BET_TYPE_PREFIXES = ['top-scorer', 'mvp', 'winner', 'totals', 'spread', 'first', 'anytime', 'series', 'props'];
+function stripBetTypePrefix(name: string): string {
+  for (const prefix of BET_TYPE_PREFIXES) {
+    if (name.toLowerCase().startsWith(prefix + ' ')) {
+      return name.slice(prefix.length + 1);
+    }
+  }
+  return name;
+}
+
 function getKalshiName(km: KalshiMarket): string {
   // 1. For sport match-winner markets (custom_strike UUID + yes_sub_title), use yes_sub_title
+  //    BUT prefix with bet-type keyword to prevent cross-bet-type false matches
   if (km.yes_sub_title && km.no_sub_title) {
     const cs = km.custom_strike;
     if (cs) {
@@ -249,7 +291,9 @@ function getKalshiName(km: KalshiMarket): string {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(val)) {
           // Sport market with UUID custom_strike: entity name is in yes_sub_title, e.g. "Belgium", "Tie"
-          return km.yes_sub_title;
+          // Include bet-type context from title to prevent cross-bet-type matching
+          const betType = extractBetTypeFromTitle(km.title || '');
+          return betType ? `${betType} ${km.yes_sub_title}` : km.yes_sub_title;
         }
       }
     }
@@ -907,15 +951,18 @@ export function matchOutcomes(
 
     if (isNamedBinary) {
       const title = pm.groupItemTitle!;
-      const norm = normalizeName(title);
+      // Enrich with bet-type context to prevent cross-bet-type matching
+      const pmBetType = extractBetTypeFromQuestion(pm.question || '');
+      const enrichedTitle = pmBetType ? `${pmBetType} ${title}` : title;
+      const norm = normalizeName(enrichedTitle);
       const prev = pmSeenNames.get(norm);
-      if (prev && prev !== title) {
-        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+      if (prev && prev !== enrichedTitle) {
+        console.warn(`[matcher]: PM name collision on "${norm}" — "${enrichedTitle}" overlaps with "${prev}"`);
       } else if (!prev) {
-        pmSeenNames.set(norm, title);
+        pmSeenNames.set(norm, enrichedTitle);
       }
       pmOutcomes.push({
-        title,
+        title: enrichedTitle,
         yesPrice: prices[0] || 0,
         noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
         market: pm,
@@ -976,7 +1023,7 @@ export function matchOutcomes(
       const kalshi = buildKalshiArbShape(exact);
       const pmShape = buildPmArbShape(pmo.market);
       matched.push({
-        artist: getKalshiName(exact),
+        artist: stripBetTypePrefix(getKalshiName(exact)),
         kalshi,
         polymarket: pmShape,
         arbitrage: placeholderArb,
@@ -999,7 +1046,9 @@ export function matchOutcomes(
     for (const [, km] of unusedKalshi) {
       const kmName = getKalshiName(km);
       const s = similarity(normalizeName(pmo.title), normalizeName(kmName));
-      if (s > bestScore && s >= 0.4) {
+      // Raise threshold for large events to reduce false-positive cross-bet-type matches
+      const minThreshold = pmOutcomes.length > 20 ? 0.6 : 0.4;
+      if (s > bestScore && s >= minThreshold) {
         bestScore = s;
         bestKm = km;
       }
@@ -1007,8 +1056,9 @@ export function matchOutcomes(
     if (bestKm) {
       const kalshi = buildKalshiArbShape(bestKm);
       const pmShape = buildPmArbShape(pmo.market);
+      const displayName = stripBetTypePrefix(getKalshiName(bestKm));
       matched.push({
-        artist: getKalshiName(bestKm),
+        artist: displayName,
         kalshi,
         polymarket: pmShape,
         arbitrage: placeholderArb,
@@ -1024,7 +1074,7 @@ export function matchOutcomes(
   for (const [, km] of unusedKalshi) {
     if (!usedKalshi.has(km.ticker)) {
       matched.push({
-        artist: getKalshiName(km),
+        artist: stripBetTypePrefix(getKalshiName(km)),
         kalshi: buildKalshiArbShape(km),
         polymarket: null,
         arbitrage: noArbResult,
@@ -1039,7 +1089,7 @@ export function matchOutcomes(
       const pmo = pmOutcomes[pi];
       const pmShape = buildPmArbShape(pmo.market);
       matched.push({
-        artist: pmo.title || 'Unknown',
+        artist: stripBetTypePrefix(pmo.title) || 'Unknown',
         kalshi: null,
         polymarket: pmShape,
         arbitrage: noArbResult,
