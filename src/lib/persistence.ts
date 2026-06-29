@@ -88,7 +88,7 @@ export async function saveScanResult(
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
     ],
   });
-  return { id: Number(row.insertId) };
+  return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
 }
 
 /** Return scan history for a given market (newest first). */

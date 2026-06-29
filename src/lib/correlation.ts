@@ -42,7 +42,7 @@ export function correlationMiddleware(
   const correlationIdValue = id || correlationId.generate();
 
   // Inject into request object for downstream use
-  (req as Record<string, unknown>)[CORRELATION_ID_HEADER] = correlationIdValue;
+  (req.headers as Record<string, unknown>)[CORRELATION_ID_HEADER] = correlationIdValue;
 
   correlationId.run(correlationIdValue, next);
 }
@@ -51,11 +51,11 @@ export function correlationMiddleware(
  * Wrapper for Next.js route handlers that ensures correlation ID propagation.
  * Usage: export async function GET(req) { return withCorrelation(handler)(req); }
  */
-export function withCorrelation<T extends (...args: unknown[]) => Response>(
+export function withCorrelation<T extends (...args: unknown[]) => unknown>(
   handler: T,
 ): T {
   return (async (...args: unknown[]) => {
     const id = correlationId.current ?? correlationId.generate();
     return correlationId.run(id, () => handler(...args));
-  }) as T;
+  }) as unknown as T;
 }

@@ -92,8 +92,8 @@ function computeSingleOutcome(
 
   if (allAvailable) {
     const candidate = calculateArbitrageMax(
-      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk },
-      { bestAsk: pmYesAsk, noPrice: pmNoAsk },
+      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
+      { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
       kYes.maxQuantity,
       kNo.maxQuantity,
       pYes.maxQuantity,

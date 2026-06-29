@@ -209,7 +209,7 @@ export function useAlertSystem(): UseAlertSystemReturn {
 
     // Determine if we should fire based on crossing behavior
     let shouldFire = false;
-    let direction: "above" | "below";
+    let direction: "above" | "below" = "above";
 
     if (settings.notifyOnCross === "both") {
       // Fire if currently above threshold, OR just crossed

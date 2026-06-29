@@ -235,7 +235,7 @@ export function useAppSettings() {
     if (input.categoryOverrides && typeof input.categoryOverrides === "object") {
       const co: Partial<Record<CategoryName, number>> = {};
       for (const cat of CATEGORIES_LIST) {
-        const val = input.categoryOverrides[cat];
+        const val = (input.categoryOverrides as Record<string, unknown>)[cat];
         if (typeof val === "number" && val >= 0) {
           co[cat] = val;
         }

@@ -96,8 +96,8 @@ export function LogsPanel() {
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
-      let aVal: number | string = 0;
-      let bVal: number | string = 0;
+      let aVal: string | number = 0;
+      let bVal: string | number = 0;
       switch (sortKey) {
         case "scanned_at":
           aVal = new Date(a.scanned_at).getTime();
@@ -120,10 +120,12 @@ export function LogsPanel() {
           bVal = b.matched_count;
           break;
       }
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      const sa = String(aVal);
+      const sb = String(bVal);
+      if (sortKey === "scanned_at") {
+        return sortDir === "asc" ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
       }
-      return sortDir === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+      return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
     });
     return arr;
   }, [filtered, sortKey, sortDir]);
