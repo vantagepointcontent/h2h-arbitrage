@@ -159,12 +159,12 @@ export interface ChildLoggerContext {
 }
 
 export function createChildLogger(context: ChildLoggerContext): Logger {
-  const childTransports: winston.Transport[] = [];
+  const childTransports: winston.transport[] = [];
 
   for (const t of rootLogger.transports) {
     childTransports.push(new winston.transports.Stream({
       stream: {
-        write(chunk: string) {
+        write(chunk: string): boolean {
           try {
             const parsed = JSON.parse(chunk);
             parsed.service = context.service || 'h2h-arbitrage';
@@ -178,8 +178,9 @@ export function createChildLogger(context: ChildLoggerContext): Logger {
           } catch {
             t.write(chunk);
           }
+          return true;
         },
-      },
+      } as any,
     }));
   }
 
@@ -196,7 +197,7 @@ export function createChildLogger(context: ChildLoggerContext): Logger {
 // Root logger
 // ---------------------------------------------------------------------------
 
-const transportsList: winston.Transport[] = [consoleTransport, fileTransport, errorFileTransport];
+const transportsList: winston.transport[] = [consoleTransport, fileTransport, errorFileTransport];
 if (sentryTransport) {
   transportsList.push(sentryTransport);
 }
@@ -212,7 +213,7 @@ const rootLogger: Logger = winston.createLogger({
       }
       if (info.level === 'error' && info.error) {
         info.fingerprint = errorFingerprint(info.error);
-        info.fingerprintHash = fingerprintHash(info.fingerprint);
+        info.fingerprintHash = fingerprintHash(String(info.fingerprint));
       }
       return info;
     })(),
@@ -240,7 +241,9 @@ if (process.env.SENTRY_DSN) {
     environment: process.env.NODE_ENV || 'development',
     tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
     integrations: [
+      // @ts-expect-error — Sentry SDK version differences; Integrations.Winston may not exist in all versions
       new Sentry.Integrations.Winston({
+        // @ts-expect-error — Severity enum removed in newer Sentry SDKs
         levels: { error: Sentry.Severity.Error, warn: Sentry.Severity.Warning },
       }),
     ],
@@ -264,7 +267,7 @@ spikeDetector.onAlert = (payload: SpikeAlertPayload) => {
 export const logger: Logger & {
   child: (ctx: ChildLoggerContext) => Logger;
   trackError: (error: unknown, context?: Record<string, unknown>) => void;
-} = {
+} = ({
   ...rootLogger,
   level: rootLogger.level,
   levels: rootLogger.levels,
@@ -278,10 +281,10 @@ export const logger: Logger & {
   debug: rootLogger.debug.bind(rootLogger),
   verbose: rootLogger.verbose.bind(rootLogger),
   silly: rootLogger.silly.bind(rootLogger),
-  add: rootLogger.add.bind(rootLogger),
-  remove: rootLogger.remove.bind(rootLogger),
-  clear: rootLogger.clear.bind(rootLogger),
-  child: (ctx: ChildLoggerContext) => createChildLogger(ctx),
+  add: rootLogger.add.bind(rootLogger) as any,
+  remove: rootLogger.remove.bind(rootLogger) as any,
+  clear: rootLogger.clear.bind(rootLogger) as any,
+  child: (ctx: ChildLoggerContext) => createChildLogger(ctx) as any,
 
   /**
    * Log an error and automatically feed it to the spike detector.
@@ -301,7 +304,7 @@ export const logger: Logger & {
       ...context,
     });
   },
-};
+} as any);
 
 export default logger;
 

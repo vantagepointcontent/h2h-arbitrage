@@ -204,7 +204,7 @@ class IdbCache {
       const tx = db.transaction(this.opts.storeName, 'readwrite');
       const store = tx.objectStore(this.opts.storeName);
       const req = store.delete(key);
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => resolve(req.result ?? true);
       req.onerror = () => resolve(false);
     });
   }

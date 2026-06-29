@@ -5,104 +5,119 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-29T21:42:18.638Z",
-  "finishedAt": "2026-06-29T21:42:38.744Z",
-  "durationMs": 20106,
-  "successCount": 8,
-  "failureCount": 18,
-  "skippedCount": 516,
-  "avgScanMs": 22015,
-  "maxScanMs": 30000,
+  "startedAt": "2026-06-29T22:02:25.968Z",
+  "finishedAt": "2026-06-29T22:02:35.275Z",
+  "durationMs": 9307,
+  "successCount": 3,
+  "failureCount": 21,
+  "skippedCount": 518,
+  "avgScanMs": 1037,
+  "maxScanMs": 9290,
   "errors": [
     {
-      "market": "Wisconsin Governor Democratic Primary Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "2026 NHL Stanley Cup Champion ",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Top Spotify Artist 2026",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "FL-23 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "WA-03 Primary Winners",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Alaska Governor Election Winner  ",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Who will win the 2026 Fields Medal?",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "NY-23 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Which bills will become law in 2026?",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Top Coding AI this month",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "OK-01 Republican Primary Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Peru Presidential Election Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "Alabama Democratic Senate Primary Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "World Cup Group E Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "World Cup Group B Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
-    },
-    {
-      "market": "World Cup Group A Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
+      "market": "ME-02 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 311
     },
     {
       "market": "CA-40 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
+      "error": "HTTP 404",
+      "durationMs": 416
     },
     {
-      "market": "ME-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 30000
+      "market": "MI-12 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 1976
+    },
+    {
+      "market": "MI-11 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 2254
+    },
+    {
+      "market": "MI-13 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 30
+    },
+    {
+      "market": "MN-01 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 40
+    },
+    {
+      "market": "MN-02 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 29
+    },
+    {
+      "market": "MN-03 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 51
+    },
+    {
+      "market": "MN-04 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 51
+    },
+    {
+      "market": "MN-05 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 31
+    },
+    {
+      "market": "MN-06 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 30
+    },
+    {
+      "market": "MN-07 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 27
+    },
+    {
+      "market": "MN-08 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 23
+    },
+    {
+      "market": "MS-01 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 22
+    },
+    {
+      "market": "MS-02 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 28
+    },
+    {
+      "market": "MS-03 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 29
+    },
+    {
+      "market": "MS-04 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 22
+    },
+    {
+      "market": "MO-01 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 21
+    },
+    {
+      "market": "MO-02 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 19
+    },
+    {
+      "market": "MO-03 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 34
+    },
+    {
+      "market": "MO-04 House Election Winner",
+      "error": "HTTP 500",
+      "durationMs": 32
     }
   ]
 }

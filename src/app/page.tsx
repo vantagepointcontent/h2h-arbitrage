@@ -630,10 +630,10 @@ export default function Home() {
         const legacyCat = params.get("category");
         if (catsParam) {
           const cats = catsParam.split(",");
-          if (cats.every(c => CATEGORIES.includes(c))) {
+          if (cats.every(c => (CATEGORIES as readonly string[]).includes(c))) {
             setMfCategories(cats);
           }
-        } else if (legacyCat && CATEGORIES.includes(legacyCat)) {
+        } else if (legacyCat && (CATEGORIES as readonly string[]).includes(legacyCat)) {
           setMfCategories([legacyCat]);
         }
         const maxDays = params.get("maxDays");
@@ -1493,7 +1493,7 @@ export default function Home() {
   // ── Render ──
   return (
     <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
-      <ToastContainer toast={alertSystem.toast} />
+      <ToastContainer toasts={alertSystem.toasts} onDismiss={alertSystem.dismissToast} />
       {alertSettingsOpen && <AlertSettingsPanel
         settings={alertSystem.settings}
         onSettingsChange={alertSystem.setSettings}
@@ -2003,7 +2003,7 @@ export default function Home() {
                             bestAsk: o.polymarket.bestAsk,
                             lastTradePrice: o.polymarket.lastTradePrice,
                           } : null,
-                        }))}
+                        })) as any}
                         lastUpdated={lastUpdated}
                       />
                     )}
@@ -2706,8 +2706,8 @@ function OverviewPanel({
       return mul * (cb - ca);
     }
     if (sort === "scanned") {
-      const ta = a.liveResult?.scannedAt ?? a.lastScanResult?.scannedAt ?? 0;
-      const tb = b.liveResult?.scannedAt ?? b.lastScanResult?.scannedAt ?? 0;
+      const ta = new Date(a.liveResult?.scannedAt ?? a.lastScanResult?.scannedAt ?? 0).getTime() || 0;
+      const tb = new Date(b.liveResult?.scannedAt ?? b.lastScanResult?.scannedAt ?? 0).getTime() || 0;
       return mul * (tb - ta);
     }
     return 0;

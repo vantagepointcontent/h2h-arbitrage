@@ -118,13 +118,13 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
                 width={48}
               />
               <Tooltip
-                content={({ active, payload, label }) => {
-                  if (!active || !payload?.length) return null;
-                  const p = payload[0]?.payload as SpreadPoint;
+                content={((props: { active?: boolean; payload?: Array<{ payload: unknown }> }) => {
+                  if (!props?.active || !props?.payload?.length) return null;
+                  const p = props.payload[0]?.payload as SpreadPoint;
                   return (
                     <div className="rounded-lg border border-[#232E3C] bg-[#17212B] p-3 shadow-xl text-xs space-y-1">
                       <div className="text-[#5E6875] text-[10px]">
-                        {new Date(label).toLocaleString()}
+                        {new Date(p.ts).toLocaleString()}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[#5DBE81] font-bold">
@@ -141,7 +141,7 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
                       </div>
                     </div>
                   );
-                }}
+                }) as any}
               />
               {/* Zero spread reference line */}
               <ReferenceLine y={0} stroke="#232E3C" strokeDasharray="4 2" />

@@ -361,7 +361,7 @@ export function buildCaseInsensitiveMap<V>(
 
   for (const e of entries) {
     const key = normalizeName(e.raw);
-    const existing = result.get(key);
+    const existing = result.get(key) as any;
     if (existing !== undefined && e.raw !== existing._raw) {
       if (!collisions.has(key)) {
         collisions.add(key);
@@ -400,7 +400,7 @@ export function buildNormalizedMap<K extends string, V>(
       if (!collisions.has(key)) {
         collisions.add(key);
         console.warn(
-          `${logPrefix}: name collision on "${key}" — "${e.raw}" (${e.rawLabel ?? ''}) overlaps with "${existing.raw}" (${existing.rawLabel ?? ''})`,
+          `${logPrefix}: name collision on "${key}" — "${e.raw}" (${(e as any).rawLabel ?? ''}) overlaps with "${existing.raw}" (${(existing as any).rawLabel ?? ''})`,
         );
       }
     }

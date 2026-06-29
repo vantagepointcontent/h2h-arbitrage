@@ -6,6 +6,7 @@ const DB_VERSION = 1;
 const STORE_NAME = "spreads";
 
 export interface SpreadPoint {
+  id?: string;           // computed key (marketId + ts)
   ts: number;           // epoch ms
   marketId: string;     // saved market id
   kalshiYesBid: number;

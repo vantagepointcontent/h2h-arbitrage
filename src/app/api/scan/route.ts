@@ -7,7 +7,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, UnifiedOutcome } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2b: split decoupled pairs — user has explicitly unlinked these
-    const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
+    const splitOutcomes = applyDecoupledPairs(outcomes as unknown as UnifiedOutcome[], decoupledPairs);
 
     // Step 3: compute arbitrage (with depth awareness) for all matched items, including cross-outcome
     const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title).map(o => ({

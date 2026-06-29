@@ -79,7 +79,7 @@ export function errorResponse(
     headers: {
       [CORRELATION_ID_HEADER]: correlationId.current ?? '',
       'X-Error-Fingerprint': envelope.fingerprint,
-    },
+    } as Record<string, string>,
   });
 }
 
@@ -87,19 +87,19 @@ export function errorResponse(
 // Wrap a route handler function with automatic error handling + correlation
 // ---------------------------------------------------------------------------
 
-export function withErrorHandler<TArgs extends [...unknown[]], TReturn extends Promise<Response>>(
-  handler: (...args: TArgs) => TReturn,
+export function withErrorHandler<TArgs extends [...unknown[]], TReturn>(
+  handler: (...args: TArgs) => Promise<TReturn>,
   ctx?: { service?: string; path?: string },
-): (...args: TArgs) => TReturn {
-  return async (...args: TArgs): TReturn => {
+): (...args: TArgs) => Promise<TReturn> {
+  return async (...args: TArgs): Promise<TReturn> => {
     const id = correlationId.current ?? correlationId.generate();
     return correlationId.run(id, async () => {
       try {
         return await handler(...args);
       } catch (error) {
-        return errorResponse(error, ctx) as TReturn;
+        return errorResponse(error, ctx) as unknown as TReturn;
       }
-    }) as TReturn;
+    }) as unknown as Promise<TReturn>;
   };
 }
 
