@@ -5,22 +5,17 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-29T22:47:37.164Z",
-  "finishedAt": "2026-06-29T22:54:16.546Z",
-  "durationMs": 399382,
-  "successCount": 60,
-  "failureCount": 179,
-  "skippedCount": 303,
-  "avgScanMs": 25131,
+  "startedAt": "2026-06-29T22:55:16.548Z",
+  "finishedAt": "2026-06-29T22:58:37.238Z",
+  "durationMs": 200690,
+  "successCount": 37,
+  "failureCount": 211,
+  "skippedCount": 294,
+  "avgScanMs": 26839,
   "maxScanMs": 30000,
   "errors": [
     {
       "market": "2026 NHL Stanley Cup Champion ",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Minnesota Republican Senate Primary Winner",
       "error": "timeout after 30000ms",
       "durationMs": 30000
     },
@@ -30,47 +25,17 @@
       "durationMs": 30000
     },
     {
-      "market": "Top Spotify Artist 2026",
+      "market": "Pro Football: 2027 AFC Champion ",
       "error": "timeout after 30000ms",
       "durationMs": 30000
     },
     {
-      "market": "Alaska Governor Election Winner  ",
+      "market": "WNBA: 2026 Champion",
       "error": "timeout after 30000ms",
       "durationMs": 30000
     },
     {
-      "market": "Which companies will the US take a stake in?",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Venezuela leader end of 2026?",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Who will perform at World Cup halftime show?",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "MLB: 2026 AL Cy Young Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "AZ-01 Republican Primary Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "F1 Drivers' Champion",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Who will attend Taylor Swift and Travis Kelce's wedding?",
+      "market": "NBA: Giannis Antetokounmpo Next Team",
       "error": "timeout after 30000ms",
       "durationMs": 30000
     },
@@ -80,37 +45,187 @@
       "durationMs": 30000
     },
     {
+      "market": "Pro Baseball Champion",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
       "market": "Who will be Trump's next Director of National Intelligence?",
       "error": "timeout after 30000ms",
       "durationMs": 30000
     },
     {
-      "market": "OK-01 Republican Primary Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Peru Presidential Election Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "CA-40 House Election Winner",
-      "error": "HTTP 404",
-      "durationMs": 2218
-    },
-    {
-      "market": "ME-02 House Election Winner",
-      "error": "HTTP 404",
-      "durationMs": 1747
-    },
-    {
-      "market": "NY-04 House Election Winner",
+      "market": "MLB: NL Manager of the Year",
       "error": "fetch failed",
       "durationMs": 30000
     },
     {
-      "market": "NY-06 House Election Winner",
+      "market": "AL-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Lead Bank in OpenAI's IPO?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "MLB World Series Champion 2026",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "AK-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will be UFC Featherweight champion at the end of 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Michigan Governor Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Oscars 2027: Best Picture Nominations ",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "CA-34 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-01 Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "North Carolina Senate Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Peru Presidential Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Venezuela de facto leader end of 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-19 Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "MLB: Stolen Bases Leader",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "MLB: Doubles Leader",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "What price will Bitcoin hit in 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "AL-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will be UFC Flyweight champion at the end of 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "CT-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "CA-37 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "CA-40 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-18 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-19 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "IL-12 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "ME-02 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
@@ -120,7 +235,17 @@
       "durationMs": 30000
     },
     {
+      "market": "NY-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
       "market": "NY-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-06 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
@@ -615,12 +740,27 @@
       "durationMs": 30000
     },
     {
+      "market": "TX-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
       "market": "TX-09 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
     {
       "market": "TX-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-12 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
@@ -820,12 +960,22 @@
       "durationMs": 30000
     },
     {
+      "market": "VT-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
       "market": "WA-01 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
     {
       "market": "WA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-03 House Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     },
@@ -906,6 +1056,16 @@
     },
     {
       "market": "WY-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Next UK Chancellor of the Exchequer in 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Ottawa Mayoral Election Winner",
       "error": "fetch failed",
       "durationMs": 30000
     }
