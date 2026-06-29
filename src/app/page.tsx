@@ -44,6 +44,7 @@ import {
   DollarSign,
   Hash,
   PanelRight,
+  FileText,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -58,6 +59,7 @@ import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { DashboardPanel } from "@/app/components/DashboardPanel";
 import { LiveScanPanel } from "@/app/components/LiveScanPanel";
+import { LogsPanel } from "@/app/components/LogsPanel";
 import { StakeCalculator } from "@/components/StakeCalculator";
 import { computeApy } from "@/lib/matcher";
 
@@ -529,7 +531,7 @@ export default function Home() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "logs">("overview");
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
@@ -643,6 +645,8 @@ export default function Home() {
         }
       } else if (view === "live") {
         setViewMode("live");
+      } else if (view === "logs") {
+        setViewMode("logs");
       } else {
         setViewMode("overview");
       }
@@ -1653,6 +1657,8 @@ export default function Home() {
               />
             ) : viewMode === "live" ? (
               <LiveScanPanel capital={capital} savedMarkets={savedMarkets} />
+            ) : viewMode === "logs" ? (
+              <LogsPanel />
             ) : (
               <>
                 {/* Scan inputs */}
@@ -2359,6 +2365,10 @@ function MarketSidebar({
           <button onClick={() => window.location.href = '/?view=live'} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "live" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Activity className="w-4 h-4" />
             Live WS
+          </button>
+          <button onClick={() => { setViewMode("logs"); window.history.replaceState({ view: "logs" }, "", "/?view=logs"); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
+            <FileText className="w-4 h-4" />
+            Logs
           </button>
         </div>
 
