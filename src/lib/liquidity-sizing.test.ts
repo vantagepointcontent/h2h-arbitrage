@@ -26,17 +26,18 @@ describe('analyzeLiquidity', () => {
     expect(result.slippageEstimate).toBe(0.5);
 
     // spread = 1 - (0.40 + 0.50) = 0.10
+    // totalFees = 0.008
     // theoreticalProfit = 50_000 × (0.10 - 0.008) = 4_600
     expect(result.theoreticalProfit).toBeCloseTo(4_600);
-    // realisticProfit = 50_000 × (0.10 - 0.008 - 0.005) = 4_550
-    expect(result.realisticProfit).toBeCloseTo(4_550);
-    expect(result.realToTheoreticalRatio).toBeCloseTo(4_550 / 4_600, 4);
+    // realisticProfit = 50_000 × (0.10 - 0.008 - 0.005) = 4_350
+    expect(result.realisticProfit).toBeCloseTo(4_350);
+    expect(result.realToTheoreticalRatio).toBeCloseTo(4_350 / 4_600, 4);
   });
 
   /* ------------------------------------------------------------------ */
   /*  2. Shallow Kalshi, infinite PM (typical case)                        */
   /* ------------------------------------------------------------------ */
-  it('shallow Kalshi + infinite PM → low warning, 1% slippage', () => {
+  it('shallow Kalshi + infinite PM → low warning, 0.5% slippage', () => {
     const result = analyzeLiquidity(
       0.35,
       5_000,
@@ -50,13 +51,14 @@ describe('analyzeLiquidity', () => {
     expect(result.maxFillableStake).toBe(5_000);
     expect(result.warningLevel).toBe('low');
     expect(result.isLiquid).toBe(true);
-    expect(result.slippageEstimate).toBe(1);
+    // 5_000 >= 2_000 → 0.5% slippage tier
+    expect(result.slippageEstimate).toBe(0.5);
 
     // spread = 1 - (0.35 + 0.55) = 0.10
     // theoretical = 5_000 × (0.10 - 0.008) = 460
     expect(result.theoreticalProfit).toBeCloseTo(460);
-    // realistic = 5_000 × (0.10 - 0.008 - 0.01) = 440
-    expect(result.realisticProfit).toBeCloseTo(440);
+    // realistic = 5_000 × (0.10 - 0.008 - 0.005) = 435
+    expect(result.realisticProfit).toBeCloseTo(435);
   });
 
   /* ------------------------------------------------------------------ */
@@ -81,8 +83,8 @@ describe('analyzeLiquidity', () => {
     // spread = 1 - (0.45 + 0.48) = 0.07
     // theoretical = 50 × (0.07 - 0.008) = 3.1
     expect(result.theoreticalProfit).toBeCloseTo(3.1);
-    // realistic = 50 × (0.07 - 0.008 - 0.02) = 1.6
-    expect(result.realisticProfit).toBeCloseTo(1.6);
+    // realistic = 50 × (0.07 - 0.008 - 0.02) = 2.1
+    expect(result.realisticProfit).toBeCloseTo(2.1);
   });
 
   /* ------------------------------------------------------------------ */
@@ -126,14 +128,15 @@ describe('analyzeLiquidity', () => {
     expect(result.maxFillableStake).toBe(1_500);
     expect(result.warningLevel).toBe('low');
     expect(result.isLiquid).toBe(true);
+    // 1_500 < 2_000 → 1% slippage tier
     expect(result.slippageEstimate).toBe(1);
 
     // spread = 1 - (0.30 + 0.55) = 0.15
-    // theoretical = 1_500 × (0.15 - 0.008) = 2_130
-    expect(result.theoreticalProfit).toBeCloseTo(2_130);
-    // realistic = 1_500 × (0.15 - 0.008 - 0.01) = 1_980
-    expect(result.realisticProfit).toBeCloseTo(1_980);
-    expect(result.realToTheoreticalRatio).toBeCloseTo(1_980 / 2_130, 4);
+    // theoretical = 1_500 × (0.15 - 0.008) = 213
+    expect(result.theoreticalProfit).toBeCloseTo(213);
+    // realistic = 1_500 × (0.15 - 0.008 - 0.01) = 198
+    expect(result.realisticProfit).toBeCloseTo(198);
+    expect(result.realToTheoreticalRatio).toBeCloseTo(198 / 213, 4);
   });
 
   /* ------------------------------------------------------------------ */
@@ -153,7 +156,7 @@ describe('analyzeLiquidity', () => {
 
     // spread = 1 - (0.49 + 0.49) = 0.02
     // totalFees = 0.015, slippage = 2% → 0.02
-    // realistic = 200 × (0.02 - 0.015 - 0.02) = -2.999… ≈ negative
+    // realistic = 200 × (0.02 - 0.015 - 0.02) = -3 (approx)
     expect(result.realisticProfit).toBeLessThan(0);
     expect(result.realToTheoreticalRatio).toBe(0);
   });
