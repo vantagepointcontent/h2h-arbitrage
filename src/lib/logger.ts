@@ -125,9 +125,9 @@ export function errorFingerprint(error: unknown): string {
     const type = error.constructor.name;
     const msg = error.message.trim().split('\n')[0];
     const normalized = msg
-      .replace(/\d+/g, '<N>')
       .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<UUID>')
-      .replace(/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/g, '<TIMESTAMP>');
+      .replace(/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/g, '<TIMESTAMP>')
+      .replace(/\d+/g, '<N>');
 
     // Include the originating function from the stack for better granularity
     const frames = parseStackFrames(error.stack);
