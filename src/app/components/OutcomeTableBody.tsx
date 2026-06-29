@@ -51,7 +51,7 @@ export function OutcomeTableBody({
       ? safeOutcomes.filter(o => o.kalshi && o.polymarket)
       : safeOutcomes;
 
-  const profitableOutcomes = safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0);
+  const profitableOutcomes = safeOutcomes.filter(o => o.kalshi && o.polymarket && o.arbitrage.expectedProfit > 0);
   const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
   const highestProfitOutcome = profitableOutcomes.length > 0
     ? profitableOutcomes.reduce((best, o) => o.arbitrage.expectedProfit > best.arbitrage.expectedProfit ? o : best)
@@ -61,9 +61,12 @@ export function OutcomeTableBody({
   return (
     <tbody className="divide-y divide-[#182533]">
       {displayOutcomes.map((o, idx) => {
-        const spread = o.kalshi && o.polymarket ? (o.polymarket.yesPrice - o.kalshi.yesAsk) : 0;
-        const profit = o.arbitrage.expectedProfit;
-        const roiColor = o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
+        const k = o.kalshi;
+        const p = o.polymarket;
+        const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
+        const spread = hasPrices ? (p!.yesPrice - k!.yesAsk) : null;
+        const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
+        const roiColor = !hasPrices ? "text-[#5E6875]" : o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
         const isExpanded = expandedArtist === o.artist;
         const totalStake = (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0);
         const stakeRatio = totalStake > 0
@@ -96,12 +99,14 @@ export function OutcomeTableBody({
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
               <td className="px-4 py-3 text-right text-[#5E6875]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
-              <td className={`px-4 py-3 text-right font-medium ${spread > 0 ? "text-[#5DBE81]" : spread < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
-                {spread > 0 ? "+" : ""}{spread.toFixed(2)}
+              <td className={`px-4 py-3 text-right font-medium ${spread != null && spread > 0 ? "text-[#5DBE81]" : spread != null && spread < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
+                {spread != null ? `${spread > 0 ? "+" : ""}${spread.toFixed(2)}` : "—"}
               </td>
-              <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{formatPercent(o.arbitrage.roiPct)}</td>
+              <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className="relative px-4 py-3 text-right group">
-                {profit > 0 ? (
+                {!hasPrices || profit <= 0 ? (
+                  <span className="text-[#5E6875]">—</span>
+                ) : profit > 0 ? (
                   isHighestProfit ? (
                     <div className="group inline-block">
                       <span className="text-[#FFFFFF] cursor-help">
@@ -161,7 +166,9 @@ export function OutcomeTableBody({
                 ) : "—"}
               </td>
               <td className="px-4 py-3 text-xs">
-                {o.arbitrage.strategy === 'No arb' ? (
+                {!hasPrices ? (
+                  <span className="text-[#5E6875]">—</span>
+                ) : o.arbitrage.strategy === 'No arb' ? (
                   <span className="text-[#5E6875]">No arb</span>
                 ) : o.arbitrage.strategy.startsWith('Buy YES both sides') ? (
                   <span className="inline-flex items-center gap-1.5">

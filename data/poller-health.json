@@ -5,15 +5,90 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-29T22:30:52.250Z",
-  "finishedAt": "2026-06-29T22:34:10.998Z",
-  "durationMs": 198748,
-  "successCount": 107,
-  "failureCount": 3,
-  "skippedCount": 432,
-  "avgScanMs": 5382,
+  "startedAt": "2026-06-29T22:47:37.164Z",
+  "finishedAt": "2026-06-29T22:54:16.546Z",
+  "durationMs": 399382,
+  "successCount": 60,
+  "failureCount": 179,
+  "skippedCount": 303,
+  "avgScanMs": 25131,
   "maxScanMs": 30000,
   "errors": [
+    {
+      "market": "2026 NHL Stanley Cup Champion ",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Minnesota Republican Senate Primary Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Wisconsin Governor Democratic Primary Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Top Spotify Artist 2026",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Alaska Governor Election Winner  ",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Which companies will the US take a stake in?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Venezuela leader end of 2026?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will perform at World Cup halftime show?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "MLB: 2026 AL Cy Young Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "AZ-01 Republican Primary Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "F1 Drivers' Champion",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will attend Taylor Swift and Travis Kelce's wedding?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Top Coding AI this month",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will be Trump's next Director of National Intelligence?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-01 Republican Primary Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
     {
       "market": "Peru Presidential Election Winner",
       "error": "timeout after 30000ms",
@@ -22,12 +97,817 @@
     {
       "market": "CA-40 House Election Winner",
       "error": "HTTP 404",
-      "durationMs": 263
+      "durationMs": 2218
     },
     {
       "market": "ME-02 House Election Winner",
       "error": "HTTP 404",
-      "durationMs": 297
+      "durationMs": 1747
+    },
+    {
+      "market": "NY-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-12 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-14 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-16 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-18 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-19 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-20 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-21 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-22 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-24 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-25 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-26 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-12 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NC-14 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "ND-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-12 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-14 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OH-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OR-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-14 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "PA-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "RI-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "RI-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SC-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "SD-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TN-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-14 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-16 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-18 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-19 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-20 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-24 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-25 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-26 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-27 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-28 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-29 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-30 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-31 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-32 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-33 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-34 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-35 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-36 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-37 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-38 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "UT-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "UT-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "UT-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "UT-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "VA-11 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-10 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WI-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WV-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WY-AL House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
     }
   ]
 }
