@@ -900,7 +900,7 @@ export function buildPmArbShape(market: PMMarket) {
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 
-function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
+export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
   return {
     ticker: km.ticker,
     yesBid: parseFloat(km.yes_bid_dollars || '0'),
