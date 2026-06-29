@@ -1,17 +1,33 @@
 {
-  "status": "running",
+  "status": "degraded",
   "baseUrl": "http://100.86.7.30:3000",
   "concurrency": 3,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
   "startedAt": "2026-06-29T22:30:52.250Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
-  "failureCount": 0,
-  "skippedCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "finishedAt": "2026-06-29T22:34:10.998Z",
+  "durationMs": 198748,
+  "successCount": 107,
+  "failureCount": 3,
+  "skippedCount": 432,
+  "avgScanMs": 5382,
+  "maxScanMs": 30000,
+  "errors": [
+    {
+      "market": "Peru Presidential Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "CA-40 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 263
+    },
+    {
+      "market": "ME-02 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 297
+    }
+  ]
 }
