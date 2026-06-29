@@ -159,21 +159,22 @@ export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
 }
 
 // Helpers for direct Polymarket book updates from the WS message format
-export function applyPolymarketBook(tokenId: string, asks: { price: string; size: string }[]): void {
+// Each token_id represents a specific outcome (YES or NO). The caller must
+// specify which side this token is so we store it correctly.
+export function applyPolymarketBook(tokenId: string, asks: { price: string; size: string }[], side: 'yes' | 'no' = 'yes'): void {
   const levels = asks
     .map((a) => ({ price: parseFloat(a.price), quantity: parseFloat(a.size) }))
     .filter((a) => a.price > 0 && a.quantity > 0)
     .sort((a, b) => a.price - b.price);
 
-  // Polymarket WS 'book' messages contain the full book per token, but we need
-  // to know which outcome side it is. The engine subscribes separately per token,
-  // so we just update whichever side this token_id represents.
   const existing = orderbookState.getBook(tokenId);
   if (existing) {
-    const side: 'yes' | 'no' = existing.yes.asks.length > 0 || levels.length > 0 ? 'yes' : 'no';
-    orderbookState.setBook(tokenId, side === 'yes' ? levels : [], side === 'no' ? levels : []);
+    // Update only the specified side, preserve the other
+    const yesAsks = side === 'yes' ? levels : existing.yes.asks;
+    const noAsks = side === 'no' ? levels : existing.no.asks;
+    orderbookState.setBook(tokenId, yesAsks, noAsks);
   } else {
-    // First time we see this token: seed as yes side; caller can re-seed if needed.
-    orderbookState.setBook(tokenId, levels, []);
+    // First time: seed the specified side
+    orderbookState.setBook(tokenId, side === 'yes' ? levels : [], side === 'no' ? levels : []);
   }
 }
