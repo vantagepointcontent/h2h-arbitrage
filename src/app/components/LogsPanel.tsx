@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
 interface LogEntry {
   id: number;
@@ -31,6 +31,15 @@ interface LogEntry {
   raw_result: string | null;
 }
 
+type EventType = "all" | "scan" | "arb" | "system";
+
+const EVENT_TYPE_OPTIONS: { key: EventType; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "scan", label: "Scan" },
+  { key: "arb", label: "Arb" },
+  { key: "system", label: "System" },
+];
+
 type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "positive_arb_count" | "matched_count";
 type SortDir = "asc" | "desc";
 
@@ -46,6 +55,9 @@ export function LogsPanel() {
   const [positiveArbOnly, setPositiveArbOnly] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [eventType, setEventType] = useState<EventType>("all");
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const lastLogCountRef = useRef(0);
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>("scanned_at");
@@ -83,6 +95,13 @@ export function LogsPanel() {
     fetchLogs();
   }, [fetchLogs]);
 
+  // Auto-refresh: poll every 15s for real-time log streaming
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const iv = setInterval(fetchLogs, 15000);
+    return () => clearInterval(iv);
+  }, [autoRefresh, fetchLogs]);
+
   // Fetch saved markets for market name lookup
   useEffect(() => {
     fetch("/api/saved-markets")
@@ -99,11 +118,23 @@ export function LogsPanel() {
       .catch(() => {});
   }, []);
 
-  // Filter by search query (market_id, market name, or strategy)
+  // Filter by search query (market_id, market name, or strategy) + event type
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return logs;
+    let result = logs;
+    
+    // Event type filter
+    if (eventType !== "all") {
+      result = result.filter((l) => {
+        if (eventType === "arb") return l.positive_arb_count > 0;
+        if (eventType === "scan") return l.positive_arb_count === 0;
+        if (eventType === "system") return l.matched_count === 0 || l.kalshi_count === 0 || l.pm_count === 0;
+        return true;
+      });
+    }
+    
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase();
-    return logs.filter(
+    return result.filter(
       (l) => {
         const marketName = savedMarkets.get(l.market_id);
         return (
@@ -113,7 +144,7 @@ export function LogsPanel() {
         );
       }
     );
-  }, [logs, searchQuery, savedMarkets]);
+  }, [logs, searchQuery, savedMarkets, eventType]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -205,6 +236,18 @@ export function LogsPanel() {
         </h2>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+              autoRefresh
+                ? "bg-[#5DBE81]/10 text-[#5DBE81] border-[#5DBE81]/30"
+                : "bg-[#182533] text-[#8A9BA8] border-[#182533] hover:text-[#FFFFFF]"
+            }`}
+            title="Auto-refresh every 15s for real-time streaming"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${autoRefresh ? "animate-spin" : ""}`} />
+            {autoRefresh ? "Live" : "Auto"}
+          </button>
+          <button
             onClick={fetchLogs}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF] text-xs font-medium transition-colors"
           >
@@ -291,8 +334,8 @@ export function LogsPanel() {
           </div>
         </div>
 
-        {/* Toggle */}
-        <div className="flex items-center gap-3">
+        {/* Toggle + Event Type Filter */}
+        <div className="flex items-center gap-3 flex-wrap">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -302,6 +345,25 @@ export function LogsPanel() {
             />
             <span className="text-xs text-[#8A9BA8]">Positive arb only</span>
           </label>
+          {/* Event type filter pills */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[#5E6875] uppercase tracking-wide">Type:</span>
+            <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
+              {EVENT_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setEventType(opt.key)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                    eventType === opt.key
+                      ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                      : "text-[#5E6875] hover:text-[#FFFFFF]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

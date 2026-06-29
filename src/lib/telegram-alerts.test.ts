@@ -16,12 +16,23 @@ if (!AbortSignal.timeout) {
 import {
   shouldAlert,
   formatArbMessage,
+  formatSpreadWidenedMessage,
+  formatVanishingMessage,
+  formatResolvedMessage,
   getConfigFromEnv,
   checkAndSendAlert,
   sendBatchAlerts,
   sendTestMessage,
   sendTelegramMessage,
+  sendResolvedAlert,
+  detectSpreadWidened,
+  detectVanishing,
+  detectResolved,
   _resetCooldown,
+  _resetPreviousRoi,
+  _resetResolved,
+  _setPreviousRoi,
+  _getPreviousRoi,
   ArbAlertInput,
   TelegramAlertConfig,
 } from './telegram-alerts';
@@ -51,6 +62,8 @@ describe('telegram-alerts', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     _resetCooldown();
+    _resetPreviousRoi();
+    _resetResolved();
     // Clear env
     delete process.env.TELEGRAM_BOT_TOKEN;
     delete process.env.TELEGRAM_CHAT_ID;
@@ -195,6 +208,211 @@ describe('telegram-alerts', () => {
       });
       expect(msg).toContain('&lt;YES&gt;');
       expect(msg).toContain('&amp; NO');
+    });
+
+    it('includes platform prices when provided', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        kalshiYesPrice: 0.45,
+        kalshiNoPrice: 0.55,
+        pmYesPrice: 0.52,
+        pmNoPrice: 0.48,
+      });
+      expect(msg).toContain('K: YES $0.45 / NO $0.55');
+      expect(msg).toContain('PM: YES $0.52 / NO $0.48');
+    });
+
+    it('includes persistence score when provided', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        persistenceScore: 75,
+      });
+      expect(msg).toContain('Persistence: <b>75</b>/100');
+    });
+
+    it('includes deep link when marketId is present', () => {
+      const msg = formatArbMessage(baseArb);
+      expect(msg).toContain('http://100.86.7.30:3000/?view=scan&id=market-123');
+    });
+
+    it('encodes special chars in deep link', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        marketId: 'abc/def&ghi',
+      });
+      expect(msg).toContain('view=scan&id=abc%2Fdef%26ghi');
+    });
+  });
+
+  // ── Spread Widened alert ────────────────────────────────────
+
+  describe('spread widened', () => {
+    it('detectSpreadWidened returns true when ROI increased >2%', () => {
+      _setPreviousRoi('mkt-1', 3.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'mkt-1', roiPct: 5.5 };
+      expect(detectSpreadWidened(arb)).toBe(true);
+    });
+
+    it('detectSpreadWidened returns false when ROI increased ≤2%', () => {
+      _setPreviousRoi('mkt-2', 4.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'mkt-2', roiPct: 5.5 };
+      expect(detectSpreadWidened(arb)).toBe(false);
+    });
+
+    it('detectSpreadWidened returns false when ROI decreased', () => {
+      _setPreviousRoi('mkt-3', 8.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'mkt-3', roiPct: 5.5 };
+      expect(detectSpreadWidened(arb)).toBe(false);
+    });
+
+    it('detectSpreadWidened returns false when no previous ROI tracked', () => {
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'mkt-new' };
+      expect(detectSpreadWidened(arb)).toBe(false);
+    });
+
+    it('formatSpreadWidenedMessage contains correct emoji and labels', () => {
+      const msg = formatSpreadWidenedMessage(baseArb, 3.0);
+      expect(msg).toContain('📈');
+      expect(msg).toContain('ARB SPREAD WIDENED');
+      expect(msg).toContain('+2.20%');
+    });
+
+    it('checkAndSendAlert sends widened alert even during cooldown', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+
+      _setPreviousRoi('widening-market', 3.0);
+      // First alert to establish cooldown
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 1 } }),
+      });
+      // Second call triggers widened alert
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 2 } }),
+      });
+
+      const first = await checkAndSendAlert({ ...baseArb, marketId: 'widening-market', roiPct: 3.0 });
+      expect(first.sent).toBe(true);
+
+      const second = await checkAndSendAlert({ ...baseArb, marketId: 'widening-market', roiPct: 5.5 });
+      expect(second.sent).toBe(true);
+      // The message body should mention spread widened
+      const callBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+      expect(callBody.text).toContain('ARB SPREAD WIDENED');
+    });
+  });
+
+  // ── Vanishing alert ──────────────────────────────────────────
+
+  describe('vanishing', () => {
+    it('detectVanishing returns true when ROI dropped >50%', () => {
+      _setPreviousRoi('v1', 10.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'v1', roiPct: 4.0 };
+      expect(detectVanishing(arb)).toBe(true);
+    });
+
+    it('detectVanishing returns false when ROI dropped ≤50%', () => {
+      _setPreviousRoi('v2', 10.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'v2', roiPct: 5.5 };
+      expect(detectVanishing(arb)).toBe(false);
+    });
+
+    it('detectVanishing returns false when ROI increased', () => {
+      _setPreviousRoi('v3', 5.0);
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'v3', roiPct: 8.0 };
+      expect(detectVanishing(arb)).toBe(false);
+    });
+
+    it('detectVanishing returns false when no previous ROI tracked', () => {
+      const arb: ArbAlertInput = { ...baseArb, marketId: 'v-new' };
+      expect(detectVanishing(arb)).toBe(false);
+    });
+
+    it('formatVanishingMessage contains correct emoji and labels', () => {
+      const msg = formatVanishingMessage(baseArb, 10.0);
+      expect(msg).toContain('⚠️');
+      expect(msg).toContain('ARB VANISHING');
+      expect(msg).toContain('Act now — spread is closing fast!');
+    });
+
+    it('checkAndSendAlert sends vanishing alert even during cooldown', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+
+      _setPreviousRoi('vanish-market', 10.0);
+      // First alert establishes cooldown
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 1 } }),
+      });
+      // Second call triggers vanishing alert
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 2 } }),
+      });
+
+      const first = await checkAndSendAlert({ ...baseArb, marketId: 'vanish-market', roiPct: 10.0 });
+      expect(first.sent).toBe(true);
+
+      const second = await checkAndSendAlert({ ...baseArb, marketId: 'vanish-market', roiPct: 3.0 });
+      expect(second.sent).toBe(true);
+      const callBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+      expect(callBody.text).toContain('ARB VANISHING');
+    });
+  });
+
+  // ── Resolved market alert ────────────────────────────────────
+
+  describe('market resolved', () => {
+    it('detectResolved returns true for new expired market', () => {
+      expect(detectResolved('r1', 'Some Market Title', true)).toBe(true);
+    });
+
+    it('detectResolved returns false for already-resolved market', () => {
+      expect(detectResolved('r1b', 'Same Market', true)).toBe(true);
+      // Second call: already resolved
+      expect(detectResolved('r1b', 'Same Market', true)).toBe(false);
+    });
+
+    it('detectResolved returns false when not expired', () => {
+      expect(detectResolved('r2', 'Active Market', false)).toBe(false);
+    });
+
+    it('formatResolvedMessage contains correct emoji and labels', () => {
+      const msg = formatResolvedMessage('Some Market', 'mrkt-1');
+      expect(msg).toContain('🏁');
+      expect(msg).toContain('MARKET RESOLVED');
+      expect(msg).toContain('expired or been resolved');
+    });
+
+    it('sendResolvedAlert sends alert for new resolved market', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 5 } }),
+      });
+
+      const result = await sendResolvedAlert('Resolved Market', 'rm-1');
+      expect(result.sent).toBe(true);
+      expect(result.messageId).toBe(5);
+    });
+
+    it('sendResolvedAlert skips already-alerted market', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+
+      // First call marks as resolved
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 5 } }),
+      });
+
+      const first = await sendResolvedAlert('Same Market', 'rm-2');
+      expect(first.sent).toBe(true);
+
+      // Second call should skip
+      const second = await sendResolvedAlert('Same Market', 'rm-2');
+      expect(second.sent).toBe(false);
+      expect(second.reason).toContain('Already alerted');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -372,6 +590,18 @@ describe('telegram-alerts', () => {
       expect(result.sent).toBe(false);
       expect(result.error).toBe('Unauthorized');
     });
+
+    it('records ROI after sending alert', async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({ ok: true, result: { message_id: 1 } }),
+      });
+
+      await checkAndSendAlert(baseArb);
+      expect(_getPreviousRoi('market-123')).toBe(5.2);
+    });
   });
 
   // ── sendBatchAlerts ──────────────────────────────────────────
@@ -470,6 +700,38 @@ describe('telegram-alerts', () => {
       const result = await sendTestMessage('bad-tok', 'chat');
       expect(result.sent).toBe(false);
       expect(result.error).toBe('Bad token');
+    });
+  });
+
+  // ── Test helper exports ──────────────────────────────────────
+
+  describe('test helpers', () => {
+    it('_resetCooldown clears cooldown map', () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'tok';
+      process.env.TELEGRAM_CHAT_ID = '-100';
+      mockFetch.mockResolvedValue({
+        json: async () => ({ ok: true, result: { message_id: 1 } }),
+      });
+      checkAndSendAlert(baseArb);
+      _resetCooldown();
+      // Should allow immediate re-send
+      const result = shouldAlert(baseArb, baseConfig);
+      expect(result.shouldAlert).toBe(true);
+    });
+
+    it('_resetPreviousRoi clears ROI tracking', () => {
+      _setPreviousRoi('test-mkt', 5.0);
+      expect(_getPreviousRoi('test-mkt')).toBe(5.0);
+      _resetPreviousRoi();
+      expect(_getPreviousRoi('test-mkt')).toBeUndefined();
+    });
+
+    it('_resetResolved clears resolved markets', () => {
+      _resetResolved();
+      expect(detectResolved('fresh-mkt', 'Fresh', true)).toBe(true);
+      expect(detectResolved('fresh-mkt', 'Fresh', true)).toBe(false);
+      _resetResolved();
+      expect(detectResolved('fresh-mkt', 'Fresh', true)).toBe(true);
     });
   });
 });

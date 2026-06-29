@@ -25,6 +25,10 @@ import {
   Tooltip,
   Legend,
   Cell,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
 } from "recharts";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -65,12 +69,33 @@ interface ActiveArb {
   scanned_at: string;
 }
 
+interface MarketCoverageItem {
+  name: string;
+  value: number;
+}
+
+interface ProfitTimelinePoint {
+  time: string;
+  profit: number;
+}
+
+interface LifecycleFunnel {
+  found: number;
+  active: number;
+  recurring: number;
+  vanished: number;
+  expired: number;
+}
+
 interface DashboardData {
   kpis: KPISummary;
   scansPerDay: ScanPerDay[];
   roiDistribution: ROIBucket[];
   timeline: TimelinePoint[];
   topActiveArbs: ActiveArb[];
+  marketCoverage: MarketCoverageItem[];
+  profitTimeline: ProfitTimelinePoint[];
+  lifecycleFunnel: LifecycleFunnel;
   range: string;
 }
 
@@ -404,66 +429,230 @@ export function DashboardPanel() {
             </Panel>
           </div>
 
-          {/* ── Row 2: ROI Histogram ───────────────────────── */}
-          <Panel
-            title="ROI Distribution"
-            icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
-            rightElement={
-              <span className="text-xs text-[#8A9BA8]">
-                Net of fees
-              </span>
-            }
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart
-                data={data!.roiDistribution.map((b) => ({
-                  ...b,
-                  color:
-                    b.low >= 10
-                      ? "#5DBE81"
-                      : b.low >= 5
-                        ? "#facc15"
-                        : b.low >= 2
-                          ? "#5DBE81"
-                          : "#5E6875",
-                }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: "#8A9BA8" }}
-                />
-                <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
-                <Tooltip
-                  content={({ active, payload }: any) => {
-                    if (!active || !payload?.length) return null;
-                    return (
-                      <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                        <p className="text-xs text-[#8A9BA8]">
-                          ROI {payload[0]?.payload?.label}
-                        </p>
-                        <p className="text-xs font-mono text-[#5DBE81]">
-                          {payload[0].value} scans
-                        </p>
-                      </div>
-                    );
-                  }}
-                />
-                <Bar dataKey="count" name="Scans" radius={[4, 4, 0, 0]} maxBarSize={80}>
-                  {data!.roiDistribution.map((b, i) => {
-                    const c =
+          {/* ── Row 2: ROI Histogram + Market Coverage ──────── */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* ROI Distribution */}
+            <Panel
+              title="ROI Distribution"
+              icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
+              rightElement={
+                <span className="text-xs text-[#8A9BA8]">
+                  Net of fees
+                </span>
+              }
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart
+                  data={data!.roiDistribution.map((b) => ({
+                    ...b,
+                    color:
                       b.low >= 10
                         ? "#5DBE81"
                         : b.low >= 5
                           ? "#facc15"
                           : b.low >= 2
                             ? "#5DBE81"
-                            : "#5E6875";
-                    return <Cell key={i} fill={c} opacity={b.count > 0 ? 1 : 0.15} />;
-                  })}
-                </Bar>
-              </BarChart>
+                            : "#5E6875",
+                  }))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "#8A9BA8" }}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
+                  <Tooltip
+                    content={({ active, payload }: any) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                          <p className="text-xs text-[#8A9BA8]">
+                            ROI {payload[0]?.payload?.label}
+                          </p>
+                          <p className="text-xs font-mono text-[#5DBE81]">
+                            {payload[0].value} scans
+                          </p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="count" name="Scans" radius={[4, 4, 0, 0]} maxBarSize={80}>
+                    {data!.roiDistribution.map((b, i) => {
+                      const c =
+                        b.low >= 10
+                          ? "#5DBE81"
+                          : b.low >= 5
+                            ? "#facc15"
+                            : b.low >= 2
+                              ? "#5DBE81"
+                              : "#5E6875";
+                      return <Cell key={i} fill={c} opacity={b.count > 0 ? 1 : 0.15} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            {/* Market Coverage (donut chart) */}
+            <Panel
+              title="Market Coverage"
+              icon={<Globe className="w-4 h-4 text-[#a855f7]" />}
+              rightElement={
+                <span className="text-xs text-[#8A9BA8]">
+                  By domain
+                </span>
+              }
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={data!.marketCoverage}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }: any) =>
+                      percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
+                    }
+                    labelLine={false}
+                  >
+                    {data!.marketCoverage.map((_: any, i: number) => {
+                      const COLORS: Record<string, string> = {
+                        Politics: "#5DBE81",
+                        Sports: "#facc15",
+                        Crypto: "#a855f7",
+                        Economics: "#60a5fa",
+                        Entertainment: "#ef4444",
+                        Other: "#5E6875",
+                      };
+                      return (
+                        <Cell
+                          key={i}
+                          fill={COLORS[data!.marketCoverage[i].name] || "#5E6875"}
+                          stroke="transparent"
+                        />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }: any) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                          <p className="text-xs font-semibold" style={{ color: payload[0].color }}>
+                            {payload[0].name}
+                          </p>
+                          <p className="text-xs font-mono text-[#8A9BA8]">
+                            {payload[0].value} markets
+                          </p>
+                        </div>
+                      );
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </Panel>
+          </div>
+
+          {/* ── Row 3: Profit Timeline (area chart) ──────────── */}
+          <Panel
+            title="Arb Profit Timeline"
+            icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
+            rightElement={
+              <span className="text-xs text-[#8A9BA8]">
+                Potential profit per hour
+              </span>
+            }
+          >
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={data!.profitTimeline}>
+                <defs>
+                  <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#5DBE81" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#5DBE81" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fontSize: 10, fill: "#8A9BA8" }}
+                  tickFormatter={(val: string) => val.slice(5)}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "#5DBE81" }}
+                  tickFormatter={(v: number) => `$${v}`}
+                />
+                <Tooltip
+                  content={({ active, payload }: any) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                        <p className="text-xs text-[#8A9BA8]">{payload[0]?.payload?.time}</p>
+                        <p className="text-xs font-mono text-[#5DBE81]">
+                          {fmtUsd(payload[0].value)}
+                        </p>
+                      </div>
+                    );
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  name="Profit"
+                  stroke="#5DBE81"
+                  strokeWidth={2}
+                  fill="url(#profitGrad)"
+                  connectNulls
+                />
+              </AreaChart>
             </ResponsiveContainer>
+          </Panel>
+
+          {/* ── Row 4: Lifecycle Funnel ─────────────────────── */}
+          <Panel
+            title="Arb Lifecycle Funnel"
+            icon={<Layers className="w-4 h-4 text-[#facc15]" />}
+            rightElement={
+              <span className="text-xs text-[#8A9BA8]">
+                Found → Active → Recurring → Vanished → Expired
+              </span>
+            }
+          >
+            <div className="space-y-3">
+              {(() => {
+                const funnel = data!.lifecycleFunnel;
+                const stages = [
+                  { label: "Found", value: funnel.found, color: "#5DBE81" },
+                  { label: "Active", value: funnel.active, color: "#facc15" },
+                  { label: "Recurring", value: funnel.recurring, color: "#a855f7" },
+                  { label: "Vanished", value: funnel.vanished, color: "#ef4444" },
+                  { label: "Expired", value: funnel.expired, color: "#5E6875" },
+                ];
+                const maxVal = Math.max(...stages.map((s) => s.value), 1);
+                return stages.map((stage) => (
+                  <div key={stage.label} className="flex items-center gap-3">
+                    <span className="text-xs font-medium w-20 text-[#8A9BA8] text-right shrink-0">
+                      {stage.label}
+                    </span>
+                    <div className="flex-1 bg-[#0E1621] rounded-full overflow-hidden" style={{ height: 24 }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max((stage.value / maxVal) * 100, stage.value > 0 ? 2 : 0)}%`,
+                          backgroundColor: stage.color,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono font-semibold w-12 text-right shrink-0" style={{ color: stage.color }}>
+                      {stage.value.toLocaleString()}
+                    </span>
+                  </div>
+                ));
+              })()}
+            </div>
           </Panel>
 
           {/* ── Row 3: Top Active Arbs Table ───────────────── */}
