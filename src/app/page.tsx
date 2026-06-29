@@ -691,7 +691,7 @@ export default function Home() {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kalshiUrl: kUrl, polymarketUrl: pUrl, capital: capital }),
+        body: JSON.stringify({ kalshiUrl: kUrl, polymarketUrl: pUrl, capital: capital, skipAutoMatch: matchMode === "manual" }),
       });
       const data = await res.json();
       if (res.ok) {

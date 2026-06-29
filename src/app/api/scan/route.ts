@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { kalshiUrl, polymarketUrl } = body;
+    const { kalshiUrl, polymarketUrl, skipAutoMatch } = body;
 
     const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
     const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
@@ -242,12 +242,51 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 1: auto-match
+    // Step 1: auto-match (skip if manual mode requested)
     const kalshiRawCount = kalshiMarkets.length;
-    const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
-
-    // Step 2: apply manual matches to merge auto-unmatched pairs
-    const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+    let outcomes;
+    if (skipAutoMatch) {
+      // Manual mode: don't auto-match anything — all markets are unmatched
+      outcomes = [
+        ...kalshiMarkets.map(km => ({
+          artist: km.yes_sub_title || km.title || km.ticker,
+          kalshi: {
+            ticker: km.ticker,
+            yesBid: parseFloat(km.yes_bid_dollars || '0'),
+            yesAsk: parseFloat(km.yes_ask_dollars || '1'),
+            noBid: parseFloat(km.no_bid_dollars || '0'),
+            noAsk: parseFloat(km.no_ask_dollars || '1'),
+            lastPrice: parseFloat(km.last_price_dollars || '0'),
+            yesAskDepth: km.yes_ask_size_fp,
+            noAskDepth: km.no_ask_size_fp,
+          },
+          polymarket: null,
+          arbitrage: { roiPct: 0, expectedProfit: 0, strategy: 'No arb', kalshiStake: 0, pmStake: 0, fees: null, apyPct: 0 },
+          platformA: 'kalshi' as const,
+          platformB: null,
+        })),
+        ...pmMarkets.map(pm => ({
+          artist: pm.groupItemTitle || pm.question || 'Unknown',
+          kalshi: null,
+          polymarket: {
+            conditionId: pm.conditionId,
+            marketId: pm.id,
+            yesPrice: parseFloat(JSON.parse(pm.outcomePrices || '["0","1"]')[0] || '0'),
+            noPrice: parseFloat(JSON.parse(pm.outcomePrices || '["0","1"]')[1] || '1'),
+            bestBid: pm.bestBid ?? 0,
+            bestAsk: pm.bestAsk ?? 0,
+            lastTradePrice: pm.lastTradePrice ?? 0,
+          },
+          arbitrage: { roiPct: 0, expectedProfit: 0, strategy: 'No arb', kalshiStake: 0, pmStake: 0, fees: null, apyPct: 0 },
+          platformA: null,
+          platformB: 'polymarket' as const,
+        })),
+      ];
+    } else {
+      const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
+      // Step 2: apply manual matches to merge auto-unmatched pairs
+      outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+    }
 
     // Step 2b: split decoupled pairs — user has explicitly unlinked these
     const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
