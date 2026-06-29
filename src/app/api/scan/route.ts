@@ -10,7 +10,7 @@ import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
-import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
+import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -355,7 +355,7 @@ export async function POST(request: NextRequest) {
           })),
         };
         await updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate);
-        // Record in global scan history
+        // Record in global scan history (JSON)
         await appendScanHistory({
           scanTimestamp: new Date().toISOString(),
           marketId: market.id,
@@ -363,6 +363,20 @@ export async function POST(request: NextRequest) {
           bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
           positiveArbCount: positiveArbs.length,
           matchedCount,
+        });
+        // Also persist to SQLite for Dashboard & Logs
+        await saveScanResult(market.id, {
+          bestRoiPct: scanResult.bestRoiPct,
+          bestProfit: scanResult.bestProfit,
+          strategy: scanResult.strategy,
+          outcomeCount: scanResult.outcomeCount,
+          matchedCount: scanResult.matchedCount,
+          kalshiCount: scanResult.kalshiCount,
+          pmCount: scanResult.pmCount,
+          positiveArbCount: scanResult.allArbs?.length ?? 0,
+          totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
+          scannedAt: scanResult.scannedAt,
+          raw: { allArbs: scanResult.allArbs },
         });
       }
     } catch (e) {
