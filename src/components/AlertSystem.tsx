@@ -324,6 +324,7 @@ function TelegramSettingsSection() {
   const [errorMsg, setErrorMsg] = useState("");
   const [minRoi, setMinRoi] = useState("1.0");
   const [minProfit, setMinProfit] = useState("1.0");
+  const [paused, setPaused] = useState(false);
 
   // Check if already configured via env
   useEffect(() => {
@@ -335,6 +336,7 @@ function TelegramSettingsSection() {
           if (data.minRoiPct != null) setMinRoi(String(data.minRoiPct));
           if (data.minProfitUsd != null) setMinProfit(String(data.minProfitUsd));
         }
+        setPaused(data.paused === true);
       })
       .catch(() => {});
   }, []);
@@ -386,9 +388,9 @@ function TelegramSettingsSection() {
       </p>
 
       {status === "configured" && (
-        <div className="text-xs text-[#5DBE81] flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#5DBE81]" />
-          Active — alerts fire automatically on positive arbs
+        <div className={`text-xs flex items-center gap-1.5 ${paused ? "text-[#facc15]" : "text-[#5DBE81]"}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${paused ? "bg-[#facc15]" : "bg-[#5DBE81]"}`} />
+          {paused ? "Paused — alerts suppressed (TELEGRAM_ALERTS_PAUSED=true)" : "Active — alerts fire automatically on positive arbs"}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfigFromEnv, sendTestMessage, sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
+import { getConfigFromEnv, sendTestMessage, sendBatchAlerts, isPaused, ArbAlertInput } from '@/lib/telegram-alerts';
 
 /**
  * GET /api/telegram-alerts
@@ -9,6 +9,7 @@ export async function GET() {
   const config = getConfigFromEnv();
   return NextResponse.json({
     configured: config !== null,
+    paused: isPaused(),
     minRoiPct: config?.minRoiPct ?? null,
     minProfitUsd: config?.minProfitUsd ?? null,
     cooldownMs: config?.cooldownMs ?? null,

@@ -5,29 +5,104 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-29T21:26:40.147Z",
-  "finishedAt": "2026-06-29T21:28:17.219Z",
-  "durationMs": 97072,
-  "successCount": 159,
-  "failureCount": 3,
-  "skippedCount": 380,
-  "avgScanMs": 1792,
+  "startedAt": "2026-06-29T21:42:18.638Z",
+  "finishedAt": "2026-06-29T21:42:38.744Z",
+  "durationMs": 20106,
+  "successCount": 8,
+  "failureCount": 18,
+  "skippedCount": 516,
+  "avgScanMs": 22015,
   "maxScanMs": 30000,
   "errors": [
     {
-      "market": "World Cup Winner ",
-      "error": "timeout after 30000ms",
+      "market": "Wisconsin Governor Democratic Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "2026 NHL Stanley Cup Champion ",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Top Spotify Artist 2026",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "FL-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-03 Primary Winners",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Alaska Governor Election Winner  ",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will win the 2026 Fields Medal?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "NY-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Which bills will become law in 2026?",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Top Coding AI this month",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-01 Republican Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Peru Presidential Election Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "Alabama Democratic Senate Primary Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "World Cup Group E Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "World Cup Group B Winner",
+      "error": "fetch failed",
+      "durationMs": 30000
+    },
+    {
+      "market": "World Cup Group A Winner",
+      "error": "fetch failed",
       "durationMs": 30000
     },
     {
       "market": "CA-40 House Election Winner",
-      "error": "HTTP 404",
-      "durationMs": 151
+      "error": "fetch failed",
+      "durationMs": 30000
     },
     {
       "market": "ME-02 House Election Winner",
-      "error": "HTTP 404",
-      "durationMs": 132
+      "error": "fetch failed",
+      "durationMs": 30000
     }
   ]
 }
