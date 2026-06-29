@@ -2,443 +2,571 @@
 
 import {
   Activity,
-  Heart,
   TrendingUp,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
+  Zap,
+  Target,
+  Globe,
+  RefreshCw,
   BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
+  Layers,
+  AlertTriangle,
+  Eye,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Cell,
+} from "recharts";
 
-interface DashboardStats {
-  totalMarkets: number;
-  totalProfit: number;
-  arbOpportunities: number;
+// ── Types ────────────────────────────────────────────────────────
+interface KPISummary {
+  totalArbsFound: number;
+  activeArbs: number;
+  totalScans: number;
   avgRoi: number;
-  lastScan: string | null;
-  health: "healthy" | "degraded" | "unhealthy";
-  uptime: number;
-}
-
-interface ScanHistoryEntry {
-  scanTimestamp: string;
-  marketId: string;
+  marketsTracked: number;
   totalProfit: number;
-  bestRoiPct: number;
-  positiveArbCount: number;
-  matchedCount: number;
 }
 
+interface ScanPerDay {
+  date: string;
+  count: number;
+}
+
+interface ROIBucket {
+  label: string;
+  low: number;
+  high: number;
+  count: number;
+}
+
+interface TimelinePoint {
+  time: string;
+  scans: number;
+  avgRoi: number;
+}
+
+interface ActiveArb {
+  id: number;
+  market_id: string;
+  best_roi_pct: number;
+  best_profit: number;
+  strategy: string;
+  positive_arb_count: number;
+  scanned_at: string;
+}
+
+interface DashboardData {
+  kpis: KPISummary;
+  scansPerDay: ScanPerDay[];
+  roiDistribution: ROIBucket[];
+  timeline: TimelinePoint[];
+  topActiveArbs: ActiveArb[];
+  range: string;
+}
+
+type RangeKey = "today" | "7d" | "30d" | "90d" | "all";
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7 Days" },
+  { key: "30d", label: "30 Days" },
+  { key: "90d", label: "90 Days" },
+  { key: "all", label: "All" },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────
+const fmtPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+const fmtUsd = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  });
+
+const fmtShortDate = (s: string) => {
+  const d = new Date(s);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const fmtTime = (s: string) => {
+  const d = new Date(s);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+// ── Reusable card wrapper ────────────────────────────────────────
+function Panel({
+  title,
+  icon,
+  children,
+  rightElement,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  rightElement?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold flex items-center gap-1.5">
+          {icon}
+          {title}
+        </h3>
+        {rightElement}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Empty state ──────────────────────────────────────────────────
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="py-16 text-center text-sm text-[#5E6875]">
+      <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
+      {message}
+    </div>
+  );
+}
+
+// ── Custom tooltip for charts ────────────────────────────────────
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+      <p className="text-xs text-[#8A9BA8] mb-1">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <p key={i} className="text-xs font-mono" style={{ color: entry.color }}>
+          {entry.name}: {entry.value}
+        </p>
+      ))}
+    </div>
+  );
+};
+
+// ── Main Component ───────────────────────────────────────────────
 export function DashboardPanel() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
-  const [histLoading, setHistLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [range, setRange] = useState<RangeKey>("30d");
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Main stats
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/dashboard/stats?range=${range}`,
+        { cache: "no-store" }
+      );
+      const json = await res.json();
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setData(json);
+        setError("");
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to fetch dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, [range]);
+
   useEffect(() => {
-    fetch("/api/healthz", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((h) => {
-        fetch("/api/saved-markets", { cache: "no-store" })
-          .then((r) => r.json())
-          .then((d) => {
-            const markets = d.markets || [];
-            const totalProfit = markets.reduce(
-              (s: number, m: any) => s + (m.lastScanResult?.totalProfit ?? 0),
-              0
-            );
-            const arbOpps = markets.filter(
-              (m: any) => (m.lastScanResult?.positiveArbCount ?? 0) > 0
-            ).length;
-            const avgRoi =
-              markets.length > 0
-                ? markets.reduce(
-                    (s: number, m: any) => s + (m.lastScanResult?.bestRoiPct ?? 0),
-                    0
-                  ) / markets.length
-                : 0;
+    fetchData();
+  }, [fetchData]);
 
-            setStats({
-              totalMarkets: markets.length,
-              totalProfit,
-              arbOpportunities: arbOpps,
-              avgRoi,
-              lastScan: h.lastScanAt,
-              health: h.status,
-              uptime: h.uptimeSeconds ?? 0,
-            });
-            setLoading(false);
-          });
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  // Scan history
+  // Auto-refresh every 60s
   useEffect(() => {
-    fetch("/api/scan-history?limit=100", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        setHistory(d.history || []);
-        setHistLoading(false);
-      })
-      .catch(() => setHistLoading(false));
-  }, []);
+    if (!autoRefresh) return;
+    const iv = setInterval(fetchData, 60000);
+    return () => clearInterval(iv);
+  }, [autoRefresh, fetchData]);
 
   if (loading) {
     return (
       <div className="py-20 text-center text-sm text-[#5E6875]">
         <Activity className="w-6 h-6 animate-spin mx-auto mb-3" />
-        Loading dashboard...
+        Loading dashboard…
       </div>
     );
   }
 
-  if (!stats) {
+  if (!data && error) {
     return (
       <div className="py-20 text-center text-sm text-[#ef4444]">
         <AlertTriangle className="w-6 h-6 mx-auto mb-3" />
-        Failed to load dashboard data.
+        {error}
       </div>
     );
   }
 
-  const formatCurrency = (n: number) =>
-    n >= 1000
-      ? `$${(n / 1000).toFixed(1)}k`
-      : `$${n.toFixed(0)}`;
-
-  const formatPercent = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
-
-  const healthColor =
-    stats.health === "healthy"
-      ? "text-[#5DBE81]"
-      : stats.health === "degraded"
-        ? "text-[#facc15]"
-        : "text-[#ef4444]";
-
-  const healthBg =
-    stats.health === "healthy"
-      ? "bg-[#5DBE81]/10 border-[#5DBE81]/20"
-      : stats.health === "degraded"
-        ? "bg-[#facc15]/10 border-[#facc15]/20"
-        : "bg-[#ef4444]/10 border-[#ef4444]/20";
-
-  // ── Scan history derived values ────────────────────────────────
-  const hasHistory = !histLoading && history.length > 0;
-
-  // Avg spread (mean of bestRoiPct across all history entries)
-  const avgSpread = hasHistory
-    ? history.reduce((s, e) => s + e.bestRoiPct, 0) / history.length
-    : 0;
-
-  // Top 5 best scans by ROI
-  const top5Scans = hasHistory
-    ? [...history]
-        .sort((a, b) => b.bestRoiPct - a.bestRoiPct)
-        .slice(0, 5)
-    : [];
-
-  // Bar chart: last 40 scans (most recent first), normalized to max ROI
-  const chartBars = hasHistory
-    ? [...history].slice(0, 40)
-    : [];
-  const maxRoiInChart = chartBars.length
-    ? Math.max(...chartBars.map((b) => Math.abs(b.bestRoiPct)), 1)
-    : 1;
-
-  const barColor = (roi: number) => {
-    if (roi >= 5) return "#5DBE81";
-    if (roi >= 1) return "#facc15";
-    if (roi > 0) return "#5DBE81";
-    return "#ef4444";
-  };
+  const kpis = data!.kpis;
+  const hasData = kpis.totalScans > 0;
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
           <Activity className="w-5 h-5 text-[#5DBE81]" />
           Dashboard
         </h2>
-        <div
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${healthBg}`}
-        >
-          {stats.health === "healthy" ? (
-            <CheckCircle className={`w-3.5 h-3.5 ${healthColor}`} />
-          ) : (
-            <AlertTriangle className={`w-3.5 h-3.5 ${healthColor}`} />
-          )}
-          <span className={`text-xs font-medium capitalize ${healthColor}`}>
-            {stats.health}
-          </span>
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
-          label="Total Markets"
-          value={stats.totalMarkets.toString()}
-          color="#5DBE81"
-        />
-        <StatCard
-          icon={<Heart className="w-4 h-4 text-[#ef4444]" />}
-          label="Arb Opportunities"
-          value={stats.arbOpportunities.toString()}
-          color="#ef4444"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
-          label="Total Profit"
-          value={formatCurrency(stats.totalProfit)}
-          color="#facc15"
-        />
-        <StatCard
-          icon={<Clock className="w-4 h-4 text-[#5E6875]" />}
-          label="Avg ROI"
-          value={formatPercent(stats.avgRoi)}
-          color="#5E6875"
-        />
-      </div>
-
-      {/* ── Scan History Bar Chart ─────────────────────────────── */}
-      <div className="rounded-lg border border-[#182533] bg-[#17212B] p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold flex items-center gap-1.5">
-            <BarChart3 className="w-4 h-4 text-[#5DBE81]" />
-            Scan History
-          </h3>
-          <span className="text-xs text-[#5E6875]">
-            {chartBars.length} scans · last {Math.round(avgSpread, 1)}% avg ROI
-          </span>
-        </div>
-
-        {!hasHistory && (
-          <div className="text-xs text-[#5E6875] text-center py-6">
-            No scan history yet — run a scan to populate the chart.
-          </div>
-        )}
-
-        {hasHistory && (
-          <>
-            {/* Zero baseline label */}
-            <div className="relative h-32 mb-1">
-              {/* Baseline line */}
-              <div className="absolute left-0 right-0 top-1/2 border-t border-dashed border-[#182533]" />
-
-              {/* Bars */}
-              <div className="absolute inset-0 flex items-end gap-px">
-                {chartBars.map((bar, i) => {
-                  const absRoi = Math.abs(bar.bestRoiPct);
-                  const heightPct = Math.max((absRoi / maxRoiInChart) * 100, 2);
-                  const isPositive = bar.bestRoiPct >= 0;
-                  const color = barColor(bar.bestRoiPct);
-
-                  return (
-                    <div
-                      key={i}
-                      className="flex-1 min-w-[2px] flex flex-col justify-end group relative"
-                      style={{ height: "100%" }}
-                      title={`${new Date(bar.scanTimestamp).toLocaleTimeString()} · ${formatPercent(bar.bestRoiPct)} · ${bar.positiveArbCount} arbs`}
-                    >
-                      {/* Bar fills from center outward */}
-                      <div
-                        className="w-full rounded-sm transition-all duration-200 hover:brightness-125"
-                        style={{
-                          height: `${heightPct}%`,
-                          backgroundColor: color,
-                          opacity: 0.85,
-                          alignSelf: isPositive ? "flex-start" : "flex-end",
-                          marginTop: isPositive ? "auto" : 0,
-                          marginBottom: isPositive ? 0 : "auto",
-                        }}
-                      />
-                      {/* Tooltip on hover */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#0E1621] border border-[#182533] text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
-                        <div className="font-mono text-white">{formatPercent(bar.bestRoiPct)}</div>
-                        <div className="text-[#5E6875]">{bar.positiveArbCount} arbs</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Scale labels */}
-            <div className="flex justify-between text-[10px] text-[#5E6875] font-mono mt-1">
-              <span>-{maxRoiInChart.toFixed(1)}%</span>
-              <span>0%</span>
-              <span>+{maxRoiInChart.toFixed(1)}%</span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Best Arb Trend ─────────────────────────────────────── */}
-      {hasHistory && top5Scans.length > 0 && (
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-4">
-          <h3 className="text-sm font-semibold flex items-center gap-1.5 mb-3">
-            <TrendingUp className="w-4 h-4 text-[#facc15]" />
-            Best Arb Trend
-          </h3>
-          <div className="space-y-2">
-            {top5Scans.map((scan, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between py-1.5 px-2 rounded-md bg-[#0E1621] border border-[#182533]"
+        <div className="flex items-center gap-3">
+          {/* Date range selector */}
+          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setRange(opt.key)}
+                className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                  range === opt.key
+                    ? "bg-[#5DBE81]/20 text-[#5DBE81]"
+                    : "text-[#5E6875] hover:text-[#FFFFFF]"
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                    style={{
-                      backgroundColor: i === 0 ? "#facc15" : i < 3 ? "#5DBE81" : "#5E6875",
-                      color: i === 0 ? "#0E1621" : "#fff",
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <div>
-                    <div className="text-xs font-medium text-white">
-                      {scan.bestRoiPct >= 1 ? "🟢" : scan.bestRoiPct > 0 ? "🟡" : "🔴"}{" "}
-                      {formatPercent(scan.bestRoiPct)}
-                    </div>
-                    <div className="text-[10px] text-[#5E6875]">
-                      {new Date(scan.scanTimestamp).toLocaleString()} · {scan.positiveArbCount}{" "}
-                      arbs · {scan.matchedCount} matched
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-mono text-[#5DBE81]">
-                    {formatCurrency(scan.totalProfit)}
-                  </div>
-                  <div className="text-[10px] text-[#5E6875]">profit</div>
-                </div>
-              </div>
+                {opt.label}
+              </button>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* ── Avg Spread ─────────────────────────────────────────── */}
-      {hasHistory && (
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-4">
-          <h3 className="text-sm font-semibold flex items-center gap-1.5 mb-3">
-            <BarChart3 className="w-4 h-4 text-[#facc15]" />
-            Avg Spread
-          </h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[#5DBE81]">
-                {avgSpread.toFixed(1)}%
-              </div>
-              <div className="text-[10px] text-[#5E6875] mt-1">Mean ROI</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[#facc15]">
-                {history
-                  .reduce((s, e) => s + e.totalProfit, 0)
-                  .toFixed(0)}
-              </div>
-              <div className="text-[10px] text-[#5E6875] mt-1">Total Profit ($)</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[#FFFFFF]">
-                {history.length}
-              </div>
-              <div className="text-[10px] text-[#5E6875] mt-1">Scans</div>
-            </div>
-          </div>
-          {/* Spread distribution mini chart */}
-          <div className="mt-3 flex items-end gap-0.5 h-8">
-            {(() => {
-              const buckets = [
-                { label: "<1%", range: [-Infinity, 1], count: 0 },
-                { label: "1-3%", range: [1, 3], count: 0 },
-                { label: "3-5%", range: [3, 5], count: 0 },
-                { label: "5-10%", range: [5, 10], count: 0 },
-                { label: ">10%", range: [10, Infinity], count: 0 },
-              ];
-              history.forEach((e) => {
-                const roi = e.bestRoiPct;
-                for (let bi = 0; bi < buckets.length; bi++) {
-                  const [lo, hi] = buckets[bi].range;
-                  if (roi >= lo && roi < hi) {
-                    buckets[bi].count++;
-                    break;
-                  }
-                }
-              });
-              const maxBucket = Math.max(...buckets.map((b) => b.count), 1);
-              return buckets.map((b, i) => (
-                <div
-                  key={i}
-                  className="flex-1 flex flex-col items-center justify-end h-full"
-                >
-                  <div
-                    className="w-full rounded-t-sm transition-all"
-                    style={{
-                      height: `${Math.max((b.count / maxBucket) * 100, 4)}%`,
-                      backgroundColor:
-                        i === 0
-                          ? "#5E6875"
-                          : i === 1
-                            ? "#5DBE81"
-                            : i === 2
-                              ? "#facc15"
-                              : i === 3
-                                ? "#5DBE81"
-                                : "#5DBE81",
-                      opacity: b.count > 0 ? 0.85 : 0.2,
-                    }}
-                  />
-                </div>
-              ));
-            })()}
-          </div>
-          <div className="flex justify-between text-[9px] text-[#5E6875] mt-1 font-mono">
-            <span>&lt;1%</span>
-            <span>1-3%</span>
-            <span>3-5%</span>
-            <span>5-10%</span>
-            <span>&gt;10%</span>
-          </div>
-        </div>
-      )}
-
-      {/* Uptime */}
-      <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[#5E6875]">Server Uptime</span>
-          <span className="text-xs font-mono text-[#FFFFFF]">
-            {Math.floor(stats.uptime / 3600)}h{" "}
-            {(Math.floor(stats.uptime / 60) % 60)}m
-          </span>
+          {/* Auto-refresh toggle */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+              autoRefresh
+                ? "bg-[#5DBE81]/10 text-[#5DBE81] border-[#5DBE81]/30"
+                : "bg-[#182533] text-[#8A9BA8] border-[#182533] hover:text-[#FFFFFF]"
+            }`}
+            title="Auto-refresh every 60s"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${autoRefresh ? "animate-spin" : ""}`} />
+            {autoRefresh ? "On" : "Off"}
+          </button>
         </div>
       </div>
 
-      {/* Last scan */}
-      {stats.lastScan && (
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[#5E6875]">Last Auto-Scan</span>
-            <span className="text-xs font-mono text-[#FFFFFF]">
-              {new Date(stats.lastScan).toLocaleString()}
-            </span>
+      {/* ── 5 KPI Cards ──────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KPICard
+          icon={<Zap className="w-4 h-4" />}
+          label="Total Arbs Found"
+          value={kpis.totalArbsFound.toLocaleString()}
+          color="#5DBE81"
+        />
+        <KPICard
+          icon={<Eye className="w-4 h-4" />}
+          label="Active Arbs Now"
+          value={kpis.activeArbs.toLocaleString()}
+          color="#facc15"
+        />
+        <KPICard
+          icon={<BarChart3 className="w-4 h-4" />}
+          label="Total Scans"
+          value={kpis.totalScans.toLocaleString()}
+          color="#FFFFFF"
+        />
+        <KPICard
+          icon={<TrendingUp className="w-4 h-4" />}
+          label="Avg ROI"
+          value={fmtPct(kpis.avgRoi)}
+          color={kpis.avgRoi > 0 ? "#5DBE81" : "#ef4444"}
+        />
+        <KPICard
+          icon={<Globe className="w-4 h-4" />}
+          label="Markets Tracked"
+          value={kpis.marketsTracked.toString()}
+          color="#a855f7"
+        />
+      </div>
+
+      {!hasData ? (
+        <EmptyState message="No scan data yet. Run a scan to populate the dashboard." />
+      ) : (
+        <>
+          {/* ── Row 1: Timeline + Scans Per Day ──────────── */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* Arb Discovery Timeline (line chart) */}
+            <Panel
+              title="Arb Discovery Timeline"
+              icon={<Activity className="w-4 h-4 text-[#5DBE81]" />}
+              rightElement={
+                <span className="text-xs text-[#5E6875]">
+                  Scans &amp; ROI trend
+                </span>
+              }
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={data!.timeline}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 10, fill: "#5E6875" }}
+                    tickFormatter={(val: string) => val.slice(5)}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 10, fill: "#5DBE81" }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 10, fill: "#facc15" }}
+                    domain={[0, "dataMax"]}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="scans"
+                    name="Scans"
+                    stroke="#5DBE81"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgRoi"
+                    name="Avg ROI %"
+                    stroke="#facc15"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            {/* Scans Per Day (bar chart) */}
+            <Panel
+              title="Scans Per Day"
+              icon={<BarChart3 className="w-4 h-4 text-[#5DBE81]" />}
+              rightElement={
+                <span className="text-xs text-[#5E6875]">
+                  Last 30 days
+                </span>
+              }
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data!.scansPerDay}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: "#5E6875" }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: "#5E6875" }} allowDecimals={false} />
+                  <Tooltip
+                    content={({ active, payload, label }: any) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                          <p className="text-xs text-[#8A9BA8]">{fmtShortDate(label)}</p>
+                          <p className="text-xs font-mono text-[#5DBE81]">
+                            {payload[0].value} scans
+                          </p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="count" name="Scans" radius={[3, 3, 0, 0]}>
+                    {data!.scansPerDay.map((_, i) => (
+                      <Cell
+                        key={i}
+                        fill={
+                          data!.scansPerDay[i].count > 0
+                            ? "#5DBE81"
+                            : "#182533"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
           </div>
+
+          {/* ── Row 2: ROI Histogram ───────────────────────── */}
+          <Panel
+            title="ROI Distribution"
+            icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
+            rightElement={
+              <span className="text-xs text-[#5E6875]">
+                Net of fees
+              </span>
+            }
+          >
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart
+                data={data!.roiDistribution.map((b) => ({
+                  ...b,
+                  color:
+                    b.low >= 10
+                      ? "#5DBE81"
+                      : b.low >= 5
+                        ? "#facc15"
+                        : b.low >= 2
+                          ? "#5DBE81"
+                          : "#5E6875",
+                }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "#8A9BA8" }}
+                />
+                <YAxis tick={{ fontSize: 10, fill: "#5E6875" }} allowDecimals={false} />
+                <Tooltip
+                  content={({ active, payload }: any) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                        <p className="text-xs text-[#8A9BA8]">
+                          ROI {payload[0]?.payload?.label}
+                        </p>
+                        <p className="text-xs font-mono text-[#5DBE81]">
+                          {payload[0].value} scans
+                        </p>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="count" name="Scans" radius={[4, 4, 0, 0]} maxBarSize={80}>
+                  {data!.roiDistribution.map((b, i) => {
+                    const c =
+                      b.low >= 10
+                        ? "#5DBE81"
+                        : b.low >= 5
+                          ? "#facc15"
+                          : b.low >= 2
+                            ? "#5DBE81"
+                            : "#5E6875";
+                    return <Cell key={i} fill={c} opacity={b.count > 0 ? 1 : 0.15} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Panel>
+
+          {/* ── Row 3: Top Active Arbs Table ───────────────── */}
+          <Panel
+            title="Top Active Arbs"
+            icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
+            rightElement={
+              <span className="text-xs text-[#5E6875]">
+                Sorted by ROI ↓ · Click to open scan
+              </span>
+            }
+          >
+            {data!.topActiveArbs.length === 0 ? (
+              <EmptyState message="No active arbitrage opportunities in this period." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#182533] bg-[#0E1621]">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        Market
+                      </th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        Strategy
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        ROI
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        Profit
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        Arbs
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                        Scanned
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data!.topActiveArbs.map((arb) => {
+                      const roiColor =
+                        arb.best_roi_pct >= 5
+                          ? "text-[#5DBE81]"
+                          : arb.best_roi_pct >= 0
+                            ? "text-[#facc15]"
+                            : "text-[#ef4444]";
+                      return (
+                        <tr
+                          key={arb.id}
+                          className="border-b border-[#182533] hover:bg-[#0E1621]/50 transition-colors cursor-pointer"
+                          onClick={() =>
+                            (window.location.href = `/?view=scan&id=${encodeURIComponent(arb.market_id)}`)
+                          }
+                          title="Click to open market scan"
+                        >
+                          <td
+                            className="px-3 py-2 text-xs font-medium text-[#FFFFFF] truncate max-w-[200px]"
+                            title={arb.market_id}
+                          >
+                            {arb.market_id}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={arb.strategy}>
+                            {arb.strategy || "—"}
+                          </td>
+                          <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>
+                            {fmtPct(arb.best_roi_pct)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">
+                            {fmtUsd(arb.best_profit)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-xs font-mono text-[#5DBE81]">
+                            {arb.positive_arb_count}
+                          </td>
+                          <td className="px-3 py-2 text-right text-xs text-[#5E6875] font-mono whitespace-nowrap">
+                            {fmtTime(arb.scanned_at)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </>
+      )}
+
+      {/* Footer note */}
+      {hasData && (
+        <div className="flex items-center justify-between text-xs text-[#5E6875]">
+          <span>All values net of fees</span>
+          <span>
+            Data range: {RANGE_OPTIONS.find((r) => r.key === range)?.label}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-function StatCard({
+// ── KPI Card ─────────────────────────────────────────────────────
+function KPICard({
   icon,
   label,
   value,
@@ -450,7 +578,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-2">
+    <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         {icon}
         <span className="text-[10px] text-[#5E6875]">{label}</span>
