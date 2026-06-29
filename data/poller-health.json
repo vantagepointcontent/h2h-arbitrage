@@ -1,17 +1,73 @@
 {
-  "status": "running",
+  "status": "degraded",
   "baseUrl": "http://100.86.7.30:3000",
   "concurrency": 3,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-29T20:20:28.980Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
-  "failureCount": 0,
-  "skippedCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "startedAt": "2026-06-29T20:43:52.519Z",
+  "finishedAt": "2026-06-29T21:10:25.388Z",
+  "durationMs": 1592869,
+  "successCount": 400,
+  "failureCount": 11,
+  "skippedCount": 131,
+  "avgScanMs": 11570,
+  "maxScanMs": 30000,
+  "errors": [
+    {
+      "market": "2026 NHL Stanley Cup Champion ",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Pro Baseball Champion",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "Who will be Trump's next Director of National Intelligence?",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "OK-01 Republican Primary Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "CA-40 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 256
+    },
+    {
+      "market": "ME-02 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 189
+    },
+    {
+      "market": "TX-08 House Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-11 House Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "TX-12 House Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "VT-AL House Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    },
+    {
+      "market": "WA-03 House Election Winner",
+      "error": "timeout after 30000ms",
+      "durationMs": 30000
+    }
+  ]
 }

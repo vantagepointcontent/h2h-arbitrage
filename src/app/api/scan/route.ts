@@ -11,6 +11,7 @@ import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyMan
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
+import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -378,6 +379,23 @@ export async function POST(request: NextRequest) {
           scannedAt: scanResult.scannedAt,
           raw: { allArbs: scanResult.allArbs },
         });
+
+        // ── Telegram alerts: fire if positive arbs found ──
+        if (positiveArbs.length > 0) {
+          const alertArbs: ArbAlertInput[] = positiveArbs.map(o => ({
+            marketTitle: pmEvent.title,
+            marketId: market.id,
+            roiPct: o.arbitrage!.roiPct,
+            expectedProfit: o.arbitrage!.expectedProfit,
+            strategy: o.arbitrage!.strategy,
+            totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
+            fees: o.arbitrage!.fees,
+          }));
+          // Fire-and-forget — don't block scan response on Telegram
+          sendBatchAlerts(alertArbs).catch(err => {
+            logger.trackError(err, { service: 'telegram-alerts', context: 'scan batch' });
+          });
+        }
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
