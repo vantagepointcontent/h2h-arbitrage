@@ -590,7 +590,7 @@ export default function Home() {
         stopPolling();
         setViewMode("overview");
         setActiveMarketId(null);
-        window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+        window.history.replaceState({ view: "markets" }, "", "/?view=markets");
       }
     };
     window.addEventListener("popstate", onPop);
@@ -622,6 +622,9 @@ export default function Home() {
           setViewMode("scan");
         }
       } else if (view === "overview") {
+        // Backwards compat: old ?view=overview URLs redirect to Markets (now "overview" viewMode)
+        setViewMode("overview");
+      } else if (view === "markets") {
         setViewMode("overview");
       } else if (view === "marketfinder") {
         setViewMode("marketfinder");
@@ -650,7 +653,7 @@ export default function Home() {
       } else if (view === "logs") {
         setViewMode("logs");
       } else {
-        setViewMode("overview");
+        setViewMode("dashboard");
       }
     };
     syncFromUrl();
@@ -840,7 +843,7 @@ export default function Home() {
         if (activeMarketId === id) {
           setActiveMarketId(null);
           setViewMode("overview");
-          window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+          window.history.replaceState({ view: "markets" }, "", "/?view=markets");
         }
       }
     } catch { /* ignore */ }
@@ -1046,7 +1049,7 @@ export default function Home() {
     stopPolling();
     setCouplingPanelOpen(false);
     setViewMode("overview");
-    window.history.replaceState({ view: "overview" }, "", "/?view=overview");
+    window.history.replaceState({ view: "markets" }, "", "/?view=markets");
   };
 
   const goToLogs = () => {
@@ -2374,9 +2377,13 @@ function MarketSidebar({
       <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
         {/* ── Navigation (moved from header) ── */}
         <div className="space-y-1">
+          <button onClick={onGoDashboard} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
+            <BarChart3 className="w-4 h-4" />
+            Dashboard
+          </button>
           <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <BarChart3 className="w-4 h-4" />
-            Overview
+            Markets
           </button>
           <button onClick={onGoScan} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Scan className="w-4 h-4" />
@@ -2389,10 +2396,6 @@ function MarketSidebar({
           <button onClick={() => window.location.href = '/?view=live'} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "live" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <Activity className="w-4 h-4" />
             Live WS
-          </button>
-          <button onClick={onGoDashboard} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <BarChart3 className="w-4 h-4" />
-            Dashboard
           </button>
           <button onClick={onGoLogs} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
             <FileText className="w-4 h-4" />
@@ -2762,7 +2765,7 @@ function OverviewPanel({
       </div>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight">Overview</h2>
+        <h2 className="text-xl font-bold tracking-tight">Markets</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
             <button
