@@ -293,6 +293,13 @@ function getKalshiName(km: KalshiMarket): string {
           // Sport market with UUID custom_strike: entity name is in yes_sub_title, e.g. "Belgium", "Tie"
           // Include bet-type context from title to prevent cross-bet-type matching
           const betType = extractBetTypeFromTitle(km.title || '');
+          // Political markets (e.g. KXHOUSERACE): yes_sub_title is the candidate name,
+          // but PM groupItemTitle is the party name. Use the title-extracted name instead
+          // so "Republican" matches "Republican Party".
+          if (cs && 'political_party' in cs) {
+            const titleName = extractNameFromKalshiTitle(km.title || km.ticker);
+            return betType ? `${betType} ${titleName}` : titleName;
+          }
           return betType ? `${betType} ${km.yes_sub_title}` : km.yes_sub_title;
         }
       }
