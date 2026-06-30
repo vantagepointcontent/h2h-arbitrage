@@ -294,6 +294,45 @@ export async function POST(request: NextRequest) {
     if (!kalshi && !pm) {
       return NextResponse.json({ error: 'Could not find markets. Check URLs.' }, { status: 404 });
     }
+
+    // Guard: if one side is missing, return what we have with a warning
+    if (!kalshi) {
+      return NextResponse.json({
+        error: 'Kalshi market not found for the given URL',
+        allPM: pmData.markets.map((m, idx) => {
+          const { prices } = parseOutcomes(m);
+          return {
+            conditionId: m.conditionId,
+            marketId: m.id,
+            title: m.groupItemTitle || m.question || `Market ${idx + 1}`,
+            yesPrice: prices[0] ?? 0,
+            noPrice: prices[1] ?? (1 - (prices[0] ?? 0)),
+            bestAsk: m.bestAsk ?? prices[0] ?? 0,
+            bestBid: m.bestBid ?? prices[0] ?? 0,
+            lastTradePrice: m.lastTradePrice ?? prices[0] ?? 0,
+            isNegRisk: m.neg_risk === true,
+            liquidity: Number(m.liquidityNum ?? m.liquidity ?? 0),
+          };
+        }),
+        pmEventTitle: pmData.eventTitle,
+      }, { status: 200 });
+    }
+
+    if (!pm) {
+      return NextResponse.json({
+        error: 'Polymarket market not found for the given URL',
+        allKalshi: kalshiMarkets.map(km => ({
+          ticker: km.ticker,
+          title: km.title || km.ticker,
+          yesAsk: parseFloat(km.yes_ask_dollars || '1'),
+          noAsk: parseFloat(km.no_ask_dollars || '1'),
+          yesBid: parseFloat(km.yes_bid_dollars || '0'),
+          noBid: parseFloat(km.no_bid_dollars || '0'),
+          lastPrice: parseFloat(km.last_price_dollars || '0'),
+          volume: km.volume_24h_fp,
+        })),
+      }, { status: 200 });
+    }
     
     // Enrich Polymarket with CLOB prices
     let clobLive: Awaited<ReturnType<typeof getClobPrices>> | undefined;
