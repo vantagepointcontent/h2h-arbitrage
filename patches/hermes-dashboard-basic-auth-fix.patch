@@ -1,0 +1,28 @@
+hermes_cli/dashboard_auth/middleware.py | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+--- Changes ---
+
+hermes_cli/dashboard_auth/middleware.py
+  @@ -188,9 +188,20 @@ def _auto_sso_response(request: Request) -> Response | None:
+  -    auth_login = f"{prefix}/auth/login?provider={quote(provider.name, safe='')}"
+  -    if next_param:
+  -        auth_login = f"{auth_login}&next={next_param}"
+  +
+  +    # Password-only providers (e.g. basic auth) don't support the OAuth
+  +    # redirect flow — /auth/login calls start_login() which raises
+  +    # NotImplementedError. Route to the server-rendered /login page
+  +    # instead, which renders a credential form that POSTs to
+  +    # /auth/password-login.
+  +    if getattr(provider, "supports_password", False):
+  +        auth_login = f"{prefix}/login"
+  +        if next_param:
+  +            auth_login = f"{auth_login}?next={next_param}"
+  +    else:
+  +        auth_login = f"{prefix}/auth/login?provider={quote(provider.name, safe='')}"
+  +        if next_param:
+  +            auth_login = f"{auth_login}&next={next_param}"
+   
+       resp = RedirectResponse(url=auth_login, status_code=302)
+       # Drop the one-shot marker so a return trip that's STILL unauthenticated
+  +14 -3
