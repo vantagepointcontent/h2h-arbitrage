@@ -184,7 +184,11 @@ export async function GET(req: NextRequest) {
         (msg: KalshiWsMessage) => {
           if (session.closed) return;
           if (msg.type === 'orderbook_snapshot') {
-            orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+            // Only apply WS snapshot if we don't already have a REST-seeded book.
+            // REST seed is the authoritative base; WS snapshots can be stale/wrong.
+            if (!orderbookState.hasBook(msg.marketTicker)) {
+              orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+            }
           } else if (msg.type === 'orderbook_delta') {
             orderbookState.applyAskDelta(msg.marketTicker, msg.side, msg.price, msg.delta, msg.seq);
           }
@@ -201,7 +205,10 @@ export async function GET(req: NextRequest) {
           (msg: KalshiWsMessage) => {
             if (session.closed) return;
             if (msg.type === 'orderbook_snapshot') {
-              orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+              // Same guard: don't overwrite REST-seeded book with WS snapshot
+              if (!orderbookState.hasBook(msg.marketTicker)) {
+                orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+              }
             } else if (msg.type === 'orderbook_delta') {
               orderbookState.applyAskDelta(msg.marketTicker, msg.side, msg.price, msg.delta, msg.seq);
             }
