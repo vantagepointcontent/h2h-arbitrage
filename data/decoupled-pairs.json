@@ -14,5 +14,21 @@
     "pmTitle": "Mexico advances",
     "id": "1782756422237-awav4ps",
     "decoupledAt": "2026-06-29T18:07:02.237Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xb54ccf642fdfab45637e1f093509e5ee69fcb1ff25979c11cf04650f18c3f97e",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782834320059-3hb8pta",
+    "decoupledAt": "2026-06-30T15:45:20.059Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xd9d9532b0d1a2485cfda6cae8cd4831bb323b7df6aeb72741bca50c6c4587393",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782834321613-cf8is9y",
+    "decoupledAt": "2026-06-30T15:45:21.613Z"
   }
 ]
