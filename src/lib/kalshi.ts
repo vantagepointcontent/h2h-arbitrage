@@ -37,9 +37,17 @@ export function extractKalshiEventTicker(url: string): string | null {
 
   // Try to extract explicit event_ticker from deeper path if available
   // e.g. /markets/kxtrumpsaymonth/trump-monthly/kxtrumpsaymonth-26jun01 -> event_ticker = KXTRUMPSAYMONTH-26JUN01
+  // For sports: /markets/kxwcadvance/world-cup-advance/kxwcadvance-26jul02por -> strip team suffix -> KXWCADVANCE-26JUL02
   const deeper = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([A-Z0-9-]+)/i);
   if (deeper) {
     const deepTicker = deeper[1].toUpperCase();
+    // Strip team/outcome suffix from sports market tickers
+    // Pattern: SERIES-YYMMMDDXXX -> SERIES-YYMMMDD (XXX = team code like POR, CRO, ENG)
+    // e.g. KXWCADVANCE-26JUL02POR -> KXWCADVANCE-26JUL02
+    const eventLevel = deepTicker.replace(/^([A-Z]+-\d{2}[A-Z]{3}\d{2})[A-Z]{2,}$/, '$1');
+    if (eventLevel !== deepTicker && eventLevel.length > firstSegment.length) {
+      return eventLevel;
+    }
     // Only return deeper ticker if it's longer (has date suffix)
     if (deepTicker.length > firstSegment.length) {
       return deepTicker;

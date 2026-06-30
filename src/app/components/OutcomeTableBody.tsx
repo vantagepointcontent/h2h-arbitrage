@@ -64,7 +64,21 @@ export function OutcomeTableBody({
         const k = o.kalshi;
         const p = o.polymarket;
         const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
-        const spread = hasPrices ? (p!.yesPrice - k!.yesAsk) : null;
+        // Compute spread based on the actual arbitrage strategy used
+        let spread: number | null = null;
+        if (hasPrices) {
+          const strategy = o.arbitrage.strategy;
+          if (strategy === 'Buy YES Kalshi + NO PM') {
+            spread = (1 - (k!.yesAsk + p!.noPrice)) * 100;
+          } else if (strategy === 'Buy YES PM + NO Kalshi') {
+            spread = (1 - (p!.yesPrice + k!.noAsk)) * 100;
+          } else if (strategy.startsWith('Buy YES both sides')) {
+            spread = (1 - (k!.yesAsk + p!.yesPrice)) * 100;
+          } else {
+            // Fallback: use the simpler spread calculation
+            spread = (p!.yesPrice - k!.yesAsk) * 100;
+          }
+        }
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
         const roiColor = !hasPrices ? "text-[#5E6875]" : o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
         const isExpanded = expandedArtist === o.artist;

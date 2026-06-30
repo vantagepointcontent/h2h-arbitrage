@@ -5,69 +5,24 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 542,
-  "startedAt": "2026-06-30T18:16:40.631Z",
-  "finishedAt": "2026-06-30T18:30:59.525Z",
-  "durationMs": 858894,
-  "successCount": 347,
-  "failureCount": 11,
-  "skippedCount": 184,
-  "avgScanMs": 7125,
-  "maxScanMs": 30000,
+  "startedAt": "2026-06-30T19:54:10.407Z",
+  "finishedAt": "2026-06-30T19:55:42.299Z",
+  "durationMs": 91892,
+  "successCount": 59,
+  "failureCount": 2,
+  "skippedCount": 481,
+  "avgScanMs": 4471,
+  "maxScanMs": 28569,
   "errors": [
-    {
-      "market": "Minnesota Republican Senate Primary Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Wisconsin Governor Democratic Primary Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Pro Football: 2027 AFC Champion ",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "MLB: 2026 AL Cy Young Winner",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "NBA: Giannis Antetokounmpo Next Team",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "Who will be Trump's next Director of National Intelligence?",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "MLB: 2026 American League Champion",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
-    {
-      "market": "2026 Midterms: House Popular Vote Margin of Victory",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
-    },
     {
       "market": "CA-40 House Election Winner",
       "error": "HTTP 404",
-      "durationMs": 689
+      "durationMs": 1185
     },
     {
       "market": "ME-02 House Election Winner",
       "error": "HTTP 404",
-      "durationMs": 2362
-    },
-    {
-      "market": "Next UK Chancellor of the Exchequer in 2026?",
-      "error": "timeout after 30000ms",
-      "durationMs": 30000
+      "durationMs": 196
     }
   ]
 }
