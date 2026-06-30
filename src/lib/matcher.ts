@@ -372,7 +372,7 @@ export function buildCaseInsensitiveMap<V>(
     if (existing !== undefined && e.raw !== existing._raw) {
       if (!collisions.has(key)) {
         collisions.add(key);
-        console.warn(
+        console.debug(
           `${logPrefix}: name collision on "${key}" — "${e.raw}" overlaps with "${existing._raw}"`,
         );
       }
@@ -406,7 +406,7 @@ export function buildNormalizedMap<K extends string, V>(
     if (existing && existing.raw !== e.raw) {
       if (!collisions.has(key)) {
         collisions.add(key);
-        console.warn(
+        console.debug(
           `${logPrefix}: name collision on "${key}" — "${e.raw}" (${(e as any).rawLabel ?? ''}) overlaps with "${existing.raw}" (${(existing as any).rawLabel ?? ''})`,
         );
       }
@@ -943,7 +943,7 @@ export function matchOutcomes(
     if (existing && existing !== km) {
       if (!kalshiCollisions.has(name)) {
         kalshiCollisions.add(name);
-        console.warn(
+        console.debug(
           `[matcher]: Kalshi name collision on "${name}" — "${km.ticker}" overlaps with "${existing.ticker}"`,
         );
       }
@@ -966,7 +966,7 @@ export function matchOutcomes(
       const norm = normalizeName(enrichedTitle);
       const prev = pmSeenNames.get(norm);
       if (prev && prev !== enrichedTitle) {
-        console.warn(`[matcher]: PM name collision on "${norm}" — "${enrichedTitle}" overlaps with "${prev}"`);
+        console.debug(`[matcher]: PM name collision on "${norm}" — "${enrichedTitle}" overlaps with "${prev}"`);
       } else if (!prev) {
         pmSeenNames.set(norm, enrichedTitle);
       }
