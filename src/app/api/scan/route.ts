@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { kalshiUrl, polymarketUrl, skipAutoMatch } = body;
+    const { kalshiUrl, polymarketUrl, skipAutoMatch, capital = 1000 } = body;
 
     const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
     const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
@@ -286,16 +286,16 @@ export async function POST(request: NextRequest) {
         })),
       ];
     } else {
-      const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
+      const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, capital, pmEvent.endDate);
       // Step 2: apply manual matches to merge auto-unmatched pairs
-      outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+      outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, pmEvent.endDate);
     }
 
     // Step 2b: split decoupled pairs — user has explicitly unlinked these
     const splitOutcomes = applyDecoupledPairs(outcomes as unknown as UnifiedOutcome[], decoupledPairs);
 
     // Step 3: compute arbitrage (with depth awareness) for all matched items, including cross-outcome
-    const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title).map(o => ({
+    const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title, capital).map(o => ({
       ...o,
       arbitrage: {
         ...o.arbitrage,

@@ -473,6 +473,7 @@ export function calculateArbitrageMax(
   depthPYes: number,
   depthPNo: number,
   category?: string,
+  maxCapital = 1000,
 ) {
   const kYes = kalshi.yesAsk;
   const kNo = kalshi.noAsk;
@@ -497,9 +498,9 @@ export function calculateArbitrageMax(
   if (kYes + pNo < 1 - SPREAD_EPSILON) {
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
     const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
-    const capital = Math.min(capK, capP);
-    // Allow infinite capital (no depth constraint) up to a sensible max
-    const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+    const capital = Math.min(capK, capP, maxCapital);
+    // Cap at user's capital; if no depth constraint, use maxCapital
+    const effectiveCapital = isFinite(capital) ? capital : maxCapital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
         'Buy YES Kalshi + NO PM',
@@ -539,8 +540,8 @@ export function calculateArbitrageMax(
   if (pYes + kNo < 1 - SPREAD_EPSILON) {
     const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
     const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
-    const capital = Math.min(capP, capK);
-    const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+    const capital = Math.min(capP, capK, maxCapital);
+    const effectiveCapital = isFinite(capital) ? capital : maxCapital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
         'Buy YES PM + NO Kalshi',
@@ -597,6 +598,7 @@ export function calculateBestArbitrageForOutcome(
   current: UnifiedOutcome,
   complement: UnifiedOutcome | null,
   category?: string,
+  maxCapital = 1000,
 ): UnifiedOutcome['arbitrage'] {
   if (!current.kalshi || !current.polymarket) {
     return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
@@ -616,6 +618,7 @@ export function calculateBestArbitrageForOutcome(
     depthPYes,
     depthPNo,
     category,
+    maxCapital,
   );
 
   // Cross-outcome: buy YES on both platforms. Only valid for strict binary markets.
@@ -630,8 +633,8 @@ export function calculateBestArbitrageForOutcome(
       const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : Infinity;
       const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : Infinity;
       // Capital limited by all four legs because we buy YES on both platforms across both outcomes
-      const capital = Math.min(capKA, capPB, capKB, capPA);
-      const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
+      const capital = Math.min(capKA, capPB, capKB, capPA, maxCapital);
+      const effectiveCapital = isFinite(capital) ? capital : maxCapital;
       if (effectiveCapital > 0) {
         const grossRoi = 1 - (kYesA + pYesB);
         const grossProfit = effectiveCapital * grossRoi;
@@ -685,6 +688,7 @@ export function calculateBestArbitrageForOutcome(
 export function calculateAllArbitrages(
   outcomes: UnifiedOutcome[],
   category?: string,
+  maxCapital = 1000,
 ): UnifiedOutcome[] {
   // Cross-outcome YES+YES is only valid for a strictly binary market: exactly two possible outcomes.
   const isStrictBinary = outcomes.length === 2;
@@ -698,7 +702,7 @@ export function calculateAllArbitrages(
     }
     return {
       ...o,
-      arbitrage: calculateBestArbitrageForOutcome(o, complement, category),
+      arbitrage: calculateBestArbitrageForOutcome(o, complement, category, maxCapital),
     };
   });
 }
