@@ -39,16 +39,14 @@ describe('Kalshi/Polymarket fees', () => {
 
     const r = calculateArbitrageMax(kalshi, pm, 100000, 100000, 100000, 100000, 'Sports');
 
-    expect(r.strategy).toBe('Buy YES PM + NO Kalshi');
-    expect(r.fees).toBeDefined();
-    if (r.fees) {
-      // Kalshi NO at 0.30 fee on sell side
-      expect(r.fees.kalshiFee).toBeGreaterThan(0);
-      // PM YES at 0.69 with theta 0.03
-      expect(r.fees.pmFee).toBeGreaterThan(0);
-      // After fees the worst-case net profit is negative: this is NOT a real arb
-      expect(r.fees.worstCaseNetProfit).toBeLessThan(0);
-    }
+    // PM YES (0.69) + Kalshi NO (0.30) = 0.99 < 1 → gross spread 0.01
+    // But after fees (Kalshi NO sell + PM YES buy), worst-case net is negative
+    // → should be rejected as "No arb"
+    expect(r.strategy).toBe('No arb');
+    expect(r.expectedProfit).toBe(0);
+    expect(r.roiPct).toBe(0);
+    expect(r.kalshiStake).toBe(0);
+    expect(r.pmStake).toBe(0);
   });
 
   it('gross ROI without fees is higher than net worst-case profit', () => {
@@ -71,10 +69,73 @@ describe('Kalshi/Polymarket fees', () => {
 
     const r = calculateArbitrageMax(kalshi, pm, 5000, 5000, 5000, 5000, 'Sports');
 
+    // Kalshi YES (0.45) + PM NO (0.50) = 0.95 < 1 → gross spread 0.05
+    // After fees this should still be positive (clear arb)
+    expect(r.strategy).not.toBe('No arb');
+    expect(r.expectedProfit).toBeGreaterThan(0);
+    expect(r.roiPct).toBeGreaterThan(0);
     if (r.fees) {
       expect(r.fees.kalshiFee).toBeGreaterThan(0);
       expect(r.fees.pmFee).toBeGreaterThan(0);
-      expect(r.fees.worstCaseNetProfit).toBeLessThan(r.expectedProfit + r.fees.kalshiFee + r.fees.pmFee);
+      expect(r.fees.worstCaseNetProfit).toBeGreaterThan(0);
     }
+  });
+
+  it('TX-18: break-even (0.06 + 0.94 = 1.00) should NOT be flagged as arb', () => {
+    const kalshi = {
+      ticker: 'KXTX18',
+      yesBid: 0.05, yesAsk: 0.06,
+      noBid: 0.93, noAsk: 0.94,
+      lastPrice: 0.06,
+      volume24h: '',
+      yesBidDepth: '$10K', yesAskDepth: '$10K',
+      noBidDepth: '$10K', noAskDepth: '$10K',
+    };
+    const pm = {
+      marketId: 'pm-tx18',
+      conditionId: 'c-tx18',
+      yesPrice: 0.06, noPrice: 0.94,
+      bestBid: 0.05, bestAsk: 0.06,
+      lastTradePrice: 0.06,
+      volume: '', liquidity: '', askDepth: 10000, noAskDepth: 10000,
+    };
+
+    const r = calculateArbitrageMax(kalshi, pm, 10000, 10000, 10000, 10000, 'Politics');
+
+    // Kalshi YES (0.06) + PM NO (0.94) = 1.00 → exact break-even
+    // Even without fees this is zero profit. With fees it's a loss.
+    // Must NOT be flagged as arbitrage.
+    expect(r.strategy).toBe('No arb');
+    expect(r.expectedProfit).toBe(0);
+    expect(r.roiPct).toBe(0);
+    expect(r.kalshiStake).toBe(0);
+    expect(r.pmStake).toBe(0);
+  });
+
+  it('tiny spread (0.001) after fees should still be No arb', () => {
+    const kalshi = {
+      ticker: 'KXTINY',
+      yesBid: 0.49, yesAsk: 0.50,
+      noBid: 0.49, noAsk: 0.50,
+      lastPrice: 0.50,
+      volume24h: '',
+      yesBidDepth: '$10K', yesAskDepth: '$10K',
+      noBidDepth: '$10K', noAskDepth: '$10K',
+    };
+    const pm = {
+      marketId: 'pm-tiny',
+      conditionId: 'c-tiny',
+      yesPrice: 0.50, noPrice: 0.499,
+      bestBid: 0.49, bestAsk: 0.50,
+      lastTradePrice: 0.50,
+      volume: '', liquidity: '', askDepth: 10000, noAskDepth: 10000,
+    };
+
+    const r = calculateArbitrageMax(kalshi, pm, 10000, 10000, 10000, 10000, 'Sports');
+
+    // Kalshi YES (0.50) + PM NO (0.499) = 0.999 → gross spread 0.001
+    // After fees this is negative → No arb
+    expect(r.strategy).toBe('No arb');
+    expect(r.expectedProfit).toBe(0);
   });
 });

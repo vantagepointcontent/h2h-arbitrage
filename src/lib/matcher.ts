@@ -490,27 +490,30 @@ export function calculateArbitrageMax(
   let sellPrice = 0;
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
 
-  if (kYes + pNo < 1) {
+  // Use a small epsilon to avoid floating-point false positives.
+  // 0.06 + 0.94 = 0.9999999999999999 in IEEE 754, which is < 1 but break-even.
+  const SPREAD_EPSILON = 1e-10;
+
+  if (kYes + pNo < 1 - SPREAD_EPSILON) {
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
     const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
     const capital = Math.min(capK, capP);
     // Allow infinite capital (no depth constraint) up to a sensible max
     const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
     if (effectiveCapital > 0) {
-      const roi = 1 - (kYes + pNo);
-      const profit = effectiveCapital * roi;
-      if (profit > maxProfit) {
-        const fees = computeArbitrageFees(
-          'Buy YES Kalshi + NO PM',
-          effectiveCapital,
-          effectiveCapital * kYes,
-          effectiveCapital * pNo,
-          kYes,
-          kNo,
-          pYes,
-          pNo,
-          category,
-        );
+      const fees = computeArbitrageFees(
+        'Buy YES Kalshi + NO PM',
+        effectiveCapital,
+        effectiveCapital * kYes,
+        effectiveCapital * pNo,
+        kYes,
+        kNo,
+        pYes,
+        pNo,
+        category,
+      );
+      // Only accept if net profit after fees is positive
+      if (fees.worstCaseNetProfit > maxProfit && fees.worstCaseNetProfit > 0) {
         maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES Kalshi + NO PM';
         bestCapital = effectiveCapital;
@@ -533,26 +536,25 @@ export function calculateArbitrageMax(
     }
   }
 
-  if (pYes + kNo < 1) {
+  if (pYes + kNo < 1 - SPREAD_EPSILON) {
     const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
     const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
     const capital = Math.min(capP, capK);
     const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
     if (effectiveCapital > 0) {
-      const roi = 1 - (pYes + kNo);
-      const profit = effectiveCapital * roi;
-      if (profit > maxProfit) {
-        const fees = computeArbitrageFees(
-          'Buy YES PM + NO Kalshi',
-          effectiveCapital,
-          effectiveCapital * kNo,
-          effectiveCapital * pYes,
-          kYes,
-          kNo,
-          pYes,
-          pNo,
-          category,
-        );
+      const fees = computeArbitrageFees(
+        'Buy YES PM + NO Kalshi',
+        effectiveCapital,
+        effectiveCapital * kNo,
+        effectiveCapital * pYes,
+        kYes,
+        kNo,
+        pYes,
+        pNo,
+        category,
+      );
+      // Only accept if net profit after fees is positive
+      if (fees.worstCaseNetProfit > maxProfit && fees.worstCaseNetProfit > 0) {
         maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES PM + NO Kalshi';
         bestCapital = effectiveCapital;
