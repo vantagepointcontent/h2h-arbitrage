@@ -95,7 +95,7 @@ export async function saveScanResult(
 export async function getScanHistory(marketId?: string, limit: number = 20): Promise<any[]> {
   await ensureDb();
   const c = getClient();
-  const clampedLimit = Math.min(Math.max(limit, 1), 500);
+  const clampedLimit = Math.min(Math.max(limit, 1), 50000);
 
   let sql = 'SELECT * FROM scan_results WHERE 1=1';
   const args: (string | number)[] = [];
