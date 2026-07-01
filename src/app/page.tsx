@@ -45,6 +45,7 @@ import {
   Hash,
   PanelRight,
   FileText,
+  PanelLeft,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -224,6 +225,24 @@ function persistMfAutoRefresh(val: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(MF_AUTO_REFRESH_KEY, JSON.stringify(val));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+const SIDEBAR_OPEN_KEY = "h2h-sidebar-open";
+
+function getStoredSidebarOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem(SIDEBAR_OPEN_KEY);
+    if (raw !== null) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return true;
+}
+
+function persistSidebarOpen(val: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SIDEBAR_OPEN_KEY, JSON.stringify(val));
   } catch { /* quota exceeded — ignore */ }
 }
 
@@ -523,7 +542,7 @@ export default function Home() {
   const UNLINK_UNDO_MS = 10000; // 10 seconds
 
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(getStoredSidebarOpen);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useSwipeGesture(
@@ -532,6 +551,9 @@ export default function Home() {
   );
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Persist sidebar toggle
+  useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs">("overview");
 
@@ -1515,6 +1537,9 @@ export default function Home() {
           <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
             <Rows3 className="w-5 h-5" />
           </button>
+          <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+            <PanelLeft className={`w-5 h-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
+          </button>
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
 
           <div className="flex items-center gap-2 ml-4">
@@ -1539,6 +1564,8 @@ export default function Home() {
           markets={savedMarkets}
           activeId={activeMarketId}
           viewMode={viewMode}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(v => !v)}
           onSelectMarket={loadMarket}
           onEditMarket={() => {}}
           onDeleteMarket={(id) => { if (confirm("Delete market?")) deleteMarket(id); }}
@@ -2259,11 +2286,45 @@ export default function Home() {
   );
 }
 
+/* ── Nav Button (collapsible sidebar icon button) ── */
+function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; collapsed: boolean }) {
+  if (collapsed) {
+    return (
+      <button
+        onClick={onClick}
+        className={`w-full flex items-center justify-center p-3 rounded-lg transition-colors ${
+          active
+            ? "bg-[#5DBE81]/10 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
+            : "text-[#5E6875] hover:bg-[#182533] hover:text-[#FFFFFF]"
+        }`}
+        title={label}
+      >
+        {icon}
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+        active
+          ? "bg-[#5DBE81]/10 text-[#5DBE81]"
+          : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 /* ── Market Sidebar ── */
 function MarketSidebar({
   markets,
   activeId,
   viewMode,
+  sidebarOpen,
+  onToggleSidebar,
   onSelectMarket,
   onEditMarket,
   onDeleteMarket,
@@ -2298,6 +2359,8 @@ function MarketSidebar({
   markets: SavedMarket[];
   activeId: string | null;
   viewMode: string;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
   onSelectMarket: (m: SavedMarket) => void;
   onEditMarket: (m: SavedMarket) => void;
   onDeleteMarket: (id: string) => void;
@@ -2329,7 +2392,6 @@ function MarketSidebar({
   mobileMenuOpen: boolean;
   onCloseMobileMenu: () => void;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [sidebarCategory, setSidebarCategory] = useState<"all" | CategoryName>("all");
 
@@ -2390,13 +2452,17 @@ function MarketSidebar({
         />
       )}
       <aside
-        className={`${sidebarOpen ? "w-[380px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200 md:block ${
+        className={`${
+          sidebarOpen
+            ? "w-[380px]"
+            : "w-[64px]"
+        } shrink-0 border-r border-[#182533] bg-[#17212B] transition-all duration-200 md:block ${
           mobileMenuOpen
             ? "fixed inset-y-0 left-0 z-50 w-[380px] max-w-[85vw] md:relative md:w-auto md:z-auto md:inset-auto"
             : "hidden md:block md:!w-auto"
-        }`}
+        } ${!sidebarOpen ? "overflow-visible" : "overflow-hidden"}`}
       >
-        <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
+        <div className="px-3 py-4 space-y-4 h-full flex flex-col">
           {/* Close button for mobile */}
           <button
             onClick={onCloseMobileMenu}
@@ -2404,224 +2470,210 @@ function MarketSidebar({
           >
             <X className="w-4 h-4" />
           </button>
-        {/* ── Navigation (moved from header) ── */}
-        <div className="space-y-1">
-          <button onClick={onGoDashboard} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <BarChart3 className="w-4 h-4" />
-            Dashboard
-          </button>
-          <button onClick={onGoOverview} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "overview" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <BarChart3 className="w-4 h-4" />
-            Markets
-          </button>
-          <button onClick={onGoScan} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "scan" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <Scan className="w-4 h-4" />
-            Scan
-          </button>
-          <button onClick={onGoMarketFinder} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "marketfinder" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <Globe className="w-4 h-4" />
-            MarketFinder
-          </button>
-          <button onClick={() => window.location.href = '/?view=live'} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "live" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <Activity className="w-4 h-4" />
-            Live WS
-          </button>
-          <button onClick={onGoLogs} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "logs" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
-            <FileText className="w-4 h-4" />
-            Logs
-          </button>
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-xs font-semibold text-[#8A9BA8] tracking-wide uppercase">Saved Markets ({markets.length})</h2>
-            <button
-              onClick={onToggleSidebarFavorites}
-              className={`p-0.5 rounded transition-colors ${
-                sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#232E3C] hover:text-[#5E6875]"
-              }`}
-              title={sidebarFavoritesOnly ? "Show all markets" : "Show favorites only"}
-            >
-              <Star className="w-3 h-3" fill={sidebarFavoritesOnly ? "currentColor" : "none"} />
-            </button>
+          {/* ── Navigation ── */}
+          <div className="space-y-1">
+            <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
+            <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
+            <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />
+            <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />
+            <NavButton icon={<Activity className="w-5 h-5 shrink-0" />} label="Live WS" active={viewMode === "live"} onClick={() => window.location.href = '/?view=live'} collapsed={!sidebarOpen} />
+            <NavButton icon={<FileText className="w-5 h-5 shrink-0" />} label="Logs" active={viewMode === "logs"} onClick={onGoLogs} collapsed={!sidebarOpen} />
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Sort toggles — cleaner chip buttons */}
-            <button
-              onClick={() => onToggleSort("apy")}
-              className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
-              }`}
-              title="Sort by APY"
-            >
-              APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")}
-            </button>
-            <button
-              onClick={() => onToggleSort("roi")}
-              className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                sort === "roi" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
-              }`}
-              title="Sort by ROI"
-            >
-              ROI{sort === "roi" && (sortDir === "asc" ? " ↑" : " ↓")}
-            </button>
-            <button
-              onClick={() => onToggleSort("name")}
-              className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                sort === "name" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
-              }`}
-              title="Sort by Name"
-            >
-              A-Z{sort === "name" && (sortDir === "asc" ? " ↑" : " ↓")}
-            </button>
-            <button
-              onClick={() => onToggleSort("scanned")}
-              className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
-              }`}
-              title="Sort by last scan time (click to toggle asc/desc)"
-            >
-              Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
-            </button>
-            <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
-            <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
-              {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
 
-        {scanningAll && scanProgress.total > 0 && (
-          <div className="flex items-center gap-2 text-[10px] text-[#5E6875]">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Scanning {scanProgress.current}/{scanProgress.total}...
-          </div>
-        )}
-        {scanAllError && <div className="text-xs text-[#ef4444]">{scanAllError}</div>}
-
-        {/* Filters */}
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={sidebarSearch}
-            onChange={(e) => setSidebarSearch(e.target.value)}
-            placeholder="Filter by name..."
-            className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
-          />
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <select
-              value={expiryFilter}
-              onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-              className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
-            >
-              <option value="all">All expiries</option>
-              <option value="lte7">≤ 7 days</option>
-              <option value="lte14">≤ 14 days</option>
-              <option value="lte30">≤ 30 days</option>
-            </select>
-            <select
-              value={sidebarCategory}
-              onChange={(e) => setSidebarCategory(e.target.value as "all" | CategoryName)}
-              className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
-            >
-              <option value="all">All categories</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-              ))}
-            </select>
-            <button
-              onClick={onToggleShowExpired}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                showExpired
-                  ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                  : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
-              }`}
-              title={showExpired ? "Hide expired markets" : "Show expired markets"}
-            >
-              Expired
-            </button>
-            <button
-              onClick={onToggleShowArbOnly}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                showArbOnly
-                  ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                  : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
-              }`}
-              title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
-            >
-              Arb Only
-            </button>
-          </div>
-        </div>
-
-        {/* Market list */}
-        <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
-          {filtered.map((m) => {
-            const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
-            const apy = computeApy(roi, m.expiryDate);
-            const isActive = activeId === m.id;
-            return (
-              <div
-                key={m.id}
-                onClick={() => onSelectMarket(m)}
-                className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
-                  isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
-                }`}
-                title={`Latest scanned: ${(() => {
-                  const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
-                  if (!scannedAt) return "Never";
-                  const diffSec = Math.round((Date.now() - new Date(scannedAt).getTime()) / 1000);
-                  if (diffSec < 60) return `${diffSec}s ago`;
-                  const diffMin = Math.round(diffSec / 60);
-                  if (diffMin < 60) return `${diffMin}m ago`;
-                  const diffHr = Math.round(diffMin / 60);
-                  if (diffHr < 24) return `${diffHr}h ago`;
-                  const diffDay = Math.round(diffHr / 24);
-                  return `${diffDay}d ago`;
-                })()}`}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(m.id);
-                  }}
-                  className={`shrink-0 p-0.5 rounded transition-colors ${
-                    favoriteIds.has(m.id)
-                      ? "text-[#facc15]"
-                      : "text-[#232E3C] group-hover:text-[#5E6875]"
-                  }`}
-                  title={favoriteIds.has(m.id) ? "Remove favorite" : "Add favorite"}
-                >
-                  <Star className="w-3 h-3" fill={favoriteIds.has(m.id) ? "currentColor" : "none"} />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {m.category && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>
-                    )}
-                    <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
-                  </div>
+          {sidebarOpen && (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-xs font-semibold text-[#8A9BA8] tracking-wide uppercase">Saved Markets ({markets.length})</h2>
+                  <button
+                    onClick={onToggleSidebarFavorites}
+                    className={`p-0.5 rounded transition-colors ${
+                      sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#232E3C] hover:text-[#5E6875]"
+                    }`}
+                    title={sidebarFavoritesOnly ? "Show all markets" : "Show favorites only"}
+                  >
+                    <Star className="w-3 h-3" fill={sidebarFavoritesOnly ? "currentColor" : "none"} />
+                  </button>
                 </div>
-                <div className="flex items-center shrink-0">
-                  {roi !== 0 && (
-                    <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                      {roi > 0 ? "+" : ""}{formatPercent(roi)}
-                    </span>
-                  )}
-                  {apy > 0 && (
-                    <span className="text-[10px] text-[#5E6875] ml-1">({formatPercent(apy)})</span>
-                  )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => onToggleSort("apy")}
+                    className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+                      sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                    }`}
+                    title="Sort by APY"
+                  >
+                    APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")}
+                  </button>
+                  <button
+                    onClick={() => onToggleSort("roi")}
+                    className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+                      sort === "roi" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                    }`}
+                    title="Sort by ROI"
+                  >
+                    ROI{sort === "roi" && (sortDir === "asc" ? " ↑" : " ↓")}
+                  </button>
+                  <button
+                    onClick={() => onToggleSort("name")}
+                    className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+                      sort === "name" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                    }`}
+                    title="Sort by Name"
+                  >
+                    A-Z{sort === "name" && (sortDir === "asc" ? " ↑" : " ↓")}
+                  </button>
+                  <button
+                    onClick={() => onToggleSort("scanned")}
+                    className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
+                      sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                    }`}
+                    title="Sort by last scan time (click to toggle asc/desc)"
+                  >
+                    Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
+                  </button>
+                  <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
+                  <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
+                    {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
               </div>
-            );
-          })}
-          {filtered.length === 0 && markets.length > 0 && (
-            <div className="text-xs text-[#232E3C] text-center py-4">No markets match filters.</div>
+
+              {scanningAll && scanProgress.total > 0 && (
+                <div className="flex items-center gap-2 text-[10px] text-[#5E6875]">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Scanning {scanProgress.current}/{scanProgress.total}...
+                </div>
+              )}
+              {scanAllError && <div className="text-xs text-[#ef4444]">{scanAllError}</div>}
+
+              {/* Filters */}
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  placeholder="Filter by name..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
+                />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <select
+                    value={expiryFilter}
+                    onChange={(e) => onSetExpiryFilter(e.target.value as any)}
+                    className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
+                  >
+                    <option value="all">All expiries</option>
+                    <option value="lte7">≤ 7 days</option>
+                    <option value="lte14">≤ 14 days</option>
+                    <option value="lte30">≤ 30 days</option>
+                  </select>
+                  <select
+                    value={sidebarCategory}
+                    onChange={(e) => setSidebarCategory(e.target.value as "all" | CategoryName)}
+                    className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
+                  >
+                    <option value="all">All categories</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={onToggleShowExpired}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                      showExpired
+                        ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
+                        : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                    }`}
+                    title={showExpired ? "Hide expired markets" : "Show expired markets"}
+                  >
+                    Expired
+                  </button>
+                  <button
+                    onClick={onToggleShowArbOnly}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                      showArbOnly
+                        ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
+                        : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                    }`}
+                    title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
+                  >
+                    Arb Only
+                  </button>
+                </div>
+              </div>
+
+              {/* Market list */}
+              <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+                {filtered.map((m) => {
+                  const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+                  const apy = computeApy(roi, m.expiryDate);
+                  const isActive = activeId === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => onSelectMarket(m)}
+                      className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+                        isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
+                      }`}
+                      title={`Latest scanned: ${(() => {
+                        const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
+                        if (!scannedAt) return "Never";
+                        const diffSec = Math.round((Date.now() - new Date(scannedAt).getTime()) / 1000);
+                        if (diffSec < 60) return `${diffSec}s ago`;
+                        const diffMin = Math.round(diffSec / 60);
+                        if (diffMin < 60) return `${diffMin}m ago`;
+                        const diffHr = Math.round(diffMin / 60);
+                        if (diffHr < 24) return `${diffHr}h ago`;
+                        const diffDay = Math.round(diffHr / 24);
+                        return `${diffDay}d ago`;
+                      })()}`}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavorite(m.id);
+                        }}
+                        className={`shrink-0 p-0.5 rounded transition-colors ${
+                          favoriteIds.has(m.id)
+                            ? "text-[#facc15]"
+                            : "text-[#232E3C] group-hover:text-[#5E6875]"
+                        }`}
+                        title={favoriteIds.has(m.id) ? "Remove favorite" : "Add favorite"}
+                      >
+                        <Star className="w-3 h-3" fill={favoriteIds.has(m.id) ? "currentColor" : "none"} />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {m.category && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>
+                          )}
+                          <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center shrink-0">
+                        {roi !== 0 && (
+                          <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                            {roi > 0 ? "+" : ""}{formatPercent(roi)}
+                          </span>
+                        )}
+                        {apy > 0 && (
+                          <span className="text-[10px] text-[#5E6875] ml-1">({formatPercent(apy)})</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {filtered.length === 0 && markets.length > 0 && (
+                  <div className="text-xs text-[#232E3C] text-center py-4">No markets match filters.</div>
+                )}
+                {markets.length === 0 && (
+                  <div className="text-xs text-[#232E3C] text-center py-4">No saved markets yet.</div>
+                )}
+              </div>
+            </>
           )}
-          {markets.length === 0 && (
-            <div className="text-xs text-[#232E3C] text-center py-4">No saved markets yet.</div>
-          )}
-        </div>
         </div>
       </aside>
     </>
