@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
 
     // Fetch all records we need (SQLite doesn't support WHERE + aggregation well,
     // so we pull generously and aggregate in JS)
-    const allRows = await getScanHistory(undefined, 500);
+    const pool = await getScanHistory(undefined, 20000);
 
     // Filter by date range
     const rows = since
-      ? allRows.filter((r: any) => (r.scanned_at ?? '') >= since!)
-      : allRows;
+      ? pool.filter((r: any) => (r.scanned_at ?? '') >= since!)
+      : pool;
 
     // ── KPI aggregations ──────────────────────────────────────
     const totalScans = rows.length;
