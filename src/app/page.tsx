@@ -1567,9 +1567,11 @@ export default function Home() {
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
           onToggleSidebarFavorites={() => setSidebarFavoritesOnly(v => !v)}
+          mobileMenuOpen={mobileMenuOpen}
+          onCloseMobileMenu={() => setMobileMenuOpen(false)}
         />
         <div className="flex-1 min-h-[calc(100vh-3.5rem)]">
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="max-w-7xl mx-auto p-2 sm:p-4 md:p-6">
             {viewMode === "overview" ? (
               <OverviewPanel
                 markets={savedMarkets}
@@ -1688,8 +1690,8 @@ export default function Home() {
               <>
                 {/* Scan inputs */}
                 {!activeMarketId && (
-                <div className="rounded-xl border border-[#182533] bg-[#17212B] p-5 mb-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
                         <Link2 className="w-4 h-4" /> Kalshi URL
@@ -1717,7 +1719,7 @@ export default function Home() {
                   </div>
 
                   {/* Auto/Manual match toggle */}
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-4 flex-col sm:flex-row">
                     <span className="text-xs text-[#5E6875]">Match Mode:</span>
                     <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
                       <button
@@ -2015,7 +2017,7 @@ export default function Home() {
 
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
-                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
                         {/* Filter toggles */}
                         <div className="flex items-center gap-1 p-2 border-b border-[#182533]">
                           {(["all", "matched", "arb"] as const).map(mode => (
@@ -2290,6 +2292,8 @@ function MarketSidebar({
   onToggleFavorite,
   sidebarFavoritesOnly,
   onToggleSidebarFavorites,
+  mobileMenuOpen,
+  onCloseMobileMenu,
 }: {
   markets: SavedMarket[];
   activeId: string | null;
@@ -2377,8 +2381,29 @@ function MarketSidebar({
   });
 
   return (
-    <aside className={`${sidebarOpen ? "w-[380px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200`}>
-      <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
+    <>
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={onCloseMobileMenu}
+        />
+      )}
+      <aside
+        className={`${sidebarOpen ? "w-[380px]" : "w-0"} shrink-0 border-r border-[#182533] bg-[#17212B] overflow-hidden transition-all duration-200 md:block ${
+          mobileMenuOpen
+            ? "fixed inset-y-0 left-0 z-50 w-[380px] max-w-[85vw] md:relative md:w-auto md:z-auto md:inset-auto"
+            : "hidden md:block md:!w-auto"
+        }`}
+      >
+        <div className="pl-3 pr-4 py-4 space-y-4 h-full flex flex-col">
+          {/* Close button for mobile */}
+          <button
+            onClick={onCloseMobileMenu}
+            className="absolute top-3 right-3 p-1 rounded-lg hover:bg-[#182533] md:hidden z-10"
+          >
+            <X className="w-4 h-4" />
+          </button>
         {/* ── Navigation (moved from header) ── */}
         <div className="space-y-1">
           <button onClick={onGoDashboard} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === "dashboard" ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"}`}>
@@ -2597,8 +2622,9 @@ function MarketSidebar({
             <div className="text-xs text-[#232E3C] text-center py-4">No saved markets yet.</div>
           )}
         </div>
-      </div>
-    </aside>
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -2910,7 +2936,7 @@ function OverviewPanel({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#17212B] border-b border-[#182533]">
               <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
@@ -3299,7 +3325,7 @@ function MarketFinderPanel({
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
           {/* Skeleton rows */}
           {[...Array(6)].map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#182533] last:border-0 animate-pulse">
@@ -3320,7 +3346,7 @@ function MarketFinderPanel({
           No markets found. Try syncing to fetch from PredictionHunt.
         </div>
       ) : (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
           {/* Bulk action bar */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#182533] bg-[#17212B]">
             <div className="flex items-center gap-3">
