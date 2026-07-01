@@ -1,11 +1,11 @@
 {
   "status": "running",
   "baseUrl": "http://100.86.7.30:3000",
-  "concurrency": 3,
+  "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 543,
-  "startedAt": "2026-07-01T16:21:12.062Z",
+  "startedAt": "2026-07-01T16:29:00.012Z",
   "finishedAt": null,
   "durationMs": null,
   "successCount": 0,

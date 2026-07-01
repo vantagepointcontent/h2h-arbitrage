@@ -2322,6 +2322,8 @@ function MarketSidebar({
   onToggleFavorite: (id: string) => void;
   sidebarFavoritesOnly: boolean;
   onToggleSidebarFavorites: () => void;
+  mobileMenuOpen: boolean;
+  onCloseMobileMenu: () => void;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
