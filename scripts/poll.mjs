@@ -2,11 +2,11 @@
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
 const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
-const POLL_CONCURRENCY = Math.max(1, Number(process.env.H2H_POLL_CONCURRENCY || 3));
+const POLL_CONCURRENCY = Math.max(1, Number(process.env.H2H_POLL_CONCURRENCY || 5));
 // Base wake-up interval. Poller wakes this often to check which markets are due.
 // 60s — gentle, since most markets have 5-30min adaptive intervals.
 const POLL_WAKE_MS = 60000;
-const SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 30000));
+const SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 60000));
 const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
 const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
