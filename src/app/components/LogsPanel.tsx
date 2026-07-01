@@ -108,10 +108,9 @@ export function LogsPanel() {
       .then((res) => res.json())
       .then((data) => {
         const m = new Map<string, string>();
-        if (Array.isArray(data)) {
-          for (const mk of data) {
-            if (mk.eventTitle) m.set(mk.id, mk.eventTitle);
-          }
+        const list = Array.isArray(data) ? data : (data?.markets ?? []);
+        for (const mk of list) {
+          if (mk.eventTitle) m.set(mk.id, mk.eventTitle);
         }
         setSavedMarkets(m);
       })
