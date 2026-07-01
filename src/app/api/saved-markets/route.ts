@@ -1,9 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult } from '@/lib/persistence';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const fields = searchParams.get('fields') || 'full';
+
     const markets = await getSavedMarkets();
+
+    if (fields === 'basic') {
+      // Strip lastScanResult.allArbs to reduce payload from 490KB → ~180KB
+      const slim = markets.map((m: any) => {
+        if (m.lastScanResult) {
+          return {
+            ...m,
+            lastScanResult: {
+              bestRoiPct: m.lastScanResult.bestRoiPct,
+              bestProfit: m.lastScanResult.bestProfit,
+              strategy: m.lastScanResult.strategy,
+              outcomeCount: m.lastScanResult.outcomeCount,
+              matchedCount: m.lastScanResult.matchedCount,
+              kalshiCount: m.lastScanResult.kalshiCount,
+              pmCount: m.lastScanResult.pmCount,
+              scannedAt: m.lastScanResult.scannedAt,
+              positiveArbCount: m.lastScanResult.positiveArbCount,
+              totalStake: m.lastScanResult.totalStake,
+            },
+          };
+        }
+        return m;
+      });
+      return NextResponse.json({ markets: slim }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+    }
+
     return NextResponse.json({ markets }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
