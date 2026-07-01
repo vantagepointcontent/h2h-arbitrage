@@ -130,6 +130,8 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>("");
   const tabCounterRef = useRef(0);
+  const tabsRef = useRef<TabState[]>([]);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   const selectedMarket = useMemo(
     () => savedMarkets.find((m) => m.id === selectedId) || null,
@@ -232,8 +234,12 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
       })
     );
 
-    // Need to read the updated tab state — use a ref or re-read
-    const market = savedMarkets.find((m) => m.id === tabId);
+    // Need to read the updated tab state — use a ref or re-read.
+    // NOTE: tabId is the React-generated key ("tab-1"), NOT the market ID.
+    // Look up the market by the tab's marketId instead.
+    const tab = tabsRef.current?.find((t) => t.id === tabId);
+    const lookupMarketId = tab?.marketId || tabId;
+    const market = savedMarkets.find((m) => m.id === lookupMarketId);
     if (!market) return;
 
     const kalshiUrl = market.kalshiUrl?.trim();

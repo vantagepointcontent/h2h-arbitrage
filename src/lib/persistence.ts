@@ -91,6 +91,26 @@ export async function saveScanResult(
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
 }
 
+/** Prune scan results older than `days` days. Returns number of rows deleted. */
+export async function pruneOldScans(days: number = 30): Promise<number> {
+  await ensureDb();
+  const c = getClient();
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const result = await c.execute({
+    sql: 'DELETE FROM scan_results WHERE scanned_at < ?',
+    args: [cutoff],
+  });
+  return Number((result as any).rowsAffected ?? 0);
+}
+
+/** Return total number of scan results in the DB. */
+export async function getScanCount(): Promise<number> {
+  await ensureDb();
+  const c = getClient();
+  const result = await c.execute('SELECT COUNT(*) AS cnt FROM scan_results');
+  return (result.rows as any[])?.[0]?.cnt ?? 0;
+}
+
 /** Return scan history for a given market (newest first). */
 export async function getScanHistory(marketId?: string, limit: number = 20): Promise<any[]> {
   await ensureDb();
