@@ -30,5 +30,21 @@
     "pmTitle": "Democratic",
     "id": "1782834321613-cf8is9y",
     "decoupledAt": "2026-06-30T15:45:21.613Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xed8f832901f427aaa87a8eb9d8e3f8a84cb422fa2eb60e26b6f0ee984a3f62ab",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782922282555-vkpiciu",
+    "decoupledAt": "2026-07-01T16:11:22.555Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xc706bf8c7164ce0fb7850d52e8fe6c20eefb774ec674128bd0a2a492af531e14",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782922283586-k7hu503",
+    "decoupledAt": "2026-07-01T16:11:23.586Z"
   }
 ]
