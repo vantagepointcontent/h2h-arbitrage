@@ -122,7 +122,11 @@ const MAX_TABS = 8;
 export function LiveScanPanel({ capital, savedMarkets }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>("");
   const tabCounterRef = useRef(0);
@@ -141,10 +145,25 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
       .sort((a, b) => b.roiPct - a.roiPct);
   }, [savedMarkets]);
 
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return marketOptions;
+    const q = searchQuery.toLowerCase().trim();
+    return marketOptions.filter((m) => {
+      const title = (m.eventTitle || "").toLowerCase();
+      const cat = (m.category || "").toLowerCase();
+      // Also search in URLs for ticker/slug
+      const kalshiSlug = (m.kalshiUrl || "").toLowerCase();
+      const pmSlug = (m.polymarketUrl || "").toLowerCase();
+      return title.includes(q) || cat.includes(q) || kalshiSlug.includes(q) || pmSlug.includes(q);
+    });
+  }, [marketOptions, searchQuery]);
+
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+        setSearchQuery("");
+        setFocusedIdx(-1);
       }
     }
     document.addEventListener("mousedown", onClickOutside);
@@ -448,30 +467,98 @@ export function LiveScanPanel({ capital, savedMarkets }: Props) {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border border-[#232E3C] bg-[#182533] shadow-lg">
-                {marketOptions.length === 0 ? (
-                  <div className="px-3 py-2.5 text-xs text-[#5E6875]">No saved markets.</div>
-                ) : (
-                  marketOptions.map((m) => {
-                    const roi = m.roiPct;
-                    const isPositive = roi > 0;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => {
-                          setSelectedId(m.id);
-                          setDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[#232E3C] transition-colors ${selectedId === m.id ? "bg-[#5DBE81]/10" : ""}`}
-                      >
-                        <span className="truncate text-[#FFFFFF] text-left pr-2">{m.eventTitle}</span>
-                        <span className={`shrink-0 text-xs font-medium ${isPositive ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
-                          {isPositive ? "+" : ""}{roi.toFixed(1)}%
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
+              <div className="absolute z-20 mt-1 w-full rounded-lg border border-[#232E3C] bg-[#182533] shadow-lg">
+                {/* Search input */}
+                <div className="relative border-b border-[#232E3C]">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search markets..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setFocusedIdx(-1);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setDropdownOpen(false);
+                        setSearchQuery("");
+                        setFocusedIdx(-1);
+                      } else if (e.key === "Enter" && focusedIdx >= 0 && filteredOptions[focusedIdx]) {
+                        const m = filteredOptions[focusedIdx];
+                        setSelectedId(m.id);
+                        setDropdownOpen(false);
+                        setSearchQuery("");
+                        setFocusedIdx(-1);
+                      } else if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setFocusedIdx((prev) =>
+                          prev < filteredOptions.length - 1 ? prev + 1 : 0
+                        );
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setFocusedIdx((prev) =>
+                          prev > 0 ? prev - 1 : filteredOptions.length - 1
+                        );
+                      }
+                    }}
+                    className="w-full bg-transparent text-sm text-[#FFFFFF] placeholder-[#5E6875] px-3 py-2.5 outline-none"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setFocusedIdx(-1);
+                        searchInputRef.current?.focus();
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Market list */}
+                <div
+                  ref={listRef}
+                  className="max-h-60 overflow-y-auto"
+                  onMouseMove={() => setFocusedIdx(-1)}
+                >
+                  {filteredOptions.length === 0 ? (
+                    <div className="px-3 py-2.5 text-xs text-[#5E6875]">No markets found.</div>
+                  ) : (
+                    filteredOptions.map((m, idx) => {
+                      const roi = m.roiPct;
+                      const isPositive = roi > 0;
+                      const isFocused = idx === focusedIdx;
+                      return (
+                        <button
+                          key={m.id}
+                          ref={isFocused ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
+                          onClick={() => {
+                            setSelectedId(m.id);
+                            setDropdownOpen(false);
+                            setSearchQuery("");
+                            setFocusedIdx(-1);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors ${
+                            isFocused
+                              ? "bg-[#232E3C]"
+                              : selectedId === m.id
+                                ? "bg-[#5DBE81]/10"
+                                : "hover:bg-[#232E3C]"
+                          }`}
+                        >
+                          <span className="truncate text-[#FFFFFF] text-left pr-2">{m.eventTitle}</span>
+                          <span className={`shrink-0 text-xs font-medium ${isPositive ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                            {isPositive ? "+" : ""}{roi.toFixed(1)}%
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
     const minConfidence = parseInt(url.searchParams.get('minConfidence') || '30', 10);
     const maxSuggestions = parseInt(url.searchParams.get('maxSuggestions') || '5', 10);
     const includeCorrelated = url.searchParams.get('includeCorrelated') !== 'false';
+    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+    const clampedLimit = Math.min(Math.max(limit, 1), 200);
 
     // Gather unmatched markets from saved markets' scan results
     const savedMarkets = await getSavedMarkets();
@@ -128,9 +131,15 @@ export async function GET(request: NextRequest) {
     const correlatedCount = suggestions.filter((s) => s.confidence < 50).length;
 
     return NextResponse.json({
-      kalshiMarkets: kalshiEntries.map(entryToMarketEntry),
-      pmMarkets: pmEntries.map(entryToMarketEntry),
-      suggestions,
+      kalshiMarkets: kalshiEntries.map(entryToMarketEntry).slice(offset, offset + clampedLimit),
+      pmMarkets: pmEntries.map(entryToMarketEntry).slice(offset, offset + clampedLimit),
+      suggestions: suggestions.slice(0, Math.min(maxSuggestions, 20)),
+      pagination: {
+        kalshiTotal: kalshiEntries.length,
+        pmTotal: pmEntries.length,
+        offset,
+        limit: clampedLimit,
+      },
       stats: {
         kalshiCount: kalshiEntries.length,
         pmCount: pmEntries.length,
