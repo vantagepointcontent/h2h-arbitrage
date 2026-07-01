@@ -404,8 +404,24 @@ async function pollOnce() {
 
 async function run() {
   console.log(`[${new Date().toISOString()}] Poller started — wake interval: ${formatInterval(POLL_WAKE_MS)}, adaptive refresh: enabled`);
+  // Track last prune date — run once daily
+  let lastPruneDate = '';
   while (true) {
     const health = await pollOnce();
+    // Daily DB pruning at midnight
+    const today = new Date().toISOString().slice(0, 10);
+    if (today !== lastPruneDate) {
+      lastPruneDate = today;
+      try {
+        const res = await fetch(`${BASE_URL}/api/prune-scans?days=30`, { method: 'POST' });
+        if (res.ok) {
+          const result = await res.json();
+          console.log(`[${new Date().toISOString()}] DB pruning: ${result.deleted} rows deleted (retention: 30d)`);
+        }
+      } catch (e) {
+        console.warn(`[${new Date().toISOString()}] DB pruning failed:`, e.message);
+      }
+    }
     // Sleep for the base wake interval (smallest tier).
     // Markets are individually gated by their adaptive interval.
     const sleepMs = Math.max(1000, POLL_WAKE_MS);
