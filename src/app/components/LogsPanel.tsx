@@ -104,7 +104,7 @@ export function LogsPanel() {
 
   // Fetch saved markets for market name lookup
   useEffect(() => {
-    fetch("/api/saved-markets")
+    fetch("/api/saved-markets?fields=basic")
       .then((res) => res.json())
       .then((data) => {
         const m = new Map<string, string>();
