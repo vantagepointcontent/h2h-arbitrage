@@ -10,11 +10,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 8,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 8,
-      "scannedAt": "2026-07-01T14:07:39.674Z",
+      "scannedAt": "2026-07-01T14:07:39.706Z",
       "allArbs": []
     },
     "category": "Finances"
@@ -34,23 +34,16 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:07:39.977Z",
+      "scannedAt": "2026-07-01T14:07:39.996Z",
       "allArbs": [
         {
           "artist": "Democratics + Democrat",
           "roiPct": 0.9999999999999913,
           "expectedProfit": 2.271818181818162,
           "strategy": "Buy YES both sides: Kalshi Democratics + Democrat + PM Republicans + Republican",
-          "totalStake": 224.91,
-          "fees": {
-            "kalshiFee": 0,
-            "pmFee": 0,
-            "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
-            "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 2.271818181818162,
-            "netProfitIfPmWins": 2.271818181818162,
-            "worstCaseNetProfit": 2.271818181818162
-          }
+          "kalshiStake": 124.95,
+          "pmStake": 99.96,
+          "totalStake": 224.91
         }
       ]
     },
@@ -71,23 +64,16 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:07:40.165Z",
+      "scannedAt": "2026-07-01T14:07:40.189Z",
       "allArbs": [
         {
           "artist": "Democratics + Democrat",
           "roiPct": 1.131,
           "expectedProfit": 11.31,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 983,
-          "fees": {
-            "kalshiFee": 5.6899999999999995,
-            "pmFee": 2.823,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.04 + NO sell 1556 @ $0.03 = $5.69",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.94 (θ=0.05) = $2.82",
-            "netProfitIfKalshiWins": 11.31,
-            "netProfitIfPmWins": 14.177,
-            "worstCaseNetProfit": 11.31
-          }
+          "kalshiStake": 42,
+          "pmStake": 941,
+          "totalStake": 983
         }
       ]
     },
@@ -108,39 +94,25 @@
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 11,
-      "scannedAt": "2026-07-01T14:07:42.846Z",
+      "scannedAt": "2026-07-01T14:07:42.864Z",
       "allArbs": [
         {
           "artist": "Red Bull Racing",
           "roiPct": 0.13,
           "expectedProfit": 1.3,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 998,
-          "fees": {
-            "kalshiFee": 0.7,
-            "pmFee": 0.3968,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.99 = $0.70",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (θ=0.05) = $0.40",
-            "netProfitIfKalshiWins": 1.3,
-            "netProfitIfPmWins": 1.6032,
-            "worstCaseNetProfit": 1.3
-          }
+          "kalshiStake": 990,
+          "pmStake": 8,
+          "totalStake": 998
         },
         {
           "artist": "Mercedes AMG Motorsport + Mercedes",
           "roiPct": 0.25999999999999995,
           "expectedProfit": 2.5999999999999996,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 990,
-          "fees": {
-            "kalshiFee": 7.4,
-            "pmFee": 5.655,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.12 = $7.40",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.87 (θ=0.05) = $5.66",
-            "netProfitIfKalshiWins": 2.5999999999999996,
-            "netProfitIfPmWins": 4.345,
-            "worstCaseNetProfit": 2.5999999999999996
-          }
+          "kalshiStake": 120,
+          "pmStake": 870,
+          "totalStake": 990
         }
       ]
     },
@@ -154,30 +126,23 @@
     "id": "1779566094057-vc90yk8",
     "createdAt": "2026-05-23T19:54:54.057Z",
     "lastScanResult": {
-      "bestRoiPct": 1.2557975279576201,
-      "bestProfit": 0.8708571428571413,
+      "bestRoiPct": 1.2611666666666645,
+      "bestProfit": 3.0885714285714236,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 3,
+      "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 3,
-      "scannedAt": "2026-07-01T14:08:18.185Z",
+      "scannedAt": "2026-07-01T14:16:25.392Z",
       "allArbs": [
         {
           "artist": "John Rose",
-          "roiPct": 1.2557975279576201,
-          "expectedProfit": 0.8708571428571413,
+          "roiPct": 1.2611666666666645,
+          "expectedProfit": 3.0885714285714236,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 68.37608163265305,
-          "fees": {
-            "kalshiFee": 0.1,
-            "pmFee": 0.02068,
-            "kalshiFeeDetails": "Kalshi NO sell 69 @ $0.98 = $0.10",
-            "pmFeeDetails": "Polymarket YES buy 69 @ $0.01 (θ=0.05) = $0.02",
-            "netProfitIfKalshiWins": 0.8708571428571413,
-            "netProfitIfPmWins": 0.9501771428571413,
-            "worstCaseNetProfit": 0.8708571428571413
-          }
+          "kalshiStake": 240,
+          "pmStake": 1.469387755102041,
+          "totalStake": 241.46938775510205
         }
       ]
     },
@@ -199,7 +164,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:32.400Z",
+      "scannedAt": "2026-07-01T14:16:15.453Z",
       "allArbs": []
     }
   },
@@ -219,23 +184,16 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:07:56.472Z",
+      "scannedAt": "2026-07-01T14:07:56.490Z",
       "allArbs": [
         {
           "artist": "a Republican",
           "roiPct": 1.1058000000000026,
           "expectedProfit": 3.252352941176478,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 288.2352941176471,
-          "fees": {
-            "kalshiFee": 2.63,
-            "pmFee": 1.66324,
-            "kalshiFeeDetails": "Kalshi NO sell 294 @ $0.85 = $2.63",
-            "pmFeeDetails": "Polymarket YES buy 294 @ $0.13 (θ=0.05) = $1.66",
-            "netProfitIfKalshiWins": 3.252352941176478,
-            "netProfitIfPmWins": 4.219112941176478,
-            "worstCaseNetProfit": 3.252352941176478
-          }
+          "kalshiStake": 250,
+          "pmStake": 38.23529411764706,
+          "totalStake": 288.2352941176471
         }
       ]
     }
@@ -252,11 +210,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 13,
+      "outcomeCount": 8,
       "matchedCount": 8,
       "kalshiCount": 9,
       "pmCount": 12,
-      "scannedAt": "2026-07-01T14:07:47.692Z",
+      "scannedAt": "2026-07-01T14:07:47.709Z",
       "allArbs": []
     }
   },
@@ -272,27 +230,20 @@
       "bestRoiPct": 0.043,
       "bestProfit": 0.43,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 16,
+      "outcomeCount": 8,
       "matchedCount": 8,
       "kalshiCount": 11,
       "pmCount": 13,
-      "scannedAt": "2026-07-01T14:07:52.834Z",
+      "scannedAt": "2026-07-01T14:07:52.853Z",
       "allArbs": [
         {
           "artist": "Brett Hulsey",
           "roiPct": 0.043,
           "expectedProfit": 0.43,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 999.5,
-          "fees": {
-            "kalshiFee": 0.07,
-            "pmFee": 0.04993,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.00 + NO sell Infinity @ $0.00 = $0.07",
-            "pmFeeDetails": "Polymarket NO buy 999 @ $1.00 (θ=0.05) = $0.05",
-            "netProfitIfKalshiWins": 0.43,
-            "netProfitIfPmWins": 0.45006999999999997,
-            "worstCaseNetProfit": 0.43
-          }
+          "kalshiStake": 1,
+          "pmStake": 998.5,
+          "totalStake": 999.5
         }
       ]
     }
@@ -313,7 +264,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:07:54.523Z",
+      "scannedAt": "2026-07-01T14:07:54.541Z",
       "allArbs": []
     }
   },
@@ -329,11 +280,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 22,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 15,
       "pmCount": 7,
-      "scannedAt": "2026-07-01T14:07:55.613Z",
+      "scannedAt": "2026-07-01T14:07:55.632Z",
       "allArbs": []
     }
   },
@@ -349,59 +300,38 @@
       "bestRoiPct": 2.935703479576392,
       "bestProfit": 2.086559139784941,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 11,
+      "outcomeCount": 9,
       "matchedCount": 9,
       "kalshiCount": 10,
       "pmCount": 10,
-      "scannedAt": "2026-07-01T14:08:05.420Z",
+      "scannedAt": "2026-07-01T14:08:05.438Z",
       "allArbs": [
         {
           "artist": "Taylor Swift",
           "roiPct": 2.935703479576392,
           "expectedProfit": 2.086559139784941,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 68.65870967741935,
-          "fees": {
-            "kalshiFee": 0.33,
-            "pmFee": 0.12333,
-            "kalshiFeeDetails": "Kalshi NO sell 71 @ $0.93 = $0.33",
-            "pmFeeDetails": "Polymarket YES buy 71 @ $0.04 (θ=0.05) = $0.12",
-            "netProfitIfKalshiWins": 2.086559139784941,
-            "netProfitIfPmWins": 2.2932291397849407,
-            "worstCaseNetProfit": 2.086559139784941
-          }
+          "kalshiStake": 66.1,
+          "pmStake": 2.5587096774193543,
+          "totalStake": 68.65870967741935
         },
         {
           "artist": "Drake",
           "roiPct": 0.069121083218499,
           "expectedProfit": 0.3845666666666556,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 552.4721000000001,
-          "fees": {
-            "kalshiFee": 3.51,
-            "pmFee": 2.3465,
-            "kalshiFeeDetails": "Kalshi NO sell 556 @ $0.90 = $3.51",
-            "pmFeeDetails": "Polymarket YES buy 556 @ $0.09 (θ=0.05) = $2.35",
-            "netProfitIfKalshiWins": 0.3845666666666556,
-            "netProfitIfPmWins": 1.5480666666666556,
-            "worstCaseNetProfit": 0.3845666666666556
-          }
+          "kalshiStake": 500.73,
+          "pmStake": 51.7421,
+          "totalStake": 552.4721000000001
         },
         {
           "artist": "Bruno Mars",
           "roiPct": 0.02884133568817485,
           "expectedProfit": 0.14185858585858446,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 491.36672727272725,
-          "fees": {
-            "kalshiFee": 0.35,
-            "pmFee": 0.21934,
-            "kalshiFeeDetails": "Kalshi NO sell 492 @ $0.99 = $0.35",
-            "pmFeeDetails": "Polymarket YES buy 492 @ $0.01 (θ=0.05) = $0.22",
-            "netProfitIfKalshiWins": 0.14185858585858446,
-            "netProfitIfPmWins": 0.27251858585858446,
-            "worstCaseNetProfit": 0.14185858585858446
-          }
+          "kalshiStake": 486.94,
+          "pmStake": 4.426727272727272,
+          "totalStake": 491.36672727272725
         }
       ]
     }
@@ -422,7 +352,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:32.129Z",
+      "scannedAt": "2026-07-01T14:16:15.433Z",
       "allArbs": []
     }
   },
@@ -442,7 +372,7 @@
       "matchedCount": 7,
       "kalshiCount": 30,
       "pmCount": 30,
-      "scannedAt": "2026-07-01T13:43:26.571Z",
+      "scannedAt": "2026-07-01T14:16:35.467Z",
       "allArbs": [
         {
           "artist": "Los Angeles G",
@@ -499,39 +429,25 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:08:07.758Z",
+      "scannedAt": "2026-07-01T14:08:07.777Z",
       "allArbs": [
         {
           "artist": "Republican",
           "roiPct": 0.7428571428571435,
           "expectedProfit": 0.005909090909090914,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 0.7795454545454545,
-          "fees": {
-            "kalshiFee": 0.01,
-            "pmFee": 0.00358,
-            "kalshiFeeDetails": "Kalshi NO sell 1 @ $0.88 = $0.01",
-            "pmFeeDetails": "Polymarket YES buy 1 @ $0.10 (θ=0.05) = $0.00",
-            "netProfitIfKalshiWins": 0.005909090909090914,
-            "netProfitIfPmWins": 0.012329090909090915,
-            "worstCaseNetProfit": 0.005909090909090914
-          }
+          "kalshiStake": 0.7,
+          "pmStake": 0.07954545454545454,
+          "totalStake": 0.7795454545454545
         },
         {
           "artist": "Democratic",
           "roiPct": 1.1142857142857103,
           "expectedProfit": 0.08863636363636332,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 7.715909090909091,
-          "fees": {
-            "kalshiFee": 0.15,
-            "pmFee": 0.03293,
-            "kalshiFeeDetails": "Kalshi YES buy 8 @ $0.88 + NO sell 9 @ $0.82 = $0.15",
-            "pmFeeDetails": "Polymarket NO buy 9 @ $0.08 (θ=0.05) = $0.03",
-            "netProfitIfKalshiWins": 0.08863636363636332,
-            "netProfitIfPmWins": 0.2057063636363633,
-            "worstCaseNetProfit": 0.08863636363636332
-          }
+          "kalshiStake": 7,
+          "pmStake": 0.7159090909090908,
+          "totalStake": 7.715909090909091
         }
       ]
     }
@@ -548,27 +464,20 @@
       "bestRoiPct": 3.272,
       "bestProfit": 0.17978021978021977,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 12,
+      "outcomeCount": 6,
       "matchedCount": 6,
       "kalshiCount": 11,
       "pmCount": 7,
-      "scannedAt": "2026-07-01T14:08:07.278Z",
+      "scannedAt": "2026-07-01T14:08:07.298Z",
       "allArbs": [
         {
           "artist": "Brent Hennrich",
           "roiPct": 3.272,
           "expectedProfit": 0.17978021978021977,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 5.274725274725275,
-          "fees": {
-            "kalshiFee": 0.04,
-            "pmFee": 0.01305,
-            "kalshiFeeDetails": "Kalshi NO sell 5 @ $0.91 = $0.04",
-            "pmFeeDetails": "Polymarket YES buy 5 @ $0.05 (θ=0.05) = $0.01",
-            "netProfitIfKalshiWins": 0.17978021978021977,
-            "netProfitIfPmWins": 0.20673021978021977,
-            "worstCaseNetProfit": 0.17978021978021977
-          }
+          "kalshiStake": 5,
+          "pmStake": 0.27472527472527475,
+          "totalStake": 5.274725274725275
         }
       ]
     }
@@ -589,7 +498,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:32.139Z",
+      "scannedAt": "2026-07-01T14:16:15.684Z",
       "allArbs": []
     }
   },
@@ -609,7 +518,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:32.266Z",
+      "scannedAt": "2026-07-01T14:16:16.082Z",
       "allArbs": []
     }
   },
@@ -625,123 +534,74 @@
       "bestRoiPct": 1.8839709973094996,
       "bestProfit": 4.490608695652176,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 24,
+      "outcomeCount": 14,
       "matchedCount": 14,
       "kalshiCount": 16,
       "pmCount": 22,
-      "scannedAt": "2026-07-01T14:08:25.484Z",
+      "scannedAt": "2026-07-01T14:08:25.501Z",
       "allArbs": [
         {
           "artist": "Adam Crum",
           "roiPct": 0.3270930232558205,
           "expectedProfit": 0.8524242424242596,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 259.56363636363636,
-          "fees": {
-            "kalshiFee": 0.19,
-            "pmFee": 0.07771,
-            "kalshiFeeDetails": "Kalshi NO sell 261 @ $0.99 = $0.19",
-            "pmFeeDetails": "Polymarket YES buy 261 @ $0.01 (θ=0.05) = $0.08",
-            "netProfitIfKalshiWins": 0.8524242424242596,
-            "netProfitIfPmWins": 0.9647142424242596,
-            "worstCaseNetProfit": 0.8524242424242596
-          }
+          "kalshiStake": 258,
+          "pmStake": 1.5636363636363637,
+          "totalStake": 259.56363636363636
         },
         {
           "artist": "Shelley Hughes",
           "roiPct": 0.12928571428571056,
           "expectedProfit": 0.9141414141413877,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 705.6565656565657,
-          "fees": {
-            "kalshiFee": 0.5,
-            "pmFee": 0.28057,
-            "kalshiFeeDetails": "Kalshi NO sell 707 @ $0.99 = $0.50",
-            "pmFeeDetails": "Polymarket YES buy 707 @ $0.01 (θ=0.05) = $0.28",
-            "netProfitIfKalshiWins": 0.9141414141413877,
-            "netProfitIfPmWins": 1.1335714141413877,
-            "worstCaseNetProfit": 0.9141414141413877
-          }
+          "kalshiStake": 700,
+          "pmStake": 5.656565656565657,
+          "totalStake": 705.6565656565657
         },
         {
           "artist": "Nancy Dahlstrom",
           "roiPct": 0.11600000000000002,
           "expectedProfit": 1.1600000000000001,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 998,
-          "fees": {
-            "kalshiFee": 0.84,
-            "pmFee": 0.4464,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell 3000 @ $0.00 = $0.84",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (θ=0.05) = $0.45",
-            "netProfitIfKalshiWins": 1.1600000000000001,
-            "netProfitIfPmWins": 1.5535999999999999,
-            "worstCaseNetProfit": 1.1600000000000001
-          }
+          "kalshiStake": 6,
+          "pmStake": 992,
+          "totalStake": 998
         },
         {
           "artist": "Matt Heilala",
           "roiPct": 0.6296000000000034,
           "expectedProfit": 2.8618181818181974,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 451.3636363636364,
-          "fees": {
-            "kalshiFee": 0.32,
-            "pmFee": 0.06798,
-            "kalshiFeeDetails": "Kalshi NO sell 455 @ $0.99 = $0.32",
-            "pmFeeDetails": "Polymarket YES buy 455 @ $0.00 (θ=0.05) = $0.07",
-            "netProfitIfKalshiWins": 2.8618181818181974,
-            "netProfitIfPmWins": 3.1138381818181973,
-            "worstCaseNetProfit": 2.8618181818181974
-          }
+          "kalshiStake": 450,
+          "pmStake": 1.3636363636363638,
+          "totalStake": 451.3636363636364
         },
         {
           "artist": "Jonathan Kreiss-Tomkins",
           "roiPct": 0.006837606837608467,
           "expectedProfit": 0.0038554216867479063,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 55.82168674698795,
-          "fees": {
-            "kalshiFee": 0.56,
-            "pmFee": 0.37891,
-            "kalshiFeeDetails": "Kalshi NO sell 56 @ $0.83 = $0.56",
-            "pmFeeDetails": "Polymarket YES buy 56 @ $0.16 (θ=0.05) = $0.38",
-            "netProfitIfKalshiWins": 0.0038554216867479063,
-            "netProfitIfPmWins": 0.18494542168674794,
-            "worstCaseNetProfit": 0.0038554216867479063
-          }
+          "kalshiStake": 46.8,
+          "pmStake": 9.021686746987951,
+          "totalStake": 55.82168674698795
         },
         {
           "artist": "Lesil McGuire",
           "roiPct": 0.6305862068965478,
           "expectedProfit": 5.541515151515116,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 872.6363636363636,
-          "fees": {
-            "kalshiFee": 0.61,
-            "pmFee": 0.13142,
-            "kalshiFeeDetails": "Kalshi NO sell 879 @ $0.99 = $0.61",
-            "pmFeeDetails": "Polymarket YES buy 879 @ $0.00 (θ=0.05) = $0.13",
-            "netProfitIfKalshiWins": 5.541515151515116,
-            "netProfitIfPmWins": 6.020095151515116,
-            "worstCaseNetProfit": 5.541515151515116
-          }
+          "kalshiStake": 870,
+          "pmStake": 2.6363636363636362,
+          "totalStake": 872.6363636363636
         },
         {
           "artist": "Bill Walker",
           "roiPct": 1.8839709973094996,
           "expectedProfit": 4.490608695652176,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 232.63808695652173,
-          "fees": {
-            "kalshiFee": 1.23,
-            "pmFee": 0.63003,
-            "kalshiFeeDetails": "Kalshi NO sell 238 @ $0.92 = $1.23",
-            "pmFeeDetails": "Polymarket YES buy 238 @ $0.06 (θ=0.05) = $0.63",
-            "netProfitIfKalshiWins": 4.490608695652176,
-            "netProfitIfPmWins": 5.090578695652177,
-            "worstCaseNetProfit": 4.490608695652176
-          }
+          "kalshiStake": 219.29,
+          "pmStake": 13.348086956521739,
+          "totalStake": 232.63808695652173
         }
       ]
     }
@@ -758,11 +618,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 11,
+      "outcomeCount": 10,
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 11,
-      "scannedAt": "2026-07-01T14:08:14.858Z",
+      "scannedAt": "2026-07-01T14:08:14.877Z",
       "allArbs": []
     }
   },
@@ -782,39 +642,25 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:08:19.696Z",
+      "scannedAt": "2026-07-01T14:08:19.713Z",
       "allArbs": [
         {
           "artist": "Democratic",
           "roiPct": 1.000000000000001,
           "expectedProfit": 2.8409090909090935,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 281.24999999999994,
-          "fees": {
-            "kalshiFee": 0,
-            "pmFee": 0,
-            "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
-            "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 2.8409090909090935,
-            "netProfitIfPmWins": 2.8409090909090935,
-            "worstCaseNetProfit": 2.8409090909090935
-          }
+          "kalshiStake": 42.61363636363636,
+          "pmStake": 238.6363636363636,
+          "totalStake": 281.24999999999994
         },
         {
           "artist": "Republican",
           "roiPct": 0.10700000000000003,
           "expectedProfit": 1.0700000000000003,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 990,
-          "fees": {
-            "kalshiFee": 8.93,
-            "pmFee": 6.72,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.15 = $8.93",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.84 (θ=0.05) = $6.72",
-            "netProfitIfKalshiWins": 1.0700000000000003,
-            "netProfitIfPmWins": 3.2800000000000002,
-            "worstCaseNetProfit": 1.0700000000000003
-          }
+          "kalshiStake": 150,
+          "pmStake": 840,
+          "totalStake": 990
         }
       ]
     }
@@ -835,7 +681,7 @@
       "matchedCount": 16,
       "kalshiCount": 16,
       "pmCount": 16,
-      "scannedAt": "2026-07-01T13:23:56.416Z",
+      "scannedAt": "2026-07-01T14:16:35.708Z",
       "allArbs": [
         {
           "artist": "Miami",
@@ -910,7 +756,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:34.175Z",
+      "scannedAt": "2026-07-01T14:16:25.713Z",
       "allArbs": []
     }
   },
@@ -926,11 +772,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 44,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 30,
       "pmCount": 14,
-      "scannedAt": "2026-07-01T14:08:22.342Z",
+      "scannedAt": "2026-07-01T14:08:22.361Z",
       "allArbs": []
     }
   },
@@ -950,39 +796,25 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:08:25.238Z",
+      "scannedAt": "2026-07-01T14:08:25.255Z",
       "allArbs": [
         {
           "artist": "Democratic",
           "roiPct": 1.1537600000000048,
           "expectedProfit": 3.353953488372107,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 284.8837209302326,
-          "fees": {
-            "kalshiFee": 2.46,
-            "pmFee": 1.53488,
-            "kalshiFeeDetails": "Kalshi NO sell 291 @ $0.86 = $2.46",
-            "pmFeeDetails": "Polymarket YES buy 291 @ $0.12 (θ=0.05) = $1.53",
-            "netProfitIfKalshiWins": 3.353953488372107,
-            "netProfitIfPmWins": 4.279073488372107,
-            "worstCaseNetProfit": 3.353953488372107
-          }
+          "kalshiStake": 250,
+          "pmStake": 34.883720930232556,
+          "totalStake": 284.8837209302326
         },
         {
           "artist": "Republican",
           "roiPct": 1.9999999999999976,
           "expectedProfit": 5.833720930232552,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
-          "totalStake": 285.85232558139535,
-          "fees": {
-            "kalshiFee": 0,
-            "pmFee": 0,
-            "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
-            "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 5.833720930232552,
-            "netProfitIfPmWins": 5.833720930232552,
-            "worstCaseNetProfit": 5.833720930232552
-          }
+          "kalshiStake": 250.85000000000002,
+          "pmStake": 35.00232558139535,
+          "totalStake": 285.85232558139535
         }
       ]
     }
@@ -999,11 +831,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 41,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 21,
       "pmCount": 20,
-      "scannedAt": "2026-07-01T14:08:28.376Z",
+      "scannedAt": "2026-07-01T14:08:28.398Z",
       "allArbs": []
     }
   },
@@ -1023,23 +855,16 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:08:32.389Z",
+      "scannedAt": "2026-07-01T14:08:32.407Z",
       "allArbs": [
         {
           "artist": "Republican",
           "roiPct": 0.108,
           "expectedProfit": 1.08,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 994,
-          "fees": {
-            "kalshiFee": 4.92,
-            "pmFee": 0.999,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.97 + NO sell 1021 @ $0.95 = $4.92",
-            "pmFeeDetails": "Polymarket NO buy 20000 @ $0.00 (θ=0.05) = $1.00",
-            "netProfitIfKalshiWins": 1.08,
-            "netProfitIfPmWins": 5.001,
-            "worstCaseNetProfit": 1.08
-          }
+          "kalshiStake": 974,
+          "pmStake": 20,
+          "totalStake": 994
         }
       ]
     }
@@ -1053,23 +878,23 @@
     "id": "1779921598922-8sg17v8",
     "createdAt": "2026-05-27T22:39:58.922Z",
     "lastScanResult": {
-      "bestRoiPct": 3.9199999999999893,
-      "bestProfit": 2.3229629629629565,
+      "bestRoiPct": 2.957916666666667,
+      "bestProfit": 1.7314634146341468,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 4,
       "matchedCount": 4,
       "kalshiCount": 15,
       "pmCount": 15,
-      "scannedAt": "2026-07-01T13:24:01.150Z",
+      "scannedAt": "2026-07-01T14:16:46.160Z",
       "allArbs": [
         {
           "artist": "New York",
-          "roiPct": 3.9199999999999893,
-          "expectedProfit": 2.3229629629629565,
+          "roiPct": 2.957916666666667,
+          "expectedProfit": 1.7314634146341468,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 48,
-          "pmStake": 8.296296296296296,
-          "totalStake": 56.2962962962963
+          "pmStake": 8.195121951219514,
+          "totalStake": 56.19512195121951
         }
       ]
     }
@@ -1086,43 +911,29 @@
       "bestRoiPct": 0.19200000000001136,
       "bestProfit": 1.9200000000001136,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 15,
+      "outcomeCount": 9,
       "matchedCount": 9,
       "kalshiCount": 13,
       "pmCount": 11,
-      "scannedAt": "2026-07-01T14:08:34.193Z",
+      "scannedAt": "2026-07-01T14:08:34.210Z",
       "allArbs": [
         {
           "artist": "the Netherlands",
           "roiPct": 0.12100000000000008,
           "expectedProfit": 1.2100000000000009,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 980,
-          "fees": {
-            "kalshiFee": 18.79,
-            "pmFee": 8.3,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.15 + NO sell 2459 @ $0.06 = $18.79",
-            "pmFeeDetails": "Polymarket NO buy 1038 @ $0.80 (θ=0.05) = $8.30",
-            "netProfitIfKalshiWins": 1.2100000000000009,
-            "netProfitIfPmWins": 11.7,
-            "worstCaseNetProfit": 1.2100000000000009
-          }
+          "kalshiStake": 150,
+          "pmStake": 830,
+          "totalStake": 980
         },
         {
           "artist": "the United States of America",
           "roiPct": 0.19200000000001136,
           "expectedProfit": 1.9200000000001136,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 989.9999999999999,
-          "fees": {
-            "kalshiFee": 8.08,
-            "pmFee": 3.72,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.06 + NO sell 3529 @ $0.02 = $8.08",
-            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.92 (θ=0.05) = $3.72",
-            "netProfitIfKalshiWins": 1.9200000000001136,
-            "netProfitIfPmWins": 6.280000000000113,
-            "worstCaseNetProfit": 1.9200000000001136
-          }
+          "kalshiStake": 60,
+          "pmStake": 929.9999999999999,
+          "totalStake": 989.9999999999999
         }
       ]
     }
@@ -1139,11 +950,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 34,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 18,
       "pmCount": 16,
-      "scannedAt": "2026-07-01T14:08:41.955Z",
+      "scannedAt": "2026-07-01T14:08:41.972Z",
       "allArbs": []
     }
   },
@@ -1159,11 +970,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 2,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 1,
-      "scannedAt": "2026-07-01T14:08:42.742Z",
+      "scannedAt": "2026-07-01T14:08:42.762Z",
       "allArbs": []
     }
   },
@@ -1179,11 +990,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 51,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 50,
-      "scannedAt": "2026-07-01T14:08:49.163Z",
+      "scannedAt": "2026-07-01T14:08:49.182Z",
       "allArbs": []
     }
   },
@@ -1203,7 +1014,7 @@
       "matchedCount": 23,
       "kalshiCount": 42,
       "pmCount": 24,
-      "scannedAt": "2026-07-01T13:34:09.986Z",
+      "scannedAt": "2026-07-01T14:09:04.866Z",
       "allArbs": [
         {
           "artist": "Ranger Suarez",
@@ -1242,7 +1053,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:33.418Z",
+      "scannedAt": "2026-07-01T14:16:35.855Z",
       "allArbs": []
     }
   },
@@ -1262,7 +1073,7 @@
       "matchedCount": 6,
       "kalshiCount": 31,
       "pmCount": 30,
-      "scannedAt": "2026-07-01T13:24:10.896Z",
+      "scannedAt": "2026-07-01T14:17:01.106Z",
       "allArbs": []
     }
   },
@@ -1275,32 +1086,32 @@
     "id": "1780516036144-j6f7e3q",
     "createdAt": "2026-06-03T19:47:16.144Z",
     "lastScanResult": {
-      "bestRoiPct": 4.000000000000002,
-      "bestProfit": 0.41500535905680624,
+      "bestRoiPct": 3.900000000000002,
+      "bestProfit": 0.4046302250803861,
       "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:34:04.500Z",
+      "scannedAt": "2026-07-01T14:09:05.314Z",
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 3.466623999999998,
-          "expectedProfit": 9.278972162740892,
+          "roiPct": 3.366623999999998,
+          "expectedProfit": 9.011306209850101,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 249.99999999999997,
-          "pmStake": 7.226980728051391,
-          "totalStake": 257.2269807280514
+          "pmStake": 7.494646680942183,
+          "totalStake": 257.49464668094214
         },
         {
           "artist": "Republican",
-          "roiPct": 4.000000000000002,
-          "expectedProfit": 0.41500535905680624,
+          "roiPct": 3.900000000000002,
+          "expectedProfit": 0.4046302250803861,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
           "kalshiStake": 9.68,
-          "pmStake": 0.28012861736334405,
-          "totalStake": 9.960128617363344
+          "pmStake": 0.2905037513397642,
+          "totalStake": 9.970503751339765
         }
       ]
     }
@@ -1321,7 +1132,7 @@
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 14,
-      "scannedAt": "2026-07-01T13:34:13.370Z",
+      "scannedAt": "2026-07-01T14:09:19.732Z",
       "allArbs": []
     }
   },
@@ -1334,32 +1145,23 @@
     "id": "1780516130290-bbhg6o1",
     "createdAt": "2026-06-03T19:48:50.290Z",
     "lastScanResult": {
-      "bestRoiPct": 0.15899999999999997,
-      "bestProfit": 1.5899999999999999,
+      "bestRoiPct": 0.32112,
+      "bestProfit": 3.2112,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 20,
       "matchedCount": 20,
       "kalshiCount": 22,
       "pmCount": 22,
-      "scannedAt": "2026-07-01T13:34:19.885Z",
+      "scannedAt": "2026-07-01T14:09:24.236Z",
       "allArbs": [
         {
-          "artist": "Max Verstappen",
-          "roiPct": 0.15899999999999997,
-          "expectedProfit": 1.5899999999999999,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 40,
-          "pmStake": 953,
-          "totalStake": 993
-        },
-        {
           "artist": "Oscar Piastri",
-          "roiPct": 0.13,
-          "expectedProfit": 1.3,
+          "roiPct": 0.32112,
+          "expectedProfit": 3.2112,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 10,
-          "pmStake": 988,
-          "totalStake": 998
+          "pmStake": 986,
+          "totalStake": 996
         }
       ]
     }
@@ -1380,7 +1182,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:34:12.908Z",
+      "scannedAt": "2026-07-01T14:09:23.787Z",
       "allArbs": []
     }
   },
@@ -1400,7 +1202,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:34:16.503Z",
+      "scannedAt": "2026-07-01T14:09:24.010Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -1430,7 +1232,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:34:16.969Z",
+      "scannedAt": "2026-07-01T14:09:28.660Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -1469,7 +1271,7 @@
       "matchedCount": 4,
       "kalshiCount": 4,
       "pmCount": 4,
-      "scannedAt": "2026-07-01T13:34:22.842Z",
+      "scannedAt": "2026-07-01T14:09:31.777Z",
       "allArbs": [
         {
           "artist": "Seattle",
@@ -1499,7 +1301,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:33.808Z",
+      "scannedAt": "2026-07-01T14:16:36.067Z",
       "allArbs": []
     }
   },
@@ -1512,23 +1314,23 @@
     "id": "1780524610133-tw8c996",
     "createdAt": "2026-06-03T22:10:10.133Z",
     "lastScanResult": {
-      "bestRoiPct": 0.2368421052631619,
-      "bestProfit": 0.09000000000000152,
+      "bestRoiPct": 0.22467986030267958,
+      "bestProfit": 0.07720000000000071,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 1,
       "matchedCount": 1,
       "kalshiCount": 1,
       "pmCount": 1,
-      "scannedAt": "2026-07-01T13:34:17.980Z",
+      "scannedAt": "2026-07-01T14:09:26.644Z",
       "allArbs": [
         {
           "artist": "Democrats (Nov 03, 2026) + Will Democrats win all \"core four\" senate races?",
-          "roiPct": 0.2368421052631619,
-          "expectedProfit": 0.09000000000000152,
+          "roiPct": 0.22467986030267958,
+          "expectedProfit": 0.07720000000000071,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 19,
-          "pmStake": 18.24,
-          "totalStake": 37.239999999999995
+          "kalshiStake": 17.18,
+          "pmStake": 16.4928,
+          "totalStake": 33.672799999999995
         }
       ]
     }
@@ -1549,7 +1351,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:34:22.607Z",
+      "scannedAt": "2026-07-01T14:09:31.540Z",
       "allArbs": []
     }
   },
@@ -1569,7 +1371,7 @@
       "matchedCount": 2,
       "kalshiCount": 22,
       "pmCount": 16,
-      "scannedAt": "2026-07-01T13:34:22.392Z",
+      "scannedAt": "2026-07-01T14:09:31.307Z",
       "allArbs": []
     }
   },
@@ -1589,7 +1391,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:34.362Z",
+      "scannedAt": "2026-07-01T14:16:36.197Z",
       "allArbs": []
     }
   },
@@ -1609,7 +1411,7 @@
       "matchedCount": 0,
       "kalshiCount": 30,
       "pmCount": 30,
-      "scannedAt": "2026-07-01T13:24:20.154Z",
+      "scannedAt": "2026-07-01T14:17:01.564Z",
       "allArbs": []
     }
   },
@@ -1622,24 +1424,15 @@
     "id": "1780524929760-fwvrvx2",
     "createdAt": "2026-06-03T22:15:29.760Z",
     "lastScanResult": {
-      "bestRoiPct": 0.70671,
-      "bestProfit": 7.0671,
-      "strategy": "Buy YES Kalshi + NO PM",
+      "bestRoiPct": 1.0200000000000071,
+      "bestProfit": 0.02318181818181835,
+      "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 18,
       "matchedCount": 18,
       "kalshiCount": 31,
       "pmCount": 25,
-      "scannedAt": "2026-07-01T13:34:33.824Z",
+      "scannedAt": "2026-07-01T14:09:42.825Z",
       "allArbs": [
-        {
-          "artist": "Harry Kane",
-          "roiPct": 0.5380486909433017,
-          "expectedProfit": 2.9681898734177246,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 435.80999999999995,
-          "pmStake": 106.47003797468354,
-          "totalStake": 542.2800379746835
-        },
         {
           "artist": "Lautaro Martinez",
           "roiPct": 0.030000000000000002,
@@ -1666,6 +1459,15 @@
           "kalshiStake": 15.000000000000002,
           "pmStake": 1.4833333333333334,
           "totalStake": 16.483333333333334
+        },
+        {
+          "artist": "Lionel Messi",
+          "roiPct": 1.0200000000000071,
+          "expectedProfit": 0.02318181818181835,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 2,
+          "pmStake": 0.22954545454545458,
+          "totalStake": 2.2295454545454545
         }
       ]
     }
@@ -1686,7 +1488,7 @@
       "matchedCount": 0,
       "kalshiCount": 30,
       "pmCount": 21,
-      "scannedAt": "2026-07-01T13:34:36.464Z",
+      "scannedAt": "2026-07-01T14:09:49.517Z",
       "allArbs": []
     }
   },
@@ -1706,7 +1508,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:34.208Z",
+      "scannedAt": "2026-07-01T14:16:46.450Z",
       "allArbs": []
     }
   },
@@ -1726,7 +1528,7 @@
       "matchedCount": 0,
       "kalshiCount": 22,
       "pmCount": 25,
-      "scannedAt": "2026-07-01T13:35:41.931Z",
+      "scannedAt": "2026-07-01T14:09:52.610Z",
       "allArbs": []
     }
   },
@@ -1746,7 +1548,7 @@
       "matchedCount": 0,
       "kalshiCount": 9,
       "pmCount": 50,
-      "scannedAt": "2026-07-01T13:35:52.004Z",
+      "scannedAt": "2026-07-01T14:09:59.333Z",
       "allArbs": []
     }
   },
@@ -1766,7 +1568,7 @@
       "matchedCount": 17,
       "kalshiCount": 23,
       "pmCount": 51,
-      "scannedAt": "2026-07-01T13:24:24.654Z",
+      "scannedAt": "2026-07-01T14:17:12.525Z",
       "allArbs": [
         {
           "artist": "Aaron Lukas",
@@ -1850,7 +1652,7 @@
       "matchedCount": 0,
       "kalshiCount": 32,
       "pmCount": 27,
-      "scannedAt": "2026-07-01T13:35:45.227Z",
+      "scannedAt": "2026-07-01T14:10:09.792Z",
       "allArbs": []
     }
   },
@@ -1870,7 +1672,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 18,
-      "scannedAt": "2026-07-01T13:36:06.905Z",
+      "scannedAt": "2026-07-01T14:10:25.686Z",
       "allArbs": []
     }
   },
@@ -1890,7 +1692,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:52:35.943Z",
+      "scannedAt": "2026-07-01T14:17:01.492Z",
       "allArbs": []
     }
   },
@@ -1910,7 +1712,7 @@
       "matchedCount": 14,
       "kalshiCount": 15,
       "pmCount": 15,
-      "scannedAt": "2026-07-01T13:24:31.827Z",
+      "scannedAt": "2026-07-01T14:17:22.650Z",
       "allArbs": [
         {
           "artist": "Houston",
@@ -1933,14 +1735,14 @@
     "id": "1780525241216-nevhd9n",
     "createdAt": "2026-06-03T22:20:41.216Z",
     "lastScanResult": {
-      "bestRoiPct": 72.20130813953487,
-      "bestProfit": 66.23266666666666,
+      "bestRoiPct": 72.19521178637201,
+      "bestProfit": 78.40400000000001,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:00.460Z",
+      "scannedAt": "2026-07-01T14:10:26.314Z",
       "allArbs": [
         {
           "artist": "Anthropic",
@@ -1953,12 +1755,12 @@
         },
         {
           "artist": "OpenAI",
-          "roiPct": 72.20130813953487,
-          "expectedProfit": 66.23266666666666,
+          "roiPct": 72.19521178637201,
+          "expectedProfit": 78.40400000000001,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 13.76,
-          "pmStake": 10.090666666666666,
-          "totalStake": 23.850666666666665
+          "kalshiStake": 16.29,
+          "pmStake": 11.945999999999998,
+          "totalStake": 28.235999999999997
         }
       ]
     }
@@ -1979,7 +1781,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:08.954Z",
+      "scannedAt": "2026-07-01T14:10:31.222Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2018,7 +1820,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:09.437Z",
+      "scannedAt": "2026-07-01T14:10:31.922Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2057,7 +1859,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:12.606Z",
+      "scannedAt": "2026-07-01T14:10:37.191Z",
       "allArbs": []
     }
   },
@@ -2077,7 +1879,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:13.306Z",
+      "scannedAt": "2026-07-01T14:10:37.667Z",
       "allArbs": [
         {
           "artist": "the Democratic party + Democrat",
@@ -2107,7 +1909,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:36:13.550Z",
+      "scannedAt": "2026-07-01T14:10:57.094Z",
       "allArbs": []
     }
   },
@@ -2120,32 +1922,32 @@
     "id": "1780616584214-jghi7cb",
     "createdAt": "2026-06-04T23:43:04.214Z",
     "lastScanResult": {
-      "bestRoiPct": 0.3019999999999933,
-      "bestProfit": 0.015252525252524912,
+      "bestRoiPct": 0.530084745762717,
+      "bestProfit": 4.018363636363676,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 18,
       "matchedCount": 18,
       "kalshiCount": 31,
       "pmCount": 25,
-      "scannedAt": "2026-07-01T13:37:26.588Z",
+      "scannedAt": "2026-07-01T14:10:52.531Z",
       "allArbs": [
         {
           "artist": "Kyle Schwarber",
-          "roiPct": 0.294742527907816,
-          "expectedProfit": 0.7795238095238144,
+          "roiPct": 0.29245283018867674,
+          "expectedProfit": 1.2399999999999896,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 111.08,
-          "pmStake": 148.10666666666668,
-          "totalStake": 259.18666666666667
+          "kalshiStake": 178.08,
+          "pmStake": 237.44000000000005,
+          "totalStake": 415.5200000000001
         },
         {
           "artist": "Junior Caminero",
-          "roiPct": 0.3019999999999933,
-          "expectedProfit": 0.015252525252524912,
+          "roiPct": 0.530084745762717,
+          "expectedProfit": 4.018363636363676,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 5,
-          "pmStake": 0.025252525252525252,
-          "totalStake": 5.025252525252525
+          "kalshiStake": 750.48,
+          "pmStake": 3.0322424242424244,
+          "totalStake": 753.5122424242425
         }
       ]
     }
@@ -2166,7 +1968,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:31.206Z",
+      "scannedAt": "2026-07-01T14:10:58.870Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -2196,7 +1998,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:31.433Z",
+      "scannedAt": "2026-07-01T14:10:59.343Z",
       "allArbs": [
         {
           "artist": "the Republican party",
@@ -2235,7 +2037,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-07-01T13:37:29.467Z",
+      "scannedAt": "2026-07-01T14:10:58.632Z",
       "allArbs": []
     }
   },
@@ -2255,7 +2057,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:33.991Z",
+      "scannedAt": "2026-07-01T14:11:05.098Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2294,7 +2096,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:34.804Z",
+      "scannedAt": "2026-07-01T14:11:05.326Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2329,11 +2131,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 60,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 30,
       "pmCount": 30,
-      "scannedAt": "2026-07-01T13:40:02.331Z",
+      "scannedAt": "2026-07-01T14:17:22.893Z",
       "allArbs": []
     }
   },
@@ -2353,7 +2155,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:35.037Z",
+      "scannedAt": "2026-07-01T14:11:05.808Z",
       "allArbs": []
     }
   },
@@ -2373,7 +2175,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 1,
-      "scannedAt": "2026-07-01T13:37:34.559Z",
+      "scannedAt": "2026-07-01T14:11:05.927Z",
       "allArbs": []
     }
   },
@@ -2386,23 +2188,23 @@
     "id": "1780947342746-x2ck9fp",
     "createdAt": "2026-06-08T19:35:42.746Z",
     "lastScanResult": {
-      "bestRoiPct": 1.946534052133709,
-      "bestProfit": 5.358453932584274,
+      "bestRoiPct": 1.942740098530952,
+      "bestProfit": 4.2079292134831325,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 15,
       "matchedCount": 15,
       "kalshiCount": 17,
       "pmCount": 15,
-      "scannedAt": "2026-07-01T13:37:55.522Z",
+      "scannedAt": "2026-07-01T14:17:23.138Z",
       "allArbs": [
         {
           "artist": "Don Kelly",
-          "roiPct": 1.946534052133709,
-          "expectedProfit": 5.358453932584274,
+          "roiPct": 1.942740098530952,
+          "expectedProfit": 4.2079292134831325,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 22.02254382022472,
-          "pmStake": 245.0008,
-          "totalStake": 267.02334382022474
+          "kalshiStake": 17.327811235955057,
+          "pmStake": 192.7719,
+          "totalStake": 210.09971123595506
         }
       ]
     }
@@ -2423,7 +2225,7 @@
       "matchedCount": 4,
       "kalshiCount": 4,
       "pmCount": 4,
-      "scannedAt": "2026-07-01T13:37:46.860Z",
+      "scannedAt": "2026-07-01T14:17:33.066Z",
       "allArbs": []
     }
   },
@@ -2443,7 +2245,7 @@
       "matchedCount": 21,
       "kalshiCount": 23,
       "pmCount": 22,
-      "scannedAt": "2026-07-01T13:37:43.045Z",
+      "scannedAt": "2026-07-01T14:17:28.526Z",
       "allArbs": [
         {
           "artist": "Marco Rubio",
@@ -2483,12 +2285,12 @@
         },
         {
           "artist": "Pope Leo XIV",
-          "roiPct": 0.9658029350104809,
-          "expectedProfit": 7.022682926829258,
+          "roiPct": 0.9667437594704545,
+          "expectedProfit": 5.913170731707332,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 596.25,
-          "pmStake": 116.34146341463415,
-          "totalStake": 712.5914634146342
+          "kalshiStake": 501.56000000000006,
+          "pmStake": 97.86536585365855,
+          "totalStake": 599.4253658536586
         }
       ]
     }
@@ -2509,7 +2311,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 1,
-      "scannedAt": "2026-07-01T13:37:43.843Z",
+      "scannedAt": "2026-07-01T14:17:28.646Z",
       "allArbs": []
     }
   },
@@ -2529,7 +2331,7 @@
       "matchedCount": 1,
       "kalshiCount": 6,
       "pmCount": 9,
-      "scannedAt": "2026-07-01T13:37:56.231Z",
+      "scannedAt": "2026-07-01T14:17:56.235Z",
       "allArbs": []
     }
   },
@@ -2549,7 +2351,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:37:49.814Z",
+      "scannedAt": "2026-07-01T14:17:33.793Z",
       "allArbs": []
     }
   },
@@ -2569,7 +2371,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T14:08:18.679Z",
+      "scannedAt": "2026-07-01T14:21:08.243Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2615,32 +2417,32 @@
     "id": "1780947685278-vey4gcm",
     "createdAt": "2026-06-08T19:41:25.278Z",
     "lastScanResult": {
-      "bestRoiPct": 0.8548148148148116,
-      "bestProfit": 0.47102040816326346,
+      "bestRoiPct": 0.3292857142857175,
+      "bestProfit": 0.09313131313131405,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 19,
       "matchedCount": 19,
       "kalshiCount": 70,
       "pmCount": 25,
-      "scannedAt": "2026-07-01T13:39:16.678Z",
+      "scannedAt": "2026-07-01T14:17:42.903Z",
       "allArbs": [
         {
           "artist": "Juan Soto",
-          "roiPct": 0.42928571428571755,
-          "expectedProfit": 0.12141414141414235,
+          "roiPct": 0.3292857142857175,
+          "expectedProfit": 0.09313131313131405,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 28,
-          "pmStake": 0.1414141414141414,
-          "totalStake": 28.141414141414142
+          "pmStake": 0.1696969696969697,
+          "totalStake": 28.169696969696968
         },
         {
           "artist": "Aaron Judge",
-          "roiPct": 0.8548148148148116,
-          "expectedProfit": 0.47102040816326346,
+          "roiPct": 0.02000000000000211,
+          "expectedProfit": 0.00020408163265308275,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 54,
-          "pmStake": 0.5510204081632653,
-          "totalStake": 54.55102040816327
+          "kalshiStake": 1,
+          "pmStake": 0.010204081632653062,
+          "totalStake": 1.010204081632653
         }
       ]
     }
@@ -2681,7 +2483,7 @@
       "matchedCount": 5,
       "kalshiCount": 15,
       "pmCount": 11,
-      "scannedAt": "2026-07-01T13:41:28.603Z",
+      "scannedAt": "2026-07-01T14:17:52.333Z",
       "allArbs": []
     }
   },
@@ -2701,7 +2503,7 @@
       "matchedCount": 14,
       "kalshiCount": 41,
       "pmCount": 14,
-      "scannedAt": "2026-07-01T13:39:27.211Z",
+      "scannedAt": "2026-07-01T14:17:55.488Z",
       "allArbs": [
         {
           "artist": "The Odyssey",
@@ -2731,7 +2533,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:39:30.643Z",
+      "scannedAt": "2026-07-01T14:18:10.703Z",
       "allArbs": []
     }
   },
@@ -2751,7 +2553,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 20,
-      "scannedAt": "2026-07-01T13:39:41.187Z",
+      "scannedAt": "2026-07-01T14:18:06.447Z",
       "allArbs": []
     }
   },
@@ -2787,11 +2589,11 @@
       "bestRoiPct": 0,
       "bestProfit": 0,
       "strategy": "No arb",
-      "outcomeCount": 12,
+      "outcomeCount": 0,
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 12,
-      "scannedAt": "2026-07-01T13:51:35.826Z",
+      "scannedAt": "2026-07-01T14:11:24.466Z",
       "allArbs": []
     }
   },
@@ -2811,7 +2613,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:39:53.239Z",
+      "scannedAt": "2026-07-01T14:18:18.845Z",
       "allArbs": []
     }
   },
@@ -2831,7 +2633,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:24.875Z",
+      "scannedAt": "2026-07-01T14:18:10.917Z",
       "allArbs": []
     }
   },
@@ -2851,7 +2653,7 @@
       "matchedCount": 10,
       "kalshiCount": 51,
       "pmCount": 10,
-      "scannedAt": "2026-07-01T13:39:49.725Z",
+      "scannedAt": "2026-07-01T14:18:18.116Z",
       "allArbs": [
         {
           "artist": "Bryce Harper",
@@ -2890,7 +2692,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:39:54.926Z",
+      "scannedAt": "2026-07-01T14:18:23.242Z",
       "allArbs": []
     }
   },
@@ -2910,7 +2712,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:39:56.830Z",
+      "scannedAt": "2026-07-01T14:18:23.715Z",
       "allArbs": []
     }
   },
@@ -2930,7 +2732,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:40:00.714Z",
+      "scannedAt": "2026-07-01T14:18:28.051Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2969,7 +2771,7 @@
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 10,
-      "scannedAt": "2026-07-01T13:39:58.235Z",
+      "scannedAt": "2026-07-01T14:18:26.315Z",
       "allArbs": [
         {
           "artist": "Earbuds/Headphones",
@@ -3027,12 +2829,12 @@
         },
         {
           "artist": "Tablet",
-          "roiPct": 1.9682231655548732,
-          "expectedProfit": 9.273142857142815,
+          "roiPct": 2.068223165554875,
+          "expectedProfit": 9.744285714285681,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 32.98,
-          "pmStake": 424.4997142857142,
-          "totalStake": 457.47971428571424
+          "pmStake": 424.02857142857135,
+          "totalStake": 457.0085714285714
         },
         {
           "artist": "Computer",
@@ -3058,43 +2860,29 @@
       "bestRoiPct": 0.4089999999999999,
       "bestProfit": 4.089999999999999,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 23,
+      "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 23,
-      "scannedAt": "2026-07-01T13:51:31.622Z",
+      "scannedAt": "2026-07-01T14:11:20.765Z",
       "allArbs": [
         {
           "artist": "Keiko Fujimori",
           "roiPct": 0.4089999999999999,
           "expectedProfit": 4.089999999999999,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 995,
-          "fees": {
-            "kalshiFee": 0.9099999999999999,
-            "pmFee": 0,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.99 + NO sell 1001 @ $0.99 = $0.91",
-            "pmFeeDetails": "Polymarket NO buy Infinity @ $0.00 (θ=0.05) = $0.00",
-            "netProfitIfKalshiWins": 4.089999999999999,
-            "netProfitIfPmWins": 4.999999999999999,
-            "worstCaseNetProfit": 4.089999999999999
-          }
+          "kalshiStake": 994,
+          "pmStake": 1.0000000000000009,
+          "totalStake": 995
         },
         {
           "artist": "Roberto Sánchez Palomino",
           "roiPct": 0.27199999999999996,
           "expectedProfit": 2.7199999999999998,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 997,
-          "fees": {
-            "kalshiFee": 0.28,
-            "pmFee": 0.04995,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $1.00 = $0.28",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.00 (θ=0.05) = $0.05",
-            "netProfitIfKalshiWins": 2.7199999999999998,
-            "netProfitIfPmWins": 2.95005,
-            "worstCaseNetProfit": 2.7199999999999998
-          }
+          "kalshiStake": 996,
+          "pmStake": 1,
+          "totalStake": 997
         }
       ]
     }
@@ -3108,23 +2896,23 @@
     "id": "1781519741520-18gha7a",
     "createdAt": "2026-06-15T10:35:41.520Z",
     "lastScanResult": {
-      "bestRoiPct": 5.000000000000006,
-      "bestProfit": 0.2631578947368425,
+      "bestRoiPct": 3.000000000000003,
+      "bestProfit": 9.146341463414643,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:40:01.538Z",
+      "scannedAt": "2026-07-01T14:18:34.399Z",
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 5.000000000000006,
-          "expectedProfit": 0.2631578947368425,
+          "roiPct": 3.000000000000003,
+          "expectedProfit": 9.146341463414643,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "kalshiStake": 1,
-          "pmStake": 4,
-          "totalStake": 5
+          "kalshiStake": 64.02439024390243,
+          "pmStake": 231.70731707317074,
+          "totalStake": 295.7317073170732
         },
         {
           "artist": "Republican",
@@ -3154,7 +2942,7 @@
       "matchedCount": 5,
       "kalshiCount": 8,
       "pmCount": 16,
-      "scannedAt": "2026-07-01T13:41:15.733Z",
+      "scannedAt": "2026-07-01T14:18:47.711Z",
       "allArbs": [
         {
           "artist": "Vladimir Padrino López (VLOP, Jan 2027)",
@@ -3193,7 +2981,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:25.346Z",
+      "scannedAt": "2026-07-01T14:11:21.073Z",
       "allArbs": []
     }
   },
@@ -3213,7 +3001,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:24.908Z",
+      "scannedAt": "2026-07-01T14:11:21.208Z",
       "allArbs": []
     }
   },
@@ -3226,32 +3014,32 @@
     "id": "1781520309047-uvwt6hx",
     "createdAt": "2026-06-15T10:45:09.047Z",
     "lastScanResult": {
-      "bestRoiPct": 30.37599999999999,
-      "bestProfit": 303.7599999999999,
+      "bestRoiPct": 30.376676737160118,
+      "bestProfit": 295.72588235294114,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 6,
       "pmCount": 8,
-      "scannedAt": "2026-07-01T13:27:28.101Z",
+      "scannedAt": "2026-07-01T14:11:35.921Z",
       "allArbs": [
         {
           "artist": "Eliminated in the Round of 16",
-          "roiPct": 7.384799999999991,
-          "expectedProfit": 4.01347826086956,
+          "roiPct": 7.383981264637001,
+          "expectedProfit": 68.54260869565215,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 50,
-          "pmStake": 0.05434782608695652,
-          "totalStake": 50.05434782608695
+          "kalshiStake": 854,
+          "pmStake": 0.9282608695652174,
+          "totalStake": 854.9282608695652
         },
         {
           "artist": "Eliminated in the Round of 32",
-          "roiPct": 30.37599999999999,
-          "expectedProfit": 303.7599999999999,
+          "roiPct": 30.376676737160118,
+          "expectedProfit": 295.72588235294114,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 680,
-          "pmStake": 0.9999999999999999,
-          "totalStake": 681
+          "kalshiStake": 662,
+          "pmStake": 0.9735294117647059,
+          "totalStake": 662.9735294117647
         }
       ]
     }
@@ -3272,7 +3060,7 @@
       "matchedCount": 6,
       "kalshiCount": 8,
       "pmCount": 6,
-      "scannedAt": "2026-07-01T13:41:16.206Z",
+      "scannedAt": "2026-07-01T14:18:50.394Z",
       "allArbs": []
     }
   },
@@ -3285,32 +3073,59 @@
     "id": "1781520373665-ku233qk",
     "createdAt": "2026-06-15T10:46:13.665Z",
     "lastScanResult": {
-      "bestRoiPct": 1.6780405405405496,
-      "bestProfit": 1.51146904512068,
+      "bestRoiPct": 1.5859999999999999,
+      "bestProfit": 15.86,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 24,
       "matchedCount": 24,
       "kalshiCount": 25,
       "pmCount": 50,
-      "scannedAt": "2026-07-01T13:27:30.502Z",
+      "scannedAt": "2026-07-01T14:11:43.288Z",
       "allArbs": [
         {
-          "artist": "USA",
-          "roiPct": 0.737,
-          "expectedProfit": 7.37,
+          "artist": "France",
+          "roiPct": 0.11095313322801491,
+          "expectedProfit": 0.06423780487804887,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 961,
+          "kalshiStake": 37.98,
+          "pmStake": 18.932103658536583,
+          "totalStake": 56.91210365853658
+        },
+        {
+          "artist": "Portugal",
+          "roiPct": 0.08600000000000003,
+          "expectedProfit": 0.8600000000000003,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 937,
+          "pmStake": 58,
+          "totalStake": 995
+        },
+        {
+          "artist": "USA",
+          "roiPct": 0.831,
+          "expectedProfit": 8.31,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 960,
           "pmStake": 29,
-          "totalStake": 990
+          "totalStake": 989
         },
         {
           "artist": "Mexico",
-          "roiPct": 1.6780405405405496,
-          "expectedProfit": 1.51146904512068,
+          "roiPct": 1.5859999999999999,
+          "expectedProfit": 15.86,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 85.84,
-          "pmStake": 2.431983210912907,
-          "totalStake": 88.27198321091291
+          "kalshiStake": 953,
+          "pmStake": 28,
+          "totalStake": 981
+        },
+        {
+          "artist": "Morocco",
+          "roiPct": 0.116,
+          "expectedProfit": 1.16,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 973,
+          "pmStake": 24,
+          "totalStake": 997
         },
         {
           "artist": "Belgium",
@@ -3333,23 +3148,23 @@
     "id": "1781521870595-oqgkld7",
     "createdAt": "2026-06-15T11:11:10.595Z",
     "lastScanResult": {
-      "bestRoiPct": 4.670999722495193,
-      "bestProfit": 44.605170212765984,
+      "bestRoiPct": 4.671,
+      "bestProfit": 46.71,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 25,
       "matchedCount": 25,
       "kalshiCount": 50,
       "pmCount": 30,
-      "scannedAt": "2026-07-01T13:41:42.413Z",
+      "scannedAt": "2026-07-01T14:19:03.165Z",
       "allArbs": [
         {
           "artist": "José Caballero",
-          "roiPct": 4.670999722495193,
-          "expectedProfit": 44.605170212765984,
+          "roiPct": 4.671,
+          "expectedProfit": 46.71,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 9.549384042553193,
-          "pmStake": 897.6421,
-          "totalStake": 907.1914840425533
+          "kalshiStake": 10,
+          "pmStake": 940,
+          "totalStake": 950
         },
         {
           "artist": "Jazz Chisholm Jr.",
@@ -3362,12 +3177,12 @@
         },
         {
           "artist": "Jakob Marsee",
-          "roiPct": 2.6710004067573667,
-          "expectedProfit": 26.266277021276615,
+          "roiPct": 2.6710000000000003,
+          "expectedProfit": 26.71,
           "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 29.501617021276598,
-          "pmStake": 924.384,
-          "totalStake": 953.8856170212766
+          "kalshiStake": 30,
+          "pmStake": 940,
+          "totalStake": 970
         },
         {
           "artist": "Luisangel Acuña",
@@ -3397,7 +3212,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:41:41.927Z",
+      "scannedAt": "2026-07-01T14:19:02.680Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3436,7 +3251,7 @@
       "matchedCount": 31,
       "kalshiCount": 71,
       "pmCount": 41,
-      "scannedAt": "2026-07-01T13:41:42.161Z",
+      "scannedAt": "2026-07-01T14:19:09.972Z",
       "allArbs": [
         {
           "artist": "Taylor Ward",
@@ -3458,12 +3273,12 @@
         },
         {
           "artist": "Willy Adames",
-          "roiPct": 0.22080000000000025,
-          "expectedProfit": 0.11151515151515165,
+          "roiPct": 0.32080000000000025,
+          "expectedProfit": 0.16202020202020215,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 50,
-          "pmStake": 0.35353535353535354,
-          "totalStake": 50.35353535353536
+          "pmStake": 0.30303030303030304,
+          "totalStake": 50.303030303030305
         },
         {
           "artist": "Gavin Sheets",
@@ -3493,7 +3308,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:26.891Z",
+      "scannedAt": "2026-07-01T14:11:35.933Z",
       "allArbs": []
     }
   },
@@ -3513,7 +3328,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 14,
-      "scannedAt": "2026-07-01T13:27:30.741Z",
+      "scannedAt": "2026-07-01T14:11:45.195Z",
       "allArbs": []
     }
   },
@@ -3533,7 +3348,7 @@
       "matchedCount": 0,
       "kalshiCount": 28,
       "pmCount": 42,
-      "scannedAt": "2026-07-01T13:41:47.673Z",
+      "scannedAt": "2026-07-01T14:19:08.734Z",
       "allArbs": []
     }
   },
@@ -3553,7 +3368,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:41:54.380Z",
+      "scannedAt": "2026-07-01T14:19:18.423Z",
       "allArbs": []
     }
   },
@@ -3573,7 +3388,7 @@
       "matchedCount": 0,
       "kalshiCount": 8,
       "pmCount": 27,
-      "scannedAt": "2026-07-01T13:41:52.052Z",
+      "scannedAt": "2026-07-01T14:19:14.304Z",
       "allArbs": []
     }
   },
@@ -3593,7 +3408,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:26.033Z",
+      "scannedAt": "2026-07-01T14:11:36.220Z",
       "allArbs": []
     }
   },
@@ -3613,7 +3428,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 5,
-      "scannedAt": "2026-07-01T13:48:28.649Z",
+      "scannedAt": "2026-07-01T14:11:43.527Z",
       "allArbs": []
     }
   },
@@ -3633,7 +3448,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:27.827Z",
+      "scannedAt": "2026-07-01T14:11:43.650Z",
       "allArbs": []
     }
   },
@@ -3653,7 +3468,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:28.354Z",
+      "scannedAt": "2026-07-01T14:11:43.687Z",
       "allArbs": []
     }
   },
@@ -3673,7 +3488,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:29.357Z",
+      "scannedAt": "2026-07-01T14:11:44.535Z",
       "allArbs": []
     }
   },
@@ -3693,7 +3508,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:30.219Z",
+      "scannedAt": "2026-07-01T14:11:44.410Z",
       "allArbs": []
     }
   },
@@ -3713,7 +3528,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:29.800Z",
+      "scannedAt": "2026-07-01T14:11:45.781Z",
       "allArbs": []
     }
   },
@@ -3733,7 +3548,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:30.589Z",
+      "scannedAt": "2026-07-01T14:11:45.952Z",
       "allArbs": []
     }
   },
@@ -3753,7 +3568,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:31.604Z",
+      "scannedAt": "2026-07-01T14:11:46.263Z",
       "allArbs": []
     }
   },
@@ -3773,7 +3588,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:31.894Z",
+      "scannedAt": "2026-07-01T14:11:46.971Z",
       "allArbs": []
     }
   },
@@ -3793,7 +3608,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 11,
-      "scannedAt": "2026-07-01T13:42:03.024Z",
+      "scannedAt": "2026-07-01T14:19:26.528Z",
       "allArbs": []
     }
   },
@@ -3813,7 +3628,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:41:59.893Z",
+      "scannedAt": "2026-07-01T14:19:20.532Z",
       "allArbs": []
     }
   },
@@ -3833,7 +3648,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:42:02.305Z",
+      "scannedAt": "2026-07-01T14:19:22.178Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3872,7 +3687,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:14.314Z",
+      "scannedAt": "2026-07-01T14:19:23.922Z",
       "allArbs": []
     }
   },
@@ -3892,7 +3707,7 @@
       "matchedCount": 0,
       "kalshiCount": 1,
       "pmCount": 6,
-      "scannedAt": "2026-07-01T13:43:20.082Z",
+      "scannedAt": "2026-07-01T14:19:30.584Z",
       "allArbs": []
     }
   },
@@ -3912,7 +3727,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:24.063Z",
+      "scannedAt": "2026-07-01T14:19:26.757Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3951,7 +3766,7 @@
       "matchedCount": 0,
       "kalshiCount": 0,
       "pmCount": 0,
-      "scannedAt": "2026-07-01T13:48:31.790Z",
+      "scannedAt": "2026-07-01T14:11:47.765Z",
       "allArbs": []
     }
   },
@@ -3971,7 +3786,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:24.324Z",
+      "scannedAt": "2026-07-01T14:19:30.906Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4010,7 +3825,7 @@
       "matchedCount": 3,
       "kalshiCount": 3,
       "pmCount": 3,
-      "scannedAt": "2026-07-01T13:43:30.298Z",
+      "scannedAt": "2026-07-01T14:19:33.293Z",
       "allArbs": [
         {
           "artist": "Independent",
@@ -4081,34 +3896,15 @@
     "id": "1782506106217-5rsvdiz",
     "createdAt": "2026-06-26T20:35:06.217Z",
     "lastScanResult": {
-      "bestRoiPct": 0.9519999999999998,
-      "bestProfit": 9.52,
-      "strategy": "Buy YES Kalshi + NO PM",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:30.537Z",
-      "allArbs": [
-        {
-          "artist": "Republican",
-          "roiPct": 0.9519999999999998,
-          "expectedProfit": 9.52,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "kalshiStake": 80,
-          "pmStake": 900,
-          "totalStake": 980
-        },
-        {
-          "artist": "Democratic",
-          "roiPct": 0.484,
-          "expectedProfit": 4.84,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 80,
-          "pmStake": 910,
-          "totalStake": 990
-        }
-      ]
+      "scannedAt": "2026-07-01T14:19:34.938Z",
+      "allArbs": []
     }
   },
   {
@@ -4166,7 +3962,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:34.979Z",
+      "scannedAt": "2026-07-01T14:19:35.166Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4244,7 +4040,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:39.551Z",
+      "scannedAt": "2026-07-01T14:19:36.564Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4303,7 +4099,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:40.041Z",
+      "scannedAt": "2026-07-01T14:19:39.315Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4381,7 +4177,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:44.700Z",
+      "scannedAt": "2026-07-01T14:19:39.786Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4440,7 +4236,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:49.188Z",
+      "scannedAt": "2026-07-01T14:19:40.012Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4518,7 +4314,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:49.700Z",
+      "scannedAt": "2026-07-01T14:19:43.932Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4596,7 +4392,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:54.381Z",
+      "scannedAt": "2026-07-01T14:19:44.170Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4655,7 +4451,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:58.816Z",
+      "scannedAt": "2026-07-01T14:19:44.396Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4714,7 +4510,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:43:59.289Z",
+      "scannedAt": "2026-07-01T14:19:48.271Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4792,7 +4588,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:03.702Z",
+      "scannedAt": "2026-07-01T14:19:48.498Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4842,7 +4638,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:08.106Z",
+      "scannedAt": "2026-07-01T14:19:48.727Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4911,7 +4707,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:09.640Z",
+      "scannedAt": "2026-07-01T14:19:52.681Z",
       "allArbs": []
     }
   },
@@ -4961,7 +4757,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:14.622Z",
+      "scannedAt": "2026-07-01T14:19:52.908Z",
       "allArbs": []
     }
   },
@@ -5011,7 +4807,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:19.043Z",
+      "scannedAt": "2026-07-01T14:19:53.171Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5070,7 +4866,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:19.559Z",
+      "scannedAt": "2026-07-01T14:19:56.929Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5129,7 +4925,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:23.847Z",
+      "scannedAt": "2026-07-01T14:19:57.155Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5207,7 +5003,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:44:28.197Z",
+      "scannedAt": "2026-07-01T14:19:57.376Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -13915,32 +13711,32 @@
     "createdAt": "2026-06-28T13:26:22.596446Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 3.999999999999995,
-      "bestProfit": 8.955223880597003,
-      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+      "bestRoiPct": 55.291000000000004,
+      "bestProfit": 552.91,
+      "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
-      "kalshiCount": 2,
+      "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:39.398Z",
+      "scannedAt": "2026-07-01T14:11:52.453Z",
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 3.999999999999995,
-          "expectedProfit": 8.955223880597003,
-          "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "kalshiStake": 76.11940298507463,
-          "pmStake": 138.80597014925374,
-          "totalStake": 214.92537313432837
+          "roiPct": 51.800000000000004,
+          "expectedProfit": 518,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 70,
+          "pmStake": 400,
+          "totalStake": 470
         },
         {
           "artist": "Republican",
-          "roiPct": 2.426933333333329,
-          "expectedProfit": 10.70705882352939,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 150,
-          "pmStake": 273.52941176470586,
-          "totalStake": 423.52941176470586
+          "roiPct": 55.291000000000004,
+          "expectedProfit": 552.91,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "kalshiStake": 45,
+          "pmStake": 390,
+          "totalStake": 435
         }
       ]
     }
@@ -13961,7 +13757,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:39.856Z",
+      "scannedAt": "2026-07-01T14:11:52.002Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14000,7 +13796,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:40.091Z",
+      "scannedAt": "2026-07-01T14:11:52.690Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14013,12 +13809,12 @@
         },
         {
           "artist": "Democratic",
-          "roiPct": 21.95,
-          "expectedProfit": 219.5,
+          "roiPct": 22.930500000000002,
+          "expectedProfit": 229.305,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 70,
-          "pmStake": 700,
-          "totalStake": 770
+          "pmStake": 690,
+          "totalStake": 760
         }
       ]
     }
@@ -14039,7 +13835,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:43.919Z",
+      "scannedAt": "2026-07-01T14:11:56.881Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14078,7 +13874,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:44.141Z",
+      "scannedAt": "2026-07-01T14:11:57.125Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14117,7 +13913,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:44.373Z",
+      "scannedAt": "2026-07-01T14:11:57.376Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14156,7 +13952,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:48.323Z",
+      "scannedAt": "2026-07-01T14:12:01.398Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14195,7 +13991,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:48.555Z",
+      "scannedAt": "2026-07-01T14:12:01.663Z",
       "allArbs": []
     }
   },
@@ -14215,7 +14011,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:48.786Z",
+      "scannedAt": "2026-07-01T14:12:01.899Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14254,7 +14050,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:52.667Z",
+      "scannedAt": "2026-07-01T14:12:06.046Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14293,7 +14089,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:53.876Z",
+      "scannedAt": "2026-07-01T14:12:06.278Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14332,7 +14128,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:54.109Z",
+      "scannedAt": "2026-07-01T14:12:06.512Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14362,7 +14158,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:58.376Z",
+      "scannedAt": "2026-07-01T14:12:11.593Z",
       "allArbs": []
     }
   },
@@ -14382,7 +14178,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:58.610Z",
+      "scannedAt": "2026-07-01T14:12:12.060Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14412,16 +14208,16 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:24:58.851Z",
+      "scannedAt": "2026-07-01T14:12:12.298Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 1.286,
-          "expectedProfit": 12.86,
+          "roiPct": 1.1800000000000002,
+          "expectedProfit": 11.8,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 63,
+          "kalshiStake": 64,
           "pmStake": 920,
-          "totalStake": 983
+          "totalStake": 984
         },
         {
           "artist": "Democratic",
@@ -14451,7 +14247,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:02.878Z",
+      "scannedAt": "2026-07-01T14:12:16.510Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14490,7 +14286,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:03.107Z",
+      "scannedAt": "2026-07-01T14:12:16.747Z",
       "allArbs": []
     }
   },
@@ -14510,7 +14306,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:03.336Z",
+      "scannedAt": "2026-07-01T14:12:16.985Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14549,7 +14345,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:07.250Z",
+      "scannedAt": "2026-07-01T14:12:21.036Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14581,14 +14377,14 @@
     "createdAt": "2026-06-28T13:26:22.596579Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 46.227999999999994,
-      "bestProfit": 462.28,
+      "bestRoiPct": 45.2015,
+      "bestProfit": 452.015,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:07.465Z",
+      "scannedAt": "2026-07-01T14:12:21.271Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14601,12 +14397,12 @@
         },
         {
           "artist": "Republican",
-          "roiPct": 46.227999999999994,
-          "expectedProfit": 462.28,
+          "roiPct": 45.2015,
+          "expectedProfit": 452.015,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
-          "pmStake": 480,
-          "totalStake": 525
+          "pmStake": 490,
+          "totalStake": 535
         }
       ]
     }
@@ -14627,7 +14423,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:07.685Z",
+      "scannedAt": "2026-07-01T14:12:21.534Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14666,7 +14462,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:11.590Z",
+      "scannedAt": "2026-07-01T14:12:25.664Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14705,7 +14501,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:11.816Z",
+      "scannedAt": "2026-07-01T14:12:25.891Z",
       "allArbs": []
     }
   },
@@ -14725,7 +14521,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:12.048Z",
+      "scannedAt": "2026-07-01T14:12:26.130Z",
       "allArbs": []
     }
   },
@@ -14745,7 +14541,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:15.832Z",
+      "scannedAt": "2026-07-01T14:12:30.305Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14777,14 +14573,14 @@
     "createdAt": "2026-06-28T13:26:22.596619Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 16.525000000000002,
-      "bestProfit": 165.25,
+      "bestRoiPct": 15.512500000000001,
+      "bestProfit": 155.125,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:16.069Z",
+      "scannedAt": "2026-07-01T14:12:30.512Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14797,12 +14593,12 @@
         },
         {
           "artist": "Republican",
-          "roiPct": 16.525000000000002,
-          "expectedProfit": 165.25,
+          "roiPct": 15.512500000000001,
+          "expectedProfit": 155.125,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
-          "pmStake": 780,
-          "totalStake": 825
+          "pmStake": 790,
+          "totalStake": 835
         }
       ]
     }
@@ -14823,12 +14619,12 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:16.305Z",
+      "scannedAt": "2026-07-01T14:12:30.753Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 30.421,
-          "expectedProfit": 304.21,
+          "roiPct": 30.578500000000002,
+          "expectedProfit": 305.785,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
           "pmStake": 630,
@@ -14862,7 +14658,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:20.371Z",
+      "scannedAt": "2026-07-01T14:12:34.877Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14892,7 +14688,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:20.620Z",
+      "scannedAt": "2026-07-01T14:12:35.141Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -14931,7 +14727,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:20.840Z",
+      "scannedAt": "2026-07-01T14:12:35.396Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -14970,7 +14766,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:24.702Z",
+      "scannedAt": "2026-07-01T14:12:39.412Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15000,7 +14796,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:24.938Z",
+      "scannedAt": "2026-07-01T14:12:39.653Z",
       "allArbs": []
     }
   },
@@ -15020,7 +14816,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:25.166Z",
+      "scannedAt": "2026-07-01T14:12:39.884Z",
       "allArbs": []
     }
   },
@@ -15040,7 +14836,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:29.032Z",
+      "scannedAt": "2026-07-01T14:12:43.993Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15079,7 +14875,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:29.262Z",
+      "scannedAt": "2026-07-01T14:12:44.227Z",
       "allArbs": []
     }
   },
@@ -15099,7 +14895,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:29.506Z",
+      "scannedAt": "2026-07-01T14:12:44.459Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15138,7 +14934,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:33.508Z",
+      "scannedAt": "2026-07-01T14:12:48.399Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15177,7 +14973,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 5,
-      "scannedAt": "2026-07-01T13:25:37.009Z",
+      "scannedAt": "2026-07-01T14:12:52.461Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15207,7 +15003,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:34.004Z",
+      "scannedAt": "2026-07-01T14:12:48.954Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15246,7 +15042,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:37.541Z",
+      "scannedAt": "2026-07-01T14:12:52.227Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15285,7 +15081,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:37.806Z",
+      "scannedAt": "2026-07-01T14:12:52.707Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15324,7 +15120,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:41.952Z",
+      "scannedAt": "2026-07-01T14:12:56.738Z",
       "allArbs": []
     }
   },
@@ -15344,7 +15140,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:42.202Z",
+      "scannedAt": "2026-07-01T14:12:56.983Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15374,7 +15170,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:42.447Z",
+      "scannedAt": "2026-07-01T14:12:57.219Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15404,7 +15200,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:46.708Z",
+      "scannedAt": "2026-07-01T14:13:01.209Z",
       "allArbs": []
     }
   },
@@ -15424,7 +15220,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:46.965Z",
+      "scannedAt": "2026-07-01T14:13:01.489Z",
       "allArbs": []
     }
   },
@@ -15444,7 +15240,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:47.219Z",
+      "scannedAt": "2026-07-01T14:13:01.779Z",
       "allArbs": []
     }
   },
@@ -15464,7 +15260,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:51.645Z",
+      "scannedAt": "2026-07-01T14:13:05.729Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15496,25 +15292,15 @@
     "createdAt": "2026-06-28T13:26:22.596774Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0.9999999999999963,
-      "bestProfit": 0.16666666666666607,
-      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:51.889Z",
-      "allArbs": [
-        {
-          "artist": "Democratic",
-          "roiPct": 0.9999999999999963,
-          "expectedProfit": 0.16666666666666607,
-          "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "kalshiStake": 1,
-          "pmStake": 15.500000000000002,
-          "totalStake": 16.5
-        }
-      ]
+      "scannedAt": "2026-07-01T14:13:05.986Z",
+      "allArbs": []
     }
   },
   {
@@ -15526,32 +15312,32 @@
     "createdAt": "2026-06-28T13:26:22.596780Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 2.999999999999999,
-      "bestProfit": 8.064516129032256,
+      "bestRoiPct": 4.00000000000001,
+      "bestProfit": 10.752688172043037,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:52.134Z",
+      "scannedAt": "2026-07-01T14:13:06.221Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 2.314,
-          "expectedProfit": 23.14,
+          "roiPct": 3.314,
+          "expectedProfit": 33.14,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 110,
-          "pmStake": 860,
-          "totalStake": 970
+          "pmStake": 850,
+          "totalStake": 960
         },
         {
           "artist": "Democratic",
-          "roiPct": 2.999999999999999,
-          "expectedProfit": 8.064516129032256,
+          "roiPct": 4.00000000000001,
+          "expectedProfit": 10.752688172043037,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
           "kalshiStake": 29.56989247311828,
-          "pmStake": 231.18279569892474,
-          "totalStake": 260.752688172043
+          "pmStake": 228.49462365591395,
+          "totalStake": 258.06451612903226
         }
       ]
     }
@@ -15572,7 +15358,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:57.925Z",
+      "scannedAt": "2026-07-01T14:13:11.236Z",
       "allArbs": []
     }
   },
@@ -15592,7 +15378,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:58.431Z",
+      "scannedAt": "2026-07-01T14:13:11.704Z",
       "allArbs": []
     }
   },
@@ -15612,7 +15398,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:25:58.674Z",
+      "scannedAt": "2026-07-01T14:13:11.930Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15651,7 +15437,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:02.914Z",
+      "scannedAt": "2026-07-01T14:13:16.174Z",
       "allArbs": []
     }
   },
@@ -15671,7 +15457,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:03.161Z",
+      "scannedAt": "2026-07-01T14:13:16.420Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15710,7 +15496,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:03.407Z",
+      "scannedAt": "2026-07-01T14:13:16.667Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15749,7 +15535,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:07.652Z",
+      "scannedAt": "2026-07-01T14:13:20.558Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15788,7 +15574,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:07.893Z",
+      "scannedAt": "2026-07-01T14:13:20.795Z",
       "allArbs": []
     }
   },
@@ -15808,7 +15594,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:26:08.145Z",
+      "scannedAt": "2026-07-01T14:13:21.031Z",
       "allArbs": []
     }
   },
@@ -15828,7 +15614,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:36.020Z",
+      "scannedAt": "2026-07-01T14:13:25.305Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -15867,7 +15653,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:37.929Z",
+      "scannedAt": "2026-07-01T14:13:25.549Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15906,7 +15692,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:36.722Z",
+      "scannedAt": "2026-07-01T14:13:25.785Z",
       "allArbs": []
     }
   },
@@ -15926,7 +15712,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:41.016Z",
+      "scannedAt": "2026-07-01T14:13:29.856Z",
       "allArbs": []
     }
   },
@@ -15946,7 +15732,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:41.507Z",
+      "scannedAt": "2026-07-01T14:13:30.095Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -15978,25 +15764,15 @@
     "createdAt": "2026-06-28T13:26:22.596877Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0.9999999999999963,
-      "bestProfit": 0.16666666666666607,
-      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:41.755Z",
-      "allArbs": [
-        {
-          "artist": "Democratic",
-          "roiPct": 0.9999999999999963,
-          "expectedProfit": 0.16666666666666607,
-          "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "kalshiStake": 1,
-          "pmStake": 15.500000000000002,
-          "totalStake": 16.5
-        }
-      ]
+      "scannedAt": "2026-07-01T14:13:30.336Z",
+      "allArbs": []
     }
   },
   {
@@ -16015,7 +15791,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:45.796Z",
+      "scannedAt": "2026-07-01T14:13:34.436Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16054,7 +15830,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:46.039Z",
+      "scannedAt": "2026-07-01T14:13:34.676Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16093,7 +15869,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:46.280Z",
+      "scannedAt": "2026-07-01T14:13:34.915Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16132,7 +15908,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:50.360Z",
+      "scannedAt": "2026-07-01T14:13:38.981Z",
       "allArbs": []
     }
   },
@@ -16152,7 +15928,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:50.604Z",
+      "scannedAt": "2026-07-01T14:13:39.225Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16191,7 +15967,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:50.858Z",
+      "scannedAt": "2026-07-01T14:13:39.460Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16230,7 +16006,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:55.954Z",
+      "scannedAt": "2026-07-01T14:13:43.432Z",
       "allArbs": []
     }
   },
@@ -16250,7 +16026,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:56.438Z",
+      "scannedAt": "2026-07-01T14:13:43.663Z",
       "allArbs": []
     }
   },
@@ -16270,7 +16046,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:27:56.709Z",
+      "scannedAt": "2026-07-01T14:13:43.910Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16300,7 +16076,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:00.948Z",
+      "scannedAt": "2026-07-01T14:13:48.086Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16332,15 +16108,34 @@
     "createdAt": "2026-06-28T13:26:22.596950Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
+      "bestRoiPct": 0.9999999999999919,
+      "bestProfit": 2.7027027027026804,
+      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:01.205Z",
-      "allArbs": []
+      "scannedAt": "2026-07-01T14:13:48.326Z",
+      "allArbs": [
+        {
+          "artist": "Democratic",
+          "roiPct": 0.9999999999999919,
+          "expectedProfit": 2.7027027027026804,
+          "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+          "kalshiStake": 29.72972972972973,
+          "pmStake": 237.83783783783784,
+          "totalStake": 267.56756756756755
+        },
+        {
+          "artist": "Republican",
+          "roiPct": 0.31399999999999995,
+          "expectedProfit": 3.1399999999999997,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "kalshiStake": 110,
+          "pmStake": 880,
+          "totalStake": 990
+        }
+      ]
     }
   },
   {
@@ -16359,7 +16154,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:01.443Z",
+      "scannedAt": "2026-07-01T14:13:48.551Z",
       "allArbs": []
     }
   },
@@ -16379,7 +16174,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:05.421Z",
+      "scannedAt": "2026-07-01T14:13:52.587Z",
       "allArbs": []
     }
   },
@@ -16399,7 +16194,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:05.641Z",
+      "scannedAt": "2026-07-01T14:13:52.843Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16438,7 +16233,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:05.879Z",
+      "scannedAt": "2026-07-01T14:13:53.102Z",
       "allArbs": []
     }
   },
@@ -16458,7 +16253,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:09.930Z",
+      "scannedAt": "2026-07-01T14:13:57.144Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16488,7 +16283,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:10.173Z",
+      "scannedAt": "2026-07-01T14:13:57.398Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16527,7 +16322,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:10.408Z",
+      "scannedAt": "2026-07-01T14:13:57.615Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16566,7 +16361,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:14.469Z",
+      "scannedAt": "2026-07-01T14:14:01.694Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16605,7 +16400,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:14.702Z",
+      "scannedAt": "2026-07-01T14:14:01.937Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16637,14 +16432,14 @@
     "createdAt": "2026-06-28T13:26:22.597016Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 44.175,
-      "bestProfit": 441.75,
+      "bestRoiPct": 44.15,
+      "bestProfit": 441.5,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:14.941Z",
+      "scannedAt": "2026-07-01T14:14:02.184Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16657,8 +16452,8 @@
         },
         {
           "artist": "Republican",
-          "roiPct": 44.175,
-          "expectedProfit": 441.75,
+          "roiPct": 44.15,
+          "expectedProfit": 441.5,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
           "pmStake": 500,
@@ -16683,7 +16478,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:18.955Z",
+      "scannedAt": "2026-07-01T14:14:06.162Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16722,7 +16517,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:19.190Z",
+      "scannedAt": "2026-07-01T14:14:06.404Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16752,7 +16547,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:19.429Z",
+      "scannedAt": "2026-07-01T14:14:06.654Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16782,7 +16577,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:23.605Z",
+      "scannedAt": "2026-07-01T14:14:11.889Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16821,7 +16616,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:23.844Z",
+      "scannedAt": "2026-07-01T14:14:12.112Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16860,7 +16655,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:24.111Z",
+      "scannedAt": "2026-07-01T14:14:12.361Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -16899,7 +16694,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:28.261Z",
+      "scannedAt": "2026-07-01T14:14:16.446Z",
       "allArbs": []
     }
   },
@@ -16912,23 +16707,23 @@
     "createdAt": "2026-06-28T13:26:22.597066Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 33.782000000000004,
-      "bestProfit": 337.82,
+      "bestRoiPct": 34.7745,
+      "bestProfit": 347.745,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:28.521Z",
+      "scannedAt": "2026-07-01T14:14:16.686Z",
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 33.782000000000004,
-          "expectedProfit": 337.82,
+          "roiPct": 34.7745,
+          "expectedProfit": 347.745,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 70,
-          "pmStake": 580,
-          "totalStake": 650
+          "pmStake": 570,
+          "totalStake": 640
         },
         {
           "artist": "Republican",
@@ -16958,7 +16753,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:28.761Z",
+      "scannedAt": "2026-07-01T14:14:16.926Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -16997,7 +16792,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:32.866Z",
+      "scannedAt": "2026-07-01T14:14:20.846Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17036,7 +16831,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:33.110Z",
+      "scannedAt": "2026-07-01T14:14:21.087Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17075,7 +16870,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:33.345Z",
+      "scannedAt": "2026-07-01T14:14:21.310Z",
       "allArbs": []
     }
   },
@@ -17095,7 +16890,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:37.422Z",
+      "scannedAt": "2026-07-01T14:14:25.245Z",
       "allArbs": []
     }
   },
@@ -17115,7 +16910,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:37.673Z",
+      "scannedAt": "2026-07-01T14:14:25.493Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17154,7 +16949,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:37.886Z",
+      "scannedAt": "2026-07-01T14:14:25.722Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17193,7 +16988,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:41.849Z",
+      "scannedAt": "2026-07-01T14:14:29.734Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17232,7 +17027,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:42.096Z",
+      "scannedAt": "2026-07-01T14:14:29.985Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17271,7 +17066,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:42.346Z",
+      "scannedAt": "2026-07-01T14:14:30.219Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17310,7 +17105,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:46.466Z",
+      "scannedAt": "2026-07-01T14:14:34.241Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17342,32 +17137,32 @@
     "createdAt": "2026-06-28T13:26:22.597144Z",
     "expiryDate": "2026-11-03T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 1.800000000000004,
-      "bestProfit": 4.663212435233171,
+      "bestRoiPct": 1.2000000000000042,
+      "bestProfit": 3.1088082901554515,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:46.713Z",
+      "scannedAt": "2026-07-01T14:14:34.480Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 1.5606800000000038,
-          "expectedProfit": 4.043212435233171,
+          "roiPct": 0.9606800000000042,
+          "expectedProfit": 2.4888082901554514,
           "strategy": "Buy YES PM + NO Kalshi",
           "kalshiStake": 250,
-          "pmStake": 4.404145077720208,
-          "totalStake": 254.40414507772022
+          "pmStake": 5.958549222797927,
+          "totalStake": 255.95854922279793
         },
         {
           "artist": "Democratic",
-          "roiPct": 1.800000000000004,
-          "expectedProfit": 4.663212435233171,
+          "roiPct": 1.2000000000000042,
+          "expectedProfit": 3.1088082901554515,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
           "kalshiStake": 250,
-          "pmStake": 4.404145077720208,
-          "totalStake": 254.40414507772022
+          "pmStake": 5.958549222797927,
+          "totalStake": 255.95854922279793
         }
       ]
     }
@@ -17388,7 +17183,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:46.985Z",
+      "scannedAt": "2026-07-01T14:14:34.734Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17427,7 +17222,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:51.022Z",
+      "scannedAt": "2026-07-01T14:14:38.574Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -17466,7 +17261,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:51.254Z",
+      "scannedAt": "2026-07-01T14:14:38.813Z",
       "allArbs": []
     }
   },
@@ -17486,7 +17281,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:51.489Z",
+      "scannedAt": "2026-07-01T14:14:39.039Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17525,7 +17320,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:56.876Z",
+      "scannedAt": "2026-07-01T14:14:43.090Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17564,7 +17359,7 @@
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:57.119Z",
+      "scannedAt": "2026-07-01T14:14:43.346Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17603,7 +17398,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:28:57.362Z",
+      "scannedAt": "2026-07-01T14:14:43.587Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17642,7 +17437,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:01.882Z",
+      "scannedAt": "2026-07-01T14:14:47.469Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -17674,23 +17469,23 @@
     "createdAt": "2026-06-28T13:26:22.597201Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 52.219,
-      "bestProfit": 522.19,
+      "bestRoiPct": 51.16700000000001,
+      "bestProfit": 511.67,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:02.126Z",
+      "scannedAt": "2026-07-01T14:14:47.711Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 52.219,
-          "expectedProfit": 522.19,
+          "roiPct": 51.16700000000001,
+          "expectedProfit": 511.67,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
-          "pmStake": 420,
-          "totalStake": 465
+          "pmStake": 430,
+          "totalStake": 475
         },
         {
           "artist": "Democratic",
@@ -17720,7 +17515,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:02.371Z",
+      "scannedAt": "2026-07-01T14:14:47.945Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17752,14 +17547,14 @@
     "createdAt": "2026-06-28T13:26:22.597214Z",
     "expiryDate": "2026-11-04T00:00:00Z",
     "lastScanResult": {
-      "bestRoiPct": 26.276,
-      "bestProfit": 262.76,
+      "bestRoiPct": 25.258000000000003,
+      "bestProfit": 252.58,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:06.470Z",
+      "scannedAt": "2026-07-01T14:14:52.011Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -17772,12 +17567,12 @@
         },
         {
           "artist": "Republican",
-          "roiPct": 26.276,
-          "expectedProfit": 262.76,
+          "roiPct": 25.258000000000003,
+          "expectedProfit": 252.58,
           "strategy": "Buy YES Kalshi + NO PM",
           "kalshiStake": 45,
-          "pmStake": 680,
-          "totalStake": 725
+          "pmStake": 690,
+          "totalStake": 735
         }
       ]
     }
@@ -17798,7 +17593,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:06.670Z",
+      "scannedAt": "2026-07-01T14:14:52.239Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17837,7 +17632,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:06.907Z",
+      "scannedAt": "2026-07-01T14:14:52.476Z",
       "allArbs": []
     }
   },
@@ -17857,7 +17652,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:11.049Z",
+      "scannedAt": "2026-07-01T14:14:56.617Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -17896,7 +17691,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:11.296Z",
+      "scannedAt": "2026-07-01T14:14:56.865Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -17935,7 +17730,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:11.539Z",
+      "scannedAt": "2026-07-01T14:14:57.095Z",
       "allArbs": []
     }
   },
@@ -17955,7 +17750,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:18.996Z",
+      "scannedAt": "2026-07-01T14:15:04.429Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -17994,7 +17789,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-01T13:29:19.246Z",
+      "scannedAt": "2026-07-01T14:15:04.899Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -18026,23 +17821,32 @@
     "id": "1782686030954-mvnvq47",
     "createdAt": "2026-06-28T22:33:50.954Z",
     "lastScanResult": {
-      "bestRoiPct": 7.507605633802812,
-      "bestProfit": 18.3806896551724,
-      "strategy": "Buy YES PM + NO Kalshi",
+      "bestRoiPct": 5.33,
+      "bestProfit": 53.3,
+      "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 8,
       "matchedCount": 8,
       "kalshiCount": 15,
       "pmCount": 35,
-      "scannedAt": "2026-07-01T13:29:28.616Z",
+      "scannedAt": "2026-07-01T14:15:15.195Z",
       "allArbs": [
         {
           "artist": "Ed Miliband",
-          "roiPct": 2.452299999999992,
-          "expectedProfit": 14.862424242424192,
+          "roiPct": 3.4731428571428573,
+          "expectedProfit": 3.79875,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 200,
-          "pmStake": 381.8181818181818,
-          "totalStake": 581.8181818181818
+          "kalshiStake": 35,
+          "pmStake": 68.90625,
+          "totalStake": 103.90625
+        },
+        {
+          "artist": "Pat McFadden",
+          "roiPct": 3.519999999999997,
+          "expectedProfit": 0.5028571428571423,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "kalshiStake": 1,
+          "pmStake": 12.642857142857142,
+          "totalStake": 13.642857142857142
         },
         {
           "artist": "Wes Streeting",
@@ -18064,12 +17868,12 @@
         },
         {
           "artist": "Shabana Mahmood",
-          "roiPct": 7.507605633802812,
-          "expectedProfit": 18.3806896551724,
+          "roiPct": 3.4249152542372805,
+          "expectedProfit": 15.543846153846118,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 213,
-          "pmStake": 11.506896551724138,
-          "totalStake": 224.50689655172414
+          "kalshiStake": 413,
+          "pmStake": 22.692307692307693,
+          "totalStake": 435.6923076923077
         }
       ]
     }
@@ -18090,8 +17894,18 @@
       "matchedCount": 0,
       "kalshiCount": 3,
       "pmCount": 5,
-      "scannedAt": "2026-07-01T13:29:25.180Z",
+      "scannedAt": "2026-07-01T14:15:11.519Z",
       "allArbs": []
     }
+  },
+  {
+    "kalshiUrl": "https://kalshi.com/markets/kxnextteamnba/next-nba-team/kxnextteamnba-26ljam",
+    "polymarketUrl": "https://polymarket.com/event/nba-lebron-james-next-team",
+    "eventTitle": "NBA: LeBron James Next Team",
+    "category": "",
+    "expiryDate": null,
+    "id": "1782915377416-r23zhuu",
+    "createdAt": "2026-07-01T14:16:17.416Z",
+    "lastScanResult": null
   }
 ]
