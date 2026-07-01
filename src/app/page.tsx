@@ -52,14 +52,16 @@ import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
-import { CouplingPanel } from "@/app/components/CouplingPanel";
-import { ManualMatchPanel } from "@/app/components/ManualMatchPanel";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
-import { DualBrowserPanels } from "@/components/EmbeddedBrowserPanel";
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
-import { DashboardPanel } from "@/app/components/DashboardPanel";
-import { LiveScanPanel } from "@/app/components/LiveScanPanel";
-import { LogsPanel } from "@/app/components/LogsPanel";
+
+import dynamic from "next/dynamic";
+const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
+const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
+const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
+const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { ssr: false });
+const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
+const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 import { StakeCalculator } from "@/components/StakeCalculator";
 import { computeApy } from "@/lib/matcher";
 
