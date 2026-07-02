@@ -184,7 +184,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // ── Main Component ───────────────────────────────────────────────
-export function DashboardPanel() {
+export default function DashboardPanel() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

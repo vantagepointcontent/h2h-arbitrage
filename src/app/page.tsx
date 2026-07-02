@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Zap,
@@ -48,22 +47,22 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import { DateTimePicker } from "@/components/DateTimePicker";
 import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components/AlertSystem";
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
-import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
-import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
-import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 
 import dynamic from "next/dynamic";
+const DateTimePicker = dynamic(() => import("@/components/DateTimePicker").then(m => m.DateTimePicker), { ssr: false });
+const Bookmaker1on1 = dynamic(() => import("@/app/components/Bookmaker1on1").then(m => m.Bookmaker1on1), { ssr: false });
+const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSuggestions").then(m => m.CouplingSuggestions), { ssr: false });
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
 const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { ssr: false });
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
-import { StakeCalculator } from "@/components/StakeCalculator";
+const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
+const OutcomeTableBody = dynamic(() => import("@/app/components/OutcomeTableBody").then(m => m.OutcomeTableBody), { ssr: false });
 import { computeApy } from "@/lib/matcher";
 
 // ─── Selection storage key ───
@@ -542,8 +541,8 @@ export default function Home() {
   const UNLINK_UNDO_MS = 10000; // 10 seconds
 
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(getStoredSidebarOpen);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(() => getStoredSidebarOpen());
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useSwipeGesture(
     () => { setMobileMenuOpen(false); },
@@ -1108,7 +1107,19 @@ export default function Home() {
   // Sort helpers
   const [overviewSort, setOverviewSort] = useState<OverviewSort>("apy");
   const [overviewSortDir, setOverviewSortDir] = useState<"asc" | "desc">("desc");
-  const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">("grid");
+  const [overviewLayout, setOverviewLayout] = useState<"grid" | "table">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("overviewLayout");
+      if (saved === "grid" || saved === "table") return saved;
+    }
+    return "table"; // default to table view (UI-012)
+  });
+  // Persist layout preference (UI-012)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("overviewLayout", overviewLayout);
+    }
+  }, [overviewLayout]);
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("lte30");
   const [showExpired, setShowExpired] = useState(false);
   const [showArbOnly, setShowArbOnly] = useState(true);
@@ -1519,7 +1530,7 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0E1621] text-[#FFFFFF]">
+    <div className="h-screen bg-[#0E1621] text-[#FFFFFF] flex flex-col overflow-hidden">
       <ToastContainer toasts={alertSystem.toasts} onDismiss={alertSystem.dismissToast} />
       {alertSettingsOpen && <AlertSettingsPanel
         settings={alertSystem.settings}
@@ -1559,7 +1570,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex">
+      <main className="flex flex-1 overflow-hidden">
         <MarketSidebar
           markets={savedMarkets}
           activeId={activeMarketId}
@@ -1597,7 +1608,7 @@ export default function Home() {
           mobileMenuOpen={mobileMenuOpen}
           onCloseMobileMenu={() => setMobileMenuOpen(false)}
         />
-        <div className="flex-1 min-h-[calc(100vh-3.5rem)]">
+        <div className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto p-2 sm:p-4 md:p-6">
             {viewMode === "overview" ? (
               <OverviewPanel
@@ -2023,22 +2034,28 @@ export default function Home() {
                       <Bookmaker1on1
                         outcomes={result.outcomes.map(o => ({
                           artist: o.artist,
-                          kalshi: o.kalshi ? {
+                          platformA: o.kalshi ? {
                             yesBid: o.kalshi.yesBid,
                             yesAsk: o.kalshi.yesAsk,
                             noBid: o.kalshi.noBid,
                             noAsk: o.kalshi.noAsk,
                             lastPrice: o.kalshi.lastPrice,
+                            lastUpdated: lastUpdated,
                           } : null,
-                          polymarket: o.polymarket ? {
+                          platformB: o.polymarket ? {
                             yesPrice: o.polymarket.yesPrice,
                             noPrice: o.polymarket.noPrice,
                             bestBid: o.polymarket.bestBid,
                             bestAsk: o.polymarket.bestAsk,
                             lastTradePrice: o.polymarket.lastTradePrice,
+                            lastUpdated: lastUpdated,
                           } : null,
-                        })) as any}
+                        }))}
                         lastUpdated={lastUpdated}
+                        kalshiUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.kalshiUrl : undefined}
+                        pmUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.polymarketUrl : undefined}
+                        capital={capital}
+                        useLivePrices={bookmakerView}
                       />
                     )}
 
@@ -2472,7 +2489,7 @@ function MarketSidebar({
           </button>
 
           {/* ── Navigation ── */}
-          <div className="space-y-1">
+          <div className="space-y-1 sticky top-0 z-10 bg-[#17212B] pb-2">
             <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
             <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
             <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />

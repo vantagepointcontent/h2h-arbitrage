@@ -20,9 +20,34 @@
       "category": "international",
       "lastScannedAt": "2026-07-01T01:56:06.966Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "international",
+      "lastScannedAt": "2026-07-02T01:29:21.122Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "crypto",
+      "lastScannedAt": "2026-07-02T04:29:21.336Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-02T07:29:25.875Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "technology",
+      "lastScannedAt": "2026-07-02T10:29:28.246Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "economics",
+      "lastScannedAt": "2026-07-02T13:29:21.159Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-01T01:56:06.966Z",
+  "lastScanAt": "2026-07-02T13:29:21.160Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }

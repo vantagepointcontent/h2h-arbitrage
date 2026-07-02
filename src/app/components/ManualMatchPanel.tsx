@@ -47,7 +47,7 @@ function fmtPct(n: number): string {
 
 // ─── Component ─────────────────────────────────────────────────────────
 
-export function ManualMatchPanel({
+export default function ManualMatchPanel({
   unmatchedKalshi,
   unmatchedPolymarket,
   activeMatches,
