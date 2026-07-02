@@ -53,8 +53,8 @@ import { CATEGORIES, CategoryName } from "@/lib/categories";
 
 import dynamic from "next/dynamic";
 const DateTimePicker = dynamic(() => import("@/components/DateTimePicker").then(m => m.DateTimePicker), { ssr: false });
-const Bookmaker1on1 = dynamic(() => import("@/app/components/Bookmaker1on1").then(m => m.Bookmaker1on1), { ssr: false });
-const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSuggestions").then(m => m.CouplingSuggestions), { ssr: false });
+import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
+import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
@@ -62,7 +62,7 @@ const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { 
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
-const OutcomeTableBody = dynamic(() => import("@/app/components/OutcomeTableBody").then(m => m.OutcomeTableBody), { ssr: false });
+import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { computeApy } from "@/lib/matcher";
 
 // ─── Selection storage key ───
