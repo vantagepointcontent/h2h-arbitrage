@@ -373,14 +373,6 @@ export function Bookmaker1on1({
 
   const validOutcomes = (displayOutcomes ?? []).filter((o) => o.platformA && o.platformB);
 
-  if (validOutcomes.length === 0) {
-    return (
-      <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] p-8 text-center">
-        <p className="text-[#8A9BA8] text-sm">No matched outcomes to display.</p>
-      </div>
-    );
-  }
-
   const handleThresholdSave = useCallback(() => {
     onThresholdChange?.(editableThresholds);
     setShowThresholds(false);
@@ -394,6 +386,14 @@ export function Bookmaker1on1({
       onRefreshIntervalChange?.(0);
     }
   }, [onRefreshIntervalChange]);
+
+  if (validOutcomes.length === 0) {
+    return (
+      <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] p-8 text-center">
+        <p className="text-[#8A9BA8] text-sm">No matched outcomes to display.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] overflow-hidden">

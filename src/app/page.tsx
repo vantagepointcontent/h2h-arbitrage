@@ -21,6 +21,8 @@ import {
   Bell,
   Plus,
   BarChart3,
+  LayoutDashboard,
+  Layers,
   X,
   Calendar,
   ArrowUpDown,
@@ -2490,8 +2492,8 @@ function MarketSidebar({
 
           {/* ── Navigation ── */}
           <div className="space-y-1 sticky top-0 z-10 bg-[#17212B] pb-2">
-            <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
-            <NavButton icon={<BarChart3 className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
+            <NavButton icon={<LayoutDashboard className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
+            <NavButton icon={<Layers className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
             <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />
             <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />
             <NavButton icon={<Activity className="w-5 h-5 shrink-0" />} label="Live WS" active={viewMode === "live"} onClick={() => window.location.href = '/?view=live'} collapsed={!sidebarOpen} />
