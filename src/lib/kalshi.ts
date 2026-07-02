@@ -85,7 +85,7 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
   try {
     const res = await rateLimiters.kalshi.execute(() =>
       fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&_t=${Date.now()}`,
+        `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
         { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
       ),
     );
@@ -103,7 +103,7 @@ export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<Ka
   try {
     const res = await rateLimiters.kalshi.execute(() =>
       fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&_t=${Date.now()}`,
+        `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
         { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
       ),
     );
@@ -121,7 +121,7 @@ export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | 
   try {
     const res = await rateLimiters.kalshi.execute(() =>
       fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}`,
+        `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
         { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
       ),
     );
