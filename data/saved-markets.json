@@ -236,7 +236,7 @@
             "kalshiFee": 0.14,
             "pmFee": 0.05125,
             "kalshiFeeDetails": "Kalshi NO sell 30 @ $0.93 = $0.14",
-            "pmFeeDetails": "Polymarket YES buy 30 @ $0.04 (\u03b8=0.05) = $0.05",
+            "pmFeeDetails": "Polymarket YES buy 30 @ $0.04 (θ=0.05) = $0.05",
             "netProfitIfKalshiWins": 0.8642795698924722,
             "netProfitIfPmWins": 0.9530295698924722,
             "worstCaseNetProfit": 0.8642795698924722
@@ -252,7 +252,7 @@
             "kalshiFee": 3.24,
             "pmFee": 1.75684,
             "kalshiFeeDetails": "Kalshi NO sell 513 @ $0.90 = $3.24",
-            "pmFeeDetails": "Polymarket YES buy 513 @ $0.07 (\u03b8=0.05) = $1.76",
+            "pmFeeDetails": "Polymarket YES buy 513 @ $0.07 (θ=0.05) = $1.76",
             "netProfitIfKalshiWins": 10.09193333333331,
             "netProfitIfPmWins": 11.57509333333331,
             "worstCaseNetProfit": 10.09193333333331
@@ -268,7 +268,7 @@
             "kalshiFee": 0.35,
             "pmFee": 0.21934,
             "kalshiFeeDetails": "Kalshi NO sell 492 @ $0.99 = $0.35",
-            "pmFeeDetails": "Polymarket YES buy 492 @ $0.01 (\u03b8=0.05) = $0.22",
+            "pmFeeDetails": "Polymarket YES buy 492 @ $0.01 (θ=0.05) = $0.22",
             "netProfitIfKalshiWins": 0.14185858585858446,
             "netProfitIfPmWins": 0.27251858585858446,
             "worstCaseNetProfit": 0.14185858585858446
@@ -325,7 +325,7 @@
             "kalshiFee": 4.1,
             "pmFee": 2.85,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.03 + NO sell 1500 @ $0.02 = $4.10",
-            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.94 (\u03b8=0.05) = $2.85",
+            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.94 (θ=0.05) = $2.85",
             "netProfitIfKalshiWins": 15.9,
             "netProfitIfPmWins": 17.15,
             "worstCaseNetProfit": 15.9
@@ -341,7 +341,7 @@
             "kalshiFee": 2.04,
             "pmFee": 1.02795,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.97 = $2.04",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (\u03b8=0.05) = $1.03",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (θ=0.05) = $1.03",
             "netProfitIfKalshiWins": 6.96,
             "netProfitIfPmWins": 7.97205,
             "worstCaseNetProfit": 6.96
@@ -357,7 +357,7 @@
             "kalshiFee": 2.04,
             "pmFee": 1.02795,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.97 = $2.04",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (\u03b8=0.05) = $1.03",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (θ=0.05) = $1.03",
             "netProfitIfKalshiWins": 6.96,
             "netProfitIfPmWins": 7.97205,
             "worstCaseNetProfit": 6.96
@@ -373,7 +373,7 @@
             "kalshiFee": 2.04,
             "pmFee": 0.83555,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.97 = $2.04",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (\u03b8=0.05) = $0.84",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (θ=0.05) = $0.84",
             "netProfitIfKalshiWins": 10.96,
             "netProfitIfPmWins": 12.16445,
             "worstCaseNetProfit": 10.96
@@ -449,7 +449,7 @@
             "kalshiFee": 0.03,
             "pmFee": 0.01263,
             "kalshiFeeDetails": "Kalshi NO sell 5 @ $0.94 = $0.03",
-            "pmFeeDetails": "Polymarket YES buy 5 @ $0.05 (\u03b8=0.05) = $0.01",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.05 (θ=0.05) = $0.01",
             "netProfitIfKalshiWins": 0.02319148936170204,
             "netProfitIfPmWins": 0.040561489361702036,
             "worstCaseNetProfit": 0.02319148936170204
@@ -465,7 +465,7 @@
             "kalshiFee": 0.06,
             "pmFee": 0.02582,
             "kalshiFeeDetails": "Kalshi NO sell 11 @ $0.92 = $0.06",
-            "pmFeeDetails": "Polymarket YES buy 11 @ $0.05 (\u03b8=0.05) = $0.03",
+            "pmFeeDetails": "Polymarket YES buy 11 @ $0.05 (θ=0.05) = $0.03",
             "netProfitIfKalshiWins": 0.26608695652173936,
             "netProfitIfPmWins": 0.30026695652173935,
             "worstCaseNetProfit": 0.26608695652173936
@@ -542,7 +542,7 @@
             "kalshiFee": 0.19,
             "pmFee": 0.07771,
             "kalshiFeeDetails": "Kalshi NO sell 261 @ $0.99 = $0.19",
-            "pmFeeDetails": "Polymarket YES buy 261 @ $0.01 (\u03b8=0.05) = $0.08",
+            "pmFeeDetails": "Polymarket YES buy 261 @ $0.01 (θ=0.05) = $0.08",
             "netProfitIfKalshiWins": 0.8524242424242596,
             "netProfitIfPmWins": 0.9647142424242596,
             "worstCaseNetProfit": 0.8524242424242596
@@ -558,7 +558,7 @@
             "kalshiFee": 0.5,
             "pmFee": 0.07057,
             "kalshiFeeDetails": "Kalshi NO sell 707 @ $0.99 = $0.50",
-            "pmFeeDetails": "Polymarket YES buy 707 @ $0.00 (\u03b8=0.05) = $0.07",
+            "pmFeeDetails": "Polymarket YES buy 707 @ $0.00 (θ=0.05) = $0.07",
             "netProfitIfKalshiWins": 5.15656565656563,
             "netProfitIfPmWins": 5.58599565656563,
             "worstCaseNetProfit": 5.15656565656563
@@ -574,7 +574,7 @@
             "kalshiFee": 0.84,
             "pmFee": 0.4464,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell 3000 @ $0.00 = $0.84",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (\u03b8=0.05) = $0.45",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (θ=0.05) = $0.45",
             "netProfitIfKalshiWins": 1.1600000000000001,
             "netProfitIfPmWins": 1.5535999999999999,
             "worstCaseNetProfit": 1.1600000000000001
@@ -590,7 +590,7 @@
             "kalshiFee": 0.32,
             "pmFee": 0.06798,
             "kalshiFeeDetails": "Kalshi NO sell 455 @ $0.99 = $0.32",
-            "pmFeeDetails": "Polymarket YES buy 455 @ $0.00 (\u03b8=0.05) = $0.07",
+            "pmFeeDetails": "Polymarket YES buy 455 @ $0.00 (θ=0.05) = $0.07",
             "netProfitIfKalshiWins": 2.8618181818181974,
             "netProfitIfPmWins": 3.1138381818181973,
             "worstCaseNetProfit": 2.8618181818181974
@@ -606,7 +606,7 @@
             "kalshiFee": 0.56,
             "pmFee": 0.37891,
             "kalshiFeeDetails": "Kalshi NO sell 56 @ $0.83 = $0.56",
-            "pmFeeDetails": "Polymarket YES buy 56 @ $0.16 (\u03b8=0.05) = $0.38",
+            "pmFeeDetails": "Polymarket YES buy 56 @ $0.16 (θ=0.05) = $0.38",
             "netProfitIfKalshiWins": 0.0038554216867479063,
             "netProfitIfPmWins": 0.18494542168674794,
             "worstCaseNetProfit": 0.0038554216867479063
@@ -622,7 +622,7 @@
             "kalshiFee": 0.61,
             "pmFee": 0.0877,
             "kalshiFeeDetails": "Kalshi NO sell 879 @ $0.99 = $0.61",
-            "pmFeeDetails": "Polymarket YES buy 879 @ $0.00 (\u03b8=0.05) = $0.09",
+            "pmFeeDetails": "Polymarket YES buy 879 @ $0.00 (θ=0.05) = $0.09",
             "netProfitIfKalshiWins": 6.420303030302995,
             "netProfitIfPmWins": 6.942603030302996,
             "worstCaseNetProfit": 6.420303030302995
@@ -638,7 +638,7 @@
             "kalshiFee": 1.23,
             "pmFee": 0.7861,
             "kalshiFeeDetails": "Kalshi NO sell 238 @ $0.92 = $1.23",
-            "pmFeeDetails": "Polymarket YES buy 238 @ $0.07 (\u03b8=0.05) = $0.79",
+            "pmFeeDetails": "Polymarket YES buy 238 @ $0.07 (θ=0.05) = $0.79",
             "netProfitIfKalshiWins": 0.915228260869569,
             "netProfitIfPmWins": 1.359128260869569,
             "worstCaseNetProfit": 0.915228260869569
@@ -695,7 +695,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.8364,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (\u03b8=0.05) = $0.84",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (θ=0.05) = $0.84",
             "netProfitIfKalshiWins": 5.3,
             "netProfitIfPmWins": 5.1636,
             "worstCaseNetProfit": 5.1636
@@ -711,7 +711,7 @@
             "kalshiFee": 0.7,
             "pmFee": 1.0769,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (\u03b8=0.05) = $1.08",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (θ=0.05) = $1.08",
             "netProfitIfKalshiWins": 10.3,
             "netProfitIfPmWins": 9.9231,
             "worstCaseNetProfit": 9.9231
@@ -727,7 +727,7 @@
             "kalshiFee": 4.56,
             "pmFee": 2.82,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.93 = $4.56",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.06 (\u03b8=0.05) = $2.82",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.06 (θ=0.05) = $2.82",
             "netProfitIfKalshiWins": 5.44,
             "netProfitIfPmWins": 7.18,
             "worstCaseNetProfit": 5.44
@@ -743,7 +743,7 @@
             "kalshiFee": 7.92,
             "pmFee": 4.5,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.87 = $7.92",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.10 (\u03b8=0.05) = $4.50",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.10 (θ=0.05) = $4.50",
             "netProfitIfKalshiWins": 22.08,
             "netProfitIfPmWins": 25.5,
             "worstCaseNetProfit": 22.08
@@ -759,7 +759,7 @@
             "kalshiFee": 8.43,
             "pmFee": 5.655,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.86 = $8.43",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.13 (\u03b8=0.05) = $5.66",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.13 (θ=0.05) = $5.66",
             "netProfitIfKalshiWins": 1.5700000000000003,
             "netProfitIfPmWins": 4.345,
             "worstCaseNetProfit": 1.5700000000000003
@@ -775,7 +775,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.788,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (\u03b8=0.05) = $0.79",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (θ=0.05) = $0.79",
             "netProfitIfKalshiWins": 4.3,
             "netProfitIfPmWins": 4.212,
             "worstCaseNetProfit": 4.212
@@ -872,7 +872,7 @@
             "kalshiFee": 10.34,
             "pmFee": 6.72,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.82 = $10.34",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.16 (\u03b8=0.05) = $6.72",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.16 (θ=0.05) = $6.72",
             "netProfitIfKalshiWins": 9.66,
             "netProfitIfPmWins": 13.280000000000001,
             "worstCaseNetProfit": 9.66
@@ -888,7 +888,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.2982,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.99 = $0.70",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (\u03b8=0.05) = $0.30",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (θ=0.05) = $0.30",
             "netProfitIfKalshiWins": 3.3,
             "netProfitIfPmWins": 3.7018,
             "worstCaseNetProfit": 3.3
@@ -1024,7 +1024,7 @@
             "kalshiFee": 0.41,
             "pmFee": 2.56255,
             "kalshiFeeDetails": "Kalshi YES buy 589 @ $0.01 + NO sell Infinity @ $0.00 = $0.41",
-            "pmFeeDetails": "Polymarket NO buy 632 @ $0.91 (\u03b8=0.05) = $2.56",
+            "pmFeeDetails": "Polymarket NO buy 632 @ $0.91 (θ=0.05) = $2.56",
             "netProfitIfKalshiWins": 6.655704539877288,
             "netProfitIfPmWins": 4.503154539877288,
             "worstCaseNetProfit": 4.503154539877288
@@ -1040,7 +1040,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.24875,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.99 = $0.70",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (\u03b8=0.05) = $0.25",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (θ=0.05) = $0.25",
             "netProfitIfKalshiWins": 4.3,
             "netProfitIfPmWins": 4.75125,
             "worstCaseNetProfit": 4.3
@@ -1056,7 +1056,7 @@
             "kalshiFee": 7.25,
             "pmFee": 4.28935,
             "kalshiFeeDetails": "Kalshi NO sell 673 @ $0.81 = $7.25",
-            "pmFeeDetails": "Polymarket YES buy 673 @ $0.15 (\u03b8=0.05) = $4.29",
+            "pmFeeDetails": "Polymarket YES buy 673 @ $0.15 (θ=0.05) = $4.29",
             "netProfitIfKalshiWins": 19.66358024691357,
             "netProfitIfPmWins": 22.62423024691357,
             "worstCaseNetProfit": 19.66358024691357
@@ -1072,7 +1072,7 @@
             "kalshiFee": 0.02,
             "pmFee": 0.00787,
             "kalshiFeeDetails": "Kalshi NO sell 11 @ $0.98 = $0.02",
-            "pmFeeDetails": "Polymarket YES buy 11 @ $0.01 (\u03b8=0.05) = $0.01",
+            "pmFeeDetails": "Polymarket YES buy 11 @ $0.01 (θ=0.05) = $0.01",
             "netProfitIfKalshiWins": 0.03326530612244845,
             "netProfitIfPmWins": 0.04539530612244845,
             "worstCaseNetProfit": 0.03326530612244845
@@ -1169,7 +1169,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.5934,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (\u03b8=0.05) = $0.59",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (θ=0.05) = $0.59",
             "netProfitIfKalshiWins": 0.30000000000000004,
             "netProfitIfPmWins": 0.40659999999999996,
             "worstCaseNetProfit": 0.30000000000000004
@@ -1185,7 +1185,7 @@
             "kalshiFee": 7.4,
             "pmFee": 4.3392,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.88 = $7.40",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.10 (\u03b8=0.05) = $4.34",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.10 (θ=0.05) = $4.34",
             "netProfitIfKalshiWins": 16.6,
             "netProfitIfPmWins": 19.660800000000002,
             "worstCaseNetProfit": 16.6
@@ -1242,7 +1242,7 @@
             "kalshiFee": 3.38,
             "pmFee": 2.41039,
             "kalshiFeeDetails": "Kalshi NO sell 193 @ $0.50 = $3.38",
-            "pmFeeDetails": "Polymarket YES buy 193 @ $0.48 (\u03b8=0.05) = $2.41",
+            "pmFeeDetails": "Polymarket YES buy 193 @ $0.48 (θ=0.05) = $2.41",
             "netProfitIfKalshiWins": 0.4828000000000072,
             "netProfitIfPmWins": 1.452410000000007,
             "worstCaseNetProfit": 0.4828000000000072
@@ -1258,7 +1258,7 @@
             "kalshiFee": 28.63,
             "pmFee": 11.04,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.28 + NO sell 1077 @ $0.26 = $28.63",
-            "pmFeeDetails": "Polymarket NO buy 1015 @ $0.68 (\u03b8=0.05) = $11.04",
+            "pmFeeDetails": "Polymarket NO buy 1015 @ $0.68 (θ=0.05) = $11.04",
             "netProfitIfKalshiWins": 1.370000000000001,
             "netProfitIfPmWins": 18.96,
             "worstCaseNetProfit": 1.370000000000001
@@ -1424,7 +1424,7 @@
             "kalshiFee": 0.16,
             "pmFee": 0.08292,
             "kalshiFeeDetails": "Kalshi NO sell 112 @ $0.98 = $0.16",
-            "pmFeeDetails": "Polymarket YES buy 112 @ $0.01 (\u03b8=0.05) = $0.08",
+            "pmFeeDetails": "Polymarket YES buy 112 @ $0.01 (θ=0.05) = $0.08",
             "netProfitIfKalshiWins": 0.4012244897959195,
             "netProfitIfPmWins": 0.47830448979591955,
             "worstCaseNetProfit": 0.4012244897959195
@@ -1440,7 +1440,7 @@
             "kalshiFee": 2.42,
             "pmFee": 1.64184,
             "kalshiFeeDetails": "Kalshi NO sell 171 @ $0.72 = $2.42",
-            "pmFeeDetails": "Polymarket YES buy 171 @ $0.26 (\u03b8=0.05) = $1.64",
+            "pmFeeDetails": "Polymarket YES buy 171 @ $0.26 (θ=0.05) = $1.64",
             "netProfitIfKalshiWins": 1.1730416666666716,
             "netProfitIfPmWins": 1.9512016666666716,
             "worstCaseNetProfit": 1.1730416666666716
@@ -1456,7 +1456,7 @@
             "kalshiFee": 0.7,
             "pmFee": 1.0802,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1004 @ $0.98 (\u03b8=0.05) = $1.08",
+            "pmFeeDetails": "Polymarket NO buy 1004 @ $0.98 (θ=0.05) = $1.08",
             "netProfitIfKalshiWins": 7.3,
             "netProfitIfPmWins": 6.9198,
             "worstCaseNetProfit": 6.9198
@@ -1472,7 +1472,7 @@
             "kalshiFee": 0.36,
             "pmFee": 0.0504,
             "kalshiFeeDetails": "Kalshi NO sell 505 @ $0.99 = $0.36",
-            "pmFeeDetails": "Polymarket YES buy 505 @ $0.00 (\u03b8=0.05) = $0.05",
+            "pmFeeDetails": "Polymarket YES buy 505 @ $0.00 (θ=0.05) = $0.05",
             "netProfitIfKalshiWins": 3.68040404040407,
             "netProfitIfPmWins": 3.99000404040407,
             "worstCaseNetProfit": 3.68040404040407
@@ -1488,7 +1488,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.8364,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (\u03b8=0.05) = $0.84",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.98 (θ=0.05) = $0.84",
             "netProfitIfKalshiWins": 5.3,
             "netProfitIfPmWins": 5.1636,
             "worstCaseNetProfit": 5.1636
@@ -1504,7 +1504,7 @@
             "kalshiFee": 0.28,
             "pmFee": 0.17389,
             "kalshiFeeDetails": "Kalshi NO sell 43 @ $0.90 = $0.28",
-            "pmFeeDetails": "Polymarket YES buy 43 @ $0.09 (\u03b8=0.05) = $0.17",
+            "pmFeeDetails": "Polymarket YES buy 43 @ $0.09 (θ=0.05) = $0.17",
             "netProfitIfKalshiWins": 0.2400000000000022,
             "netProfitIfPmWins": 0.34611000000000225,
             "worstCaseNetProfit": 0.2400000000000022
@@ -1621,7 +1621,7 @@
             "kalshiFee": 0.22,
             "pmFee": 0.00157,
             "kalshiFeeDetails": "Kalshi NO sell 31 @ $0.89 = $0.22",
-            "pmFeeDetails": "Polymarket YES buy 31 @ $0.00 (\u03b8=0.05) = $0.00",
+            "pmFeeDetails": "Polymarket YES buy 31 @ $0.00 (θ=0.05) = $0.00",
             "netProfitIfKalshiWins": 3.209213483146066,
             "netProfitIfPmWins": 3.427643483146066,
             "worstCaseNetProfit": 3.209213483146066
@@ -1637,7 +1637,7 @@
             "kalshiFee": 0.56,
             "pmFee": 1.02795,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.56",
-            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.98 (\u03b8=0.05) = $1.03",
+            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.98 (θ=0.05) = $1.03",
             "netProfitIfKalshiWins": 12.44,
             "netProfitIfPmWins": 11.97205,
             "worstCaseNetProfit": 11.97205
@@ -1653,7 +1653,7 @@
             "kalshiFee": 0.7,
             "pmFee": 2.23955,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.95 (\u03b8=0.05) = $2.24",
+            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.95 (θ=0.05) = $2.24",
             "netProfitIfKalshiWins": 36.3,
             "netProfitIfPmWins": 34.76045,
             "worstCaseNetProfit": 34.76045
@@ -1669,7 +1669,7 @@
             "kalshiFee": 1.31,
             "pmFee": 1.31355,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.02 + NO sell Infinity @ $0.00 = $1.31",
-            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.97 (\u03b8=0.05) = $1.31",
+            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.97 (θ=0.05) = $1.31",
             "netProfitIfKalshiWins": 6.6899999999999995,
             "netProfitIfPmWins": 6.68645,
             "worstCaseNetProfit": 6.68645
@@ -1685,7 +1685,7 @@
             "kalshiFee": 1.31,
             "pmFee": 1.2662,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.02 + NO sell Infinity @ $0.00 = $1.31",
-            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.97 (\u03b8=0.05) = $1.27",
+            "pmFeeDetails": "Polymarket NO buy 1000 @ $0.97 (θ=0.05) = $1.27",
             "netProfitIfKalshiWins": 5.6899999999999995,
             "netProfitIfPmWins": 5.7338000000000005,
             "worstCaseNetProfit": 5.6899999999999995
@@ -1701,7 +1701,7 @@
             "kalshiFee": 0.02,
             "pmFee": 0.00567,
             "kalshiFeeDetails": "Kalshi NO sell 38 @ $1.00 = $0.02",
-            "pmFeeDetails": "Polymarket YES buy 38 @ $0.00 (\u03b8=0.05) = $0.01",
+            "pmFeeDetails": "Polymarket YES buy 38 @ $0.00 (θ=0.05) = $0.01",
             "netProfitIfKalshiWins": 0.017921686746984734,
             "netProfitIfPmWins": 0.03225168674698473,
             "worstCaseNetProfit": 0.017921686746984734
@@ -1717,7 +1717,7 @@
             "kalshiFee": 0.07,
             "pmFee": 0.14955,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.00 + NO sell Infinity @ $0.00 = $0.07",
-            "pmFeeDetails": "Polymarket NO buy 1000 @ $1.00 (\u03b8=0.05) = $0.15",
+            "pmFeeDetails": "Polymarket NO buy 1000 @ $1.00 (θ=0.05) = $0.15",
             "netProfitIfKalshiWins": 1.93,
             "netProfitIfPmWins": 1.85045,
             "worstCaseNetProfit": 1.85045
@@ -1814,7 +1814,7 @@
             "kalshiFee": 3.33,
             "pmFee": 1.92,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.95 = $3.33",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.04 (\u03b8=0.05) = $1.92",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.04 (θ=0.05) = $1.92",
             "netProfitIfKalshiWins": 6.67,
             "netProfitIfPmWins": 8.08,
             "worstCaseNetProfit": 6.67
@@ -1940,7 +1940,7 @@
             "kalshiFee": 0.01,
             "pmFee": 0.00101,
             "kalshiFeeDetails": "Kalshi NO sell 5 @ $0.99 = $0.01",
-            "pmFeeDetails": "Polymarket YES buy 5 @ $0.00 (\u03b8=0.05) = $0.00",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.00 (θ=0.05) = $0.00",
             "netProfitIfKalshiWins": 0.020303030303029962,
             "netProfitIfPmWins": 0.029293030303029963,
             "worstCaseNetProfit": 0.020303030303029962
@@ -2243,7 +2243,7 @@
             "kalshiFee": 0.02,
             "pmFee": 0.00843,
             "kalshiFeeDetails": "Kalshi NO sell 28 @ $0.99 = $0.02",
-            "pmFeeDetails": "Polymarket YES buy 28 @ $0.01 (\u03b8=0.05) = $0.01",
+            "pmFeeDetails": "Polymarket YES buy 28 @ $0.01 (θ=0.05) = $0.01",
             "netProfitIfKalshiWins": 0.09313131313131405,
             "netProfitIfPmWins": 0.10470131313131406,
             "worstCaseNetProfit": 0.09313131313131405
@@ -2259,7 +2259,7 @@
             "kalshiFee": 0.01,
             "pmFee": 0.00046,
             "kalshiFeeDetails": "Kalshi NO sell 1 @ $0.98 = $0.01",
-            "pmFeeDetails": "Polymarket YES buy 1 @ $0.01 (\u03b8=0.05) = $0.00",
+            "pmFeeDetails": "Polymarket YES buy 1 @ $0.01 (θ=0.05) = $0.00",
             "netProfitIfKalshiWins": 0.0012244897959183907,
             "netProfitIfPmWins": 0.01076448979591839,
             "worstCaseNetProfit": 0.0012244897959183907
@@ -2336,7 +2336,7 @@
             "kalshiFee": 22.119999999999997,
             "pmFee": 7.76,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.81 + NO sell 1013 @ $0.80 = $22.12",
-            "pmFeeDetails": "Polymarket NO buy 5333 @ $0.03 (\u03b8=0.05) = $7.76",
+            "pmFeeDetails": "Polymarket NO buy 5333 @ $0.03 (θ=0.05) = $7.76",
             "netProfitIfKalshiWins": 7.879999999999974,
             "netProfitIfPmWins": 22.239999999999974,
             "worstCaseNetProfit": 7.879999999999974
@@ -2473,7 +2473,7 @@
             "kalshiFee": 0.42,
             "pmFee": 0.5868,
             "kalshiFeeDetails": "Kalshi YES buy 300 @ $0.02 + NO sell Infinity @ $0.00 = $0.42",
-            "pmFeeDetails": "Polymarket NO buy 306 @ $0.96 (\u03b8=0.05) = $0.59",
+            "pmFeeDetails": "Polymarket NO buy 306 @ $0.96 (θ=0.05) = $0.59",
             "netProfitIfKalshiWins": 0.18000000000002275,
             "netProfitIfPmWins": 0.013200000000022749,
             "worstCaseNetProfit": 0.013200000000022749
@@ -2489,7 +2489,7 @@
             "kalshiFee": 0.01,
             "pmFee": 0.00176,
             "kalshiFeeDetails": "Kalshi NO sell 5 @ $0.99 = $0.01",
-            "pmFeeDetails": "Polymarket YES buy 5 @ $0.01 (\u03b8=0.05) = $0.00",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.01 (θ=0.05) = $0.00",
             "netProfitIfKalshiWins": 0.005151515151514812,
             "netProfitIfPmWins": 0.013391515151514813,
             "worstCaseNetProfit": 0.005151515151514812
@@ -2526,7 +2526,7 @@
             "kalshiFee": 5.78,
             "pmFee": 3.76119,
             "kalshiFeeDetails": "Kalshi NO sell 373 @ $0.67 = $5.78",
-            "pmFeeDetails": "Polymarket YES buy 373 @ $0.28 (\u03b8=0.05) = $3.76",
+            "pmFeeDetails": "Polymarket YES buy 373 @ $0.28 (θ=0.05) = $3.76",
             "netProfitIfKalshiWins": 12.876716417910416,
             "netProfitIfPmWins": 14.895526417910418,
             "worstCaseNetProfit": 12.876716417910416
@@ -2542,7 +2542,7 @@
             "kalshiFee": 0.62,
             "pmFee": 0.34891,
             "kalshiFeeDetails": "Kalshi YES buy 31 @ $0.16 + NO sell 50 @ $0.10 = $0.62",
-            "pmFeeDetails": "Polymarket NO buy 34 @ $0.71 (\u03b8=0.05) = $0.35",
+            "pmFeeDetails": "Polymarket NO buy 34 @ $0.71 (θ=0.05) = $0.35",
             "netProfitIfKalshiWins": 1.5675,
             "netProfitIfPmWins": 1.83859,
             "worstCaseNetProfit": 1.5675
@@ -2558,7 +2558,7 @@
             "kalshiFee": 11.79,
             "pmFee": 6.8,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.09 + NO sell 2250 @ $0.04 = $11.79",
-            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.84 (\u03b8=0.05) = $6.80",
+            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.84 (θ=0.05) = $6.80",
             "netProfitIfKalshiWins": 48.21,
             "netProfitIfPmWins": 53.2,
             "worstCaseNetProfit": 48.21
@@ -2574,7 +2574,7 @@
             "kalshiFee": 2.31,
             "pmFee": 1.18869,
             "kalshiFeeDetails": "Kalshi YES buy 119 @ $0.16 + NO sell 173 @ $0.11 = $2.31",
-            "pmFeeDetails": "Polymarket NO buy 124 @ $0.74 (\u03b8=0.05) = $1.19",
+            "pmFeeDetails": "Polymarket NO buy 124 @ $0.74 (θ=0.05) = $1.19",
             "netProfitIfKalshiWins": 6.0024999999999995,
             "netProfitIfPmWins": 7.12381,
             "worstCaseNetProfit": 6.0024999999999995
@@ -2590,7 +2590,7 @@
             "kalshiFee": 0.6799999999999999,
             "pmFee": 0.53357,
             "kalshiFeeDetails": "Kalshi YES buy 71 @ $0.07 + NO sell 250 @ $0.02 = $0.68",
-            "pmFeeDetails": "Polymarket NO buy 72 @ $0.82 (\u03b8=0.05) = $0.53",
+            "pmFeeDetails": "Polymarket NO buy 72 @ $0.82 (θ=0.05) = $0.53",
             "netProfitIfKalshiWins": 6.462857142857146,
             "netProfitIfPmWins": 6.609287142857146,
             "worstCaseNetProfit": 6.462857142857146
@@ -2606,7 +2606,7 @@
             "kalshiFee": 11.79,
             "pmFee": 6.45,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.09 + NO sell 2250 @ $0.04 = $11.79",
-            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.85 (\u03b8=0.05) = $6.45",
+            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.85 (θ=0.05) = $6.45",
             "netProfitIfKalshiWins": 38.21,
             "netProfitIfPmWins": 43.55,
             "worstCaseNetProfit": 38.21
@@ -2622,7 +2622,7 @@
             "kalshiFee": 11.79,
             "pmFee": 4.86685,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.09 + NO sell 2250 @ $0.04 = $11.79",
-            "pmFeeDetails": "Polymarket NO buy 1002 @ $0.89 (\u03b8=0.05) = $4.87",
+            "pmFeeDetails": "Polymarket NO buy 1002 @ $0.89 (θ=0.05) = $4.87",
             "netProfitIfKalshiWins": 5.210000000000001,
             "netProfitIfPmWins": 12.13315,
             "worstCaseNetProfit": 5.210000000000001
@@ -2638,7 +2638,7 @@
             "kalshiFee": 0.7,
             "pmFee": 3.72,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.92 (\u03b8=0.05) = $3.72",
+            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.92 (θ=0.05) = $3.72",
             "netProfitIfKalshiWins": 59.30000000000011,
             "netProfitIfPmWins": 56.280000000000115,
             "worstCaseNetProfit": 56.280000000000115
@@ -2675,7 +2675,7 @@
             "kalshiFee": 0.5599999999999999,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $1.00 + NO sell 1002 @ $0.99 = $0.56",
-            "pmFeeDetails": "Polymarket NO buy Infinity @ $0.00 (\u03b8=0.05) = $0.00",
+            "pmFeeDetails": "Polymarket NO buy Infinity @ $0.00 (θ=0.05) = $0.00",
             "netProfitIfKalshiWins": 1.439999999999999,
             "netProfitIfPmWins": 1.9999999999999991,
             "worstCaseNetProfit": 1.439999999999999
@@ -2703,7 +2703,7 @@
       "scannedAt": "2026-07-01T21:46:28.084Z",
       "allArbs": [
         {
-          "artist": "Vladimir Padrino L\u00f3pez (VLOP, Jan 2027)",
+          "artist": "Vladimir Padrino López (VLOP, Jan 2027)",
           "roiPct": 0.7290500000000096,
           "expectedProfit": 4.4184848484849075,
           "strategy": "Buy YES PM + NO Kalshi",
@@ -2712,14 +2712,14 @@
             "kalshiFee": 0.43,
             "pmFee": 0.06048,
             "kalshiFeeDetails": "Kalshi NO sell 606 @ $0.99 = $0.43",
-            "pmFeeDetails": "Polymarket YES buy 606 @ $0.00 (\u03b8=0.05) = $0.06",
+            "pmFeeDetails": "Polymarket YES buy 606 @ $0.00 (θ=0.05) = $0.06",
             "netProfitIfKalshiWins": 4.4184848484849075,
             "netProfitIfPmWins": 4.788004848484907,
             "worstCaseNetProfit": 4.4184848484849075
           }
         },
         {
-          "artist": "Nicol\u00e1s Maduro (NMAD, Jan 2027)",
+          "artist": "Nicolás Maduro (NMAD, Jan 2027)",
           "roiPct": 0.7290500000000096,
           "expectedProfit": 4.4184848484849075,
           "strategy": "Buy YES PM + NO Kalshi",
@@ -2728,7 +2728,7 @@
             "kalshiFee": 0.43,
             "pmFee": 0.06048,
             "kalshiFeeDetails": "Kalshi NO sell 606 @ $0.99 = $0.43",
-            "pmFeeDetails": "Polymarket YES buy 606 @ $0.00 (\u03b8=0.05) = $0.06",
+            "pmFeeDetails": "Polymarket YES buy 606 @ $0.00 (θ=0.05) = $0.06",
             "netProfitIfKalshiWins": 4.4184848484849075,
             "netProfitIfPmWins": 4.788004848484907,
             "worstCaseNetProfit": 4.4184848484849075
@@ -2780,7 +2780,7 @@
   {
     "kalshiUrl": "https://kalshi.com/markets/kxwcstageofelim/world-cup-stage-of-elimination/kxwcstageofelim-26tur",
     "polymarketUrl": "https://polymarket.com/event/world-cup-turkiye-stage-of-elimination/will-turkiye-be-eliminated-in-group-stage-stage-of-the-world-cup-20260605224225647",
-    "eventTitle": "World Cup: T\u00fcrkiye Stage of Elimination",
+    "eventTitle": "World Cup: Türkiye Stage of Elimination",
     "category": "",
     "expiryDate": "2026-07-19T19:00:00Z",
     "id": "1781520309047-uvwt6hx",
@@ -2826,50 +2826,78 @@
     "id": "1781520373665-ku233qk",
     "createdAt": "2026-06-15T10:46:13.665Z",
     "lastScanResult": {
-      "bestRoiPct": 1.492,
-      "bestProfit": 14.92,
+      "bestRoiPct": 1.3179999999999998,
+      "bestProfit": 13.18,
       "strategy": "Buy YES PM + NO Kalshi",
-      "outcomeCount": 23,
-      "matchedCount": 23,
-      "kalshiCount": 24,
+      "outcomeCount": 50,
+      "matchedCount": 22,
+      "kalshiCount": 22,
       "pmCount": 50,
-      "scannedAt": "2026-07-01T20:02:54.825Z",
+      "scannedAt": "2026-07-02T16:27:57.661Z",
       "allArbs": [
         {
-          "artist": "England",
-          "roiPct": 0.015000000000000036,
-          "expectedProfit": 0.15000000000000036,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 908,
-          "pmStake": 86,
-          "totalStake": 994
+          "artist": "Switzerland",
+          "roiPct": 0.016000000000000004,
+          "expectedProfit": 0.16000000000000003,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 999,
+          "fees": {
+            "kalshiFee": 0.84,
+            "pmFee": 0.3972,
+            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell 1200 @ $0.01 = $0.84",
+            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.99 (θ=0.05) = $0.40",
+            "netProfitIfKalshiWins": 0.16000000000000003,
+            "netProfitIfPmWins": 0.6028,
+            "worstCaseNetProfit": 0.16000000000000003
+          }
         },
         {
-          "artist": "Portugal",
-          "roiPct": 0.016999999999999994,
-          "expectedProfit": 0.16999999999999993,
+          "artist": "Colombia",
+          "roiPct": 0.022,
+          "expectedProfit": 0.21999999999999997,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 942,
-          "pmStake": 54,
-          "totalStake": 996
+          "totalStake": 998,
+          "fees": {
+            "kalshiFee": 1.78,
+            "pmFee": 1.1712,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.97 = $1.78",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.02 (θ=0.05) = $1.17",
+            "netProfitIfKalshiWins": 0.21999999999999997,
+            "netProfitIfPmWins": 0.8288,
+            "worstCaseNetProfit": 0.21999999999999997
+          }
         },
         {
           "artist": "USA",
-          "roiPct": 0.744,
-          "expectedProfit": 7.4399999999999995,
+          "roiPct": 1.3179999999999998,
+          "expectedProfit": 13.18,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 962,
-          "pmStake": 28,
-          "totalStake": 990
+          "totalStake": 984,
+          "fees": {
+            "kalshiFee": 2.82,
+            "pmFee": 1.2662,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.96 = $2.82",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.03 (θ=0.05) = $1.27",
+            "netProfitIfKalshiWins": 13.18,
+            "netProfitIfPmWins": 14.7338,
+            "worstCaseNetProfit": 13.18
+          }
         },
         {
           "artist": "Mexico",
-          "roiPct": 1.492,
-          "expectedProfit": 14.92,
+          "roiPct": 1.1609999999999998,
+          "expectedProfit": 11.61,
           "strategy": "Buy YES PM + NO Kalshi",
-          "kalshiStake": 954,
-          "pmStake": 28,
-          "totalStake": 982
+          "totalStake": 985,
+          "fees": {
+            "kalshiFee": 3.39,
+            "pmFee": 1.7352,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.95 = $3.39",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.04 (θ=0.05) = $1.74",
+            "netProfitIfKalshiWins": 11.61,
+            "netProfitIfPmWins": 13.2648,
+            "worstCaseNetProfit": 11.61
+          }
         }
       ]
     }
@@ -2893,7 +2921,7 @@
       "scannedAt": "2026-07-01T20:42:20.250Z",
       "allArbs": [
         {
-          "artist": "Jos\u00e9 Caballero",
+          "artist": "José Caballero",
           "roiPct": 4.671,
           "expectedProfit": 46.71,
           "strategy": "Buy YES Kalshi + NO PM",
@@ -2902,7 +2930,7 @@
             "kalshiFee": 0.7,
             "pmFee": 3.29,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.93 (\u03b8=0.05) = $3.29",
+            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.93 (θ=0.05) = $3.29",
             "netProfitIfKalshiWins": 49.3,
             "netProfitIfPmWins": 46.71,
             "worstCaseNetProfit": 46.71
@@ -2918,7 +2946,7 @@
             "kalshiFee": 0.13,
             "pmFee": 0.0515,
             "kalshiFeeDetails": "Kalshi NO sell 46 @ $0.96 = $0.13",
-            "pmFeeDetails": "Polymarket YES buy 46 @ $0.02 (\u03b8=0.05) = $0.05",
+            "pmFeeDetails": "Polymarket YES buy 46 @ $0.02 (θ=0.05) = $0.05",
             "netProfitIfKalshiWins": 0.649166666666669,
             "netProfitIfPmWins": 0.727666666666669,
             "worstCaseNetProfit": 0.649166666666669
@@ -2934,7 +2962,7 @@
             "kalshiFee": 0.06,
             "pmFee": 0.02949,
             "kalshiFeeDetails": "Kalshi NO sell 6 @ $0.83 = $0.06",
-            "pmFeeDetails": "Polymarket YES buy 6 @ $0.11 (\u03b8=0.05) = $0.03",
+            "pmFeeDetails": "Polymarket YES buy 6 @ $0.11 (θ=0.05) = $0.03",
             "netProfitIfKalshiWins": 0.3014457831325304,
             "netProfitIfPmWins": 0.3319557831325304,
             "worstCaseNetProfit": 0.3014457831325304
@@ -2950,7 +2978,7 @@
             "kalshiFee": 1.97,
             "pmFee": 3.17216,
             "kalshiFeeDetails": "Kalshi YES buy 964 @ $0.03 + NO sell Infinity @ $0.00 = $1.97",
-            "pmFeeDetails": "Polymarket NO buy 975 @ $0.93 (\u03b8=0.05) = $3.17",
+            "pmFeeDetails": "Polymarket NO buy 975 @ $0.93 (θ=0.05) = $3.17",
             "netProfitIfKalshiWins": 26.955463829787305,
             "netProfitIfPmWins": 25.753303829787306,
             "worstCaseNetProfit": 25.753303829787306
@@ -2987,7 +3015,7 @@
             "kalshiFee": 0.18,
             "pmFee": 0.06299,
             "kalshiFeeDetails": "Kalshi NO sell 52 @ $0.95 = $0.18",
-            "pmFeeDetails": "Polymarket YES buy 52 @ $0.03 (\u03b8=0.05) = $0.06",
+            "pmFeeDetails": "Polymarket YES buy 52 @ $0.03 (θ=0.05) = $0.06",
             "netProfitIfKalshiWins": 1.1121052631578985,
             "netProfitIfPmWins": 1.2291152631578983,
             "worstCaseNetProfit": 1.1121052631578985
@@ -3003,7 +3031,7 @@
             "kalshiFee": 0.04,
             "pmFee": 0.02067,
             "kalshiFeeDetails": "Kalshi NO sell 6 @ $0.89 = $0.04",
-            "pmFeeDetails": "Polymarket YES buy 6 @ $0.08 (\u03b8=0.05) = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 6 @ $0.08 (θ=0.05) = $0.02",
             "netProfitIfKalshiWins": 0.12853932584269614,
             "netProfitIfPmWins": 0.14786932584269616,
             "worstCaseNetProfit": 0.12853932584269614
@@ -3019,7 +3047,7 @@
             "kalshiFee": 0.04,
             "pmFee": 0.01506,
             "kalshiFeeDetails": "Kalshi NO sell 51 @ $0.99 = $0.04",
-            "pmFeeDetails": "Polymarket YES buy 51 @ $0.01 (\u03b8=0.05) = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 51 @ $0.01 (θ=0.05) = $0.02",
             "netProfitIfKalshiWins": 0.16202020202020215,
             "netProfitIfPmWins": 0.18696020202020217,
             "worstCaseNetProfit": 0.16202020202020215
@@ -3035,7 +3063,7 @@
             "kalshiFee": 0.04,
             "pmFee": 0.01506,
             "kalshiFeeDetails": "Kalshi NO sell 51 @ $0.99 = $0.04",
-            "pmFeeDetails": "Polymarket YES buy 51 @ $0.01 (\u03b8=0.05) = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 51 @ $0.01 (θ=0.05) = $0.02",
             "netProfitIfKalshiWins": 0.16202020202020215,
             "netProfitIfPmWins": 0.18696020202020217,
             "worstCaseNetProfit": 0.16202020202020215
@@ -3481,7 +3509,7 @@
             "kalshiFee": 4.73,
             "pmFee": 3.41235,
             "kalshiFeeDetails": "Kalshi NO sell 277 @ $0.42 = $4.73",
-            "pmFeeDetails": "Polymarket YES buy 277 @ $0.56 (\u03b8=0.05) = $3.41",
+            "pmFeeDetails": "Polymarket YES buy 277 @ $0.56 (θ=0.05) = $3.41",
             "netProfitIfKalshiWins": 0.8095238095238138,
             "netProfitIfPmWins": 2.127173809523814,
             "worstCaseNetProfit": 0.8095238095238138
@@ -3497,7 +3525,7 @@
             "kalshiFee": 0.66,
             "pmFee": 0.34045,
             "kalshiFeeDetails": "Kalshi YES buy 45 @ $0.11 + NO sell 100 @ $0.05 = $0.66",
-            "pmFeeDetails": "Polymarket NO buy 47 @ $0.82 (\u03b8=0.05) = $0.34",
+            "pmFeeDetails": "Polymarket NO buy 47 @ $0.82 (θ=0.05) = $0.34",
             "netProfitIfKalshiWins": 0.8854545454545467,
             "netProfitIfPmWins": 1.2050045454545468,
             "worstCaseNetProfit": 0.8854545454545467
@@ -3513,7 +3541,7 @@
             "kalshiFee": 0.7,
             "pmFee": 1.421,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1009 @ $0.97 (\u03b8=0.05) = $1.42",
+            "pmFeeDetails": "Polymarket NO buy 1009 @ $0.97 (θ=0.05) = $1.42",
             "netProfitIfKalshiWins": 9.3,
             "netProfitIfPmWins": 8.579,
             "worstCaseNetProfit": 8.579
@@ -3529,7 +3557,7 @@
             "kalshiFee": 0.16,
             "pmFee": 0.05556,
             "kalshiFeeDetails": "Kalshi NO sell 25 @ $0.90 = $0.16",
-            "pmFeeDetails": "Polymarket YES buy 25 @ $0.05 (\u03b8=0.05) = $0.06",
+            "pmFeeDetails": "Polymarket YES buy 25 @ $0.05 (θ=0.05) = $0.06",
             "netProfitIfKalshiWins": 1.2073999999999983,
             "netProfitIfPmWins": 1.3118399999999981,
             "worstCaseNetProfit": 1.2073999999999983
@@ -3586,7 +3614,7 @@
             "kalshiFee": 0.7,
             "pmFee": 0.3968,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.99 = $0.70",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (\u03b8=0.05) = $0.40",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.01 (θ=0.05) = $0.40",
             "netProfitIfKalshiWins": 1.3,
             "netProfitIfPmWins": 1.6032,
             "worstCaseNetProfit": 1.3

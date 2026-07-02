@@ -1,13 +1,5 @@
 [
   {
-    "scanTimestamp": "2026-07-01T21:16:47.060Z",
-    "marketId": "1782653182964-9b9th6",
-    "totalProfit": 0,
-    "bestRoiPct": 0,
-    "positiveArbCount": 0,
-    "matchedCount": 2
-  },
-  {
     "scanTimestamp": "2026-07-01T21:16:49.743Z",
     "marketId": "1782653182965-xixniq",
     "totalProfit": 40.95000000000012,
@@ -3998,5 +3990,13 @@
     "bestRoiPct": 4.76814392277314,
     "positiveArbCount": 4,
     "matchedCount": 8
+  },
+  {
+    "scanTimestamp": "2026-07-02T16:27:57.669Z",
+    "marketId": "1781520373665-ku233qk",
+    "totalProfit": 25.17,
+    "bestRoiPct": 1.3179999999999998,
+    "positiveArbCount": 4,
+    "matchedCount": 22
   }
 ]

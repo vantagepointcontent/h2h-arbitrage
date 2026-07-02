@@ -1,0 +1,498 @@
+[
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUN30MEXECU-ECU",
+    "pmConditionId": "0xa0f4d15ca1f25a095760f56ba63d7f99bad977a33ae93003d86d58fda3ba3da4",
+    "kalshiTitle": "KXWCADVANCE-26JUN30MEXECU-ECU",
+    "pmTitle": "Ecuador advances",
+    "id": "1782756421539-932en3o",
+    "decoupledAt": "2026-06-29T18:07:01.539Z"
+  },
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUN30MEXECU-MEX",
+    "pmConditionId": "0x65f5760095b3b903c895b320765ccdd4074b72750458b09fde516f6254bcec67",
+    "kalshiTitle": "KXWCADVANCE-26JUN30MEXECU-MEX",
+    "pmTitle": "Mexico advances",
+    "id": "1782756422237-awav4ps",
+    "decoupledAt": "2026-06-29T18:07:02.237Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xb54ccf642fdfab45637e1f093509e5ee69fcb1ff25979c11cf04650f18c3f97e",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782834320059-3hb8pta",
+    "decoupledAt": "2026-06-30T15:45:20.059Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xd9d9532b0d1a2485cfda6cae8cd4831bb323b7df6aeb72741bca50c6c4587393",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782834321613-cf8is9y",
+    "decoupledAt": "2026-06-30T15:45:21.613Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xed8f832901f427aaa87a8eb9d8e3f8a84cb422fa2eb60e26b6f0ee984a3f62ab",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782922282555-vkpiciu",
+    "decoupledAt": "2026-07-01T16:11:22.555Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xc706bf8c7164ce0fb7850d52e8fe6c20eefb774ec674128bd0a2a492af531e14",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782922283586-k7hu503",
+    "decoupledAt": "2026-07-01T16:11:23.586Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xf2f8fe98ed981d087711861d69e68ec9161263e48ab8dfeda27c9ca8f0a52cfe",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944716064-e772kbz",
+    "decoupledAt": "2026-07-01T22:25:16.064Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x6995e8ac437713345a1a6486140279b7db55635122accc68965590241dfdf03c",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944717041-e4vieb4",
+    "decoupledAt": "2026-07-01T22:25:17.041Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x909e3566fa0384f39020837073fe6e9fac5fe340b49998f284737c04fddd3212",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944802544-1cdix36",
+    "decoupledAt": "2026-07-01T22:26:42.544Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x669ba3821baa39faef138f51fb0bc00dce395302cb56a432917b4d0bb459fc60",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944805473-d9nj68v",
+    "decoupledAt": "2026-07-01T22:26:45.473Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x5d41f4a4385b22a66866d1d9b1f26ed020d194b9ef6a390ad323674915cbb101",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944822760-i25e7vv",
+    "decoupledAt": "2026-07-01T22:27:02.760Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x9f449f3731d4ccd04392dd4ad859e346f1b66fcd2e76f52b26824d45101bde1e",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944823558-dx83ip8",
+    "decoupledAt": "2026-07-01T22:27:03.558Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x47c160ef68d32681a7b157f8769d56a39757b8855d007a0b3e76c74eed11bae9",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944831791-s4f8grq",
+    "decoupledAt": "2026-07-01T22:27:11.791Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x17d9797821f1a32321564af18ce9bb98ba79f269d6973c9af4c092a518a916ff",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944832717-1kmebfp",
+    "decoupledAt": "2026-07-01T22:27:12.717Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xf207d480dde3add509a4b1a355d4f3b06195f917de37ff94f7814d9277df0cdd",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944840082-ax95c9r",
+    "decoupledAt": "2026-07-01T22:27:20.082Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xe0fbb3e61e61b14f5fef15ffdd0e2a0c6cf4336bb5b15877fe3e3c9fdcc6bc7f",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944842308-ets01xq",
+    "decoupledAt": "2026-07-01T22:27:22.308Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x418fcd9c72501eea029eee747b522e4da91478dbf52829893aa7a55b36d84984",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944854625-023av2a",
+    "decoupledAt": "2026-07-01T22:27:34.625Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xb7b4326e339012a34a5a5f052dd96b0d96ccfd0d80acb9f2f8ec94e21a522112",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944856922-bkxmaci",
+    "decoupledAt": "2026-07-01T22:27:36.922Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x27a4dd39adf63849239f3b260b701e1ce1c3a08b8e3624b1dbc2c1268ea87537",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944877457-yi8zvmc",
+    "decoupledAt": "2026-07-01T22:27:57.457Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x44c315e3dd57007aaed17213010288ad8b5507123b38e0496fd90fcceb3537f8",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944878350-hf4vskl",
+    "decoupledAt": "2026-07-01T22:27:58.350Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x55c186d303a88f67eb790a5486e0d5430352ed3c018e9602af313b873ae7c6ae",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944883189-l6nuqf3",
+    "decoupledAt": "2026-07-01T22:28:03.189Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x5907a57bb422718865f59393fa0779374d6a62965cce0d50637411762867a8f4",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944883872-75qgf7y",
+    "decoupledAt": "2026-07-01T22:28:03.872Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x4fc8fa3232d953ba415ec7bfc2a494d8a01f7001b2e5c4e07fb4f4e4b931af32",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944890837-5by7fnp",
+    "decoupledAt": "2026-07-01T22:28:10.837Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xdb02ac87c8cf9941ff45ed2ca572c702a56669f05b73bb5e4f183180113ed77a",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944891577-n8mxaw3",
+    "decoupledAt": "2026-07-01T22:28:11.577Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x89e54c86f437d7696d9789c5ff901dd5f3b35a5594f5aadf27af50bc6d2ca50e",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944898095-t11lrzq",
+    "decoupledAt": "2026-07-01T22:28:18.095Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xb470bc5d43c2f41ce9e741f7c9f0041b2dbcc58ddccd65e006b816b545efa9c4",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944899326-gzpuscc",
+    "decoupledAt": "2026-07-01T22:28:19.326Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xbd353d44ec152e7bb9061883baed937386a50b3e3b6358c5d47ef9a572381f8b",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944905301-s2wl7a2",
+    "decoupledAt": "2026-07-01T22:28:25.301Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x86b398869c0bbdd80f5636abf20ebd6a3f86cf2656a41f186de652a5826115b3",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944907471-3lohy9x",
+    "decoupledAt": "2026-07-01T22:28:27.471Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x1d8cfb3cd1956e90d83d38cdbb87625012d4571684677d999ed46bd39b203905",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782944986966-vw83e8x",
+    "decoupledAt": "2026-07-01T22:29:46.966Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x8d327131d3f3f8c6a517250e07cbc8914a9d7c378f0662e4984d25f326d13205",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782944987540-ctnjntp",
+    "decoupledAt": "2026-07-01T22:29:47.540Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xba679a5c42f2d674752c390ddbb8603f04a221eb50ce03662067163cdd359421",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945012359-pfl0qtv",
+    "decoupledAt": "2026-07-01T22:30:12.359Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xd1f23e2bc9c61979e1c9f53bd0b76de8ef9cf5bcbc92ecfbccfbf67bfd3c8801",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945013288-4xip8u1",
+    "decoupledAt": "2026-07-01T22:30:13.288Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xe64ec54460a1f1b250c9785968e6ebecfb0fd542a34300a161f64460c7a811df",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945029678-qcmxvuu",
+    "decoupledAt": "2026-07-01T22:30:29.678Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x7fd71c48a98bb515664cadb1f62cf1f27b770fe9cc1216571e183b982a48e42a",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945030804-2dwwotx",
+    "decoupledAt": "2026-07-01T22:30:30.804Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xf6ff4c55696ff8529e6e1021f4e4a17adaa305c4991d9001bcbf7a5fbdd326d3",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945038233-9yzy56i",
+    "decoupledAt": "2026-07-01T22:30:38.233Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xb47f229515c8720ca5ab0bb536f6e6b3fc2041e587179551358503741a1820db",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945039179-zjeqa5i",
+    "decoupledAt": "2026-07-01T22:30:39.179Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x24a2f4194f009d82637b36e77e5ff1bcae5099d202b6c4e93fa48ff5e8f8255c",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945046633-3chan8b",
+    "decoupledAt": "2026-07-01T22:30:46.634Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xddcb215d8c020c9794ed641720bde228d41f7fbbc8591e6c93e6cb7b9ed39efc",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945047616-5m83k2v",
+    "decoupledAt": "2026-07-01T22:30:47.616Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xff0755a0219789891e2385f9218d0a41279f5fee853a5a87deb608a93370cc29",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945054248-s7v6wxv",
+    "decoupledAt": "2026-07-01T22:30:54.248Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x5b1d46c7f29397ca3a713ccdae49131bafdd0ff7f217895c3e7042a72d27ce1a",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945054932-wu6r1j0",
+    "decoupledAt": "2026-07-01T22:30:54.932Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x69366045ca68108d34ad7436760a709d22949ac250de44119c4f8734a47dc9e8",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945060172-6xpb7lf",
+    "decoupledAt": "2026-07-01T22:31:00.172Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x47620df478cd381b061f6ee36fe420ed53d29a17bffa9a0507c3d1b6398d0503",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945060752-lp0a9uf",
+    "decoupledAt": "2026-07-01T22:31:00.752Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x9256274410a5fa5d9332cdc42b6898cdc27186c79792bb3dbf609153a433bd05",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945066024-0pqt61e",
+    "decoupledAt": "2026-07-01T22:31:06.024Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x9735676a9c6bc3ee63496bfbe27c5f222d02463c41aa7f7a4e3b645f79cfa29c",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945066687-btcqpl6",
+    "decoupledAt": "2026-07-01T22:31:06.687Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x088f7c361f9ad03a659def729f6e4f4b4ac888552c4e1b795deb5ce6a0700033",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945072158-9md9pou",
+    "decoupledAt": "2026-07-01T22:31:12.158Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x9d54f82ccce95184f18f3a46dcbab3ce637fbb92a604a15ff74cefdf0b1eb38e",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945072727-hh7otnq",
+    "decoupledAt": "2026-07-01T22:31:12.727Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xa5145e1792295ac4dc5eb50e75665c1bcb300d5627639b8603e3156b7ab2c9e9",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945078704-bmxvv0x",
+    "decoupledAt": "2026-07-01T22:31:18.704Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x87e411b5f2ee67fe075aa7f31214a54b5fbba9ceb114d3de78290326ef374d75",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945079269-2eazsyv",
+    "decoupledAt": "2026-07-01T22:31:19.269Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x587f44f11f175ae5a67de2052bceec0a2eb9bb9b98c99f051103211211604606",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945097786-zkz8lbh",
+    "decoupledAt": "2026-07-01T22:31:37.786Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x2b94021bfae4d3742477c683eef5f901e26cdc07d42a3dea536a3092b290f177",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945098716-klvu4rh",
+    "decoupledAt": "2026-07-01T22:31:38.716Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xa33cf18dc8a3f0f8550fcb3f68a7b4272f40709419029ac6e589d82f30bb3273",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782945104747-klzszpz",
+    "decoupledAt": "2026-07-01T22:31:44.747Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x1ba8c5b414501846fafc1639481a839d57bc3bbb62471400e86224e93c2281f5",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782945105960-v13yomf",
+    "decoupledAt": "2026-07-01T22:31:45.960Z"
+  },
+  {
+    "kalshiTicker": "KXWCSTAGEOFELIM-26AUT-R16",
+    "pmConditionId": "0xaecc9ca5e4005449a1fed3fe1134aabfe3ef492361dcc00a63ad191c8d683062",
+    "kalshiTitle": "KXWCSTAGEOFELIM-26AUT-R16",
+    "pmTitle": "Eliminated in the Round of 16",
+    "id": "1782998086532-y75gtkk",
+    "decoupledAt": "2026-07-02T13:14:46.532Z"
+  },
+  {
+    "kalshiTicker": "KXWCSTAGEOFELIM-26SUI-R32",
+    "pmConditionId": "0x85e5b7f98345f80e9b223681303be939d98ce5541371e4be978e997c693cd02e",
+    "kalshiTitle": "KXWCSTAGEOFELIM-26SUI-R32",
+    "pmTitle": "Eliminated in the Round of 32",
+    "id": "1782998087393-wdef68o",
+    "decoupledAt": "2026-07-02T13:14:47.393Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x5ad7756609da59ffb359e37a16cc0b89285f4b823623e22e2900f054a77ed8ed",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782998100025-3y4oyo5",
+    "decoupledAt": "2026-07-02T13:15:00.025Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0xd67cfab2dbfb4e25b5d8b2a9fa66d0dadbcb6c11ba1c7c66cc343c985c5f8540",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782998100862-sclgh34",
+    "decoupledAt": "2026-07-02T13:15:00.862Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x97c667cff605b7dea893e79ace9b9506d244898fc5429358ae1e218548ac360b",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782998109715-czh1ts1",
+    "decoupledAt": "2026-07-02T13:15:09.715Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x4a03df68d8bc2d9d5acb5a20a907decce4045668931d6edac88f6deea39de1ce",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782998110374-hdbpn3z",
+    "decoupledAt": "2026-07-02T13:15:10.374Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0x0eda21c8b5651dba9fd69aad361e9d01481965e94241ac438486a16dab181344",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782998120909-ht3jzcu",
+    "decoupledAt": "2026-07-02T13:15:20.909Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x680a8d22cfe66bedefbc517a3640921b3164afe28f66af6afea4ce6feb73c0be",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782998123184-1mkvu89",
+    "decoupledAt": "2026-07-02T13:15:23.184Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
+    "pmConditionId": "0x8e55594f3856badd772cbc1354b3c234848092dd030ee38f9b0de7c2ee82a232",
+    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
+    "pmTitle": "Republican",
+    "id": "1782998140084-k1gldk1",
+    "decoupledAt": "2026-07-02T13:15:40.084Z"
+  },
+  {
+    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
+    "pmConditionId": "0xdf4512f9c4cdcddd0296b17f54807db88d33685d3142e877f616191f39a3848a",
+    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
+    "pmTitle": "Democratic",
+    "id": "1782998140923-8nx332a",
+    "decoupledAt": "2026-07-02T13:15:40.923Z"
+  }
+]
