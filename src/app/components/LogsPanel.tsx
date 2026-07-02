@@ -43,7 +43,7 @@ const EVENT_TYPE_OPTIONS: { key: EventType; label: string }[] = [
 type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "positive_arb_count" | "matched_count";
 type SortDir = "asc" | "desc";
 
-export function LogsPanel() {
+export default function LogsPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [savedMarkets, setSavedMarkets] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -102,9 +102,9 @@ export function LogsPanel() {
     return () => clearInterval(iv);
   }, [autoRefresh, fetchLogs]);
 
-  // Fetch saved markets for market name lookup
+  // Fetch saved markets for market name lookup — use ultra-light names endpoint (~20KB vs 277KB)
   useEffect(() => {
-    fetch("/api/saved-markets?fields=basic")
+    fetch("/api/saved-markets?fields=names")
       .then((res) => res.json())
       .then((data) => {
         const m = new Map<string, string>();

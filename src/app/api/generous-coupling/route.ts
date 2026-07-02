@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     const maxSuggestions = parseInt(url.searchParams.get('maxSuggestions') || '5', 10);
     const includeCorrelated = url.searchParams.get('includeCorrelated') !== 'false';
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
-    const limit = parseInt(url.searchParams.get('limit') || '50', 10);
-    const clampedLimit = Math.min(Math.max(limit, 1), 200);
+    const limit = parseInt(url.searchParams.get('limit') || '30', 10);
+    const clampedLimit = Math.min(Math.max(limit, 1), 100);
 
     // Gather unmatched markets from saved markets' scan results
     const savedMarkets = await getSavedMarkets();
@@ -52,8 +52,6 @@ export async function GET(request: NextRequest) {
     // Collect from saved markets' last scan results
     for (const sm of savedMarkets) {
       if (sm.lastScanResult) {
-        // Extract unmatched from scan result if available
-        // We rebuild from the URLs since scan results don't store full unmatched lists
         if (sm.kalshiUrl) {
           const kId = sm.kalshiUrl.split('/').pop() || '';
           if (!seenKalshi.has(kId)) {
@@ -147,6 +145,10 @@ export async function GET(request: NextRequest) {
         exactCount,
         looseCount,
         correlatedCount,
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=5',
       },
     });
   } catch (error: any) {

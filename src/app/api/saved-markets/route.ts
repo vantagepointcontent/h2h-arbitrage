@@ -8,8 +8,19 @@ export async function GET(request: NextRequest) {
 
     const markets = await getSavedMarkets();
 
+    if (fields === 'names') {
+      // Ultra-light: just {id, eventTitle} for lookups (~20KB for 500 markets)
+      const names = markets.map((m: any) => ({ id: m.id, eventTitle: m.eventTitle }));
+      return NextResponse.json({ markets: names }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+    }
+
     if (fields === 'basic') {
-      // Strip lastScanResult.allArbs to reduce payload from 490KB → ~180KB
+      // Strip lastScanResult.allArbs to reduce payload
       const slim = markets.map((m: any) => {
         if (m.lastScanResult) {
           return {
@@ -30,6 +41,18 @@ export async function GET(request: NextRequest) {
         }
         return m;
       });
+      // Support pagination for MF-012: ?fields=basic&limit=50&offset=0
+      const limit = parseInt(searchParams.get('limit') || '0', 10);
+      const offset = parseInt(searchParams.get('offset') || '0', 10);
+      if (limit > 0) {
+        const page = slim.slice(offset, offset + limit);
+        return NextResponse.json({ markets: page, total: slim.length }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+          }
+        });
+      }
       return NextResponse.json({ markets: slim }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

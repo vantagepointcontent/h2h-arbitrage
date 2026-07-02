@@ -119,7 +119,7 @@ const MAX_TABS = 8;
 
 /* ── Main component ─────────────────────────────────────────────── */
 
-export function LiveScanPanel({ capital, savedMarkets }: Props) {
+export default function LiveScanPanel({ capital, savedMarkets }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

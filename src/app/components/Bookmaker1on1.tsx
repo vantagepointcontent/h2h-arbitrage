@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Info, Clock, Settings2, ArrowUp, ArrowDown, Minus, RefreshCw, Zap } from "lucide-react";
+import { useLivePrices } from "@/lib/use-live-prices";
 
 // ── Threshold configuration (percentage points) ──
 interface SpreadThresholds {
@@ -64,6 +65,11 @@ interface Bookmaker1on1Props {
   onRefreshIntervalChange?: (ms: number) => void;
   // External data fetching callback for auto-refresh
   onRefresh?: () => Promise<void>;
+  // Live WS props
+  kalshiUrl?: string;
+  pmUrl?: string;
+  capital?: number;
+  useLivePrices?: boolean;
 }
 
 /** Determine spread color class based on thresholds */
@@ -181,6 +187,10 @@ export function Bookmaker1on1({
   autoRefreshInterval = 0,
   onRefreshIntervalChange,
   onRefresh,
+  kalshiUrl,
+  pmUrl,
+  capital = 10,
+  useLivePrices = false,
 }: Bookmaker1on1Props) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
@@ -197,6 +207,36 @@ export function Bookmaker1on1({
 
   // Track which cells are currently flashing
   const [flashingCells, setFlashingCells] = useState<Map<string, "up" | "down">>(new Map());
+
+  // Live WS prices and status
+  const {
+    outcomes: liveOutcomes,
+    connectionStatus: wsConnectionStatus,
+    error: wsError,
+  } = useLivePrices({
+    kalshiUrl,
+    pmUrl,
+    capital,
+    enabled: useLivePrices && !!kalshiUrl && !!pmUrl,
+  });
+
+  // Use live outcomes if available and enabled, otherwise fall back to static outcomes
+  const displayOutcomes = useLivePrices && wsConnectionStatus === "active" && liveOutcomes.length > 0
+    ? liveOutcomes.map(lo => ({
+        artist: lo.artist,
+        platformA: lo.platformA,
+        platformB: lo.platformB ? {
+          yesPrice: lo.platformB.yesPrice,
+          noPrice: lo.platformB.noPrice,
+          bestBid: lo.platformB.bestBid,
+          bestAsk: lo.platformB.bestAsk,
+          lastTradePrice: lo.platformB.lastTradePrice,
+          lastUpdated: lo.platformB.lastUpdated,
+          bidVolume: lo.platformB.bidVolume,
+          askVolume: lo.platformB.askVolume,
+        } : null,
+      }))
+    : outcomes;
 
   // Auto-refresh timer
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -221,7 +261,7 @@ export function Bookmaker1on1({
     const newFlashes = new Map<string, "up" | "down">();
     const prev = prevPricesRef.current;
 
-    outcomes.forEach((o) => {
+    displayOutcomes.forEach((o) => {
       if (!o.platformA || !o.platformB) return;
       const key = o.artist;
       const curr = o.platformA;
@@ -240,23 +280,6 @@ export function Bookmaker1on1({
       ];
 
       fields.forEach(({ field, currentVal }) => {
-        // @ts-ignore — pre-existing dynamic field access pattern
-        const prevVal = prevEntry
-          ? prevEntry[field.replace(/-.*/, "").replace("a", "").replace("b", "") === key
-            ? (() => {
-                if (field.includes("aYesBid")) return prevEntry.yesBid;
-                if (field.includes("aYesAsk")) return prevEntry.yesAsk;
-                if (field.includes("aNoBid")) return prevEntry.noBid;
-                if (field.includes("aNoAsk")) return prevEntry.noAsk;
-                if (field.includes("bYesPrice")) return prevEntry.yesPrice;
-                if (field.includes("bBestBid")) return prevEntry.bestBid;
-                if (field.includes("bBestAsk")) return prevEntry.bestAsk;
-                return null;
-              })()
-            : null
-          ]
-          : null;
-
         // Simpler lookup
         let pv: number | null = null;
         if (prevEntry) {
@@ -278,7 +301,7 @@ export function Bookmaker1on1({
 
     // Update previous prices
     const newPrev = new Map<string, typeof prevPricesRef.current[number]>();
-    outcomes.forEach((o) => {
+    displayOutcomes.forEach((o) => {
       if (o.platformA && o.platformB) {
         newPrev.set(o.artist, {
           yesBid: o.platformA.yesBid,
@@ -298,7 +321,7 @@ export function Bookmaker1on1({
       // Clear flash after animation completes
       setTimeout(() => setFlashingCells(new Map()), 800);
     }
-  }, [outcomes]);
+  }, [displayOutcomes]);
 
   // Auto-refresh management
   useEffect(() => {
@@ -325,7 +348,7 @@ export function Bookmaker1on1({
   // Compute spreads for all outcomes
   const spreads = useMemo(() => {
     const map = new Map<string, number>();
-    outcomes.forEach((o) => {
+    displayOutcomes.forEach((o) => {
       if (o.platformA && o.platformB) {
         map.set(
           o.artist,
@@ -334,21 +357,21 @@ export function Bookmaker1on1({
       }
     });
     return map;
-  }, [outcomes]);
+  }, [displayOutcomes]);
 
   // Compute max volumes for depth normalization
   const maxVolumes = useMemo(() => {
     let maxBid = 0, maxAsk = 0;
-    (outcomes ?? []).forEach((o) => {
+    (displayOutcomes ?? []).forEach((o) => {
       if (o.platformA?.bidVolume) maxBid = Math.max(maxBid, o.platformA.bidVolume);
       if (o.platformA?.askVolume) maxBid = Math.max(maxBid, o.platformA.askVolume);
       if (o.platformB?.bidVolume) maxBid = Math.max(maxBid, o.platformB.bidVolume);
       if (o.platformB?.askVolume) maxBid = Math.max(maxBid, o.platformB.askVolume);
     });
     return { maxBid: maxBid || 1, maxAsk: maxAsk || 1 };
-  }, [outcomes]);
+  }, [displayOutcomes]);
 
-  const validOutcomes = (outcomes ?? []).filter((o) => o.platformA && o.platformB);
+  const validOutcomes = (displayOutcomes ?? []).filter((o) => o.platformA && o.platformB);
 
   if (validOutcomes.length === 0) {
     return (
@@ -374,6 +397,34 @@ export function Bookmaker1on1({
 
   return (
     <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] overflow-hidden">
+      {/* ── Live WS Connection Status ── */}
+      {useLivePrices && (
+        <div className="border-b border-[#232E3C] bg-[#17212B]/60 px-3 py-1.5 flex items-center gap-2">
+          <span className="text-[10px] text-[#8A9BA8]">Live WS:</span>
+          {wsConnectionStatus === "connecting" && (
+            <span className="flex items-center gap-1 text-[10px] text-[#facc15]">
+              <RefreshCw className="w-3 h-3 animate-spin" /> Connecting...
+            </span>
+          )}
+          {wsConnectionStatus === "active" && (
+            <span className="flex items-center gap-1 text-[10px] text-[#5DBE81]">
+              <div className="w-2 h-2 rounded-full bg-[#5DBE81] animate-pulse" /> Active
+            </span>
+          )}
+          {wsConnectionStatus === "disconnected" && (
+            <span className="flex items-center gap-1 text-[10px] text-[#ef4444]">
+              <div className="w-2 h-2 rounded-full bg-[#ef4444]" /> Disconnected
+            </span>
+          )}
+          {wsConnectionStatus === "idle" && (
+            <span className="text-[10px] text-[#5E6875]">Idle</span>
+          )}
+          {wsError && (
+            <span className="text-[10px] text-[#ef4444] ml-2">Error: {wsError}</span>
+          )}
+        </div>
+      )}
+
       {/* ── Header Row ── */}
       <div className="grid grid-cols-[1fr_auto_1fr] bg-[#17212B] border-b border-[#232E3C]">
         {/* Platform A header */}
@@ -531,20 +582,20 @@ export function Bookmaker1on1({
 
       {/* ── Outcome Rows ── */}
       <div className="divide-y divide-zinc-800">
-        {validOutcomes.map((outcome, oidx) => {
+        {validOutcomes.map((outcome: OutcomeEntry, oidx: number) => {
           const spread = spreads.get(outcome.artist) ?? 0;
           const isHovered = hoveredRow === outcome.artist;
           const a = outcome.platformA!;
           const b = outcome.platformB!;
 
           // Flash states for each cell
-          const flashAYesBid = flashingCells.get(`${outcome.artist}-aYesBid`);
-          const flashAYesAsk = flashingCells.get(`${outcome.artist}-aYesAsk`);
-          const flashANoBid = flashingCells.get(`${outcome.artist}-aNoBid`);
-          const flashANoAsk = flashingCells.get(`${outcome.artist}-aNoAsk`);
-          const flashBYesPrice = flashingCells.get(`${outcome.artist}-bYesPrice`);
-          const flashBBestBid = flashingCells.get(`${outcome.artist}-bBestBid`);
-          const flashBBestAsk = flashingCells.get(`${outcome.artist}-bBestAsk`);
+          const flashAYesBid = flashingCells.get(`${outcome.artist}-aYesBid`) || null;
+          const flashAYesAsk = flashingCells.get(`${outcome.artist}-aYesAsk`) || null;
+          const flashANoBid = flashingCells.get(`${outcome.artist}-aNoBid`) || null;
+          const flashANoAsk = flashingCells.get(`${outcome.artist}-aNoAsk`) || null;
+          const flashBYesPrice = flashingCells.get(`${outcome.artist}-bYesPrice`) || null;
+          const flashBBestBid = flashingCells.get(`${outcome.artist}-bBestBid`) || null;
+          const flashBBestAsk = flashingCells.get(`${outcome.artist}-bBestAsk`) || null;
 
           return (
             <div

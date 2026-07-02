@@ -46,7 +46,7 @@ interface CouplingPanelProps {
 
 // ─── Component ──────────────────────────────────────────────────────────
 
-export function CouplingPanel({
+export default function CouplingPanel({
   open,
   onClose,
   outcomes,
