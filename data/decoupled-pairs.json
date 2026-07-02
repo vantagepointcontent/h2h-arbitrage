@@ -16,35 +16,19 @@
     "decoupledAt": "2026-06-29T18:07:02.237Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
-    "pmConditionId": "0xb54ccf642fdfab45637e1f093509e5ee69fcb1ff25979c11cf04650f18c3f97e",
-    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
-    "pmTitle": "Republican",
-    "id": "1782834320059-3hb8pta",
-    "decoupledAt": "2026-06-30T15:45:20.059Z"
+    "kalshiTicker": "KXWCSTAGEOFELIM-26AUT-R16",
+    "pmConditionId": "0xaecc9ca5e4005449a1fed3fe1134aabfe3ef492361dcc00a63ad191c8d683062",
+    "kalshiTitle": "KXWCSTAGEOFELIM-26AUT-R16",
+    "pmTitle": "Eliminated in the Round of 16",
+    "id": "1782998086532-y75gtkk",
+    "decoupledAt": "2026-07-02T13:14:46.532Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
-    "pmConditionId": "0xd9d9532b0d1a2485cfda6cae8cd4831bb323b7df6aeb72741bca50c6c4587393",
-    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
-    "pmTitle": "Democratic",
-    "id": "1782834321613-cf8is9y",
-    "decoupledAt": "2026-06-30T15:45:21.613Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-TX20-26-D",
-    "pmConditionId": "0xed8f832901f427aaa87a8eb9d8e3f8a84cb422fa2eb60e26b6f0ee984a3f62ab",
-    "kalshiTitle": "KXHOUSERACE-TX20-26-D",
-    "pmTitle": "Democratic",
-    "id": "1782922282555-vkpiciu",
-    "decoupledAt": "2026-07-01T16:11:22.555Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-TX33-26-R",
-    "pmConditionId": "0xc706bf8c7164ce0fb7850d52e8fe6c20eefb774ec674128bd0a2a492af531e14",
-    "kalshiTitle": "KXHOUSERACE-TX33-26-R",
-    "pmTitle": "Republican",
-    "id": "1782922283586-k7hu503",
-    "decoupledAt": "2026-07-01T16:11:23.586Z"
+    "kalshiTicker": "KXWCSTAGEOFELIM-26SUI-R32",
+    "pmConditionId": "0x85e5b7f98345f80e9b223681303be939d98ce5541371e4be978e997c693cd02e",
+    "kalshiTitle": "KXWCSTAGEOFELIM-26SUI-R32",
+    "pmTitle": "Eliminated in the Round of 32",
+    "id": "1782998087393-wdef68o",
+    "decoupledAt": "2026-07-02T13:14:47.393Z"
   }
 ]

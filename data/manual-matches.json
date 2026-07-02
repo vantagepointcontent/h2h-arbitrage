@@ -3,7 +3,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B70.5",
     "pmConditionId": "0x17f4f170236f32b8cf3acd28282cd24bf308a06f0c165fd28c3234bbc71475fe",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B70.5",
-    "pmTitle": "70-71°F",
+    "pmTitle": "70-71\u00b0F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552284999-i5lhldt",
@@ -13,7 +13,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B72.5",
     "pmConditionId": "0x159075046c879b2c5e66856014ea45973ca55d431ff935ea42aed50a5b9718fa",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B72.5",
-    "pmTitle": "72-73°F",
+    "pmTitle": "72-73\u00b0F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552297191-dpp511v",
@@ -23,7 +23,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B74.5",
     "pmConditionId": "0x4e842a0577a06bfadd37a336f302fbf7e3bf9e5a60d4955859dab5a6546b73fa",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B74.5",
-    "pmTitle": "74-75°F",
+    "pmTitle": "74-75\u00b0F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552306796-axzxykk",
@@ -33,7 +33,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B76.5",
     "pmConditionId": "0x350d83b6af8e472ba37c3cac25ecca1a0afde37a005e83a563e6f43331a7f08b",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B76.5",
-    "pmTitle": "76-77°F",
+    "pmTitle": "76-77\u00b0F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552329728-9uh8d9x",
@@ -240,66 +240,6 @@
     "createdAt": "2026-05-27T21:44:53.278Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-AR02-26-R",
-    "pmConditionId": "0x2c3932e61938a4878fd60fbd1c3528a11f972ce8ec25bf8d33270490a1e6dfc0",
-    "kalshiTitle": "KXHOUSERACE-AR02-26-R",
-    "pmTitle": "Republican Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar02-26",
-    "polymarketUrl": "https://polymarket.com/event/ar-02-house-election-winner/will-the-democratic-party-win-the-ar-02-house-seat",
-    "id": "1779919085141-kp83kid",
-    "createdAt": "2026-05-27T21:58:05.141Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-AR02-26-D",
-    "pmConditionId": "0x07ed21c53502e59a3ec5455dc88878244e90a7c34e27e2a0ee3573a302452c79",
-    "kalshiTitle": "KXHOUSERACE-AR02-26-D",
-    "pmTitle": "Democratic Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar02-26",
-    "polymarketUrl": "https://polymarket.com/event/ar-02-house-election-winner/will-the-democratic-party-win-the-ar-02-house-seat",
-    "id": "1779919087631-myyzik9",
-    "createdAt": "2026-05-27T21:58:07.631Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-AR01-26-R",
-    "pmConditionId": "0x94fec7c18e1210413a4515fca3f7f38f8801929f34e59e69a91e1ee3df9737e3",
-    "kalshiTitle": "KXHOUSERACE-AR01-26-R",
-    "pmTitle": "Republican Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar01-26",
-    "polymarketUrl": "https://polymarket.com/event/ar-01-house-election-winner/will-the-republican-party-win-the-ar-01-house-seat",
-    "id": "1779921489823-gahg807",
-    "createdAt": "2026-05-27T22:38:09.823Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-AR01-26-D",
-    "pmConditionId": "0xce73664a88dbb8d87db3f337be1eff34dca81c20d980325c29729ae8d58cd28a",
-    "kalshiTitle": "KXHOUSERACE-AR01-26-D",
-    "pmTitle": "Democratic Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-ar01-26",
-    "polymarketUrl": "https://polymarket.com/event/ar-01-house-election-winner/will-the-republican-party-win-the-ar-01-house-seat",
-    "id": "1779921492372-y9xstnq",
-    "createdAt": "2026-05-27T22:38:12.372Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-WV01-26-R",
-    "pmConditionId": "0xef5c254927f991fe8834d80e509f1f7131d931bb5c9d5c86906b9c039842a8bc",
-    "kalshiTitle": "KXHOUSERACE-WV01-26-R",
-    "pmTitle": "Republican Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-wv01-26",
-    "polymarketUrl": "https://polymarket.com/event/wv-01-house-election-winner/will-the-republican-party-win-the-wv-01-house-seat",
-    "id": "1780516002923-ivj55b8",
-    "createdAt": "2026-06-03T19:46:42.923Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-WV01-26-D",
-    "pmConditionId": "0xa37afc19faa48cac35c83b22814e603a01e2eeadf1ca08f8249830ed01c33644",
-    "kalshiTitle": "KXHOUSERACE-WV01-26-D",
-    "pmTitle": "Democratic Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-wv01-26",
-    "polymarketUrl": "https://polymarket.com/event/wv-01-house-election-winner/will-the-republican-party-win-the-wv-01-house-seat",
-    "id": "1780516011230-wh7vxeh",
-    "createdAt": "2026-06-03T19:46:51.230Z"
-  },
-  {
     "kalshiTicker": "HOUSEOH13-26-R",
     "pmConditionId": "0x484b9d64f4b8c3b00a8f455bfac9b84d889236ec419edc636c0e50ad33b2c3dd",
     "kalshiTitle": "HOUSEOH13-26-R",
@@ -318,26 +258,6 @@
     "polymarketUrl": "https://polymarket.com/event/oh-13-house-election-winner/will-the-democratic-party-win-the-oh-13-house-seat",
     "id": "1780516359282-upyz982",
     "createdAt": "2026-06-03T19:52:39.282Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-TX21-26-R",
-    "pmConditionId": "0xb1e3b39a46589125fbbb8ca8c68084cacc94276780fdcd21d804c37ab51b39ba",
-    "kalshiTitle": "KXHOUSERACE-TX21-26-R",
-    "pmTitle": "Republican Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-tx21-26",
-    "polymarketUrl": "https://polymarket.com/event/tx-21-house-election-winner/will-the-republican-party-win-the-tx-21-house-seat",
-    "id": "1780612460465-s5l00xq",
-    "createdAt": "2026-06-04T22:34:20.465Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-TX21-26-D",
-    "pmConditionId": "0xe3898446a280c6ad3b5a4b451a1bb91dddebf3eb73eb4ea5d2935156114aeb0a",
-    "kalshiTitle": "KXHOUSERACE-TX21-26-D",
-    "pmTitle": "Democratic Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-tx21-26",
-    "polymarketUrl": "https://polymarket.com/event/tx-21-house-election-winner/will-the-republican-party-win-the-tx-21-house-seat",
-    "id": "1780612466202-k1djh23",
-    "createdAt": "2026-06-04T22:34:26.202Z"
   },
   {
     "kalshiTicker": "GOVPARTYNM-26-R",
@@ -360,26 +280,6 @@
     "createdAt": "2026-06-04T22:35:22.539Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-PA16-26-R",
-    "pmConditionId": "0xcf74254eb635dae1db5d96da6582146510fcbbd7e2645b482756ae04ad566237",
-    "kalshiTitle": "KXHOUSERACE-PA16-26-R",
-    "pmTitle": "Republican Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-pa16-26",
-    "polymarketUrl": "https://polymarket.com/event/pa-16-house-election-winner/will-the-republican-party-win-the-pa-16-house-seat",
-    "id": "1780612595602-0b5m0qs",
-    "createdAt": "2026-06-04T22:36:35.602Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-PA16-26-D",
-    "pmConditionId": "0xa6406c5e7b3d32781543b0956f78fd847aa47677fc18f3ec8582e95f139a6a1b",
-    "kalshiTitle": "KXHOUSERACE-PA16-26-D",
-    "pmTitle": "Democratic Party",
-    "kalshiUrl": "https://kalshi.com/markets/kxhouserace/house-race-winner/kxhouserace-pa16-26",
-    "polymarketUrl": "https://polymarket.com/event/pa-16-house-election-winner/will-the-republican-party-win-the-pa-16-house-seat",
-    "id": "1780612599981-gnde89z",
-    "createdAt": "2026-06-04T22:36:39.981Z"
-  },
-  {
     "kalshiTicker": "KXDEMCOREFOURSENATESWEEP-26NOV03",
     "pmConditionId": "0x096f26b2abcfde3ee7863e7916ca17682522715f7631debd4878a43ee6c797a9",
     "kalshiTitle": "KXDEMCOREFOURSENATESWEEP-26NOV03",
@@ -388,76 +288,12 @@
     "createdAt": "2026-06-15T10:42:53.988Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-NC09-26-R",
-    "pmConditionId": "0x31727e0e298757e552661f62733cc401c6066b80a7d2607d2ac56b729eb15a00",
-    "kalshiTitle": "KXHOUSERACE-NC09-26-R",
-    "pmTitle": "Republican Party",
-    "id": "1781522216692-1eika22",
-    "createdAt": "2026-06-15T11:16:56.692Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-NC09-26-D",
-    "pmConditionId": "0xdc23b5a54616abf57d7f89f57a29dbacc0d836ab6f3994f5533c8c41ba929ebb",
-    "kalshiTitle": "KXHOUSERACE-NC09-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1781522218098-167a0vg",
-    "createdAt": "2026-06-15T11:16:58.098Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-PA12-26-R",
-    "pmConditionId": "0xbf8c5ae17ff90a51a9b3561d0bb05bb95a21114325e1f0692e366cd6499397bd",
-    "kalshiTitle": "KXHOUSERACE-PA12-26-R",
-    "pmTitle": "Republican Party",
-    "id": "1781559597581-mlyuazu",
-    "createdAt": "2026-06-15T21:39:57.581Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-PA12-26-D",
-    "pmConditionId": "0x2fb6fc5f23f19908324012acc701150dd9a6c97ede04a2653b408e26f213abe8",
-    "kalshiTitle": "KXHOUSERACE-PA12-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1781560720786-r4bpski",
-    "createdAt": "2026-06-15T21:58:40.786Z"
-  },
-  {
     "kalshiTicker": "KXNY13D-26-JAMA",
     "pmConditionId": "0xe93e70dba8f12060ef544e9ef6b0accc90d4e134994cabf7ac7a13c519524f90",
     "kalshiTitle": "KXNY13D-26-JAMA",
     "pmTitle": "Jaleel Amador",
     "id": "1781703334817-620gijp",
     "createdAt": "2026-06-17T13:35:34.817Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-IA02-26-R",
-    "pmConditionId": "0xbc6530ac376b0e2f5bc07bc1c34884295d378fd694383a36714b85350520ab12",
-    "kalshiTitle": "KXHOUSERACE-IA02-26-R",
-    "pmTitle": "Republican Party",
-    "id": "1781822727380-b4euec2",
-    "createdAt": "2026-06-18T22:45:27.380Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-IA02-26-D",
-    "pmConditionId": "0xf4051fc690cc6d64fb5132f0d1a50b864a41820ebf2bc82192858628d4015430",
-    "kalshiTitle": "KXHOUSERACE-IA02-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1781822733881-wuba0aw",
-    "createdAt": "2026-06-18T22:45:33.881Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-OK03-26-R",
-    "pmConditionId": "0x89cbcdb241e13650e512d26b959e332820f65706553a92b0b39e394b256ba0b7",
-    "kalshiTitle": "KXHOUSERACE-OK03-26-R",
-    "pmTitle": "Republican Party",
-    "id": "1781993125813-rbdkjdg",
-    "createdAt": "2026-06-20T22:05:25.813Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-OK03-26-D",
-    "pmConditionId": "0x7b6c8d4306c7d590c25e49b7e7f70f42d9185c2ca3932dd4b580d4bf7f2e5b4e",
-    "kalshiTitle": "KXHOUSERACE-OK03-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1781993130887-g2c2jw4",
-    "createdAt": "2026-06-20T22:05:30.887Z"
   },
   {
     "kalshiTicker": "SENATEMT-26-R",
@@ -479,7 +315,7 @@
     "kalshiTicker": "KXNY7D-26-JGUT",
     "pmConditionId": "0x1fcbb222f49bb80d4d54f5004d44c6c7dfc808fd01bc17455c9178e57aaa4744",
     "kalshiTitle": "KXNY7D-26-JGUT",
-    "pmTitle": "Jennifer Gútierrez",
+    "pmTitle": "Jennifer G\u00fatierrez",
     "id": "1781993365267-mlo0ge0",
     "createdAt": "2026-06-20T22:09:25.267Z"
   },
@@ -500,22 +336,6 @@
     "createdAt": "2026-06-28T12:43:01.251Z"
   },
   {
-    "kalshiTicker": "KXHOUSERACE-AL05-26-R",
-    "pmConditionId": "0xd75ce5a2e0255ab0be626ab545199179e6b4e31cb0ae8a091912b1c15e0ce9f0",
-    "kalshiTitle": "KXHOUSERACE-AL05-26-R",
-    "pmTitle": "Republican Party",
-    "id": "1782650760893-2pchfoy",
-    "createdAt": "2026-06-28T12:46:00.893Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-AL05-26-D",
-    "pmConditionId": "0x983d15d52f8780293cfb996daee22ce1327bf5349ac473b02c6ef07829ffb6f0",
-    "kalshiTitle": "KXHOUSERACE-AL05-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1782650763425-7gq60qu",
-    "createdAt": "2026-06-28T12:46:03.425Z"
-  },
-  {
     "kalshiTicker": "KXIPOSPACEX-26JUL01",
     "pmConditionId": "0x3dbeee81527f6d4868a6e500fca15d8905a6dda0e9b1f525145a4ad813bac98e",
     "kalshiTitle": "KXIPOSPACEX-26JUL01",
@@ -524,21 +344,5 @@
     "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
     "id": "1782688598016-ur1sfah",
     "createdAt": "2026-06-28T23:16:38.016Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-PA03-26-D",
-    "pmConditionId": "0x4275738d1eb217ee77c4404f74b41988ad1640c17b8fe0fd0aec3d5614873b23",
-    "kalshiTitle": "KXHOUSERACE-PA03-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1782739234956-ltam258",
-    "createdAt": "2026-06-29T13:20:34.956Z"
-  },
-  {
-    "kalshiTicker": "KXHOUSERACE-IL04-26-D",
-    "pmConditionId": "0xcf1687f8e90f5d5113d2cbc76729773851b254c136bfb83bd53cacc526002ef4",
-    "kalshiTitle": "KXHOUSERACE-IL04-26-D",
-    "pmTitle": "Democratic Party",
-    "id": "1782755988865-xrioyea",
-    "createdAt": "2026-06-29T17:59:48.865Z"
   }
 ]
