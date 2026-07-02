@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X } from "lucide-react";
+import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, ExternalLink } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 
 interface LiveArbOutcome {
@@ -571,6 +571,34 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
         </div>
 
         <div className="flex items-center gap-3">
+          {selectedMarket && (
+            <div className="flex items-center gap-2">
+              {selectedMarket.kalshiUrl && (
+                <a
+                  href={selectedMarket.kalshiUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#182533] text-[#8A9BA8] text-xs font-medium hover:text-[#5DBE81] hover:bg-[#232E3C] transition-colors"
+                  title="Open in Kalshi"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Kalshi
+                </a>
+              )}
+              {selectedMarket.polymarketUrl && (
+                <a
+                  href={selectedMarket.polymarketUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#182533] text-[#8A9BA8] text-xs font-medium hover:text-[#5DBE81] hover:bg-[#232E3C] transition-colors"
+                  title="Open in Polymarket"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Polymarket
+                </a>
+              )}
+            </div>
+          )}
           <button
             onClick={addTab}
             disabled={!selectedMarket || tabs.length >= MAX_TABS}
