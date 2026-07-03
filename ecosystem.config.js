@@ -65,7 +65,10 @@ module.exports = {
       on_stop: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh stop',
 
       // ── Resource limits ─────────────────────────────────────
-      max_memory_restart: '512M',
+      // 1G: at 512M pm2 was SIGKILLing the app mid-scan-burst (Next.js RSS
+      // legitimately peaks >512M under concurrent scan load), which caused
+      // the poller's 'fetch failed' bursts and 273-failure cycles.
+      max_memory_restart: '1G',
     },
     {
       name: 'h2h-poller',
@@ -87,7 +90,10 @@ module.exports = {
       // ── Environment ─────────────────────────────────────────
       env: {
         NODE_ENV: 'production',
-        H2H_BASE_URL: 'http://100.86.7.30:3000',
+        // Poller runs on the SAME machine as the app — use loopback, not the
+        // Tailscale IP (100.86.7.30), which intermittently drops/times out
+        // local connections and caused 'fetch failed' bursts.
+        H2H_BASE_URL: 'http://localhost:3000',
         // SEC-001: poller calls the app over the Tailscale IP, so it must
         // authenticate its mutating requests with the shared token.
         H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
