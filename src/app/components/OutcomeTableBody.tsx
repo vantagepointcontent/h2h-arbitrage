@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
+import { ExecutionReadiness } from './ExecutionReadiness';
 
 interface Outcome {
   artist: string;
-  kalshi?: { yesAsk: number; noAsk: number } | null;
-  polymarket?: { yesPrice: number; noPrice: number } | null;
+  kalshi?: { yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
+  polymarket?: { yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
@@ -212,6 +213,12 @@ export function OutcomeTableBody({
                       {isBalanced ? "● Balanced" : "● Imbalanced"}
                     </div>
                   </div>
+                  <ExecutionReadiness
+                    kalshi={o.kalshi}
+                    polymarket={o.polymarket}
+                    arbitrage={o.arbitrage}
+                    formatCurrency={formatCurrency}
+                  />
                 </td>
               </tr>
             )}
