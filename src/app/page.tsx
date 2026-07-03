@@ -67,6 +67,8 @@ const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
+const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalSpreadChart").then(m => m.HistoricalSpreadChart), { ssr: false });
+import { saveSpread } from "@/lib/spreadHistory";
 import { computeApy } from "@/lib/matcher";
 
 import { MarketSidebar } from "@/app/components/MarketSidebar";
@@ -354,6 +356,29 @@ export default function Home() {
           }
         });
         previousPricesRef.current = prices;
+        // HOOKUP-07: record spread point for historical chart (IndexedDB, client-side)
+        try {
+          const mid = activeMarketIdRef.current;
+          if (mid && Array.isArray(data.outcomes)) {
+            const best = data.outcomes
+              .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket && o.arbitrage)
+              .reduce((b: UnifiedOutcome | null, o: UnifiedOutcome) =>
+                (!b || (o.arbitrage.roiPct ?? -Infinity) > (b.arbitrage.roiPct ?? -Infinity)) ? o : b, null);
+            if (best && best.kalshi && best.polymarket) {
+              void saveSpread({
+                ts: Date.now(),
+                marketId: mid,
+                kalshiYesBid: best.kalshi.yesBid,
+                kalshiYesAsk: best.kalshi.yesAsk,
+                pmYesBid: best.polymarket.bestBid,
+                pmYesAsk: best.polymarket.bestAsk,
+                spread: Math.abs(best.kalshi.yesAsk - best.polymarket.yesPrice) * 100,
+                strategy: best.arbitrage.strategy ?? "",
+                roiPct: best.arbitrage.roiPct ?? 0,
+              }).catch(() => {});
+            }
+          }
+        } catch { /* chart persistence is best-effort */ }
       } else {
         setError(data.error || "Scan failed");
       }
@@ -1725,6 +1750,21 @@ export default function Home() {
                           />
                         </table>
                       </div>
+                    )}
+
+                    {/* HOOKUP-07: historical spread chart for the active saved market */}
+                    {activeMarketId && result && !result.expired && (
+                      <HistoricalSpreadChart
+                        marketId={activeMarketId}
+                        currentSpread={(() => {
+                          const b = result.outcomes?.find((o: UnifiedOutcome) => o.kalshi && o.polymarket);
+                          return b && b.kalshi && b.polymarket ? Math.abs(b.kalshi.yesAsk - b.polymarket.yesPrice) * 100 : undefined;
+                        })()}
+                        currentRoi={(() => {
+                          const rois = (result.outcomes ?? []).map((o: UnifiedOutcome) => o.arbitrage?.roiPct ?? 0);
+                          return rois.length ? Math.max(...rois) : undefined;
+                        })()}
+                      />
                     )}
 
                     {/* Manual matching panel — two-list pairing interface */}

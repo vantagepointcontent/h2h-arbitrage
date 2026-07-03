@@ -525,10 +525,26 @@ async function run() {
   loadBreakerState();
   // Track last prune date — run once daily
   let lastPruneDate = '';
+  // HOOKUP-01/06: ensure the in-app scheduler (auto-discovery scans + hourly
+  // lifecycle sweep) is running. Idempotent; re-warmed hourly so it survives
+  // pm2 restarts of the Next.js process. Gated in-app by discovery.paused /
+  // lifecycle.enabled settings.
+  let lastWarmupAt = 0;
   while (true) {
     let health = null;
     try {
       await refreshScannerSettings(); // SETTINGS-001: hot-reload concurrency/timeout each cycle
+      if (Date.now() - lastWarmupAt > 60 * 60 * 1000) {
+        try {
+          const res = await fetch(`${BASE_URL}/api/auto-discovery/warmup`, { signal: AbortSignal.timeout(5000) });
+          if (res.ok) {
+            lastWarmupAt = Date.now();
+            console.log(`[${new Date().toISOString()}] Scheduler warmup OK (auto-discovery + lifecycle sweep active)`);
+          }
+        } catch (e) {
+          console.warn(`[${new Date().toISOString()}] Scheduler warmup failed:`, e.message);
+        }
+      }
       health = await pollOnce();
     } catch (e) {
       console.error(`[${new Date().toISOString()}] Poll cycle failed (poller continues):`, e && e.stack ? e.stack : e);
