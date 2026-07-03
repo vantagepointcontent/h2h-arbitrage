@@ -11,8 +11,10 @@ import {
   Layers,
   AlertTriangle,
   Eye,
+  Clock,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
+import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
 import {
   ResponsiveContainer,
   LineChart,
@@ -653,6 +655,21 @@ export default function DashboardPanel() {
                 ));
               })()}
             </div>
+          </Panel>
+
+          {/* ── Row 4b: Arb Episode Lifecycle (durable vs phantom) ── */}
+          <Panel
+            title="Arb Episode Stats"
+            icon={<Clock className="w-4 h-4 text-[#5DBE81]" />}
+            rightElement={
+              <span className="text-xs text-[#8A9BA8]">
+                Durable (≥5m) vs phantom (&lt;1m) episodes
+              </span>
+            }
+          >
+            <LifecycleStatsPanel
+              days={range === "today" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365}
+            />
           </Panel>
 
           {/* ── Row 3: Top Active Arbs Table ───────────────── */}
