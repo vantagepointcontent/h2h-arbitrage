@@ -55,6 +55,9 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   // ── Scanner ──
   { key: 'scanner.pollConcurrency', section: 'scanner', label: 'Poll concurrency', description: 'Parallel market scans in the poller.', type: 'number', env: 'H2H_POLL_CONCURRENCY', default: 5, min: 1, max: 20, slider: true },
   { key: 'scanner.scanTimeoutMs', section: 'scanner', label: 'Scan timeout (ms)', description: 'Per-scan hard timeout before abort.', type: 'number', env: 'H2H_SCAN_TIMEOUT_MS', default: 60000, min: 5000, max: 300000 },
+  { key: 'watcher.hotMaxKalshi', section: 'scanner', label: 'Watcher: max Kalshi tickers', description: 'WS-103: HOT-tier cap on live-streamed Kalshi tickers in the WS watcher.', type: 'number', env: 'H2H_WATCHER_MAX_KALSHI', default: 200, min: 10, max: 1000, slider: true },
+  { key: 'watcher.hotMaxPmTokens', section: 'scanner', label: 'Watcher: max PM tokens', description: 'WS-103: HOT-tier cap on live-streamed Polymarket token IDs in the WS watcher.', type: 'number', env: 'H2H_WATCHER_MAX_PM_TOKENS', default: 400, min: 20, max: 2000, slider: true },
+  { key: 'watcher.demoteAfterDays', section: 'scanner', label: 'Watcher: demote after (days)', description: 'WS-103: HOT pairs with no arb episode within this window score down toward WARM.', type: 'number', default: 14, min: 1, max: 60, slider: true },
 
   // ── Auto-Discovery ──
   { key: 'discovery.paused', section: 'auto-discovery', label: 'Pause auto-discovery', description: 'Stop automatic category scans for new market pairs.', type: 'boolean', default: false },

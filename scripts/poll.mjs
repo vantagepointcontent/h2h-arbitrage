@@ -483,6 +483,17 @@ async function pollOnce() {
     const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';
     if (best && best.roiPct > 0) {
       console.log(`[${new Date().toISOString()}] ${market.eventTitle} → Best: ${best.outcome} ${formatRoi(best.roiPct)} | ${all.length} profitable arb(s), +$${profitSum.toFixed(2)} (${scan.durationMs}ms, interval: ${interval})`);
+      // WS-103: flag this pair for HOT-tier promotion in the WS watcher.
+      // Fire-and-forget — promotion is an optimization, never block the scan loop.
+      fetch(`${BASE_URL}/api/watcher/targets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.H2H_API_TOKEN ? { 'x-api-token': process.env.H2H_API_TOKEN } : {}),
+        },
+        body: JSON.stringify({ action: 'promote', pairId: market.id }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
     } else {
       console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
     }
