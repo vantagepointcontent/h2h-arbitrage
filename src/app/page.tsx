@@ -47,6 +47,7 @@ import {
   PanelRight,
   FileText,
   PanelLeft,
+  Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components/AlertSystem";
@@ -60,6 +61,7 @@ import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
+const SettingsPanel = dynamic(() => import("@/app/components/SettingsPanel"), { ssr: false });
 const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { ssr: false });
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
@@ -164,7 +166,7 @@ export default function Home() {
   // Persist sidebar toggle
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings">("overview");
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
@@ -285,6 +287,8 @@ export default function Home() {
         setViewMode("dashboard");
       } else if (view === "logs") {
         setViewMode("logs");
+      } else if (view === "settings") {
+        setViewMode("settings");
       } else {
         setViewMode("dashboard");
       }
@@ -697,6 +701,13 @@ export default function Home() {
     setCouplingPanelOpen(false);
     setViewMode("dashboard");
     window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
+  };
+
+  const goToSettings = () => {
+    stopPolling();
+    setCouplingPanelOpen(false);
+    setViewMode("settings");
+    window.history.replaceState({ view: "settings" }, "", "/?view=settings");
   };
 
   const goToScan = () => {
@@ -1168,6 +1179,9 @@ export default function Home() {
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
+            <button onClick={goToSettings} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "settings" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#5E6875] hover:text-[#FFFFFF]"}`} title="App settings">
+              <SettingsIconLucide className="w-4 h-4" />
+            </button>
             <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Toggle theme">
               {theme.theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -1329,6 +1343,8 @@ export default function Home() {
               <DashboardPanel />
             ) : viewMode === "logs" ? (
               <LogsPanel />
+            ) : viewMode === "settings" ? (
+              <SettingsPanel />
             ) : (
               <>
                 {/* Scan inputs */}

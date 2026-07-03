@@ -2,11 +2,33 @@
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
 const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
-const POLL_CONCURRENCY = Math.max(1, Number(process.env.H2H_POLL_CONCURRENCY || 5));
+let POLL_CONCURRENCY = Math.max(1, Number(process.env.H2H_POLL_CONCURRENCY || 5));
 // Base wake-up interval. Poller wakes this often to check which markets are due.
 // 60s — gentle, since most markets have 5-30min adaptive intervals.
 const POLL_WAKE_MS = 60000;
-const SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 60000));
+let SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 60000));
+
+// ── SETTINGS-001: hot-reload scanner settings from /api/settings ──────────
+// DB-backed overrides beat env. Refreshed each wake cycle; failures keep
+// current values (env/default) so the poller never stalls on the app.
+async function refreshScannerSettings() {
+  try {
+    const res = await fetch(`${BASE_URL}/api/settings`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return;
+    const { settings } = await res.json();
+    const get = (k) => settings?.find?.((s) => s.key === k)?.value;
+    const conc = Number(get('scanner.pollConcurrency'));
+    const tmo = Number(get('scanner.scanTimeoutMs'));
+    if (Number.isFinite(conc) && conc >= 1 && conc <= 20 && conc !== POLL_CONCURRENCY) {
+      console.log(`[settings] pollConcurrency ${POLL_CONCURRENCY} -> ${conc}`);
+      POLL_CONCURRENCY = conc;
+    }
+    if (Number.isFinite(tmo) && tmo >= 5000 && tmo <= 300000 && tmo !== SCAN_TIMEOUT_MS) {
+      console.log(`[settings] scanTimeoutMs ${SCAN_TIMEOUT_MS} -> ${tmo}`);
+      SCAN_TIMEOUT_MS = tmo;
+    }
+  } catch { /* app unreachable — keep current values */ }
+}
 const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
 const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathname;
 const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
@@ -495,6 +517,7 @@ async function run() {
   while (true) {
     let health = null;
     try {
+      await refreshScannerSettings(); // SETTINGS-001: hot-reload concurrency/timeout each cycle
       health = await pollOnce();
     } catch (e) {
       console.error(`[${new Date().toISOString()}] Poll cycle failed (poller continues):`, e && e.stack ? e.stack : e);

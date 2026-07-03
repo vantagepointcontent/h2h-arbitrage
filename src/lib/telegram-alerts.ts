@@ -121,6 +121,42 @@ export function isPaused(): boolean {
          process.env.TELEGRAM_ALERTS_PAUSED === '1';
 }
 
+// ─── SETTINGS-001: DB-backed overrides (hot-reload) ───────────────
+
+/**
+ * Async pause check: DB setting > env. Falls back to env on DB failure.
+ */
+export async function isPausedResolved(): Promise<boolean> {
+  try {
+    const { getSetting } = await import('./settings');
+    return await getSetting<boolean>('alerts.paused');
+  } catch {
+    return isPaused();
+  }
+}
+
+/**
+ * Resolve alert thresholds through the settings layer (DB > env > default).
+ * Bot token / chat id stay env-only — they're secrets, not tunables.
+ */
+export async function getConfigResolved(): Promise<TelegramAlertConfig | null> {
+  const envConfig = getConfigFromEnv();
+  if (!envConfig) return null;
+  try {
+    const { getSetting } = await import('./settings');
+    return {
+      ...envConfig,
+      minRoiPct: await getSetting<number>('alerts.minRoiPct'),
+      minProfitUsd: await getSetting<number>('alerts.minProfitUsd'),
+      cooldownMs: await getSetting<number>('alerts.cooldownMs'),
+      minStakeUsd: await getSetting<number>('alerts.minStakeUsd'),
+      minPersistenceSec: await getSetting<number>('alerts.minPersistenceSec'),
+    };
+  } catch {
+    return envConfig; // settings layer unavailable — env values still apply
+  }
+}
+
 // ─── Message formatting ───────────────────────────────────────────
 
 /**
@@ -419,13 +455,13 @@ export async function checkAndSendAlert(
   arb: ArbAlertInput,
   configOverride?: Partial<TelegramAlertConfig>,
 ): Promise<TelegramAlertResult> {
-  const envConfig = getConfigFromEnv();
+  const envConfig = await getConfigResolved();
   if (!envConfig) {
     return { sent: false, reason: 'Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)' };
   }
 
-  if (isPaused()) {
-    return { sent: false, reason: 'Alerts paused (TELEGRAM_ALERTS_PAUSED=true)' };
+  if (await isPausedResolved()) {
+    return { sent: false, reason: 'Alerts paused (settings or TELEGRAM_ALERTS_PAUSED)' };
   }
 
   const config: TelegramAlertConfig = { ...envConfig, ...configOverride };
