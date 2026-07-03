@@ -275,8 +275,8 @@ export function calculateConfidence(
 }
 
 /** Determine disposition based on confidence score. */
-export function getDisposition(confidence: number): 'auto-queue' | 'review' | 'skip' {
-  if (confidence >= CONFIDENCE_AUTO_QUEUE) return 'auto-queue';
+export function getDisposition(confidence: number, autoQueueThreshold: number = CONFIDENCE_AUTO_QUEUE): 'auto-queue' | 'review' | 'skip' {
+  if (confidence >= autoQueueThreshold) return 'auto-queue';
   if (confidence >= CONFIDENCE_REVIEW_LOW) return 'review';
   return 'skip';
 }
@@ -325,7 +325,7 @@ function hashMarket(title: string, cat: string): string {
 }
 
 /** Build matched pairs from PM + Kalshi markets with spread data and confidence scores. */
-function buildMatchedPairs(pmMarkets: any[], kMarkets: any[]): Array<PendingReviewPair> {
+function buildMatchedPairs(pmMarkets: any[], kMarkets: any[], autoQueueThreshold: number = CONFIDENCE_AUTO_QUEUE): Array<PendingReviewPair> {
   const kMap = new Map<string, any>();
   for (const k of kMarkets) {
     const nt = normalizeTitle(k.title);
@@ -358,7 +358,7 @@ function buildMatchedPairs(pmMarkets: any[], kMarkets: any[]): Array<PendingRevi
       match.expiration_date || null,
     );
 
-    const disposition = getDisposition(confidence);
+    const disposition = getDisposition(confidence, autoQueueThreshold);
 
     results.push({
       id: hashMarket(pm.title, pm.category),
@@ -442,15 +442,29 @@ function addToReviewQueue(pair: PendingReviewPair): void {
 let schedulerTimer: ReturnType<typeof setInterval> | null = null;
 let schedulerRunning = false;
 
-/** Start the 3-hour background scheduler. Idempotent — safe to call multiple times. */
+/** Start the background scheduler. Idempotent — safe to call multiple times.
+ * AUTO-001: ticks every 10 min and fires when discovery.scanIntervalHours
+ * (Settings, default 3h) has elapsed since lastScanAt — interval is hot-tunable. */
 export function startScheduler(): void {
   if (schedulerRunning) return;
   schedulerRunning = true;
 
+  const TICK_MS = 10 * 60 * 1000;
   schedulerTimer = setInterval(async () => {
     try {
       const state = loadState();
       if (state.paused) return;
+
+      // Resolve interval from settings (hot-reload); fall back to 3h
+      let intervalMs = SCAN_INTERVAL_MS;
+      try {
+        const { getSetting } = await import('./settings');
+        const hours = await getSetting<number>('discovery.scanIntervalHours');
+        if (Number.isFinite(hours) && hours >= 1 && hours <= 24) intervalMs = hours * 3600000;
+      } catch { /* keep default */ }
+
+      const last = state.lastScanAt ? Date.parse(state.lastScanAt) : 0;
+      if (Date.now() - last < intervalMs) return;
 
       const result = await runAutoDiscovery();
       if (result.added > 0) {
@@ -466,9 +480,9 @@ export function startScheduler(): void {
     } catch (err: any) {
       console.error('[auto-discovery] Scheduled scan failed:', err.message);
     }
-  }, SCAN_INTERVAL_MS);
+  }, TICK_MS);
 
-  console.log(`[auto-discovery] Scheduler started (interval: ${SCAN_INTERVAL_MS / 3600000}h)`);
+  console.log(`[auto-discovery] Scheduler started (tick: 10min, interval from settings, default ${SCAN_INTERVAL_MS / 3600000}h)`);
 }
 
 /** Stop the background scheduler. */
@@ -537,8 +551,19 @@ export async function runAutoDiscovery(): Promise<{
 }> {
   const state = loadState();
 
-  // Check pause
-  if (state.paused) {
+  // AUTO-001: resolve knobs from the settings layer (DB > env > default)
+  let autoApproveConfidence = 85;
+  let maxMarketsPerScan = 10;
+  let settingsPaused = false;
+  try {
+    const { getSetting } = await import('./settings');
+    autoApproveConfidence = await getSetting<number>('discovery.autoApproveConfidence');
+    maxMarketsPerScan = await getSetting<number>('discovery.maxMarketsPerScan');
+    settingsPaused = await getSetting<boolean>('discovery.paused');
+  } catch { /* settings unavailable — use defaults */ }
+
+  // Check pause (legacy state flag or settings toggle)
+  if (state.paused || settingsPaused) {
     return { category: '-', added: 0, reviewQueued: 0, skipped: 0, errors: ['Auto-discovery is paused'], scanRecord: null };
   }
 
@@ -561,7 +586,7 @@ export async function runAutoDiscovery(): Promise<{
       }),
     ]);
 
-    const pairs = buildMatchedPairs(pmMarkets, kMarkets);
+    const pairs = buildMatchedPairs(pmMarkets, kMarkets, autoApproveConfidence);
 
     // Get existing saved markets to avoid duplicates
     const savedMarkets = await getSavedMarkets();
@@ -583,7 +608,12 @@ export async function runAutoDiscovery(): Promise<{
       }
 
       if (pair.queued) {
-        // High confidence — auto-add
+        // High confidence (>= discovery.autoApproveConfidence) — auto-add,
+        // capped by discovery.maxMarketsPerScan
+        if (added >= maxMarketsPerScan) {
+          skipped++;
+          continue;
+        }
         try {
           await upsertSavedMarket({
             kalshiUrl: pair.kalshiUrl!,

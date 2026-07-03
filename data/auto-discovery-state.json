@@ -75,9 +75,14 @@
       "category": "economics",
       "lastScannedAt": "2026-07-03T13:57:50.700Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-03T19:08:55.837Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-03T13:57:50.700Z",
+  "lastScanAt": "2026-07-03T19:08:55.837Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }
