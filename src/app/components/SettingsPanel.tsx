@@ -48,6 +48,7 @@ const SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: "scanner", label: "Scanner", icon: <Radar className="w-4 h-4" /> },
   { id: "auto-discovery", label: "Auto-Discovery", icon: <Search className="w-4 h-4" /> },
   { id: "auto-execute", label: "Auto-Execute", icon: <Zap className="w-4 h-4" /> },
+  { id: "lifecycle", label: "Lifecycle", icon: <Radar className="w-4 h-4" /> },
   { id: "display", label: "Display", icon: <Monitor className="w-4 h-4" /> },
 ];
 

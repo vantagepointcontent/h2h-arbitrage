@@ -441,6 +441,8 @@ function addToReviewQueue(pair: PendingReviewPair): void {
 
 let schedulerTimer: ReturnType<typeof setInterval> | null = null;
 let schedulerRunning = false;
+let lastLifecycleSweepAt = 0; // AUTO-002
+const LIFECYCLE_SWEEP_MS = 60 * 60 * 1000; // hourly
 
 /** Start the background scheduler. Idempotent — safe to call multiple times.
  * AUTO-001: ticks every 10 min and fires when discovery.scanIntervalHours
@@ -451,6 +453,16 @@ export function startScheduler(): void {
 
   const TICK_MS = 10 * 60 * 1000;
   schedulerTimer = setInterval(async () => {
+    // AUTO-002: hourly lifecycle sweep (independent of discovery pause)
+    try {
+      if (Date.now() - lastLifecycleSweepAt >= LIFECYCLE_SWEEP_MS) {
+        lastLifecycleSweepAt = Date.now();
+        const { runLifecycleSweep } = await import('./lifecycle');
+        await runLifecycleSweep();
+      }
+    } catch (err: any) {
+      console.error('[lifecycle] Sweep failed:', err.message);
+    }
     try {
       const state = loadState();
       if (state.paused) return;

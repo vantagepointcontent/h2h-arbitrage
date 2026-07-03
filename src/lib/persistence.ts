@@ -61,6 +61,15 @@ async function initDb(): Promise<void> {
       last_scan_result TEXT    -- JSON LastScanResult
     )
   `);
+  // AUTO-002: lifecycle columns (archive expired/dead markets)
+  for (const ddl of [
+    `ALTER TABLE saved_markets ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE saved_markets ADD COLUMN archived_at TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN archive_reason TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN last_matched_at TEXT`,
+  ]) {
+    try { await c.execute(ddl); } catch { /* column already exists */ }
+  }
   await c.execute(`
     CREATE TABLE IF NOT EXISTS scan_history (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -204,6 +213,11 @@ export interface SavedMarket {
   expiryDate?: string | null; // ISO timestamp
   favorite?: boolean;         // user-starred for quick access
   lastScanResult?: LastScanResult | null;
+  // AUTO-002: lifecycle
+  archived?: boolean;
+  archivedAt?: string | null;
+  archiveReason?: string | null;   // 'expired' | 'dead' | 'manual'
+  lastMatchedAt?: string | null;   // last scan with matchedCount > 0
 }
 
 async function ensureDir() {
@@ -229,6 +243,10 @@ function rowToMarket(r: any): SavedMarket {
     expiryDate: r.expiry_date != null ? String(r.expiry_date) : null,
     favorite: Boolean(Number(r.favorite ?? 0)),
     lastScanResult,
+    archived: Boolean(Number(r.archived ?? 0)),
+    archivedAt: r.archived_at != null ? String(r.archived_at) : null,
+    archiveReason: r.archive_reason != null ? String(r.archive_reason) : null,
+    lastMatchedAt: r.last_matched_at != null ? String(r.last_matched_at) : null,
   };
 }
 
@@ -236,8 +254,9 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
   const c = getClient();
   await c.execute({
     sql: `INSERT INTO saved_markets
-            (id, kalshi_url, polymarket_url, event_title, category, created_at, expiry_date, favorite, last_scan_result)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, kalshi_url, polymarket_url, event_title, category, created_at, expiry_date, favorite, last_scan_result,
+             archived, archived_at, archive_reason, last_matched_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             kalshi_url = excluded.kalshi_url,
             polymarket_url = excluded.polymarket_url,
@@ -245,11 +264,16 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
             category = excluded.category,
             expiry_date = excluded.expiry_date,
             favorite = excluded.favorite,
-            last_scan_result = excluded.last_scan_result`,
+            last_scan_result = excluded.last_scan_result,
+            archived = excluded.archived,
+            archived_at = excluded.archived_at,
+            archive_reason = excluded.archive_reason,
+            last_matched_at = excluded.last_matched_at`,
     args: [
       m.id, m.kalshiUrl, m.polymarketUrl, m.eventTitle, m.category ?? null,
       m.createdAt, m.expiryDate ?? null, m.favorite ? 1 : 0,
       m.lastScanResult ? JSON.stringify(m.lastScanResult) : null,
+      m.archived ? 1 : 0, m.archivedAt ?? null, m.archiveReason ?? null, m.lastMatchedAt ?? null,
     ],
   });
 }
@@ -293,11 +317,46 @@ function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-export async function getSavedMarkets(): Promise<SavedMarket[]> {
+export async function getSavedMarkets(opts?: { includeArchived?: boolean }): Promise<SavedMarket[]> {
   await ensureMarketsMigrated();
   const c = getClient();
-  const res = await c.execute('SELECT * FROM saved_markets ORDER BY created_at ASC');
+  const where = opts?.includeArchived ? '' : 'WHERE archived = 0';
+  const res = await c.execute(`SELECT * FROM saved_markets ${where} ORDER BY created_at ASC`);
   return (res.rows as any[]).map(rowToMarket);
+}
+
+/** AUTO-002: archived markets only (newest archive first). */
+export async function getArchivedMarkets(): Promise<SavedMarket[]> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const res = await c.execute('SELECT * FROM saved_markets WHERE archived = 1 ORDER BY archived_at DESC');
+  return (res.rows as any[]).map(rowToMarket);
+}
+
+/** AUTO-002: archive a market (excluded from polling + JSON mirror). */
+export async function archiveSavedMarket(id: string, reason: string): Promise<boolean> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'UPDATE saved_markets SET archived = 1, archived_at = ?, archive_reason = ? WHERE id = ? AND archived = 0',
+    args: [new Date().toISOString(), reason, id],
+  });
+  const changed = Number((res as any).rowsAffected ?? 0) > 0;
+  if (changed) await mirrorMarketsToJson();
+  return changed;
+}
+
+/** AUTO-002: restore an archived market back into the active watchlist. */
+export async function unarchiveSavedMarket(id: string): Promise<boolean> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'UPDATE saved_markets SET archived = 0, archived_at = NULL, archive_reason = NULL WHERE id = ? AND archived = 1',
+    args: [id],
+  });
+  const changed = Number((res as any).rowsAffected ?? 0) > 0;
+  if (changed) await mirrorMarketsToJson();
+  return changed;
 }
 
 /** Normalize a URL for identity comparison (strip trailing slash + query, lowercase) */
@@ -384,15 +443,17 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   // main race: concurrent scans clobbering each other's lastScanResult.
   await ensureMarketsMigrated();
   const c = getClient();
+  // AUTO-002: track last time this market had matched outcomes (dead-market detection)
+  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
   if (expiryDate !== undefined) {
     await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ? WHERE id = ?',
-      args: [JSON.stringify(result), expiryDate ?? null, id],
+      sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+      args: [JSON.stringify(result), expiryDate ?? null, matchedNow, id],
     });
   } else {
     await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ? WHERE id = ?',
-      args: [JSON.stringify(result), id],
+      sql: 'UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+      args: [JSON.stringify(result), matchedNow, id],
     });
   }
   await mirrorMarketsToJson();

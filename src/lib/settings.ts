@@ -26,7 +26,7 @@ export type SettingType = 'number' | 'boolean' | 'string';
 
 export interface SettingDef {
   key: string;
-  section: 'alerts' | 'scanner' | 'auto-discovery' | 'auto-execute' | 'display';
+  section: 'alerts' | 'scanner' | 'auto-discovery' | 'auto-execute' | 'lifecycle' | 'display';
   label: string;
   description: string;
   type: SettingType;
@@ -61,6 +61,12 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'discovery.scanIntervalHours', section: 'auto-discovery', label: 'Scan interval (h)', description: 'Hours between auto-discovery category scans.', type: 'number', default: 3, min: 1, max: 24, slider: true },
   { key: 'discovery.autoApproveConfidence', section: 'auto-discovery', label: 'Auto-approve confidence', description: 'Pairs at or above this confidence are saved automatically (AUTO-001, when implemented).', type: 'number', default: 85, min: 50, max: 100, slider: true },
   { key: 'discovery.maxMarketsPerScan', section: 'auto-discovery', label: 'Max markets per scan', description: 'Cap on markets added by a single discovery scan.', type: 'number', default: 10, min: 1, max: 100 },
+
+  // ── Lifecycle (AUTO-002) ──
+  { key: 'lifecycle.enabled', section: 'lifecycle', label: 'Auto-retirement', description: 'Automatically archive expired or dead markets so they stop consuming polling budget.', type: 'boolean', default: true },
+  { key: 'lifecycle.expiryGraceHours', section: 'lifecycle', label: 'Expiry grace (h)', description: 'Hours after market expiry before it is archived (allows settlement-window arbs).', type: 'number', default: 24, min: 0, max: 168, slider: true },
+  { key: 'lifecycle.deadMarketDays', section: 'lifecycle', label: 'Dead-market days', description: 'Archive markets with zero matched outcomes for this many consecutive days.', type: 'number', default: 7, min: 1, max: 60, slider: true },
+  { key: 'lifecycle.protectFavorites', section: 'lifecycle', label: 'Protect favorites', description: 'Never auto-archive starred markets.', type: 'boolean', default: true },
 
   // ── Auto-Execute ──
   { key: 'execute.dryRun', section: 'auto-execute', label: 'Dry run mode', description: 'When ON, executions are simulated. Turning this OFF places REAL orders.', type: 'boolean', env: 'H2H_DRY_RUN', default: true, dangerous: true },
