@@ -16,7 +16,10 @@ const SQLITE_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
 
 function getClient() {
-  if (!_client) _client = createClient({ url: `file:${SQLITE_PATH}` });
+  if (!_client) {
+    _client = createClient({ url: `file:${SQLITE_PATH}` });
+    void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+  }
   return _client;
 }
 

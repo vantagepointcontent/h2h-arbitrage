@@ -190,7 +190,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const pmCount = withArbitrage.filter(o => o.polymarket).length;
   const matchedCount = withArbitrage.filter(o => o.kalshi && o.polymarket).length;
 
-  const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0);
+  const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
   const bestArb = positiveArbs.length > 0
     ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
     : null;

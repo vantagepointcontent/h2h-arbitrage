@@ -51,18 +51,24 @@ export async function GET(request: NextRequest) {
     // ── KPI aggregations ──────────────────────────────────────
     const totalScans = rows.length;
 
+    // Phantom guard for value aggregations: rows with ROI above the
+    // suspicious threshold are one-tick empty-book quotes, not fillable arbs.
+    // They stay in scan counts but are excluded from ROI/profit math.
+    const SUSPICIOUS_ROI_KPI = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
+    const cleanRows = rows.filter((r: any) => (r.best_roi_pct ?? 0) <= SUSPICIOUS_ROI_KPI);
+
     // Total arbs found (sum of positive_arb_count)
-    const totalArbsFound = rows.reduce((s: number, r: any) => s + (r.positive_arb_count ?? 0), 0);
+    const totalArbsFound = cleanRows.reduce((s: number, r: any) => s + (r.positive_arb_count ?? 0), 0);
 
     // Active arbs now: scans in the last 5 minutes with positive_arb_count > 0
     const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
-    const activeArbs = rows.filter(
+    const activeArbs = cleanRows.filter(
       (r: any) => (r.scanned_at ?? '') >= fiveMinAgo && (r.positive_arb_count ?? 0) > 0
     ).length;
 
     // Average ROI (net of fees — stored as-is in DB)
-    const avgRoi = totalScans > 0
-      ? rows.reduce((s: number, r: any) => s + (r.best_roi_pct ?? 0), 0) / totalScans
+    const avgRoi = cleanRows.length > 0
+      ? cleanRows.reduce((s: number, r: any) => s + (r.best_roi_pct ?? 0), 0) / cleanRows.length
       : 0;
 
     // Distinct markets tracked
@@ -70,7 +76,7 @@ export async function GET(request: NextRequest) {
     const marketsTracked = marketsSet.size;
 
     // Total profit (sum of best_profit, net of fees)
-    const totalProfit = rows.reduce((s: number, r: any) => s + (r.best_profit ?? 0), 0);
+    const totalProfit = cleanRows.reduce((s: number, r: any) => s + (r.best_profit ?? 0), 0);
 
     // ── Scans-per-day (last 30 days) ──────────────────────────
     const scansPerDay: { date: string; count: number }[] = [];
@@ -127,9 +133,16 @@ export async function GET(request: NextRequest) {
     // ── Top active arbs (recent scans with positive arbs) ──────
     // Dedupe by market (keep best-ROI scan per market) so one hot market
     // doesn't fill all 10 rows.
+    // BUG: phantom filter — historical scan rows predate the suspicious-arb
+    // guard in /api/scan, and one 87%+ phantom tick (empty orderbook quote)
+    // would otherwise own a market's slot for the whole range. Real
+    // cross-platform arbs live in the 1–5% band; anything above the
+    // suspicious threshold in *history* is noise, so exclude it here too.
+    const SUSPICIOUS_ROI = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
     const bestPerMarket = new Map<string, any>();
     for (const r of rows) {
       if ((r.positive_arb_count ?? 0) <= 0) continue;
+      if ((r.best_roi_pct ?? 0) > SUSPICIOUS_ROI) continue; // phantom tick
       const prev = bestPerMarket.get(r.market_id);
       if (!prev || (r.best_roi_pct ?? 0) > (prev.best_roi_pct ?? 0)) {
         bestPerMarket.set(r.market_id, r);

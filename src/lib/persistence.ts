@@ -12,6 +12,9 @@ let _client: ReturnType<typeof createClient> | null = null;
 function getClient() {
   if (!_client) {
     _client = createClient({ url: `file:${SQLITE_PATH}` });
+    // Wait up to 5s on writer contention instead of failing SQLITE_BUSY
+    // (Next.js, poller-driven scans, and ws-watcher all write this file).
+    void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
   }
   return _client;
 }
