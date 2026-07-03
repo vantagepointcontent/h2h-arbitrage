@@ -11,6 +11,7 @@ import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyMan
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
+import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
 
@@ -379,7 +380,30 @@ export async function POST(request: NextRequest) {
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
           raw: { allArbs: scanResult.allArbs },
+          marketTitle: pmEvent.title || market.eventTitle,
         });
+
+        // ── Arb lifecycle tracking: open/extend/close episodes ──
+        // Non-fatal: lifecycle data must never break a scan.
+        try {
+          const lifecycle = await recordArbObservations(
+            market.id,
+            pmEvent.title || market.eventTitle,
+            (market as { category?: string }).category,
+            positiveArbs.map(o => ({
+              outcome: o.artist,
+              strategy: o.arbitrage!.strategy,
+              roiPct: o.arbitrage!.roiPct,
+              expectedProfit: o.arbitrage!.expectedProfit,
+              totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
+            })),
+          );
+          if (lifecycle.opened > 0 || lifecycle.closed > 0) {
+            console.log(`[arb-lifecycle] ${market.eventTitle}: ${lifecycle.opened} opened, ${lifecycle.extended} extended, ${lifecycle.closed} closed`);
+          }
+        } catch (lcErr) {
+          console.warn('[arb-lifecycle] tracking failed (scan unaffected):', lcErr instanceof Error ? lcErr.message : lcErr);
+        }
 
         // ── Telegram alerts: fire if positive arbs found ──
         if (positiveArbs.length > 0) {
