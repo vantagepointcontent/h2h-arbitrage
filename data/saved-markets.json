@@ -9,29 +9,29 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2,
-      "bestProfit": 20,
+      "bestRoiPct": 1,
+      "bestProfit": 10,
       "strategy": "Buy YES both sides: Kalshi Democratics + Democrat + PM Republicans + Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:35:15.433Z",
+      "scannedAt": "2026-07-03T21:05:53.651Z",
       "allArbs": [
         {
           "artist": "Democratics + Democrat",
-          "roiPct": 2,
-          "expectedProfit": 20,
+          "roiPct": 1,
+          "expectedProfit": 10,
           "strategy": "Buy YES both sides: Kalshi Democratics + Democrat + PM Republicans + Republican",
-          "totalStake": 980,
+          "totalStake": 990,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 20,
-            "netProfitIfPmWins": 20,
-            "worstCaseNetProfit": 20
+            "netProfitIfKalshiWins": 10,
+            "netProfitIfPmWins": 10,
+            "worstCaseNetProfit": 10
           }
         }
       ]
@@ -39,7 +39,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:15.433Z"
+    "lastMatchedAt": "2026-07-03T21:05:53.651Z"
   },
   {
     "id": "1779565414697-01jpgss",
@@ -58,7 +58,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:35:16.204Z",
+      "scannedAt": "2026-07-03T21:05:54.364Z",
       "allArbs": [
         {
           "artist": "Democratics + Democrat",
@@ -81,7 +81,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:16.204Z"
+    "lastMatchedAt": "2026-07-03T21:05:54.364Z"
   },
   {
     "id": "1779565498134-v5tij6n",
@@ -100,7 +100,7 @@
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 11,
-      "scannedAt": "2026-07-03T20:35:44.138Z",
+      "scannedAt": "2026-07-03T21:06:08.476Z",
       "allArbs": [
         {
           "artist": "Red Bull Racing",
@@ -123,7 +123,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:44.138Z"
+    "lastMatchedAt": "2026-07-03T21:06:08.476Z"
   },
   {
     "id": "1779566094057-vc90yk8",
@@ -142,13 +142,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 3,
-      "scannedAt": "2026-07-03T20:35:50.204Z",
+      "scannedAt": "2026-07-03T21:07:57.810Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:50.204Z"
+    "lastMatchedAt": "2026-07-03T21:07:57.810Z"
   },
   {
     "id": "1779615969341-4z00t8d",
@@ -167,13 +167,13 @@
       "matchedCount": 8,
       "kalshiCount": 9,
       "pmCount": 12,
-      "scannedAt": "2026-07-03T20:35:48.789Z",
+      "scannedAt": "2026-07-03T21:06:08.953Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:48.789Z"
+    "lastMatchedAt": "2026-07-03T21:06:08.953Z"
   },
   {
     "id": "1779617150327-ntzesfy",
@@ -192,7 +192,7 @@
       "matchedCount": 8,
       "kalshiCount": 11,
       "pmCount": 13,
-      "scannedAt": "2026-07-03T20:35:32.111Z",
+      "scannedAt": "2026-07-03T21:06:47.525Z",
       "allArbs": [
         {
           "artist": "David Crowley",
@@ -231,7 +231,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:32.111Z"
+    "lastMatchedAt": "2026-07-03T21:06:47.525Z"
   },
   {
     "id": "1779626444294-dlx66jv",
@@ -243,29 +243,29 @@
     "expiryDate": "2026-12-31T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2.1427539204254376,
-      "bestProfit": 21.142529892473057,
+      "bestRoiPct": 0.17658888888889873,
+      "bestProfit": 0.01672947368421146,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 11,
       "matchedCount": 9,
       "kalshiCount": 10,
       "pmCount": 10,
-      "scannedAt": "2026-07-03T20:35:26.537Z",
+      "scannedAt": "2026-07-03T21:06:00.319Z",
       "allArbs": [
         {
           "artist": "Taylor Swift",
-          "roiPct": 2.1427539204254376,
-          "expectedProfit": 21.142529892473057,
+          "roiPct": 0.17658888888889873,
+          "expectedProfit": 0.01672947368421146,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 959.0713548387097,
+          "totalStake": 9.397894736842105,
           "fees": {
-            "kalshiFee": 4.5,
-            "pmFee": 1.98504,
-            "kalshiFeeDetails": "Kalshi NO sell 987 @ $0.93 = $4.50",
-            "pmFeeDetails": "Polymarket YES buy 987 @ $0.04 (θ=0.05) = $1.99",
-            "netProfitIfKalshiWins": 21.142529892473057,
-            "netProfitIfPmWins": 21.142529892473057,
-            "worstCaseNetProfit": 21.142529892473057
+            "kalshiFee": 0.04,
+            "pmFee": 0.01906,
+            "kalshiFeeDetails": "Kalshi NO sell 9 @ $0.95 = $0.04",
+            "pmFeeDetails": "Polymarket YES buy 9 @ $0.04 (θ=0.05) = $0.02",
+            "netProfitIfKalshiWins": 0.01672947368421146,
+            "netProfitIfPmWins": 0.01672947368421146,
+            "worstCaseNetProfit": 0.01672947368421146
           }
         }
       ]
@@ -273,7 +273,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:26.537Z"
+    "lastMatchedAt": "2026-07-03T21:06:00.319Z"
   },
   {
     "id": "1779652505195-fchs4a3",
@@ -292,7 +292,7 @@
       "matchedCount": 7,
       "kalshiCount": 30,
       "pmCount": 30,
-      "scannedAt": "2026-07-03T20:36:17.354Z",
+      "scannedAt": "2026-07-03T21:08:49.925Z",
       "allArbs": [
         {
           "artist": "Los Angeles G",
@@ -363,7 +363,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:17.354Z"
+    "lastMatchedAt": "2026-07-03T21:08:49.925Z"
   },
   {
     "id": "1779652525824-sl6nqkx",
@@ -382,7 +382,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:35:35.863Z",
+      "scannedAt": "2026-07-03T21:06:05.773Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -421,7 +421,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:35.863Z"
+    "lastMatchedAt": "2026-07-03T21:06:05.773Z"
   },
   {
     "id": "1779918190243-xbh0u7e",
@@ -433,29 +433,29 @@
     "expiryDate": "2026-08-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2.210456000000002,
-      "bestProfit": 0.12013347826086967,
+      "bestRoiPct": 1.8426399999999947,
+      "bestProfit": 0.020028695652173856,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 12,
       "matchedCount": 6,
       "kalshiCount": 11,
       "pmCount": 7,
-      "scannedAt": "2026-07-03T20:35:37.675Z",
+      "scannedAt": "2026-07-03T21:06:02.915Z",
       "allArbs": [
         {
           "artist": "Brent Hennrich",
-          "roiPct": 2.210456000000002,
-          "expectedProfit": 0.12013347826086967,
+          "roiPct": 1.8426399999999947,
+          "expectedProfit": 0.020028695652173856,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 5.271739130434782,
+          "totalStake": 1.0543478260869565,
           "fees": {
-            "kalshiFee": 0.03,
-            "pmFee": 0.01291,
-            "kalshiFeeDetails": "Kalshi NO sell 5 @ $0.92 = $0.03",
-            "pmFeeDetails": "Polymarket YES buy 5 @ $0.05 (θ=0.05) = $0.01",
-            "netProfitIfKalshiWins": 0.12013347826086967,
-            "netProfitIfPmWins": 0.12013347826086967,
-            "worstCaseNetProfit": 0.12013347826086967
+            "kalshiFee": 0.01,
+            "pmFee": 0.00258,
+            "kalshiFeeDetails": "Kalshi NO sell 1 @ $0.92 = $0.01",
+            "pmFeeDetails": "Polymarket YES buy 1 @ $0.05 (θ=0.05) = $0.00",
+            "netProfitIfKalshiWins": 0.020028695652173856,
+            "netProfitIfPmWins": 0.020028695652173856,
+            "worstCaseNetProfit": 0.020028695652173856
           }
         }
       ]
@@ -463,7 +463,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:37.675Z"
+    "lastMatchedAt": "2026-07-03T21:06:02.915Z"
   },
   {
     "id": "1779918332608-3at7dls",
@@ -482,22 +482,22 @@
       "matchedCount": 14,
       "kalshiCount": 16,
       "pmCount": 22,
-      "scannedAt": "2026-07-03T20:36:07.436Z",
+      "scannedAt": "2026-07-03T21:09:07.914Z",
       "allArbs": [
         {
           "artist": "Click Bishop",
-          "roiPct": 0.4735993000000014,
-          "expectedProfit": 2.4926278947368496,
+          "roiPct": 0.5782049000000008,
+          "expectedProfit": 3.043183684210531,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 521.0526315789474,
+          "totalStake": 520.5263157894738,
           "fees": {
             "kalshiFee": 1.76,
-            "pmFee": 1.01053,
+            "pmFee": 0.98629,
             "kalshiFeeDetails": "Kalshi NO sell 526 @ $0.95 = $1.76",
-            "pmFeeDetails": "Polymarket YES buy 526 @ $0.04 (θ=0.05) = $1.01",
-            "netProfitIfKalshiWins": 2.4926278947368496,
-            "netProfitIfPmWins": 2.4926278947368496,
-            "worstCaseNetProfit": 2.4926278947368496
+            "pmFeeDetails": "Polymarket YES buy 526 @ $0.04 (θ=0.05) = $0.99",
+            "netProfitIfKalshiWins": 3.043183684210531,
+            "netProfitIfPmWins": 3.043183684210531,
+            "worstCaseNetProfit": 3.043183684210531
           }
         },
         {
@@ -617,7 +617,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:07.436Z"
+    "lastMatchedAt": "2026-07-03T21:09:07.914Z"
   },
   {
     "id": "1779918706058-tmlnj5g",
@@ -636,7 +636,7 @@
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 11,
-      "scannedAt": "2026-07-03T20:35:45.778Z",
+      "scannedAt": "2026-07-03T21:06:05.006Z",
       "allArbs": [
         {
           "artist": "Yu Deng",
@@ -659,7 +659,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:45.778Z"
+    "lastMatchedAt": "2026-07-03T21:06:05.006Z"
   },
   {
     "id": "1779918758511-quuqz22",
@@ -678,7 +678,7 @@
       "matchedCount": 16,
       "kalshiCount": 16,
       "pmCount": 16,
-      "scannedAt": "2026-07-03T20:36:27.243Z",
+      "scannedAt": "2026-07-03T21:08:19.744Z",
       "allArbs": [
         {
           "artist": "Miami",
@@ -781,7 +781,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:27.243Z"
+    "lastMatchedAt": "2026-07-03T21:08:19.744Z"
   },
   {
     "id": "1779921598922-8sg17v8",
@@ -793,29 +793,29 @@
     "expiryDate": "2026-10-31T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 1.314375939849636,
-      "bestProfit": 0.852741463414642,
+      "bestRoiPct": 0.7228600000000073,
+      "bestProfit": 0.008815365853658625,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 26,
       "matchedCount": 4,
       "kalshiCount": 15,
       "pmCount": 15,
-      "scannedAt": "2026-07-03T20:36:29.743Z",
+      "scannedAt": "2026-07-03T21:08:19.253Z",
       "allArbs": [
         {
           "artist": "New York",
-          "roiPct": 1.314375939849636,
-          "expectedProfit": 0.852741463414642,
+          "roiPct": 0.7228600000000073,
+          "expectedProfit": 0.008815365853658625,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 62.931707317073176,
+          "totalStake": 1.1829268292682926,
           "fees": {
-            "kalshiFee": 0.68,
-            "pmFee": 0.4136,
-            "kalshiFeeDetails": "Kalshi NO sell 65 @ $0.82 = $0.68",
-            "pmFeeDetails": "Polymarket YES buy 65 @ $0.15 (θ=0.05) = $0.41",
-            "netProfitIfKalshiWins": 0.852741463414642,
-            "netProfitIfPmWins": 0.852741463414642,
-            "worstCaseNetProfit": 0.852741463414642
+            "kalshiFee": 0.02,
+            "pmFee": 0.00777,
+            "kalshiFeeDetails": "Kalshi NO sell 1 @ $0.82 = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 1 @ $0.15 (θ=0.05) = $0.01",
+            "netProfitIfKalshiWins": 0.008815365853658625,
+            "netProfitIfPmWins": 0.008815365853658625,
+            "worstCaseNetProfit": 0.008815365853658625
           }
         },
         {
@@ -839,7 +839,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:29.743Z"
+    "lastMatchedAt": "2026-07-03T21:08:19.253Z"
   },
   {
     "id": "1779921626235-sb1i94e",
@@ -858,7 +858,7 @@
       "matchedCount": 9,
       "kalshiCount": 13,
       "pmCount": 11,
-      "scannedAt": "2026-07-03T20:35:52.897Z",
+      "scannedAt": "2026-07-03T21:07:59.628Z",
       "allArbs": [
         {
           "artist": "the Netherlands",
@@ -875,29 +875,13 @@
             "netProfitIfPmWins": 0.3200000000000003,
             "worstCaseNetProfit": 0.3200000000000003
           }
-        },
-        {
-          "artist": "New Zealand",
-          "roiPct": 0.09517333333332385,
-          "expectedProfit": 0.03568999999999645,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 36.375,
-          "fees": {
-            "kalshiFee": 0.74,
-            "pmFee": 0.34931,
-            "kalshiFeeDetails": "Kalshi YES buy 38 @ $0.16 + NO sell 60 @ $0.10 = $0.74",
-            "pmFeeDetails": "Polymarket NO buy 39 @ $0.77 (θ=0.05) = $0.35",
-            "netProfitIfKalshiWins": 0.03568999999999645,
-            "netProfitIfPmWins": 0.03568999999999645,
-            "worstCaseNetProfit": 0.03568999999999645
-          }
         }
       ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:35:52.897Z"
+    "lastMatchedAt": "2026-07-03T21:07:59.628Z"
   },
   {
     "id": "1780515890597-uyepmew",
@@ -916,7 +900,7 @@
       "matchedCount": 23,
       "kalshiCount": 42,
       "pmCount": 24,
-      "scannedAt": "2026-07-03T20:36:06.441Z",
+      "scannedAt": "2026-07-03T21:08:10.512Z",
       "allArbs": [
         {
           "artist": "Cole Ragans",
@@ -965,13 +949,29 @@
             "netProfitIfPmWins": 8.596819999999942,
             "worstCaseNetProfit": 8.596819999999942
           }
+        },
+        {
+          "artist": "Bryce Miller",
+          "roiPct": 0.825005,
+          "expectedProfit": 8.25005,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 991,
+          "fees": {
+            "kalshiFee": 0.7,
+            "pmFee": 0.04995,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.99 = $0.70",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.00 (θ=0.05) = $0.05",
+            "netProfitIfKalshiWins": 8.25005,
+            "netProfitIfPmWins": 8.25005,
+            "worstCaseNetProfit": 8.25005
+          }
         }
       ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:06.441Z"
+    "lastMatchedAt": "2026-07-03T21:08:10.512Z"
   },
   {
     "id": "1780515968723-d0aycj7",
@@ -990,13 +990,13 @@
       "matchedCount": 6,
       "kalshiCount": 31,
       "pmCount": 30,
-      "scannedAt": "2026-07-03T20:37:01.031Z",
+      "scannedAt": "2026-07-03T21:08:32.686Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:01.031Z"
+    "lastMatchedAt": "2026-07-03T21:08:32.686Z"
   },
   {
     "id": "1780516066111-3yx3lkb",
@@ -1015,13 +1015,13 @@
       "matchedCount": 7,
       "kalshiCount": 8,
       "pmCount": 14,
-      "scannedAt": "2026-07-03T20:36:27.958Z",
+      "scannedAt": "2026-07-03T21:08:32.085Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:27.958Z"
+    "lastMatchedAt": "2026-07-03T21:08:32.085Z"
   },
   {
     "id": "1780516130290-bbhg6o1",
@@ -1033,29 +1033,29 @@
     "expiryDate": "2026-12-06T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 1.7197963016988005,
-      "bestProfit": 9.233234096385573,
+      "bestRoiPct": 1.8242590144485382,
+      "bestProfit": 10.374539036144565,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 24,
       "matchedCount": 20,
       "kalshiCount": 22,
       "pmCount": 22,
-      "scannedAt": "2026-07-03T20:36:56.701Z",
+      "scannedAt": "2026-07-03T21:08:35.804Z",
       "allArbs": [
         {
           "artist": "Lewis Hamilton",
-          "roiPct": 1.7197963016988005,
-          "expectedProfit": 9.233234096385573,
+          "roiPct": 1.8242590144485382,
+          "expectedProfit": 10.374539036144565,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 519.1624939759037,
+          "totalStake": 549.3630361445782,
           "fees": {
-            "kalshiFee": 5.31,
-            "pmFee": 3.17379,
-            "kalshiFeeDetails": "Kalshi NO sell 537 @ $0.83 = $5.31",
-            "pmFeeDetails": "Polymarket YES buy 537 @ $0.14 (θ=0.05) = $3.17",
-            "netProfitIfKalshiWins": 9.233234096385573,
-            "netProfitIfPmWins": 9.233234096385573,
-            "worstCaseNetProfit": 9.233234096385573
+            "kalshiFee": 5.62,
+            "pmFee": 3.34122,
+            "kalshiFeeDetails": "Kalshi NO sell 569 @ $0.83 = $5.62",
+            "pmFeeDetails": "Polymarket YES buy 569 @ $0.14 (θ=0.05) = $3.34",
+            "netProfitIfKalshiWins": 10.374539036144565,
+            "netProfitIfPmWins": 10.374539036144565,
+            "worstCaseNetProfit": 10.374539036144565
           }
         }
       ]
@@ -1063,7 +1063,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:56.701Z"
+    "lastMatchedAt": "2026-07-03T21:08:35.804Z"
   },
   {
     "id": "1780516372802-ky4zbp8",
@@ -1082,13 +1082,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:36:32.286Z",
+      "scannedAt": "2026-07-03T21:08:35.574Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:32.286Z"
+    "lastMatchedAt": "2026-07-03T21:08:35.574Z"
   },
   {
     "id": "1780521673191-sxsf08c",
@@ -1107,13 +1107,13 @@
       "matchedCount": 4,
       "kalshiCount": 4,
       "pmCount": 4,
-      "scannedAt": "2026-07-03T20:36:56.235Z",
+      "scannedAt": "2026-07-03T21:08:56.664Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:56.235Z"
+    "lastMatchedAt": "2026-07-03T21:08:56.664Z"
   },
   {
     "id": "1780524610133-tw8c996",
@@ -1132,13 +1132,13 @@
       "matchedCount": 1,
       "kalshiCount": 1,
       "pmCount": 1,
-      "scannedAt": "2026-07-03T20:36:31.311Z",
+      "scannedAt": "2026-07-03T21:08:36.178Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:31.311Z"
+    "lastMatchedAt": "2026-07-03T21:08:36.178Z"
   },
   {
     "id": "1780524643165-9gqgu9w",
@@ -1157,13 +1157,13 @@
       "matchedCount": 2,
       "kalshiCount": 22,
       "pmCount": 16,
-      "scannedAt": "2026-07-03T20:36:34.250Z",
+      "scannedAt": "2026-07-03T21:08:38.193Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:34.250Z"
+    "lastMatchedAt": "2026-07-03T21:08:38.193Z"
   },
   {
     "id": "1780524929760-fwvrvx2",
@@ -1175,14 +1175,14 @@
     "expiryDate": "2026-10-31T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 1.369529411764705,
-      "bestProfit": 0.8148699999999995,
+      "bestRoiPct": 1.1751017429056834,
+      "bestProfit": 2.523769189189193,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 38,
       "matchedCount": 18,
       "kalshiCount": 31,
       "pmCount": 25,
-      "scannedAt": "2026-07-03T20:36:46.572Z",
+      "scannedAt": "2026-07-03T21:08:49.818Z",
       "allArbs": [
         {
           "artist": "Lamine Yamal",
@@ -1202,18 +1202,18 @@
         },
         {
           "artist": "Harry Kane",
-          "roiPct": 1.369529411764705,
-          "expectedProfit": 0.8148699999999995,
+          "roiPct": 1.1751017429056834,
+          "expectedProfit": 2.523769189189193,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 57.358000000000004,
+          "totalStake": 207.4680810810811,
           "fees": {
-            "kalshiFee": 0.81,
-            "pmFee": 0.51713,
-            "kalshiFeeDetails": "Kalshi NO sell 60 @ $0.74 = $0.81",
-            "pmFeeDetails": "Polymarket YES buy 59 @ $0.22 (θ=0.05) = $0.52",
-            "netProfitIfKalshiWins": 0.8148699999999995,
-            "netProfitIfPmWins": 0.8148699999999995,
-            "worstCaseNetProfit": 0.8148699999999995
+            "kalshiFee": 2.9,
+            "pmFee": 1.87842,
+            "kalshiFeeDetails": "Kalshi NO sell 215 @ $0.74 = $2.90",
+            "pmFeeDetails": "Polymarket YES buy 215 @ $0.23 (θ=0.05) = $1.88",
+            "netProfitIfKalshiWins": 2.523769189189193,
+            "netProfitIfPmWins": 2.523769189189193,
+            "worstCaseNetProfit": 2.523769189189193
           }
         },
         {
@@ -1266,18 +1266,18 @@
         },
         {
           "artist": "Cristiano Ronaldo",
-          "roiPct": 0.39224000000000003,
-          "expectedProfit": 3.9224,
+          "roiPct": 0.39715999999999996,
+          "expectedProfit": 3.9716,
           "strategy": "Buy YES Kalshi + NO PM",
           "totalStake": 994,
           "fees": {
             "kalshiFee": 0.7,
-            "pmFee": 1.3776,
+            "pmFee": 1.3284,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.97 (θ=0.05) = $1.38",
-            "netProfitIfKalshiWins": 3.9224,
-            "netProfitIfPmWins": 3.9224,
-            "worstCaseNetProfit": 3.9224
+            "pmFeeDetails": "Polymarket NO buy 1011 @ $0.97 (θ=0.05) = $1.33",
+            "netProfitIfKalshiWins": 3.9716,
+            "netProfitIfPmWins": 3.9716,
+            "worstCaseNetProfit": 3.9716
           }
         }
       ]
@@ -1285,7 +1285,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:46.572Z"
+    "lastMatchedAt": "2026-07-03T21:08:49.818Z"
   },
   {
     "id": "1780524935254-y4p559m",
@@ -1442,7 +1442,7 @@
       "matchedCount": 14,
       "kalshiCount": 15,
       "pmCount": 15,
-      "scannedAt": "2026-07-03T20:37:40.502Z",
+      "scannedAt": "2026-07-03T21:09:43.215Z",
       "allArbs": [
         {
           "artist": "Cleveland",
@@ -1459,29 +1459,13 @@
             "netProfitIfPmWins": 0.5856247368421053,
             "worstCaseNetProfit": 0.5856247368421053
           }
-        },
-        {
-          "artist": "Houston",
-          "roiPct": 0.788845,
-          "expectedProfit": 7.88845,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 987,
-          "fees": {
-            "kalshiFee": 3.33,
-            "pmFee": 1.78155,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.95 = $3.33",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.04 (θ=0.05) = $1.78",
-            "netProfitIfKalshiWins": 7.88845,
-            "netProfitIfPmWins": 7.88845,
-            "worstCaseNetProfit": 7.88845
-          }
         }
       ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:40.502Z"
+    "lastMatchedAt": "2026-07-03T21:09:43.215Z"
   },
   {
     "id": "1780525241216-nevhd9n",
@@ -1493,45 +1477,45 @@
     "expiryDate": "2027-12-31T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 60.2445,
-      "bestProfit": 602.445,
+      "bestRoiPct": 60.254999999999995,
+      "bestProfit": 602.55,
       "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:36:57.305Z",
+      "scannedAt": "2026-07-03T21:08:58.814Z",
       "allArbs": [
         {
           "artist": "Anthropic",
-          "roiPct": 0.24249999999999972,
-          "expectedProfit": 2.424999999999997,
+          "roiPct": 1.2119999999999997,
+          "expectedProfit": 12.119999999999997,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 980,
+          "totalStake": 970,
           "fees": {
             "kalshiFee": 9.88,
-            "pmFee": 7.695,
+            "pmFee": 8,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.17 = $9.88",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.81 (θ=0.05) = $7.70",
-            "netProfitIfKalshiWins": 2.424999999999997,
-            "netProfitIfPmWins": 2.424999999999997,
-            "worstCaseNetProfit": 2.424999999999997
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.80 (θ=0.05) = $8.00",
+            "netProfitIfKalshiWins": 12.119999999999997,
+            "netProfitIfPmWins": 12.119999999999997,
+            "worstCaseNetProfit": 12.119999999999997
           }
         },
         {
           "artist": "OpenAI",
-          "roiPct": 60.2445,
-          "expectedProfit": 602.445,
+          "roiPct": 60.254999999999995,
+          "expectedProfit": 602.55,
           "strategy": "Buy YES Kalshi + NO PM",
           "totalStake": 370,
           "fees": {
             "kalshiFee": 19.05,
-            "pmFee": 8.505,
+            "pmFee": 8.4,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.16 + NO sell 1143 @ $0.14 = $19.05",
-            "pmFeeDetails": "Polymarket NO buy 1105 @ $0.19 (θ=0.05) = $8.51",
-            "netProfitIfKalshiWins": 602.445,
-            "netProfitIfPmWins": 602.445,
-            "worstCaseNetProfit": 602.445
+            "pmFeeDetails": "Polymarket NO buy 1050 @ $0.20 (θ=0.05) = $8.40",
+            "netProfitIfKalshiWins": 602.55,
+            "netProfitIfPmWins": 602.55,
+            "worstCaseNetProfit": 602.55
           }
         }
       ]
@@ -1539,7 +1523,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:36:57.305Z"
+    "lastMatchedAt": "2026-07-03T21:08:58.814Z"
   },
   {
     "id": "1780612499359-fuv0rf2",
@@ -1558,13 +1542,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:37:15.299Z",
+      "scannedAt": "2026-07-03T21:09:18.054Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:15.299Z"
+    "lastMatchedAt": "2026-07-03T21:09:18.054Z"
   },
   {
     "id": "1780612579960-z55igki",
@@ -1583,7 +1567,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:37:16.059Z",
+      "scannedAt": "2026-07-03T21:09:18.542Z",
       "allArbs": [
         {
           "artist": "the Republican party",
@@ -1622,7 +1606,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:16.060Z"
+    "lastMatchedAt": "2026-07-03T21:09:18.542Z"
   },
   {
     "id": "1780616584214-jghi7cb",
@@ -1641,13 +1625,13 @@
       "matchedCount": 18,
       "kalshiCount": 31,
       "pmCount": 25,
-      "scannedAt": "2026-07-03T20:37:15.056Z",
+      "scannedAt": "2026-07-03T21:09:15.149Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:15.056Z"
+    "lastMatchedAt": "2026-07-03T21:09:15.149Z"
   },
   {
     "id": "1780616663733-gqtyl8u",
@@ -1666,7 +1650,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:37:24.815Z",
+      "scannedAt": "2026-07-03T21:09:25.443Z",
       "allArbs": [
         {
           "artist": "the Republican party",
@@ -1705,7 +1689,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:24.815Z"
+    "lastMatchedAt": "2026-07-03T21:09:25.443Z"
   },
   {
     "id": "1780947342746-x2ck9fp",
@@ -1717,20 +1701,37 @@
     "expiryDate": "2026-12-19T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
+      "bestRoiPct": 0.3225079999999929,
+      "bestProfit": 0.17917111111110717,
+      "strategy": "Buy YES Kalshi + NO PM",
       "outcomeCount": 17,
       "matchedCount": 15,
       "kalshiCount": 17,
       "pmCount": 15,
-      "scannedAt": "2026-07-03T20:37:41.206Z",
-      "allArbs": []
+      "scannedAt": "2026-07-03T21:09:42.198Z",
+      "allArbs": [
+        {
+          "artist": "Don Kelly",
+          "roiPct": 0.3225079999999929,
+          "expectedProfit": 0.17917111111110717,
+          "strategy": "Buy YES Kalshi + NO PM",
+          "totalStake": 54.44444444444445,
+          "fees": {
+            "kalshiFee": 0.66,
+            "pmFee": 0.27194,
+            "kalshiFeeDetails": "Kalshi YES buy 56 @ $0.09 + NO sell 125 @ $0.04 = $0.66",
+            "pmFeeDetails": "Polymarket NO buy 56 @ $0.89 (θ=0.05) = $0.27",
+            "netProfitIfKalshiWins": 0.17917111111110717,
+            "netProfitIfPmWins": 0.17917111111110717,
+            "worstCaseNetProfit": 0.17917111111110717
+          }
+        }
+      ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:41.206Z"
+    "lastMatchedAt": "2026-07-03T21:09:42.198Z"
   },
   {
     "id": "1780947485064-f22ikcd",
@@ -1749,7 +1750,7 @@
       "matchedCount": 21,
       "kalshiCount": 23,
       "pmCount": 22,
-      "scannedAt": "2026-07-03T20:37:23.656Z",
+      "scannedAt": "2026-07-03T21:09:24.964Z",
       "allArbs": [
         {
           "artist": "Taylor Swift",
@@ -1769,18 +1770,18 @@
         },
         {
           "artist": "Pope Leo XIV",
-          "roiPct": 1.213309059633021,
-          "expectedProfit": 0.2612359259259245,
+          "roiPct": 1.2449619985925302,
+          "expectedProfit": 0.436812592592589,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 20.884938271604938,
+          "totalStake": 34.03382716049383,
           "fees": {
-            "kalshiFee": 0.24,
-            "pmFee": 0.14469,
-            "kalshiFeeDetails": "Kalshi NO sell 22 @ $0.81 = $0.24",
-            "pmFeeDetails": "Polymarket YES buy 22 @ $0.16 (θ=0.05) = $0.14",
-            "netProfitIfKalshiWins": 0.2612359259259245,
-            "netProfitIfPmWins": 0.2612359259259245,
-            "worstCaseNetProfit": 0.2612359259259245
+            "kalshiFee": 0.38,
+            "pmFee": 0.23578,
+            "kalshiFeeDetails": "Kalshi NO sell 35 @ $0.81 = $0.38",
+            "pmFeeDetails": "Polymarket YES buy 35 @ $0.16 (θ=0.05) = $0.24",
+            "netProfitIfKalshiWins": 0.436812592592589,
+            "netProfitIfPmWins": 0.436812592592589,
+            "worstCaseNetProfit": 0.436812592592589
           }
         }
       ]
@@ -1788,7 +1789,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:23.656Z"
+    "lastMatchedAt": "2026-07-03T21:09:24.964Z"
   },
   {
     "id": "1780947518057-wjbasjw",
@@ -1807,13 +1808,13 @@
       "matchedCount": 1,
       "kalshiCount": 6,
       "pmCount": 9,
-      "scannedAt": "2026-07-03T20:37:39.601Z",
+      "scannedAt": "2026-07-03T21:09:41.232Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:39.601Z"
+    "lastMatchedAt": "2026-07-03T21:09:41.232Z"
   },
   {
     "id": "1780947734818-qz3g6z6",
@@ -1832,13 +1833,13 @@
       "matchedCount": 5,
       "kalshiCount": 15,
       "pmCount": 11,
-      "scannedAt": "2026-07-03T20:37:37.444Z",
+      "scannedAt": "2026-07-03T21:09:38.339Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:37:37.444Z"
+    "lastMatchedAt": "2026-07-03T21:09:38.339Z"
   },
   {
     "id": "1780947788335-qp3d590",
@@ -1857,13 +1858,13 @@
       "matchedCount": 14,
       "kalshiCount": 41,
       "pmCount": 14,
-      "scannedAt": "2026-07-03T20:39:09.503Z",
+      "scannedAt": "2026-07-03T21:11:11.500Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:09.503Z"
+    "lastMatchedAt": "2026-07-03T21:11:11.500Z"
   },
   {
     "id": "1781177131219-rbowt9m",
@@ -1940,7 +1941,7 @@
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 10,
-      "scannedAt": "2026-07-03T20:38:42.299Z",
+      "scannedAt": "2026-07-03T21:11:03.471Z",
       "allArbs": [
         {
           "artist": "Glasses",
@@ -1991,22 +1992,6 @@
           }
         },
         {
-          "artist": "Watch",
-          "roiPct": 1.5870000000000002,
-          "expectedProfit": 15.870000000000001,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 960,
-          "fees": {
-            "kalshiFee": 16.66,
-            "pmFee": 7.47,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.13 + NO sell 3250 @ $0.04 = $16.66",
-            "pmFeeDetails": "Polymarket NO buy 1012 @ $0.82 (θ=0.05) = $7.47",
-            "netProfitIfKalshiWins": 15.870000000000001,
-            "netProfitIfPmWins": 15.870000000000001,
-            "worstCaseNetProfit": 15.870000000000001
-          }
-        },
-        {
           "artist": "Ring",
           "roiPct": 4.301000000000001,
           "expectedProfit": 43.010000000000005,
@@ -2021,29 +2006,13 @@
             "netProfitIfPmWins": 43.010000000000005,
             "worstCaseNetProfit": 43.010000000000005
           }
-        },
-        {
-          "artist": "Tablet",
-          "roiPct": 3.1464399999999997,
-          "expectedProfit": 31.464399999999998,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 954,
-          "fees": {
-            "kalshiFee": 9.32,
-            "pmFee": 5.2156,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.07 + NO sell 2333 @ $0.03 = $9.32",
-            "pmFeeDetails": "Polymarket NO buy 1002 @ $0.88 (θ=0.05) = $5.22",
-            "netProfitIfKalshiWins": 31.464399999999998,
-            "netProfitIfPmWins": 31.464399999999998,
-            "worstCaseNetProfit": 31.464399999999998
-          }
         }
       ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:38:42.299Z"
+    "lastMatchedAt": "2026-07-03T21:11:03.471Z"
   },
   {
     "id": "1781519846014-mod39v9",
@@ -2113,29 +2082,29 @@
     "expiryDate": "2026-07-19T19:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 10.200798199999994,
-      "bestProfit": 5.730785505617974,
+      "bestRoiPct": 13.035012000000007,
+      "bestProfit": 7.5784953488372135,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 12,
       "matchedCount": 2,
       "kalshiCount": 6,
       "pmCount": 8,
-      "scannedAt": "2026-07-03T20:39:04.447Z",
+      "scannedAt": "2026-07-03T21:11:15.532Z",
       "allArbs": [
         {
           "artist": "Eliminated in the Round of 16",
-          "roiPct": 10.200798199999994,
-          "expectedProfit": 5.730785505617974,
+          "roiPct": 13.035012000000007,
+          "expectedProfit": 7.5784953488372135,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 50.056179775280896,
+          "totalStake": 50.05813953488372,
           "fees": {
-            "kalshiFee": 0.39,
-            "pmFee": 0.00281,
-            "kalshiFeeDetails": "Kalshi NO sell 56 @ $0.89 = $0.39",
-            "pmFeeDetails": "Polymarket YES buy 56 @ $0.00 (θ=0.05) = $0.00",
-            "netProfitIfKalshiWins": 5.730785505617974,
-            "netProfitIfPmWins": 5.730785505617974,
-            "worstCaseNetProfit": 5.730785505617974
+            "kalshiFee": 0.5,
+            "pmFee": 0.0029,
+            "kalshiFeeDetails": "Kalshi NO sell 58 @ $0.86 = $0.50",
+            "pmFeeDetails": "Polymarket YES buy 58 @ $0.00 (θ=0.05) = $0.00",
+            "netProfitIfKalshiWins": 7.5784953488372135,
+            "netProfitIfPmWins": 7.5784953488372135,
+            "worstCaseNetProfit": 7.5784953488372135
           }
         }
       ]
@@ -2143,7 +2112,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:04.447Z"
+    "lastMatchedAt": "2026-07-03T21:11:15.532Z"
   },
   {
     "id": "1781520333275-tmumx79",
@@ -2162,13 +2131,13 @@
       "matchedCount": 6,
       "kalshiCount": 8,
       "pmCount": 6,
-      "scannedAt": "2026-07-03T20:38:53.841Z",
+      "scannedAt": "2026-07-03T21:13:20.446Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:38:53.841Z"
+    "lastMatchedAt": "2026-07-03T21:13:20.446Z"
   },
   {
     "id": "1781520373665-ku233qk",
@@ -2180,45 +2149,45 @@
     "expiryDate": "2026-07-20T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 1.488445,
-      "bestProfit": 14.884450000000001,
+      "bestRoiPct": 1.6978049999999998,
+      "bestProfit": 16.97805,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 50,
-      "matchedCount": 19,
-      "kalshiCount": 19,
+      "matchedCount": 18,
+      "kalshiCount": 18,
       "pmCount": 50,
-      "scannedAt": "2026-07-03T20:39:51.948Z",
+      "scannedAt": "2026-07-03T21:14:37.429Z",
       "allArbs": [
         {
           "artist": "USA",
-          "roiPct": 0.548125,
-          "expectedProfit": 5.48125,
+          "roiPct": 0.6411250000000001,
+          "expectedProfit": 6.41125,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 991,
+          "totalStake": 990,
           "fees": {
-            "kalshiFee": 2.3,
+            "kalshiFee": 2.37,
             "pmFee": 1.21875,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.97 = $2.30",
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.96 = $2.37",
             "pmFeeDetails": "Polymarket YES buy 1000 @ $0.03 (θ=0.05) = $1.22",
-            "netProfitIfKalshiWins": 5.48125,
-            "netProfitIfPmWins": 5.48125,
-            "worstCaseNetProfit": 5.48125
+            "netProfitIfKalshiWins": 6.41125,
+            "netProfitIfPmWins": 6.41125,
+            "worstCaseNetProfit": 6.41125
           }
         },
         {
           "artist": "Mexico",
-          "roiPct": 1.488445,
-          "expectedProfit": 14.884450000000001,
+          "roiPct": 1.6978049999999998,
+          "expectedProfit": 16.97805,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 980,
+          "totalStake": 978,
           "fees": {
             "kalshiFee": 3.52,
-            "pmFee": 1.59555,
+            "pmFee": 1.50195,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.95 = $3.52",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.03 (θ=0.05) = $1.60",
-            "netProfitIfKalshiWins": 14.884450000000001,
-            "netProfitIfPmWins": 14.884450000000001,
-            "worstCaseNetProfit": 14.884450000000001
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.03 (θ=0.05) = $1.50",
+            "netProfitIfKalshiWins": 16.97805,
+            "netProfitIfPmWins": 16.97805,
+            "worstCaseNetProfit": 16.97805
           }
         }
       ]
@@ -2226,7 +2195,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:51.948Z"
+    "lastMatchedAt": "2026-07-03T21:14:37.429Z"
   },
   {
     "id": "1781521870595-oqgkld7",
@@ -2245,7 +2214,7 @@
       "matchedCount": 25,
       "kalshiCount": 50,
       "pmCount": 30,
-      "scannedAt": "2026-07-03T20:39:44.185Z",
+      "scannedAt": "2026-07-03T21:13:08.575Z",
       "allArbs": [
         {
           "artist": "José Caballero",
@@ -2300,7 +2269,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:44.185Z"
+    "lastMatchedAt": "2026-07-03T21:13:08.575Z"
   },
   {
     "id": "1781522252009-181a6ca",
@@ -2319,7 +2288,7 @@
       "matchedCount": 31,
       "kalshiCount": 71,
       "pmCount": 41,
-      "scannedAt": "2026-07-03T20:39:33.065Z",
+      "scannedAt": "2026-07-03T21:13:08.363Z",
       "allArbs": [
         {
           "artist": "Taylor Ward",
@@ -2355,18 +2324,18 @@
         },
         {
           "artist": "Willy Adames",
-          "roiPct": 0.2909812000000003,
-          "expectedProfit": 0.14696020202020216,
+          "roiPct": 0.18605100000000027,
+          "expectedProfit": 0.09396515151515165,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 50.303030303030305,
+          "totalStake": 50.35353535353536,
           "fees": {
             "kalshiFee": 0.04,
-            "pmFee": 0.01506,
+            "pmFee": 0.01755,
             "kalshiFeeDetails": "Kalshi NO sell 51 @ $0.99 = $0.04",
             "pmFeeDetails": "Polymarket YES buy 51 @ $0.01 (θ=0.05) = $0.02",
-            "netProfitIfKalshiWins": 0.14696020202020216,
-            "netProfitIfPmWins": 0.14696020202020216,
-            "worstCaseNetProfit": 0.14696020202020216
+            "netProfitIfKalshiWins": 0.09396515151515165,
+            "netProfitIfPmWins": 0.09396515151515165,
+            "worstCaseNetProfit": 0.09396515151515165
           }
         },
         {
@@ -2390,7 +2359,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:33.065Z"
+    "lastMatchedAt": "2026-07-03T21:13:08.364Z"
   },
   {
     "id": "1781993194195-7cj9e17",
@@ -2485,29 +2454,45 @@
     "expiryDate": "2026-12-31T23:59:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 3.624579999999997,
-      "bestProfit": 0.20136555555555535,
+      "bestRoiPct": 3.6748000000000016,
+      "bestProfit": 0.4389344444444446,
       "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 42,
       "matchedCount": 8,
       "kalshiCount": 15,
       "pmCount": 35,
-      "scannedAt": "2026-07-03T20:40:19.870Z",
+      "scannedAt": "2026-07-03T21:13:34.985Z",
       "allArbs": [
         {
+          "artist": "Ed Miliband",
+          "roiPct": 1.1041067659838713,
+          "expectedProfit": 1.3682430769230898,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 118.96615384615383,
+          "fees": {
+            "kalshiFee": 2.07,
+            "pmFee": 1.51868,
+            "kalshiFeeDetails": "Kalshi NO sell 124 @ $0.39 = $2.07",
+            "pmFeeDetails": "Polymarket YES buy 124 @ $0.57 (θ=0.05) = $1.52",
+            "netProfitIfKalshiWins": 1.3682430769230898,
+            "netProfitIfPmWins": 1.3682430769230898,
+            "worstCaseNetProfit": 1.3682430769230898
+          }
+        },
+        {
           "artist": "Darren Jones",
-          "roiPct": 0.14759000000000003,
-          "expectedProfit": 1.4759000000000002,
+          "roiPct": 0.15252,
+          "expectedProfit": 1.5252,
           "strategy": "Buy YES Kalshi + NO PM",
           "totalStake": 996,
           "fees": {
             "kalshiFee": 0.7,
-            "pmFee": 1.8241,
+            "pmFee": 1.7748,
             "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.01 + NO sell Infinity @ $0.00 = $0.70",
-            "pmFeeDetails": "Polymarket NO buy 1024 @ $0.96 (θ=0.05) = $1.82",
-            "netProfitIfKalshiWins": 1.4759000000000002,
-            "netProfitIfPmWins": 1.4759000000000002,
-            "worstCaseNetProfit": 1.4759000000000002
+            "pmFeeDetails": "Polymarket NO buy 1023 @ $0.96 (θ=0.05) = $1.77",
+            "netProfitIfKalshiWins": 1.5252,
+            "netProfitIfPmWins": 1.5252,
+            "worstCaseNetProfit": 1.5252
           }
         },
         {
@@ -2528,18 +2513,18 @@
         },
         {
           "artist": "Shabana Mahmood",
-          "roiPct": 3.624579999999997,
-          "expectedProfit": 0.20136555555555535,
+          "roiPct": 3.6748000000000016,
+          "expectedProfit": 0.4389344444444446,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 5.3,
+          "totalStake": 11.395,
           "fees": {
-            "kalshiFee": 0.04,
-            "pmFee": 0.01419,
-            "kalshiFeeDetails": "Kalshi NO sell 6 @ $0.90 = $0.04",
-            "pmFeeDetails": "Polymarket YES buy 6 @ $0.05 (θ=0.05) = $0.01",
-            "netProfitIfKalshiWins": 0.20136555555555535,
-            "netProfitIfPmWins": 0.20136555555555535,
-            "worstCaseNetProfit": 0.20136555555555535
+            "kalshiFee": 0.08,
+            "pmFee": 0.03051,
+            "kalshiFeeDetails": "Kalshi NO sell 12 @ $0.90 = $0.08",
+            "pmFeeDetails": "Polymarket YES buy 12 @ $0.05 (θ=0.05) = $0.03",
+            "netProfitIfKalshiWins": 0.4389344444444446,
+            "netProfitIfPmWins": 0.4389344444444446,
+            "worstCaseNetProfit": 0.4389344444444446
           }
         }
       ]
@@ -2547,7 +2532,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:19.870Z"
+    "lastMatchedAt": "2026-07-03T21:13:34.985Z"
   },
   {
     "id": "1782686079706-2ltaikx",
@@ -2566,7 +2551,7 @@
       "matchedCount": 0,
       "kalshiCount": 3,
       "pmCount": 5,
-      "scannedAt": "2026-07-03T20:39:49.735Z",
+      "scannedAt": "2026-07-03T21:13:19.008Z",
       "allArbs": []
     },
     "archived": false,
@@ -2584,37 +2569,20 @@
     "expiryDate": "2026-10-31T03:59:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0.09625000000000003,
-      "bestProfit": 0.9625000000000004,
-      "strategy": "Buy YES Kalshi + NO PM",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 55,
       "matchedCount": 6,
       "kalshiCount": 31,
       "pmCount": 30,
-      "scannedAt": "2026-07-03T20:40:12.827Z",
-      "allArbs": [
-        {
-          "artist": "New York",
-          "roiPct": 0.09625000000000003,
-          "expectedProfit": 0.9625000000000004,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 995,
-          "fees": {
-            "kalshiFee": 2.7699999999999996,
-            "pmFee": 1.2675,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.02 + NO sell 2000 @ $0.01 = $2.77",
-            "pmFeeDetails": "Polymarket NO buy 1001 @ $0.97 (θ=0.05) = $1.27",
-            "netProfitIfKalshiWins": 0.9625000000000004,
-            "netProfitIfPmWins": 0.9625000000000004,
-            "worstCaseNetProfit": 0.9625000000000004
-          }
-        }
-      ]
+      "scannedAt": "2026-07-03T21:13:38.367Z",
+      "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:12.827Z"
+    "lastMatchedAt": "2026-07-03T21:13:38.367Z"
   },
   {
     "id": "1782999196726-house-akal",
@@ -2633,7 +2601,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:39:55.285Z",
+      "scannedAt": "2026-07-03T21:13:22.934Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2672,7 +2640,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:55.285Z"
+    "lastMatchedAt": "2026-07-03T21:13:22.934Z"
   },
   {
     "id": "1782999196726-house-al01",
@@ -2691,7 +2659,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:39:56.239Z",
+      "scannedAt": "2026-07-03T21:13:23.610Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2714,7 +2682,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:56.239Z"
+    "lastMatchedAt": "2026-07-03T21:13:23.610Z"
   },
   {
     "id": "1782999196726-house-al02",
@@ -2733,13 +2701,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:39:58.000Z",
+      "scannedAt": "2026-07-03T21:13:27.786Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:39:58.000Z"
+    "lastMatchedAt": "2026-07-03T21:13:27.786Z"
   },
   {
     "id": "1782999196726-house-al03",
@@ -2758,7 +2726,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:01.609Z",
+      "scannedAt": "2026-07-03T21:15:41.734Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -2778,18 +2746,18 @@
         },
         {
           "artist": "Democratic",
-          "roiPct": 0.5,
-          "expectedProfit": 5,
+          "roiPct": 0.9999999999999963,
+          "expectedProfit": 0.16666666666666607,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 995,
+          "totalStake": 16.5,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 5,
-            "netProfitIfPmWins": 5,
-            "worstCaseNetProfit": 5
+            "netProfitIfKalshiWins": 0.16666666666666607,
+            "netProfitIfPmWins": 0.16666666666666607,
+            "worstCaseNetProfit": 0.16666666666666607
           }
         }
       ]
@@ -2797,7 +2765,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:01.609Z"
+    "lastMatchedAt": "2026-07-03T21:15:41.734Z"
   },
   {
     "id": "1782999196726-house-al04",
@@ -2816,13 +2784,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:02.594Z",
+      "scannedAt": "2026-07-03T21:13:32.802Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:02.594Z"
+    "lastMatchedAt": "2026-07-03T21:13:32.802Z"
   },
   {
     "id": "1782999196726-house-al05",
@@ -2841,7 +2809,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:04.357Z",
+      "scannedAt": "2026-07-03T21:13:33.477Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -2880,7 +2848,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:04.357Z"
+    "lastMatchedAt": "2026-07-03T21:13:33.477Z"
   },
   {
     "id": "1782999196726-house-al06",
@@ -2892,29 +2860,45 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0.4999999999999909,
-      "bestProfit": 1.3129842931936935,
+      "bestRoiPct": 3,
+      "bestProfit": 0.5,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:07.887Z",
+      "scannedAt": "2026-07-03T21:13:38.135Z",
       "allArbs": [
         {
+          "artist": "Republican",
+          "roiPct": 0.6045,
+          "expectedProfit": 6.045,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 985,
+          "fees": {
+            "kalshiFee": 4.86,
+            "pmFee": 4.095,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.07 = $4.86",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.91 (θ=0.05) = $4.09",
+            "netProfitIfKalshiWins": 6.045,
+            "netProfitIfPmWins": 6.045,
+            "worstCaseNetProfit": 6.045
+          }
+        },
+        {
           "artist": "Democratic",
-          "roiPct": 0.4999999999999909,
-          "expectedProfit": 1.3129842931936935,
+          "roiPct": 3,
+          "expectedProfit": 0.5,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 261.28387434554975,
+          "totalStake": 16.166666666666668,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 1.3129842931936935,
-            "netProfitIfPmWins": 1.3129842931936935,
-            "worstCaseNetProfit": 1.3129842931936935
+            "netProfitIfKalshiWins": 0.5,
+            "netProfitIfPmWins": 0.5,
+            "worstCaseNetProfit": 0.5
           }
         }
       ]
@@ -2922,7 +2906,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:07.887Z"
+    "lastMatchedAt": "2026-07-03T21:13:38.135Z"
   },
   {
     "id": "1782999196726-house-al07",
@@ -2941,13 +2925,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:08.830Z",
+      "scannedAt": "2026-07-03T21:13:39.781Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:08.830Z"
+    "lastMatchedAt": "2026-07-03T21:13:39.781Z"
   },
   {
     "id": "1782999196726-house-ar01",
@@ -2966,7 +2950,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:10.787Z",
+      "scannedAt": "2026-07-03T21:13:42.169Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3005,7 +2989,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:10.787Z"
+    "lastMatchedAt": "2026-07-03T21:13:42.169Z"
   },
   {
     "id": "1782999196726-house-ar02",
@@ -3024,13 +3008,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:14.294Z",
+      "scannedAt": "2026-07-03T21:13:43.797Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:14.294Z"
+    "lastMatchedAt": "2026-07-03T21:13:43.797Z"
   },
   {
     "id": "1782999196726-house-ar03",
@@ -3049,7 +3033,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:16.097Z",
+      "scannedAt": "2026-07-03T21:13:45.149Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3088,7 +3072,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:16.097Z"
+    "lastMatchedAt": "2026-07-03T21:13:45.149Z"
   },
   {
     "id": "1782999196726-house-ar04",
@@ -3107,7 +3091,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:17.844Z",
+      "scannedAt": "2026-07-03T21:13:45.388Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3146,7 +3130,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:17.844Z"
+    "lastMatchedAt": "2026-07-03T21:13:45.389Z"
   },
   {
     "id": "1782999196726-house-az01",
@@ -3158,29 +3142,45 @@
     "expiryDate": "2026-11-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2.000000000000002,
-      "bestProfit": 6.585365853658544,
+      "bestRoiPct": 3,
+      "bestProfit": 0.125,
       "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:19.629Z",
+      "scannedAt": "2026-07-03T21:13:46.846Z",
       "allArbs": [
         {
+          "artist": "Democratic",
+          "roiPct": 0.7374999999999999,
+          "expectedProfit": 7.375,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "totalStake": 970,
+          "fees": {
+            "kalshiFee": 12.77,
+            "pmFee": 9.855,
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.24 = $12.77",
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.73 (θ=0.05) = $9.86",
+            "netProfitIfKalshiWins": 7.375,
+            "netProfitIfPmWins": 7.375,
+            "worstCaseNetProfit": 7.375
+          }
+        },
+        {
           "artist": "Republican",
-          "roiPct": 2.000000000000002,
-          "expectedProfit": 6.585365853658544,
+          "roiPct": 3,
+          "expectedProfit": 0.125,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
-          "totalStake": 322.68292682926835,
+          "totalStake": 4.041666666666667,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 6.585365853658544,
-            "netProfitIfPmWins": 6.585365853658544,
-            "worstCaseNetProfit": 6.585365853658544
+            "netProfitIfKalshiWins": 0.125,
+            "netProfitIfPmWins": 0.125,
+            "worstCaseNetProfit": 0.125
           }
         }
       ]
@@ -3188,7 +3188,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:19.629Z"
+    "lastMatchedAt": "2026-07-03T21:13:46.846Z"
   },
   {
     "id": "1782999196726-house-az02",
@@ -3207,13 +3207,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:21.337Z",
+      "scannedAt": "2026-07-03T21:13:49.386Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:21.337Z"
+    "lastMatchedAt": "2026-07-03T21:13:49.386Z"
   },
   {
     "id": "1782999196726-house-az03",
@@ -3232,7 +3232,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:24.012Z",
+      "scannedAt": "2026-07-03T21:13:51.050Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3271,7 +3271,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:24.012Z"
+    "lastMatchedAt": "2026-07-03T21:13:51.050Z"
   },
   {
     "id": "1782999196726-house-az04",
@@ -3290,7 +3290,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:25.853Z",
+      "scannedAt": "2026-07-03T21:13:52.498Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3329,7 +3329,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:25.853Z"
+    "lastMatchedAt": "2026-07-03T21:13:52.498Z"
   },
   {
     "id": "1782999196726-house-az05",
@@ -3348,13 +3348,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:27.314Z",
+      "scannedAt": "2026-07-03T21:13:52.721Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:27.314Z"
+    "lastMatchedAt": "2026-07-03T21:13:52.721Z"
   },
   {
     "id": "1782999196726-house-az06",
@@ -3373,7 +3373,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:27.574Z",
+      "scannedAt": "2026-07-03T21:13:54.558Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3412,7 +3412,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:27.574Z"
+    "lastMatchedAt": "2026-07-03T21:13:54.558Z"
   },
   {
     "id": "1782999196726-house-az07",
@@ -3431,13 +3431,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:29.022Z",
+      "scannedAt": "2026-07-03T21:13:56.907Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:29.022Z"
+    "lastMatchedAt": "2026-07-03T21:13:56.907Z"
   },
   {
     "id": "1782999196726-house-az08",
@@ -3456,7 +3456,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:31.553Z",
+      "scannedAt": "2026-07-03T21:13:58.545Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3495,7 +3495,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:31.553Z"
+    "lastMatchedAt": "2026-07-03T21:13:58.545Z"
   },
   {
     "id": "1782999196726-house-az09",
@@ -3507,45 +3507,45 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 1.200000000000003,
-      "bestProfit": 3.174603174603183,
+      "bestRoiPct": 1.1000000000000032,
+      "bestProfit": 2.9100529100529187,
       "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:33.454Z",
+      "scannedAt": "2026-07-03T21:13:59.927Z",
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 1.0956852800000105,
-          "expectedProfit": 2.914056595744709,
+          "roiPct": 0.9911206400000107,
+          "expectedProfit": 2.6359591489361986,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 261.43617021276594,
+          "totalStake": 261.70212765957444,
           "fees": {
             "kalshiFee": 1.06,
-            "pmFee": 0.54722,
+            "pmFee": 0.55936,
             "kalshiFeeDetails": "Kalshi NO sell 266 @ $0.94 = $1.06",
-            "pmFeeDetails": "Polymarket YES buy 266 @ $0.04 (θ=0.05) = $0.55",
-            "netProfitIfKalshiWins": 2.914056595744709,
-            "netProfitIfPmWins": 2.914056595744709,
-            "worstCaseNetProfit": 2.914056595744709
+            "pmFeeDetails": "Polymarket YES buy 266 @ $0.04 (θ=0.05) = $0.56",
+            "netProfitIfKalshiWins": 2.6359591489361986,
+            "netProfitIfPmWins": 2.6359591489361986,
+            "worstCaseNetProfit": 2.6359591489361986
           }
         },
         {
           "artist": "Republican",
-          "roiPct": 1.200000000000003,
-          "expectedProfit": 3.174603174603183,
+          "roiPct": 1.1000000000000032,
+          "expectedProfit": 2.9100529100529187,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
-          "totalStake": 261.37566137566137,
+          "totalStake": 261.64021164021165,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 3.174603174603183,
-            "netProfitIfPmWins": 3.174603174603183,
-            "worstCaseNetProfit": 3.174603174603183
+            "netProfitIfKalshiWins": 2.9100529100529187,
+            "netProfitIfPmWins": 2.9100529100529187,
+            "worstCaseNetProfit": 2.9100529100529187
           }
         }
       ]
@@ -3553,7 +3553,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:33.454Z"
+    "lastMatchedAt": "2026-07-03T21:13:59.927Z"
   },
   {
     "id": "1782999196726-house-ca01",
@@ -3572,7 +3572,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:34.951Z",
+      "scannedAt": "2026-07-03T21:14:00.142Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3611,7 +3611,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:34.951Z"
+    "lastMatchedAt": "2026-07-03T21:14:00.142Z"
   },
   {
     "id": "1782999196726-house-ca02",
@@ -3630,7 +3630,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:35.187Z",
+      "scannedAt": "2026-07-03T21:14:01.790Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3669,7 +3669,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:35.187Z"
+    "lastMatchedAt": "2026-07-03T21:14:01.790Z"
   },
   {
     "id": "1782999196726-house-ca03",
@@ -3688,7 +3688,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:36.730Z",
+      "scannedAt": "2026-07-03T21:14:04.288Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -3727,7 +3727,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:36.730Z"
+    "lastMatchedAt": "2026-07-03T21:14:04.288Z"
   },
   {
     "id": "1782999196726-house-ca05",
@@ -3746,7 +3746,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:39.456Z",
+      "scannedAt": "2026-07-03T21:14:05.913Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3769,7 +3769,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:39.456Z"
+    "lastMatchedAt": "2026-07-03T21:14:05.913Z"
   },
   {
     "id": "1782999196726-house-ca06",
@@ -3788,7 +3788,7 @@
       "matchedCount": 2,
       "kalshiCount": 3,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:41.202Z",
+      "scannedAt": "2026-07-03T21:14:07.574Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3811,7 +3811,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:41.202Z"
+    "lastMatchedAt": "2026-07-03T21:14:07.574Z"
   },
   {
     "id": "1782999196726-house-ca08",
@@ -3830,7 +3830,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:42.710Z",
+      "scannedAt": "2026-07-03T21:14:07.810Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3853,7 +3853,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:42.710Z"
+    "lastMatchedAt": "2026-07-03T21:14:07.810Z"
   },
   {
     "id": "1782999196726-house-ca09",
@@ -3872,7 +3872,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:42.953Z",
+      "scannedAt": "2026-07-03T21:14:09.252Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -3895,7 +3895,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:42.953Z"
+    "lastMatchedAt": "2026-07-03T21:14:09.252Z"
   },
   {
     "id": "1782999196726-house-ca10",
@@ -3914,13 +3914,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:44.470Z",
+      "scannedAt": "2026-07-03T21:15:41.826Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:44.470Z"
+    "lastMatchedAt": "2026-07-03T21:15:41.826Z"
   },
   {
     "id": "1782999196726-house-ca13",
@@ -3939,13 +3939,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:47.086Z",
+      "scannedAt": "2026-07-03T21:14:13.741Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:47.086Z"
+    "lastMatchedAt": "2026-07-03T21:14:13.741Z"
   },
   {
     "id": "1782999196726-house-ca15",
@@ -3964,13 +3964,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:48.780Z",
+      "scannedAt": "2026-07-03T21:14:15.145Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:48.780Z"
+    "lastMatchedAt": "2026-07-03T21:14:15.145Z"
   },
   {
     "id": "1782999196726-house-ca16",
@@ -3989,13 +3989,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:50.259Z",
+      "scannedAt": "2026-07-03T21:14:15.366Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:50.259Z"
+    "lastMatchedAt": "2026-07-03T21:14:15.366Z"
   },
   {
     "id": "1782999196726-house-ca17",
@@ -4014,7 +4014,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:50.502Z",
+      "scannedAt": "2026-07-03T21:14:16.901Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4037,7 +4037,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:50.502Z"
+    "lastMatchedAt": "2026-07-03T21:14:16.901Z"
   },
   {
     "id": "1782999196726-house-ca18",
@@ -4056,7 +4056,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:51.976Z",
+      "scannedAt": "2026-07-03T21:15:41.804Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4095,7 +4095,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:51.976Z"
+    "lastMatchedAt": "2026-07-03T21:15:41.804Z"
   },
   {
     "id": "1782999196726-house-ca19",
@@ -4114,7 +4114,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:54.626Z",
+      "scannedAt": "2026-07-03T21:15:41.775Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4153,7 +4153,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:54.626Z"
+    "lastMatchedAt": "2026-07-03T21:15:41.775Z"
   },
   {
     "id": "1782999196726-house-ca20",
@@ -4172,7 +4172,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:56.389Z",
+      "scannedAt": "2026-07-03T21:14:19.357Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4195,7 +4195,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:56.389Z"
+    "lastMatchedAt": "2026-07-03T21:14:19.357Z"
   },
   {
     "id": "1782999196726-house-ca21",
@@ -4214,7 +4214,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:57.958Z",
+      "scannedAt": "2026-07-03T21:15:41.967Z",
       "allArbs": [
         {
           "artist": "a Republican",
@@ -4237,7 +4237,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:57.958Z"
+    "lastMatchedAt": "2026-07-03T21:15:41.967Z"
   },
   {
     "id": "1782999196726-house-ca22",
@@ -4249,20 +4249,37 @@
     "expiryDate": "2026-11-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
+      "bestRoiPct": 0.9999999999999963,
+      "bestProfit": 0.02499999999999991,
+      "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:40:58.223Z",
-      "allArbs": []
+      "scannedAt": "2026-07-03T21:14:21.036Z",
+      "allArbs": [
+        {
+          "artist": "Republican",
+          "roiPct": 0.9999999999999963,
+          "expectedProfit": 0.02499999999999991,
+          "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
+          "totalStake": 2.475,
+          "fees": {
+            "kalshiFee": 0,
+            "pmFee": 0,
+            "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
+            "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
+            "netProfitIfKalshiWins": 0.02499999999999991,
+            "netProfitIfPmWins": 0.02499999999999991,
+            "worstCaseNetProfit": 0.02499999999999991
+          }
+        }
+      ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:40:58.223Z"
+    "lastMatchedAt": "2026-07-03T21:14:21.036Z"
   },
   {
     "id": "1782999196726-house-ca23",
@@ -4339,7 +4356,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:02.384Z",
+      "scannedAt": "2026-07-03T21:14:22.431Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4378,7 +4395,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:02.384Z"
+    "lastMatchedAt": "2026-07-03T21:14:22.431Z"
   },
   {
     "id": "1782999196726-house-ca25",
@@ -4422,7 +4439,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:05.798Z",
+      "scannedAt": "2026-07-03T21:14:22.680Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4461,7 +4478,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:05.798Z"
+    "lastMatchedAt": "2026-07-03T21:14:22.680Z"
   },
   {
     "id": "1782999196726-house-ca27",
@@ -4505,13 +4522,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:07.593Z",
+      "scannedAt": "2026-07-03T21:14:24.089Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:07.593Z"
+    "lastMatchedAt": "2026-07-03T21:14:24.089Z"
   },
   {
     "id": "1782999196726-house-ca30",
@@ -4530,7 +4547,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:10.104Z",
+      "scannedAt": "2026-07-03T21:15:58.288Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4569,7 +4586,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:10.104Z"
+    "lastMatchedAt": "2026-07-03T21:15:58.288Z"
   },
   {
     "id": "1782999196726-house-ca31",
@@ -4588,7 +4605,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:11.857Z",
+      "scannedAt": "2026-07-03T21:15:58.328Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4627,7 +4644,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:11.857Z"
+    "lastMatchedAt": "2026-07-03T21:15:58.328Z"
   },
   {
     "id": "1782999196726-house-ca32",
@@ -4646,7 +4663,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:13.443Z",
+      "scannedAt": "2026-07-03T21:15:48.811Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4685,7 +4702,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:13.443Z"
+    "lastMatchedAt": "2026-07-03T21:15:48.811Z"
   },
   {
     "id": "1782999196726-house-ca33",
@@ -4704,7 +4721,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:13.684Z",
+      "scannedAt": "2026-07-03T21:14:28.410Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4727,7 +4744,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:13.684Z"
+    "lastMatchedAt": "2026-07-03T21:14:28.410Z"
   },
   {
     "id": "1782999196726-house-ca35",
@@ -4746,7 +4763,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:15.209Z",
+      "scannedAt": "2026-07-03T21:15:49.037Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -4785,7 +4802,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:15.209Z"
+    "lastMatchedAt": "2026-07-03T21:15:49.037Z"
   },
   {
     "id": "1782999196726-house-ca36",
@@ -4804,13 +4821,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:17.728Z",
+      "scannedAt": "2026-07-03T21:14:29.839Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:17.728Z"
+    "lastMatchedAt": "2026-07-03T21:14:29.839Z"
   },
   {
     "id": "1782999196726-house-ca38",
@@ -4829,7 +4846,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:19.518Z",
+      "scannedAt": "2026-07-03T21:15:49.290Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4868,7 +4885,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:19.518Z"
+    "lastMatchedAt": "2026-07-03T21:15:49.290Z"
   },
   {
     "id": "1782999196726-house-ca39",
@@ -4887,13 +4904,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:21.080Z",
+      "scannedAt": "2026-07-03T21:14:30.069Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:21.080Z"
+    "lastMatchedAt": "2026-07-03T21:14:30.069Z"
   },
   {
     "id": "1782999196726-house-ca41",
@@ -4912,7 +4929,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:21.337Z",
+      "scannedAt": "2026-07-03T21:15:53.359Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4935,7 +4952,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:21.337Z"
+    "lastMatchedAt": "2026-07-03T21:15:53.359Z"
   },
   {
     "id": "1782999196726-house-ca42",
@@ -4954,7 +4971,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:22.969Z",
+      "scannedAt": "2026-07-03T21:14:31.608Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -4993,7 +5010,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:22.969Z"
+    "lastMatchedAt": "2026-07-03T21:14:31.608Z"
   },
   {
     "id": "1782999196726-house-ca43",
@@ -5070,7 +5087,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:27.309Z",
+      "scannedAt": "2026-07-03T21:14:34.013Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5109,7 +5126,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:27.309Z"
+    "lastMatchedAt": "2026-07-03T21:14:34.013Z"
   },
   {
     "id": "1782999196726-house-ca46",
@@ -5153,13 +5170,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:29.046Z",
+      "scannedAt": "2026-07-03T21:14:35.675Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:29.046Z"
+    "lastMatchedAt": "2026-07-03T21:14:35.675Z"
   },
   {
     "id": "1782999196726-house-ca48",
@@ -5178,13 +5195,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:30.576Z",
+      "scannedAt": "2026-07-03T21:15:57.902Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:30.576Z"
+    "lastMatchedAt": "2026-07-03T21:15:57.902Z"
   },
   {
     "id": "1782999196726-house-ca49",
@@ -5203,7 +5220,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:33.227Z",
+      "scannedAt": "2026-07-03T21:14:37.151Z",
       "allArbs": [
         {
           "artist": "a Republican",
@@ -5226,7 +5243,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:33.227Z"
+    "lastMatchedAt": "2026-07-03T21:14:37.151Z"
   },
   {
     "id": "1782999196726-house-ca50",
@@ -5245,7 +5262,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:34.980Z",
+      "scannedAt": "2026-07-03T21:15:58.144Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5268,7 +5285,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:34.980Z"
+    "lastMatchedAt": "2026-07-03T21:15:58.144Z"
   },
   {
     "id": "1782999196726-house-ca51",
@@ -5287,7 +5304,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:36.619Z",
+      "scannedAt": "2026-07-03T21:14:37.388Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5326,7 +5343,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:36.619Z"
+    "lastMatchedAt": "2026-07-03T21:14:37.388Z"
   },
   {
     "id": "1782999196726-house-ca52",
@@ -5345,13 +5362,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:36.890Z",
+      "scannedAt": "2026-07-03T21:15:58.377Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:36.890Z"
+    "lastMatchedAt": "2026-07-03T21:15:58.377Z"
   },
   {
     "id": "1782999196726-house-co01",
@@ -5370,13 +5387,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:38.433Z",
+      "scannedAt": "2026-07-03T21:14:38.769Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:38.434Z"
+    "lastMatchedAt": "2026-07-03T21:14:38.769Z"
   },
   {
     "id": "1782999196726-house-co02",
@@ -5395,13 +5412,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:41.106Z",
+      "scannedAt": "2026-07-03T21:16:04.929Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:41.106Z"
+    "lastMatchedAt": "2026-07-03T21:16:04.929Z"
   },
   {
     "id": "1782999196726-house-co03",
@@ -5420,13 +5437,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:42.881Z",
+      "scannedAt": "2026-07-03T21:16:05.157Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:42.881Z"
+    "lastMatchedAt": "2026-07-03T21:16:05.157Z"
   },
   {
     "id": "1782999196726-house-co04",
@@ -5445,7 +5462,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:44.531Z",
+      "scannedAt": "2026-07-03T21:16:05.624Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5484,7 +5501,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:44.531Z"
+    "lastMatchedAt": "2026-07-03T21:16:05.624Z"
   },
   {
     "id": "1782999196726-house-co05",
@@ -5496,37 +5513,20 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0.9999999999999983,
-      "bestProfit": 6.578947368421041,
-      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:44.769Z",
-      "allArbs": [
-        {
-          "artist": "Democratic",
-          "roiPct": 0.9999999999999983,
-          "expectedProfit": 6.578947368421041,
-          "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 651.3157894736842,
-          "fees": {
-            "kalshiFee": 0,
-            "pmFee": 0,
-            "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
-            "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 6.578947368421041,
-            "netProfitIfPmWins": 6.578947368421041,
-            "worstCaseNetProfit": 6.578947368421041
-          }
-        }
-      ]
+      "scannedAt": "2026-07-03T21:16:05.392Z",
+      "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:44.769Z"
+    "lastMatchedAt": "2026-07-03T21:16:05.392Z"
   },
   {
     "id": "1782999196726-house-co06",
@@ -5545,7 +5545,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:46.418Z",
+      "scannedAt": "2026-07-03T21:16:05.898Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5584,7 +5584,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:46.418Z"
+    "lastMatchedAt": "2026-07-03T21:16:05.898Z"
   },
   {
     "id": "1782999196726-house-co07",
@@ -5603,7 +5603,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:48.985Z",
+      "scannedAt": "2026-07-03T21:16:12.505Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5642,7 +5642,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:48.985Z"
+    "lastMatchedAt": "2026-07-03T21:16:12.505Z"
   },
   {
     "id": "1782999196726-house-co08",
@@ -5654,45 +5654,45 @@
     "expiryDate": "2026-11-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 5,
-      "bestProfit": 0.3125,
+      "bestRoiPct": 3.9999999999999933,
+      "bestProfit": 12.388148148148126,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:50.825Z",
+      "scannedAt": "2026-07-03T21:16:12.742Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 2.2689894999999995,
-          "expectedProfit": 0.5602443209876542,
+          "roiPct": 2.2825029999999935,
+          "expectedProfit": 3.381485925925917,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 23.703703703703702,
+          "totalStake": 142.22222222222223,
           "fees": {
-            "kalshiFee": 0.27,
-            "pmFee": 0.15741,
-            "kalshiFeeDetails": "Kalshi NO sell 25 @ $0.81 = $0.27",
-            "pmFeeDetails": "Polymarket YES buy 25 @ $0.15 (θ=0.05) = $0.16",
-            "netProfitIfKalshiWins": 0.5602443209876542,
-            "netProfitIfPmWins": 0.5602443209876542,
-            "worstCaseNetProfit": 0.5602443209876542
+            "kalshiFee": 1.6,
+            "pmFee": 0.94444,
+            "kalshiFeeDetails": "Kalshi NO sell 148 @ $0.81 = $1.60",
+            "pmFeeDetails": "Polymarket YES buy 148 @ $0.15 (θ=0.05) = $0.94",
+            "netProfitIfKalshiWins": 3.381485925925917,
+            "netProfitIfPmWins": 3.381485925925917,
+            "worstCaseNetProfit": 3.381485925925917
           }
         },
         {
           "artist": "Democratic",
-          "roiPct": 5,
-          "expectedProfit": 0.3125,
+          "roiPct": 3.9999999999999933,
+          "expectedProfit": 12.388148148148126,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 5.9375,
+          "totalStake": 297.3155555555556,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 0.3125,
-            "netProfitIfPmWins": 0.3125,
-            "worstCaseNetProfit": 0.3125
+            "netProfitIfKalshiWins": 12.388148148148126,
+            "netProfitIfPmWins": 12.388148148148126,
+            "worstCaseNetProfit": 12.388148148148126
           }
         }
       ]
@@ -5700,7 +5700,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:50.825Z"
+    "lastMatchedAt": "2026-07-03T21:16:12.742Z"
   },
   {
     "id": "1782999196726-house-ct01",
@@ -5719,13 +5719,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:52.364Z",
+      "scannedAt": "2026-07-03T21:16:12.981Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:52.364Z"
+    "lastMatchedAt": "2026-07-03T21:16:12.981Z"
   },
   {
     "id": "1782999196726-house-ct02",
@@ -5744,7 +5744,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:52.606Z",
+      "scannedAt": "2026-07-03T21:16:13.214Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5783,7 +5783,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:52.606Z"
+    "lastMatchedAt": "2026-07-03T21:16:13.214Z"
   },
   {
     "id": "1782999196726-house-ct03",
@@ -5802,7 +5802,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:54.103Z",
+      "scannedAt": "2026-07-03T21:16:13.457Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -5841,7 +5841,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:54.103Z"
+    "lastMatchedAt": "2026-07-03T21:16:13.458Z"
   },
   {
     "id": "1782999196726-house-ct04",
@@ -5860,7 +5860,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:56.609Z",
+      "scannedAt": "2026-07-03T21:16:20.281Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -5899,7 +5899,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:56.609Z"
+    "lastMatchedAt": "2026-07-03T21:16:20.281Z"
   },
   {
     "id": "1782999196726-house-ct05",
@@ -5918,13 +5918,13 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:58.394Z",
+      "scannedAt": "2026-07-03T21:16:20.527Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:58.394Z"
+    "lastMatchedAt": "2026-07-03T21:16:20.527Z"
   },
   {
     "id": "1782999196726-house-deal",
@@ -5943,7 +5943,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:41:59.933Z",
+      "scannedAt": "2026-07-03T21:16:20.761Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -5982,7 +5982,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:41:59.933Z"
+    "lastMatchedAt": "2026-07-03T21:16:20.761Z"
   },
   {
     "id": "1782999196726-house-fl01",
@@ -6001,7 +6001,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:00.175Z",
+      "scannedAt": "2026-07-03T21:16:20.993Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -6040,7 +6040,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:00.175Z"
+    "lastMatchedAt": "2026-07-03T21:16:20.993Z"
   },
   {
     "id": "1782999196726-house-fl02",
@@ -6059,7 +6059,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:01.726Z",
+      "scannedAt": "2026-07-03T21:16:21.219Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6082,7 +6082,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:01.726Z"
+    "lastMatchedAt": "2026-07-03T21:16:21.219Z"
   },
   {
     "id": "1782999196726-house-fl03",
@@ -6101,7 +6101,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:04.390Z",
+      "scannedAt": "2026-07-03T21:16:28.092Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6140,7 +6140,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:04.390Z"
+    "lastMatchedAt": "2026-07-03T21:16:28.092Z"
   },
   {
     "id": "1782999196726-house-fl04",
@@ -6159,7 +6159,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:06.169Z",
+      "scannedAt": "2026-07-03T21:16:28.336Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6198,7 +6198,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:06.169Z"
+    "lastMatchedAt": "2026-07-03T21:16:28.336Z"
   },
   {
     "id": "1782999196726-house-fl05",
@@ -6217,13 +6217,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:07.741Z",
+      "scannedAt": "2026-07-03T21:16:28.578Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:07.741Z"
+    "lastMatchedAt": "2026-07-03T21:16:28.578Z"
   },
   {
     "id": "1782999196726-house-fl06",
@@ -6242,13 +6242,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:07.994Z",
+      "scannedAt": "2026-07-03T21:16:28.824Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:07.994Z"
+    "lastMatchedAt": "2026-07-03T21:16:28.824Z"
   },
   {
     "id": "1782999196726-house-fl07",
@@ -6267,7 +6267,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:09.614Z",
+      "scannedAt": "2026-07-03T21:16:29.076Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6306,7 +6306,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:09.614Z"
+    "lastMatchedAt": "2026-07-03T21:16:29.076Z"
   },
   {
     "id": "1782999196726-house-fl08",
@@ -6325,13 +6325,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:12.358Z",
+      "scannedAt": "2026-07-03T21:16:35.806Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:12.358Z"
+    "lastMatchedAt": "2026-07-03T21:16:35.806Z"
   },
   {
     "id": "1782999196726-house-fl09",
@@ -6350,7 +6350,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:14.111Z",
+      "scannedAt": "2026-07-03T21:16:36.047Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -6389,7 +6389,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:14.111Z"
+    "lastMatchedAt": "2026-07-03T21:16:36.047Z"
   },
   {
     "id": "1782999196726-house-fl10",
@@ -6408,7 +6408,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:15.646Z",
+      "scannedAt": "2026-07-03T21:16:36.279Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -6447,7 +6447,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:15.646Z"
+    "lastMatchedAt": "2026-07-03T21:16:36.279Z"
   },
   {
     "id": "1782999196726-house-fl11",
@@ -6466,13 +6466,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:15.897Z",
+      "scannedAt": "2026-07-03T21:16:36.510Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:15.897Z"
+    "lastMatchedAt": "2026-07-03T21:16:36.510Z"
   },
   {
     "id": "1782999196726-house-fl12",
@@ -6491,7 +6491,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:17.422Z",
+      "scannedAt": "2026-07-03T21:16:36.747Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -6530,7 +6530,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:17.422Z"
+    "lastMatchedAt": "2026-07-03T21:16:36.747Z"
   },
   {
     "id": "1782999196726-house-fl13",
@@ -6549,13 +6549,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:20.149Z",
+      "scannedAt": "2026-07-03T21:16:43.385Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:20.149Z"
+    "lastMatchedAt": "2026-07-03T21:16:43.385Z"
   },
   {
     "id": "1782999196726-house-fl14",
@@ -6574,13 +6574,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:21.964Z",
+      "scannedAt": "2026-07-03T21:16:43.648Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:21.964Z"
+    "lastMatchedAt": "2026-07-03T21:16:43.648Z"
   },
   {
     "id": "1782999196726-house-fl15",
@@ -6624,7 +6624,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:23.794Z",
+      "scannedAt": "2026-07-03T21:16:44.128Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6647,7 +6647,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:23.794Z"
+    "lastMatchedAt": "2026-07-03T21:16:44.128Z"
   },
   {
     "id": "1782999196726-house-fl17",
@@ -6666,7 +6666,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:25.375Z",
+      "scannedAt": "2026-07-03T21:16:44.368Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -6705,7 +6705,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:25.375Z"
+    "lastMatchedAt": "2026-07-03T21:16:44.368Z"
   },
   {
     "id": "1782999196726-house-fl18",
@@ -6724,13 +6724,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:00.449Z",
+      "scannedAt": "2026-07-03T21:16:51.130Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:00.449Z"
+    "lastMatchedAt": "2026-07-03T21:16:51.130Z"
   },
   {
     "id": "1782999196726-house-fl19",
@@ -6749,7 +6749,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:28.021Z",
+      "scannedAt": "2026-07-03T21:16:51.360Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -6788,7 +6788,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:28.021Z"
+    "lastMatchedAt": "2026-07-03T21:16:51.360Z"
   },
   {
     "id": "1782999196726-house-fl20",
@@ -7107,7 +7107,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:02.929Z",
+      "scannedAt": "2026-07-03T21:17:06.067Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7146,7 +7146,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:02.929Z"
+    "lastMatchedAt": "2026-07-03T21:17:06.067Z"
   },
   {
     "id": "1782999196726-house-ga02",
@@ -7165,13 +7165,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:35.617Z",
+      "scannedAt": "2026-07-03T21:17:06.309Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:35.617Z"
+    "lastMatchedAt": "2026-07-03T21:17:06.309Z"
   },
   {
     "id": "1782999196726-house-ga03",
@@ -7190,7 +7190,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:16.975Z",
+      "scannedAt": "2026-07-03T21:17:06.547Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -7213,7 +7213,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:16.975Z"
+    "lastMatchedAt": "2026-07-03T21:17:06.547Z"
   },
   {
     "id": "1782999196726-house-ga04",
@@ -7232,13 +7232,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:37.441Z",
+      "scannedAt": "2026-07-03T21:17:06.786Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:37.441Z"
+    "lastMatchedAt": "2026-07-03T21:17:06.786Z"
   },
   {
     "id": "1782999196726-house-ga05",
@@ -7257,7 +7257,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:03.156Z",
+      "scannedAt": "2026-07-03T21:17:07.013Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7296,7 +7296,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:03.156Z"
+    "lastMatchedAt": "2026-07-03T21:17:07.013Z"
   },
   {
     "id": "1782999196726-house-ga06",
@@ -7308,45 +7308,45 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0.8000000000000017,
-      "bestProfit": 2.09424083769634,
+      "bestRoiPct": 0.7000000000000012,
+      "bestProfit": 1.8324607329842966,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:39.099Z",
+      "scannedAt": "2026-07-03T21:17:13.677Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 0.4127502240000046,
-          "expectedProfit": 1.0816305660377479,
+          "roiPct": 0.3081252320000048,
+          "expectedProfit": 0.8074560587002222,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 259.6960167714885,
+          "totalStake": 259.95807127882597,
           "fees": {
             "kalshiFee": 0.81,
-            "pmFee": 0.46686,
+            "pmFee": 0.47898,
             "kalshiFeeDetails": "Kalshi NO sell 262 @ $0.95 = $0.81",
-            "pmFeeDetails": "Polymarket YES buy 262 @ $0.04 (θ=0.05) = $0.47",
-            "netProfitIfKalshiWins": 1.0816305660377479,
-            "netProfitIfPmWins": 1.0816305660377479,
-            "worstCaseNetProfit": 1.0816305660377479
+            "pmFeeDetails": "Polymarket YES buy 262 @ $0.04 (θ=0.05) = $0.48",
+            "netProfitIfKalshiWins": 0.8074560587002222,
+            "netProfitIfPmWins": 0.8074560587002222,
+            "worstCaseNetProfit": 0.8074560587002222
           }
         },
         {
           "artist": "Democratic",
-          "roiPct": 0.8000000000000017,
-          "expectedProfit": 2.09424083769634,
+          "roiPct": 0.7000000000000012,
+          "expectedProfit": 1.8324607329842966,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-          "totalStake": 259.68586387434556,
+          "totalStake": 259.9476439790576,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 2.09424083769634,
-            "netProfitIfPmWins": 2.09424083769634,
-            "worstCaseNetProfit": 2.09424083769634
+            "netProfitIfKalshiWins": 1.8324607329842966,
+            "netProfitIfPmWins": 1.8324607329842966,
+            "worstCaseNetProfit": 1.8324607329842966
           }
         }
       ]
@@ -7354,7 +7354,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:39.099Z"
+    "lastMatchedAt": "2026-07-03T21:17:13.677Z"
   },
   {
     "id": "1782999196726-house-ga07",
@@ -7373,7 +7373,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:03.402Z",
+      "scannedAt": "2026-07-03T21:17:13.917Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -7412,7 +7412,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:03.402Z"
+    "lastMatchedAt": "2026-07-03T21:17:13.917Z"
   },
   {
     "id": "1782999196726-house-ga08",
@@ -7431,7 +7431,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:39.347Z",
+      "scannedAt": "2026-07-03T21:17:14.158Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7454,7 +7454,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:39.347Z"
+    "lastMatchedAt": "2026-07-03T21:17:14.158Z"
   },
   {
     "id": "1782999196726-house-ga09",
@@ -7473,13 +7473,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:16.995Z",
+      "scannedAt": "2026-07-03T21:17:14.472Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:16.995Z"
+    "lastMatchedAt": "2026-07-03T21:17:14.472Z"
   },
   {
     "id": "1782999196726-house-ga10",
@@ -7540,7 +7540,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:07.450Z",
+      "scannedAt": "2026-07-03T21:17:21.319Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -7579,7 +7579,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:07.450Z"
+    "lastMatchedAt": "2026-07-03T21:17:21.319Z"
   },
   {
     "id": "1782999196726-house-ga12",
@@ -7598,13 +7598,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:43.439Z",
+      "scannedAt": "2026-07-03T21:17:21.559Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:43.439Z"
+    "lastMatchedAt": "2026-07-03T21:17:21.559Z"
   },
   {
     "id": "1782999196726-house-ga13",
@@ -7623,13 +7623,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:07.680Z",
+      "scannedAt": "2026-07-03T21:17:21.802Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:07.680Z"
+    "lastMatchedAt": "2026-07-03T21:17:21.802Z"
   },
   {
     "id": "1782999196726-house-ga14",
@@ -7648,13 +7648,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:45.235Z",
+      "scannedAt": "2026-07-03T21:17:22.047Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:45.235Z"
+    "lastMatchedAt": "2026-07-03T21:17:22.047Z"
   },
   {
     "id": "1782999196726-house-hi01",
@@ -7673,7 +7673,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:07.918Z",
+      "scannedAt": "2026-07-03T21:17:22.306Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -7712,7 +7712,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:07.918Z"
+    "lastMatchedAt": "2026-07-03T21:17:22.306Z"
   },
   {
     "id": "1782999196726-house-hi02",
@@ -7724,45 +7724,29 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2.598,
-      "bestProfit": 25.98,
+      "bestRoiPct": 0.5589999999999999,
+      "bestProfit": 5.59,
       "strategy": "Buy YES Kalshi + NO PM",
-      "outcomeCount": 2,
+      "outcomeCount": 5,
       "matchedCount": 2,
-      "kalshiCount": 2,
+      "kalshiCount": 5,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:46.975Z",
+      "scannedAt": "2026-07-03T21:17:34.714Z",
       "allArbs": [
         {
-          "artist": "Democratic",
-          "roiPct": 1.7715,
-          "expectedProfit": 17.715,
-          "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 978,
-          "fees": {
-            "kalshiFee": 1.91,
-            "pmFee": 2.375,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.03 = $1.91",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.95 (θ=0.05) = $2.38",
-            "netProfitIfKalshiWins": 17.715,
-            "netProfitIfPmWins": 17.715,
-            "worstCaseNetProfit": 17.715
-          }
-        },
-        {
           "artist": "Republican",
-          "roiPct": 2.598,
-          "expectedProfit": 25.98,
+          "roiPct": 0.5589999999999999,
+          "expectedProfit": 5.59,
           "strategy": "Buy YES Kalshi + NO PM",
-          "totalStake": 967,
+          "totalStake": 985,
           "fees": {
-            "kalshiFee": 3.73,
+            "kalshiFee": 6.119999999999999,
             "pmFee": 3.29,
-            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.03 + NO sell 27000 @ $0.00 = $3.73",
+            "kalshiFeeDetails": "Kalshi YES buy 1000 @ $0.04 + NO sell 3000 @ $0.02 = $6.12",
             "pmFeeDetails": "Polymarket NO buy 1011 @ $0.93 (θ=0.05) = $3.29",
-            "netProfitIfKalshiWins": 25.98,
-            "netProfitIfPmWins": 25.98,
-            "worstCaseNetProfit": 25.98
+            "netProfitIfKalshiWins": 5.59,
+            "netProfitIfPmWins": 5.59,
+            "worstCaseNetProfit": 5.59
           }
         }
       ]
@@ -7770,7 +7754,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:46.975Z"
+    "lastMatchedAt": "2026-07-03T21:17:34.714Z"
   },
   {
     "id": "1782999196726-house-id01",
@@ -7789,7 +7773,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:11.989Z",
+      "scannedAt": "2026-07-03T21:17:28.093Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7812,7 +7796,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:11.989Z"
+    "lastMatchedAt": "2026-07-03T21:17:28.093Z"
   },
   {
     "id": "1782999196726-house-id02",
@@ -7831,13 +7815,13 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:42:47.223Z",
+      "scannedAt": "2026-07-03T21:17:29.384Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:42:47.223Z"
+    "lastMatchedAt": "2026-07-03T21:17:29.384Z"
   },
   {
     "id": "1782999196726-house-il01",
@@ -7856,7 +7840,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:12.228Z",
+      "scannedAt": "2026-07-03T21:17:29.625Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7879,7 +7863,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:12.228Z"
+    "lastMatchedAt": "2026-07-03T21:17:29.625Z"
   },
   {
     "id": "1782999196726-house-il02",
@@ -7898,7 +7882,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:12.463Z",
+      "scannedAt": "2026-07-03T21:17:29.882Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -7937,7 +7921,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:12.463Z"
+    "lastMatchedAt": "2026-07-03T21:17:29.882Z"
   },
   {
     "id": "1782999196726-house-il03",
@@ -7956,7 +7940,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:16.533Z",
+      "scannedAt": "2026-07-03T21:17:35.667Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -7995,7 +7979,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:16.533Z"
+    "lastMatchedAt": "2026-07-03T21:17:35.667Z"
   },
   {
     "id": "1782999196726-house-il04",
@@ -8014,13 +7998,13 @@
       "matchedCount": 2,
       "kalshiCount": 3,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:17.781Z",
+      "scannedAt": "2026-07-03T21:17:35.904Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:17.781Z"
+    "lastMatchedAt": "2026-07-03T21:17:35.904Z"
   },
   {
     "id": "1782999196726-house-il05",
@@ -8039,7 +8023,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:18.016Z",
+      "scannedAt": "2026-07-03T21:17:37.220Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -8078,7 +8062,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:18.016Z"
+    "lastMatchedAt": "2026-07-03T21:17:37.220Z"
   },
   {
     "id": "1782999196726-house-il06",
@@ -8097,7 +8081,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T20:43:23.171Z",
+      "scannedAt": "2026-07-03T21:17:37.472Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -8136,7 +8120,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T20:43:23.171Z"
+    "lastMatchedAt": "2026-07-03T21:17:37.472Z"
   },
   {
     "id": "1782999196726-house-il07",

@@ -15,7 +15,7 @@ import { ClobWsService, WsPriceUpdate } from '../src/lib/clob-ws';
 import { orderbookState } from '../src/lib/orderbook-state';
 import { computeAllLiveArbitrages, LiveMatchedOutcome } from '../src/lib/live-arb-engine';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '../src/lib/ws-book-apply';
-import { seedAllBooks } from '../src/lib/book-seed';
+import { seedAllBooks, seedKalshiBook, seedPmBook } from '../src/lib/book-seed';
 import { refreshWatchTargets, computeTiers, WatchTarget } from '../src/lib/watch-targets';
 import { recordArbObservations } from '../src/lib/arb-lifecycle';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
@@ -29,6 +29,18 @@ const HEALTH_FILE = path.join(process.cwd(), 'data', 'watcher-health.json');
 const HEALTH_WRITE_MS = 15_000;
 const PM_TOKENS_PER_CONN = 450;          // stay under Polymarket per-connection asset cap
 const WATCH_CAPITAL = Number(process.env.H2H_WATCHER_CAPITAL || '1000');
+
+// WS-105: integrity layer config
+const RECONCILE_MS = 10 * 60_000;        // periodic REST reconcile per HOT book
+const RECONCILE_CHUNK = 10;              // REST calls in flight during reconcile
+const RECONCILE_DISAGREE_CENTS = 0.02;   // material best-ask disagreement threshold
+const STALE_CHECK_MS = 60_000;           // staleness sweep interval
+const STALE_BOOK_MS = 5 * 60_000;        // silent book older than this -> re-seed
+const BREAKER_CHECK_MS = 5_000;
+const BREAKER_FLAP_WINDOW_MS = 10 * 60_000;
+const BREAKER_FLAP_LIMIT = 5;            // >=N disconnects in window -> degraded
+const BREAKER_DOWN_MS = 2 * 60_000;      // continuously down this long -> degraded
+const BREAKER_RECOVER_MS = 2 * 60_000;   // stable this long -> recover
 
 // ── State ───────────────────────────────────────────────────────
 interface HotPair {
@@ -50,6 +62,29 @@ let kalshiSubKeys: string[] = [];
 let msgCount = 0;
 let lastTickAt = 0;
 let tierStats: object = {};
+
+// WS-105 state
+// Kalshi seq is per-SUBSCRIPTION (sid), shared across all tickers in the batch
+// subscribe — NOT per ticker. A gap in the sid's seq means we missed message(s)
+// for an UNKNOWN ticker, so we can't surgically re-seed one book; instead we
+// trigger a debounced full reconcile pass (REST is truth).
+const kalshiSeqBySid = new Map<number, number>();     // sid -> last seen seq
+let seqGapCount = 0;
+let gapReconcileTimer: ReturnType<typeof setTimeout> | null = null;
+const GAP_RECONCILE_DEBOUNCE_MS = 60_000;
+const GAP_RECONCILE_MIN_INTERVAL_MS = 5 * 60_000; // gaps are common (seq counts filtered msgs); don't hammer REST
+const GAP_LOG_INTERVAL_MS = 60_000;
+let lastGapLogAt = 0;
+let gapsSinceLog = 0;
+let reconcileCount = 0;
+let reconcileDisagreements = 0;
+let lastReconcileAt = 0;
+let staleReseedCount = 0;
+let degraded = false;
+let degradedSince = 0;
+const flapEvents: number[] = [];                      // disconnect timestamps
+let kalshiWasConnected = false;
+let kalshiDownSince = 0;
 
 // ── Wiring: targets -> subscriptions ────────────────────────────
 
@@ -91,9 +126,42 @@ async function loadPairTitles(): Promise<Map<string, string>> {
 function handleKalshiMsg(msg: KalshiWsMessage): void {
   msgCount++;
   lastTickAt = Date.now();
+
+  // WS-105 (1): seq-gap detection, per sid (subscription-wide seq).
+  // We still APPLY this message — its book is consistent; the missed messages
+  // belong to unknown tickers, handled by the debounced reconcile.
+  if (msg.sid != null && msg.seq != null) {
+    const last = kalshiSeqBySid.get(msg.sid);
+    if (last != null && msg.seq > last + 1) {
+      seqGapCount++;
+      gapsSinceLog += msg.seq - last - 1;
+      const now = Date.now();
+      if (now - lastGapLogAt >= GAP_LOG_INTERVAL_MS) {
+        logger.warn('[watcher] kalshi seq gaps on sid — reconcile scheduled', { sid: msg.sid, missedSinceLastLog: gapsSinceLog, totalGapEvents: seqGapCount });
+        lastGapLogAt = now;
+        gapsSinceLog = 0;
+      }
+      scheduleGapReconcile();
+    }
+    kalshiSeqBySid.set(msg.sid, msg.seq);
+    if (kalshiSeqBySid.size > 50) {
+      // resubscribes create new sids; drop all but the current one occasionally
+      for (const sid of kalshiSeqBySid.keys()) if (sid !== msg.sid) kalshiSeqBySid.delete(sid);
+    }
+  }
+
   if (!applyKalshiWsMessage(msg)) return;
   const pairs = tickerToPairs.get(msg.marketTicker);
   if (pairs) for (const pid of pairs) schedulePairCompute(pid);
+}
+
+function scheduleGapReconcile(): void {
+  if (gapReconcileTimer) return; // one pending pass covers all gaps in the window
+  const wait = Math.max(GAP_RECONCILE_DEBOUNCE_MS, lastReconcileAt + GAP_RECONCILE_MIN_INTERVAL_MS - Date.now());
+  gapReconcileTimer = setTimeout(() => {
+    gapReconcileTimer = null;
+    reconcileBooks().catch((err) => logger.warn('[watcher] gap reconcile failed', { err }));
+  }, wait);
 }
 
 function handlePmUpdates(updates: WsPriceUpdate[]): void {
@@ -125,6 +193,9 @@ async function syncSubscriptions(): Promise<void> {
   }
 
   rebuildIndexes(tiers.hot, titles);
+
+  // WS-105: clear dead-book suppression for ids no longer tracked
+  for (const id of [...deadBooks.keys()]) if (!tickerToPairs.has(id) && !tokenToPairs.has(id)) deadBooks.delete(id);
 
   // ── Kalshi: resubscribe (batch) ──
   for (const key of kalshiSubKeys) kalshiWs.unsubscribe(key);
@@ -223,12 +294,132 @@ async function computePair(pairId: string): Promise<void> {
   }
 }
 
+// ── WS-105: integrity layer ─────────────────────────────────────
+
+function bestAsks(id: string): { yes: number | null; no: number | null } {
+  const b = orderbookState.getBook(id);
+  return {
+    yes: b?.yes.asks[0]?.price ?? null,
+    no: b?.no.asks[0]?.price ?? null,
+  };
+}
+
+// (2) Periodic REST reconcile: REST is truth. For every HOT book, snapshot the
+// current WS-maintained best asks, replace the book from REST, and log when the
+// WS view disagreed materially (stale-ask phantom-arb protection).
+async function reconcileBooks(): Promise<void> {
+  const tickers = [...tickerToPairs.keys()];
+  const tokens = [...tokenToPairs.keys()];
+  let disagreements = 0;
+
+  const reconcileOne = async (id: string, isKalshi: boolean): Promise<void> => {
+    const before = bestAsks(id);
+    if (isKalshi) await seedKalshiBook(id);
+    else await seedPmBook(id, pmTokenSides.get(id) ?? 'yes');
+    const after = bestAsks(id);
+    for (const side of ['yes', 'no'] as const) {
+      const b = before[side];
+      const a = after[side];
+      if (b != null && a != null && Math.abs(b - a) >= RECONCILE_DISAGREE_CENTS) {
+        disagreements++;
+        logger.warn('[watcher] reconcile disagreement — REST wins', {
+          id, side, wsAsk: b, restAsk: a, source: isKalshi ? 'kalshi' : 'pm',
+        });
+        const pairs = (isKalshi ? tickerToPairs : tokenToPairs).get(id);
+        if (pairs) for (const pid of pairs) schedulePairCompute(pid);
+      }
+    }
+  };
+
+  const jobs: { id: string; isKalshi: boolean }[] = [
+    ...tickers.map((id) => ({ id, isKalshi: true })),
+    ...tokens.map((id) => ({ id, isKalshi: false })),
+  ];
+  for (let i = 0; i < jobs.length; i += RECONCILE_CHUNK) {
+    await Promise.all(jobs.slice(i, i + RECONCILE_CHUNK).map((j) => reconcileOne(j.id, j.isKalshi).catch(() => {})));
+  }
+
+  reconcileCount++;
+  reconcileDisagreements += disagreements;
+  lastReconcileAt = Date.now();
+  logger.info('[watcher] reconcile pass done', { books: jobs.length, disagreements });
+}
+
+// (3) Staleness guard: a HOT book silent longer than STALE_BOOK_MS gets re-seeded.
+// Books that repeatedly fail to seed (expired/dead markets) are suppressed so we
+// don't hammer REST every sweep; suppression clears when tiers change the target set.
+const deadBooks = new Map<string, number>(); // id -> consecutive failed re-seeds
+const DEAD_BOOK_STRIKES = 3;
+
+async function staleSweep(): Promise<void> {
+  const isDead = (t: string) => (deadBooks.get(t) ?? 0) >= DEAD_BOOK_STRIKES;
+  const staleTickers = [...tickerToPairs.keys()].filter((t) => !isDead(t) && orderbookState.isStale(t, STALE_BOOK_MS));
+  const staleTokens = [...tokenToPairs.keys()].filter((t) => !isDead(t) && orderbookState.isStale(t, STALE_BOOK_MS));
+  if (staleTickers.length === 0 && staleTokens.length === 0) return;
+  staleReseedCount += staleTickers.length + staleTokens.length;
+  logger.warn('[watcher] stale books — re-seeding', { kalshi: staleTickers.length, pm: staleTokens.length });
+  await seedAllBooks(staleTickers, staleTokens, pmTokenSides).catch(() => {});
+  const affected = new Set<string>();
+  for (const t of [...staleTickers, ...staleTokens]) {
+    if (orderbookState.hasBook(t) && !orderbookState.isStale(t, STALE_BOOK_MS)) {
+      deadBooks.delete(t);
+      for (const pid of (tickerToPairs.get(t) ?? tokenToPairs.get(t)) ?? []) affected.add(pid);
+    } else {
+      const strikes = (deadBooks.get(t) ?? 0) + 1;
+      deadBooks.set(t, strikes);
+      if (strikes === DEAD_BOOK_STRIKES) logger.warn('[watcher] book unseedable — suppressing (dead market?)', { id: t });
+    }
+  }
+  for (const pid of affected) schedulePairCompute(pid);
+}
+
+// (4) Degraded-mode breaker: repeated WS flaps or sustained disconnect ->
+// declare degraded in the health file. The REST poller never stopped, so
+// coverage is intact — this is a signal, not a failover. Auto-recovers after
+// a stable window.
+function breakerCheck(): void {
+  const now = Date.now();
+  const kalshiUp = kalshiWs.isConnected();
+  const pmUp = pmPool.length === 0 || pmPool.some((c) => c.isConnected());
+
+  // Edge-detect Kalshi disconnects as flap events
+  if (kalshiWasConnected && !kalshiUp) flapEvents.push(now);
+  kalshiWasConnected = kalshiUp;
+  if (!kalshiUp && kalshiDownSince === 0) kalshiDownSince = now;
+  if (kalshiUp) kalshiDownSince = 0;
+
+  // Prune flap window
+  while (flapEvents.length && flapEvents[0] < now - BREAKER_FLAP_WINDOW_MS) flapEvents.shift();
+
+  const flapping = flapEvents.length >= BREAKER_FLAP_LIMIT;
+  const sustainedDown = (kalshiDownSince !== 0 && now - kalshiDownSince >= BREAKER_DOWN_MS) || !pmUp;
+
+  if (!degraded && (flapping || sustainedDown)) {
+    degraded = true;
+    degradedSince = now;
+    logger.error('[watcher] DEGRADED — WS unreliable, REST poller remains full coverage', {
+      flaps: flapEvents.length, kalshiUp, pmUp,
+      kalshiDownForMs: kalshiDownSince ? now - kalshiDownSince : 0,
+    });
+    writeHealth();
+  } else if (degraded && kalshiUp && pmUp && !flapping) {
+    // Require a stable window since the last flap before recovering
+    const lastFlap = flapEvents[flapEvents.length - 1] ?? 0;
+    if (now - Math.max(lastFlap, degradedSince) >= BREAKER_RECOVER_MS) {
+      degraded = false;
+      degradedSince = 0;
+      logger.info('[watcher] recovered from degraded mode');
+      writeHealth();
+    }
+  }
+}
+
 // ── Health ──────────────────────────────────────────────────────
 
 function writeHealth(): void {
   const pmConnected = pmPool.filter((c) => c.isConnected()).length;
   const health = {
-    status: 'ok',
+    status: degraded ? 'degraded' : 'ok',
     ts: new Date().toISOString(),
     kalshiConnected: kalshiWs.isConnected(),
     pmConnections: `${pmConnected}/${pmPool.length}`,
@@ -238,6 +429,16 @@ function writeHealth(): void {
     msgCount,
     lastTickAt: lastTickAt ? new Date(lastTickAt).toISOString() : null,
     tierStats,
+    integrity: {
+      degraded,
+      degradedSince: degradedSince ? new Date(degradedSince).toISOString() : null,
+      flapsInWindow: flapEvents.length,
+      seqGaps: seqGapCount,
+      staleReseeds: staleReseedCount,
+      reconcilePasses: reconcileCount,
+      reconcileDisagreements,
+      lastReconcileAt: lastReconcileAt ? new Date(lastReconcileAt).toISOString() : null,
+    },
   };
   try {
     fs.writeFileSync(HEALTH_FILE, JSON.stringify(health, null, 2));
@@ -256,6 +457,11 @@ async function main(): Promise<void> {
   setInterval(() => { syncSubscriptions().catch((err) => logger.warn('[watcher] tier sync failed', { err })); }, TIER_REFRESH_MS);
   setInterval(() => { refreshWatchTargets().catch((err) => logger.warn('[watcher] target refresh failed', { err })); }, TARGET_REFRESH_MS);
   setInterval(writeHealth, HEALTH_WRITE_MS);
+  // WS-105 integrity loops
+  setInterval(() => { reconcileBooks().catch((err) => logger.warn('[watcher] reconcile failed', { err })); }, RECONCILE_MS);
+  setInterval(() => { staleSweep().catch((err) => logger.warn('[watcher] stale sweep failed', { err })); }, STALE_CHECK_MS);
+  setInterval(breakerCheck, BREAKER_CHECK_MS);
+  kalshiWasConnected = kalshiWs.isConnected();
   writeHealth();
 
   const shutdown = () => {
