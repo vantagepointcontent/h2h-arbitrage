@@ -9,8 +9,86 @@ const POLL_WAKE_MS = 60000;
 const SCAN_TIMEOUT_MS = Math.max(5000, Number(process.env.H2H_SCAN_TIMEOUT_MS || 60000));
 const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
 const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathname;
+const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
+
+// ── Adaptive timeout + circuit breaker (per-market scan stats) ────────────
+// Problem this solves: a fixed 60s timeout for every market means one bad
+// cycle (app restart, upstream outage, chronically slow market) burns
+// 60s × N with zero coverage. Instead:
+//   • adaptive timeout: EWMA of each market's scan duration → timeout is
+//     3× its typical duration (clamped 15s..SCAN_TIMEOUT_MS). Fast markets
+//     fail fast; genuinely slow markets keep their headroom.
+//   • circuit breaker: 3 consecutive failures → market on cooldown with
+//     exponential backoff (5min → 10 → 20 → 40, capped 60min). One probe
+//     scan after cooldown (half-open); success resets everything.
+// State persists across poller restarts via BREAKER_FILE.
+const TIMEOUT_FLOOR_MS = 15_000;
+const TIMEOUT_MULTIPLIER = 3;
+const BREAKER_THRESHOLD = 3;          // consecutive failures to trip
+const BREAKER_BASE_COOLDOWN_MS = 5 * 60_000;
+const BREAKER_MAX_COOLDOWN_MS = 60 * 60_000;
+
+const scanStats = new Map(); // marketId -> { avgMs, consecFails, trips, cooldownUntil }
+
+function loadBreakerState() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(BREAKER_FILE, 'utf-8'));
+    for (const [id, s] of Object.entries(raw)) scanStats.set(id, s);
+    console.log(`[${new Date().toISOString()}] Loaded breaker state for ${scanStats.size} market(s)`);
+  } catch { /* first run or corrupt file — start clean */ }
+}
+
+async function saveBreakerState() {
+  try {
+    // Only persist entries that carry signal (stats or open breakers)
+    const obj = {};
+    for (const [id, s] of scanStats) {
+      if (s.avgMs || s.consecFails > 0 || (s.cooldownUntil && s.cooldownUntil > Date.now())) obj[id] = s;
+    }
+    await writeJsonAtomic(BREAKER_FILE, obj);
+  } catch (err) {
+    console.warn(`[${new Date().toISOString()}] Failed saving breaker state:`, err.message);
+  }
+}
+
+function getStats(marketId) {
+  let s = scanStats.get(marketId);
+  if (!s) { s = { avgMs: 0, consecFails: 0, trips: 0, cooldownUntil: 0 }; scanStats.set(marketId, s); }
+  return s;
+}
+
+function adaptiveTimeoutMs(marketId) {
+  const s = scanStats.get(marketId);
+  if (!s || !s.avgMs) return SCAN_TIMEOUT_MS; // no history yet — full headroom
+  return Math.min(SCAN_TIMEOUT_MS, Math.max(TIMEOUT_FLOOR_MS, Math.round(s.avgMs * TIMEOUT_MULTIPLIER)));
+}
+
+function isBreakerOpen(marketId) {
+  const s = scanStats.get(marketId);
+  return !!s && s.cooldownUntil > Date.now();
+}
+
+function recordScanOutcome(marketId, ok, durationMs) {
+  const s = getStats(marketId);
+  if (ok) {
+    // EWMA (α=0.3): adapts to shifts without overreacting to one slow scan
+    s.avgMs = s.avgMs ? Math.round(0.7 * s.avgMs + 0.3 * durationMs) : durationMs;
+    s.consecFails = 0;
+    s.trips = 0;
+    s.cooldownUntil = 0;
+  } else {
+    s.consecFails += 1;
+    if (s.consecFails >= BREAKER_THRESHOLD) {
+      const cooldown = Math.min(BREAKER_MAX_COOLDOWN_MS, BREAKER_BASE_COOLDOWN_MS * 2 ** s.trips);
+      s.cooldownUntil = Date.now() + cooldown;
+      s.trips += 1;
+      s.consecFails = 0; // half-open: one probe scan allowed after cooldown
+      console.log(`[${new Date().toISOString()}] Circuit breaker OPEN for market ${marketId} — cooldown ${formatInterval(cooldown)} (trip #${s.trips})`);
+    }
+  }
+}
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -144,8 +222,9 @@ async function writeHealth(health) {
 // ── Scan logic ────────────────────────────────────────────────────────────
 
 async function scanMarket(market) {
+  const timeoutMs = adaptiveTimeoutMs(market.id);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const started = Date.now();
     const res = await fetch(`${BASE_URL}/api/scan?skipManual=1`, {
@@ -165,8 +244,8 @@ async function scanMarket(market) {
     return { ok: true, durationMs, result: await res.json() };
   } catch (e) {
     clearTimeout(timer);
-    const msg = e.name === 'AbortError' ? `timeout after ${SCAN_TIMEOUT_MS}ms` : (e.message || String(e));
-    return { ok: false, durationMs: SCAN_TIMEOUT_MS, error: msg };
+    const msg = e.name === 'AbortError' ? `timeout after ${timeoutMs}ms (adaptive)` : (e.message || String(e));
+    return { ok: false, durationMs: timeoutMs, error: msg };
   }
 }
 
@@ -327,12 +406,18 @@ async function pollOnce() {
     return health;
   }
 
-  // Filter to markets due for refresh (adaptive)
-  const dueMarkets = adaptiveEnabled
+  // Filter to markets due for refresh (adaptive), minus open circuit breakers
+  const dueByInterval = adaptiveEnabled
     ? markets.filter(m => isDueForRefresh(m, adaptiveConfig))
     : markets; // legacy: refresh all
+  const dueMarkets = dueByInterval.filter(m => !isBreakerOpen(m.id));
+  const breakerSkipped = dueByInterval.length - dueMarkets.length;
 
-  health.skippedCount = markets.length - dueMarkets.length;
+  health.skippedCount = markets.length - dueByInterval.length;
+  health.breakerSkipped = breakerSkipped;
+  if (breakerSkipped > 0) {
+    console.log(`[${new Date().toISOString()}] ${breakerSkipped} market(s) skipped — circuit breaker cooling down`);
+  }
 
   if (dueMarkets.length === 0) {
     console.log(`[${new Date().toISOString()}] No markets due for refresh (${markets.length} total, all within interval). Sleeping ${Math.round(POLL_WAKE_MS / 1000)}s...`);
@@ -344,20 +429,35 @@ async function pollOnce() {
   }
 
   const scanDurations = [];
+  // Global bail-out: if everything is failing, the APP is down (not the
+  // markets) — abort the cycle instead of tripping breakers on all markets
+  // and burning timeout-minutes with zero coverage.
+  let consecGlobalFails = 0;
+  const GLOBAL_FAIL_ABORT = Math.max(10, POLL_CONCURRENCY * 3);
+  let aborted = false;
 
   await mapWithConcurrency(dueMarkets, POLL_CONCURRENCY, async (market) => {
+    if (aborted) return;
     const scan = await scanMarket(market);
     scanDurations.push(scan.durationMs || 0);
 
     if (!scan.ok || !scan.result) {
       health.failureCount += 1;
+      consecGlobalFails += 1;
+      recordScanOutcome(market.id, false, scan.durationMs);
       const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
       health.errors.push(err);
       console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
+      if (consecGlobalFails >= GLOBAL_FAIL_ABORT && !aborted) {
+        aborted = true;
+        console.error(`[${new Date().toISOString()}] ABORTING CYCLE: ${consecGlobalFails} consecutive failures — app/upstream likely down, not the markets. Remaining scans deferred to next cycle.`);
+      }
       return;
     }
 
     health.successCount += 1;
+    consecGlobalFails = 0;
+    recordScanOutcome(market.id, true, scan.durationMs);
     const { best, all } = applyScanResultToMarket(market, scan.result);
     const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
     const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';
@@ -390,12 +490,14 @@ async function pollOnce() {
     await saveMarkets(latestMarkets);
   }
 
-  health.status = health.failureCount > 0 ? 'degraded' : 'ok';
+  health.status = aborted ? 'aborted' : (health.failureCount > 0 ? 'degraded' : 'ok');
   health.finishedAt = new Date().toISOString();
   health.durationMs = Date.now() - cycleStart;
   health.avgScanMs = scanDurations.length ? Math.round(scanDurations.reduce((s, n) => s + n, 0) / scanDurations.length) : 0;
   health.maxScanMs = scanDurations.length ? Math.max(...scanDurations) : 0;
+  health.openBreakers = [...scanStats.values()].filter(s => s.cooldownUntil > Date.now()).length;
   await writeHealth(health);
+  await saveBreakerState();
 
   const skipped = health.skippedCount;
   const due = dueMarkets.length;
@@ -406,7 +508,8 @@ async function pollOnce() {
 // ── Main loop ─────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log(`[${new Date().toISOString()}] Poller started — wake interval: ${formatInterval(POLL_WAKE_MS)}, adaptive refresh: enabled`);
+  console.log(`[${new Date().toISOString()}] Poller started — wake interval: ${formatInterval(POLL_WAKE_MS)}, adaptive refresh: enabled, adaptive timeouts + circuit breaker: enabled`);
+  loadBreakerState();
   // Track last prune date — run once daily
   let lastPruneDate = '';
   while (true) {
