@@ -31,6 +31,8 @@ export interface ArbAlertInput {
   expectedProfit: number;
   strategy: string;
   totalStake?: number;
+  /** Outcome name — enables the episode-persistence filter (ALERT-001). */
+  outcome?: string;
   fees?: {
     kalshiFee: number;
     pmFee: number;
@@ -58,6 +60,10 @@ export interface TelegramAlertConfig {
   minRoiPct: number;
   minProfitUsd: number;
   cooldownMs: number;
+  /** ALERT-001: minimum total stake ($) the arb must support. 0 disables. */
+  minStakeUsd: number;
+  /** ALERT-001: minimum seconds the arb episode must have persisted. 0 disables. */
+  minPersistenceSec: number;
 }
 
 // ─── Internal state ───────────────────────────────────────────────
@@ -82,6 +88,10 @@ const SPREAD_WIDENED_THRESHOLD = 2.0;
 /** Minimum ROI drop fraction to trigger "vanishing" alert (50%). */
 const VANISHING_DROP_FRACTION = 0.5;
 
+/** ALERT-001 defaults: arb must support ≥$50 stake and have persisted ≥60s. */
+const DEFAULT_MIN_STAKE = 50;
+const DEFAULT_MIN_PERSISTENCE_SEC = 60;
+
 // ─── Config resolution ────────────────────────────────────────────
 
 /**
@@ -100,6 +110,8 @@ export function getConfigFromEnv(): TelegramAlertConfig | null {
     minRoiPct: parseFloat(process.env.TELEGRAM_MIN_ROI_PCT ?? '') || DEFAULT_MIN_ROI,
     minProfitUsd: parseFloat(process.env.TELEGRAM_MIN_PROFIT_USD ?? '') || DEFAULT_MIN_PROFIT,
     cooldownMs: parseInt(process.env.TELEGRAM_COOLDOWN_MS ?? '', 10) || DEFAULT_COOLDOWN_MS,
+    minStakeUsd: parseFloat(process.env.TELEGRAM_MIN_STAKE_USD ?? '') || DEFAULT_MIN_STAKE,
+    minPersistenceSec: parseFloat(process.env.TELEGRAM_MIN_PERSISTENCE_SEC ?? '') || DEFAULT_MIN_PERSISTENCE_SEC,
   };
 }
 
@@ -294,6 +306,11 @@ export function shouldAlert(
     return { shouldAlert: false, reason: `Profit $${arb.expectedProfit.toFixed(2)} below threshold $${config.minProfitUsd}` };
   }
 
+  // ALERT-001: stake filter — a 5% ROI on a $3 fillable arb is noise.
+  if (config.minStakeUsd > 0 && (arb.totalStake ?? 0) < config.minStakeUsd) {
+    return { shouldAlert: false, reason: `Stake $${(arb.totalStake ?? 0).toFixed(2)} below threshold $${config.minStakeUsd}` };
+  }
+
   const lastAlert = lastAlertMap.get(arb.marketId);
   if (lastAlert && now - lastAlert < config.cooldownMs) {
     const remainingMs = config.cooldownMs - (now - lastAlert);
@@ -437,6 +454,20 @@ export async function checkAndSendAlert(
   const check = shouldAlert(arb, config);
   if (!check.shouldAlert) {
     return { sent: false, reason: check.reason };
+  }
+
+  // --- ALERT-001: persistence filter (async — episode lookup in SQLite) ---
+  // Don't ping on arbs younger than minPersistenceSec: 5-second phantoms
+  // are gone before anyone can act. Requires arb.outcome; lookup failures
+  // fail OPEN (alert anyway) — a lost alert is worse than a noisy one.
+  if (config.minPersistenceSec > 0 && arb.outcome) {
+    try {
+      const { getOpenEpisodeAgeSec } = await import('./arb-lifecycle');
+      const ageSec = await getOpenEpisodeAgeSec(arb.marketId, arb.outcome);
+      if (ageSec < config.minPersistenceSec) {
+        return { sent: false, reason: `Arb persisted ${Math.round(ageSec)}s, below threshold ${config.minPersistenceSec}s` };
+      }
+    } catch { /* fail open */ }
   }
 
   const message = formatArbMessage(arb);

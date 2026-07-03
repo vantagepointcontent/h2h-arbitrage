@@ -44,6 +44,14 @@ module.exports = {
         // Same token exposed to the browser UI (inlined at build time too —
         // keep .env.production in sync). Shared-secret gate, not real auth.
         NEXT_PUBLIC_H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
+        // ── ALERT-001: alert quality filters ──
+        // TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID must be set in .env.production
+        // (gitignored) or here for alerts to fire at all.
+        TELEGRAM_MIN_ROI_PCT: '1.5',        // net ROI ≥ 1.5%
+        TELEGRAM_MIN_PROFIT_USD: '5',       // expected profit ≥ $5
+        TELEGRAM_MIN_STAKE_USD: '50',       // arb must support ≥ $50 stake
+        TELEGRAM_MIN_PERSISTENCE_SEC: '60', // episode must have lived ≥ 60s
+        TELEGRAM_COOLDOWN_MS: '300000',     // 5 min per-market cooldown
         LOG_DIR: '/home/scott/.pm2/logs',
         LOG_LEVEL: 'info',
         // SENTRY_DSN: 'https://...',  // uncomment and set your Sentry DSN

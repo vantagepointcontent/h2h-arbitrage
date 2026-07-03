@@ -54,6 +54,8 @@ const baseConfig: TelegramAlertConfig = {
   minRoiPct: 1.0,
   minProfitUsd: 1.0,
   cooldownMs: 300000, // 5 min
+  minStakeUsd: 0,          // disabled in base tests (ALERT-001 tested separately)
+  minPersistenceSec: 0,    // disabled in base tests
 };
 
 // ─── Tests ────────────────────────────────────────────────────────
@@ -118,6 +120,40 @@ describe('telegram-alerts', () => {
       );
       expect(result.shouldAlert).toBe(false);
       expect(result.reason).toContain('below threshold');
+    });
+
+    // ── ALERT-001: stake filter ──
+    it('returns false when totalStake below minStakeUsd', () => {
+      const result = shouldAlert(
+        { ...baseArb, totalStake: 20 },
+        { ...baseConfig, minStakeUsd: 50 },
+      );
+      expect(result.shouldAlert).toBe(false);
+      expect(result.reason).toContain('Stake');
+    });
+
+    it('returns true when totalStake meets minStakeUsd', () => {
+      const result = shouldAlert(
+        { ...baseArb, totalStake: 100 },
+        { ...baseConfig, minStakeUsd: 50 },
+      );
+      expect(result.shouldAlert).toBe(true);
+    });
+
+    it('treats missing totalStake as 0 for the stake filter', () => {
+      const result = shouldAlert(
+        { ...baseArb, totalStake: undefined },
+        { ...baseConfig, minStakeUsd: 50 },
+      );
+      expect(result.shouldAlert).toBe(false);
+    });
+
+    it('skips stake filter when minStakeUsd is 0', () => {
+      const result = shouldAlert(
+        { ...baseArb, totalStake: 1 },
+        { ...baseConfig, minStakeUsd: 0 },
+      );
+      expect(result.shouldAlert).toBe(true);
     });
 
     it('returns false when within cooldown period', () => {

@@ -220,3 +220,22 @@ export async function pruneOldEpisodes(days: number = 90): Promise<number> {
   });
   return Number((r as any).rowsAffected ?? 0);
 }
+
+/**
+ * How long the currently-OPEN episode for (market, outcome) has persisted,
+ * in seconds. Returns 0 when there is no open episode (i.e. the arb is
+ * brand new this scan — recordArbObservations runs before alerts fire,
+ * so a first-scan arb has an episode with first_seen == last_seen ≈ now).
+ * Used by alert quality filters: don't ping on arbs younger than N sec.
+ */
+export async function getOpenEpisodeAgeSec(marketId: string, outcome: string): Promise<number> {
+  await ensureDb();
+  const c = getClient();
+  const r = await c.execute({
+    sql: `SELECT first_seen_at FROM arb_episodes WHERE market_id = ? AND outcome = ? AND status = 'open' LIMIT 1`,
+    args: [marketId, outcome],
+  });
+  const row = (r.rows as any[])[0];
+  if (!row) return 0;
+  return Math.max(0, (Date.now() - new Date(String(row.first_seen_at)).getTime()) / 1000);
+}

@@ -410,6 +410,7 @@ export async function POST(request: NextRequest) {
           const alertArbs: ArbAlertInput[] = positiveArbs.map(o => ({
             marketTitle: pmEvent.title,
             marketId: market.id,
+            outcome: o.artist,
             roiPct: o.arbitrage!.roiPct,
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
