@@ -3,9 +3,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { CATEGORIES, CategoryName } from "@/lib/categories";
-import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, RefreshCw, Scan, Star, X } from "lucide-react";
+import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
+import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 
 /* ── Nav Button (collapsible sidebar icon button) ── */
 function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; collapsed: boolean }) {
@@ -115,6 +116,23 @@ export function MarketSidebar({
 }) {
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [sidebarCategory, setSidebarCategory] = useState<"all" | CategoryName>("all");
+
+  // WS-106: HOT tier badge — poll lightweight tier-state endpoint every 60s.
+  const [hotIds, setHotIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/watcher/tiers", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setHotIds(hotPairIdSet(data.tierState));
+      } catch { /* watcher down — no badges, no noise */ }
+    };
+    poll();
+    const id = setInterval(poll, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   // Filter + sort
   const filtered = markets.filter(m => {
@@ -365,12 +383,33 @@ export function MarketSidebar({
                         <Star className="w-3 h-3" fill={favoriteIds.has(m.id) ? "currentColor" : "none"} />
                       </button>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
+                          {hotIds.has(m.id) && (
+                            <span
+                              className="shrink-0 inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-px rounded-full bg-[#f97316]/15 text-[#f97316] ring-1 ring-[#f97316]/30 uppercase"
+                              title="HOT tier — live WebSocket-watched"
+                            >
+                              <Zap className="w-2 h-2" fill="currentColor" />HOT
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {m.category && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>
                           )}
                           <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
+                          {(() => {
+                            // WS-106: last-tick freshness — prefer live WS result, fall back to poller scan
+                            const f = tickFreshness(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt ?? null);
+                            if (f.level === 'never') return null;
+                            return (
+                              <span className={`text-[9px] inline-flex items-center gap-0.5 ${freshnessColor(f.level)}`} title={`Last price update: ${f.label}`}>
+                                <span className={`w-1 h-1 rounded-full ${f.level === 'live' ? 'bg-[#5DBE81] animate-pulse' : f.level === 'recent' ? 'bg-[#8A9BA8]' : f.level === 'stale' ? 'bg-[#facc15]' : 'bg-[#ef4444]'}`} />
+                                {f.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center shrink-0">

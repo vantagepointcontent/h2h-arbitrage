@@ -6,7 +6,15 @@
  * Changes take effect live (~10s cache TTL) — no restart needed.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  classifyWatcherStatus,
+  computeMsgRate,
+  tickFreshness,
+  freshnessColor,
+  statusPillClasses,
+  type WatcherHealthPayload,
+} from "@/lib/watcher-status";
 import {
   Settings as SettingsIcon,
   Bell,
@@ -69,6 +77,33 @@ export default function SettingsPanel() {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [confirmDanger, setConfirmDanger] = useState<string | null>(null);
+
+  // WS-106: watcher health polling (15s) + msgs/sec derivation
+  const [watcherHealth, setWatcherHealth] = useState<WatcherHealthPayload | null>(null);
+  const [msgRate, setMsgRate] = useState<number | null>(null);
+  const prevSampleRef = useRef<{ msgCount: number; ts: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/watcher/health", { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const data: WatcherHealthPayload = await res.json();
+        if (cancelled) return;
+        setMsgRate(computeMsgRate(prevSampleRef.current, { msgCount: data.msgCount, ts: data.ts }));
+        if (typeof data.msgCount === "number" && data.ts) {
+          prevSampleRef.current = { msgCount: data.msgCount, ts: data.ts };
+        }
+        setWatcherHealth(data);
+      } catch {
+        if (!cancelled) setWatcherHealth(null);
+      }
+    };
+    poll();
+    const id = setInterval(poll, 15_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -266,6 +301,94 @@ export default function SettingsPanel() {
           </div>
         );
       })}
+
+      {/* WS-106: Watcher health card */}
+      <div className="mb-6 rounded-xl border border-[#182533] bg-[#17212B]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#182533]">
+          <div className="flex items-center gap-2 text-[#8A9BA8] font-semibold text-sm uppercase tracking-wide">
+            <Activity className="w-4 h-4" /> Watcher
+          </div>
+          {(() => {
+            const level = classifyWatcherStatus(watcherHealth);
+            return (
+              <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wide ${statusPillClasses(level)}`}>
+                {level}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="px-4 py-3 text-sm">
+          {watcherHealth ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Kalshi WS</div>
+                  <div className={`text-sm font-medium ${watcherHealth.kalshiConnected ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                    {watcherHealth.kalshiConnected ? "connected" : "disconnected"}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">PM WS</div>
+                  <div className="text-sm font-medium">{watcherHealth.pmConnections ?? "—"}</div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">HOT pairs</div>
+                  <div className="text-sm font-medium text-[#5DBE81]">
+                    {watcherHealth.hotPairs ?? 0}
+                    <span className="text-[#5E6875] font-normal"> / {watcherHealth.tierStats?.pairs ?? "?"}</span>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Msgs/sec</div>
+                  <div className="text-sm font-medium tabular-nums">{msgRate === null ? "—" : msgRate}</div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Subscriptions</div>
+                  <div className="text-sm font-medium">
+                    <span className="text-[#facc15]">{watcherHealth.kalshiTickers ?? 0}K</span>
+                    <span className="text-[#5E6875]"> · </span>
+                    <span className="text-[#a78bfa]">{watcherHealth.pmTokens ?? 0}P</span>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Last tick</div>
+                  {(() => {
+                    const f = tickFreshness(watcherHealth.lastTickAt);
+                    return <div className={`text-sm font-medium ${freshnessColor(f.level)}`}>{f.label}</div>;
+                  })()}
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Degraded</div>
+                  <div className={`text-sm font-medium ${watcherHealth.integrity?.degraded ? "text-[#ef4444]" : "text-[#5DBE81]"}`}>
+                    {watcherHealth.integrity?.degraded ? "YES" : "no"}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Last reconcile</div>
+                  {(() => {
+                    const f = tickFreshness(watcherHealth.integrity?.lastReconcileAt ?? null);
+                    return <div className={`text-sm font-medium ${freshnessColor(f.level)}`}>{f.label}</div>;
+                  })()}
+                </div>
+              </div>
+              {watcherHealth.integrity && (
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#5E6875]">
+                  <span>seq gaps: <span className="text-[#8A9BA8]">{watcherHealth.integrity.seqGaps ?? 0}</span></span>
+                  <span>stale reseeds: <span className="text-[#8A9BA8]">{watcherHealth.integrity.staleReseeds ?? 0}</span></span>
+                  <span>reconcile passes: <span className="text-[#8A9BA8]">{watcherHealth.integrity.reconcilePasses ?? 0}</span></span>
+                  <span>disagreements: <span className="text-[#8A9BA8]">{watcherHealth.integrity.reconcileDisagreements ?? 0}</span></span>
+                  <span>flaps: <span className="text-[#8A9BA8]">{watcherHealth.integrity.flapsInWindow ?? 0}</span></span>
+                </div>
+              )}
+              {watcherHealth.error && (
+                <div className="mt-2 text-xs text-[#ef4444]">{watcherHealth.error}</div>
+              )}
+            </>
+          ) : (
+            <span className="text-[#5E6875]">Watcher health endpoint unavailable.</span>
+          )}
+        </div>
+      </div>
 
       {/* System (read-only) */}
       <div className="mb-6 rounded-xl border border-[#182533] bg-[#17212B]">
