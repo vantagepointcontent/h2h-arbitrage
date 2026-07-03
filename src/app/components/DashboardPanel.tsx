@@ -64,6 +64,7 @@ interface TimelinePoint {
 interface ActiveArb {
   id: number;
   market_id: string;
+  market_title: string | null;
   best_roi_pct: number;
   best_profit: number;
   strategy: string;
@@ -728,9 +729,9 @@ export default function DashboardPanel() {
                         >
                           <td
                             className="px-3 py-2 text-xs font-medium text-[#FFFFFF] truncate max-w-[200px]"
-                            title={arb.market_id}
+                            title={arb.market_title || arb.market_id}
                           >
-                            {arb.market_id}
+                            {arb.market_title || arb.market_id}
                           </td>
                           <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={arb.strategy}>
                             {arb.strategy || "—"}

@@ -125,13 +125,23 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Top active arbs (recent scans with positive arbs) ──────
-    const topActiveArbs = rows
-      .filter((r: any) => (r.positive_arb_count ?? 0) > 0)
+    // Dedupe by market (keep best-ROI scan per market) so one hot market
+    // doesn't fill all 10 rows.
+    const bestPerMarket = new Map<string, any>();
+    for (const r of rows) {
+      if ((r.positive_arb_count ?? 0) <= 0) continue;
+      const prev = bestPerMarket.get(r.market_id);
+      if (!prev || (r.best_roi_pct ?? 0) > (prev.best_roi_pct ?? 0)) {
+        bestPerMarket.set(r.market_id, r);
+      }
+    }
+    const topActiveArbs = [...bestPerMarket.values()]
       .sort((a: any, b: any) => (b.best_roi_pct ?? 0) - (a.best_roi_pct ?? 0))
       .slice(0, 10)
       .map((r: any) => ({
         id: r.id,
         market_id: r.market_id,
+        market_title: r.market_title || null,
         best_roi_pct: r.best_roi_pct,
         best_profit: r.best_profit,
         strategy: r.strategy,
