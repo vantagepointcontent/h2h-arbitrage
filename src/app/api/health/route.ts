@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSavedMarkets } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET() {
   try {
@@ -15,7 +16,7 @@ export async function GET() {
       },
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = clientSafeError(err, 'Health check failed');
     return NextResponse.json({
       status: 'error',
       error: message,

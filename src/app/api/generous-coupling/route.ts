@@ -9,6 +9,7 @@ import {
 } from '@/lib/coupling';
 import { getSavedMarkets } from '@/lib/persistence';
 import { getPredictionHuntMarkets } from '@/lib/predictionhunt';
+import { clientSafeError } from '@/lib/error-handler';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch coupling data' },
+      { error: clientSafeError(error, 'Failed to fetch coupling data') },
       { status: 500 },
     );
   }
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Failed to process action' },
+      { error: clientSafeError(error, 'Failed to process action') },
       { status: 500 },
     );
   }

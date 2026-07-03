@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { approveReviewPair } from '@/lib/auto-discovery';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * POST /api/auto-discovery/approve
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Failed to approve review pair' },
+      { error: clientSafeError(err, 'Failed to approve review pair') },
       { status: 500 }
     );
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { startRefreshJob, getRefreshStatus } from '@/lib/refresh-job';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('[saved-markets-refresh-error]', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to refresh saved markets' },
+      { error: clientSafeError(err, 'Failed to refresh saved markets') },
       { status: 500 }
     );
   }

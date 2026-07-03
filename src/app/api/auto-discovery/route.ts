@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { clientSafeError } from '@/lib/error-handler';
 import {
   runAutoDiscovery,
   getState,
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Internal server error' },
+      { error: clientSafeError(err, 'Internal server error') },
       { status: 500 },
     );
   }
@@ -98,7 +99,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ success: true, state });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Internal server error' },
+      { error: clientSafeError(err, 'Internal server error') },
       { status: 500 },
     );
   }

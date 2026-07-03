@@ -12,6 +12,7 @@ import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
+import { clientSafeError } from '@/lib/error-handler';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -431,7 +432,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: any) {
     logger.trackError(err, { service: 'scan', path: '/api/scan' });
-    const msg = err.message || 'Unknown error';
+    const msg = clientSafeError(err, 'Unknown error');
     const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
     return NextResponse.json(
       { error: msg },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { classifyMarket } from '@/lib/market-classification';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * GET /api/dashboard/stats
@@ -238,7 +239,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Failed to fetch dashboard stats' },
+      { error: clientSafeError(err, 'Failed to fetch dashboard stats') },
       { status: 500 }
     );
   }

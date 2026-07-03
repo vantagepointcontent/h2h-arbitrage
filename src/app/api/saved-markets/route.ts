@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ market }, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -129,7 +130,7 @@ export async function PUT(request: NextRequest) {
     if (!ok) return NextResponse.json({ error: 'Market not found' }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -143,6 +144,6 @@ export async function DELETE(request: NextRequest) {
     const ok = await deleteSavedMarket(id);
     return NextResponse.json({ success: ok });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
