@@ -238,6 +238,7 @@ export class KalshiWsService {
         channels: ['orderbook_delta'],
         market_ticker: marketTicker,
         receive_snapshot: true,
+        depthP: Infinity,
       },
     }));
   }

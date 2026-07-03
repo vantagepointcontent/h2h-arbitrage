@@ -32,6 +32,8 @@ export interface LiveArbResult {
     pmFee: number;
     worstCaseNetProfit: number;
   } | null;
+  /** True when any underlying orderbook is missing or older than the staleness threshold. */
+  stale: boolean;
   lastUpdate: string;
 }
 
@@ -50,6 +52,13 @@ function computeSingleOutcome(
   category?: string,
 ): LiveArbResult {
   const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId } = outcome;
+
+  // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
+  const STALE_MS = Number(process.env.H2H_BOOK_STALE_MS || 30_000);
+  const stale =
+    orderbookState.isStale(kalshiTicker, STALE_MS) ||
+    orderbookState.isStale(pmYesTokenId, STALE_MS) ||
+    orderbookState.isStale(pmNoTokenId, STALE_MS);
 
   const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', capital);
   const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', capital);
@@ -90,7 +99,7 @@ function computeSingleOutcome(
 
   const allAvailable = kalshiYesAsk != null && kalshiNoAsk != null && pmYesAsk != null && pmNoAsk != null;
 
-  if (allAvailable) {
+  if (allAvailable && !stale) {
     const candidate = calculateArbitrageMax(
       { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
       { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
@@ -131,6 +140,7 @@ function computeSingleOutcome(
     kalshiStake,
     pmStake,
     fees,
+    stale,
     lastUpdate: new Date().toISOString(),
   };
 }

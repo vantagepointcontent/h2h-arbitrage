@@ -122,6 +122,16 @@ class OrderbookState {
     this.books.delete(id);
   }
 
+  /**
+   * True if the book is missing or hasn't been updated within maxAgeMs.
+   * Used to avoid computing arbs against dead/disconnected orderbooks.
+   */
+  isStale(id: BookIdentifier, maxAgeMs = 30_000): boolean {
+    const book = this.books.get(id);
+    if (!book) return true;
+    return Date.now() - book.lastUpdate > maxAgeMs;
+  }
+
   private sortAsks(levels: OrderbookLevel[]): OrderbookLevel[] {
     return levels
       .filter((lvl) => lvl.quantity > 1e-9 && lvl.price > 1e-9)

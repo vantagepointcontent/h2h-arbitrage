@@ -306,7 +306,11 @@ export class ClobWsService {
       for (const [, sub] of this.subscribers) {
         const relevant = updates.filter((u) => sub.tokenIds.has(u.tokenId));
         if (relevant.length > 0) {
-          sub.cb(relevant);
+          try {
+            sub.cb(relevant);
+          } catch (err) {
+            console.error('[clob-ws] subscriber callback error (dispatch continues):', err);
+          }
         }
       }
     }
