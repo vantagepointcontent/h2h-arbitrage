@@ -15,6 +15,7 @@ import {
   statusPillClasses,
   type WatcherHealthPayload,
 } from "@/lib/watcher-status";
+import { ExecutionCredsCard } from "@/app/components/ExecutionCredsCard";
 import {
   Settings as SettingsIcon,
   Bell,
@@ -239,7 +240,7 @@ export default function SettingsPanel() {
                         <button
                           onClick={() => {
                             const next = !(val as boolean);
-                            if (s.dangerous && s.key === "execute.dryRun" && next === false) {
+                            if (s.dangerous && next === false) {
                               setConfirmDanger(s.key);
                             } else {
                               setValue(s.key, next);
@@ -301,6 +302,9 @@ export default function SettingsPanel() {
           </div>
         );
       })}
+
+      {/* HOOKUP-04: trading credentials (manual execution only) */}
+      <ExecutionCredsCard />
 
       {/* WS-106: Watcher health card */}
       <div className="mb-6 rounded-xl border border-[#182533] bg-[#17212B]">
