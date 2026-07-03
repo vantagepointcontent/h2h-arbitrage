@@ -37,6 +37,15 @@ export interface LiveArbResult {
   lastUpdate: string;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
+  /** HOOKUP-03 (FEAT-005): arb-formation signal, attached by persistence-tracker. */
+  formation?: {
+    signal: 'FORMING' | 'STABLE' | 'DIVERGING';
+    minutesToArb: number | null;
+    predictedSpread: number;
+    kalshiVelocity1min: number;
+    pmVelocity1min: number;
+    isSpike: boolean;
+  };
 }
 
 /** A single matched outcome for live scanning. */

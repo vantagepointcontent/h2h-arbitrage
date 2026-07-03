@@ -33,6 +33,15 @@ interface LiveArbOutcome {
     level: "stable" | "moderate" | "volatile";
     interpretation: string;
   };
+  /** HOOKUP-03 (FEAT-005): arb-formation signal attached server-side. */
+  formation?: {
+    signal: "FORMING" | "STABLE" | "DIVERGING";
+    minutesToArb: number | null;
+    predictedSpread: number;
+    kalshiVelocity1min: number;
+    pmVelocity1min: number;
+    isSpike: boolean;
+  };
 }
 
 interface LiveScanResult {
@@ -715,6 +724,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">ROI</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PROFIT</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
+                      <th className="text-center py-2 px-2 text-[#5E6875] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
                       <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
                     </tr>
                   </thead>
@@ -775,6 +785,17 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                             </span>
                           ) : (
                             <span className="text-[#5E6875]">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-center" title={o.formation ? `Predicted spread in 1 min: ${(o.formation.predictedSpread * 100).toFixed(2)}% · K vel ${(o.formation.kalshiVelocity1min * 100).toFixed(2)}¢/min · PM vel ${(o.formation.pmVelocity1min * 100).toFixed(2)}¢/min${o.formation.minutesToArb != null ? ` · ~${o.formation.minutesToArb} min to arb` : ""}` : "Formation signal: needs a few ticks of history"}>
+                          {o.formation && o.formation.signal !== "STABLE" ? (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${o.formation.signal === "FORMING" ? "bg-[#5DBE81]/20 text-[#5DBE81]" : "bg-[#ef4444]/20 text-[#ef4444]"}`}>
+                              {o.formation.signal === "FORMING" && o.formation.minutesToArb != null && o.formation.minutesToArb <= 30
+                                ? `FORMING ~${o.formation.minutesToArb}m`
+                                : o.formation.signal}
+                            </span>
+                          ) : (
+                            <span className="text-[#5E6875] text-[10px]">·</span>
                           )}
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>

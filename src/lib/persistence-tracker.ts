@@ -11,7 +11,7 @@
  * live-scan SSE route) run long enough for the buffers to be meaningful.
  * State is keyed by `${marketKey}:${artist}` and evicted after inactivity.
  */
-import { PriceHistoryBuffer, calculateVelocity } from './price-velocity';
+import { PriceHistoryBuffer, calculateVelocity, detectArbFormation } from './price-velocity';
 import { calculatePersistenceScore, PersistenceScore } from './persistence-score';
 import type { LiveArbResult } from './live-arb-engine';
 
@@ -24,6 +24,8 @@ interface OutcomeTrack {
 
 const ROI_WINDOW = 30;
 const EVICT_AFTER_MS = 30 * 60 * 1000;
+/** Spread (1 - combined cost) above which an arb is considered formed. */
+const ARB_SPREAD_THRESHOLD = 0.01;
 
 const tracks = new Map<string, OutcomeTrack>();
 let lastEvictAt = 0;
@@ -107,6 +109,36 @@ export function attachPersistenceScores(
       kalshiDepth: Math.max(r.kalshiYesDepth, r.kalshiNoDepth),
       polymarketDepth: Math.max(r.pmYesDepth, r.pmNoDepth),
     });
+
+    // HOOKUP-03 (FEAT-005): arb-formation signal. Current spread = best of the
+    // two hedge combos (1 - cost of a guaranteed book); positive ≈ arb exists.
+    const s1 = r.kalshiYesAsk != null && r.pmNoAsk != null ? 1 - (r.kalshiYesAsk + r.pmNoAsk) : -Infinity;
+    const s2 = r.pmYesAsk != null && r.kalshiNoAsk != null ? 1 - (r.pmYesAsk + r.kalshiNoAsk) : -Infinity;
+    const currentSpread = Math.max(s1, s2);
+    if (Number.isFinite(currentSpread)) {
+      // detectArbFormation's sign convention: spread widens when the FIRST
+      // history's velocity exceeds the second's (spread ≈ 1 - pmYes - kNo,
+      // where rising kYes ≈ falling kNo widens it). That matches combo s2
+      // with (kalshi, pm) ordering. For combo s1 (buy K YES + PM NO) a
+      // FALLING kYes widens the spread, so the histories must be swapped.
+      const combo1 = s1 >= s2;
+      const f = detectArbFormation(
+        r.artist,
+        combo1 ? t.pmBuf.getPoints() : t.kBuf.getPoints(),
+        combo1 ? t.kBuf.getPoints() : t.pmBuf.getPoints(),
+        currentSpread,
+        ARB_SPREAD_THRESHOLD,
+        now,
+      );
+      r.formation = {
+        signal: f.signal,
+        minutesToArb: f.minutesToArb,
+        predictedSpread: f.predictedSpread,
+        kalshiVelocity1min: kVel.velocity1min,
+        pmVelocity1min: pmVel.velocity1min,
+        isSpike: kVel.isSpike || pmVel.isSpike,
+      };
+    }
   }
   return results;
 }

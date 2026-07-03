@@ -83,4 +83,40 @@ describe('attachPersistenceScores', () => {
     expect(withHistory[0].persistence!.factors.history).toBe(100);
     expect(noHistory[0].persistence!.factors.history).toBe(50);
   });
+
+  // HOOKUP-03 (FEAT-005): arb-formation signal
+  it('attaches a formation signal alongside the persistence score', () => {
+    const results = [mkResult()];
+    attachPersistenceScores(results, { marketKey: 'form-1' });
+    expect(results[0].formation).toBeDefined();
+    expect(['FORMING', 'STABLE', 'DIVERGING']).toContain(results[0].formation!.signal);
+  });
+
+  it('reports STABLE when prices are quiet', () => {
+    const t0 = Date.now();
+    for (let i = 0; i < 10; i++) {
+      attachPersistenceScores([mkResult()], { marketKey: 'quiet-mk' }, t0 + i * 6000);
+    }
+    const r = [mkResult()];
+    attachPersistenceScores(r, { marketKey: 'quiet-mk' }, t0 + 60000);
+    expect(r[0].formation!.signal).toBe('STABLE');
+    expect(r[0].formation!.isSpike).toBe(false);
+  });
+
+  it('flags FORMING when a fast Kalshi drop pushes the spread toward arb', () => {
+    const t0 = Date.now();
+    // Kalshi YES ask falls 3¢/min (spike) while PM NO holds — combined cost
+    // drops below 1, spread converges toward the arb threshold.
+    for (let i = 0; i <= 10; i++) {
+      attachPersistenceScores(
+        [mkResult({ kalshiYesAsk: 0.50 - i * 0.003, pmNoAsk: 0.52 })],
+        { marketKey: 'forming-mk' },
+        t0 + i * 6000,
+      );
+    }
+    const r = [mkResult({ kalshiYesAsk: 0.47, pmNoAsk: 0.52 })];
+    attachPersistenceScores(r, { marketKey: 'forming-mk' }, t0 + 66000);
+    expect(r[0].formation!.isSpike).toBe(true);
+    expect(r[0].formation!.signal).toBe('FORMING');
+  });
 });
