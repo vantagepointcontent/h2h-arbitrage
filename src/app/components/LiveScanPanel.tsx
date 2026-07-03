@@ -27,6 +27,12 @@ interface LiveArbOutcome {
   /** True when any underlying orderbook is missing or older than the staleness threshold (30s). */
   stale?: boolean;
   lastUpdate: string;
+  /** HOOKUP-02 (FEAT-004): likelihood-to-last rating attached server-side. */
+  persistence?: {
+    score: number;
+    level: "stable" | "moderate" | "volatile";
+    interpretation: string;
+  };
 }
 
 interface LiveScanResult {
@@ -262,6 +268,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
       params.set("kalshiUrl", kalshiUrl);
       params.set("pmUrl", pmUrl);
       params.set("capital", String(capital));
+      params.set("marketId", market.id); // HOOKUP-02: keys historical lifespan for persistence score
       const es = new EventSource(`/api/ws/live-scan?${params.toString()}`);
 
       es.onopen = () => {
@@ -707,6 +714,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">SPREAD</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">ROI</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PROFIT</th>
+                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
                       <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
                     </tr>
                   </thead>
@@ -760,6 +768,15 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         <FlashCell flash={activeTab.flashes[`${idx}-profit`]} className={`py-2 px-2 text-right font-mono font-bold ${o.expectedProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
                           {fmtUsd(o.expectedProfit)}
                         </FlashCell>
+                        <td className="py-2 px-2 text-right font-mono" title={o.persistence?.interpretation ?? "Persistence score: needs a few ticks of history"}>
+                          {o.persistence && o.roiPct > 0 ? (
+                            <span className={`font-bold ${o.persistence.score >= 70 ? "text-[#5DBE81]" : o.persistence.score >= 40 ? "text-[#facc15]" : "text-[#ef4444]"}`}>
+                              {o.persistence.score}
+                            </span>
+                          ) : (
+                            <span className="text-[#5E6875]">—</span>
+                          )}
+                        </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
                           {o.strategy}
                         </td>

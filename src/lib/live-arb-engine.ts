@@ -35,6 +35,8 @@ export interface LiveArbResult {
   /** True when any underlying orderbook is missing or older than the staleness threshold. */
   stale: boolean;
   lastUpdate: string;
+  /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
+  persistence?: import('./persistence-score').PersistenceScore;
 }
 
 /** A single matched outcome for live scanning. */

@@ -18,6 +18,8 @@ import { applyKalshiWsMessage, applyPmWsUpdates } from '../src/lib/ws-book-apply
 import { seedAllBooks, seedKalshiBook, seedPmBook } from '../src/lib/book-seed';
 import { refreshWatchTargets, computeTiers, WatchTarget } from '../src/lib/watch-targets';
 import { recordArbObservations } from '../src/lib/arb-lifecycle';
+import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
+import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
 import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '../src/lib/persistence';
 import { SUSPICIOUS_ROI_PCT } from '../src/lib/matcher';
@@ -265,6 +267,11 @@ async function computePair(pairId: string): Promise<void> {
   if (!pair) return;
 
   const results = computeAllLiveArbitrages(pair.outcomes, WATCH_CAPITAL, pair.category);
+
+  // HOOKUP-02 (FEAT-004): attach persistence scores (velocity/depth/history).
+  const avgLifespanMin = await getAvgEpisodeLifespanMin(pairId).catch(() => undefined);
+  attachPersistenceScores(results, { marketKey: pairId, avgLifespanMin });
+
   const positive = results.filter((r) => !r.stale && r.expectedProfit > 0 && r.fees != null);
 
   // WS-107: persist the live view so ALL UI surfaces (sidebar, Overview,

@@ -8,6 +8,8 @@ import { clobWs } from '@/lib/clob-ws';
 import { kalshiWs, KalshiWsMessage } from '@/lib/kalshi-ws';
 import { orderbookState } from '@/lib/orderbook-state';
 import { computeAllLiveArbitrages, LiveMatchedOutcome } from '@/lib/live-arb-engine';
+import { attachPersistenceScores } from '@/lib/persistence-tracker';
+import { getAvgEpisodeLifespanMin } from '@/lib/arb-lifecycle';
 import { resolvePair, PairResolveError } from '@/lib/pair-resolver';
 import { seedAllBooks } from '@/lib/book-seed';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '@/lib/ws-book-apply';
@@ -115,9 +117,21 @@ export async function GET(req: NextRequest) {
       // B5 fix: trailing-edge throttle — if a burst arrives inside the window,
       // schedule one trailing send so the latest state always goes out.
       let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+      // HOOKUP-02: persistence-score context. Historical lifespan keys off the
+      // saved-market id when this pair is saved (watcher episodes use that id);
+      // resolved lazily, neutral until it arrives.
+      const persistKey = `live:${kalshiUrl}|${pmUrl}`;
+      let avgLifespanMin: number | undefined;
+      const savedId = searchParams.get('marketId');
+      if (savedId) {
+        void getAvgEpisodeLifespanMin(savedId)
+          .then((v) => { avgLifespanMin = v; })
+          .catch(() => {});
+      }
       function doSendResults() {
         lastSend = Date.now();
         const outcomes = computeAllLiveArbitrages(session.matchedOutcomes, session.capital, session.category);
+        attachPersistenceScores(outcomes, { marketKey: persistKey, avgLifespanMin });
         send({ type: 'result', result: { outcomes, lastUpdate: new Date().toISOString() } });
       }
       function maybeSendResults() {

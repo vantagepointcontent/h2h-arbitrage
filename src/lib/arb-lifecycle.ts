@@ -212,6 +212,35 @@ export async function getLifecycleStats(days: number = 30): Promise<{
   };
 }
 
+/** HOOKUP-02 (FEAT-004): average closed-episode lifespan for a market, in
+ *  MINUTES, over the trailing `days` window. Cached 5 min per market — this
+ *  feeds the persistence score's history factor on every watcher tick. */
+const _lifespanCache = new Map<string, { at: number; val: number | undefined }>();
+export async function getAvgEpisodeLifespanMin(
+  marketId: string,
+  days: number = 30,
+): Promise<number | undefined> {
+  const cached = _lifespanCache.get(marketId);
+  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.val;
+  await ensureDb();
+  const c = getClient();
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  let val: number | undefined;
+  try {
+    const res = await c.execute({
+      sql: `SELECT AVG(duration_sec) AS avg_sec FROM arb_episodes
+            WHERE market_id = ? AND status = 'closed' AND first_seen_at >= ?`,
+      args: [marketId, cutoff],
+    });
+    const avgSec = (res.rows as any[])[0]?.avg_sec;
+    val = avgSec != null ? Number(avgSec) / 60 : undefined;
+  } catch {
+    val = undefined;
+  }
+  _lifespanCache.set(marketId, { at: Date.now(), val });
+  return val;
+}
+
 /** Prune closed episodes older than `days`. */
 export async function pruneOldEpisodes(days: number = 90): Promise<number> {
   await ensureDb();
