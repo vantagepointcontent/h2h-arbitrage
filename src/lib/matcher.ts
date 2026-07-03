@@ -226,6 +226,12 @@ function parseKalshiTicker(ticker: string): { label?: string; sub?: string } | n
   return { label, sub };
 }
 
+/** BUG-030: last-resort readable name from a raw ticker like "KXALHOUSE-26-R3" */
+function humanizeKalshiTicker(ticker: string): string {
+  const seg = ticker.split('-')[0] || ticker;
+  return seg.replace(/^KX/i, '').replace(/([A-Z])(\d)/g, '$1 $2');
+}
+
 function extractNameFromKalshiTitle(title: string): string {
   const willWinMatch = title.match(/^Will\s+(.+?)\s+(?:win|lose|be|finish|end|survive|get|score)/i);
   if (willWinMatch) return willWinMatch[1].trim();
@@ -321,7 +327,15 @@ function getKalshiName(km: KalshiMarket): string {
     }
   }
   if (!base) {
-    base = extractNameFromKalshiTitle(km.title || km.ticker);
+    // BUG-030: never fall back to the raw ticker as a display name.
+    // Fallback chain: title → yes_sub_title → humanized ticker.
+    if (km.title) {
+      base = extractNameFromKalshiTitle(km.title);
+    } else if (km.yes_sub_title) {
+      base = km.yes_sub_title;
+    } else {
+      base = humanizeKalshiTicker(km.ticker);
+    }
   }
 
   // 3. Append ticker-derived date/sub-code so identical bases stay distinct.
