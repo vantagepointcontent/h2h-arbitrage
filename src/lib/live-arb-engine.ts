@@ -2,7 +2,7 @@
 // and runs the existing matcher fee/arb logic against weighted ask prices.
 
 import { orderbookState, WeightedAskResult } from './orderbook-state';
-import { calculateArbitrageMax } from './matcher';
+import { calculateArbitrageMax, computeArbitrageFees } from './matcher';
 
 export interface LiveArbInputs {
   kalshiTicker: string;
@@ -145,13 +145,61 @@ function computeSingleOutcome(
   };
 }
 
-/** Compute arbitrage for all matched outcomes in one pass. */
+/** Compute arbitrage for all matched outcomes in one pass.
+ *  Includes cross-outcome ("Buy YES both sides") arbs for strict binary markets,
+ *  mirroring calculateBestArbitrageForOutcome in matcher.ts. */
 export function computeAllLiveArbitrages(
   outcomes: LiveMatchedOutcome[],
   capital: number,
   category?: string,
 ): LiveArbResult[] {
-  return outcomes.map((o) => computeSingleOutcome(o, capital, category));
+  const results = outcomes.map((o) => computeSingleOutcome(o, capital, category));
+
+  // Cross-outcome pass: only for strict binary (exactly 2 outcomes), same rule as manual scan.
+  if (results.length === 2) {
+    for (let i = 0; i < 2; i++) {
+      const cur = results[i];
+      const comp = results[1 - i];
+      if (cur.stale || comp.stale) continue;
+      const kYesA = cur.kalshiYesAsk;
+      const pYesB = comp.pmYesAsk;
+      if (kYesA == null || pYesB == null || cur.kalshiNoAsk == null || comp.pmNoAsk == null) continue;
+      if (kYesA + pYesB >= 1) continue;
+
+      // Capital limited by ask depth on both legs (mirrors manual scan's leg caps)
+      const capK = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : Infinity;
+      const capP = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : Infinity;
+      const capped = Math.min(capK, capP, capital);
+      const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+      const kalshiStake = effectiveCapital * kYesA;
+      const pmStake = effectiveCapital * pYesB;
+      const fees = computeArbitrageFees(
+        `Buy YES both sides: Kalshi ${cur.artist} + Polymarket ${comp.artist}`,
+        effectiveCapital,
+        kalshiStake,
+        pmStake,
+        kYesA,
+        cur.kalshiNoAsk,
+        pYesB,
+        comp.pmNoAsk,
+        category,
+      );
+      if (fees.worstCaseNetProfit > cur.expectedProfit) {
+        cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
+        cur.roiPct = effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0;
+        cur.expectedProfit = fees.worstCaseNetProfit;
+        cur.kalshiStake = kalshiStake;
+        cur.pmStake = pmStake;
+        cur.fees = {
+          kalshiFee: fees.kalshiFee,
+          pmFee: fees.pmFee,
+          worstCaseNetProfit: fees.worstCaseNetProfit,
+        };
+      }
+    }
+  }
+
+  return results;
 }
 
 // Legacy wrapper kept for backward compatibility
