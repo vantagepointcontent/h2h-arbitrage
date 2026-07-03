@@ -10,7 +10,7 @@ interface PriceCellProps {
   depthLabel?: string; // t.ex. "Likviditet:" eller "Djup:"
 }
 
-export function PriceCell({ price, depth, priceChange, depthLabel }: PriceCellProps) {
+function PriceCellInner({ price, depth, priceChange, depthLabel }: PriceCellProps) {
   const flashClass = priceChange === 'up' ? 'flash-green' : priceChange === 'down' ? 'flash-red' : '';
   
   const formatDepth = (d: string | number | null | undefined): string => {
@@ -39,7 +39,7 @@ interface SpreadCellProps {
   spread: number;
 }
 
-export function SpreadCell({ spread }: SpreadCellProps) {
+function SpreadCellInner({ spread }: SpreadCellProps) {
   const color = spread > 0 ? "text-[#5DBE81]" : spread < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]";
   return (
     <span className={`font-medium ${color}`}>
@@ -109,3 +109,7 @@ export function ArbitrageCell({
     </td>
   );
 }
+
+// Memoized exports — hot path (PERF-001)
+export const PriceCell = React.memo(PriceCellInner);
+export const SpreadCell = React.memo(SpreadCellInner);

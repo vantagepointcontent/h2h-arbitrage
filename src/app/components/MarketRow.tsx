@@ -49,7 +49,7 @@ function formatPercent(n: number) {
   return `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`;
 }
 
-export function MarketRow({
+function MarketRowInner({
   artist,
   kalshi,
   polymarket,
@@ -181,3 +181,6 @@ export function MarketRow({
     </React.Fragment>
   );
 }
+
+// Memoized export — hot path: re-renders only when props change (PERF-001)
+export const MarketRow = React.memo(MarketRowInner);
