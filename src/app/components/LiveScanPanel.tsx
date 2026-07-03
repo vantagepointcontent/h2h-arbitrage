@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, ExternalLink } from "lucide-react";
+import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, ExternalLink, Zap } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
+import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
 
 interface LiveArbOutcome {
   artist: string;
@@ -27,6 +28,10 @@ interface LiveArbOutcome {
   /** True when any underlying orderbook is missing or older than the staleness threshold (30s). */
   stale?: boolean;
   lastUpdate: string;
+  /** HOOKUP-04: leg identifiers for manual execution. */
+  kalshiTicker?: string;
+  pmYesTokenId?: string;
+  pmNoTokenId?: string;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating attached server-side. */
   persistence?: {
     score: number;
@@ -146,6 +151,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>("");
+  const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const tabCounterRef = useRef(0);
   const tabsRef = useRef<TabState[]>([]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
@@ -799,7 +805,23 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           )}
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
-                          {o.strategy}
+                          <span className="inline-flex items-center gap-2">
+                            {o.strategy}
+                            {(() => {
+                              if (o.stale || o.roiPct <= 0) return null;
+                              const exec = buildExecutableArb(o, activeTab.marketTitle);
+                              if (!exec) return null;
+                              return (
+                                <button
+                                  onClick={() => setExecutingArb(exec)}
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
+                                  title="Manually execute this arb (opens confirmation)"
+                                >
+                                  <Zap className="w-2.5 h-2.5" /> Execute
+                                </button>
+                              );
+                            })()}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -857,6 +879,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
             <div className="text-sm text-[#5E6875] py-8 text-center">No matched outcomes found for this market.</div>
           )}
         </div>
+      )}
+
+      {/* HOOKUP-04: manual execution confirmation modal */}
+      {executingArb && (
+        <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
       )}
     </div>
   );

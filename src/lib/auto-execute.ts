@@ -129,6 +129,75 @@ function simulateOrder(req: OrderRequest): OrderResult {
   };
 }
 
+// ─── Real Execution (HOOKUP-04 step 2) ───────────────────────────
+// Places both legs in parallel as limit orders at the requested prices.
+// One-leg-failure => immediate cancel of the surviving leg (rollback).
+// Only reachable via /api/execute (manual-only, kill-switch gated).
+
+async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<OrderResult> {
+  const { placeKalshiOrder } = await import('./kalshi-orders');
+  if (!req.ticker) {
+    return { ...emptyResult('kalshi', 'rejected'), error: 'Missing Kalshi ticker' };
+  }
+  try {
+    const priceCents = Math.round(req.price * 100);
+    const count = Math.max(1, Math.floor(req.size / req.price)); // $size → contracts
+    const r = await placeKalshiOrder({
+      ticker: req.ticker,
+      side: req.outcome,
+      count,
+      priceCents,
+      clientOrderId: `h2h-${arbId}-k`.slice(0, 64),
+    });
+    const filledContracts = r.filledCount;
+    return {
+      platform: 'kalshi',
+      status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
+      filledSize: filledContracts * req.price,
+      filledPrice: req.price,
+      orderId: r.orderId,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (err: any) {
+    return { ...emptyResult('kalshi', 'rejected'), error: err?.message ?? String(err) };
+  }
+}
+
+async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
+  const { placePmOrder } = await import('./polymarket-orders');
+  if (!req.conditionId) {
+    return { ...emptyResult('polymarket', 'rejected'), error: 'Missing Polymarket token ID' };
+  }
+  try {
+    const size = req.size / req.price; // $size → shares
+    const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
+    return {
+      platform: 'polymarket',
+      status: r.status === 'matched' ? 'filled' : 'pending',
+      filledSize: r.status === 'matched' ? req.size : 0,
+      filledPrice: req.price,
+      orderId: r.orderId,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (err: any) {
+    return { ...emptyResult('polymarket', 'rejected'), error: err?.message ?? String(err) };
+  }
+}
+
+async function cancelLeg(result: OrderResult): Promise<boolean> {
+  if (!result.orderId) return false;
+  try {
+    if (result.platform === 'kalshi') {
+      const { cancelKalshiOrder } = await import('./kalshi-orders');
+      return await cancelKalshiOrder(result.orderId);
+    }
+    const { cancelPmOrder } = await import('./polymarket-orders');
+    return await cancelPmOrder(result.orderId);
+  } catch {
+    return false;
+  }
+}
+
 // ─── Execution Engine ────────────────────────────────────────────
 
 export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult> {
@@ -162,17 +231,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       Promise.resolve(simulateOrder(req.polymarketOrder)),
     ]);
   } else {
-    // REAL EXECUTION — not implemented yet
-    // This would call Kalshi and Polymarket trading APIs
-    // Requires authenticated sessions and API keys
-    return {
-      success: false,
-      kalshiResult: emptyResult('kalshi', 'rejected'),
-      polymarketResult: emptyResult('polymarket', 'rejected'),
-      rollbackExecuted: false,
-      executionTimeMs: Date.now() - startTime,
-      error: 'Real execution not implemented. Set H2H_DRY_RUN=true (default) to simulate.',
-    };
+    // REAL EXECUTION (HOOKUP-04 step 2): both legs in parallel, limit orders.
+    [kalshiResult, polymarketResult] = await Promise.all([
+      placeRealKalshiLeg(req.kalshiOrder, req.arbId),
+      placeRealPmLeg(req.polymarketOrder),
+    ]);
   }
 
   // Check for failures and rollback
@@ -183,9 +246,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   if (kalshiFailed || polymarketFailed) {
     // Rollback: cancel the successful leg
     if (!kalshiFailed && polymarketFailed) {
+      if (!effectiveDryRun) await cancelLeg(kalshiResult);
       kalshiResult = { ...kalshiResult, status: 'cancelled' };
       rollbackExecuted = true;
     } else if (!polymarketFailed && kalshiFailed) {
+      if (!effectiveDryRun) await cancelLeg(polymarketResult);
       polymarketResult = { ...polymarketResult, status: 'cancelled' };
       rollbackExecuted = true;
     }

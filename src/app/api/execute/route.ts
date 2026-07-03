@@ -107,6 +107,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         dryRun: request.dryRun || settingDryRun,
       };
 
+      // Real execution additionally requires complete credentials.
+      if (!effective.dryRun) {
+        const creds = await getCredentialStatus();
+        if (!creds.allReady) {
+          return NextResponse.json(
+            { error: 'Real execution requires complete Kalshi + Polymarket credentials (Settings → Trading Credentials).' },
+            { status: 403 },
+          );
+        }
+      }
+
       logger.info('[execute] MANUAL execution requested', {
         arbId: effective.arbId,
         marketTitle: effective.marketTitle,

@@ -35,6 +35,10 @@ export interface LiveArbResult {
   /** True when any underlying orderbook is missing or older than the staleness threshold. */
   stale: boolean;
   lastUpdate: string;
+  /** HOOKUP-04: leg identifiers so the UI can build a manual execution request. */
+  kalshiTicker?: string;
+  pmYesTokenId?: string;
+  pmNoTokenId?: string;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
   /** HOOKUP-03 (FEAT-005): arb-formation signal, attached by persistence-tracker. */
@@ -158,6 +162,9 @@ function computeSingleOutcome(
     pmStake,
     fees,
     stale,
+    kalshiTicker,
+    pmYesTokenId,
+    pmNoTokenId,
     lastUpdate: new Date().toISOString(),
   };
 }
