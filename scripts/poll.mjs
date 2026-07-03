@@ -207,9 +207,7 @@ async function writeJsonAtomic(path, data) {
   } catch {}
 }
 
-async function saveMarkets(markets) {
-  await writeJsonAtomic(DATA_FILE, markets);
-}
+// OPS-009: saveMarkets removed — poller is now READ-ONLY on saved-markets.json.
 
 async function writeHealth(health) {
   try {
@@ -468,27 +466,9 @@ async function pollOnce() {
     }
   });
 
-  // Re-read file from disk before saving
-  const latestMarkets = await loadSavedMarkets();
-
-  if (latestMarkets.length === 0 && markets.length > 0) {
-    console.error(`[${new Date().toISOString()}] CRITICAL: saved-markets.json is empty on re-read but poller had ${markets.length} markets. Refusing to overwrite with empty array.`);
-    health.errors.push({ market: 'system', error: `Refused to overwrite empty saved-markets.json (had ${markets.length} markets)` });
-    await saveMarkets(markets);
-  } else {
-    for (const scannedMarket of markets) {
-      if (scannedMarket.lastScanResult) {
-        const live = latestMarkets.find(m => m.id === scannedMarket.id);
-        if (live) {
-          live.lastScanResult = scannedMarket.lastScanResult;
-          if (scannedMarket.expiryDate && !live.expiryDate) {
-            live.expiryDate = scannedMarket.expiryDate;
-          }
-        }
-      }
-    }
-    await saveMarkets(latestMarkets);
-  }
+  // OPS-009: no JSON write-back. The app persists each scan result itself
+  // (via /api/scan → SQLite, mirrored to saved-markets.json). The poller's
+  // old read-merge-write of saved-markets.json was the main write race.
 
   health.status = aborted ? 'aborted' : (health.failureCount > 0 ? 'degraded' : 'ok');
   health.finishedAt = new Date().toISOString();

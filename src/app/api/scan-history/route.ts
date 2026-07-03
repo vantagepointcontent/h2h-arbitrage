@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory } from '@/lib/persistence';
+import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
 /**
@@ -16,7 +16,18 @@ export async function GET(request: NextRequest) {
 
     const history = await getScanHistory(marketId, limit);
 
-    return NextResponse.json({ history, count: history.length }, {
+    // UI-015: attach human-readable names
+    let nameMap = new Map<string, string>();
+    try {
+      const saved = await getSavedMarkets();
+      nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
+    } catch { /* best-effort */ }
+    const enriched = history.map((r: any) => ({
+      ...r,
+      market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
+    }));
+
+    return NextResponse.json({ history: enriched, count: enriched.length }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',

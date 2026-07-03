@@ -29,6 +29,8 @@ interface LogEntry {
   total_stake: number;
   scanned_at: string;
   raw_result: string | null;
+  market_title?: string | null;  // stored at scan time (BUG-030)
+  market_name?: string | null;   // server-resolved (UI-015)
 }
 
 type EventType = "all" | "scan" | "arb" | "system";
@@ -135,7 +137,7 @@ export default function LogsPanel() {
     const q = searchQuery.toLowerCase();
     return result.filter(
       (l) => {
-        const marketName = savedMarkets.get(l.market_id);
+        const marketName = l.market_name ?? l.market_title ?? savedMarkets.get(l.market_id);
         return (
           l.market_id?.toLowerCase().includes(q) ||
           marketName?.toLowerCase().includes(q) ||
@@ -476,7 +478,7 @@ function LogRow({
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#5E6875]";
 
-  const marketName = savedMarkets.get(log.market_id);
+  const marketName = log.market_name ?? log.market_title ?? savedMarkets.get(log.market_id);
   const hasMarketName = !!marketName;
 
   const handleNavigate = (e: React.MouseEvent) => {

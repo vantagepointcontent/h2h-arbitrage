@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory } from '@/lib/persistence';
+import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
 /**
@@ -70,8 +70,20 @@ export async function GET(request: NextRequest) {
     const results = filtered.slice(0, limit);
     const nextCursor = results.length === limit ? results[results.length - 1].scanned_at : undefined;
 
+    // UI-015: resolve human-readable market names. Prefer the name stored at
+    // scan time (market_title), fall back to a live join with saved markets.
+    let nameMap = new Map<string, string>();
+    try {
+      const saved = await getSavedMarkets();
+      nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
+    } catch { /* name resolution is best-effort */ }
+    const enriched = results.map((r: any) => ({
+      ...r,
+      market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
+    }));
+
     return NextResponse.json(
-      { logs: results, count: results.length, total: filtered.length, nextCursor },
+      { logs: enriched, count: enriched.length, total: filtered.length, nextCursor },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

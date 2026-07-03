@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
           positiveArbCount: body.scanResult.positiveArbCount,
           totalStake: body.scanResult.totalStake,
           raw: body.scanResult.raw,
+          marketTitle: market.eventTitle,
         });
         return NextResponse.json({ market, scanResultId: saved.id }, { status: 201 });
       } catch (scanErr: any) {
