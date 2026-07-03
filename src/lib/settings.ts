@@ -61,6 +61,7 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'discovery.scanIntervalHours', section: 'auto-discovery', label: 'Scan interval (h)', description: 'Hours between auto-discovery category scans.', type: 'number', default: 3, min: 1, max: 24, slider: true },
   { key: 'discovery.autoApproveConfidence', section: 'auto-discovery', label: 'Auto-approve confidence', description: 'Pairs at or above this confidence are saved automatically (AUTO-001, when implemented).', type: 'number', default: 85, min: 50, max: 100, slider: true },
   { key: 'discovery.maxMarketsPerScan', section: 'auto-discovery', label: 'Max markets per scan', description: 'Cap on markets added by a single discovery scan.', type: 'number', default: 10, min: 1, max: 100 },
+  { key: 'discovery.yieldBias', section: 'auto-discovery', label: 'Yield bias', description: 'AUTO-003: how strongly category scans favor categories with realized arb episodes (0 = pure round-robin, 100 = heavily biased). Every category still gets scanned periodically.', type: 'number', default: 50, min: 0, max: 100, slider: true },
 
   // ── Lifecycle (AUTO-002) ──
   { key: 'lifecycle.enabled', section: 'lifecycle', label: 'Auto-retirement', description: 'Automatically archive expired or dead markets so they stop consuming polling budget.', type: 'boolean', default: true },

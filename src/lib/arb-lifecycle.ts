@@ -222,6 +222,30 @@ export async function pruneOldEpisodes(days: number = 90): Promise<number> {
 }
 
 /**
+ * AUTO-003: realized arb yield per category over the last `days` days.
+ * Returns a map of lowercased category → episode count. Categories are
+ * lowercased because arb_episodes stores display categories ("Politics")
+ * while discovery uses slugs ("politics").
+ */
+export async function getCategoryEpisodeCounts(days: number = 14): Promise<Map<string, number>> {
+  await ensureDb();
+  const c = getClient();
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const r = await c.execute({
+    sql: `SELECT LOWER(COALESCE(category, '')) AS cat, COUNT(*) AS episodes
+          FROM arb_episodes WHERE first_seen_at >= ?
+          GROUP BY LOWER(COALESCE(category, ''))`,
+    args: [cutoff],
+  });
+  const m = new Map<string, number>();
+  for (const row of r.rows as any[]) {
+    const cat = String(row.cat || '').trim();
+    if (cat) m.set(cat, Number(row.episodes ?? 0));
+  }
+  return m;
+}
+
+/**
  * How long the currently-OPEN episode for (market, outcome) has persisted,
  * in seconds. Returns 0 when there is no open episode (i.e. the arb is
  * brand new this scan — recordArbObservations runs before alerts fire,

@@ -92,8 +92,19 @@ function saveState(state: AutoDiscoveryState): void {
 }
 
 /** Pick a random category that hasn't been scanned recently.
- * Priority: categories not scanned in the last 6 hours > oldest scanned > any. */
-function pickNextCategory(scanRecords: CategoryScanRecord[]): string {
+ * Priority: categories not scanned in the last 6 hours > oldest scanned > any.
+ *
+ * AUTO-003: when yield data is available, the random choice among eligible
+ * categories is WEIGHTED by realized arb episodes (last 14 days). Weight =
+ * 1 + biasFactor * episodes, where biasFactor derives from the
+ * discovery.yieldBias setting (0 → uniform round-robin, 100 → heavy bias).
+ * The 6-hour staleness rule is kept, so every category still gets scanned
+ * periodically — this is a bias, not a filter (exploration floor). */
+function pickNextCategory(
+  scanRecords: CategoryScanRecord[],
+  yieldCounts?: Map<string, number>,
+  yieldBias: number = 50,
+): string {
   const now = Date.now();
   const sixHoursAgo = now - 6 * 60 * 60 * 1000;
 
@@ -102,7 +113,7 @@ function pickNextCategory(scanRecords: CategoryScanRecord[]): string {
   );
 
   if (uncategorized.length > 0) {
-    return uncategorized[Math.floor(Math.random() * uncategorized.length)];
+    return weightedPick(uncategorized, yieldCounts, yieldBias);
   }
 
   // Fall back to the least recently scanned
@@ -113,7 +124,38 @@ function pickNextCategory(scanRecords: CategoryScanRecord[]): string {
     return sorted[0].category;
   }
 
-  return CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+  return weightedPick([...CATEGORIES], yieldCounts, yieldBias);
+}
+
+/** AUTO-003: weighted random pick. Categories with more realized arb
+ * episodes get proportionally more scan slots; every candidate keeps a
+ * base weight of 1 so nothing is ever starved. */
+function weightedPick(candidates: string[], yieldCounts?: Map<string, number>, yieldBias: number = 50): string {
+  if (candidates.length === 0) return CATEGORIES[0];
+  if (!yieldCounts || yieldCounts.size === 0 || yieldBias <= 0) {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+  // biasFactor: 0..2 — at 50 (default) each episode adds 1x base weight
+  const biasFactor = (yieldBias / 100) * 2;
+  // Episode categories are display names ("tech", "finances"); discovery uses slugs.
+  const ALIASES: Record<string, string[]> = {
+    technology: ['tech'], economics: ['finances', 'economy', 'finance'],
+    politics: ['political'], election: ['elections'],
+  };
+  const countFor = (cat: string): number => {
+    const key = cat.toLowerCase();
+    let n = yieldCounts.get(key) ?? 0;
+    for (const alias of ALIASES[key] ?? []) n += yieldCounts.get(alias) ?? 0;
+    return n;
+  };
+  const weights = candidates.map(cat => 1 + biasFactor * countFor(cat));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < candidates.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
 }
 
 /** Normalize market title for matching (same as predictionhunt.ts) */
@@ -567,11 +609,13 @@ export async function runAutoDiscovery(): Promise<{
   let autoApproveConfidence = 85;
   let maxMarketsPerScan = 10;
   let settingsPaused = false;
+  let yieldBias = 50;
   try {
     const { getSetting } = await import('./settings');
     autoApproveConfidence = await getSetting<number>('discovery.autoApproveConfidence');
     maxMarketsPerScan = await getSetting<number>('discovery.maxMarketsPerScan');
     settingsPaused = await getSetting<boolean>('discovery.paused');
+    yieldBias = await getSetting<number>('discovery.yieldBias');
   } catch { /* settings unavailable — use defaults */ }
 
   // Check pause (legacy state flag or settings toggle)
@@ -579,7 +623,14 @@ export async function runAutoDiscovery(): Promise<{
     return { category: '-', added: 0, reviewQueued: 0, skipped: 0, errors: ['Auto-discovery is paused'], scanRecord: null };
   }
 
-  const category = pickNextCategory(state.scanRecords);
+  // AUTO-003: bias category choice toward realized arb yield (last 14 days)
+  let yieldCounts: Map<string, number> | undefined;
+  try {
+    const { getCategoryEpisodeCounts } = await import('./arb-lifecycle');
+    yieldCounts = await getCategoryEpisodeCounts(14);
+  } catch { /* no episode data — uniform pick */ }
+
+  const category = pickNextCategory(state.scanRecords, yieldCounts, yieldBias);
   const errors: string[] = [];
   let added = 0;
   let reviewQueued = 0;

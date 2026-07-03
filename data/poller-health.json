@@ -1,40 +1,19 @@
 {
-  "status": "degraded",
+  "status": "ok",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 526,
-  "startedAt": "2026-07-03T19:34:58.187Z",
-  "finishedAt": "2026-07-03T19:36:57.053Z",
-  "durationMs": 118866,
-  "successCount": 71,
-  "failureCount": 4,
-  "skippedCount": 450,
-  "avgScanMs": 7788,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "Peru Presidential Election Winner",
-      "error": "timeout after 47550ms (adaptive)",
-      "durationMs": 47550
-    },
-    {
-      "market": "MLS Cup Winner 2026",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "2026 Midterms: House Popular Vote Margin of Victory",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "MLB: Stolen Bases Leader",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    }
-  ],
+  "marketCount": 470,
+  "startedAt": "2026-07-03T19:40:19.861Z",
+  "finishedAt": "2026-07-03T19:41:26.482Z",
+  "durationMs": 66621,
+  "successCount": 41,
+  "failureCount": 0,
+  "skippedCount": 428,
+  "avgScanMs": 7917,
+  "maxScanMs": 8591,
+  "errors": [],
   "breakerSkipped": 1,
   "openBreakers": 1
 }

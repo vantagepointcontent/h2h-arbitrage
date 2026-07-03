@@ -80,9 +80,14 @@
       "category": "sports",
       "lastScannedAt": "2026-07-03T19:08:55.837Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-03T19:42:02.831Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-03T19:08:55.837Z",
+  "lastScanAt": "2026-07-03T19:42:02.831Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }
