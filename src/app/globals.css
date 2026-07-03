@@ -414,3 +414,38 @@ body {
   line-height: 1;
   font-size: 9px;
 }
+
+/* SETTINGS-001: styled range sliders for the Settings panel */
+input[type="range"].settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: #232E3C;
+  outline: none;
+  cursor: pointer;
+  min-height: 0 !important;
+}
+input[type="range"].settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #5DBE81;
+  border: 2px solid #0E1621;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+input[type="range"].settings-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #5DBE81;
+  border: 2px solid #0E1621;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+input[type="range"].settings-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: #232E3C;
+}

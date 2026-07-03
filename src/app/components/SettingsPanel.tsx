@@ -209,10 +209,10 @@ export default function SettingsPanel() {
                               setValue(s.key, next);
                             }
                           }}
-                          className={`relative w-11 h-6 rounded-full transition-colors ${val ? "bg-[#5DBE81]" : "bg-[#182533]"}`}
+                          className={`relative w-11 h-6 shrink-0 rounded-full transition-colors !min-h-0 !p-0 ${val ? "bg-[#5DBE81]" : "bg-[#2A3644]"}`}
                           title={String(val)}
                         >
-                          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${val ? "translate-x-5" : "translate-x-0.5"}`} />
+                          <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${val ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                         </button>
                       ) : s.type === "number" && s.slider ? (
                         <div className="flex items-center gap-2 w-56">
@@ -220,10 +220,10 @@ export default function SettingsPanel() {
                             type="range"
                             min={s.min ?? 0}
                             max={s.max ?? 100}
-                            step={(s.max ?? 100) - (s.min ?? 0) > 100 ? 100 : 0.5}
+                            step={(() => { const r = (s.max ?? 100) - (s.min ?? 0); return r <= 50 ? 0.5 : r <= 200 ? 1 : r <= 5000 ? 10 : 1000; })()}
                             value={Number(val)}
                             onChange={(e) => setValue(s.key, Number(e.target.value))}
-                            className="flex-1 accent-[#5DBE81]"
+                            className="settings-slider flex-1"
                           />
                           <span className="text-sm w-16 text-right tabular-nums">{val}</span>
                         </div>
@@ -273,7 +273,16 @@ export default function SettingsPanel() {
         </div>
         <div className="px-4 py-3 text-sm">
           {health ? (
-            <pre className="text-xs text-[#8A9BA8] whitespace-pre-wrap max-h-64 overflow-auto">{JSON.stringify(health, null, 2)}</pre>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Object.entries(health).map(([k, v]) => (
+                <div key={k} className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">{k}</div>
+                  <div className={`text-sm font-medium truncate ${k === "status" && v === "ok" ? "text-[#5DBE81]" : ""}`} title={String(typeof v === "object" ? JSON.stringify(v) : v)}>
+                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <span className="text-[#5E6875]">Health endpoint unavailable.</span>
           )}
