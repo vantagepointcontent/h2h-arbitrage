@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pingPlatform, clearPingCache, pingCacheStats, PingResult } from '@/lib/ping';
+import { clientSafeError } from '@/lib/error-handler';
 
 const VALID_PLATFORMS = ['kalshi', 'polymarket', 'predictionhunt'];
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('[api/ping POST]', err);
     return NextResponse.json(
-      { error: err.message || 'Internal server error' },
+      { error: clientSafeError(err, 'Internal server error') },
       { status: 500 },
     );
   }

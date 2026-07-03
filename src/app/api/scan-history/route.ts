@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanHistory } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * GET /api/scan-history?marketId=x&limit=20
@@ -22,6 +23,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to fetch scan history' }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err, 'Failed to fetch scan history') }, { status: 500 });
   }
 }

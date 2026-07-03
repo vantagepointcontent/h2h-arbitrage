@@ -119,3 +119,25 @@ export function startTimer(): TimedRequest {
     durationMs: () => Date.now() - start,
   };
 }
+
+// ---------------------------------------------------------------------------
+// SEC-002: client-safe error messages
+// Logs the FULL error server-side (message, stack, fingerprint) but returns
+// only a generic, user-facing string to the client, so internal details
+// (upstream API errors, file paths, SQL errors) never leak in responses.
+// The correlationId in logs lets you match a client report to the full error.
+// ---------------------------------------------------------------------------
+
+export function clientSafeError(error: unknown, fallback = 'Internal server error', ctx?: { path?: string }): string {
+  const fp = errorFingerprint(error);
+  const msg = error instanceof Error ? error.message : String(error);
+  spikeDetector.record({ fingerprint: fp, message: msg });
+  logger.error(msg, {
+    error,
+    fingerprint: fp,
+    fingerprintHash: fingerprintHash(fp),
+    path: ctx?.path,
+    correlationId: correlationId.current,
+  });
+  return fallback;
+}

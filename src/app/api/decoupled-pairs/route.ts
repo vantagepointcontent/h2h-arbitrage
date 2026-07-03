@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDecoupledPairs, addDecoupledPair, removeDecoupledPair } from '@/lib/decoupled-pairs';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET() {
   try {
@@ -8,7 +9,7 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -27,9 +28,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ pair }, { status: 201 });
   } catch (err: any) {
     if (err.message === 'Pair already decoupled') {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+      return NextResponse.json({ error: clientSafeError(err) }, { status: 409 });
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -43,6 +44,6 @@ export async function DELETE(request: NextRequest) {
     const ok = await removeDecoupledPair(id);
     return NextResponse.json({ success: ok });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }

@@ -9,6 +9,7 @@ import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
+import { clientSafeError } from '@/lib/error-handler';
 
 const API_TIMEOUT_MS = 15000;
 
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: any) {
     console.error('[refresh-api-error]', err);
-    const msg = err.message || 'Unknown error';
+    const msg = clientSafeError(err, 'Unknown error');
     const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
     return NextResponse.json({ error: msg }, { status });
   }

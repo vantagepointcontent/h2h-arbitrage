@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { suggestCouplings, CouplingCandidate, CouplingRejection, UnmatchedMarket } from '@/lib/coupling';
+import { clientSafeError } from '@/lib/error-handler';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const REJECTIONS_FILE = path.join(DATA_DIR, 'coupling-rejections.json');
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ suggestions });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to generate suggestions' }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(error, 'Failed to generate suggestions') }, { status: 500 });
   }
 }
 
@@ -92,6 +93,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to process coupling action' }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(error, 'Failed to process coupling action') }, { status: 500 });
   }
 }

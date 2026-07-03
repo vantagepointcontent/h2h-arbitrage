@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanHistory } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * GET /api/logs
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Failed to fetch logs' },
+      { error: clientSafeError(err, 'Failed to fetch logs') },
       { status: 500 }
     );
   }

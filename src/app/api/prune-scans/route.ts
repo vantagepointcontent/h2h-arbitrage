@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pruneOldScans, getScanCount } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * POST /api/prune-scans
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ deleted, remaining, retentionDays: days });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Failed to prune scans' },
+      { error: clientSafeError(err, 'Failed to prune scans') },
       { status: 500 },
     );
   }

@@ -15,6 +15,7 @@ import {
   buildMatchedMarketsFromSearch,
 } from '@/lib/predictionhunt';
 import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
+import { clientSafeError } from '@/lib/error-handler';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (err: any) {
     console.error('[api/predictionhunt/markets GET]', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -225,6 +226,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (err: any) {
     console.error('[api/predictionhunt/markets POST]', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: clientSafeError(err) }, { status: 500 });
   }
 }

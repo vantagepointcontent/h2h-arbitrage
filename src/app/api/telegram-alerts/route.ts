@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConfigFromEnv, sendTestMessage, sendBatchAlerts, isPaused, ArbAlertInput } from '@/lib/telegram-alerts';
+import { clientSafeError } from '@/lib/error-handler';
 
 /**
  * GET /api/telegram-alerts
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = clientSafeError(err, 'Telegram alert action failed');
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

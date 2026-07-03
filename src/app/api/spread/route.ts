@@ -7,6 +7,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket, parseOutcomes } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
+import { clientSafeError } from '@/lib/error-handler';
 
 const API_TIMEOUT_MS = 15000;
 
@@ -397,7 +398,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: any) {
     console.error('[spread-api-error]', err);
-    const msg = err.message || 'Unknown error';
+    const msg = clientSafeError(err, 'Unknown error');
     const status = msg.includes('timed out') ? 504 : 500;
     return NextResponse.json({ error: msg }, { status });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteManualMatch } from '@/lib/manual-matches';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function DELETE(
   _request: NextRequest,
@@ -13,6 +14,6 @@ export async function DELETE(
     const ok = await deleteManualMatch(id);
     return NextResponse.json({ success: ok });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }

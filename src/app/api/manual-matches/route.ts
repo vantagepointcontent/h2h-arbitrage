@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getManualMatches, addManualMatch, deleteManualMatch, ManualMatch } from '@/lib/manual-matches';
+import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
       }
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -32,9 +33,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ match }, { status: 201 });
   } catch (err: any) {
     if (err.message === 'Manual match already exists for this pair') {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+      return NextResponse.json({ error: clientSafeError(err) }, { status: 409 });
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -48,6 +49,6 @@ export async function DELETE(request: NextRequest) {
     const ok = await deleteManualMatch(id);
     return NextResponse.json({ success: ok });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }

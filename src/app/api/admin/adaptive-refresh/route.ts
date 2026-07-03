@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { DEFAULT_CONFIG, AdaptiveRefreshConfig } from '@/lib/adaptive-refresh';
+import { clientSafeError } from '@/lib/error-handler';
 
 const CONFIG_PATH = path.join(process.cwd(), 'src', 'data', 'adaptive-refresh-config.json');
 
@@ -43,7 +44,7 @@ export async function GET(_: NextRequest): Promise<NextResponse> {
     const config = await readConfig();
     return NextResponse.json(config);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
 
@@ -75,6 +76,6 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     await writeConfig(updated);
     return NextResponse.json(updated);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
