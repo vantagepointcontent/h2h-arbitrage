@@ -32,6 +32,16 @@ const SUBSCRIBE_DEBOUNCE_MS = 200;
 // Per-token best bid/ask cache (populated from WS snapshots)
 const priceCache = new Map<string, { bestBid: number; bestAsk: number; ts: number }>();
 
+// Bounded-memory guard: evict cache entries older than 30 min, every 5 min.
+// Prevents unbounded growth in long-running processes (audit F4 fix).
+const PRICE_CACHE_TTL_MS = 30 * 60_000;
+setInterval(() => {
+  const cutoff = Date.now() - PRICE_CACHE_TTL_MS;
+  for (const [key, entry] of priceCache) {
+    if (entry.ts < cutoff) priceCache.delete(key);
+  }
+}, 5 * 60_000).unref?.();
+
 export class ClobWsService {
   private ws: WebSocket | null = null;
   private connected = false;

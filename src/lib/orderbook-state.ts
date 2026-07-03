@@ -29,6 +29,18 @@ export type BookIdentifier = string; // token_id for Polymarket, ticker for Kals
 class OrderbookState {
   private books = new Map<BookIdentifier, FullBook>();
 
+  constructor() {
+    // Bounded-memory guard: books not updated for 60 min are dead
+    // (unsubscribed or disconnected stream) — evict them (audit F7 fix).
+    const BOOK_TTL_MS = 60 * 60_000;
+    setInterval(() => {
+      const cutoff = Date.now() - BOOK_TTL_MS;
+      for (const [id, book] of this.books) {
+        if (book.lastUpdate < cutoff) this.books.delete(id);
+      }
+    }, 10 * 60_000).unref?.();
+  }
+
   getBook(id: BookIdentifier): FullBook | undefined {
     return this.books.get(id);
   }
