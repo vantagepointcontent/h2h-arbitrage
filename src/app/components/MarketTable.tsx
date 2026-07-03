@@ -54,7 +54,7 @@ const SORTABLE_FIELDS = [
   { key: 'strategy', label: 'Strategy' },
 ];
 
-export function MarketTable({
+function MarketTableInner({
   outcomes,
   priceChanges,
   highestProfitArtist,
@@ -126,3 +126,6 @@ export function MarketTable({
     </div>
   );
 }
+
+// Memoized export — hot path (PERF-001)
+export const MarketTable = React.memo(MarketTableInner);

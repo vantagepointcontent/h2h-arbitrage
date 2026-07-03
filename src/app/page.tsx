@@ -528,7 +528,6 @@ export default function Home() {
   const [lastScanTime, setLastScanTime] = useState<number>(0);
   const previousPricesRef = useRef<Map<string, { kYes: number; pYes: number }>>(new Map());
   const [priceChanges, setPriceChanges] = useState<Map<string, "up" | "down" | null>>(new Map());
-  const [pollTimer, setPollTimer] = useState<number>(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const activeScanRef = useRef(false);
   const pollingActiveRef = useRef(false);
@@ -1282,7 +1281,7 @@ export default function Home() {
     }, 60000);
 
     return () => clearInterval(iv);
-  }, [activeMarketId, viewMode]);
+  }, [activeMarketId, viewMode, capital]);
 
   // Auto-fetch MarketFinder data when entering marketfinder view
   useEffect(() => {
@@ -1326,11 +1325,6 @@ export default function Home() {
     };
   }, [viewMode, mfAutoRefreshEnabled]);
 
-  // Polling timer
-  useEffect(() => {
-    const iv = setInterval(() => setPollTimer(Date.now()), 1000);
-    return () => clearInterval(iv);
-  }, []);
 
   // Persist selection to localStorage whenever it changes
   useEffect(() => {

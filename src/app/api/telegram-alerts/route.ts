@@ -30,14 +30,17 @@ export async function POST(request: NextRequest) {
     const { action } = body;
 
     if (action === 'test') {
-      const { botToken, chatId } = body;
-      if (!botToken || !chatId) {
+      // SEC-001: never accept credentials from the request body — use env
+      // config only. Prevents anyone on the LAN from relaying arbitrary
+      // messages through arbitrary bots via this endpoint.
+      const config = getConfigFromEnv();
+      if (!config) {
         return NextResponse.json(
-          { error: 'Missing botToken or chatId' },
+          { error: 'Telegram alerts not configured (set env credentials)' },
           { status: 400 },
         );
       }
-      const result = await sendTestMessage(botToken, chatId);
+      const result = await sendTestMessage(config.botToken, config.chatId);
       return NextResponse.json(result, { status: result.sent ? 200 : 500 });
     }
 
