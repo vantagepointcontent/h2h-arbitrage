@@ -24,6 +24,8 @@ interface LiveArbOutcome {
     pmFee: number;
     worstCaseNetProfit: number;
   } | null;
+  /** True when any underlying orderbook is missing or older than the staleness threshold (30s). */
+  stale?: boolean;
   lastUpdate: string;
 }
 
@@ -712,9 +714,23 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                     {activeTab.result.outcomes.map((o, idx) => (
                       <tr
                         key={`${o.artist}-${idx}`}
-                        className="border-b border-[#182533]/50 hover:bg-[#182533] transition-colors"
+                        className={`border-b border-[#182533]/50 transition-colors ${
+                          o.stale
+                            ? "opacity-40 grayscale hover:opacity-60"
+                            : "hover:bg-[#182533]"
+                        }`}
+                        title={o.stale ? "Stale: orderbook data older than 30s — prices may be wrong" : undefined}
                       >
-                        <td className="py-2 px-2 text-[#FFFFFF] font-medium">{o.artist}</td>
+                        <td className="py-2 px-2 text-[#FFFFFF] font-medium">
+                          <span className="inline-flex items-center gap-1.5">
+                            {o.artist}
+                            {o.stale && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#5E6875]/30 text-[#8A9BA8] uppercase tracking-wide">
+                                Stale
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <FlashCell flash={activeTab.flashes[`${idx}-kYes`]} className="py-2 px-2 text-right text-[#5DBE81] font-mono">
                           {fmt(o.kalshiYesAsk)}
                         </FlashCell>
@@ -756,16 +772,25 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
               {/* Summary stats */}
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                 {(() => {
-                  const positiveArbs = activeTab.result.outcomes.filter((o) => o.roiPct > 0);
+                  // Stale outcomes are excluded from stats — a grayed-out row
+                  // is honest, a stale number in "Best ROI" is a wrong number.
+                  const fresh = activeTab.result.outcomes.filter((o) => !o.stale);
+                  const staleCount = activeTab.result.outcomes.length - fresh.length;
+                  const positiveArbs = fresh.filter((o) => o.roiPct > 0);
                   const bestRoi = positiveArbs.length > 0
                     ? Math.max(...positiveArbs.map((o) => o.roiPct))
                     : 0;
-                  const totalProfit = activeTab.result.outcomes.reduce((s, o) => s + o.expectedProfit, 0);
+                  const totalProfit = fresh.reduce((s, o) => s + o.expectedProfit, 0);
                   return (
                     <>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
                         <div className="text-[10px] text-[#5E6875]">Total Outcomes</div>
-                        <div className="text-lg font-bold text-[#FFFFFF]">{activeTab.result.outcomes.length}</div>
+                        <div className="text-lg font-bold text-[#FFFFFF]">
+                          {activeTab.result.outcomes.length}
+                          {staleCount > 0 && (
+                            <span className="ml-1.5 text-[10px] font-medium text-[#8A9BA8] align-middle">({staleCount} stale)</span>
+                          )}
+                        </div>
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
                         <div className="text-[10px] text-[#5E6875]">Positive Arbs</div>
