@@ -335,7 +335,14 @@ export async function POST(request: NextRequest) {
       const allMarkets = await getSavedMarkets();
       const market = allMarkets.find(m => m.kalshiUrl === kalshiUrl && m.polymarketUrl === polymarketUrl);
       if (market) {
-        const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0);
+        // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth)
+        // from stats, history, lifecycle, and alerts. They stay visible in the
+        // scan payload itself (flagged) so the UI can grey them out.
+        const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
+        const suspiciousCount = withArbitrage.filter(o => o.arbitrage?.suspicious).length;
+        if (suspiciousCount > 0) {
+          console.log(`[scan] ${market.eventTitle}: ${suspiciousCount} suspicious arb(s) excluded from stats (ROI > threshold with unknown depth)`);
+        }
         const bestArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;

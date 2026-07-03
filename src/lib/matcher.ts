@@ -43,6 +43,10 @@ export interface UnifiedOutcome {
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket' | null;
     sellPrice: number;
+    /** True when ROI exceeds the sanity threshold AND depth on some leg was
+     *  unknown/assumed-infinite — almost certainly a phantom quote on an
+     *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
+    suspicious?: boolean;
     /** Fee-adjusted profit per winning platform for the buy side */
     fees?: {
       kalshiFee: number;
@@ -696,7 +700,27 @@ export function calculateBestArbitrageForOutcome(
     }
   }
 
-  return best;
+  // Sanity guard: flag phantom arbs (huge ROI on legs with unknown depth).
+  const depthUnknown =
+    !isFinite(depthPYes) || !isFinite(depthPNo) || depthKYes <= 0 || depthKNo <= 0;
+  return markSuspiciousArb(best, depthUnknown);
+}
+
+/** ROI above this on a leg with unknown/assumed-infinite depth is almost
+ *  certainly a phantom quote on a dead/illiquid book, not a fillable arb.
+ *  Real cross-platform arbs live in the 1–5% range. Env-tunable. */
+export const SUSPICIOUS_ROI_PCT = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
+
+/** Flag an arb result as suspicious when ROI exceeds the sanity threshold and
+ *  at least one leg's depth was unknown (assumed Infinity / zero-parsed). */
+export function markSuspiciousArb<T extends { roiPct: number; strategy: string; suspicious?: boolean }>(
+  arb: T,
+  depthUnknown: boolean,
+): T {
+  if (arb.strategy !== 'No arb' && arb.roiPct > SUSPICIOUS_ROI_PCT && depthUnknown) {
+    arb.suspicious = true;
+  }
+  return arb;
 }
 
 /** For a list of matched outcomes, compute the best arbitrage per outcome including cross-outcome.
