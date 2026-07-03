@@ -70,6 +70,8 @@ async function initDb(): Promise<void> {
     `ALTER TABLE saved_markets ADD COLUMN archived_at TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN archive_reason TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN last_matched_at TEXT`,
+    // WS-107: real-time result written by the ws-watcher for HOT pairs
+    `ALTER TABLE saved_markets ADD COLUMN live_result TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -216,6 +218,10 @@ export interface SavedMarket {
   expiryDate?: string | null; // ISO timestamp
   favorite?: boolean;         // user-starred for quick access
   lastScanResult?: LastScanResult | null;
+  /** WS-107: real-time result from the ws-watcher (HOT pairs only). UI reads
+   *  liveResult ?? lastScanResult. Core fields required, rest optional so the
+   *  client-side SavedMarket (page-shared.ts) stays structurally assignable. */
+  liveResult?: (Pick<LastScanResult, 'bestRoiPct' | 'bestProfit' | 'strategy' | 'scannedAt'> & Partial<LastScanResult>) | null;
   // AUTO-002: lifecycle
   archived?: boolean;
   archivedAt?: string | null;
@@ -236,6 +242,17 @@ async function ensureDir() {
 function rowToMarket(r: any): SavedMarket {
   let lastScanResult: LastScanResult | null = null;
   try { lastScanResult = r.last_scan_result ? JSON.parse(String(r.last_scan_result)) : null; } catch {}
+  let liveResult: LastScanResult | null = null;
+  try { liveResult = r.live_result ? JSON.parse(String(r.live_result)) : null; } catch {}
+  // WS-107: a live result is only trustworthy while the watcher is actively
+  // recomputing it. If it's older than the TTL (watcher down, pair left HOT
+  // tier), drop it so the UI falls back to the poller's lastScanResult.
+  if (liveResult?.scannedAt) {
+    const age = Date.now() - new Date(liveResult.scannedAt).getTime();
+    if (!(age >= 0 && age <= LIVE_RESULT_TTL_MS)) liveResult = null;
+  } else {
+    liveResult = null;
+  }
   return {
     id: String(r.id),
     kalshiUrl: String(r.kalshi_url),
@@ -246,6 +263,7 @@ function rowToMarket(r: any): SavedMarket {
     expiryDate: r.expiry_date != null ? String(r.expiry_date) : null,
     favorite: Boolean(Number(r.favorite ?? 0)),
     lastScanResult,
+    liveResult,
     archived: Boolean(Number(r.archived ?? 0)),
     archivedAt: r.archived_at != null ? String(r.archived_at) : null,
     archiveReason: r.archive_reason != null ? String(r.archive_reason) : null,
@@ -460,6 +478,32 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
     });
   }
   await mirrorMarketsToJson();
+}
+
+// WS-107: watcher-written real-time result ─────────────────────────
+/** How long a liveResult stays valid without a fresh watcher write. */
+export const LIVE_RESULT_TTL_MS = Number(process.env.H2H_LIVE_RESULT_TTL_MS || 10 * 60_000);
+
+/** WS-107: persist the watcher's real-time computation for a HOT market.
+ *  Targeted UPDATE of live_result only — never touches last_scan_result, so
+ *  the REST poller and the watcher can't clobber each other.
+ *  Skips the JSON mirror by design: live writes are frequent and the mirror
+ *  (poller input) should stay driven by poller-cadence scans. */
+export async function updateSavedMarketLiveResult(id: string, result: LastScanResult): Promise<void> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
+  await c.execute({
+    sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+    args: [JSON.stringify(result), matchedNow, id],
+  });
+}
+
+/** WS-107: clear a market's live result (pair left HOT tier / watcher shutdown). */
+export async function clearSavedMarketLiveResult(id: string): Promise<void> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  await c.execute({ sql: 'UPDATE saved_markets SET live_result = NULL WHERE id = ?', args: [id] });
 }
 
 export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate' | 'category'>>): Promise<boolean> {

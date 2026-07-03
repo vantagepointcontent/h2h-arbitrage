@@ -23,24 +23,39 @@ export async function GET(request: NextRequest) {
     if (fields === 'basic') {
       // Strip lastScanResult.allArbs to reduce payload
       const slim = markets.map((m: any) => {
+        const out: any = { ...m };
         if (m.lastScanResult) {
-          return {
-            ...m,
-            lastScanResult: {
-              bestRoiPct: m.lastScanResult.bestRoiPct,
-              bestProfit: m.lastScanResult.bestProfit,
-              strategy: m.lastScanResult.strategy,
-              outcomeCount: m.lastScanResult.outcomeCount,
-              matchedCount: m.lastScanResult.matchedCount,
-              kalshiCount: m.lastScanResult.kalshiCount,
-              pmCount: m.lastScanResult.pmCount,
-              scannedAt: m.lastScanResult.scannedAt,
-              positiveArbCount: m.lastScanResult.positiveArbCount,
-              totalStake: m.lastScanResult.totalStake,
-            },
+          out.lastScanResult = {
+            bestRoiPct: m.lastScanResult.bestRoiPct,
+            bestProfit: m.lastScanResult.bestProfit,
+            strategy: m.lastScanResult.strategy,
+            outcomeCount: m.lastScanResult.outcomeCount,
+            matchedCount: m.lastScanResult.matchedCount,
+            kalshiCount: m.lastScanResult.kalshiCount,
+            pmCount: m.lastScanResult.pmCount,
+            scannedAt: m.lastScanResult.scannedAt,
+            positiveArbCount: m.lastScanResult.positiveArbCount,
+            totalStake: m.lastScanResult.totalStake,
           };
         }
-        return m;
+        // WS-107: same slimming for the watcher's live result, but keep a
+        // count-preserving allArbs stub so isMatched()/arb badges still work.
+        if (m.liveResult) {
+          out.liveResult = {
+            bestRoiPct: m.liveResult.bestRoiPct,
+            bestProfit: m.liveResult.bestProfit,
+            strategy: m.liveResult.strategy,
+            outcomeCount: m.liveResult.outcomeCount,
+            matchedCount: m.liveResult.matchedCount,
+            kalshiCount: m.liveResult.kalshiCount,
+            pmCount: m.liveResult.pmCount,
+            scannedAt: m.liveResult.scannedAt,
+            allArbs: (m.liveResult.allArbs ?? []).map((a: any) => ({
+              artist: a.artist, roiPct: a.roiPct, expectedProfit: a.expectedProfit, strategy: a.strategy,
+            })),
+          };
+        }
+        return out;
       });
       // Support pagination for MF-012: ?fields=basic&limit=50&offset=0
       const limit = parseInt(searchParams.get('limit') || '0', 10);

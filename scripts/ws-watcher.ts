@@ -13,12 +13,14 @@ import path from 'path';
 import { kalshiWs, KalshiWsMessage } from '../src/lib/kalshi-ws';
 import { ClobWsService, WsPriceUpdate } from '../src/lib/clob-ws';
 import { orderbookState } from '../src/lib/orderbook-state';
-import { computeAllLiveArbitrages, LiveMatchedOutcome } from '../src/lib/live-arb-engine';
+import { computeAllLiveArbitrages, LiveMatchedOutcome, LiveArbResult } from '../src/lib/live-arb-engine';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '../src/lib/ws-book-apply';
 import { seedAllBooks, seedKalshiBook, seedPmBook } from '../src/lib/book-seed';
 import { refreshWatchTargets, computeTiers, WatchTarget } from '../src/lib/watch-targets';
 import { recordArbObservations } from '../src/lib/arb-lifecycle';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
+import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '../src/lib/persistence';
+import { SUSPICIOUS_ROI_PCT } from '../src/lib/matcher';
 import logger from '../src/lib/logger';
 
 // ── Config ──────────────────────────────────────────────────────
@@ -29,6 +31,8 @@ const HEALTH_FILE = path.join(process.cwd(), 'data', 'watcher-health.json');
 const HEALTH_WRITE_MS = 15_000;
 const PM_TOKENS_PER_CONN = 450;          // stay under Polymarket per-connection asset cap
 const WATCH_CAPITAL = Number(process.env.H2H_WATCHER_CAPITAL || '1000');
+// WS-107: persist liveResult to saved_markets at most this often per pair
+const LIVE_WRITE_MIN_MS = Number(process.env.H2H_LIVE_WRITE_MIN_MS || 2_000);
 
 // WS-105: integrity layer config
 const RECONCILE_MS = 10 * 60_000;        // periodic REST reconcile per HOT book
@@ -190,6 +194,9 @@ async function syncSubscriptions(): Promise<void> {
     if (!p) continue;
     for (const t of p.kalshiTickers) if (!tiers.hot.some((h) => h.kalshiTicker === t)) orderbookState.removeBook(t);
     for (const t of p.pmTokens) orderbookState.removeBook(t);
+    // WS-107: demoted pairs fall back to poller data immediately
+    lastLiveWriteAt.delete(pid);
+    clearSavedMarketLiveResult(pid).catch(() => {});
   }
 
   rebuildIndexes(tiers.hot, titles);
@@ -260,6 +267,11 @@ async function computePair(pairId: string): Promise<void> {
   const results = computeAllLiveArbitrages(pair.outcomes, WATCH_CAPITAL, pair.category);
   const positive = results.filter((r) => !r.stale && r.expectedProfit > 0 && r.fees != null);
 
+  // WS-107: persist the live view so ALL UI surfaces (sidebar, Overview,
+  // Dashboard) show real-time ROI for HOT markets, not the 5-min poller lag.
+  await writeLiveResult(pairId, results, positive).catch((err) =>
+    logger.warn('[watcher] liveResult write failed', { pairId, err }));
+
   // Episode lifecycle — second-precision first-seen/closed timestamps.
   // recordArbObservations opens/extends/closes based on the full observation set.
   await recordArbObservations(
@@ -291,6 +303,77 @@ async function computePair(pairId: string): Promise<void> {
       pmYesPrice: r.pmYesAsk ?? undefined,
       pmNoPrice: r.pmNoAsk ?? undefined,
     });
+  }
+}
+
+// ── WS-107: liveResult persistence ───────────────────────────────
+
+const lastLiveWriteAt = new Map<string, number>();  // pairId -> ts of last DB write
+let liveWriteCount = 0;
+let liveWriteErrors = 0;
+
+/** Mirror of markSuspiciousArb for the live path: huge ROI with no visible
+ *  ask depth on any leg is a one-tick phantom quote, not a fillable arb. */
+function isSuspiciousLive(r: LiveArbResult): boolean {
+  if (r.roiPct <= SUSPICIOUS_ROI_PCT) return false;
+  const depthUnknown =
+    (r.kalshiYesDepth <= 0 && r.kalshiNoDepth <= 0) ||
+    (r.pmYesDepth <= 0 && r.pmNoDepth <= 0);
+  return depthUnknown;
+}
+
+async function writeLiveResult(
+  pairId: string,
+  results: LiveArbResult[],
+  positive: LiveArbResult[],
+): Promise<void> {
+  // Per-pair write throttle: computes fire on every WS delta (150ms debounce);
+  // the DB doesn't need more than one write per LIVE_WRITE_MIN_MS per pair.
+  const now = Date.now();
+  const last = lastLiveWriteAt.get(pairId) ?? 0;
+  if (now - last < LIVE_WRITE_MIN_MS) return;
+  lastLiveWriteAt.set(pairId, now);
+
+  const clean = positive.filter((r) => !isSuspiciousLive(r));
+  const best = clean.length > 0
+    ? clean.reduce((b, r) => (r.roiPct > b.roiPct ? r : b))
+    : null;
+
+  const matchedCount = results.filter((r) => !r.stale &&
+    r.kalshiYesAsk != null && r.pmYesAsk != null).length;
+
+  const liveResult: LastScanResult = {
+    bestRoiPct: best ? best.roiPct : 0,
+    bestProfit: best ? best.expectedProfit : 0,      // net of fees (live-arb-engine)
+    strategy: best ? best.strategy : 'No arb',
+    outcomeCount: results.length,
+    matchedCount,
+    kalshiCount: results.filter((r) => r.kalshiYesAsk != null).length,
+    pmCount: results.filter((r) => r.pmYesAsk != null).length,
+    scannedAt: new Date().toISOString(),
+    allArbs: clean.map((r) => ({
+      artist: r.artist,
+      roiPct: r.roiPct,
+      expectedProfit: r.expectedProfit,
+      strategy: r.strategy,
+      fees: r.fees ? {
+        kalshiFee: r.fees.kalshiFee,
+        pmFee: r.fees.pmFee,
+        kalshiFeeDetails: '',
+        pmFeeDetails: '',
+        netProfitIfKalshiWins: r.fees.worstCaseNetProfit,
+        netProfitIfPmWins: r.fees.worstCaseNetProfit,
+        worstCaseNetProfit: r.fees.worstCaseNetProfit,
+      } : undefined,
+    })),
+  };
+
+  try {
+    await updateSavedMarketLiveResult(pairId, liveResult);
+    liveWriteCount++;
+  } catch (err) {
+    liveWriteErrors++;
+    throw err;
   }
 }
 
@@ -428,6 +511,7 @@ function writeHealth(): void {
     pmTokens: tokenToPairs.size,
     msgCount,
     lastTickAt: lastTickAt ? new Date(lastTickAt).toISOString() : null,
+    liveWrites: { count: liveWriteCount, errors: liveWriteErrors },  // WS-107
     tierStats,
     integrity: {
       degraded,
