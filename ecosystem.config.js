@@ -39,6 +39,11 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: '3000',
         PREDICTIONHUNT_API_KEY: 'pmx_U46EX9BAvyqxGoq9kinrYIqRt3KTWoWTrOU9B-I8VGQ',
+        // SEC-001: shared secret required on mutating /api/* from non-localhost
+        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
+        // Same token exposed to the browser UI (inlined at build time too —
+        // keep .env.production in sync). Shared-secret gate, not real auth.
+        NEXT_PUBLIC_H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
         LOG_DIR: '/home/scott/.pm2/logs',
         LOG_LEVEL: 'info',
         // SENTRY_DSN: 'https://...',  // uncomment and set your Sentry DSN
@@ -83,6 +88,9 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         H2H_BASE_URL: 'http://100.86.7.30:3000',
+        // SEC-001: poller calls the app over the Tailscale IP, so it must
+        // authenticate its mutating requests with the shared token.
+        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
       },
 
       // ── Logging ─────────────────────────────────────────────
