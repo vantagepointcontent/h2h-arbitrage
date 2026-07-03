@@ -183,70 +183,44 @@ export async function GET(req: NextRequest) {
         .catch(() => {});
 
       // ── Kalshi WS: subscribe to ALL tickers ──
-      const kalshiSubKey = `live-scan-kalshi-${Date.now()}`;
+      // B2 fix: record the exact subKeys used at subscribe time so cleanup
+      // unsubscribes the same keys (previously extra keys were rebuilt with
+      // Date.now() at abort time and never matched — permanent subscriber leak).
+      const kalshiSubKeys: string[] = [];
       kalshiWs.connect();
-      kalshiWs.subscribe(
-        session.kalshiTickers[0], // subscribe callback receives all tickers
-        (msg: KalshiWsMessage) => {
-          if (session.closed) return;
-          if (msg.type === 'orderbook_snapshot') {
-            // Only apply WS snapshot if we don't already have a REST-seeded book.
-            // REST seed is the authoritative base; WS snapshots can be stale/wrong.
-            // Kalshi WS returns BIDS: msg.yes = YES bids, msg.no = NO bids.
-            // Convert to asks: YES asks from NO bids, NO asks from YES bids.
-            if (!orderbookState.hasBook(msg.marketTicker)) {
-              const yesAsks = msg.no
-                .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
-                .filter((a) => a.price > 0 && a.price < 1);
-              const noAsks = msg.yes
-                .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
-                .filter((a) => a.price > 0 && a.price < 1);
-              orderbookState.setBook(msg.marketTicker, yesAsks, noAsks, msg.seq);
-            }
-          } else if (msg.type === 'orderbook_delta') {
-            // Kalshi WS delta: side='yes' means a YES BID level changed.
-            // We store asks, so a YES bid delta at price P becomes a NO ask delta at (1-P),
-            // and a NO bid delta at price P becomes a YES ask delta at (1-P).
-            const askSide = msg.side === 'yes' ? 'no' : 'yes';
-            const askPrice = 1 - msg.price;
-            if (askPrice > 0 && askPrice < 1) {
-              orderbookState.applyAskDelta(msg.marketTicker, askSide, askPrice, msg.delta, msg.seq);
-            }
+      const handleKalshiMsg = (msg: KalshiWsMessage) => {
+        if (session.closed) return;
+        if (msg.type === 'orderbook_snapshot') {
+          // Only apply WS snapshot if we don't already have a REST-seeded book.
+          // REST seed is the authoritative base; WS snapshots can be stale/wrong.
+          // Kalshi WS returns BIDS: msg.yes = YES bids, msg.no = NO bids.
+          // Convert to asks: YES asks from NO bids, NO asks from YES bids.
+          if (!orderbookState.hasBook(msg.marketTicker)) {
+            const yesAsks = msg.no
+              .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+              .filter((a) => a.price > 0 && a.price < 1);
+            const noAsks = msg.yes
+              .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+              .filter((a) => a.price > 0 && a.price < 1);
+            orderbookState.setBook(msg.marketTicker, yesAsks, noAsks, msg.seq);
           }
-          maybeSendResults();
-        },
-        kalshiSubKey,
-      );
+        } else if (msg.type === 'orderbook_delta') {
+          // Kalshi WS delta: side='yes' means a YES BID level changed.
+          // We store asks, so a YES bid delta at price P becomes a NO ask delta at (1-P),
+          // and a NO bid delta at price P becomes a YES ask delta at (1-P).
+          const askSide = msg.side === 'yes' ? 'no' : 'yes';
+          const askPrice = 1 - msg.price;
+          if (askPrice > 0 && askPrice < 1) {
+            orderbookState.applyAskDelta(msg.marketTicker, askSide, askPrice, msg.delta, msg.seq);
+          }
+        }
+        maybeSendResults();
+      };
 
-      // Subscribe additional Kalshi tickers beyond the first one
-      for (let i = 1; i < session.kalshiTickers.length; i++) {
-        const extraKey = `live-scan-kalshi-extra-${session.kalshiTickers[i]}-${Date.now()}-${i}`;
-        kalshiWs.subscribe(
-          session.kalshiTickers[i],
-          (msg: KalshiWsMessage) => {
-            if (session.closed) return;
-            if (msg.type === 'orderbook_snapshot') {
-              // Same guard + bid-to-ask conversion as above
-              if (!orderbookState.hasBook(msg.marketTicker)) {
-                const yesAsks = msg.no
-                  .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
-                  .filter((a) => a.price > 0 && a.price < 1);
-                const noAsks = msg.yes
-                  .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
-                  .filter((a) => a.price > 0 && a.price < 1);
-                orderbookState.setBook(msg.marketTicker, yesAsks, noAsks, msg.seq);
-              }
-            } else if (msg.type === 'orderbook_delta') {
-              const askSide = msg.side === 'yes' ? 'no' : 'yes';
-              const askPrice = 1 - msg.price;
-              if (askPrice > 0 && askPrice < 1) {
-                orderbookState.applyAskDelta(msg.marketTicker, askSide, askPrice, msg.delta, msg.seq);
-              }
-            }
-            maybeSendResults();
-          },
-          extraKey,
-        );
+      for (let i = 0; i < session.kalshiTickers.length; i++) {
+        const subKey = `live-scan-kalshi-${session.kalshiTickers[i]}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
+        kalshiSubKeys.push(subKey);
+        kalshiWs.subscribe(session.kalshiTickers[i], handleKalshiMsg, subKey);
       }
 
       // ── Polymarket WS: subscribe to ALL token IDs ──
@@ -287,12 +261,28 @@ export async function GET(req: NextRequest) {
         maybeSendResults();
       }, pmSubKey);
 
-      function maybeSendResults() {
-        const now = Date.now();
-        if (now - lastSend < minIntervalMs) return;
-        lastSend = now;
+      // B5 fix: trailing-edge throttle — if a burst arrives inside the window,
+      // schedule one trailing send so the latest state always goes out
+      // (previously leading-only; the last update in a burst was dropped
+      // until the 1s heartbeat).
+      let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+      function doSendResults() {
+        lastSend = Date.now();
         const outcomes = computeAllLiveArbitrages(session.matchedOutcomes, session.capital, session.category);
         send({ type: 'result', result: { outcomes, lastUpdate: new Date().toISOString() } });
+      }
+      function maybeSendResults() {
+        const now = Date.now();
+        const elapsed = now - lastSend;
+        if (elapsed >= minIntervalMs) {
+          if (trailingTimer) { clearTimeout(trailingTimer); trailingTimer = null; }
+          doSendResults();
+        } else if (!trailingTimer) {
+          trailingTimer = setTimeout(() => {
+            trailingTimer = null;
+            if (!session.closed) doSendResults();
+          }, minIntervalMs - elapsed);
+        }
       }
 
       // Periodic heartbeat even if no updates
@@ -305,12 +295,11 @@ export async function GET(req: NextRequest) {
       req.signal.addEventListener('abort', () => {
         session.closed = true;
         clearInterval(heartbeat);
+        if (trailingTimer) { clearTimeout(trailingTimer); trailingTimer = null; }
 
-        // Unsubscribe ALL Kalshi subscriptions
-        kalshiWs.unsubscribe(kalshiSubKey);
-        for (let i = 1; i < session.kalshiTickers.length; i++) {
-          const extraKey = `live-scan-kalshi-extra-${session.kalshiTickers[i]}-${Date.now()}-${i}`;
-          kalshiWs.unsubscribe(extraKey);
+        // Unsubscribe ALL Kalshi subscriptions using the exact keys from subscribe time (B2)
+        for (const key of kalshiSubKeys) {
+          kalshiWs.unsubscribe(key);
         }
 
         // Unsubscribe Polymarket

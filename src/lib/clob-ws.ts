@@ -55,6 +55,12 @@ export class ClobWsService {
   // ── Public API ────────────────────────────────────────────
 
   connect(): void {
+    // Idempotent: if a socket is already open or connecting, do nothing.
+    // Multiple SSE sessions call connect() — creating a new socket here
+    // would tear down the shared singleton connection mid-stream (B1).
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     this.resetReconnect();
     try {
       this.ws = new WebSocket(WS_URL);
@@ -225,18 +231,33 @@ export class ClobWsService {
       const assetId = msg.asset_id;
       if (!assetId) return;
 
-      // price_change carries level updates — we track best from cache
+      // price_change carries level updates — we track best from cache.
+      // B3 fix: the old logic was monotonic (bestAsk could only improve),
+      // so when liquidity was pulled the cache kept a stale better-than-real
+      // ask and fabricated phantom arbs. Now:
+      //  - a non-empty level at a better price improves the cached best
+      //  - an emptied level (size 0) AT the cached best invalidates that side
+      //    (set to 0 = unknown; downstream treats <=0 as no-data and the next
+      //    'book' snapshot or REST reconcile restores truth)
       const lvl = msg.level;
       const side = msg.side;
       const price = lvl?.price != null ? parseFloat(lvl.price) : null;
+      const size = lvl?.size != null ? parseFloat(lvl.size) : null;
       const ts = msg.timestamp ?? Date.now();
 
-      // Update cache entry
       const cached = priceCache.get(assetId) ?? { bestBid: 0, bestAsk: 0, ts };
       if (side === 'BUY' && price != null) {
-        cached.bestBid = Math.max(cached.bestBid, price);
+        if (size != null && size <= 0) {
+          if (cached.bestBid > 0 && Math.abs(price - cached.bestBid) < 1e-9) cached.bestBid = 0;
+        } else if (cached.bestBid <= 0 || price > cached.bestBid) {
+          cached.bestBid = price;
+        }
       } else if (side === 'SELL' && price != null) {
-        cached.bestAsk = Math.min(cached.bestAsk, price);
+        if (size != null && size <= 0) {
+          if (cached.bestAsk > 0 && Math.abs(price - cached.bestAsk) < 1e-9) cached.bestAsk = 0;
+        } else if (cached.bestAsk <= 0 || price < cached.bestAsk) {
+          cached.bestAsk = price;
+        }
       }
       cached.ts = ts;
       priceCache.set(assetId, cached);

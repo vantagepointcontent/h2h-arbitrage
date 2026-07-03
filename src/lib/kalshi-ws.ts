@@ -61,6 +61,12 @@ export class KalshiWsService {
   private pendingTickers = new Set<string>();
 
   connect(): void {
+    // Idempotent: if a socket is already open or connecting, do nothing.
+    // Multiple SSE sessions call connect() — creating a new socket here
+    // would tear down the shared singleton connection mid-stream (B1).
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     this.resetReconnect();
     this.doConnect();
   }
@@ -228,19 +234,24 @@ export class KalshiWsService {
     for (const t of this.pendingTickers) tickers.add(t);
     for (const [, sub] of this.subscribers) tickers.add(sub.marketTicker);
     this.pendingTickers.clear();
-    for (const t of tickers) {
-      this.sendSubscribe(t);
-    }
+    // B4: batch — one subscribe message with market_tickers array instead of
+    // one message per ticker (faster warm-up on connect/reconnect).
+    this.sendSubscribeBatch([...tickers]);
   }
 
   private sendSubscribe(marketTicker: string): void {
+    this.sendSubscribeBatch([marketTicker]);
+  }
+
+  private sendSubscribeBatch(marketTickers: string[]): void {
+    if (marketTickers.length === 0) return;
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify({
       id: Date.now(),
       cmd: 'subscribe',
       params: {
         channels: ['orderbook_delta'],
-        market_ticker: marketTicker,
+        market_tickers: marketTickers,
         receive_snapshot: true,
         // NOTE: no depth cap here — Kalshi WS orderbook_delta streams the FULL book
         // by default. (A literal `depthP: Infinity` would JSON.stringify to null and
@@ -257,7 +268,7 @@ export class KalshiWsService {
       cmd: 'unsubscribe',
       params: {
         channels: ['orderbook_delta'],
-        market_ticker: marketTicker,
+        market_tickers: [marketTicker],
       },
     }));
   }
