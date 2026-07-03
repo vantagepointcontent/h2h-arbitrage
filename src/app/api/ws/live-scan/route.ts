@@ -186,11 +186,26 @@ export async function GET(req: NextRequest) {
           if (msg.type === 'orderbook_snapshot') {
             // Only apply WS snapshot if we don't already have a REST-seeded book.
             // REST seed is the authoritative base; WS snapshots can be stale/wrong.
+            // Kalshi WS returns BIDS: msg.yes = YES bids, msg.no = NO bids.
+            // Convert to asks: YES asks from NO bids, NO asks from YES bids.
             if (!orderbookState.hasBook(msg.marketTicker)) {
-              orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+              const yesAsks = msg.no
+                .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+                .filter((a) => a.price > 0 && a.price < 1);
+              const noAsks = msg.yes
+                .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+                .filter((a) => a.price > 0 && a.price < 1);
+              orderbookState.setBook(msg.marketTicker, yesAsks, noAsks, msg.seq);
             }
           } else if (msg.type === 'orderbook_delta') {
-            orderbookState.applyAskDelta(msg.marketTicker, msg.side, msg.price, msg.delta, msg.seq);
+            // Kalshi WS delta: side='yes' means a YES BID level changed.
+            // We store asks, so a YES bid delta at price P becomes a NO ask delta at (1-P),
+            // and a NO bid delta at price P becomes a YES ask delta at (1-P).
+            const askSide = msg.side === 'yes' ? 'no' : 'yes';
+            const askPrice = 1 - msg.price;
+            if (askPrice > 0 && askPrice < 1) {
+              orderbookState.applyAskDelta(msg.marketTicker, askSide, askPrice, msg.delta, msg.seq);
+            }
           }
           maybeSendResults();
         },
@@ -205,12 +220,22 @@ export async function GET(req: NextRequest) {
           (msg: KalshiWsMessage) => {
             if (session.closed) return;
             if (msg.type === 'orderbook_snapshot') {
-              // Same guard: don't overwrite REST-seeded book with WS snapshot
+              // Same guard + bid-to-ask conversion as above
               if (!orderbookState.hasBook(msg.marketTicker)) {
-                orderbookState.setBook(msg.marketTicker, msg.yes, msg.no, msg.seq);
+                const yesAsks = msg.no
+                  .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+                  .filter((a) => a.price > 0 && a.price < 1);
+                const noAsks = msg.yes
+                  .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+                  .filter((a) => a.price > 0 && a.price < 1);
+                orderbookState.setBook(msg.marketTicker, yesAsks, noAsks, msg.seq);
               }
             } else if (msg.type === 'orderbook_delta') {
-              orderbookState.applyAskDelta(msg.marketTicker, msg.side, msg.price, msg.delta, msg.seq);
+              const askSide = msg.side === 'yes' ? 'no' : 'yes';
+              const askPrice = 1 - msg.price;
+              if (askPrice > 0 && askPrice < 1) {
+                orderbookState.applyAskDelta(msg.marketTicker, askSide, askPrice, msg.delta, msg.seq);
+              }
             }
             maybeSendResults();
           },
@@ -336,18 +361,39 @@ async function seedKalshiBook(ticker: string) {
     );
     if (!res.ok) return;
     const data = await res.json() as {
-      orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] };
+      orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] } |
+                   { yes: [string, string][]; no: [string, string][] };
       orderbook_fp?: { yes_dollars?: [string, string][]; no_dollars?: [string, string][] };
     };
-    const yesRaw = data.orderbook?.yes_dollars_fp ?? data.orderbook_fp?.yes_dollars ?? [];
-    const noRaw = data.orderbook?.no_dollars_fp ?? data.orderbook_fp?.no_dollars ?? [];
-    const yes = yesRaw
-      .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
-      .filter((lvl) => lvl.quantity > 0);
-    const no = noRaw
-      .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
-      .filter((lvl) => lvl.quantity > 0);
-    orderbookState.setBook(ticker, yes, no);
+    // Kalshi REST orderbook returns BIDS: yes_dollars_fp = YES bid levels, no_dollars_fp = NO bid levels.
+    // The orderbook-state stores ASKS. In binary markets:
+    //   YES ASK = 1 - best NO BID  (highest NO bid → lowest YES ask)
+    //   NO ASK  = 1 - best YES BID (highest YES bid → lowest NO ask)
+    // We also handle the alternate format where levels are under .yes/.no (not _dollars_fp).
+    const yesBidLevels = (data.orderbook as any)?.yes_dollars_fp ?? (data.orderbook as any)?.yes ?? data.orderbook_fp?.yes_dollars ?? [];
+    const noBidLevels  = (data.orderbook as any)?.no_dollars_fp  ?? (data.orderbook as any)?.no  ?? data.orderbook_fp?.no_dollars  ?? [];
+
+    const parseLevels = (raw: [string, string][]) =>
+      raw
+        .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
+        .filter((lvl) => !isNaN(lvl.price) && !isNaN(lvl.quantity) && lvl.quantity > 0 && lvl.price > 0 && lvl.price < 1);
+
+    const yesBids = parseLevels(yesBidLevels);
+    const noBids  = parseLevels(noBidLevels);
+
+    // Derive YES asks from NO bids: YES ask price = 1 - NO bid price, quantity = NO bid quantity
+    const yesAsks = noBids
+      .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+      .filter((a) => a.price > 0 && a.price < 1)
+      .sort((a, b) => a.price - b.price); // asks sorted ascending (cheapest first)
+
+    // Derive NO asks from YES bids: NO ask price = 1 - YES bid price, quantity = YES bid quantity
+    const noAsks = yesBids
+      .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
+      .filter((a) => a.price > 0 && a.price < 1)
+      .sort((a, b) => a.price - b.price);
+
+    orderbookState.setBook(ticker, yesAsks, noAsks);
   } catch (err) {
     logger.warn('[live-scan] failed to seed Kalshi book', { ticker, err });
   }

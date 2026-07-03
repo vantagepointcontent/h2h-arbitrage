@@ -159,10 +159,13 @@ export function computeArbitrageFees(
     pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${(1 - pmBuyPrice).toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   }
 
+  // Both platforms charge trading fees at execution time, regardless of which
+  // side resolves — so BOTH fees must be subtracted in every outcome branch.
+  const totalFees = kalshiFeeAmount + pmFeeAmount;
   // Net profit if Kalshi side wins (Kalshi YES pays $1 per contract, PM NO loses)
-  const netProfitIfKalshiWins = capital - kalshiStake - pmStake - kalshiFeeAmount;
+  const netProfitIfKalshiWins = capital - kalshiStake - pmStake - totalFees;
   // Net profit if PM side wins (PM YES pays $1 per contract, Kalshi NO loses)
-  const netProfitIfPmWins = capital - kalshiStake - pmStake - pmFeeAmount;
+  const netProfitIfPmWins = capital - kalshiStake - pmStake - totalFees;
   // Cross-outcome: buy YES on both platforms, one side will win and pay $1
   const netProfitIfBothYes = capital - kalshiStake - pmStake - kalshiFeeAmount - pmFeeAmount;
 

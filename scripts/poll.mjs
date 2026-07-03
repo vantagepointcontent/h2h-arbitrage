@@ -407,7 +407,12 @@ async function run() {
   // Track last prune date — run once daily
   let lastPruneDate = '';
   while (true) {
-    const health = await pollOnce();
+    let health = null;
+    try {
+      health = await pollOnce();
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] Poll cycle failed (poller continues):`, e && e.stack ? e.stack : e);
+    }
     // Daily DB pruning at midnight
     const today = new Date().toISOString().slice(0, 10);
     if (today !== lastPruneDate) {

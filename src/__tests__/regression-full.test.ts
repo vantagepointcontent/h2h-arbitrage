@@ -57,14 +57,24 @@ function makeKalshiShape(overrides?: any): any {
 
 describe('REGRESSION: calculateArbitrageMax', () => {
   it('R7: depth=0 → uses fallback capital (no depth constraint)', () => {
-    const arb = calculateArbitrageMax(makeKalshiShape(), makePmShape(), 0, 0, 0, 0);
+    // Note: spread must be wide enough to survive BOTH platform fees (fee-math
+    // fix 2026-07-03: both fees are subtracted in every net-profit branch).
+    const arb = calculateArbitrageMax(
+      makeKalshiShape({ no_ask_dollars: '0.40', no_bid_dollars: '0.38' }),
+      makePmShape(),
+      0, 0, 0, 0,
+    );
     // When depth is 0, the function uses a fallback capital of 1M
     // to allow profit calculation even without orderbook data
     expect(arb.maxCapital).toBeGreaterThan(0);
   });
 
   it('R8: hög depth → maxCapital &gt; 0', () => {
-    const arb = calculateArbitrageMax(makeKalshiShape(), makePmShape(), 1000, 800, 500, 400);
+    const arb = calculateArbitrageMax(
+      makeKalshiShape({ no_ask_dollars: '0.40', no_bid_dollars: '0.38' }),
+      makePmShape(),
+      1000, 800, 500, 400,
+    );
     expect(arb.maxCapital).toBeGreaterThan(0);
   });
 
