@@ -6,7 +6,7 @@
 // external-api-ws.kalshi.com returns 403 for this key.
 
 import WebSocket from 'ws';
-import { signKalshiRequest } from './kalshi-auth';
+import { makeKalshiWsAuthHeaders } from './kalshi-auth';
 import logger from './logger';
 
 export interface KalshiOrderbookLevel {
@@ -110,13 +110,9 @@ export class KalshiWsService {
 
   private doConnect(): void {
     try {
-      const { keyId, timestamp, signature } = signKalshiRequest('GET', '/trade-api/ws/v2');
-      const url = new URL(WS_URL);
-      url.searchParams.set('key_id', keyId);
-      url.searchParams.set('timestamp', timestamp);
-      url.searchParams.set('signature', signature);
-
-      this.ws = new WebSocket(url.toString());
+      // Auth via signed headers on the upgrade request (RSA-PSS).
+      // Query-param auth with PKCS#1 v1.5 signatures fails the handshake.
+      this.ws = new WebSocket(WS_URL, { headers: makeKalshiWsAuthHeaders() });
     } catch (err) {
       logger.error('[kalshi-ws] failed to create websocket', { err });
       this.scheduleReconnect();

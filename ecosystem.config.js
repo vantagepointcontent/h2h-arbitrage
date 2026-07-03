@@ -123,5 +123,41 @@ module.exports = {
       // ── Resource limits ─────────────────────────────────────
       max_memory_restart: '256M',
     },
+    {
+      name: 'h2h-watcher',
+      script: './dist/ws-watcher.mjs',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      // Next.js auto-loads .env.local; plain node needs it explicitly
+      // (Kalshi WS auth reads KALSHI_API_KEY_ID/KALSHI_API_PRIVATE_KEY).
+      node_args: '--env-file=.env.local',
+
+      // ── Restart policy ─────────────────────────────────────
+      restart_delay: 5000,
+      max_restarts: Infinity,
+      min_uptime: 15000,
+
+      // ── Graceful shutdown ───────────────────────────────────
+      kill_timeout: 10000,
+      shutdown_listener: true,
+
+      // ── Environment ─────────────────────────────────────────
+      env: {
+        NODE_ENV: 'production',
+        H2H_WATCHER_CAPITAL: '1000',
+      },
+
+      // ── Logging ─────────────────────────────────────────────
+      log_file: '/home/scott/.pm2/logs/h2h-watcher.log',
+      error_file: '/home/scott/.pm2/logs/h2h-watcher-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-watcher-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+
+      // ── Resource limits ─────────────────────────────────────
+      max_memory_restart: '1G',
+    },
   ],
 };
