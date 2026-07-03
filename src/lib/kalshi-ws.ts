@@ -214,7 +214,11 @@ export class KalshiWsService {
   private dispatch(marketTicker: string, msg: KalshiWsMessage): void {
     for (const [, sub] of this.subscribers) {
       if (sub.marketTicker === marketTicker) {
-        sub.cb(msg);
+        try {
+          sub.cb(msg);
+        } catch (err) {
+          console.error('[kalshi-ws] subscriber callback error (dispatch continues):', err);
+        }
       }
     }
   }
@@ -238,7 +242,10 @@ export class KalshiWsService {
         channels: ['orderbook_delta'],
         market_ticker: marketTicker,
         receive_snapshot: true,
-        depthP: Infinity,
+        // NOTE: no depth cap here — Kalshi WS orderbook_delta streams the FULL book
+        // by default. (A literal `depthP: Infinity` would JSON.stringify to null and
+        // risk a rejected subscribe.) Full-depth requirement is satisfied by omission;
+        // REST calls use depthP=Infinity as a query-string param in kalshi.ts.
       },
     }));
   }

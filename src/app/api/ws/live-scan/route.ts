@@ -6,7 +6,9 @@ import { computeAllLiveArbitrages, applyPolymarketBook, LiveMatchedOutcome } fro
 import { makeKalshiAuthHeaders } from '@/lib/kalshi-auth';
 import { extractKalshiEventTicker, fetchKalshiEventMarkets, KalshiMarket } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from '@/lib/polymarket';
-import { matchOutcomes } from '@/lib/matcher';
+import { matchOutcomes, applyManualMatches, UnifiedOutcome } from '@/lib/matcher';
+import { getManualMatches } from '@/lib/manual-matches';
+import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -89,10 +91,14 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Match outcomes (same logic as scan route) ──
+  const [manualMatches, decoupledPairs] = await Promise.all([getManualMatches(), getDecoupledPairs()]);
   const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent?.title, capital);
+  // Apply manual matches (merges auto-unmatched pairs) then split decoupled pairs — same as /api/scan
+  const mergedOutcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, pmEvent?.endDate);
+  const finalOutcomes = applyDecoupledPairs(mergedOutcomes as unknown as UnifiedOutcome[], decoupledPairs);
 
   // Filter to only fully matched outcomes (both Kalshi and PM present)
-  const matched = baseOutcomes.filter((o) => o.kalshi && o.polymarket);
+  const matched = finalOutcomes.filter((o) => o.kalshi && o.polymarket);
 
   if (matched.length === 0) {
     return new Response('No matching outcomes found between Kalshi and Polymarket', { status: 400 });
