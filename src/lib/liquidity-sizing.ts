@@ -49,7 +49,10 @@ export function analyzeLiquidity(
 ): LiquidityAnalysis {
   // --- max fillable stake ---
   // Binding constraint: min(dollar depth on each side)
-  const maxFillableStake = Math.min(kalshiAskDepth, polymarketDepth);
+  // Guard: if both depths are Infinity (PM defaults to Infinity per project
+  // rule), fall back to a finite cap to avoid Infinity/Infinity = NaN below.
+  const rawFillable = Math.min(kalshiAskDepth, polymarketDepth);
+  const maxFillableStake = Number.isFinite(rawFillable) ? rawFillable : 10_000;
 
   // --- slippage tiers ---
   const bindingDepth = maxFillableStake;

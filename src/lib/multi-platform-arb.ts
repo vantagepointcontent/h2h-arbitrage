@@ -132,17 +132,28 @@ export function detectMultiLegArb(
 
       // Total cost = YES price + sum of NO prices + fees
       const totalRawCost = cheapestYes.yesPrice + noLegs.reduce((s, l) => s + l.noPrice, 0);
-      const totalFee = Object.values(fees).reduce((s, f) => s + (f as number), 0) / Math.max(1, entries.length);
-      const totalCost = totalRawCost * (1 + totalFee);
+      // Per-leg fees: each leg pays its OWN platform's fee rate on its own
+      // price (audit F7 fix — previously all platform rates were averaged
+      // and applied flat, misestimating fees whenever rates differ).
+      const feeFor = (platform: string, price: number) => (fees[platform] ?? 0) * price;
+      const totalFeeCost =
+        feeFor(cheapestYes.platform, cheapestYes.yesPrice) +
+        noLegs.reduce((s, l) => s + feeFor(l.platform, l.noPrice), 0);
+      const totalCost = totalRawCost + totalFeeCost;
 
       if (totalCost < 1) {
         // Arb found! Calculate stake sizing
         const profit = 1 - totalCost;
-        const roiPct = (profit / totalCost) * 100;
+        const roiPct = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
-        // Max stake = min of all depths
+        // Max stake = min of all depths, capped so Infinity depth (PM default)
+        // can't produce Infinity stake/cost/profit (audit F8 fix).
+        const MAX_STAKE_CAP = 10_000;
         const allDepths = [cheapestYes.yesDepth, ...noLegs.map(l => l.noDepth)];
-        const maxStake = Math.min(...allDepths);
+        const rawMaxStake = Math.min(...allDepths);
+        const maxStake = Number.isFinite(rawMaxStake)
+          ? Math.min(rawMaxStake, MAX_STAKE_CAP)
+          : MAX_STAKE_CAP;
 
         const legs: ArbLeg[] = [
           {

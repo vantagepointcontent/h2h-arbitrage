@@ -68,7 +68,13 @@ export async function GET(request: NextRequest) {
 
     const escapeCsv = (val: any): string => {
       if (val === null || val === undefined) return '';
-      const s = String(val);
+      let s = String(val);
+      // CSV formula-injection guard: prefix values Excel would treat as a
+      // formula (=, +, -, @, tab, CR) with a single quote (audit L6 fix).
+      // Legitimate negative/positive NUMBERS are exempt (e.g. ROI -0.5).
+      if (/^[=+\-@\t\r]/.test(s) && Number.isNaN(Number(s))) {
+        s = `'${s}`;
+      }
       if (s.includes(',') || s.includes('"') || s.includes('\n')) {
         return `"${s.replace(/"/g, '""')}"`;
       }
