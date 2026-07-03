@@ -1,35 +1,17 @@
 {
-  "status": "degraded",
+  "status": "running",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 526,
-  "startedAt": "2026-07-03T19:08:01.181Z",
-  "finishedAt": "2026-07-03T19:09:02.301Z",
-  "durationMs": 61120,
-  "successCount": 65,
-  "failureCount": 3,
-  "skippedCount": 458,
-  "avgScanMs": 4422,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "CO-08 House Election Winner",
-      "error": "timeout after 25923ms (adaptive)",
-      "durationMs": 25923
-    },
-    {
-      "market": "ME-02 House Election Winner",
-      "error": "HTTP 404",
-      "durationMs": 173
-    },
-    {
-      "market": "Who will be Trump's next Director of National Intelligence?",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    }
-  ],
-  "breakerSkipped": 0,
-  "openBreakers": 1
+  "startedAt": "2026-07-03T19:17:26.886Z",
+  "finishedAt": null,
+  "durationMs": null,
+  "successCount": 0,
+  "failureCount": 0,
+  "skippedCount": 0,
+  "avgScanMs": 0,
+  "maxScanMs": 0,
+  "errors": []
 }
