@@ -73,10 +73,10 @@ module.exports = {
       on_stop: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh stop',
 
       // ── Resource limits ─────────────────────────────────────
-      // 1G: at 512M pm2 was SIGKILLing the app mid-scan-burst (Next.js RSS
-      // legitimately peaks >512M under concurrent scan load), which caused
-      // the poller's 'fetch failed' bursts and 273-failure cycles.
-      max_memory_restart: '1G',
+      // 4G: server upgraded to 32GB RAM / 6 cores (2026-07-03). Previously 1G
+      // (at 512M pm2 was SIGKILLing the app mid-scan-burst; Next.js RSS
+      // legitimately peaks >512M under concurrent scan load).
+      max_memory_restart: '4G',
     },
     {
       name: 'h2h-poller',
