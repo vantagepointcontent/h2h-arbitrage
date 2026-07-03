@@ -150,7 +150,10 @@ async function scanMarket(market) {
     const started = Date.now();
     const res = await fetch(`${BASE_URL}/api/scan?skipManual=1`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+      },
       body: JSON.stringify({ kalshiUrl: market.kalshiUrl, polymarketUrl: market.polymarketUrl }),
       signal: controller.signal,
     });
@@ -418,7 +421,10 @@ async function run() {
     if (today !== lastPruneDate) {
       lastPruneDate = today;
       try {
-        const res = await fetch(`${BASE_URL}/api/prune-scans?days=30`, { method: 'POST' });
+        const res = await fetch(`${BASE_URL}/api/prune-scans?days=30`, {
+          method: 'POST',
+          headers: process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {},
+        });
         if (res.ok) {
           const result = await res.json();
           console.log(`[${new Date().toISOString()}] DB pruning: ${result.deleted} rows deleted (retention: 30d)`);
