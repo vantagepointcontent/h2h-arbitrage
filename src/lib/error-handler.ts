@@ -130,14 +130,21 @@ export function startTimer(): TimedRequest {
 
 export function clientSafeError(error: unknown, fallback = 'Internal server error', ctx?: { path?: string }): string {
   const fp = errorFingerprint(error);
+  const fpHash = fingerprintHash(fp);
   const msg = error instanceof Error ? error.message : String(error);
+  const cid = correlationId.current;
   spikeDetector.record({ fingerprint: fp, message: msg });
   logger.error(msg, {
     error,
     fingerprint: fp,
-    fingerprintHash: fingerprintHash(fp),
+    fingerprintHash: fpHash,
     path: ctx?.path,
-    correlationId: correlationId.current,
+    correlationId: cid,
   });
-  return fallback;
+  // Client gets: generic message + error CLASS (safe) + fingerprint hash +
+  // correlation id. Enough verbosity to report/debug ("grep the log for
+  // ref:xxxx"), without leaking upstream error details, paths, or SQL.
+  const kind = error instanceof Error ? error.constructor.name : 'Error';
+  const ref = cid ? `${fpHash}/${cid}` : fpHash;
+  return `${fallback} (${kind}, ref: ${ref})`;
 }
