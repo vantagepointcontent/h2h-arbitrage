@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory } from '@/lib/persistence';
+import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
 /**
@@ -52,9 +52,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // UI-015: resolve human-readable market names for the CSV
+    let nameMap = new Map<string, string>();
+    try {
+      const saved = await getSavedMarkets();
+      nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
+    } catch { /* best-effort */ }
+
     // Build CSV
     const headers = [
       'Scan Time',
+      'Market Name',
       'Market ID',
       'Strategy',
       'ROI %',
@@ -85,6 +93,7 @@ export async function GET(request: NextRequest) {
     const rows = filtered.map((r: any) =>
       [
         r.scanned_at,
+        r.market_title ?? nameMap.get(r.market_id) ?? '',
         r.market_id,
         r.strategy,
         r.best_roi_pct,
