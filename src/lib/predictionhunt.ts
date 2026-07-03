@@ -361,9 +361,11 @@ export async function fetchMatchingMarkets(
   url.searchParams.set('q', query);
   url.searchParams.set('limit', String(limit));
 
-  const res = await fetch(url.toString(), {
-    headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
-  });
+  const res = await rateLimiters.predictionhunt.execute(() =>
+    fetch(url.toString(), {
+      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
+    }),
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -481,9 +483,11 @@ export async function searchPredictionHunt(
   url.searchParams.set('limit', String(limit));
   if (category && category !== 'all') url.searchParams.set('category', category);
 
-  const res = await fetch(url.toString(), {
-    headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
-  });
+  const res = await rateLimiters.predictionhunt.execute(() =>
+    fetch(url.toString(), {
+      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
+    }),
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');

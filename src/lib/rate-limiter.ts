@@ -307,11 +307,11 @@ const KALSHI_CFG: RateLimiterConfig = {
 };
 
 const PH_CFG: RateLimiterConfig = {
-  maxTokens: envInt('H2H_PREDICTIONHUNT_MAX_TOKENS', 20),
-  refillIntervalMs: envInt('H2H_PREDICTIONHUNT_REFILL_MS', 500), // ~2 req/s
-  maxQueueSize: envInt('H2H_PREDICTIONHUNT_QUEUE_SIZE', 20),
-  maxRetries: 3,
-  retryBaseDelayMs: 200,
+  maxTokens: envInt('H2H_PREDICTIONHUNT_MAX_TOKENS', 3),
+  refillIntervalMs: envInt('H2H_PREDICTIONHUNT_REFILL_MS', 1000), // ~1 req/s (PH per-second limit)
+  maxQueueSize: envInt('H2H_PREDICTIONHUNT_QUEUE_SIZE', 50),
+  maxRetries: 4,
+  retryBaseDelayMs: 2000,
 };
 
 /* ──────────────────────────── Singleton Instances ────────────── */
