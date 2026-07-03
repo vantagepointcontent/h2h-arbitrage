@@ -100,14 +100,20 @@ function computeSingleOutcome(
   const allAvailable = kalshiYesAsk != null && kalshiNoAsk != null && pmYesAsk != null && pmNoAsk != null;
 
   if (allAvailable && !stale) {
+    // Depth args must be in DOLLARS (calculateArbitrageMax does depth/price
+    // to derive contract capital) — use totalCost (fillable dollars up to
+    // `capital`), NOT maxQuantity (contracts). Also forward the user's
+    // capital as maxCapital instead of the silent 1000 default, so live WS
+    // matches the manual scan path (BUG-031b).
     const candidate = calculateArbitrageMax(
       { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
       { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
-      kYes.maxQuantity,
-      kNo.maxQuantity,
-      pYes.maxQuantity,
-      pNo.maxQuantity,
+      kYes.totalCost,
+      kNo.totalCost,
+      pYes.totalCost,
+      pNo.totalCost,
       category,
+      capital,
     );
 
     strategy = candidate.strategy;
