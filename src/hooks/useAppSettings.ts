@@ -2,15 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-export type CategoryName =
-  | "sports" | "politics" | "election" | "entertainment" | "economics"
-  | "crypto" | "science" | "technology" | "weather" | "international";
-
-export interface CategoryOverride {
-  /** Override interval in ms, or 0 to use global default */
-  intervalMs: number;
-}
-
 export interface AppSettings {
   // Appearance
   theme: "dark" | "light";
@@ -24,9 +15,6 @@ export interface AppSettings {
   globalRefreshInterval: number; // ms — overall overview refresh cycle (5s–30min)
   shortTermInterval: number; // ms — aggressive refresh for active scans
   longTermInterval: number; // ms — relaxed refresh for idle monitoring
-
-  // Per-category refresh overrides (0 = use global default)
-  categoryOverrides: Record<CategoryName, number>;
 
   // Sorting & filtering
   sortField: "roi" | "profit" | "expiry";
@@ -56,18 +44,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   globalRefreshInterval: 10000,
   shortTermInterval: 3000,
   longTermInterval: 30000,
-  categoryOverrides: {
-    sports: 0,
-    politics: 0,
-    election: 0,
-    entertainment: 0,
-    economics: 0,
-    crypto: 0,
-    science: 0,
-    technology: 0,
-    weather: 0,
-    international: 0,
-  },
   sortField: "roi",
   sortDirection: "desc",
   overviewExpiryFilter: "all",
@@ -83,10 +59,30 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 const STORAGE_KEY = "h2h-settings";
 
-const CATEGORIES_LIST: CategoryName[] = [
-  "sports", "politics", "election", "entertainment", "economics",
-  "crypto", "science", "technology", "weather", "international",
-];
+/** Declarative per-field validators for applySettings/importJSON. Each entry
+ *  validates and coerces one raw input value; returning undefined means "skip". */
+const SETTINGS_VALIDATORS: {
+  [K in keyof AppSettings]: (v: unknown) => AppSettings[K] | undefined;
+} = {
+  theme: (v) => (typeof v === "string" && ["dark", "light"].includes(v) ? (v as AppSettings["theme"]) : undefined),
+  overviewLayout: (v) => (typeof v === "string" && ["grid", "table"].includes(v) ? (v as AppSettings["overviewLayout"]) : undefined),
+  refreshInterval: (v) => (typeof v === "number" && v > 0 ? v : undefined),
+  sidebarOpen: (v) => (typeof v === "boolean" ? v : undefined),
+  globalRefreshInterval: (v) => (typeof v === "number" && v > 0 ? v : undefined),
+  shortTermInterval: (v) => (typeof v === "number" && v > 0 ? v : undefined),
+  longTermInterval: (v) => (typeof v === "number" && v > 0 ? v : undefined),
+  sortField: (v) => (typeof v === "string" && ["roi", "profit", "expiry"].includes(v) ? (v as AppSettings["sortField"]) : undefined),
+  sortDirection: (v) => (typeof v === "string" && ["asc", "desc"].includes(v) ? (v as AppSettings["sortDirection"]) : undefined),
+  overviewExpiryFilter: (v) => (typeof v === "string" && ["all", "lte7", "lte14", "lte30"].includes(v) ? (v as AppSettings["overviewExpiryFilter"]) : undefined),
+  overviewSort: (v) => (typeof v === "string" && ["expiry", "roi", "name", "apy"].includes(v) ? (v as AppSettings["overviewSort"]) : undefined),
+  overviewSortDir: (v) => (typeof v === "string" && ["asc", "desc"].includes(v) ? (v as AppSettings["overviewSortDir"]) : undefined),
+  hideUnmatched: (v) => (typeof v === "boolean" ? v : undefined),
+  sidebarSort: (v) => (typeof v === "string" && ["name", "roi", "expiry", "apy"].includes(v) ? (v as AppSettings["sidebarSort"]) : undefined),
+  sidebarSortDir: (v) => (typeof v === "string" && ["asc", "desc"].includes(v) ? (v as AppSettings["sidebarSortDir"]) : undefined),
+  sidebarCategoryFilter: (v) => (typeof v === "string" ? v : undefined),
+  sidebarSearch: (v) => (typeof v === "string" ? v : undefined),
+  viewMode: (v) => (typeof v === "string" && ["overview", "scan", "marketfinder"].includes(v) ? (v as AppSettings["viewMode"]) : undefined),
+};
 
 function loadInitial<T extends object>(key: string, defaultValue: T): T {
   try {
@@ -167,80 +163,20 @@ export function useAppSettings() {
     return JSON.stringify(settings, null, 2);
   }, [settings]);
 
-  /** Apply settings from an object, validating known keys. */
+  /** Apply settings from an object, validating known keys against SETTINGS_VALIDATORS. */
   const applySettings = useCallback((input: Record<string, unknown>): string | null => {
     if (typeof input !== "object" || input === null) {
       return "Imported data is not a valid settings object.";
     }
 
     const validated: Partial<AppSettings> = {};
-    if (input.theme && typeof input.theme === "string" && ["dark", "light"].includes(input.theme as string)) {
-      validated.theme = input.theme as "dark" | "light";
-    }
-    if (input.overviewLayout && typeof input.overviewLayout === "string" && ["grid", "table"].includes(input.overviewLayout as string)) {
-      validated.overviewLayout = input.overviewLayout as "grid" | "table";
-    }
-    if (typeof input.refreshInterval === "number" && input.refreshInterval > 0) {
-      validated.refreshInterval = input.refreshInterval;
-    }
-    if (typeof input.globalRefreshInterval === "number" && input.globalRefreshInterval > 0) {
-      validated.globalRefreshInterval = input.globalRefreshInterval;
-    }
-    if (typeof input.shortTermInterval === "number" && input.shortTermInterval > 0) {
-      validated.shortTermInterval = input.shortTermInterval;
-    }
-    if (typeof input.longTermInterval === "number" && input.longTermInterval > 0) {
-      validated.longTermInterval = input.longTermInterval;
-    }
-    if (typeof input.sidebarOpen === "boolean") {
-      validated.sidebarOpen = input.sidebarOpen;
-    }
-    if (input.sortField && typeof input.sortField === "string" && ["roi", "profit", "expiry"].includes(input.sortField as string)) {
-      validated.sortField = input.sortField as "roi" | "profit" | "expiry";
-    }
-    if (input.sortDirection && typeof input.sortDirection === "string" && ["asc", "desc"].includes(input.sortDirection as string)) {
-      validated.sortDirection = input.sortDirection as "asc" | "desc";
-    }
-    if (input.overviewExpiryFilter && typeof input.overviewExpiryFilter === "string" &&
-        ["all", "lte7", "lte14", "lte30"].includes(input.overviewExpiryFilter as string)) {
-      validated.overviewExpiryFilter = input.overviewExpiryFilter as "all" | "lte7" | "lte14" | "lte30";
-    }
-    if (input.overviewSort && typeof input.overviewSort === "string" &&
-        ["expiry", "roi", "name", "apy"].includes(input.overviewSort as string)) {
-      validated.overviewSort = input.overviewSort as "expiry" | "roi" | "name" | "apy";
-    }
-    if (input.overviewSortDir && typeof input.overviewSortDir === "string" && ["asc", "desc"].includes(input.overviewSortDir as string)) {
-      validated.overviewSortDir = input.overviewSortDir as "asc" | "desc";
-    }
-    if (typeof input.hideUnmatched === "boolean") {
-      validated.hideUnmatched = input.hideUnmatched;
-    }
-    if (input.sidebarSort && typeof input.sidebarSort === "string" &&
-        ["name", "roi", "expiry", "apy"].includes(input.sidebarSort as string)) {
-      validated.sidebarSort = input.sidebarSort as "name" | "roi" | "expiry" | "apy";
-    }
-    if (input.sidebarSortDir && typeof input.sidebarSortDir === "string" && ["asc", "desc"].includes(input.sidebarSortDir as string)) {
-      validated.sidebarSortDir = input.sidebarSortDir as "asc" | "desc";
-    }
-    if (typeof input.sidebarCategoryFilter === "string") {
-      validated.sidebarCategoryFilter = input.sidebarCategoryFilter;
-    }
-    if (typeof input.sidebarSearch === "string") {
-      validated.sidebarSearch = input.sidebarSearch;
-    }
-    if (input.viewMode && typeof input.viewMode === "string" &&
-        ["overview", "scan", "marketfinder"].includes(input.viewMode as string)) {
-      validated.viewMode = input.viewMode as "overview" | "scan" | "marketfinder";
-    }
-    if (input.categoryOverrides && typeof input.categoryOverrides === "object") {
-      const co: Partial<Record<CategoryName, number>> = {};
-      for (const cat of CATEGORIES_LIST) {
-        const val = (input.categoryOverrides as Record<string, unknown>)[cat];
-        if (typeof val === "number" && val >= 0) {
-          co[cat] = val;
-        }
+    for (const key of Object.keys(SETTINGS_VALIDATORS) as (keyof AppSettings)[]) {
+      if (!(key in input)) continue;
+      const validator = SETTINGS_VALIDATORS[key] as (v: unknown) => unknown;
+      const value = validator(input[key]);
+      if (value !== undefined) {
+        (validated as Record<string, unknown>)[key] = value;
       }
-      validated.categoryOverrides = co as Record<CategoryName, number>;
     }
 
     const merged = { ...DEFAULT_SETTINGS, ...validated };
@@ -270,36 +206,4 @@ export function useAppSettings() {
     exportJSON,
     importJSON,
   };
-}
-
-/**
- * Get the effective refresh interval for a category.
- * Returns the category override if set (>0), otherwise the global default.
- */
-export function getEffectiveInterval(
-  category: CategoryName,
-  globalInterval: number,
-  overrides: Record<CategoryName, number>,
-): number {
-  const override = overrides[category];
-  return override > 0 ? override : globalInterval;
-}
-
-/**
- * Estimate API calls per hour based on current settings.
- * Assumes N markets tracked; each market refreshes at its effective interval.
- */
-export function estimateApiCallsPerHour(
-  marketCount: number,
-  globalInterval: number,
-  overrides: Record<CategoryName, number>,
-  categoryDistribution: Record<CategoryName, number>,
-): number {
-  let totalCalls = 0;
-  for (const cat of Object.keys(categoryDistribution) as CategoryName[]) {
-    const count = categoryDistribution[cat] || 0;
-    const interval = getEffectiveInterval(cat, globalInterval, overrides);
-    totalCalls += (3600000 / interval) * count;
-  }
-  return Math.round(totalCalls);
 }
