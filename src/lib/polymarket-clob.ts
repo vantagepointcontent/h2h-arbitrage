@@ -100,6 +100,9 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
 
   // Acquire semaphore to limit concurrent requests
   await clobSemaphore.acquire();
+  // NOTE: single shared deadline across all retry attempts (not per-attempt) --
+  // AbortController kept here deliberately since AbortSignal.timeout() would
+  // reset per fetch() call inside the loop, changing retry timing semantics.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
@@ -146,8 +149,6 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
  */
 export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
   await clobSemaphore.acquire();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await rateLimiters.clobBook.execute(() =>
       fetch(
@@ -159,7 +160,7 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
             'Accept-Encoding': 'gzip, deflate',
           },
           cache: 'no-store',
-          signal: controller.signal,
+          signal: AbortSignal.timeout(5000),
         },
       ),
     );
@@ -168,7 +169,6 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
   } catch {
     return null;
   } finally {
-    clearTimeout(timer);
     clobSemaphore.release();
   }
 }
