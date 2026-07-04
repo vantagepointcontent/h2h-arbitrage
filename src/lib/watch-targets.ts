@@ -18,6 +18,11 @@ function getClient() {
     void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
     void _client.execute('PRAGMA journal_mode = WAL').catch(() => {});
     void _client.execute('PRAGMA synchronous = NORMAL').catch(() => {});
+    // PERF-P3: keep WAL small (checkpoint every ~1000 pages ≈ 4MB), larger
+    // page cache (16MB) and mmap (256MB) — the whole DB fits in memory.
+    void _client.execute('PRAGMA wal_autocheckpoint = 1000').catch(() => {});
+    void _client.execute('PRAGMA cache_size = -16000').catch(() => {});
+    void _client.execute('PRAGMA mmap_size = 268435456').catch(() => {});
   }
   return _client;
 }

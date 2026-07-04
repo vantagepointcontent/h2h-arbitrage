@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
@@ -36,10 +37,22 @@ export async function GET(request: NextRequest) {
             }
           : null,
       }));
-      return NextResponse.json({ markets: basic }, {
+      // PERF-P3: ETag/304 — the UI polls every 60s but poller tiers are
+      // 5-30min, so most polls are unchanged. 304 skips the 370KB body.
+      const body = JSON.stringify({ markets: basic });
+      const etag = `"${createHash('sha1').update(body).digest('hex')}"`;
+      if (request.headers.get('if-none-match') === etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: { 'ETag': etag, 'Cache-Control': 'no-cache' },
+        });
+      }
+      return new NextResponse(body, {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          'Pragma': 'no-cache',
+          'Content-Type': 'application/json',
+          'ETag': etag,
+          // no-cache (NOT no-store): browser revalidates with If-None-Match
+          'Cache-Control': 'no-cache',
         }
       });
     }

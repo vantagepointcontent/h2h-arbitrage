@@ -17,6 +17,11 @@ function getClient() {
     void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
     void _client.execute('PRAGMA journal_mode = WAL').catch(() => {});
     void _client.execute('PRAGMA synchronous = NORMAL').catch(() => {});
+    // PERF-P3: keep WAL small (checkpoint every ~1000 pages ≈ 4MB), larger
+    // page cache (16MB) and mmap (256MB) — the whole DB fits in memory.
+    void _client.execute('PRAGMA wal_autocheckpoint = 1000').catch(() => {});
+    void _client.execute('PRAGMA cache_size = -16000').catch(() => {});
+    void _client.execute('PRAGMA mmap_size = 268435456').catch(() => {});
   }
   return _client;
 }
@@ -48,6 +53,8 @@ async function initDb(): Promise<void> {
   // Index for fast per-market lookups
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_market_id ON scan_results(market_id)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_scanned_at ON scan_results(scanned_at DESC)`);
+  // PERF-P3: partial index for positiveArbOnly logs filter + dashboard top-arbs
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arbs ON scan_results(scanned_at DESC) WHERE positive_arb_count > 0`);
 
   // ── OPS-009: saved markets + scan history live in SQLite ──────────
   // JSON files had multi-process write races (app + poller). SQLite with
@@ -359,6 +366,7 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
       m.archived ? 1 : 0, m.archivedAt ?? null, m.archiveReason ?? null, m.lastMatchedAt ?? null,
     ],
   });
+  invalidateMarketsCache();
 }
 
 // One-time migration: import JSON file into SQLite if table is empty.
@@ -422,12 +430,26 @@ function mirrorMarketsToJsonThrottled(): void {
   if (typeof (_mirrorTimer as any)?.unref === 'function') (_mirrorTimer as any).unref();
 }
 
+// PERF-P3: micro-cache for getSavedMarkets — it runs SELECT * over 526 rows
+// (with JSON blobs) on nearly every API request. 5s TTL, invalidated on any
+// write. Poller/watcher freshness is unaffected (they act on ≥60s cycles).
+let _marketsCache: { data: SavedMarket[]; at: number; includeArchived: boolean } | null = null;
+const MARKETS_CACHE_TTL_MS = 5_000;
+function invalidateMarketsCache(): void { _marketsCache = null; }
+
 export async function getSavedMarkets(opts?: { includeArchived?: boolean }): Promise<SavedMarket[]> {
+  const includeArchived = !!opts?.includeArchived;
+  const now = Date.now();
+  if (_marketsCache && _marketsCache.includeArchived === includeArchived && now - _marketsCache.at < MARKETS_CACHE_TTL_MS) {
+    return _marketsCache.data;
+  }
   await ensureMarketsMigrated();
   const c = getClient();
-  const where = opts?.includeArchived ? '' : 'WHERE archived = 0';
+  const where = includeArchived ? '' : 'WHERE archived = 0';
   const res = await c.execute(`SELECT * FROM saved_markets ${where} ORDER BY created_at ASC`);
-  return (res.rows as any[]).map(rowToMarket);
+  const data = (res.rows as any[]).map(rowToMarket);
+  _marketsCache = { data, at: now, includeArchived };
+  return data;
 }
 
 /** PERF-P1: targeted lookup by exact URL pair — avoids loading all markets. */
@@ -458,6 +480,7 @@ export async function archiveSavedMarket(id: string, reason: string): Promise<bo
     sql: 'UPDATE saved_markets SET archived = 1, archived_at = ?, archive_reason = ? WHERE id = ? AND archived = 0',
     args: [new Date().toISOString(), reason, id],
   });
+  invalidateMarketsCache();
   const changed = Number((res as any).rowsAffected ?? 0) > 0;
   if (changed) await mirrorMarketsToJson();
   return changed;
@@ -471,6 +494,7 @@ export async function unarchiveSavedMarket(id: string): Promise<boolean> {
     sql: 'UPDATE saved_markets SET archived = 0, archived_at = NULL, archive_reason = NULL WHERE id = ? AND archived = 1',
     args: [id],
   });
+  invalidateMarketsCache();
   const changed = Number((res as any).rowsAffected ?? 0) > 0;
   if (changed) await mirrorMarketsToJson();
   return changed;
@@ -567,11 +591,13 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
       sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
       args: [JSON.stringify(result), expiryDate ?? null, matchedNow, id],
     });
+  invalidateMarketsCache();
   } else {
     await c.execute({
       sql: 'UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
       args: [JSON.stringify(result), matchedNow, id],
     });
+  invalidateMarketsCache();
   }
   mirrorMarketsToJsonThrottled();
 }
@@ -593,6 +619,7 @@ export async function updateSavedMarketLiveResult(id: string, result: LastScanRe
     sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
     args: [JSON.stringify(result), matchedNow, id],
   });
+  invalidateMarketsCache();
 }
 
 /** WS-107: clear a market's live result (pair left HOT tier / watcher shutdown). */
@@ -613,6 +640,7 @@ export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedM
   if (sets.length === 0) return false;
   args.push(id);
   const res = await c.execute({ sql: `UPDATE saved_markets SET ${sets.join(', ')} WHERE id = ?`, args });
+  invalidateMarketsCache();
   const changed = Number((res as any).rowsAffected ?? 0) > 0;
   if (changed) await mirrorMarketsToJson();
   return changed;
@@ -622,6 +650,7 @@ export async function deleteSavedMarket(id: string): Promise<boolean> {
   await ensureMarketsMigrated();
   const c = getClient();
   const res = await c.execute({ sql: 'DELETE FROM saved_markets WHERE id = ?', args: [id] });
+  invalidateMarketsCache();
   const deleted = Number((res as any).rowsAffected ?? 0) > 0;
   if (deleted) await mirrorMarketsToJson();
   return deleted;
