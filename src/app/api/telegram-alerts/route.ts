@@ -23,7 +23,6 @@ export async function GET() {
  * POST /api/telegram-alerts
  * Actions:
  *   { action: 'test' } — send a test message using provided botToken + chatId
- *   { action: 'send', arbs: [...] } — send batch alerts (internal use from scan loop)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -45,20 +44,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: result.sent ? 200 : 500 });
     }
 
-    if (action === 'send') {
-      const { arbs } = body as { arbs: ArbAlertInput[] };
-      if (!Array.isArray(arbs)) {
-        return NextResponse.json(
-          { error: 'Missing or invalid "arbs" array' },
-          { status: 400 },
-        );
-      }
-      const result = await sendBatchAlerts(arbs);
-      return NextResponse.json(result);
-    }
-
     return NextResponse.json(
-      { error: 'Unknown action. Use "test" or "send".' },
+      { error: 'Unknown action. Use "test".' },
       { status: 400 },
     );
   } catch (err) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getManualMatches, addManualMatch, deleteManualMatch, ManualMatch } from '@/lib/manual-matches';
+import { getManualMatches, addManualMatch } from '@/lib/manual-matches';
 import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET() {
@@ -35,20 +35,6 @@ export async function POST(request: NextRequest) {
     if (err.message === 'Manual match already exists for this pair') {
       return NextResponse.json({ error: clientSafeError(err) }, { status: 409 });
     }
-    return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id query parameter' }, { status: 400 });
-    }
-    const ok = await deleteManualMatch(id);
-    return NextResponse.json({ success: ok });
-  } catch (err: any) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
