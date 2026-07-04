@@ -8,44 +8,11 @@ import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
+import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 
-const API_TIMEOUT_MS = 3000;
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
 const CLOB_TIMEOUT_MS = 1500;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-  );
-  return Promise.race([promise, timeout]);
-}
-
-function chooseBestPmStructure(
-  allPmMarkets: any[],
-  kalshiMarkets: any[],
-  pmEventTitle: string,
-): any[] {
-  const namedMarkets = allPmMarkets.filter((m: any) =>
-    m.groupItemTitle && m.groupItemTitle !== '' && m.groupItemTitle !== 'N/A'
-  );
-  const unnamedMarkets = allPmMarkets.filter((m: any) =>
-    !m.groupItemTitle || m.groupItemTitle === '' || m.groupItemTitle === 'N/A'
-  );
-
-  if (namedMarkets.length === 0) return unnamedMarkets;
-  if (unnamedMarkets.length === 0) return namedMarkets;
-
-  const namedOutcomes = matchOutcomes(kalshiMarkets, namedMarkets, pmEventTitle, 1000);
-  const unnamedOutcomes = matchOutcomes(kalshiMarkets, unnamedMarkets, pmEventTitle, 1000);
-
-  const namedMatched = namedOutcomes.filter((o: any) => o.kalshi && o.polymarket).length;
-  const unnamedMatched = unnamedOutcomes.filter((o: any) => o.kalshi && o.polymarket).length;
-
-  if (namedMatched === 0 && unnamedMatched === 0) return allPmMarkets;
-  if (namedMatched >= unnamedMatched) return namedMarkets;
-  return unnamedMarkets;
-}
 
 export interface SingleRefreshResult {
   id: string;
