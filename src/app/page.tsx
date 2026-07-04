@@ -127,6 +127,7 @@ export default function Home() {
   const [capital, setCapital] = useState(1000);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [bgRefreshing, setBgRefreshing] = useState(false); // BUG-032
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
@@ -165,6 +166,8 @@ export default function Home() {
   const kalshiUrlRef = useRef(kalshiUrl);
   const pmUrlRef = useRef(pmUrl);
   const activeMarketIdRef = useRef(activeMarketId);
+  // BUG-036: serialize MarketFinder individual saves to avoid concurrent read-modify-write races
+  const mfSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => { savedMarketsRef.current = savedMarkets; }, [savedMarkets]);
   useEffect(() => { kalshiUrlRef.current = kalshiUrl; }, [kalshiUrl]);
@@ -194,7 +197,10 @@ export default function Home() {
             setResult(null);
             previousPricesRef.current = new Map();
             setPriceChanges(new Map());
-            handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+            const popExpiry = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
+            if (!(popExpiry > 0 && popExpiry <= Date.now())) {
+              handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+            }
           } else {
             setViewMode("scan");
           }
@@ -290,6 +296,8 @@ export default function Home() {
     if (!silent) {
       setLoading(true);
       setResult(null);
+    } else {
+      setBgRefreshing(true); // BUG-032: show subtle refresh indicator for silent background scans
     }
     setError("");
     previousPricesRef.current = new Map();
@@ -343,6 +351,7 @@ export default function Home() {
       setError(err.message || "Network error");
     } finally {
       if (!silent) setLoading(false);
+      else setBgRefreshing(false);
     }
   };
 
@@ -588,8 +597,10 @@ export default function Home() {
       setLastUpdated(null);
     }
 
-    // Background refresh (silent)
-    handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
+    // Background refresh (silent) — skip for expired markets (BUG-033)
+    if (!isExpired) {
+      handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
+    }
   };
 
   // View mode switcher
@@ -725,7 +736,7 @@ export default function Home() {
   const [mfExpiryDays, setMfExpiryDays] = useState(getStoredMfExpiryDays);
 
   // MF fetch count — caps PredictionHunt API usage (default 3)
-  const [mfFetchCount, setMfFetchCount] = useState(3);
+  const [mfFetchCount, setMfFetchCount] = useState(20);
 
   // ── MF matched/unmatched filter (all | matched | unmatched) ──
   const [mfMatchFilter, setMfMatchFilter] = useState<"all" | "matched" | "unmatched">("all");
@@ -1189,7 +1200,9 @@ export default function Home() {
                 onSaveToH2H={(m) => {
                   if (!m.kalshiUrl || !m.polymarketUrl) return;
                   setMfSavingIds((prev) => new Set(prev).add(m.id));
-                  fetch("/api/predictionhunt/markets?action=save-to-h2h", {
+                  // BUG-036: chain saves on a queue so rapid clicks don't race the backend read-modify-write
+                  mfSaveQueueRef.current = mfSaveQueueRef.current.then(() =>
+                    fetch("/api/predictionhunt/markets?action=save-to-h2h", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1215,7 +1228,8 @@ export default function Home() {
                         n.delete(m.id);
                         return n;
                       });
-                    });
+                    })
+                  );
                 }}
                 onToggleSelected={toggleMfSelected}
                 onToggleSelectAll={toggleMfSelectAll}
@@ -1406,8 +1420,8 @@ export default function Home() {
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
                             title="Refresh"
                           >
-                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[#5E6875]" /> : <RefreshCw className="w-3 h-3 text-[#5E6875]" />}
-                            <span className="text-[10px] text-[#FFFFFF]">{lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#5E6875]" />}
+                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
                           </button>
 
                           {/* Data chips (config-driven) */}
@@ -1457,7 +1471,7 @@ export default function Home() {
                         <div className="space-y-1">
                           <div className="font-semibold">{result.expired ? 'Market expired' : result.noPrices ? 'No live prices' : 'Market data warning'}</div>
                           <div className="text-xs text-[#8A9BA8]">
-                            {result.expired && <span className="mr-3">This market has expired. Prices and arbitrage calculations are no longer valid.</span>}
+                            {result.expired && <span className="mr-3">This market has expired. Data is no longer being captured or updated — prices and arbitrage calculations are frozen and no longer valid.</span>}
                             {result.noPrices && <span className="mr-3">No live prices available. Refresh or check the market URLs.</span>}
                             {!result.expired && !result.noPrices && result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
                             {!result.expired && !result.noPrices && result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
