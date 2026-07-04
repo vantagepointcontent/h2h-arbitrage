@@ -37,6 +37,24 @@ export interface SingleRefreshResult {
 }
 
 export async function refreshSingleMarket(market: SavedMarket, manualMatches: any[]): Promise<SingleRefreshResult> {
+  // BUG-035: skip upstream fetches entirely for expired markets
+  const _expiryMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
+  if (_expiryMs > 0 && _expiryMs <= Date.now()) {
+    return {
+      id: market.id,
+      eventTitle: market.eventTitle,
+      bestRoiPct: 0,
+      bestProfit: 0,
+      strategy: 'Expired',
+      matchedCount: 0,
+      kalshiCount: 0,
+      pmCount: 0,
+      scannedAt: new Date().toISOString(),
+      totalStake: 0,
+      allArbs: [],
+      expiryDate: market.expiryDate,
+    } as SingleRefreshResult;
+  }
   const kalshiTicker = extractKalshiEventTicker(market.kalshiUrl);
   const pmSlug = extractPolymarketSlug(market.polymarketUrl);
 

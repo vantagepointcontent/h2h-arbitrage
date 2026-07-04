@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { kalshiUrl, polymarketUrl, skipAutoMatch, capital = 1000 } = body;
+    const { kalshiUrl, polymarketUrl, skipAutoMatch, capital = 1000, force = false } = body;
 
     const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
     const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     // return empty result with expired flag. Note: for sports markets, endDate
     // is often the match start time — the market stays live until resolution.
     const expiryDate = pmEvent.endDate;
-    if (expiryDate) {
+    if (expiryDate && !force) {
       const expiryMs = new Date(expiryDate).getTime();
       const isMarketLive = pmEvent.active && !pmEvent.closed;
       if (expiryMs > 0 && expiryMs <= Date.now() && !isMarketLive) {

@@ -164,7 +164,8 @@ function getAdaptiveIntervalMs(market, config) {
   const expiryMs = new Date(expiryStr).getTime();
   if (isNaN(expiryMs)) return FALLBACK_INTERVAL_MS * config.globalMultiplier;
 
-  const secondsToExpiry = Math.max(0, Math.round((expiryMs - Date.now()) / 1000));
+  const secondsToExpiry = Math.round((expiryMs - Date.now()) / 1000);
+  if (secondsToExpiry <= 0) return Infinity; // expired — never poll again (BUG-033)
   const mult = config.globalMultiplier;
 
   for (const tier of config.tiers) {

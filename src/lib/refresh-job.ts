@@ -62,6 +62,13 @@ async function runRefreshJob(marketIds?: string[]) {
 
   for (let i = 0; i < markets.length; i++) {
     const market = markets[i];
+    // BUG-035: skip expired markets entirely
+    const expMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
+    if (expMs > 0 && expMs <= Date.now()) {
+      newState.processed++;
+      await writeState(newState);
+      continue;
+    }
     newState.currentMarketId = market.id;
     newState.currentMarketTitle = market.eventTitle;
     await writeState(newState);
