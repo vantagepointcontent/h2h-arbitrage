@@ -35,19 +35,18 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+function applyTheme(t: Theme) {
+  document.documentElement.setAttribute("data-theme", t);
+  document.documentElement.classList.toggle("dark", t === "dark");
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
     localStorage.setItem(STORAGE_KEY, t);
-    document.documentElement.setAttribute("data-theme", t);
-    if (t === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    applyTheme(t);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -58,13 +57,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initial = getInitialTheme();
     setThemeState(initial);
-    document.documentElement.setAttribute("data-theme", initial);
-    if (initial === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    setMounted(true);
+    applyTheme(initial);
   }, []);
 
   // Listen for system preference changes
@@ -76,12 +69,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (!stored) {
         const newTheme = e.matches ? "light" : "dark";
         setThemeState(newTheme);
-        document.documentElement.setAttribute("data-theme", newTheme);
-        if (newTheme === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+        applyTheme(newTheme);
       }
     };
     mq.addEventListener("change", handler);
