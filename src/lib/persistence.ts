@@ -191,6 +191,7 @@ export interface LastScanResult {
   kalshiCount: number;
   pmCount: number;
   scannedAt: string;        // ISO timestamp
+  pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
     artist: string;
     roiPct: number;

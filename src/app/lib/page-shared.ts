@@ -147,6 +147,7 @@ export interface LastScanResult {
   kalshiCount: number;
   pmCount: number;
   scannedAt: string;
+  pmClosed?: boolean; // UI-013: PM reports market closed (endDate may still be future)
   allArbs?: {
     artist: string;
     roiPct: number;

@@ -315,6 +315,10 @@ export async function POST(request: NextRequest) {
           kalshiCount,
           pmCount,
           scannedAt: new Date().toISOString(),
+          // UI-013: PM often keeps endDate far in the future even after a market
+          // resolves. Persist PM's own closed signal so the UI can treat
+          // closed-but-not-yet-past-endDate markets as expired.
+          pmClosed: Boolean(pmEvent.closed) && !pmEvent.active,
           allArbs: positiveArbs.map(o => ({
             artist: o.artist,
             roiPct: o.arbitrage!.roiPct,

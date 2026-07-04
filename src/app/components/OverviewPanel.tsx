@@ -129,7 +129,10 @@ export function OverviewPanel({
   // Apply expiry filter
   const filteredByExpiry = [...markets].filter(m => {
     if (!showExpired) {
-      const isExpired = m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false;
+      // UI-013: expired = past expiryDate OR PM reports the market closed
+      const isExpired =
+        (m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false) ||
+        Boolean(m.lastScanResult?.pmClosed);
       if (isExpired) return false;
     }
     if (expiryFilter === "all") return true;
