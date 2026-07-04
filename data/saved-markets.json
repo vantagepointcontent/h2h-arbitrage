@@ -238,16 +238,16 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 8,
-      "matchedCount": 0,
+      "matchedCount": 3,
       "kalshiCount": 8,
       "pmCount": 8,
-      "scannedAt": "2026-07-04T00:05:35.823Z",
+      "scannedAt": "2026-07-04T00:06:41.107Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:04:43.279Z"
+    "lastMatchedAt": "2026-07-04T00:06:41.107Z"
   },
   {
     "id": "1779626444294-dlx66jv",
@@ -401,7 +401,7 @@
       "matchedCount": 0,
       "kalshiCount": 7,
       "pmCount": 7,
-      "scannedAt": "2026-07-04T00:05:14.344Z",
+      "scannedAt": "2026-07-04T00:06:17.261Z",
       "allArbs": []
     },
     "archived": false,
@@ -681,16 +681,16 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 14,
-      "matchedCount": 0,
+      "matchedCount": 4,
       "kalshiCount": 14,
       "pmCount": 14,
-      "scannedAt": "2026-07-04T00:03:32.807Z",
+      "scannedAt": "2026-07-04T00:06:35.809Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:57:24.221Z"
+    "lastMatchedAt": "2026-07-04T00:06:35.809Z"
   },
   {
     "id": "1779918706058-tmlnj5g",
@@ -841,10 +841,10 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 16,
-      "matchedCount": 7,
+      "matchedCount": 0,
       "kalshiCount": 16,
       "pmCount": 16,
-      "scannedAt": "2026-07-04T00:02:31.202Z",
+      "scannedAt": "2026-07-04T00:06:17.259Z",
       "allArbs": []
     },
     "archived": false,
@@ -910,16 +910,16 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 4,
-      "matchedCount": 0,
+      "matchedCount": 1,
       "kalshiCount": 4,
       "pmCount": 4,
-      "scannedAt": "2026-07-04T00:05:28.381Z",
+      "scannedAt": "2026-07-04T00:06:49.008Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:02:58.529Z"
+    "lastMatchedAt": "2026-07-04T00:06:49.008Z"
   },
   {
     "id": "1779921626235-sb1i94e",
@@ -1070,16 +1070,16 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 23,
-      "matchedCount": 0,
+      "matchedCount": 6,
       "kalshiCount": 23,
       "pmCount": 23,
-      "scannedAt": "2026-07-04T00:05:23.452Z",
+      "scannedAt": "2026-07-04T00:06:42.814Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:01:30.189Z"
+    "lastMatchedAt": "2026-07-04T00:06:42.814Z"
   },
   {
     "id": "1780515968723-d0aycj7",
@@ -1403,16 +1403,16 @@
       "bestProfit": 0,
       "strategy": "No arb",
       "outcomeCount": 18,
-      "matchedCount": 0,
+      "matchedCount": 11,
       "kalshiCount": 18,
       "pmCount": 18,
-      "scannedAt": "2026-07-04T00:05:22.542Z",
+      "scannedAt": "2026-07-04T00:06:42.061Z",
       "allArbs": []
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:57:41.419Z"
+    "lastMatchedAt": "2026-07-04T00:06:42.061Z"
   },
   {
     "id": "1780524935254-y4p559m",
@@ -2060,7 +2060,7 @@
       "matchedCount": 0,
       "kalshiCount": 6,
       "pmCount": 6,
-      "scannedAt": "2026-07-04T00:05:16.017Z",
+      "scannedAt": "2026-07-04T00:06:17.266Z",
       "allArbs": []
     },
     "archived": false,
@@ -2161,7 +2161,7 @@
       "matchedCount": 0,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-04T00:05:16.015Z",
+      "scannedAt": "2026-07-04T00:06:17.260Z",
       "allArbs": []
     },
     "archived": false,
@@ -2265,17 +2265,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 0,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.437Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -2361,20 +2351,51 @@
       ]
     },
     "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
+      "bestRoiPct": 2.077323928060303,
+      "bestProfit": 20.77323928060303,
+      "strategy": "Buy YES PM + NO Kalshi",
       "outcomeCount": 9,
-      "matchedCount": 0,
+      "matchedCount": 9,
       "kalshiCount": 9,
       "pmCount": 9,
-      "scannedAt": "2026-07-04T00:05:37.335Z",
-      "allArbs": []
+      "scannedAt": "2026-07-04T00:06:54.433Z",
+      "allArbs": [
+        {
+          "artist": "Argentina",
+          "roiPct": 2.077323928060303,
+          "expectedProfit": 20.77323928060303,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "fees": {
+            "kalshiFee": 9.55,
+            "pmFee": 5.54355,
+            "kalshiFeeDetails": "",
+            "pmFeeDetails": "",
+            "netProfitIfKalshiWins": 20.77323928060303,
+            "netProfitIfPmWins": 20.77323928060303,
+            "worstCaseNetProfit": 20.77323928060303
+          }
+        },
+        {
+          "artist": "USA",
+          "roiPct": 0.34938000000001135,
+          "expectedProfit": 3.4938000000001135,
+          "strategy": "Buy YES PM + NO Kalshi",
+          "fees": {
+            "kalshiFee": 2.24,
+            "pmFee": 1.2662,
+            "kalshiFeeDetails": "",
+            "pmFeeDetails": "",
+            "netProfitIfKalshiWins": 3.4938000000001135,
+            "netProfitIfPmWins": 3.4938000000001135,
+            "worstCaseNetProfit": 3.4938000000001135
+          }
+        }
+      ]
     },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:04:45.736Z"
+    "lastMatchedAt": "2026-07-04T00:06:54.433Z"
   },
   {
     "id": "1781521870595-oqgkld7",
@@ -2554,7 +2575,7 @@
       "matchedCount": 0,
       "kalshiCount": 18,
       "pmCount": 18,
-      "scannedAt": "2026-07-04T00:04:15.936Z",
+      "scannedAt": "2026-07-04T00:06:17.264Z",
       "allArbs": []
     },
     "archived": false,
@@ -2740,7 +2761,7 @@
       "matchedCount": 0,
       "kalshiCount": 5,
       "pmCount": 5,
-      "scannedAt": "2026-07-04T00:05:06.350Z",
+      "scannedAt": "2026-07-04T00:06:21.932Z",
       "allArbs": []
     },
     "archived": false,
@@ -10488,17 +10509,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.423Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -10541,17 +10552,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.441Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -10610,17 +10611,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.430Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -10679,17 +10670,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.426Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -10748,17 +10729,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.420Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -10886,17 +10857,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.414Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11171,17 +11132,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.406Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11240,17 +11191,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.411Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11335,17 +11276,7 @@
         }
       ]
     },
-    "liveResult": {
-      "bestRoiPct": 0,
-      "bestProfit": 0,
-      "strategy": "No arb",
-      "outcomeCount": 2,
-      "matchedCount": 0,
-      "kalshiCount": 2,
-      "pmCount": 0,
-      "scannedAt": "2026-07-04T00:05:15.403Z",
-      "allArbs": []
-    },
+    "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11482,7 +11413,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.284Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11577,7 +11518,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.299Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11636,11 +11587,21 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-07-04T00:06:17.266Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:05:24.928Z"
+    "lastMatchedAt": "2026-07-04T00:06:17.266Z"
   },
   {
     "id": "1782999196726-house-mi12",
@@ -11695,7 +11656,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.287Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11754,7 +11725,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.279Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -11865,11 +11846,21 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-07-04T00:06:17.267Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:05:32.773Z"
+    "lastMatchedAt": "2026-07-04T00:06:17.267Z"
   },
   {
     "id": "1782999196726-house-mn04",
@@ -11924,11 +11915,21 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 2,
+      "kalshiCount": 2,
+      "pmCount": 2,
+      "scannedAt": "2026-07-04T00:06:17.267Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-04T00:05:33.024Z"
+    "lastMatchedAt": "2026-07-04T00:06:17.267Z"
   },
   {
     "id": "1782999196726-house-mn05",
@@ -11967,7 +11968,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.296Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -12010,7 +12021,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.293Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -12105,7 +12126,17 @@
         }
       ]
     },
-    "liveResult": null,
+    "liveResult": {
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "outcomeCount": 2,
+      "matchedCount": 0,
+      "kalshiCount": 2,
+      "pmCount": 0,
+      "scannedAt": "2026-07-04T00:06:15.290Z",
+      "allArbs": []
+    },
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
@@ -12154,7 +12185,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:19.117Z",
+      "scannedAt": "2026-07-04T00:06:46.620Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -12194,7 +12225,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:19.117Z"
+    "lastMatchedAt": "2026-07-04T00:06:46.620Z"
   },
   {
     "id": "1782999196726-house-ms04",
@@ -12213,7 +12244,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:19.819Z",
+      "scannedAt": "2026-07-04T00:06:46.860Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -12253,7 +12284,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:19.819Z"
+    "lastMatchedAt": "2026-07-04T00:06:46.860Z"
   },
   {
     "id": "1782999196726-house-mo01",
@@ -12272,14 +12303,14 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:19.348Z",
+      "scannedAt": "2026-07-04T00:06:47.337Z",
       "allArbs": []
     },
     "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:19.348Z"
+    "lastMatchedAt": "2026-07-04T00:06:47.337Z"
   },
   {
     "id": "1782999196726-house-mo02",
@@ -12298,7 +12329,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:19.581Z",
+      "scannedAt": "2026-07-04T00:06:47.100Z",
       "allArbs": [
         {
           "artist": "Republican",
@@ -12338,7 +12369,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:19.581Z"
+    "lastMatchedAt": "2026-07-04T00:06:47.100Z"
   },
   {
     "id": "1782999196726-house-mo03",
@@ -12357,7 +12388,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:20.055Z",
+      "scannedAt": "2026-07-04T00:06:47.601Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -12381,7 +12412,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:20.055Z"
+    "lastMatchedAt": "2026-07-04T00:06:47.601Z"
   },
   {
     "id": "1782999196727-house-mo04",
@@ -12400,7 +12431,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:26.650Z",
+      "scannedAt": "2026-07-04T00:06:54.395Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -12440,7 +12471,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:36:21.605Z"
+    "lastMatchedAt": "2026-07-04T00:06:54.395Z"
   },
   {
     "id": "1782999196727-house-mo05",
@@ -12452,45 +12483,45 @@
     "expiryDate": "2026-11-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 4.9999999999999964,
-      "bestProfit": 10.959615384615375,
+      "bestRoiPct": 5.999999999999996,
+      "bestProfit": 13.15153846153845,
       "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:26.873Z",
+      "scannedAt": "2026-07-04T00:06:54.643Z",
       "allArbs": [
         {
           "artist": "Republican",
-          "roiPct": 4.9999999999999964,
-          "expectedProfit": 10.959615384615375,
+          "roiPct": 5.999999999999996,
+          "expectedProfit": 13.15153846153845,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
-          "totalStake": 208.2326923076923,
+          "totalStake": 206.04076923076923,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 10.959615384615375,
-            "netProfitIfPmWins": 10.959615384615375,
-            "worstCaseNetProfit": 10.959615384615375
+            "netProfitIfKalshiWins": 13.15153846153845,
+            "netProfitIfPmWins": 13.15153846153845,
+            "worstCaseNetProfit": 13.15153846153845
           }
         },
         {
           "artist": "Democratic",
-          "roiPct": 2.131621559999999,
-          "expectedProfit": 6.745637848101262,
+          "roiPct": 3.165120720000001,
+          "expectedProfit": 10.016204810126585,
           "strategy": "Buy YES PM + NO Kalshi",
-          "totalStake": 303.79746835443035,
+          "totalStake": 300.63291139240505,
           "fees": {
             "kalshiFee": 3.68,
-            "pmFee": 2.23259,
+            "pmFee": 2.12658,
             "kalshiFeeDetails": "Kalshi NO sell 316 @ $0.79 = $3.68",
-            "pmFeeDetails": "Polymarket YES buy 316 @ $0.17 (θ=0.05) = $2.23",
-            "netProfitIfKalshiWins": 6.745637848101262,
-            "netProfitIfPmWins": 6.745637848101262,
-            "worstCaseNetProfit": 6.745637848101262
+            "pmFeeDetails": "Polymarket YES buy 316 @ $0.16 (θ=0.05) = $2.13",
+            "netProfitIfKalshiWins": 10.016204810126585,
+            "netProfitIfPmWins": 10.016204810126585,
+            "worstCaseNetProfit": 10.016204810126585
           }
         }
       ]
@@ -12499,7 +12530,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:35:26.873Z"
+    "lastMatchedAt": "2026-07-04T00:06:54.643Z"
   },
   {
     "id": "1782999196727-house-mo06",
@@ -12518,7 +12549,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-03T23:35:27.106Z",
+      "scannedAt": "2026-07-04T00:06:54.882Z",
       "allArbs": [
         {
           "artist": "Democratic",
@@ -12542,7 +12573,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-03T23:36:21.609Z"
+    "lastMatchedAt": "2026-07-04T00:06:54.882Z"
   },
   {
     "id": "1782999196727-house-mo07",

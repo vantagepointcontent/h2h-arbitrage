@@ -5,8 +5,7 @@
  *   • Auto-restart on crash (max 10/min via restart_delay)
  *   • Log rotation (7d retention, 10MB max — see /etc/logrotate.d/h2h-pm2)
  *   • Graceful shutdown drain (kill_timeout + shutdown_listener)
- *   • Deploy hook integration (on_restart / on_online / on_stop)
- */
+ *   • Deploy hook integration (
 module.exports = {
   apps: [
     {
@@ -55,7 +54,7 @@ module.exports = {
         LOG_DIR: '/home/scott/.pm2/logs',
         LOG_LEVEL: 'info',
         // SENTRY_DSN: 'https://...',  // uncomment and set your Sentry DSN
-        // SENTRY_TRACES_SAMPLE_RATE: '0.1',
+        // SENTRY_TRACES_SAMPLE_RATE: '0.1'
       },
 
       // ── Logging ─────────────────────────────────────────────
@@ -68,15 +67,7 @@ module.exports = {
 
       // ── Deploy hooks ────────────────────────────────────────
       // Scripts run in cwd with env vars available
-      on_restart: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh restart',
-      on_online: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh online',
-      on_stop: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh stop',
-
-      // ── Resource limits ─────────────────────────────────────
-      // 4G: server upgraded to 32GB RAM / 6 cores (2026-07-03). Previously 1G
-      // (at 512M pm2 was SIGKILLing the app mid-scan-burst; Next.js RSS
-      // legitimately peaks >512M under concurrent scan load).
-      max_memory_restart: '4G',
+      max_memory_restart: '4G'
     },
     {
       name: 'h2h-poller',
@@ -104,7 +95,7 @@ module.exports = {
         H2H_BASE_URL: 'http://localhost:3000',
         // SEC-001: poller calls the app over the Tailscale IP, so it must
         // authenticate its mutating requests with the shared token.
-        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
+        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9'
       },
 
       // ── Logging ─────────────────────────────────────────────
@@ -116,12 +107,7 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
       // ── Deploy hooks ────────────────────────────────────────
-      on_restart: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh restart',
-      on_online: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh online',
-      on_stop: '/home/scott/h2h-arbitrage/scripts/deploy-hooks.sh stop',
-
-      // ── Resource limits ─────────────────────────────────────
-      max_memory_restart: '256M',
+      max_memory_restart: '256M'
     },
     {
       name: 'h2h-watcher',
@@ -145,7 +131,7 @@ module.exports = {
       // ── Environment ─────────────────────────────────────────
       env: {
         NODE_ENV: 'production',
-        H2H_WATCHER_CAPITAL: '1000',
+        H2H_WATCHER_CAPITAL: '1000'
       },
 
       // ── Logging ─────────────────────────────────────────────
@@ -157,7 +143,7 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
       // ── Resource limits ─────────────────────────────────────
-      max_memory_restart: '1G',
+      max_memory_restart: '1G'
     },
-  ],
+  ]
 };
