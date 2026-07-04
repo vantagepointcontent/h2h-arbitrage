@@ -577,3 +577,82 @@ export async function appendScanHistory(entry: ScanHistoryEntry): Promise<void> 
   await c.execute(`DELETE FROM scan_history WHERE id NOT IN (SELECT id FROM scan_history ORDER BY scan_timestamp DESC LIMIT 5000)`);
 }
 
+
+// ─── TRADES-001: persistent execution log ─────────────────────────
+// auto-execute's in-memory auditLog is lost on every pm2 restart; this
+// table is the durable record backing the Trades page.
+
+let _executionsReady = false;
+async function ensureExecutionsTable(): Promise<void> {
+  if (_executionsReady) return;
+  const c = getClient();
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS executions (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp        TEXT    NOT NULL,
+      arb_id           TEXT    NOT NULL,
+      market_title     TEXT    NOT NULL,
+      dry_run          INTEGER NOT NULL DEFAULT 1,
+      success          INTEGER NOT NULL DEFAULT 0,
+      strategy         TEXT,
+      kalshi_order     TEXT,
+      polymarket_order TEXT,
+      result           TEXT,
+      estimated_profit REAL    NOT NULL DEFAULT 0
+    )`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
+  _executionsReady = true;
+}
+
+export interface ExecutionRecord {
+  id?: number;
+  timestamp: string;
+  arbId: string;
+  marketTitle: string;
+  dryRun: boolean;
+  success: boolean;
+  strategy?: string | null;
+  kalshiOrder?: unknown;
+  polymarketOrder?: unknown;
+  result?: unknown;
+  estimatedProfit: number;
+}
+
+export async function persistExecution(e: ExecutionRecord): Promise<void> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  await c.execute({
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
+      e.strategy ?? null,
+      e.kalshiOrder != null ? JSON.stringify(e.kalshiOrder) : null,
+      e.polymarketOrder != null ? JSON.stringify(e.polymarketOrder) : null,
+      e.result != null ? JSON.stringify(e.result) : null,
+      e.estimatedProfit ?? 0,
+    ],
+  });
+}
+
+export async function getExecutions(limit = 200): Promise<ExecutionRecord[]> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`,
+    args: [Math.min(1000, Math.max(1, limit))],
+  });
+  return (res.rows as any[]).map((r) => ({
+    id: Number(r.id),
+    timestamp: String(r.timestamp),
+    arbId: String(r.arb_id),
+    marketTitle: String(r.market_title),
+    dryRun: Boolean(Number(r.dry_run)),
+    success: Boolean(Number(r.success)),
+    strategy: r.strategy != null ? String(r.strategy) : null,
+    kalshiOrder: r.kalshi_order ? JSON.parse(String(r.kalshi_order)) : null,
+    polymarketOrder: r.polymarket_order ? JSON.parse(String(r.polymarket_order)) : null,
+    result: r.result ? JSON.parse(String(r.result)) : null,
+    estimatedProfit: Number(r.estimated_profit ?? 0),
+  }));
+}

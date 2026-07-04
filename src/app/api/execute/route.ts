@@ -14,6 +14,7 @@ import {
   CREDENTIAL_KEYS,
 } from '@/lib/execution-creds';
 import { getSetting } from '@/lib/settings';
+import { persistExecution } from '@/lib/persistence';
 import logger from '@/lib/logger';
 
 /**
@@ -136,6 +137,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         result,
         estimatedProfit: effective.estimatedProfit,
       });
+      // TRADES-001: durable copy — in-memory auditLog dies on restart
+      await persistExecution({
+        timestamp: new Date().toISOString(),
+        arbId: effective.arbId,
+        marketTitle: effective.marketTitle,
+        dryRun: effective.dryRun,
+        success: result.success,
+        strategy: (effective as any).strategy ?? null,
+        kalshiOrder: effective.kalshiOrder,
+        polymarketOrder: effective.polymarketOrder,
+        result,
+        estimatedProfit: effective.estimatedProfit,
+      }).catch((e) => logger.warn('[execute] persistExecution failed', { error: String(e) }));
 
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun });
     }

@@ -64,6 +64,7 @@ const SettingsPanel = dynamic(() => import("@/app/components/SettingsPanel"), { 
 const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { ssr: false });
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
+const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -152,7 +153,7 @@ export default function Home() {
   // Persist sidebar toggle
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
@@ -275,6 +276,8 @@ export default function Home() {
         setViewMode("logs");
       } else if (view === "settings") {
         setViewMode("settings");
+      } else if (view === "trades") {
+        setViewMode("trades");
       } else {
         setViewMode("dashboard");
       }
@@ -654,6 +657,13 @@ export default function Home() {
     setCouplingPanelOpen(false);
     setViewMode("settings");
     window.history.replaceState({ view: "settings" }, "", "/?view=settings");
+  };
+
+  // TRADES-001
+  const goToTrades = () => {
+    setCouplingPanelOpen(false);
+    setViewMode("trades");
+    window.history.replaceState({ view: "trades" }, "", "/?view=trades");
   };
 
   const goToScan = () => {
@@ -1128,6 +1138,7 @@ export default function Home() {
           onGoMarketFinder={goToMarketFinder}
           onGoLogs={goToLogs}
           onGoDashboard={goToDashboard}
+          onGoTrades={goToTrades}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
@@ -1256,6 +1267,8 @@ export default function Home() {
               <LogsPanel />
             ) : viewMode === "settings" ? (
               <SettingsPanel />
+            ) : viewMode === "trades" ? (
+              <TradesPanel />
             ) : (
               <>
                 {/* Scan inputs */}
@@ -1609,6 +1622,7 @@ export default function Home() {
                             formatPercent={formatPercent}
                             priceChanges={priceChanges}
                             filterMode={outcomeFilter}
+                            marketTitle={result.eventTitle}
                           />
                         </table>
                       </div>

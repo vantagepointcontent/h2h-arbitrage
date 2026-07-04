@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
+import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
@@ -80,6 +80,7 @@ export function MarketSidebar({
   onGoMarketFinder,
   onGoLogs,
   onGoDashboard,
+  onGoTrades,
   favoriteIds,
   onToggleFavorite,
   sidebarFavoritesOnly,
@@ -113,6 +114,7 @@ export function MarketSidebar({
   onGoMarketFinder: () => void;
   onGoLogs: () => void;
   onGoDashboard: () => void;
+  onGoTrades: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   sidebarFavoritesOnly: boolean;
@@ -236,6 +238,7 @@ export function MarketSidebar({
             <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />
             <NavButton icon={<Activity className="w-5 h-5 shrink-0" />} label="Live WS" active={viewMode === "live"} onClick={() => window.location.href = '/?view=live'} collapsed={!sidebarOpen} />
             <NavButton icon={<FileText className="w-5 h-5 shrink-0" />} label="Logs" active={viewMode === "logs"} onClick={onGoLogs} collapsed={!sidebarOpen} />
+            <NavButton icon={<Receipt className="w-5 h-5 shrink-0" />} label="Trades" active={viewMode === "trades"} onClick={onGoTrades} collapsed={!sidebarOpen} />
           </div>
 
           {sidebarOpen && (
