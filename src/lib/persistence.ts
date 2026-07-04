@@ -385,11 +385,15 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
   ];
   const perDay = new Map((perDayRes.rows as any[]).map((r) => [r.day, Number(r.cnt)]));
 
-  // Fixed 30-day window for the scans-per-day chart (fills gaps with 0)
+  // Scans-per-day: number of buckets matches the selected range (not hardcoded 30).
+  // Fills gaps with 0 so the chart shows continuous days.
+  const rangeDays = since
+    ? Math.min(Math.max(Math.ceil((Date.now() - new Date(since).getTime()) / 86400000), 1), 365)
+    : 90; // "all" — default to 90 days to keep the chart readable
   const scansPerDay: { date: string; count: number }[] = [];
   const todayMid = new Date();
   const today = new Date(todayMid.getFullYear(), todayMid.getMonth(), todayMid.getDate());
-  for (let i = 29; i >= 0; i--) {
+  for (let i = rangeDays - 1; i >= 0; i--) {
     const ds = new Date(today.getTime() - i * 86400000).toISOString().slice(0, 10);
     scansPerDay.push({ date: ds, count: perDay.get(ds) ?? 0 });
   }

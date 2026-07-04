@@ -389,7 +389,7 @@ export default function DashboardPanel() {
               icon={<BarChart3 className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
                 <span className="text-xs text-[#8A9BA8]">
-                  Last 30 days
+                  {range === "all" ? "Last 365 days" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
             >
