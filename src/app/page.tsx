@@ -1410,46 +1410,20 @@ export default function Home() {
                             <span className="text-[10px] text-[#FFFFFF]">{lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
                           </button>
 
-                          {/* Kalshi chip */}
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]">
-                              <span className="text-[8px] font-bold text-[#FFFFFF]">K</span>
+                          {/* Data chips (config-driven) */}
+                          {([
+                            { label: "Kalshi", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><span className="text-[8px] font-bold text-[#FFFFFF]">K</span></div>, value: String(result.kalshiCount), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Polymarket", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]"><span className="text-[7px] font-bold text-[#FFFFFF]">PM</span></div>, value: String(result.pmCount), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><Check className="w-2.5 h-2.5 text-[#FFFFFF]" /></div>, value: String(result.matchedCount), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[#5DBE81]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0)), valueClass: "text-[#5DBE81]", dim: !!result.expired },
+                            { label: "Expiry", icon: <Clock className="w-3 h-3 text-[#facc15]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[#FFFFFF]", dim: false },
+                          ] as const).map((chip) => (
+                            <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${chip.dim ? "opacity-50" : ""}`}>
+                              {chip.icon}
+                              <span className="text-[10px] text-[#5E6875]">{chip.label}</span>
+                              <span className={`text-xs font-bold ${chip.valueClass}`}>{chip.value}</span>
                             </div>
-                            <span className="text-[10px] text-[#5E6875]">Kalshi</span>
-                            <span className="text-xs font-bold text-[#FFFFFF]">{result.kalshiCount}</span>
-                          </div>
-
-                          {/* PM chip */}
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]">
-                              <span className="text-[7px] font-bold text-[#FFFFFF]">PM</span>
-                            </div>
-                            <span className="text-[10px] text-[#5E6875]">Polymarket</span>
-                            <span className="text-xs font-bold text-[#FFFFFF]">{result.pmCount}</span>
-                          </div>
-
-                          {/* Matched chip */}
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]">
-                              <Check className="w-2.5 h-2.5 text-[#FFFFFF]" />
-                            </div>
-                            <span className="text-[10px] text-[#5E6875]">Matched</span>
-                            <span className="text-xs font-bold text-[#FFFFFF]">{result.matchedCount}</span>
-                          </div>
-
-                          {/* Total Profit chip */}
-                          <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${result.expired ? 'opacity-50' : ''}`}>
-                            <TrendingUp className="w-3 h-3 text-[#5DBE81]" />
-                            <span className="text-[10px] text-[#5E6875]">Total Profit</span>
-                            <span className="text-xs font-bold text-[#5DBE81]">{result.expired ? '—' : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0))}</span>
-                          </div>
-
-                          {/* Expiry chip */}
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-                            <Clock className="w-3 h-3 text-[#facc15]" />
-                            <span className="text-[10px] text-[#5E6875]">Expiry</span>
-                            <span className="text-xs font-bold text-[#FFFFFF]">{formatExpiry(result.expiryDate)}</span>
-                          </div>
+                          ))}
 
                           {/* Delete chip */}
                           <button

@@ -1,185 +1,75 @@
 // page-shared.ts — shared types, storage helpers, and utils for the main views.
 // Extracted from page.tsx (PERF-002 split). No behavior changes.
 
-// ─── Selection storage key ───
-export const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
+// ─── Generic localStorage helpers ───
 
-// ─── MF category filter storage key ───
+function getStored<T>(key: string, fallback: T, validate?: (v: T) => boolean): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const v = JSON.parse(raw) as T;
+    return validate && !validate(v) ? fallback : v;
+  } catch {
+    return fallback;
+  }
+}
+
+function persist(key: string, value: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+// ─── Storage keys ───
+export const MF_SELECTED_IDS_KEY = "h2h-mf-selected-ids";
 export const MF_CATEGORIES_KEY = "h2h-mf-categories";
 export const MF_EXPIRY_DAYS_KEY = "h2h-mf-expiry-days";
-
-/** Read persisted selected categories from localStorage */
-export function getStoredMfCategories(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(MF_CATEGORIES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Persist selected categories to localStorage */
-export function persistMfCategories(cats: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MF_CATEGORIES_KEY, JSON.stringify(cats));
-  } catch { /* quota exceeded – ignore */ }
-}
-
-/** Read persisted expiry days from localStorage */
-export function getStoredMfExpiryDays(): number {
-  if (typeof window === "undefined") return 365;
-  try {
-    const raw = localStorage.getItem(MF_EXPIRY_DAYS_KEY);
-    const n = raw ? parseInt(raw, 10) : 365;
-    return Number.isFinite(n) && n >= 1 && n <= 365 ? n : 365;
-  } catch {
-    return 365;
-  }
-}
-
-/** Persist expiry days to localStorage */
-export function persistMfExpiryDays(days: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MF_EXPIRY_DAYS_KEY, String(days));
-  } catch { /* quota exceeded – ignore */ }
-}
-
-/** Read persisted selection IDs from localStorage */
-export function getStoredMfSelectedIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(MF_SELECTED_IDS_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-/** Persist selection IDs to localStorage */
-export function persistMfSelectedIds(ids: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MF_SELECTED_IDS_KEY, JSON.stringify([...ids]));
-  } catch { /* quota exceeded – ignore */ }
-}
-
-// ─── Favorites storage key ───
 export const FAVORITE_IDS_KEY = "h2h-favorites";
-
-/** Read persisted favorite IDs from localStorage */
-export function getStoredFavoriteIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(FAVORITE_IDS_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-/** Persist favorite IDs to localStorage */
-export function persistFavoriteIds(ids: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(FAVORITE_IDS_KEY, JSON.stringify([...ids]));
-  } catch { /* quota exceeded – ignore */ }
-}
-
-// ─── Matched-only filter storage key ──
-export const MATCHED_ONLY_KEY = "h2h-hide-unmatched";
-
-/** Read persisted matched-only filter from localStorage (default: true) */
-export function getStoredHideUnmatched(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = localStorage.getItem(MATCHED_ONLY_KEY);
-    if (raw !== null) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return true; // default: show matched only
-}
-
-/** Persist matched-only filter to localStorage */
-export function persistHideUnmatched(val: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MATCHED_ONLY_KEY, JSON.stringify(val));
-  } catch { /* quota exceeded – ignore */ }
-}
-
-// ─── Custom title storage key ──
 export const CUSTOM_TITLES_KEY = "h2h-custom-titles";
 export const MAX_CUSTOM_TITLE_LEN = 100;
+export const MF_AUTO_REFRESH_KEY = "h2h-mf-auto-refresh";
+export const SIDEBAR_OPEN_KEY = "h2h-sidebar-open";
 
-/** Read persisted custom titles from localStorage (marketId → customTitle) */
-export function getStoredCustomTitles(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(CUSTOM_TITLES_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
+// ─── Typed accessors ───
+export const getStoredMfCategories = (): string[] => getStored<string[]>(MF_CATEGORIES_KEY, []);
+export const persistMfCategories = (cats: string[]): void => persist(MF_CATEGORIES_KEY, cats);
+
+export const getStoredMfExpiryDays = (): number =>
+  getStored<number>(MF_EXPIRY_DAYS_KEY, 365, (n) => Number.isFinite(n) && n >= 1 && n <= 365);
+export const persistMfExpiryDays = (days: number): void => persist(MF_EXPIRY_DAYS_KEY, days);
+
+export const getStoredMfSelectedIds = (): Set<string> =>
+  new Set(getStored<string[]>(MF_SELECTED_IDS_KEY, []));
+export const persistMfSelectedIds = (ids: Set<string>): void => persist(MF_SELECTED_IDS_KEY, [...ids]);
+
+export const getStoredFavoriteIds = (): Set<string> =>
+  new Set(getStored<string[]>(FAVORITE_IDS_KEY, []));
+export const persistFavoriteIds = (ids: Set<string>): void => persist(FAVORITE_IDS_KEY, [...ids]);
+
+export const getStoredCustomTitles = (): Record<string, string> =>
+  getStored<Record<string, string>>(CUSTOM_TITLES_KEY, {});
 
 /** Persist a single custom title to localStorage */
 export function setCustomTitle(marketId: string, title: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const titles: Record<string, string> = getStoredCustomTitles();
-    titles[marketId] = title;
-    localStorage.setItem(CUSTOM_TITLES_KEY, JSON.stringify(titles));
-  } catch { /* quota exceeded – ignore */ }
+  const titles = getStoredCustomTitles();
+  titles[marketId] = title;
+  persist(CUSTOM_TITLES_KEY, titles);
 }
 
 /** Remove a custom title from localStorage */
 export function removeCustomTitle(marketId: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const titles: Record<string, string> = getStoredCustomTitles();
-    delete titles[marketId];
-    localStorage.setItem(CUSTOM_TITLES_KEY, JSON.stringify(titles));
-  } catch { /* quota exceeded — ignore */ }
+  const titles = getStoredCustomTitles();
+  delete titles[marketId];
+  persist(CUSTOM_TITLES_KEY, titles);
 }
 
-// ─── Auto-refresh toggle storage key ──
-export const MF_AUTO_REFRESH_KEY = "h2h-mf-auto-refresh";
+export const getStoredMfAutoRefresh = (): boolean => getStored<boolean>(MF_AUTO_REFRESH_KEY, true);
+export const persistMfAutoRefresh = (val: boolean): void => persist(MF_AUTO_REFRESH_KEY, val);
 
-export function getStoredMfAutoRefresh(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = localStorage.getItem(MF_AUTO_REFRESH_KEY);
-    if (raw !== null) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return true; // default: enabled
-}
-
-export function persistMfAutoRefresh(val: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MF_AUTO_REFRESH_KEY, JSON.stringify(val));
-  } catch { /* quota exceeded — ignore */ }
-}
-
-export const SIDEBAR_OPEN_KEY = "h2h-sidebar-open";
-
-export function getStoredSidebarOpen(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = localStorage.getItem(SIDEBAR_OPEN_KEY);
-    if (raw !== null) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return true;
-}
-
-export function persistSidebarOpen(val: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(SIDEBAR_OPEN_KEY, JSON.stringify(val));
-  } catch { /* quota exceeded — ignore */ }
-}
+export const getStoredSidebarOpen = (): boolean => getStored<boolean>(SIDEBAR_OPEN_KEY, true);
+export const persistSidebarOpen = (val: boolean): void => persist(SIDEBAR_OPEN_KEY, val);
 
 export interface ArbitrageInfo {
   strategy: string;
