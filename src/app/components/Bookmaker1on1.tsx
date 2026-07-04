@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Info, Clock, Settings2, ArrowUp, ArrowDown, Minus, RefreshCw, Zap } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Info, Clock, ArrowUp, ArrowDown, Minus, RefreshCw } from "lucide-react";
 import { useLivePrices } from "@/lib/use-live-prices";
 
 // ── Threshold configuration (percentage points) ──
@@ -10,19 +10,10 @@ interface SpreadThresholds {
   yellow: number;  // Near-threshold
 }
 
-const DEFAULT_THRESHOLDS: SpreadThresholds = {
+const THRESHOLDS: SpreadThresholds = {
   green: 5,   // >= 5 cents = excellent arb
   yellow: 2,   // 2-5 cents = marginal
 };
-
-// ── Refresh interval presets (milliseconds) ──
-const REFRESH_PRESETS = [
-  { label: "5s", ms: 5000 },
-  { label: "10s", ms: 10000 },
-  { label: "15s", ms: 15000 },
-  { label: "30s", ms: 30000 },
-  { label: "60s", ms: 60000 },
-];
 
 interface PlatformPrice {
   yesBid: number;
@@ -53,18 +44,7 @@ interface OutcomeEntry {
 
 interface Bookmaker1on1Props {
   outcomes: OutcomeEntry[];
-  platformAName?: string;
-  platformBName?: string;
-  platformAIcon?: string;
-  platformBIcon?: string;
-  thresholds?: SpreadThresholds;
   lastUpdated?: Date | null;
-  onThresholdChange?: (t: SpreadThresholds) => void;
-  // Auto-refresh
-  autoRefreshInterval?: number;  // ms, 0 = disabled
-  onRefreshIntervalChange?: (ms: number) => void;
-  // External data fetching callback for auto-refresh
-  onRefresh?: () => Promise<void>;
   // Live WS props
   kalshiUrl?: string;
   pmUrl?: string;
@@ -177,30 +157,19 @@ function depthPercent(volume: number | undefined, maxVolume: number): number {
  */
 export function Bookmaker1on1({
   outcomes,
-  platformAName = "Kalshi",
-  platformBName = "Polymarket",
-  platformAIcon = "/kalshi-icon.png",
-  platformBIcon = "/polymarket-icon.png",
-  thresholds = DEFAULT_THRESHOLDS,
   lastUpdated,
-  onThresholdChange,
-  autoRefreshInterval = 0,
-  onRefreshIntervalChange,
-  onRefresh,
   kalshiUrl,
   pmUrl,
   capital = 10,
   useLivePrices = false,
 }: Bookmaker1on1Props) {
+  const platformAName = "Kalshi";
+  const platformBName = "Polymarket";
+  const platformAIcon = "/kalshi-icon.png";
+  const platformBIcon = "/polymarket-icon.png";
+  const thresholds = THRESHOLDS;
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
-  const [showThresholds, setShowThresholds] = useState(false);
-  const [editableThresholds, setEditableThresholds] = useState(thresholds);
-  const [showRefreshControls, setShowRefreshControls] = useState(false);
-  const [selectedRefreshIdx, setSelectedRefreshIdx] = useState(() => {
-    if (autoRefreshInterval === 0) return -1;
-    return REFRESH_PRESETS.findIndex(p => p.ms === autoRefreshInterval);
-  });
 
   // Previous prices for detecting changes (flash animation)
   const prevPricesRef = useRef<Map<string, { yesBid: number; yesAsk: number; noBid: number; noAsk: number; yesPrice: number; bestBid: number; bestAsk: number }>>(new Map());
@@ -237,24 +206,6 @@ export function Bookmaker1on1({
         } : null,
       }))
     : outcomes;
-
-  // Auto-refresh timer
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Sync editable thresholds when prop changes
-  useEffect(() => {
-    setEditableThresholds(thresholds);
-  }, [thresholds]);
-
-  // Sync selected refresh index when prop changes
-  useEffect(() => {
-    if (autoRefreshInterval === 0) {
-      setSelectedRefreshIdx(-1);
-    } else {
-      const idx = REFRESH_PRESETS.findIndex(p => p.ms === autoRefreshInterval);
-      setSelectedRefreshIdx(idx);
-    }
-  }, [autoRefreshInterval]);
 
   // Detect price changes and trigger flash animations
   useEffect(() => {
@@ -323,28 +274,6 @@ export function Bookmaker1on1({
     }
   }, [displayOutcomes]);
 
-  // Auto-refresh management
-  useEffect(() => {
-    // Clear existing timer
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-
-    if (autoRefreshInterval > 0 && onRefresh) {
-      refreshTimerRef.current = setInterval(() => {
-        onRefresh();
-      }, autoRefreshInterval);
-    }
-
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-    };
-  }, [autoRefreshInterval, onRefresh]);
-
   // Compute spreads for all outcomes
   const spreads = useMemo(() => {
     const map = new Map<string, number>();
@@ -372,20 +301,6 @@ export function Bookmaker1on1({
   }, [displayOutcomes]);
 
   const validOutcomes = (displayOutcomes ?? []).filter((o) => o.platformA && o.platformB);
-
-  const handleThresholdSave = useCallback(() => {
-    onThresholdChange?.(editableThresholds);
-    setShowThresholds(false);
-  }, [editableThresholds, onThresholdChange]);
-
-  const handleRefreshIntervalChange = useCallback((idx: number) => {
-    setSelectedRefreshIdx(idx);
-    if (idx >= 0) {
-      onRefreshIntervalChange?.(REFRESH_PRESETS[idx].ms);
-    } else {
-      onRefreshIntervalChange?.(0);
-    }
-  }, [onRefreshIntervalChange]);
 
   if (validOutcomes.length === 0) {
     return (
@@ -454,13 +369,6 @@ export function Bookmaker1on1({
           <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium">
             Spread
           </span>
-          <button
-            onClick={() => setShowThresholds((v) => !v)}
-            className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-[#232E3C] text-[#5E6875] hover:text-[#8A9BA8] transition-colors"
-            title="Configure thresholds"
-          >
-            <Settings2 className="w-3 h-3" />
-          </button>
         </div>
 
         {/* Platform B header */}
@@ -484,100 +392,6 @@ export function Bookmaker1on1({
             </span>
           </div>
         </div>
-      </div>
-
-      {/* ── Threshold Configuration Panel ── */}
-      {showThresholds && (
-        <div className="border-b border-[#232E3C] bg-[#17212B]/80 px-3 py-2.5 flex items-center gap-4 flex-wrap">
-          <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
-            Thresholds:
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#5DBE81]" />
-            <span className="text-[10px] text-[#8A9BA8]">&ge;</span>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={editableThresholds.green}
-              onChange={(e) =>
-                setEditableThresholds((t) => ({
-                  ...t,
-                  green: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="w-12 px-1.5 py-0.5 rounded bg-[#232E3C] border border-[#3f3f3f] text-[10px] text-[#8A9BA8] text-center focus:outline-none focus:border-[#5DBE81]"
-            />
-            <span className="text-[10px] text-[#8A9BA8]">&#8270; great</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#facc15]" />
-            <span className="text-[10px] text-[#8A9BA8]">{editableThresholds.yellow}&#8211;</span>
-            <span className="text-[10px] text-[#8A9BA8]">
-              {editableThresholds.green - 1}&cent; ok
-            </span>
-          </div>
-          <button
-            onClick={handleThresholdSave}
-            className="px-2 py-0.5 rounded bg-[#5DBE81]/20 text-[#5DBE81] text-[10px] font-medium hover:bg-[#5DBE81]/30 transition-colors"
-          >
-            Apply
-          </button>
-        </div>
-      )}
-
-      {/* ── Auto-Refresh Controls ── */}
-      <div className="border-b border-[#232E3C] bg-[#17212B]/60 px-3 py-1.5 flex items-center gap-2">
-        <button
-          onClick={() => setShowRefreshControls((v) => !v)}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#232E3C] transition-colors"
-        >
-          <Zap className="w-3 h-3" />
-          {autoRefreshInterval > 0
-            ? `Auto: ${REFRESH_PRESETS.find(p => p.ms === autoRefreshInterval)?.label || "off"}`
-            : "Auto-refresh: Off"}
-        </button>
-
-        {showRefreshControls && (
-          <>
-            <span className="text-[10px] text-[#5E6875]">|</span>
-            <span className="text-[10px] text-[#8A9BA8]">Interval:</span>
-            {REFRESH_PRESETS.map((preset, idx) => (
-              <button
-                key={preset.ms}
-                onClick={() => handleRefreshIntervalChange(idx)}
-                className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                  selectedRefreshIdx === idx
-                    ? "bg-[#5DBE81]/20 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                    : "bg-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-zinc-700"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-            <button
-              onClick={() => handleRefreshIntervalChange(-1)}
-              className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                selectedRefreshIdx === -1
-                  ? "bg-zinc-700 text-[#FFFFFF]"
-                  : "text-[#8A9BA8] hover:text-[#8A9BA8]"
-              }`}
-            >
-              Off
-            </button>
-            {onRefresh && (
-              <>
-                <span className="text-[10px] text-[#5E6875]">|</span>
-                <button
-                  onClick={onRefresh}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#232E3C] text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-zinc-700 transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" /> Now
-                </button>
-              </>
-            )}
-          </>
-        )}
       </div>
 
       {/* ── Outcome Rows ── */}
