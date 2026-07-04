@@ -148,9 +148,12 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Periodic heartbeat even if no updates
+      // Periodic heartbeat — sends results every 1s even if no WS updates.
+      // Also sends SSE comment lines (: heartbeat) to keep proxies alive.
       const heartbeat = setInterval(() => {
         if (session.closed) return;
+        // SSE comment line — keeps connection alive through proxies
+        controller.enqueue(encoder.encode(`: heartbeat\n\n`));
         maybeSendResults();
       }, 1000);
 
@@ -185,8 +188,9 @@ export async function GET(req: NextRequest) {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no', // disable nginx proxy buffering
     },
   });
 }

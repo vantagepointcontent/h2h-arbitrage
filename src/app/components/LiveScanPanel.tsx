@@ -290,7 +290,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
         setTabs((prev) =>
           prev.map((t) =>
             t.id === tabId
-              ? { ...t, loading: false, running: true, status: "Streaming live prices", eventSource: es }
+              ? { ...t, loading: false, running: true, status: "Streaming live prices", error: "", eventSource: es }
               : t
           )
         );
@@ -402,14 +402,34 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
       };
 
       es.onerror = () => {
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === tabId
-              ? { ...t, error: "Stream disconnected.", running: false, loading: false, status: "Disconnected" }
-              : t
-          )
-        );
-        es.close();
+        // EventSource fires onerror for transient issues (proxy timeouts,
+        // network blips, browser connection management). The stream may
+        // still be alive on the server side. Instead of immediately killing
+        // the connection, check if readyState is CLOSED (fatal) vs
+        // CONNECTING (browser is auto-reconnecting).
+        if (es.readyState === EventSource.CLOSED) {
+          // Fatal — server closed the connection
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === tabId
+                ? { ...t, error: "Stream disconnected.", running: false, loading: false, status: "Disconnected" }
+                : t
+            )
+          );
+          es.close();
+        } else {
+          // readyState === CONNECTING — browser is auto-reconnecting.
+          // Update status but DON'T close the EventSource. The browser
+          // will retry automatically and onmessage will fire again if it
+          // reconnects.
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === tabId
+                ? { ...t, status: "Reconnecting...", loading: true }
+                : t
+            )
+          );
+        }
       };
     } catch (err) {
       setTabs((prev) =>
