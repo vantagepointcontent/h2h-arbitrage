@@ -7,7 +7,8 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, UnifiedOutcome } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
+import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
@@ -257,6 +258,10 @@ export async function POST(request: NextRequest) {
     const splitOutcomes = applyDecoupledPairs(outcomes as unknown as UnifiedOutcome[], decoupledPairs);
 
     // Step 3: compute arbitrage (with depth awareness) for all matched items, including cross-outcome
+    // SET-003: hot-apply the configurable suspicious-ROI threshold
+    const suspRoi = await getSetting<number>('scanner.suspiciousRoiPct').catch(() => null);
+    if (suspRoi != null) setSuspiciousRoiPct(suspRoi);
+
     const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title, capital).map(o => ({
       ...o,
       arbitrage: {

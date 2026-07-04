@@ -585,13 +585,23 @@ export function calculateBestArbitrageForOutcome(
  *  Real cross-platform arbs live in the 1–5% range. Env-tunable. */
 export const SUSPICIOUS_ROI_PCT = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
 
+/** SET-003: runtime-tunable suspicious-ROI threshold. Defaults to the env/25
+ *  constant; the scan route overwrites it from the settings DB per request. */
+let suspiciousRoiPct = SUSPICIOUS_ROI_PCT;
+export function setSuspiciousRoiPct(v: number): void {
+  if (Number.isFinite(v) && v > 0) suspiciousRoiPct = v;
+}
+export function getSuspiciousRoiPct(): number {
+  return suspiciousRoiPct;
+}
+
 /** Flag an arb result as suspicious when ROI exceeds the sanity threshold and
  *  at least one leg's depth was unknown (assumed Infinity / zero-parsed). */
 export function markSuspiciousArb<T extends { roiPct: number; strategy: string; suspicious?: boolean }>(
   arb: T,
   depthUnknown: boolean,
 ): T {
-  if (arb.strategy !== 'No arb' && arb.roiPct > SUSPICIOUS_ROI_PCT && depthUnknown) {
+  if (arb.strategy !== 'No arb' && arb.roiPct > suspiciousRoiPct && depthUnknown) {
     arb.suspicious = true;
   }
   return arb;
