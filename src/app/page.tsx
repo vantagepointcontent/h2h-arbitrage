@@ -50,7 +50,7 @@ import {
   Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import { useAlertSystem, ToastContainer, AlertSettingsPanel } from "@/components/AlertSystem";
+import { AlertSettingsPanel } from "@/components/AlertSystem";
 import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 
@@ -852,7 +852,7 @@ export default function Home() {
   const [mfBulkMsg, setMfBulkMsg] = useState("");
 
   // Alert system
-  const alertSystem = useAlertSystem();
+
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false);
 
   // Sidebar sort — default APY desc (highest first)
@@ -1166,16 +1166,7 @@ export default function Home() {
   // ── Render ──
   return (
     <div className="h-screen bg-[#0E1621] text-[#FFFFFF] flex flex-col overflow-hidden">
-      <ToastContainer toasts={alertSystem.toasts} onDismiss={alertSystem.dismissToast} />
-      {alertSettingsOpen && <AlertSettingsPanel
-        settings={alertSystem.settings}
-        onSettingsChange={alertSystem.setSettings}
-        history={alertSystem.history}
-        onClearHistory={alertSystem.clearHistory}
-        notificationPermission={alertSystem.notificationPermission}
-        onRequestPermission={alertSystem.onRequestPermission}
-        onClose={() => setAlertSettingsOpen(false)}
-      />}
+      {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} />}
 
       {/* Top nav bar */}
       <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
