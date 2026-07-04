@@ -2,8 +2,7 @@ import winston, { format, Logger, transports } from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import * as crypto from 'crypto';
 import path from 'path';
-import * as Sentry from '@sentry/nextjs';
-import { correlationId, CORRELATION_ID_HEADER } from './correlation';
+import { correlationId } from './correlation';
 import { spikeDetector, SpikeAlertPayload } from './spike-alert';
 
 // ---------------------------------------------------------------------------
@@ -49,28 +48,6 @@ const errorFileTransport = new DailyRotateFile({
     format.json(),
   ),
 });
-
-// Sentry transport — only in production, only errors and above
-const sentryTransport = process.env.SENTRY_DSN
-  ? new winston.transports.Http({
-      level: 'error',
-      host: 'sentry.io',
-      path: `/api/0/${extractSentryProject(process.env.SENTRY_DSN)}/store/?sentry_key=${extractSentryKey(process.env.SENTRY_DSN)}`,
-      ssl: true,
-      format: format.combine(
-        format.timestamp(),
-        format((info) => {
-          info.tags = { environment: process.env.NODE_ENV || 'development' };
-          // Pass fingerprint to Sentry for deduplication grouping
-          if (info.fingerprint) {
-            info.fingerprint = [`hash:${info.fingerprint}`];
-          }
-          return info;
-        })(),
-        format.json(),
-      ),
-    })
-  : null;
 
 // ---------------------------------------------------------------------------
 // Error fingerprinting
@@ -158,39 +135,9 @@ export interface ChildLoggerContext {
   [key: string]: unknown;
 }
 
+/** Child logger with bound static context — winston's native implementation. */
 export function createChildLogger(context: ChildLoggerContext): Logger {
-  const childTransports: winston.transport[] = [];
-
-  for (const t of rootLogger.transports) {
-    childTransports.push(new winston.transports.Stream({
-      stream: {
-        write(chunk: string): boolean {
-          try {
-            const parsed = JSON.parse(chunk);
-            parsed.service = context.service || 'h2h-arbitrage';
-            if (context.component) parsed.component = context.component;
-            for (const [k, v] of Object.entries(context)) {
-              if (k !== 'service' && k !== 'component') {
-                parsed[k] = v;
-              }
-            }
-            t.write(JSON.stringify(parsed));
-          } catch {
-            t.write(chunk);
-          }
-          return true;
-        },
-      } as any,
-    }));
-  }
-
-  return winston.createLogger({
-    level: rootLogger.level,
-    levels: winston.config.npm.levels,
-    transports: childTransports,
-    format: rootLogger.format,
-    exitOnError: false,
-  });
+  return rootLogger.child({ service: 'h2h-arbitrage', ...context });
 }
 
 // ---------------------------------------------------------------------------
@@ -198,9 +145,6 @@ export function createChildLogger(context: ChildLoggerContext): Logger {
 // ---------------------------------------------------------------------------
 
 const transportsList: winston.transport[] = [consoleTransport, fileTransport, errorFileTransport];
-if (sentryTransport) {
-  transportsList.push(sentryTransport);
-}
 
 const rootLogger: Logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -234,22 +178,6 @@ if (process.env.NODE_ENV !== 'production') {
   }));
 }
 
-// Initialize Sentry if DSN is configured
-if (process.env.SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
-    integrations: [
-      // @ts-expect-error — Sentry SDK version differences; Integrations.Winston may not exist in all versions
-      new Sentry.Integrations.Winston({
-        // @ts-expect-error — Severity enum removed in newer Sentry SDKs
-        levels: { error: Sentry.Severity.Error, warn: Sentry.Severity.Warning },
-      }),
-    ],
-  });
-}
-
 // Wire up spike alert → logger feedback loop
 // spikeDetector fires onAlert; we log it. No circular dependency at init time.
 spikeDetector.onAlert = (payload: SpikeAlertPayload) => {
@@ -267,25 +195,7 @@ spikeDetector.onAlert = (payload: SpikeAlertPayload) => {
 export const logger: Logger & {
   child: (ctx: ChildLoggerContext) => Logger;
   trackError: (error: unknown, context?: Record<string, unknown>) => void;
-} = ({
-  ...rootLogger,
-  level: rootLogger.level,
-  levels: rootLogger.levels,
-  transports: rootLogger.transports,
-  format: rootLogger.format,
-
-  log: rootLogger.log.bind(rootLogger),
-  info: rootLogger.info.bind(rootLogger),
-  warn: rootLogger.warn.bind(rootLogger),
-  error: rootLogger.error.bind(rootLogger),
-  debug: rootLogger.debug.bind(rootLogger),
-  verbose: rootLogger.verbose.bind(rootLogger),
-  silly: rootLogger.silly.bind(rootLogger),
-  add: rootLogger.add.bind(rootLogger) as any,
-  remove: rootLogger.remove.bind(rootLogger) as any,
-  clear: rootLogger.clear.bind(rootLogger) as any,
-  child: (ctx: ChildLoggerContext) => createChildLogger(ctx) as any,
-
+} = Object.assign(rootLogger, {
   /**
    * Log an error and automatically feed it to the spike detector.
    * Call this instead of logger.error() when you want spike tracking.
@@ -304,20 +214,6 @@ export const logger: Logger & {
       ...context,
     });
   },
-} as any);
+}) as any;
 
 export default logger;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function extractSentryProject(dsn: string): string {
-  const match = dsn.match(/\/(\d+)$/);
-  return match ? match[1] : '0';
-}
-
-function extractSentryKey(dsn: string): string {
-  const match = dsn.match(/^https?:\/\/([^@]+)@/);
-  return match ? match[1] : '';
-}
