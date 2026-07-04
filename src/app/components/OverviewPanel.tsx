@@ -196,9 +196,9 @@ export function OverviewPanel({
                   ? "bg-[#5DBE81]/20 text-[#5DBE81]"
                   : "text-[#5E6875] hover:text-[#FFFFFF]"
               }`}
-              title={showExpired ? "Hide expired markets" : "Show expired markets"}
+              title={showExpired ? "Click to hide expired markets" : "Expired markets are hidden — click to show them"}
             >
-              {showExpired ? "Expired: On" : "Expired: Off"}
+              {showExpired ? "Showing expired" : "Expired hidden"}
             </button>
           </div>
           <div className="w-px h-4 bg-[#232E3C]" />
