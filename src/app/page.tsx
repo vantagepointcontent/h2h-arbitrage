@@ -171,8 +171,6 @@ export default function Home() {
 
     // Dual panel layout + auto-refresh
   const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
-  const [embedRefreshCounter, setEmbedRefreshCounter] = useState(0);
-
   // Outcome table filter
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
 
@@ -345,8 +343,6 @@ export default function Home() {
         setResult(data);
         setLastUpdated(new Date());
         setLastScanTime(Date.now());
-        // Trigger embedded panel refresh on new scan
-        setEmbedRefreshCounter((c) => c + 1);
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
         data.outcomes.forEach((o: UnifiedOutcome) => {
@@ -916,7 +912,6 @@ export default function Home() {
         setResult(data);
         setLastUpdated(new Date());
         setLastScanTime(Date.now());
-        setEmbedRefreshCounter(c => c + 1);
 
         // Auto-clear blink after 3 seconds
         setTimeout(() => setPriceChanges(new Map()), 3000);
@@ -1877,7 +1872,6 @@ export default function Home() {
                       pmUrl={pmUrl}
                       layout={panelLayout}
                       onLayoutChange={setPanelLayout}
-                      refreshTrigger={embedRefreshCounter}
                     />
                   </div>
                 )}

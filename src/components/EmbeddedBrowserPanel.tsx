@@ -23,24 +23,16 @@ interface EmbeddedBrowserProps {
   minHeight?: number;
   maxHeight?: number;
   onRefresh?: () => void;
-  /** Called when iframe scroll position changes (for sync) */
-  onScroll?: (scrollTop: number) => void;
-  /** Scroll to this position (for sync from sibling) */
-  scrollTo?: number | null;
 }
 
 interface DualPanelProps {
   kalshiUrl: string;
   pmUrl: string;
-  onKalshiUrlChange?: (url: string) => void;
-  onPmUrlChange?: (url: string) => void;
   layout?: "sidebyside" | "stacked";
   onLayoutChange?: (layout: "sidebyside" | "stacked") => void;
   defaultHeight?: number;
   minHeight?: number;
   maxHeight?: number;
-  /** Trigger iframe refresh when this changes */
-  refreshTrigger?: number;
 }
 
 // ─── Single Panel ─────────────────────────────────────────
@@ -53,8 +45,6 @@ export function EmbeddedBrowserPanel({
   minHeight = 160,
   maxHeight = 600,
   onRefresh,
-  onScroll,
-  scrollTo,
 }: EmbeddedBrowserProps) {
   const [visible, setVisible] = useState(true);
   const [height, setHeight] = useState(defaultHeight);
@@ -161,34 +151,6 @@ export function EmbeddedBrowserPanel({
   const toggleVisibility = useCallback(() => {
     setVisible((v) => !v);
   }, []);
-
-  // ── Synchronized scroll via postMessage ──────────────────
-  // We listen for scroll events from the iframe content (when same-origin allows)
-  // and propagate to siblings via onScroll callback.
-  const handleMessage = useCallback(
-    (e: MessageEvent) => {
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      if (e.data?.type === "scroll" && typeof e.data.top === "number") {
-        onScroll?.(e.data.top);
-      }
-    },
-    [onScroll],
-  );
-
-  useEffect(() => {
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [handleMessage]);
-
-  // Respond to scrollTo prop from sibling panel
-  useEffect(() => {
-    if (scrollTo != null && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(
-        { type: "scrollto", top: scrollTo },
-        "*"
-      );
-    }
-  }, [scrollTo]);
 
   if (!visible) return null;
 
@@ -350,55 +312,14 @@ export function ShowPanelButton({
 export function DualBrowserPanels({
   kalshiUrl,
   pmUrl,
-  onKalshiUrlChange,
-  onPmUrlChange,
   layout = "stacked",
   onLayoutChange,
   defaultHeight = 320,
   minHeight = 160,
   maxHeight = 600,
-  refreshTrigger,
 }: DualPanelProps) {
   const [kalshiVisible, setKalshiVisible] = useState(true);
   const [pmVisible, setPmVisible] = useState(true);
-
-  // Scroll sync state
-  const [kalshiScroll, setKalshiScroll] = useState<number | null>(null);
-  const [pmScroll, setPmScroll] = useState<number | null>(null);
-
-  // Debounce scroll propagation to avoid infinite loops
-  const kalshiScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pmScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleKalshiScroll = useCallback((top: number) => {
-    if (kalshiScrollTimer.current) clearTimeout(kalshiScrollTimer.current);
-    kalshiScrollTimer.current = setTimeout(() => {
-      setPmScroll(top);
-    }, 100);
-  }, []);
-
-  const handlePmScroll = useCallback((top: number) => {
-    if (pmScrollTimer.current) clearTimeout(pmScrollTimer.current);
-    pmScrollTimer.current = setTimeout(() => {
-      setKalshiScroll(top);
-    }, 100);
-  }, []);
-
-  // Auto-refresh when trigger changes
-  const [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    if (refreshTrigger != null) {
-      setRefreshKey(refreshTrigger);
-    }
-  }, [refreshTrigger]);
-
-  const handleKalshiRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
-
-  const handlePmRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
 
   const anyVisible = kalshiVisible || pmVisible;
   const isSideBySide = layout === "sidebyside";
@@ -456,66 +377,30 @@ export function DualBrowserPanels({
         )}
       </div>
 
-      {/* Panels */}
-      {isSideBySide ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {kalshiVisible && (
-            <EmbeddedBrowserPanel
-              platformName="Kalshi"
-              url={kalshiUrl}
-              iconSrc="/kalshi-icon.png"
-              defaultHeight={defaultHeight}
-              minHeight={minHeight}
-              maxHeight={maxHeight}
-              onRefresh={handleKalshiRefresh}
-              onScroll={handleKalshiScroll}
-              scrollTo={kalshiScroll}
-            />
-          )}
-          {pmVisible && (
-            <EmbeddedBrowserPanel
-              platformName="Polymarket"
-              url={pmUrl}
-              iconSrc="/polymarket-icon.png"
-              defaultHeight={defaultHeight}
-              minHeight={minHeight}
-              maxHeight={maxHeight}
-              onRefresh={handlePmRefresh}
-              onScroll={handlePmScroll}
-              scrollTo={pmScroll}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {kalshiVisible && (
-            <EmbeddedBrowserPanel
-              platformName="Kalshi"
-              url={kalshiUrl}
-              iconSrc="/kalshi-icon.png"
-              defaultHeight={defaultHeight}
-              minHeight={minHeight}
-              maxHeight={maxHeight}
-              onRefresh={handleKalshiRefresh}
-              onScroll={handleKalshiScroll}
-              scrollTo={kalshiScroll}
-            />
-          )}
-          {pmVisible && (
-            <EmbeddedBrowserPanel
-              platformName="Polymarket"
-              url={pmUrl}
-              iconSrc="/polymarket-icon.png"
-              defaultHeight={defaultHeight}
-              minHeight={minHeight}
-              maxHeight={maxHeight}
-              onRefresh={handlePmRefresh}
-              onScroll={handlePmScroll}
-              scrollTo={pmScroll}
-            />
-          )}
-        </div>
-      )}
+      {/* Panels — sidebyside and stacked render the same pair, only the
+          wrapper layout className differs. */}
+      <div className={isSideBySide ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-3"}>
+        {kalshiVisible && (
+          <EmbeddedBrowserPanel
+            platformName="Kalshi"
+            url={kalshiUrl}
+            iconSrc="/kalshi-icon.png"
+            defaultHeight={defaultHeight}
+            minHeight={minHeight}
+            maxHeight={maxHeight}
+          />
+        )}
+        {pmVisible && (
+          <EmbeddedBrowserPanel
+            platformName="Polymarket"
+            url={pmUrl}
+            iconSrc="/polymarket-icon.png"
+            defaultHeight={defaultHeight}
+            minHeight={minHeight}
+            maxHeight={maxHeight}
+          />
+        )}
+      </div>
     </div>
   );
 }
