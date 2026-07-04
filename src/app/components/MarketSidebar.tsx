@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { CATEGORIES, CategoryName } from "@/lib/categories";
 import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
@@ -122,7 +121,15 @@ export function MarketSidebar({
   onCloseMobileMenu: () => void;
 }) {
   const [sidebarSearch, setSidebarSearch] = useState("");
-  const [sidebarCategory, setSidebarCategory] = useState<"all" | CategoryName>("all");
+  const [sidebarCategory, setSidebarCategory] = useState<string>("all");
+
+  // UI-012: derive category options from categories actually present in saved
+  // markets. The static CATEGORIES list ('economics', 'technology', …) didn't
+  // match stored values ('Finances', 'Tech', …), so several options matched
+  // nothing and some stored categories were unselectable.
+  const availableCategories = Array.from(
+    new Set(markets.map((m) => m.category?.trim()).filter((c): c is string => !!c))
+  ).sort((a, b) => a.localeCompare(b));
 
   // WS-106: HOT tier badge — poll lightweight tier-state endpoint every 60s.
   const [hotIds, setHotIds] = useState<Set<string>>(new Set());
@@ -153,7 +160,7 @@ export function MarketSidebar({
       if (expiryFilter === "lte14" && days > 14) return false;
       if (expiryFilter === "lte30" && days > 30) return false;
     }
-    if (sidebarCategory !== "all" && m.category?.toLowerCase() !== sidebarCategory) return false;
+    if (sidebarCategory !== "all" && m.category?.toLowerCase() !== sidebarCategory.toLowerCase()) return false;
     if (sidebarSearch && !m.eventTitle.toLowerCase().includes(sidebarSearch.toLowerCase())) return false;
     if (sidebarFavoritesOnly && !favoriteIds.has(m.id)) return false;
     if (showArbOnly) {
@@ -316,12 +323,12 @@ export function MarketSidebar({
                   </select>
                   <select
                     value={sidebarCategory}
-                    onChange={(e) => setSidebarCategory(e.target.value as "all" | CategoryName)}
+                    onChange={(e) => setSidebarCategory(e.target.value)}
                     className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
                   >
                     <option value="all">All categories</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                   <button
