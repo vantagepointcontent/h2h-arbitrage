@@ -85,9 +85,14 @@
       "category": "politics",
       "lastScannedAt": "2026-07-03T19:42:02.831Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "economics",
+      "lastScannedAt": "2026-07-03T22:46:41.829Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-03T19:42:02.831Z",
+  "lastScanAt": "2026-07-03T22:46:41.829Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }
