@@ -308,6 +308,44 @@ export async function getLatestSyncLog(): Promise<SyncLog | null> {
 
 /* ──────────────────────────── Search API ──────────────────────────── */
 
+/** Shared mapper: raw API group → PhSearchGroup. */
+function mapGroup(g: any): PhSearchGroup {
+  return {
+    group_id: g.group_id,
+    title: g.title,
+    markets: (g.markets || []).map((m: any) => ({
+      id: String(m.id ?? m.market_id ?? ''),
+      source: m.source || m.platform || '',
+      source_url: m.source_url || null,
+      last_price: m.last_price ?? null,
+      yes_ask: m.yes_ask ?? null,
+      yes_bid: m.yes_bid ?? null,
+    })),
+  };
+}
+
+/** Shared mapper: raw API event → PhSearchEvent. Uses `title` fallback for /matching-markets. */
+function mapEvent(e: any, useTitleFallback: boolean): PhSearchEvent {
+  return {
+    event_name: useTitleFallback ? (e.title || e.event_name) : e.event_name,
+    event_type: e.event_type || 'unknown',
+    event_date: e.event_date || null,
+    confidence: e.confidence === 'high' || e.confidence === 'medium' ? e.confidence : 'medium',
+    group_count: e.group_count,
+    groups: (e.groups || []).map(mapGroup),
+  };
+}
+
+/** Filter events by date cutoff. */
+function filterByDate(events: PhSearchEvent[], maxDays: number): PhSearchEvent[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + maxDays);
+  return events.filter((e) => {
+    if (!e.event_date) return true;
+    return new Date(e.event_date).getTime() <= cutoff.getTime();
+  });
+}
+
 export interface PhSearchMarket {
   id: string;
   source: string;
@@ -373,33 +411,8 @@ export async function fetchMatchingMarkets(
   }
 
   const data = await res.json();
-  const events: PhSearchEvent[] = (data.events || []).map((e: any) => ({
-    event_name: e.title || e.event_name,
-    event_type: e.event_type || 'unknown',
-    event_date: e.event_date || null,
-    confidence: e.confidence === 'high' || e.confidence === 'medium' ? e.confidence : 'medium',
-    group_count: e.group_count,
-    groups: (e.groups || []).map((g: any) => ({
-      group_id: g.group_id,
-      title: g.title,
-      markets: (g.markets || []).map((m: any) => ({
-        id: String(m.id ?? m.market_id ?? ''),
-        source: m.source || m.platform || '',
-        source_url: m.source_url || null,
-        last_price: m.last_price ?? null,
-        yes_ask: m.yes_ask ?? null,
-        yes_bid: m.yes_bid ?? null,
-      })),
-    })),
-  }));
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + maxDays);
-
-  const filtered = events.filter((e) => {
-    if (!e.event_date) return true;
-    return new Date(e.event_date).getTime() <= cutoff.getTime();
-  });
+  const events = (data.events || []).map((e: any) => mapEvent(e, true));
+  const filtered = filterByDate(events, maxDays);
 
   return { success: true, count: filtered.length, events: filtered };
 }
@@ -495,33 +508,8 @@ export async function searchPredictionHunt(
   }
 
   const data = await res.json();
-  const events: PhSearchEvent[] = (data.events || []).map((e: any) => ({
-    event_name: e.event_name,
-    event_type: e.event_type,
-    event_date: e.event_date || null,
-    confidence: e.confidence === 'high' || e.confidence === 'medium' ? e.confidence : 'medium',
-    group_count: e.group_count,
-    groups: (e.groups || []).map((g: any) => ({
-      group_id: g.group_id,
-      title: g.title,
-      markets: (g.markets || []).map((m: any) => ({
-        id: String(m.id ?? m.market_id ?? ''),
-        source: m.source || m.platform || '',
-        source_url: m.source_url || null,
-        last_price: m.last_price ?? null,
-        yes_ask: m.yes_ask ?? null,
-        yes_bid: m.yes_bid ?? null,
-      })),
-    })),
-  }));
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + maxDays);
-
-  const filtered = events.filter((e) => {
-    if (!e.event_date) return true;
-    return new Date(e.event_date).getTime() <= cutoff.getTime();
-  });
+  const events = (data.events || []).map((e: any) => mapEvent(e, false));
+  const filtered = filterByDate(events, maxDays);
 
   return { success: true, count: filtered.length, events: filtered };
 }
