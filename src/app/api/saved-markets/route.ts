@@ -131,6 +131,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ market }, { status: 201 });
   } catch (err: any) {
+    if (err?.message?.startsWith('Market already exists')) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
