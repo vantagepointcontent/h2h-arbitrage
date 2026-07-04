@@ -60,43 +60,55 @@ async function runRefreshJob(marketIds?: string[]) {
   };
   await writeState(newState);
 
-  for (let i = 0; i < markets.length; i++) {
-    const market = markets[i];
-    // BUG-035: skip expired markets entirely
-    const expMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
-    if (expMs > 0 && expMs <= Date.now()) {
+  // PERF-P2: refresh markets with bounded concurrency (was strictly serial —
+  // 470 markets × ~1-4s each ≈ 10+ min). Worker-pool of 4 respects upstream
+  // rate limiters (which serialize per-API anyway) while overlapping I/O waits.
+  const CONCURRENCY = Math.max(1, Number(process.env.H2H_REFRESH_CONCURRENCY || 4));
+  let nextIdx = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= markets.length) return;
+      const market = markets[i];
+      // BUG-035: skip expired markets entirely
+      const expMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
+      if (expMs > 0 && expMs <= Date.now()) {
+        newState.processed++;
+        await writeState(newState);
+        continue;
+      }
+      newState.currentMarketId = market.id;
+      newState.currentMarketTitle = market.eventTitle;
+      await writeState(newState);
+
+      try {
+        const result = await refreshSingleMarket(market, manualMatches);
+        const scanResult = {
+          bestRoiPct: result.bestRoiPct,
+          bestProfit: result.bestProfit,
+          strategy: result.strategy,
+          outcomeCount: result.matchedCount,
+          matchedCount: result.matchedCount,
+          kalshiCount: result.kalshiCount,
+          pmCount: result.pmCount,
+          scannedAt: result.scannedAt,
+          allArbs: result.allArbs,
+        };
+        await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
+        newState.succeeded++;
+      } catch (e: any) {
+        newState.failed++;
+        newState.errors.push({ id: market.id, title: market.eventTitle, error: e.message || 'Unknown error' });
+        console.error(`[refresh-job] failed ${market.eventTitle}:`, e.message);
+      }
+
       newState.processed++;
       await writeState(newState);
-      continue;
     }
-    newState.currentMarketId = market.id;
-    newState.currentMarketTitle = market.eventTitle;
-    await writeState(newState);
-
-    try {
-      const result = await refreshSingleMarket(market, manualMatches);
-      const scanResult = {
-        bestRoiPct: result.bestRoiPct,
-        bestProfit: result.bestProfit,
-        strategy: result.strategy,
-        outcomeCount: result.matchedCount,
-        matchedCount: result.matchedCount,
-        kalshiCount: result.kalshiCount,
-        pmCount: result.pmCount,
-        scannedAt: result.scannedAt,
-        allArbs: result.allArbs,
-      };
-      await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
-      newState.succeeded++;
-    } catch (e: any) {
-      newState.failed++;
-      newState.errors.push({ id: market.id, title: market.eventTitle, error: e.message || 'Unknown error' });
-      console.error(`[refresh-job] failed ${market.eventTitle}:`, e.message);
-    }
-
-    newState.processed++;
-    await writeState(newState);
   }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, markets.length) }, () => worker()));
 
   newState.running = false;
   newState.finishedAt = new Date().toISOString();

@@ -134,6 +134,10 @@ export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("");
   const [pmUrl, setPmUrl] = useState("");
   const [capital, setCapital] = useState(1000);
+  // PERF-P2: ref mirror so the 60s auto-refresh interval doesn't tear down
+  // and restart on every capital keystroke (capital was in its deps).
+  const capitalRef = useRef(capital);
+  useEffect(() => { capitalRef.current = capital; }, [capital]);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [bgRefreshing, setBgRefreshing] = useState(false); // BUG-032
@@ -813,7 +817,7 @@ export default function Home() {
       fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kalshiUrl: market.kalshiUrl, polymarketUrl: market.polymarketUrl, capital }),
+        body: JSON.stringify({ kalshiUrl: market.kalshiUrl, polymarketUrl: market.polymarketUrl, capital: capitalRef.current }),
       })
       .then(res => res.json())
       .then(data => {
@@ -851,7 +855,7 @@ export default function Home() {
     }, 60000);
 
     return () => clearInterval(iv);
-  }, [activeMarketId, viewMode, capital]);
+  }, [activeMarketId, viewMode]);
 
   // Auto-fetch MarketFinder data when entering marketfinder view
   useEffect(() => {

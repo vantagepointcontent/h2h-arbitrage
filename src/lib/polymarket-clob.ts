@@ -27,7 +27,10 @@ export interface ClobBook {
 
 const CLOB_RETRIES = 2;
 const CLOB_MAX_CONCURRENCY = 10;
-const CLOB_CACHE_TTL_MS = 2000;
+// PERF-P2: 15s (was 2s). Poller tiers are ≥5min and UI auto-refresh is 60s,
+// so a 15s orderbook cache is well within staleness tolerance for scanning.
+// Live WS uses its own REST-seed + WS-delta path and is unaffected.
+const CLOB_CACHE_TTL_MS = Number(process.env.H2H_CLOB_CACHE_TTL_MS || 15_000);
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 function debugLog(...args: unknown[]) {

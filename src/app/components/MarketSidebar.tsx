@@ -373,6 +373,9 @@ function MarketSidebarInner({
                     <div
                       key={m.id}
                       onClick={() => onSelectMarket(m)}
+                      // PERF-P2: browser-native virtualization — off-screen rows
+                      // are skipped during layout/paint (470+ markets).
+                      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 40px" }}
                       className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
                         isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
                       }`}

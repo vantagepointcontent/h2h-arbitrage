@@ -216,7 +216,7 @@ export async function queryScanHistory(opts: {
   const rows = await c.execute({
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
-                 positive_arb_count, total_stake, scanned_at
+                 positive_arb_count, total_stake, scanned_at, raw_result
           FROM scan_results${where}
           ORDER BY scanned_at DESC LIMIT ?`,
     args: [...args, limit],

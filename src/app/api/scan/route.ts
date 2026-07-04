@@ -355,7 +355,9 @@ export async function POST(request: NextRequest) {
           positiveArbCount: scanResult.allArbs?.length ?? 0,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
-          raw: { allArbs: scanResult.allArbs },
+          // PERF-P2: raw blob only stored when there are arbs to drill into —
+          // zero-arb scans (vast majority) get NULL, keeping the DB lean.
+          raw: (scanResult.allArbs?.length ?? 0) > 0 ? { allArbs: scanResult.allArbs } : undefined,
           marketTitle: pmEvent.title || market.eventTitle,
         });
 
