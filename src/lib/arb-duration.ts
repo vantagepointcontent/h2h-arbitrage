@@ -40,37 +40,6 @@ function persistArbDurations(map: Map<string, ArbDurationEntry>): void {
   }
 }
 
-/**
- * Record or update the duration for a market.
- * If the market has an active arb (roi > 0), records first detection.
- * If not, removes the entry.
- */
-export function updateArbDuration(
-  marketId: string,
-  hasArb: boolean,
-): Map<string, ArbDurationEntry> {
-  const map = loadArbDurations();
-  const now = Date.now();
-
-  if (hasArb) {
-    const existing = map.get(marketId);
-    if (existing) {
-      // Already tracked — just update last seen
-      existing.lastSeenMs = now;
-      map.set(marketId, existing);
-    } else {
-      // First detection
-      map.set(marketId, { marketId, firstDetectedMs: now, lastSeenMs: now });
-    }
-  } else {
-    // No arb — remove tracking
-    map.delete(marketId);
-  }
-
-  persistArbDurations(map);
-  return map;
-}
-
 /** Get the duration string for a market */
 export function getArbDurationString(
   marketId: string,

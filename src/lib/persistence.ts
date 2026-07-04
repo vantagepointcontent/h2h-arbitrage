@@ -334,10 +334,6 @@ async function mirrorMarketsToJson(): Promise<void> {
   }
 }
 
-function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
 export async function getSavedMarkets(opts?: { includeArchived?: boolean }): Promise<SavedMarket[]> {
   await ensureMarketsMigrated();
   const c = getClient();
@@ -580,20 +576,3 @@ export async function appendScanHistory(entry: ScanHistoryEntry): Promise<void> 
   await c.execute(`DELETE FROM scan_history WHERE id NOT IN (SELECT id FROM scan_history ORDER BY scan_timestamp DESC LIMIT 5000)`);
 }
 
-/** @deprecated Use `getScanHistory` (scan_results table) instead. Reads the SQLite scan_history table. */
-export async function getScanHistoryFromJson(limit: number = 100): Promise<ScanHistoryEntry[]> {
-  await ensureHistoryMigrated();
-  const c = getClient();
-  const res = await c.execute({
-    sql: 'SELECT * FROM scan_history ORDER BY scan_timestamp DESC LIMIT ?',
-    args: [Math.min(Math.max(limit, 1), 5000)],
-  });
-  return (res.rows as any[]).map(r => ({
-    scanTimestamp: String(r.scan_timestamp),
-    marketId: String(r.market_id),
-    totalProfit: Number(r.total_profit ?? 0),
-    bestRoiPct: Number(r.best_roi_pct ?? 0),
-    positiveArbCount: Number(r.positive_arb_count ?? 0),
-    matchedCount: Number(r.matched_count ?? 0),
-  }));
-}

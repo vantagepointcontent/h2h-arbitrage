@@ -308,8 +308,3 @@ export class KalshiWsService {
 
 // Singleton — one WS connection shared across the server lifetime
 export const kalshiWs = new KalshiWsService();
-
-// Also expose a factory for isolated test sessions.
-export function createKalshiWsService(): KalshiWsService {
-  return new KalshiWsService();
-}

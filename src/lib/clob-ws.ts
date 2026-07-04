@@ -134,56 +134,6 @@ export class ClobWsService {
     return this.subscribers.size;
   }
 
-  // ── REST fallback: fetch prices for tokens when WS is down ──
-
-  /** Fetch best bid/ask for a token via CLOB REST API. */
-  static async fetchTokenPrice(tokenId: string): Promise<WsPriceUpdate | null> {
-    try {
-      const res = await fetch(
-        `https://clob.polymarket.com/book?token_id=${tokenId}`,
-        { cache: 'no-store' },
-      );
-      if (!res.ok) return null;
-      const data = await res.json();
-      const bids = (data as any).bids as { price: string }[] | undefined;
-      const asks = (data as any).asks as { price: string }[] | undefined;
-
-      let bestBid: number | null = null;
-      let bestAsk: number | null = null;
-
-      if (bids?.length) {
-        bestBid = Math.max(...bids.map((b: any) => parseFloat(b.price)));
-      }
-      if (asks?.length) {
-        bestAsk = Math.min(...asks.map((a: any) => parseFloat(a.price)));
-      }
-
-      if (bestBid === null && bestAsk === null) return null;
-
-      return {
-        tokenId,
-        type: 'rest_fallback',
-        bestBid,
-        bestAsk,
-        lastTradePrice: null,
-        ts: Date.now(),
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  /** REST fallback: fetch prices for all tracked tokens. */
-  static async fetchAllPrices(tokenIds: string[]): Promise<WsPriceUpdate[]> {
-    const results = await Promise.allSettled(
-      tokenIds.map((tid) => this.fetchTokenPrice(tid)),
-    );
-    return results
-      .filter((r): r is PromiseFulfilledResult<WsPriceUpdate> => r.status === 'fulfilled')
-      .map((r) => r.value)
-      .filter(Boolean);
-  }
-
   // ── Internal ─────────────────────────────────────────────
 
   private handleMessage(raw: string): void {

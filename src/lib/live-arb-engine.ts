@@ -4,14 +4,6 @@
 import { orderbookState, WeightedAskResult } from './orderbook-state';
 import { calculateArbitrageMax, computeArbitrageFees } from './matcher';
 
-export interface LiveArbInputs {
-  kalshiTicker: string;
-  pmYesTokenId: string;
-  pmNoTokenId: string;
-  capital: number;
-  category?: string;
-}
-
 export interface LiveArbResult {
   artist: string;
   kalshiYesAsk: number | null;
@@ -224,20 +216,6 @@ export function computeAllLiveArbitrages(
   }
 
   return results;
-}
-
-// Legacy wrapper kept for backward compatibility
-export function computeLiveArbitrage(inputs: LiveArbInputs): LiveArbResult {
-  return computeSingleOutcome(
-    {
-      artist: inputs.category || '',
-      kalshiTicker: inputs.kalshiTicker,
-      pmYesTokenId: inputs.pmYesTokenId,
-      pmNoTokenId: inputs.pmNoTokenId,
-    },
-    inputs.capital,
-    inputs.category,
-  );
 }
 
 // Helpers for direct Polymarket book updates from the WS message format

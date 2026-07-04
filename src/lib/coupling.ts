@@ -170,37 +170,3 @@ export function suggestCouplings(
   candidates.sort((a, b) => b.confidence - a.confidence);
   return candidates.slice(0, MAX_SUGGESTIONS);
 }
-
-/**
- * Check if a pair was recently rejected.
- */
-export function isRecentlyRejected(
-  kalshiTicker: string,
-  pmConditionId: string,
-  rejections: CouplingRejection[],
-): boolean {
-  const now = Date.now();
-  return rejections.some(
-    r => r.kalshiTicker === kalshiTicker &&
-         r.pmConditionId === pmConditionId &&
-         (now - new Date(r.rejectedAt).getTime()) < REJECTION_COOLDOWN_MS,
-  );
-}
-
-/**
- * Get the penalty factor for a previously rejected pair.
- * Returns a multiplier (0-1) that decreases suggestion score based on rejection history.
- * More rejections = stronger penalty.
- */
-export function getRejectionPenalty(
-  kalshiTicker: string,
-  pmConditionId: string,
-  rejections: CouplingRejection[],
-): number {
-  const rejectionCount = rejections.filter(
-    r => r.kalshiTicker === kalshiTicker && r.pmConditionId === pmConditionId,
-  ).length;
-
-  // Each rejection reduces confidence by 10%, minimum 0.1
-  return Math.max(0.1, 1 - rejectionCount * 0.1);
-}

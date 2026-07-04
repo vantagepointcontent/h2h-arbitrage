@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-import type { NextApiRequest, NextApiResponse } from 'next';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export const CORRELATION_ID_HEADER = 'x-correlation-id';
@@ -25,37 +23,6 @@ export const correlationId = {
    * Generate a new correlation ID.
    */
   generate(): string {
-    return uuidv4();
+    return crypto.randomUUID();
   },
 };
-
-/**
- * Next.js middleware that extracts or generates a correlation ID
- * and binds it to the async local storage for the lifetime of the request.
- */
-export function correlationMiddleware(
-  req: NextApiRequest,
-  _res: NextApiResponse,
-  next: () => void,
-): void {
-  const id = req.headers[CORRELATION_ID_HEADER] as string | undefined;
-  const correlationIdValue = id || correlationId.generate();
-
-  // Inject into request object for downstream use
-  (req.headers as Record<string, unknown>)[CORRELATION_ID_HEADER] = correlationIdValue;
-
-  correlationId.run(correlationIdValue, next);
-}
-
-/**
- * Wrapper for Next.js route handlers that ensures correlation ID propagation.
- * Usage: export async function GET(req) { return withCorrelation(handler)(req); }
- */
-export function withCorrelation<T extends (...args: unknown[]) => unknown>(
-  handler: T,
-): T {
-  return (async (...args: unknown[]) => {
-    const id = correlationId.current ?? correlationId.generate();
-    return correlationId.run(id, () => handler(...args));
-  }) as unknown as T;
-}
