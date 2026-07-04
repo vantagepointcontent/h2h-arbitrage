@@ -63,6 +63,7 @@ const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: fal
 const SettingsPanel = dynamic(() => import("@/app/components/SettingsPanel"), { ssr: false });
 const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { ssr: false });
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
+const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -1260,6 +1261,8 @@ export default function Home() {
                 {/* Scan inputs */}
                 {!activeMarketId && (
                 <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
+                  {/* FEAT-015: category picker — browse matched pairs instead of pasting URLs */}
+                  <ScanCategoryPicker onPick={(k, pm) => { setKalshiUrl(k); setPmUrl(pm); }} />
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
