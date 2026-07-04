@@ -112,48 +112,6 @@ export function useLivePrices({ kalshiUrl, pmUrl, capital = 10, enabled = true }
             return { artist, platformA, platformB };
           });
 
-          // Detect price changes for flash animation
-          const newFlashes = new Map<string, "up" | "down">();
-          const prev = prevPricesRef.current;
-
-          newOutcomes.forEach((o) => {
-            if (!o.platformA || !o.platformB) return;
-            const key = o.artist;
-            const curr = o.platformA;
-            const pm = o.platformB;
-            const prevEntry = prev.get(key);
-
-            const fields: Array<{ field: string; currentVal: number }> = [
-              { field: `${key}-aYesBid`, currentVal: curr.yesBid },
-              { field: `${key}-aYesAsk`, currentVal: curr.yesAsk },
-              { field: `${key}-aNoBid`, currentVal: curr.noBid },
-              { field: `${key}-aNoAsk`, currentVal: curr.noAsk },
-              { field: `${key}-bYesPrice`, currentVal: pm.yesPrice },
-              { field: `${key}-bBestBid`, currentVal: pm.bestBid },
-              { field: `${key}-bBestAsk`, currentVal: pm.bestAsk },
-            ];
-
-            fields.forEach(({ field, currentVal }) => {
-              let pv: number | null = null;
-              if (prevEntry) {
-                if (field.endsWith("aYesBid")) pv = prevEntry.yesBid;
-                else if (field.endsWith("aYesAsk")) pv = prevEntry.yesAsk;
-                else if (field.endsWith("aNoBid")) pv = prevEntry.noBid;
-                else if (field.endsWith("aNoAsk")) pv = prevEntry.noAsk;
-                else if (field.endsWith("bYesPrice")) pv = prevEntry.yesPrice;
-                else if (field.endsWith("bBestBid")) pv = prevEntry.bestBid;
-                else if (field.endsWith("bBestAsk")) pv = prevEntry.bestAsk;
-              }
-
-              if (pv !== null) {
-                const diff = currentVal - pv;
-                if (Math.abs(diff) < 0.001) return;
-                if (diff > 0) newFlashes.set(field, "up");
-                else newFlashes.set(field, "down");
-              }
-            });
-          });
-
           // Update previous prices
           const newPrev = new Map<string, typeof prevPricesRef.current[number]>();
           newOutcomes.forEach((o) => {

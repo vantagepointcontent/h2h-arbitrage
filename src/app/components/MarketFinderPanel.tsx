@@ -72,18 +72,6 @@ export function MarketFinderPanel({
   matchFilter: "all" | "matched" | "unmatched";
   onSetMatchFilter: (f: "all" | "matched" | "unmatched") => void;
 }) {
-  // Parent handles auto-fetch via viewMode effect; this just fetches on first mount
-  const [hasFetched, setHasFetched] = useState(false);
-  useEffect(() => {
-    if (!hasFetched) {
-      onFetch();
-      setHasFetched(true);
-    }
-  }, [hasFetched, onFetch]);
-
-  // Local spread threshold (defaults to prop, user-adjustable via slider)
-  const [localThreshold, setLocalThreshold] = useState(spreadThreshold);
-
   // Local fetch count (defaults to prop, user-adjustable via slider)
   const [localFetchCount, setLocalFetchCount] = useState(fetchCount);
 
@@ -116,8 +104,8 @@ export function MarketFinderPanel({
 
   // Sort: markets with spread < threshold first, then by spread, then by expiry
   const sorted = categoryFiltered.sort((a, b) => {
-    const aBelow = a.spreadPct != null && a.spreadPct <= localThreshold;
-    const bBelow = b.spreadPct != null && b.spreadPct <= localThreshold;
+    const aBelow = a.spreadPct != null && a.spreadPct <= spreadThreshold;
+    const bBelow = b.spreadPct != null && b.spreadPct <= spreadThreshold;
     if (aBelow !== bBelow) return aBelow ? -1 : 1;
     if (a.spreadPct != null && b.spreadPct != null) {
       return a.spreadPct - b.spreadPct;
@@ -391,49 +379,12 @@ export function MarketFinderPanel({
               {sorted.map((m) => {
                 const isSaving = savingIds.has(m.id);
                 const isChecked = selectedIds.has(m.id);
-                const spread = m.spreadPct;
-                const spreadClass = spread != null
-                  ? spread <= spreadThreshold ? "text-[#5DBE81]" : "text-[#facc15]"
-                  : "text-[#232E3C]";
-
-                // Calculate arbitrage
-                const pmAsk = m.pmPrice?.yesAsk;
-                const kalshiBid = m.kalshiPrice?.yesBid;
-                const kalshiAsk = m.kalshiPrice?.yesAsk;
-                const pmBid = m.pmPrice?.yesBid;
-                let arbPct: number | null = null;
-                let arbStrategy = "";
-                if (pmAsk != null && kalshiBid != null && pmAsk > 0 && kalshiBid > 0) {
-                  if (kalshiBid > pmAsk) {
-                    arbPct = (kalshiBid - pmAsk) / pmAsk * 100;
-                    arbStrategy = "Buy YES PM + NO Kalshi";
-                  }
-                }
-                if (kalshiAsk != null && pmBid != null && kalshiAsk > 0 && pmBid > 0) {
-                  if (pmBid > kalshiAsk) {
-                    const pct = (pmBid - kalshiAsk) / kalshiAsk * 100;
-                    if (arbPct === null || pct > arbPct) {
-                      arbPct = pct;
-                      arbStrategy = "Buy YES Kalshi + NO PM";
-                    }
-                  }
-                }
-                const arbClass = arbPct != null && arbPct > 0 ? "text-[#5DBE81] font-bold" : "text-[#232E3C]";
 
                 // Matched/unmatched badge
                 const isMatched = m.kalshiUrl && m.polymarketUrl;
                 const matchBadge = isMatched
                   ? <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#5DBE81]/15 text-[#5DBE81]">Matched</span>
                   : <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#facc15]/15 text-[#facc15]">Unmatched</span>;
-
-                // Spread tooltip
-                const spreadTooltip = m.pmPrice && m.kalshiPrice
-                  ? `PM: bid=${m.pmPrice.yesBid?.toFixed(2)} ask=${m.pmPrice.yesAsk?.toFixed(2)} | Kalshi: bid=${m.kalshiPrice.yesBid?.toFixed(2)} ask=${m.kalshiPrice.yesAsk?.toFixed(2)}`
-                  : m.platform === 'polymarket' && m.price
-                    ? `PM: bid=${m.price.yes_bid?.toFixed(2)} ask=${m.price.yes_ask?.toFixed(2)}`
-                    : m.platform === 'kalshi' && m.price
-                      ? `Kalshi: bid=${m.price.yes_bid?.toFixed(2)} ask=${m.price.yes_ask?.toFixed(2)}`
-                      : "No price data";
 
                 return (
                   <tr key={m.id} className={`hover:bg-[#182533]/50 transition-colors ${isChecked ? "bg-[#5DBE81]/5" : ""}`}>
