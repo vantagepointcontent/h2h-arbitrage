@@ -230,11 +230,11 @@ export function MarketFinderPanel({
       {/* Fetch count control */}
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
         <Hash className="w-3.5 h-3.5 text-[#5E6875]" />
-        <span className="text-xs text-[#5E6875]">Fetch count:</span>
+        <span className="text-xs text-[#5E6875]" title="Maximum number of matched markets to show in results">Max results:</span>
         <input
           type="range"
           min="1"
-          max="20"
+          max="50"
           step="1"
           value={localFetchCount}
           onChange={(e) => {
@@ -371,6 +371,9 @@ export function MarketFinderPanel({
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Matched Event</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Expiry</th>
+                <th className="text-right px-4 py-3 font-medium w-24">Kalshi</th>
+                <th className="text-right px-4 py-3 font-medium w-24">PM</th>
+                <th className="text-right px-4 py-3 font-medium w-24">Spread</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Links</th>
                 <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
@@ -379,6 +382,9 @@ export function MarketFinderPanel({
               {sorted.map((m) => {
                 const isSaving = savingIds.has(m.id);
                 const isChecked = selectedIds.has(m.id);
+                // BUG-038: price display — normalize 0-1 fractions vs cent values
+                const fmtPrice = (v: number | null | undefined) =>
+                  v == null ? "—" : `${(v <= 1 ? v * 100 : v).toFixed(0)}¢`;
 
                 // Matched/unmatched badge
                 const isMatched = m.kalshiUrl && m.polymarketUrl;
@@ -407,6 +413,15 @@ export function MarketFinderPanel({
                       <div className="text-xs text-[#FFFFFF]">
                         {m.eventDate ? new Date(m.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-xs font-mono text-[#facc15]">{fmtPrice(m.kalshiPrice?.yesAsk)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-xs font-mono text-[#a855f7]">{fmtPrice(m.pmPrice?.yesAsk)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-xs font-mono ${m.spreadPct != null ? (m.spreadPct <= spreadThreshold ? "text-[#5DBE81]" : "text-[#5E6875]") : "text-[#232E3C]"}`}>{m.spreadPct != null ? `${m.spreadPct.toFixed(1)}%` : "—"}</span>
                     </td>
                     <td className="px-4 py-3">
                       {showAllPlatforms ? (
