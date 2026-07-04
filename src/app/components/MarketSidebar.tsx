@@ -61,14 +61,11 @@ export function MarketSidebar({
   sidebarOpen,
   onToggleSidebar,
   onSelectMarket,
-  onEditMarket,
   onDeleteMarket,
   sort,
   sortDir,
   onToggleSort,
   timeUntilExpiry,
-  layout,
-  onToggleLayout,
   expiryFilter,
   onSetExpiryFilter,
   showExpired,
@@ -97,14 +94,11 @@ export function MarketSidebar({
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onSelectMarket: (m: SavedMarket) => void;
-  onEditMarket: (m: SavedMarket) => void;
   onDeleteMarket: (id: string) => void;
   sort: "name" | "roi" | "expiry" | "apy" | "scanned";
   sortDir: "asc" | "desc";
   onToggleSort: (field: "name" | "roi" | "expiry" | "apy" | "scanned") => void;
   timeUntilExpiry: (iso?: string | null) => string;
-  layout: "grid" | "table";
-  onToggleLayout: (l: "grid" | "table") => void;
   expiryFilter: "all" | "lte7" | "lte14" | "lte30";
   onSetExpiryFilter: (f: "all" | "lte7" | "lte14" | "lte30") => void;
   showExpired: boolean;

@@ -76,7 +76,7 @@ import { MarketFinderPanel } from "@/app/components/MarketFinderPanel";
 import {
   getStoredMfCategories, persistMfCategories, getStoredMfExpiryDays, persistMfExpiryDays,
   getStoredMfSelectedIds, persistMfSelectedIds, getStoredFavoriteIds, persistFavoriteIds,
-  getStoredHideUnmatched, persistHideUnmatched, getStoredCustomTitles, setCustomTitle,
+  getStoredCustomTitles, setCustomTitle,
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
   formatCurrency, formatPercent, formatExpiry, timeUntilExpiry,
@@ -129,29 +129,13 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
   const [manualMatches, setManualMatches] = useState<ManualMatch[]>([]);
-  const [manualMatchMsg, setManualMatchMsg] = useState("");
   const [couplingPanelOpen, setCouplingPanelOpen] = useState(false);
   const [decoupledPairs, setDecoupledPairs] = useState<any[]>([]);
-  const [sortField, setSortField] = useState<"roi" | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [lastScanTime, setLastScanTime] = useState<number>(0);
   const previousPricesRef = useRef<Map<string, { kYes: number; pYes: number }>>(new Map());
   const [priceChanges, setPriceChanges] = useState<Map<string, "up" | "down" | null>>(new Map());
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
   const activeScanRef = useRef(false);
-  const pollingActiveRef = useRef(false);
-
-  // ── Unlink state (GEN-12: Manual unmatch for automated pairings) ──
-  interface UnlinkedPair {
-    outcome: UnifiedOutcome;
-    unlinkedAt: number;
-    undoTimeout: ReturnType<typeof setTimeout>;
-  }
-  const [unlinkedPairs, setUnlinkedPairs] = useState<Map<string, UnlinkedPair>>(new Map());
-  const UNLINK_UNDO_MS = 10000; // 10 seconds
 
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(() => getStoredSidebarOpen());
@@ -161,7 +145,6 @@ export default function Home() {
     () => { setMobileMenuOpen(false); },
     () => { setMobileMenuOpen(true); },
   );
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Persist sidebar toggle
@@ -193,11 +176,9 @@ export default function Home() {
     const onPop = (e: PopStateEvent) => {
       const state = e.state;
       if (state?.view === "overview") {
-        stopPolling();
         setViewMode("overview");
         setActiveMarketId(null);
       } else if (state?.view === "marketfinder") {
-        stopPolling();
         setViewMode("marketfinder");
         setActiveMarketId(null);
       } else if (state?.view === "scan") {
@@ -221,7 +202,6 @@ export default function Home() {
           setViewMode("scan");
         }
       } else {
-        stopPolling();
         setViewMode("overview");
         setActiveMarketId(null);
         window.history.replaceState({ view: "markets" }, "", "/?view=markets");
@@ -295,23 +275,6 @@ export default function Home() {
     syncFromUrl();
   }, []);
 
-  // Stop polling helper
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearTimeout(pollRef.current);
-      pollRef.current = null;
-    }
-    setIsPolling(false);
-    pollingActiveRef.current = false;
-  }, []);
-
-  // Start polling
-  const startPolling = useCallback(() => {
-    stopPolling();
-    setIsPolling(true);
-    pollingActiveRef.current = true;
-  }, [stopPolling]);
-
   // Scan handler
   const handleScan = async (useDefaults: boolean) => {
     const kUrl = useDefaults
@@ -342,7 +305,6 @@ export default function Home() {
       if (res.ok) {
         setResult(data);
         setLastUpdated(new Date());
-        setLastScanTime(Date.now());
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
         data.outcomes.forEach((o: UnifiedOutcome) => {
@@ -506,23 +468,6 @@ export default function Home() {
     } catch { /* ignore */ }
   };
 
-  // Save modal state
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingMarket, setEditingMarket] = useState<SavedMarket | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editCategory, setEditCategory] = useState("");
-  const [editExpiry, setEditExpiry] = useState("");
-
-  const openSaveModal = () => setSaveModalOpen(true);
-  const openEditModal = (m: SavedMarket) => {
-    setEditingMarket(m);
-    setEditTitle(m.eventTitle);
-    setEditCategory(m.category || "");
-    setEditExpiry(m.expiryDate ? m.expiryDate.substring(0, 10) : "");
-    setEditModalOpen(true);
-  };
-
   // Save market from scan result
   const saveMarket = async () => {
     if (!result) return;
@@ -549,33 +494,9 @@ export default function Home() {
         return;
       }
       await loadSavedMarkets();
-      setSaveModalOpen(false);
     } catch (err: any) {
       setError(err.message || "Network error");
     } finally {
-      setSaving(false);
-    }
-  };
-
-  // Edit market
-  const saveEdit = async () => {
-    if (!editingMarket) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/saved-markets/${editingMarket.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventTitle: editTitle,
-          category: editCategory,
-          expiryDate: editExpiry || null,
-        }),
-      });
-      if (res.ok) {
-        await loadSavedMarkets();
-        setEditModalOpen(false);
-      }
-    } catch { /* ignore */ } finally {
       setSaving(false);
     }
   };
@@ -590,8 +511,6 @@ export default function Home() {
       });
       if (res.ok) {
         await loadManualMatches();
-        setManualMatchMsg("Linked! Re-scanning...");
-        setTimeout(() => setManualMatchMsg(""), 2000);
         // Auto re-scan the current market so the new pairing shows up immediately
         if (kalshiUrlRef.current && pmUrlRef.current) {
           handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
@@ -675,7 +594,6 @@ export default function Home() {
 
   // View mode switcher
   const goToMarketFinder = () => {
-    stopPolling();
     setViewMode("marketfinder");
     window.history.replaceState({ view: "marketfinder" }, "", "/?view=marketfinder");
   };
@@ -703,35 +621,30 @@ export default function Home() {
   }, []);
 
   const goToOverview = () => {
-    stopPolling();
     setCouplingPanelOpen(false);
     setViewMode("overview");
     window.history.replaceState({ view: "markets" }, "", "/?view=markets");
   };
 
   const goToLogs = () => {
-    stopPolling();
     setCouplingPanelOpen(false);
     setViewMode("logs");
     window.history.replaceState({ view: "logs" }, "", "/?view=logs");
   };
 
   const goToDashboard = () => {
-    stopPolling();
     setCouplingPanelOpen(false);
     setViewMode("dashboard");
     window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
   };
 
   const goToSettings = () => {
-    stopPolling();
     setCouplingPanelOpen(false);
     setViewMode("settings");
     window.history.replaceState({ view: "settings" }, "", "/?view=settings");
   };
 
   const goToScan = () => {
-    stopPolling();
     setActiveMarketId(null);
     activeMarketIdRef.current = null;
     setResult(null);
@@ -764,8 +677,6 @@ export default function Home() {
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("lte30");
   const [showExpired, setShowExpired] = useState(false);
   const [showArbOnly, setShowArbOnly] = useState(true);
-  const [overviewCategory, setOverviewCategory] = useState<string>("all");
-  const [hideUnmatched, setHideUnmatched] = useState(getStoredHideUnmatched);
   const [scanningAll, setScanningAll] = useState(false);
   const [scanAllError, setScanAllError] = useState("");
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
@@ -773,7 +684,6 @@ export default function Home() {
 
   // Favorites state (persisted to localStorage)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(getStoredFavoriteIds);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sidebarFavoritesOnly, setSidebarFavoritesOnly] = useState(false);
 
   // Toggle favorite for a market
@@ -786,32 +696,13 @@ export default function Home() {
     });
   }, []);
 
-  // Bulk favorite/unfavorite selected markets
-  const bulkFavorite = useCallback((selectedIds: Set<string>) => {
-    setFavoriteIds(prev => {
-      const next = new Set(prev);
-      for (const id of selectedIds) {
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
   // Persist favorites to localStorage whenever they change
   useEffect(() => {
     persistFavoriteIds(favoriteIds);
   }, [favoriteIds]);
 
-  // Persist hideUnmatched to localStorage whenever it changes
-  useEffect(() => {
-    persistHideUnmatched(hideUnmatched);
-  }, [hideUnmatched]);
-
   // Auto-fetch state
   const [overviewLoading, setOverviewLoading] = useState(false);
-  const overviewCacheRef = useRef<{ data: SavedMarket[]; fetchedAt: number }>({ data: [], fetchedAt: 0 });
-  const OVERVIEW_CACHE_TTL_MS = 30000;
 
   // MarketFinder state
   const [mfMarkets, setMfMarkets] = useState<any[]>([]);
@@ -821,7 +712,6 @@ export default function Home() {
   const [mfError, setMfError] = useState("");
   const [mfLastSync, setMfLastSync] = useState<any>(null);
   const [mfSavingIds, setMfSavingIds] = useState<Set<string>>(new Set());
-  const [mfExpiryFilter, setMfExpiryFilter] = useState<"all" | "lt24h" | "lt1h" | "lt15m">("all");
   // MF category filter — multi-select (empty = all categories)
   const [mfCategories, setMfCategories] = useState<string[]>(getStoredMfCategories);
   const mfAutoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -911,7 +801,6 @@ export default function Home() {
         setPriceChanges(changes);
         setResult(data);
         setLastUpdated(new Date());
-        setLastScanTime(Date.now());
 
         // Auto-clear blink after 3 seconds
         setTimeout(() => setPriceChanges(new Map()), 3000);
@@ -1207,14 +1096,11 @@ export default function Home() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(v => !v)}
           onSelectMarket={loadMarket}
-          onEditMarket={() => {}}
           onDeleteMarket={(id) => { if (confirm("Delete market?")) deleteMarket(id); }}
           sort={sidebarSort}
           sortDir={sidebarSortDir}
           onToggleSort={toggleSidebarSort}
           timeUntilExpiry={timeUntilExpiry}
-          layout={overviewLayout}
-          onToggleLayout={setOverviewLayout}
           expiryFilter={overviewExpiryFilter}
           onSetExpiryFilter={setOverviewExpiryFilter}
           showExpired={showExpired}
@@ -1424,7 +1310,7 @@ export default function Home() {
                     </button>
 
                     {result && (
-                      <button onClick={openSaveModal} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
+                      <button onClick={saveMarket} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving..." : "Save Market"}
                       </button>
@@ -1902,48 +1788,6 @@ export default function Home() {
         }}
       />
 
-      {/* Save modal */}
-      {saveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSaveModalOpen(false)}>
-          <div className="bg-[#17212B] border border-[#182533] rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-4">Save Market</h3>
-            <p className="text-sm text-[#5E6875] mb-4">This will add the scanned market pair to your saved markets list.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setSaveModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#182533] text-sm hover:bg-[#232E3C] transition-colors">Cancel</button>
-              <button onClick={saveMarket} disabled={saving} className="px-4 py-2 rounded-lg bg-[#5DBE81] text-black text-sm font-semibold hover:bg-[#4DA66E] transition-colors disabled:opacity-50">
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {editModalOpen && editingMarket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setEditModalOpen(false)}>
-          <div className="bg-[#17212B] border border-[#182533] rounded-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold">Edit Market</h3>
-            <div>
-              <label className="text-xs text-[#5E6875] block mb-1">Title</label>
-              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
-            </div>
-            <div>
-              <label className="text-xs text-[#5E6875] block mb-1">Category</label>
-              <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" placeholder="e.g. Politics, Crypto..." />
-            </div>
-            <div>
-              <label className="text-xs text-[#5E6875] block mb-1">Expiry date</label>
-              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 rounded-lg bg-[#182533] text-sm hover:bg-[#232E3C] transition-colors">Cancel</button>
-              <button onClick={saveEdit} disabled={saving} className="px-4 py-2 rounded-lg bg-[#5DBE81] text-black text-sm font-semibold hover:bg-[#4DA66E] transition-colors disabled:opacity-50">
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
