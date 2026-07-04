@@ -8,7 +8,6 @@ import { clientSafeError } from '@/lib/error-handler';
  * Query params:
  *   marketId   — filter by market ID
  *   limit      — max results (default 100, max 200)
- *   cursor     — ISO timestamp of the last row from previous page (cursor-based pagination)
  *   minRoi     — only return scans with bestRoiPct >= this value
  *   positiveArbOnly=true — only return scans with positive_arb_count > 0
  *   fromDate   — ISO date string, scans at or after
@@ -20,7 +19,6 @@ export async function GET(request: NextRequest) {
     const marketId = searchParams.get('marketId') || undefined;
     const limitStr = searchParams.get('limit');
     const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 200) : 100;
-    const cursor = searchParams.get('cursor') || undefined;
     const minRoi = searchParams.get('minRoi');
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
     const fromDate = searchParams.get('fromDate');
@@ -30,11 +28,6 @@ export async function GET(request: NextRequest) {
     const pool = await getScanHistory(marketId, 10000);
 
     let filtered = pool;
-
-    // Cursor: skip rows with scanned_at >= cursor (we're descending, so cursor = oldest seen)
-    if (cursor) {
-      filtered = filtered.filter((r: any) => (r.scanned_at ?? '') < cursor);
-    }
 
     if (minRoi) {
       const min = parseFloat(minRoi);

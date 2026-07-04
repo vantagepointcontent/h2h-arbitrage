@@ -6,15 +6,13 @@ import {
   fetchAllPlatformMarkets,
   CATEGORIES,
   fetchPlatformMarkets,
-  buildMatches,
   RATE_LIMIT_MS,
-  PhV2Market,
   PredictionHuntMarket,
   CATEGORY_SEARCH_TERMS,
   fetchMatchingMarkets,
   buildMatchedMarketsFromSearch,
 } from '@/lib/predictionhunt';
-import { addSavedMarket, upsertSavedMarket } from '@/lib/persistence';
+import { upsertSavedMarket } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -148,21 +146,6 @@ export async function GET(request: NextRequest) {
     console.error('[api/predictionhunt/markets GET]', err);
     return NextResponse.json({ success: false, error: clientSafeError(err) }, { status: 500 });
   }
-}
-
-/** Fetch a subset of categories for a platform. */
-async function fetchCategories(platform: string, categories: string[]): Promise<PhV2Market[]> {
-  const all: PhV2Market[] = [];
-  for (const cat of categories) {
-    try {
-      const ms = await fetchPlatformMarkets(platform, cat);
-      all.push(...ms);
-    } catch (e: any) {
-      console.warn(`[ph] ${platform}/${cat} failed: ${e.message}`);
-    }
-    await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
-  }
-  return all;
 }
 
 /* ═══════════════════════════════════════════════════════════════
