@@ -80,55 +80,37 @@ export function extractKalshiTicker(url: string): string | null {
 }
 
 export async function fetchKalshiEventMarkets(eventTicker: string): Promise<KalshiMarket[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const res = await rateLimiters.kalshi.execute(() =>
-      fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
-        { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
-      ),
-    );
-    if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
-    const data = await res.json();
-    return data.markets || [];
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
+    ),
+  );
+  if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
+  const data = await res.json();
+  return data.markets || [];
 }
 
 export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<KalshiMarket[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const res = await rateLimiters.kalshi.execute(() =>
-      fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
-        { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
-      ),
-    );
-    if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
-    const data = await res.json();
-    return data.markets || [];
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
+    ),
+  );
+  if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
+  const data = await res.json();
+  return data.markets || [];
 }
 
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const res = await rateLimiters.kalshi.execute(() =>
-      fetch(
-        `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
-        { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: controller.signal },
-      ),
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.market || null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
+    ),
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.market || null;
 }

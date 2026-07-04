@@ -42,7 +42,7 @@ export async function addDecoupledPair(pair: Omit<DecoupledPair, 'id' | 'decoupl
   if (exists) throw new Error('Pair already decoupled');
   const entry: DecoupledPair = {
     ...pair,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: crypto.randomUUID(),
     decoupledAt: new Date().toISOString(),
   };
   pairs.push(entry);

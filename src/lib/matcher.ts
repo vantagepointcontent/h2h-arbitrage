@@ -1,5 +1,6 @@
 import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
+import type { ManualMatch } from './manual-matches';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -185,17 +186,6 @@ export function computeArbitrageFees(
   };
 }
 
-export interface ManualMatch {
-  id: string;
-  kalshiTicker: string;
-  pmConditionId: string;
-  kalshiTitle: string;
-  pmTitle: string;
-  kalshiUrl?: string;
-  polymarketUrl?: string;
-  createdAt: string;
-}
-
 const MONTH_MAP: Record<string, string> = {
   JAN: 'Jan', FEB: 'Feb', MAR: 'Mar', APR: 'Apr', MAY: 'May', JUN: 'Jun',
   JUL: 'Jul', AUG: 'Aug', SEP: 'Sep', OCT: 'Oct', NOV: 'Nov', DEC: 'Dec',
@@ -242,24 +232,9 @@ function extractNameFromKalshiTitle(title: string): string {
   return title.slice(0, 30);
 }
 
-/** Extract a bet-type keyword from a Kalshi market title to prevent cross-bet-type matching */
-function extractBetTypeFromTitle(title: string): string {
-  const lower = title.toLowerCase();
-  if (/top\s*scorer|anytime\s*scorer/i.test(lower)) return 'top-scorer';
-  if (/mvp|most\s*valuable/i.test(lower)) return 'mvp';
-  if (/winner|will\s+win|champion/i.test(lower)) return 'winner';
-  if (/over|under/i.test(lower)) return 'totals';
-  if (/spread|cover/i.test(lower)) return 'spread';
-  if (/first\s*(goal|touch|down|score)/i.test(lower)) return 'first';
-  if (/anytime/i.test(lower)) return 'anytime';
-  if (/series\s*price|series\s*winner/i.test(lower)) return 'series';
-  if (/game\s*props|player\s*props/i.test(lower)) return 'props';
-  return '';
-}
-
-/** Extract a bet-type keyword from a Polymarket question to prevent cross-bet-type matching */
-function extractBetTypeFromQuestion(question: string): string {
-  const lower = question.toLowerCase();
+/** Extract a bet-type keyword from market text to prevent cross-bet-type matching */
+function extractBetType(text: string): string {
+  const lower = text.toLowerCase();
   if (/top\s*scorer|anytime\s*scorer/i.test(lower)) return 'top-scorer';
   if (/mvp|most\s*valuable/i.test(lower)) return 'mvp';
   if (/winner|will\s+win|champion/i.test(lower)) return 'winner';
@@ -296,7 +271,7 @@ function getKalshiName(km: KalshiMarket): string {
         if (uuidRegex.test(val)) {
           // Sport market with UUID custom_strike: entity name is in yes_sub_title, e.g. "Belgium", "Tie"
           // Include bet-type context from title to prevent cross-bet-type matching
-          const betType = extractBetTypeFromTitle(km.title || '');
+          const betType = extractBetType(km.title || '');
           // Political markets (e.g. KXHOUSERACE): yes_sub_title is the candidate name,
           // but PM groupItemTitle is the party name. Use the title-extracted name instead
           // so "Republican" matches "Republican Party".
@@ -840,7 +815,7 @@ export function matchOutcomes(
     if (isNamedBinary) {
       const title = pm.groupItemTitle!;
       // Enrich with bet-type context to prevent cross-bet-type matching
-      const pmBetType = extractBetTypeFromQuestion(pm.question || '');
+      const pmBetType = extractBetType(pm.question || '');
       const enrichedTitle = pmBetType ? `${pmBetType} ${title}` : title;
       const norm = normalizeName(enrichedTitle);
       const prev = pmSeenNames.get(norm);

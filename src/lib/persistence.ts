@@ -396,7 +396,7 @@ export async function addSavedMarket(market: Omit<SavedMarket, 'id' | 'createdAt
   }
   const newMarket: SavedMarket = {
     ...market,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     lastScanResult: null,
   };
@@ -446,7 +446,7 @@ export async function upsertSavedMarket(input: {
     category: input.category,
     expiryDate: input.expiryDate,
     favorite: false,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     lastScanResult: input.lastScanResult ?? null,
   };
