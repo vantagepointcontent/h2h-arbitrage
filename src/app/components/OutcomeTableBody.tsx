@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
+import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
 
 interface Outcome {
   artist: string;
-  kalshi?: { yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
-  polymarket?: { yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
+  kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
+  polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
@@ -33,6 +35,8 @@ interface OutcomeTableBodyProps {
   formatPercent: (n: number) => string;
   priceChanges?: Map<string, "up" | "down" | null>;
   filterMode?: "all" | "matched" | "arb";
+  /** EXEC-002: market title for the manual-execute modal. Execute buttons render only when provided. */
+  marketTitle?: string;
 }
 
 export function OutcomeTableBody({
@@ -43,8 +47,46 @@ export function OutcomeTableBody({
   formatPercent,
   priceChanges,
   filterMode,
+  marketTitle,
 }: OutcomeTableBodyProps) {
   const safeOutcomes = outcomes ?? [];
+
+  // EXEC-002: manual-execute state — modal + per-row token resolution
+  const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
+  const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
+  const [execError, setExecError] = useState<string | null>(null);
+
+  const startExecute = async (o: Outcome) => {
+    if (!marketTitle || !o.kalshi?.ticker || !o.polymarket?.conditionId) return;
+    setResolvingArtist(o.artist);
+    setExecError(null);
+    try {
+      const res = await fetch(`/api/pm-tokens?conditionId=${encodeURIComponent(o.polymarket.conditionId)}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Token resolution failed');
+      const exec = buildExecutableArb({
+        artist: o.artist,
+        strategy: o.arbitrage.strategy,
+        roiPct: o.arbitrage.roiPct,
+        expectedProfit: o.arbitrage.expectedProfit,
+        kalshiStake: o.arbitrage.kalshiStake ?? 0,
+        pmStake: o.arbitrage.pmStake ?? 0,
+        kalshiYesAsk: o.kalshi.yesAsk ?? null,
+        kalshiNoAsk: o.kalshi.noAsk ?? null,
+        pmYesAsk: o.polymarket.yesPrice ?? null,
+        pmNoAsk: o.polymarket.noPrice ?? null,
+        kalshiTicker: o.kalshi.ticker,
+        pmYesTokenId: data.yesTokenId,
+        pmNoTokenId: data.noTokenId,
+      }, marketTitle);
+      if (!exec) throw new Error('Strategy not executable from this button (cross-outcome or missing prices)');
+      setExecutingArb(exec);
+    } catch (e: any) {
+      setExecError(`${o.artist}: ${e.message}`);
+    } finally {
+      setResolvingArtist(null);
+    }
+  };
 
   const displayOutcomes = filterMode === "arb"
     ? safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0)
@@ -191,7 +233,20 @@ export function OutcomeTableBody({
                     <span className="text-[#8A9BA8]">{o.arbitrage.strategy.replace(/^Buy YES both sides: Kalshi (.+?) \+ PM (.+)$/, '$1 + $2')}</span>
                   </span>
                 ) : (
-                  <span className="text-[#8A9BA8]">{o.arbitrage.strategy}</span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-[#8A9BA8]">{o.arbitrage.strategy}</span>
+                    {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
+                    {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                        disabled={resolvingArtist === o.artist}
+                        className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                        title="Manually execute this arb (opens confirmation)"
+                      >
+                        <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
+                      </button>
+                    )}
+                  </span>
                 )}
               </td>
             </tr>
@@ -225,6 +280,15 @@ export function OutcomeTableBody({
           </React.Fragment>
         );
       })}
+      {/* EXEC-002: token-resolution error + confirmation modal */}
+      {execError && (
+        <tr><td colSpan={10} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
+      )}
+      {executingArb && (
+        <tr><td colSpan={10}>
+          <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
+        </td></tr>
+      )}
     </tbody>
   );
 }
