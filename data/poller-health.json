@@ -1,17 +1,19 @@
 {
-  "status": "running",
+  "status": "ok",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 470,
-  "startedAt": "2026-07-04T00:06:39.643Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
+  "startedAt": "2026-07-04T00:08:05.870Z",
+  "finishedAt": "2026-07-04T00:08:43.793Z",
+  "durationMs": 37923,
+  "successCount": 26,
   "failureCount": 0,
-  "skippedCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "skippedCount": 443,
+  "avgScanMs": 7017,
+  "maxScanMs": 7696,
+  "errors": [],
+  "breakerSkipped": 1,
+  "openBreakers": 1
 }

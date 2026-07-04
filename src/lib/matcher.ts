@@ -65,15 +65,6 @@ export interface UnifiedOutcome {
   isCrossOutcome?: boolean;
 }
 
-export interface FeeInputs {
-  /** Kalshi taker fee rate (default 0.07) */
-  kalshiTakerRate?: number;
-  /** Kalshi maker fee rate (default 0.0175) */
-  kalshiMakerRate?: number;
-  /** Polymarket theta coefficient by category (default 0.05) */
-  pmTheta?: number;
-}
-
 /** Default fee parameters per platform. Polymarket theta varies by category. */
 export function getPolymarketTheta(category?: string): number {
   const c = (category || 'other').toLowerCase();
@@ -366,98 +357,6 @@ export function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Normalize a market name for display (preserves readability) while ensuring
- * the comparison key is lowercase. Returns both the display name and the
- * normalized comparison key.
- */
-export function normalizeMarketName(name: string): { display: string; key: string } {
-  const key = normalizeName(name);
-  return { display: name, key };
-}
-
-/**
- * Build a case-insensitive lookup map from market entries.
- * Logs warnings when two distinct raw names collide to the same normalized key.
- */
-export function buildCaseInsensitiveMap<V>(
-  entries: { raw: string; value: V }[],
-  logPrefix = '[matcher]',
-): Map<string, V> {
-  const result = new Map<string, V>();
-  const collisions = new Set<string>();
-
-  for (const e of entries) {
-    const key = normalizeName(e.raw);
-    const existing = result.get(key) as any;
-    if (existing !== undefined && e.raw !== existing._raw) {
-      if (!collisions.has(key)) {
-        collisions.add(key);
-        console.debug(
-          `${logPrefix}: name collision on "${key}" — "${e.raw}" overlaps with "${existing._raw}"`,
-        );
-      }
-    }
-    result.set(key, { ...e, _raw: e.raw } as any);
-  }
-
-  // Strip internal _raw field from values
-  const clean = new Map<string, V>();
-  for (const [k, v] of result) {
-    const { _raw, ...rest } = v as any;
-    clean.set(k, rest as V);
-  }
-  return clean;
-}
-
-/**
- * Build a Map of normalized name -> value, logging warnings when two
- * distinct raw names collide to the same normalized key.
- */
-export function buildNormalizedMap<K extends string, V>(
-  entries: { raw: K; rawLabel?: string; value: V }[],
-  logPrefix = '[matcher]',
-): Map<K, V> {
-  const normMap = new Map<string, { raw: K; value: V }>();
-  const collisions = new Set<string>();
-
-  for (const e of entries) {
-    const key = normalizeName(e.raw);
-    const existing = normMap.get(key);
-    if (existing && existing.raw !== e.raw) {
-      if (!collisions.has(key)) {
-        collisions.add(key);
-        console.debug(
-          `${logPrefix}: name collision on "${key}" — "${e.raw}" (${(e as any).rawLabel ?? ''}) overlaps with "${existing.raw}" (${(existing as any).rawLabel ?? ''})`,
-        );
-      }
-    }
-    normMap.set(key, e);
-  }
-
-  // Return raw->value map keyed by the original raw string
-  const result = new Map<K, V>();
-  for (const [, { raw, value }] of normMap) {
-    result.set(raw, value);
-  }
-  return result;
-}
-
-/**
- * Given a normalized name, find the matching entry in a raw-keyed map.
- * Handles the case where the raw key differs in casing from the lookup.
- */
-export function findByNormalizedName<K extends string, V>(
-  rawMap: Map<K, V>,
-  lookupName: string,
-): V | undefined {
-  const normLookup = normalizeName(lookupName);
-  for (const [key, val] of rawMap) {
-    if (normalizeName(key) === normLookup) return val;
-  }
-  return undefined;
-}
-
 export function similarity(a: string, b: string): number {
   const arrA = a.split(' ').filter(s => s.length >= 2);
   const arrB = b.split(' ').filter(s => s.length >= 2);
@@ -747,71 +646,6 @@ export function calculateAllArbitrages(
     };
   });
 }
-
-function calculateCrossOutcomeArbitrage(
-  outcomeA: UnifiedOutcome,
-  outcomeB: UnifiedOutcome,
-  category?: string,
-): UnifiedOutcome['arbitrage'] {
-  if (!outcomeA.kalshi || !outcomeA.polymarket || !outcomeB.kalshi || !outcomeB.polymarket) {
-    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
-  }
-
-  const kYesA = outcomeA.kalshi.yesAsk;
-  const pYesB = outcomeB.polymarket.bestAsk;
-  if (kYesA + pYesB >= 1) {
-    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
-  }
-
-  const depthKYesA = parseDepth(outcomeA.kalshi.yesAskDepth);
-  const depthPYesB = outcomeB.polymarket.askDepth != null && outcomeB.polymarket.askDepth > 0 ? outcomeB.polymarket.askDepth : Infinity;
-  const depthKYesB = parseDepth(outcomeB.kalshi.yesAskDepth);
-  const depthPYesA = outcomeA.polymarket.askDepth != null && outcomeA.polymarket.askDepth > 0 ? outcomeA.polymarket.askDepth : Infinity;
-
-  const capKA = depthKYesA > 0 ? depthKYesA / kYesA : Infinity;
-  const capPB = depthPYesB > 0 ? depthPYesB / pYesB : Infinity;
-  const capKB = depthKYesB > 0 ? depthKYesB / outcomeB.kalshi.yesAsk : Infinity;
-  const capPA = depthPYesA > 0 ? depthPYesA / outcomeA.polymarket.bestAsk : Infinity;
-  const capital = Math.min(capKA, capPB, capKB, capPA);
-  const effectiveCapital = isFinite(capital) ? capital : 1_000_000;
-
-  const kalshiStake = effectiveCapital * kYesA;
-  const pmStake = effectiveCapital * pYesB;
-  const fees = computeArbitrageFees(
-    `Buy YES both sides: Kalshi ${outcomeA.artist} + Polymarket ${outcomeB.artist}`,
-    effectiveCapital,
-    kalshiStake,
-    pmStake,
-    kYesA,
-    outcomeA.kalshi.noAsk,
-    pYesB,
-    outcomeB.polymarket.noPrice,
-    category,
-  );
-
-  return {
-    strategy: `Buy YES both sides: Kalshi ${outcomeA.artist} + PM ${outcomeB.artist}`,
-    kalshiStake,
-    pmStake,
-    expectedProfit: fees.worstCaseNetProfit,
-    roiPct: effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0,
-    maxCapital: effectiveCapital,
-    buyPlatform: 'kalshi',
-    buyPrice: kYesA,
-    sellPlatform: 'polymarket',
-    sellPrice: pYesB,
-    fees: {
-      kalshiFee: fees.kalshiFee,
-      pmFee: fees.pmFee,
-      kalshiFeeDetails: fees.kalshiFeeDetails,
-      pmFeeDetails: fees.pmFeeDetails,
-      netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
-      netProfitIfPmWins: fees.netProfitIfPmWins,
-      worstCaseNetProfit: fees.worstCaseNetProfit,
-    },
-  };
-}
-
 
 /** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
 export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
