@@ -55,7 +55,6 @@ import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDura
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 
 import dynamic from "next/dynamic";
-const DateTimePicker = dynamic(() => import("@/components/DateTimePicker").then(m => m.DateTimePicker), { ssr: false });
 import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
 import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
