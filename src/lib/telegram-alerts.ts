@@ -159,6 +159,37 @@ export async function getConfigResolved(): Promise<TelegramAlertConfig | null> {
 
 // ─── Message formatting ───────────────────────────────────────────
 
+/** Build the platform-prices line shared by all arb formatters. */
+function buildPricesLine(arb: ArbAlertInput): string {
+  const parts: string[] = [];
+  if (arb.kalshiYesPrice != null || arb.kalshiNoPrice != null) {
+    const kYes = arb.kalshiYesPrice != null ? `$${arb.kalshiYesPrice.toFixed(2)}` : '—';
+    const kNo = arb.kalshiNoPrice != null ? `$${arb.kalshiNoPrice.toFixed(2)}` : '—';
+    parts.push(`<code>K: YES ${kYes} / NO ${kNo}</code>`);
+  }
+  if (arb.pmYesPrice != null || arb.pmNoPrice != null) {
+    const pYes = arb.pmYesPrice != null ? `$${arb.pmYesPrice.toFixed(2)}` : '—';
+    const pNo = arb.pmNoPrice != null ? `$${arb.pmNoPrice.toFixed(2)}` : '—';
+    parts.push(`<code>PM: YES ${pYes} / NO ${pNo}</code>`);
+  }
+  return parts.length > 0 ? `\n📊 ${parts.join(' · ')}` : '';
+}
+
+/** Build the persistence-line shared by arb formatters. */
+function buildPersistenceLine(score: number | undefined): string {
+  return score != null ? `\n🛡️ Persistence: <b>${score}</b>/100` : '';
+}
+
+/** Build the deep-link shared by all formatters. */
+function buildDeepLink(id: string | undefined): string {
+  return id ? `\n🔗 <a href="http://100.86.7.30:3000/?view=scan&id=${encodeURIComponent(id)}">View Scan</a>` : '';
+}
+
+/** Shared footer: timestamp + deep link. */
+function buildFooter(deepLink: string): string {
+  return `\n🕐 ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC\n${deepLink}`;
+}
+
 /**
  * Format an arb opportunity as a Telegram message.
  * Uses HTML parse_mode for rich formatting.
@@ -171,30 +202,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
   const feeStr = arb.fees
     ? `Net: $${arb.fees.worstCaseNetProfit.toFixed(2)}`
     : '';
-
-  // Platform prices line
-  const pricesParts: string[] = [];
-  if (arb.kalshiYesPrice != null || arb.kalshiNoPrice != null) {
-    const kYes = arb.kalshiYesPrice != null ? `$${arb.kalshiYesPrice.toFixed(2)}` : '—';
-    const kNo = arb.kalshiNoPrice != null ? `$${arb.kalshiNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>K: YES ${kYes} / NO ${kNo}</code>`);
-  }
-  if (arb.pmYesPrice != null || arb.pmNoPrice != null) {
-    const pYes = arb.pmYesPrice != null ? `$${arb.pmYesPrice.toFixed(2)}` : '—';
-    const pNo = arb.pmNoPrice != null ? `$${arb.pmNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>PM: YES ${pYes} / NO ${pNo}</code>`);
-  }
-  const pricesLine = pricesParts.length > 0 ? `\n📊 ${pricesParts.join(' · ')}` : '';
-
-  // Persistence score
-  const persistenceLine = arb.persistenceScore != null
-    ? `\n🛡️ Persistence: <b>${arb.persistenceScore}</b>/100`
-    : '';
-
-  // Deep link
-  const deepLink = arb.marketId
-    ? `\n🔗 <a href="http://100.86.7.30:3000/?view=scan&id=${encodeURIComponent(arb.marketId)}">View Scan</a>`
-    : '';
+  const deepLink = buildDeepLink(arb.marketId);
 
   return [
     '🟢 <b>Arbitrage Found</b>',
@@ -205,11 +213,10 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     `💰 Profit: <b>$${profitStr}</b>${feeStr ? ` (${feeStr})` : ''}`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     `💵 Stake: $${stakeStr}`,
-    pricesLine,
-    persistenceLine,
+    buildPricesLine(arb),
+    buildPersistenceLine(arb.persistenceScore),
     '',
-    `🕐 ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
-    deepLink,
+    buildFooter(deepLink),
   ].join('\n');
 }
 
@@ -218,24 +225,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
  */
 export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number): string {
   const delta = arb.roiPct - prevRoi;
-  const pricesParts: string[] = [];
-  if (arb.kalshiYesPrice != null || arb.kalshiNoPrice != null) {
-    const kYes = arb.kalshiYesPrice != null ? `$${arb.kalshiYesPrice.toFixed(2)}` : '—';
-    const kNo = arb.kalshiNoPrice != null ? `$${arb.kalshiNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>K: YES ${kYes} / NO ${kNo}</code>`);
-  }
-  if (arb.pmYesPrice != null || arb.pmNoPrice != null) {
-    const pYes = arb.pmYesPrice != null ? `$${arb.pmYesPrice.toFixed(2)}` : '—';
-    const pNo = arb.pmNoPrice != null ? `$${arb.pmNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>PM: YES ${pYes} / NO ${pNo}</code>`);
-  }
-  const pricesLine = pricesParts.length > 0 ? `\n📊 ${pricesParts.join(' · ')}` : '';
-  const persistenceLine = arb.persistenceScore != null
-    ? `\n🛡️ Persistence: <b>${arb.persistenceScore}</b>/100`
-    : '';
-  const deepLink = arb.marketId
-    ? `\n🔗 <a href="http://100.86.7.30:3000/?view=scan&id=${encodeURIComponent(arb.marketId)}">View Scan</a>`
-    : '';
+  const deepLink = buildDeepLink(arb.marketId);
 
   return [
     '📈 <b>ARB SPREAD WIDENED</b>',
@@ -245,11 +235,10 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
     `ROI: ${prevRoi.toFixed(2)}% → <b>${arb.roiPct.toFixed(2)}%</b> (+${delta.toFixed(2)}%)`,
     `💰 Profit: <b>$${arb.expectedProfit.toFixed(2)}</b>`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
-    pricesLine,
-    persistenceLine,
+    buildPricesLine(arb),
+    buildPersistenceLine(arb.persistenceScore),
     '',
-    `🕐 ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
-    deepLink,
+    buildFooter(deepLink),
   ].join('\n');
 }
 
@@ -258,21 +247,7 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
  */
 export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): string {
   const dropPct = ((prevRoi - arb.roiPct) / Math.abs(prevRoi) * 100);
-  const pricesParts: string[] = [];
-  if (arb.kalshiYesPrice != null || arb.kalshiNoPrice != null) {
-    const kYes = arb.kalshiYesPrice != null ? `$${arb.kalshiYesPrice.toFixed(2)}` : '—';
-    const kNo = arb.kalshiNoPrice != null ? `$${arb.kalshiNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>K: YES ${kYes} / NO ${kNo}</code>`);
-  }
-  if (arb.pmYesPrice != null || arb.pmNoPrice != null) {
-    const pYes = arb.pmYesPrice != null ? `$${arb.pmYesPrice.toFixed(2)}` : '—';
-    const pNo = arb.pmNoPrice != null ? `$${arb.pmNoPrice.toFixed(2)}` : '—';
-    pricesParts.push(`<code>PM: YES ${pYes} / NO ${pNo}</code>`);
-  }
-  const pricesLine = pricesParts.length > 0 ? `\n📊 ${pricesParts.join(' · ')}` : '';
-  const deepLink = arb.marketId
-    ? `\n🔗 <a href="http://100.86.7.30:3000/?view=scan&id=${encodeURIComponent(arb.marketId)}">View Scan</a>`
-    : '';
+  const deepLink = buildDeepLink(arb.marketId);
 
   return [
     '⚠️ <b>ARB VANISHING</b>',
@@ -282,12 +257,11 @@ export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): str
     `ROI: ${prevRoi.toFixed(2)}% → <b>${arb.roiPct.toFixed(2)}%</b> (-${dropPct.toFixed(1)}%)`,
     `💰 Profit: <b>$${arb.expectedProfit.toFixed(2)}</b>`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
-    pricesLine,
+    buildPricesLine(arb),
     '',
     `Act now — spread is closing fast!`,
     '',
-    `🕐 ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
-    deepLink,
+    buildFooter(deepLink),
   ].join('\n');
 }
 
