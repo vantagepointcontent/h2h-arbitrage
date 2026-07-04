@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
+import { getScanRowsSince, getSavedMarkets } from '@/lib/persistence';
 import { classifyMarket } from '@/lib/market-classification';
 import { clientSafeError } from '@/lib/error-handler';
 
@@ -39,14 +39,9 @@ export async function GET(request: NextRequest) {
         since = new Date(now.getTime() - 30 * 86400000).toISOString();
     }
 
-    // Fetch all records we need (SQLite doesn't support WHERE + aggregation well,
-    // so we pull generously and aggregate in JS)
-    const pool = await getScanHistory(undefined, 20000);
-
-    // Filter by date range
-    const rows = since
-      ? pool.filter((r: any) => (r.scanned_at ?? '') >= since!)
-      : pool;
+    // PERF-P1: date filter runs in SQL, and only slim columns are fetched
+    // (raw_result blobs excluded). JS aggregation over slim rows is cheap.
+    const rows = await getScanRowsSince(since);
 
     // ── KPI aggregations ──────────────────────────────────────
     const totalScans = rows.length;

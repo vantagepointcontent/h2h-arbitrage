@@ -55,8 +55,15 @@ import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDura
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 
 import dynamic from "next/dynamic";
-import { Bookmaker1on1 } from "@/app/components/Bookmaker1on1";
-import { CouplingSuggestions } from "@/app/components/CouplingSuggestions";
+// PERF-P1: lazy-load heavy conditionally-rendered components into separate chunks
+const Bookmaker1on1 = dynamic(() => import("@/app/components/Bookmaker1on1").then(m => m.Bookmaker1on1), {
+  loading: () => <div className="p-4 text-sm text-[#5E6875]">Loading...</div>,
+  ssr: false,
+});
+const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSuggestions").then(m => m.CouplingSuggestions), {
+  loading: () => <div className="p-4 text-sm text-[#5E6875]">Loading...</div>,
+  ssr: false,
+});
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });

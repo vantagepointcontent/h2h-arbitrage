@@ -184,6 +184,65 @@ export async function getScanHistory(marketId?: string, limit: number = 20): Pro
   return Array.isArray(rows.rows) ? rows.rows : [];
 }
 
+/**
+ * PERF-P1: SQL-side filtered scan history for /api/logs.
+ * Filters run in SQLite (indexed on scanned_at DESC) instead of loading
+ * 10k rows into JS. Excludes the heavy raw_result blob.
+ * Returns { rows, total } where total counts all matches (pre-LIMIT).
+ */
+export async function queryScanHistory(opts: {
+  marketId?: string;
+  minRoi?: number;
+  positiveArbOnly?: boolean;
+  fromDate?: string;
+  toDate?: string;
+  limit?: number;
+}): Promise<{ rows: any[]; total: number }> {
+  await ensureDb();
+  const c = getClient();
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
+
+  let where = ' WHERE 1=1';
+  const args: (string | number)[] = [];
+  if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
+  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
+  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
+  if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
+  if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+
+  const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM scan_results${where}`, args });
+  const total = Number((countRes.rows as any[])[0]?.cnt ?? 0);
+
+  const rows = await c.execute({
+    sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
+                 outcome_count, matched_count, kalshi_count, pm_count,
+                 positive_arb_count, total_stake, scanned_at
+          FROM scan_results${where}
+          ORDER BY scanned_at DESC LIMIT ?`,
+    args: [...args, limit],
+  });
+  return { rows: Array.isArray(rows.rows) ? (rows.rows as any[]) : [], total };
+}
+
+/**
+ * PERF-P1: slim scan rows for dashboard aggregation.
+ * Date filter in SQL (indexed scanned_at), and only the columns the
+ * dashboard aggregates — excludes raw_result blobs which dominate row size.
+ */
+export async function getScanRowsSince(since?: string): Promise<any[]> {
+  await ensureDb();
+  const c = getClient();
+  const cols = `id, market_id, market_title, best_roi_pct, best_profit, strategy,
+                positive_arb_count, scanned_at`;
+  const res = since
+    ? await c.execute({
+        sql: `SELECT ${cols} FROM scan_results WHERE scanned_at >= ? ORDER BY scanned_at DESC LIMIT 50000`,
+        args: [since],
+      })
+    : await c.execute(`SELECT ${cols} FROM scan_results ORDER BY scanned_at DESC LIMIT 50000`);
+  return Array.isArray(res.rows) ? (res.rows as any[]) : [];
+}
+
 export interface LastScanResult {
   bestRoiPct: number;      // t.ex. 26.5 (for backward compat / display)
   bestProfit: number;       // t.ex. 265
@@ -337,12 +396,50 @@ async function mirrorMarketsToJson(): Promise<void> {
   }
 }
 
+// PERF-P1: throttled mirror for high-frequency scan-result writes.
+// Every scan used to trigger a full DB read + 745KB JSON rewrite. The poller
+// (the JSON's only freshness-sensitive reader) wakes every 60s, so mirroring
+// at most once per 60s — with a trailing write so the last update always
+// lands — is lossless for consumers and eliminates ~95% of mirror I/O.
+const MIRROR_THROTTLE_MS = 60_000;
+let _lastMirrorAt = 0;
+let _mirrorTimer: ReturnType<typeof setTimeout> | null = null;
+function mirrorMarketsToJsonThrottled(): void {
+  const now = Date.now();
+  if (now - _lastMirrorAt >= MIRROR_THROTTLE_MS) {
+    _lastMirrorAt = now;
+    void mirrorMarketsToJson();
+    return;
+  }
+  if (_mirrorTimer) return; // trailing write already scheduled
+  const delay = MIRROR_THROTTLE_MS - (now - _lastMirrorAt);
+  _mirrorTimer = setTimeout(() => {
+    _mirrorTimer = null;
+    _lastMirrorAt = Date.now();
+    void mirrorMarketsToJson();
+  }, delay);
+  // Don't keep the process alive just for a pending mirror
+  if (typeof (_mirrorTimer as any)?.unref === 'function') (_mirrorTimer as any).unref();
+}
+
 export async function getSavedMarkets(opts?: { includeArchived?: boolean }): Promise<SavedMarket[]> {
   await ensureMarketsMigrated();
   const c = getClient();
   const where = opts?.includeArchived ? '' : 'WHERE archived = 0';
   const res = await c.execute(`SELECT * FROM saved_markets ${where} ORDER BY created_at ASC`);
   return (res.rows as any[]).map(rowToMarket);
+}
+
+/** PERF-P1: targeted lookup by exact URL pair — avoids loading all markets. */
+export async function findSavedMarketByUrls(kalshiUrl: string, polymarketUrl: string): Promise<SavedMarket | null> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'SELECT * FROM saved_markets WHERE kalshi_url = ? AND polymarket_url = ? AND archived = 0 LIMIT 1',
+    args: [kalshiUrl, polymarketUrl],
+  });
+  const rows = res.rows as any[];
+  return rows.length > 0 ? rowToMarket(rows[0]) : null;
 }
 
 /** AUTO-002: archived markets only (newest archive first). */
@@ -476,7 +573,7 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
       args: [JSON.stringify(result), matchedNow, id],
     });
   }
-  await mirrorMarketsToJson();
+  mirrorMarketsToJsonThrottled();
 }
 
 // WS-107: watcher-written real-time result ─────────────────────────

@@ -11,7 +11,7 @@ import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyMan
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
-import { getSavedMarkets, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
+import { getSavedMarkets, findSavedMarketByUrls, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
 import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
@@ -297,8 +297,8 @@ export async function POST(request: NextRequest) {
 
     // ---- UPDATE SAVED MARKET SCAN RESULT ----
     try {
-      const allMarkets = await getSavedMarkets();
-      const market = allMarkets.find(m => m.kalshiUrl === kalshiUrl && m.polymarketUrl === polymarketUrl);
+      // PERF-P1: targeted single-market lookup instead of loading all markets
+      const market = await findSavedMarketByUrls(kalshiUrl, polymarketUrl);
       if (market) {
         // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth)
         // from stats, history, lifecycle, and alerts. They stay visible in the
