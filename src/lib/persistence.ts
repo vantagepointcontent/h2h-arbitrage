@@ -250,6 +250,157 @@ export async function getScanRowsSince(since?: string): Promise<any[]> {
   return Array.isArray(res.rows) ? (res.rows as any[]) : [];
 }
 
+/**
+ * PERF-P4: full-SQL dashboard aggregation. Replaces JS loops over 35k+ rows
+ * with GROUP BY queries (indexed scanned_at + partial arbs index).
+ * `suspiciousRoi` mirrors the phantom guard: rows above it stay in scan
+ * counts/histograms but are excluded from ROI/profit KPIs and top arbs.
+ */
+export async function getDashboardAggregates(since: string | undefined, suspiciousRoi: number): Promise<{
+  kpis: { totalScans: number; totalArbsFound: number; activeArbs: number; avgRoi: number; marketsTracked: number; totalProfit: number };
+  scansPerDay: { date: string; count: number }[];
+  roiBuckets: { label: string; low: number; high: number; count: number }[];
+  timeline: { time: string; scans: number; avgRoi: number }[];
+  profitTimeline: { time: string; profit: number }[];
+  topActiveArbs: any[];
+  recurringArbs: number;
+  vanishedArbs: number;
+}> {
+  await ensureDb();
+  const c = getClient();
+  const w = since ? 'WHERE scanned_at >= ?' : 'WHERE 1=1';
+  const args: (string | number)[] = since ? [since] : [];
+  const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
+  const dayAgo = new Date(Date.now() - 24 * 3600000).toISOString();
+
+  const [kpiRes, perDayRes, bucketRes, hourRes, profitRes, topRes, recurRes, vanishedRes] = await Promise.all([
+    c.execute({
+      sql: `SELECT
+              COUNT(*) AS total_scans,
+              COUNT(DISTINCT market_id) AS markets_tracked,
+              SUM(CASE WHEN best_roi_pct <= ? THEN positive_arb_count ELSE 0 END) AS total_arbs,
+              SUM(CASE WHEN best_roi_pct <= ? AND positive_arb_count > 0 AND scanned_at >= ? THEN 1 ELSE 0 END) AS active_arbs,
+              AVG(CASE WHEN best_roi_pct <= ? THEN best_roi_pct END) AS avg_roi,
+              SUM(CASE WHEN best_roi_pct <= ? THEN best_profit ELSE 0 END) AS total_profit
+            FROM scan_results ${w}`,
+      args: [suspiciousRoi, suspiciousRoi, fiveMinAgo, suspiciousRoi, suspiciousRoi, ...args],
+    }),
+    c.execute({
+      sql: `SELECT substr(scanned_at, 1, 10) AS day, COUNT(*) AS cnt
+            FROM scan_results ${w} GROUP BY day`,
+      args,
+    }),
+    c.execute({
+      sql: `SELECT
+              SUM(CASE WHEN best_roi_pct >= 0  AND best_roi_pct < 2  THEN 1 ELSE 0 END) AS b0,
+              SUM(CASE WHEN best_roi_pct >= 2  AND best_roi_pct < 5  THEN 1 ELSE 0 END) AS b1,
+              SUM(CASE WHEN best_roi_pct >= 5  AND best_roi_pct < 10 THEN 1 ELSE 0 END) AS b2,
+              SUM(CASE WHEN best_roi_pct >= 10 AND best_roi_pct < 20 THEN 1 ELSE 0 END) AS b3,
+              SUM(CASE WHEN best_roi_pct >= 20 THEN 1 ELSE 0 END) AS b4
+            FROM scan_results ${w}`,
+      args,
+    }),
+    c.execute({
+      sql: `SELECT substr(scanned_at, 1, 13) || ':00:00' AS hour,
+                   COUNT(*) AS scans, AVG(best_roi_pct) AS avg_roi
+            FROM scan_results ${w} GROUP BY hour ORDER BY hour`,
+      args,
+    }),
+    c.execute({
+      sql: `SELECT substr(scanned_at, 1, 13) || ':00:00' AS hour,
+                   SUM(best_profit) AS profit
+            FROM scan_results ${w} GROUP BY hour ORDER BY hour`,
+      args,
+    }),
+    c.execute({
+      // Best-ROI scan per market among non-phantom positive arbs, top 10.
+      sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit,
+                   strategy, positive_arb_count, scanned_at
+            FROM (
+              SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY market_id ORDER BY best_roi_pct DESC
+              ) AS rn
+              FROM scan_results ${w}
+                AND positive_arb_count > 0 AND best_roi_pct <= ?
+            ) WHERE rn = 1
+            ORDER BY best_roi_pct DESC LIMIT 10`,
+      args: [...args, suspiciousRoi],
+    }),
+    c.execute({
+      sql: `SELECT COUNT(*) AS cnt FROM (
+              SELECT market_id FROM scan_results ${w}
+              GROUP BY market_id HAVING COUNT(*) > 1
+            )`,
+      args,
+    }),
+    c.execute({
+      // Markets that had positive arbs in-range but no scans in the last 24h
+      sql: `SELECT COUNT(*) AS cnt FROM (
+              SELECT DISTINCT market_id FROM scan_results ${w} AND positive_arb_count > 0
+            ) a
+            WHERE market_id NOT IN (
+              SELECT DISTINCT market_id FROM scan_results WHERE scanned_at >= ?
+            )`,
+      args: [...args, dayAgo],
+    }),
+  ]);
+
+  const k = (kpiRes.rows as any[])[0] ?? {};
+  const bucketRow = (bucketRes.rows as any[])[0] ?? {};
+  // Keep low/high — DashboardPanel colors buckets by b.low
+  const bucketDefs = [
+    { label: '0–2%', low: 0, high: 2 },
+    { label: '2–5%', low: 2, high: 5 },
+    { label: '5–10%', low: 5, high: 10 },
+    { label: '10–20%', low: 10, high: 20 },
+    { label: '20%+', low: 20, high: Infinity },
+  ];
+  const perDay = new Map((perDayRes.rows as any[]).map((r) => [r.day, Number(r.cnt)]));
+
+  // Fixed 30-day window for the scans-per-day chart (fills gaps with 0)
+  const scansPerDay: { date: string; count: number }[] = [];
+  const todayMid = new Date();
+  const today = new Date(todayMid.getFullYear(), todayMid.getMonth(), todayMid.getDate());
+  for (let i = 29; i >= 0; i--) {
+    const ds = new Date(today.getTime() - i * 86400000).toISOString().slice(0, 10);
+    scansPerDay.push({ date: ds, count: perDay.get(ds) ?? 0 });
+  }
+
+  return {
+    kpis: {
+      totalScans: Number(k.total_scans ?? 0),
+      totalArbsFound: Number(k.total_arbs ?? 0),
+      activeArbs: Number(k.active_arbs ?? 0),
+      avgRoi: Number(k.avg_roi ?? 0),
+      marketsTracked: Number(k.markets_tracked ?? 0),
+      totalProfit: Number(k.total_profit ?? 0),
+    },
+    scansPerDay,
+    roiBuckets: bucketDefs.map((d, i) => ({ ...d, count: Number(bucketRow[`b${i}`] ?? 0) })),
+    timeline: (hourRes.rows as any[]).map((r) => ({
+      time: r.hour,
+      scans: Number(r.scans),
+      avgRoi: +Number(r.avg_roi ?? 0).toFixed(2),
+    })),
+    profitTimeline: (profitRes.rows as any[]).map((r) => ({
+      time: r.hour,
+      profit: +Number(r.profit ?? 0).toFixed(2),
+    })),
+    topActiveArbs: (topRes.rows as any[]).map((r) => ({
+      id: r.id,
+      market_id: r.market_id,
+      market_title: r.market_title || null,
+      best_roi_pct: r.best_roi_pct,
+      best_profit: r.best_profit,
+      strategy: r.strategy,
+      positive_arb_count: r.positive_arb_count,
+      scanned_at: r.scanned_at,
+    })),
+    recurringArbs: Number((recurRes.rows as any[])[0]?.cnt ?? 0),
+    vanishedArbs: Number((vanishedRes.rows as any[])[0]?.cnt ?? 0),
+  };
+}
+
 export interface LastScanResult {
   bestRoiPct: number;      // t.ex. 26.5 (for backward compat / display)
   bestProfit: number;       // t.ex. 265

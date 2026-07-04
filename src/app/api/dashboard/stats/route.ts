@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanRowsSince, getSavedMarkets } from '@/lib/persistence';
+import { getDashboardAggregates, getSavedMarkets } from '@/lib/persistence';
 import { classifyMarket } from '@/lib/market-classification';
 import { clientSafeError } from '@/lib/error-handler';
 
@@ -10,6 +10,9 @@ import { clientSafeError } from '@/lib/error-handler';
  *   range   — "today" | "7d" | "30d" | "90d" | "all" (default: "30d")
  *
  * Returns aggregated dashboard statistics from scan_results.
+ * PERF-P4: all row aggregation happens in SQLite (GROUP BY / window fn);
+ * only the market-coverage pie (needs classifyMarket) stays in JS over the
+ * ~500 saved markets.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -39,125 +42,15 @@ export async function GET(request: NextRequest) {
         since = new Date(now.getTime() - 30 * 86400000).toISOString();
     }
 
-    // PERF-P1: date filter runs in SQL, and only slim columns are fetched
-    // (raw_result blobs excluded). JS aggregation over slim rows is cheap.
-    const rows = await getScanRowsSince(since);
-
-    // ── KPI aggregations ──────────────────────────────────────
-    const totalScans = rows.length;
-
-    // Phantom guard for value aggregations: rows with ROI above the
-    // suspicious threshold are one-tick empty-book quotes, not fillable arbs.
-    // They stay in scan counts but are excluded from ROI/profit math.
-    const SUSPICIOUS_ROI_KPI = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
-    const cleanRows = rows.filter((r: any) => (r.best_roi_pct ?? 0) <= SUSPICIOUS_ROI_KPI);
-
-    // Total arbs found (sum of positive_arb_count)
-    const totalArbsFound = cleanRows.reduce((s: number, r: any) => s + (r.positive_arb_count ?? 0), 0);
-
-    // Active arbs now: scans in the last 5 minutes with positive_arb_count > 0
-    const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
-    const activeArbs = cleanRows.filter(
-      (r: any) => (r.scanned_at ?? '') >= fiveMinAgo && (r.positive_arb_count ?? 0) > 0
-    ).length;
-
-    // Average ROI (net of fees — stored as-is in DB)
-    const avgRoi = cleanRows.length > 0
-      ? cleanRows.reduce((s: number, r: any) => s + (r.best_roi_pct ?? 0), 0) / cleanRows.length
-      : 0;
-
-    // Distinct markets tracked
-    const marketsSet = new Set(rows.map((r: any) => r.market_id).filter(Boolean));
-    const marketsTracked = marketsSet.size;
-
-    // Total profit (sum of best_profit, net of fees)
-    const totalProfit = cleanRows.reduce((s: number, r: any) => s + (r.best_profit ?? 0), 0);
-
-    // ── Scans-per-day (last 30 days) ──────────────────────────
-    const scansPerDay: { date: string; count: number }[] = [];
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today.getTime() - i * 86400000);
-      const ds = d.toISOString().slice(0, 10);
-      const count = rows.filter(
-        (r: any) => (r.scanned_at ?? '').slice(0, 10) === ds
-      ).length;
-      scansPerDay.push({ date: ds, count });
-    }
-
-    // ── ROI Distribution histogram ────────────────────────────
-    const roiBuckets = [
-      { label: '0–2%', low: 0, high: 2, count: 0 },
-      { label: '2–5%', low: 2, high: 5, count: 0 },
-      { label: '5–10%', low: 5, high: 10, count: 0 },
-      { label: '10–20%', low: 10, high: 20, count: 0 },
-      { label: '20%+', low: 20, high: Infinity, count: 0 },
-    ];
-    rows.forEach((r: any) => {
-      const roi = r.best_roi_pct ?? 0;
-      for (const b of roiBuckets) {
-        if (roi >= b.low && roi < b.high) { b.count++; break; }
-      }
-    });
-
-    // ── Timeline data (hourly buckets for line chart) ──────────
-    const timelineData: { time: string; scans: number; avgRoi: number }[] = [];
-    const hourlyMap = new Map<string, { scans: number; roiSum: number }>();
-    rows.forEach((r: any) => {
-      const ts = r.scanned_at ?? '';
-      // Bucket by hour
-      const bucket = ts.slice(0, 13) + ':00:00';
-      const entry = hourlyMap.get(bucket);
-      if (entry) {
-        entry.scans++;
-        entry.roiSum += r.best_roi_pct ?? 0;
-      } else {
-        hourlyMap.set(bucket, { scans: 1, roiSum: r.best_roi_pct ?? 0 });
-      }
-    });
-    const sortedHours = [...hourlyMap.keys()].sort();
-    for (const h of sortedHours) {
-      const e = hourlyMap.get(h)!;
-      timelineData.push({
-        time: h,
-        scans: e.scans,
-        avgRoi: e.scans > 0 ? +(e.roiSum / e.scans).toFixed(2) : 0,
-      });
-    }
-
-    // ── Top active arbs (recent scans with positive arbs) ──────
-    // Dedupe by market (keep best-ROI scan per market) so one hot market
-    // doesn't fill all 10 rows.
-    // BUG: phantom filter — historical scan rows predate the suspicious-arb
-    // guard in /api/scan, and one 87%+ phantom tick (empty orderbook quote)
-    // would otherwise own a market's slot for the whole range. Real
-    // cross-platform arbs live in the 1–5% band; anything above the
-    // suspicious threshold in *history* is noise, so exclude it here too.
+    // Phantom guard: rows with ROI above the suspicious threshold are
+    // one-tick empty-book quotes, not fillable arbs. They stay in scan
+    // counts/histograms but are excluded from ROI/profit KPIs and top arbs.
     const SUSPICIOUS_ROI = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
-    const bestPerMarket = new Map<string, any>();
-    for (const r of rows) {
-      if ((r.positive_arb_count ?? 0) <= 0) continue;
-      if ((r.best_roi_pct ?? 0) > SUSPICIOUS_ROI) continue; // phantom tick
-      const prev = bestPerMarket.get(r.market_id);
-      if (!prev || (r.best_roi_pct ?? 0) > (prev.best_roi_pct ?? 0)) {
-        bestPerMarket.set(r.market_id, r);
-      }
-    }
-    const topActiveArbs = [...bestPerMarket.values()]
-      .sort((a: any, b: any) => (b.best_roi_pct ?? 0) - (a.best_roi_pct ?? 0))
-      .slice(0, 10)
-      .map((r: any) => ({
-        id: r.id,
-        market_id: r.market_id,
-        market_title: r.market_title || null,
-        best_roi_pct: r.best_roi_pct,
-        best_profit: r.best_profit,
-        strategy: r.strategy,
-        positive_arb_count: r.positive_arb_count,
-        scanned_at: r.scanned_at,
-      }));
+
+    const agg = await getDashboardAggregates(since, SUSPICIOUS_ROI);
 
     // ── Market Coverage (pie chart data) ───────────────────────
+    // classifyMarket is JS-only — runs over ~500 saved markets, cheap.
     const savedMarkets = await getSavedMarkets();
     const marketCategoryCounts: Record<string, number> = {
       Politics: 0,
@@ -185,68 +78,27 @@ export async function GET(request: NextRequest) {
       value,
     }));
 
-    // ── Profit Timeline (area chart data) ──────────────────────
-    const profitHourlyMap = new Map<string, number>();
-    rows.forEach((r: any) => {
-      const ts = r.scanned_at ?? '';
-      const bucket = ts.slice(0, 13) + ':00:00';
-      profitHourlyMap.set(bucket, (profitHourlyMap.get(bucket) ?? 0) + (r.best_profit ?? 0));
-    });
-    const profitTimeline = [...profitHourlyMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([time, profit]) => ({
-        time,
-        profit: +profit.toFixed(2),
-      }));
-
-    // ── Lifecycle Funnel ────────────────────────────────────────
-    // Count how many times each market appears in scan history
-    const marketScanCounts = new Map<string, number>();
-    rows.forEach((r: any) => {
-      marketScanCounts.set(r.market_id, (marketScanCounts.get(r.market_id) ?? 0) + 1);
-    });
-    const recurringArbs = [...marketScanCounts.values()].filter(c => c > 1).length;
-
-    // Vanished: markets that had arbs historically but not in recent scans
-    const recentWindow = new Date(Date.now() - 24 * 3600000).toISOString();
-    const recentMarkets = new Set(
-      rows.filter((r: any) => (r.scanned_at ?? '') >= recentWindow).map((r: any) => r.market_id)
-    );
-    const allMarketsWithArbs = new Set(
-      rows.filter((r: any) => (r.positive_arb_count ?? 0) > 0).map((r: any) => r.market_id)
-    );
-    const vanishedArbs = [...allMarketsWithArbs].filter(
-      (mid) => !recentMarkets.has(mid)
-    ).length;
-
     // Expired: saved markets past their expiry date
     const expiredArbs = savedMarkets.filter(
       (m) => m.expiryDate && new Date(m.expiryDate) < now
     ).length;
 
     const lifecycleFunnel = {
-      found: totalArbsFound,
-      active: activeArbs,
-      recurring: recurringArbs,
-      vanished: vanishedArbs,
+      found: agg.kpis.totalArbsFound,
+      active: agg.kpis.activeArbs,
+      recurring: agg.recurringArbs,
+      vanished: agg.vanishedArbs,
       expired: expiredArbs,
     };
 
     return NextResponse.json({
-      kpis: {
-        totalArbsFound,
-        activeArbs,
-        totalScans,
-        avgRoi,
-        marketsTracked,
-        totalProfit,
-      },
-      scansPerDay,
-      roiDistribution: roiBuckets,
-      timeline: timelineData,
-      topActiveArbs,
+      kpis: agg.kpis,
+      scansPerDay: agg.scansPerDay,
+      roiDistribution: agg.roiBuckets,
+      timeline: agg.timeline,
+      topActiveArbs: agg.topActiveArbs,
       marketCoverage,
-      profitTimeline,
+      profitTimeline: agg.profitTimeline,
       lifecycleFunnel,
       range,
     }, {
