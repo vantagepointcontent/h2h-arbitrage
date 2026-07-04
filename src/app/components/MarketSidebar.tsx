@@ -8,6 +8,19 @@ import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 
+/** Format a "time ago" string from an ISO timestamp for the sidebar hover tooltip. */
+function formatTimeAgo(scannedAt: string | null | undefined): string {
+  if (!scannedAt) return "Never";
+  const diffSec = Math.round((Date.now() - new Date(scannedAt).getTime()) / 1000);
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
 /* ── Nav Button (collapsible sidebar icon button) ── */
 function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; collapsed: boolean }) {
   if (collapsed) {
@@ -355,18 +368,7 @@ export function MarketSidebar({
                       className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
                         isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
                       }`}
-                      title={`Latest scanned: ${(() => {
-                        const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
-                        if (!scannedAt) return "Never";
-                        const diffSec = Math.round((Date.now() - new Date(scannedAt).getTime()) / 1000);
-                        if (diffSec < 60) return `${diffSec}s ago`;
-                        const diffMin = Math.round(diffSec / 60);
-                        if (diffMin < 60) return `${diffMin}m ago`;
-                        const diffHr = Math.round(diffMin / 60);
-                        if (diffHr < 24) return `${diffHr}h ago`;
-                        const diffDay = Math.round(diffHr / 24);
-                        return `${diffDay}d ago`;
-                      })()}`}
+                      title={`Latest scanned: ${formatTimeAgo(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt)}`}
                     >
                       <button
                         onClick={(e) => {
