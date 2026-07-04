@@ -6,8 +6,43 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const fields = searchParams.get('fields') || 'full';
+    const id = searchParams.get('id');
 
     const markets = await getSavedMarkets();
+
+    // Single full market by id — used by loadMarket() for instant-load allArbs
+    if (id) {
+      const market = markets.find((m: any) => m.id === id) ?? null;
+      return NextResponse.json({ market }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+    }
+
+    if (fields === 'basic') {
+      // Slim payload: keep all scalar fields but reduce allArbs entries to
+      // { expectedProfit } — the only field sidebar/overview read from the
+      // blob (arb counts + profit totals). Full blobs come from ?id= fetch.
+      const basic = markets.map((m: any) => ({
+        ...m,
+        lastScanResult: m.lastScanResult
+          ? {
+              ...m.lastScanResult,
+              allArbs: Array.isArray(m.lastScanResult.allArbs)
+                ? m.lastScanResult.allArbs.map((a: any) => ({ expectedProfit: a.expectedProfit ?? 0 }))
+                : m.lastScanResult.allArbs,
+            }
+          : null,
+      }));
+      return NextResponse.json({ markets: basic }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+    }
 
     if (fields === 'names') {
       // Ultra-light: just {id, eventTitle} for lookups (~20KB for 500 markets)

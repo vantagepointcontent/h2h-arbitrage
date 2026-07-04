@@ -16,6 +16,8 @@ function getClient() {
   if (!_client) {
     _client = createClient({ url: `file:${SQLITE_PATH}` });
     void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+    void _client.execute('PRAGMA journal_mode = WAL').catch(() => {});
+    void _client.execute('PRAGMA synchronous = NORMAL').catch(() => {});
   }
   return _client;
 }

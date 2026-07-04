@@ -362,7 +362,7 @@ export default function Home() {
   // Saved markets
   const loadSavedMarkets = async (): Promise<SavedMarket[]> => {
     try {
-      const res = await fetch("/api/saved-markets");
+      const res = await fetch("/api/saved-markets?fields=basic");
       if (res.ok) {
         const data = await res.json();
         setSavedMarkets(data.markets || []);
@@ -540,7 +540,7 @@ export default function Home() {
   };
 
   // Navigate to market detail
-  const loadMarket = (m: SavedMarket) => {
+  const loadMarket = async (m: SavedMarket) => {
     setKalshiUrl(m.kalshiUrl);
     setPmUrl(m.polymarketUrl);
     setActiveMarketId(m.id);
@@ -554,8 +554,21 @@ export default function Home() {
     const expiryMs = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
     const isExpired = expiryMs > 0 && expiryMs <= now;
 
-    // Build cached result from lastScanResult/liveResult to show instantly
-    const cached = m.liveResult ?? m.lastScanResult;
+    // Build cached result from lastScanResult/liveResult to show instantly.
+    // Sidebar payload (fields=basic) strips allArbs — fetch the single full
+    // market by id (tiny, local) when the blob is missing.
+    let cached = m.liveResult ?? m.lastScanResult;
+    const hasFullArbs = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.artist !== undefined);
+    if (cached && !hasFullArbs && !isExpired) {
+      try {
+        const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`);
+        if (r.ok) {
+          const d = await r.json();
+          const full = d.market?.liveResult ?? d.market?.lastScanResult;
+          if (full) cached = full;
+        }
+      } catch { /* fall back to blob-less cached */ }
+    }
     if (cached && !isExpired) {
       const cachedResult: ScanResult = {
         eventTitle: m.eventTitle,

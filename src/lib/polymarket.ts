@@ -45,6 +45,9 @@ export function isPolymarketMarketUrl(url: string): boolean {
 }
 
 import { rateLimiters } from '@/lib/rate-limiter';
+import { createTtlMemo } from '@/lib/ttl-cache';
+
+const gammaEventMemo = createTtlMemo<PMEvent | null>(10_000);
 
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
@@ -53,6 +56,7 @@ function debugLog(...args: unknown[]) {
 }
 
 export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null> {
+  return gammaEventMemo(`event:${slug}`, async () => {
   const res = await rateLimiters.gamma.execute(() =>
     fetch(
       `https://gamma-api.polymarket.com/events/slug/${slug}?_t=${Date.now()}`,
@@ -67,6 +71,7 @@ export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null
   const data = await res.json();
   debugLog('[PM gamma] slug:', slug, 'markets:', (data.markets || []).map((m: PMMarket) => ({ q: m.question?.slice(0, 20), p: m.outcomePrices })));
   return data;
+  });
 }
 
 /**
@@ -76,6 +81,7 @@ export async function fetchPolymarketEvent(slug: string): Promise<PMEvent | null
  * Falls back to wrapping just the single market if event lookup fails.
  */
 export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEvent | null> {
+  return gammaEventMemo(`market:${slug}`, async () => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
@@ -138,6 +144,7 @@ export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEven
   } finally {
     clearTimeout(timer);
   }
+  });
 }
 
 export function parseOutcomes(market: PMMarket): { outcomes: string[]; prices: number[] } {

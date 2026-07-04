@@ -15,6 +15,8 @@ function getClient() {
     // Wait up to 5s on writer contention instead of failing SQLITE_BUSY
     // (Next.js, poller-driven scans, and ws-watcher all write this file).
     void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+    void _client.execute('PRAGMA journal_mode = WAL').catch(() => {});
+    void _client.execute('PRAGMA synchronous = NORMAL').catch(() => {});
   }
   return _client;
 }

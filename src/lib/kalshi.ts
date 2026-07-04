@@ -2,6 +2,7 @@
 // Base URL: https://external-api.kalshi.com/trade-api/v2
 
 import { rateLimiters } from '@/lib/rate-limiter';
+import { createTtlMemo } from '@/lib/ttl-cache';
 
 export interface KalshiMarket {
   ticker: string;
@@ -79,7 +80,11 @@ export function extractKalshiTicker(url: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
+const kalshiMemo = createTtlMemo<KalshiMarket[]>(10_000);
+const kalshiSingleMemo = createTtlMemo<KalshiMarket | null>(10_000);
+
 export async function fetchKalshiEventMarkets(eventTicker: string): Promise<KalshiMarket[]> {
+  return kalshiMemo(`event:${eventTicker}`, async () => {
   const res = await rateLimiters.kalshi.execute(() =>
     fetch(
       `https://external-api.kalshi.com/trade-api/v2/markets?event_ticker=${eventTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
@@ -89,9 +94,11 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
   return data.markets || [];
+  });
 }
 
 export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<KalshiMarket[]> {
+  return kalshiMemo(`series:${seriesTicker}`, async () => {
   const res = await rateLimiters.kalshi.execute(() =>
     fetch(
       `https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=${seriesTicker}&status=open&depthP=Infinity&_t=${Date.now()}`,
@@ -101,9 +108,11 @@ export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<Ka
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
   return data.markets || [];
+  });
 }
 
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {
+  return kalshiSingleMemo(`market:${ticker}`, async () => {
   const res = await rateLimiters.kalshi.execute(() =>
     fetch(
       `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
@@ -113,4 +122,5 @@ export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | 
   if (!res.ok) return null;
   const data = await res.json();
   return data.market || null;
+  });
 }

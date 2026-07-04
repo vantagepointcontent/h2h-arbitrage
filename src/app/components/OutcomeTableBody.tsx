@@ -39,7 +39,7 @@ interface OutcomeTableBodyProps {
   marketTitle?: string;
 }
 
-export function OutcomeTableBody({
+function OutcomeTableBodyInner({
   outcomes,
   expandedArtist,
   setExpandedArtist,
@@ -292,3 +292,6 @@ export function OutcomeTableBody({
     </tbody>
   );
 }
+
+// PERF-P0: memoized export — skip re-render when props are shallow-equal
+export const OutcomeTableBody = React.memo(OutcomeTableBodyInner);

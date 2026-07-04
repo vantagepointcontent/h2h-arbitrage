@@ -7,7 +7,7 @@ import { computeApy } from "@/lib/matcher";
 import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime } from "@/app/lib/page-shared";
 
 /* ── Overview Panel ── */
-export function OverviewPanel({
+function OverviewPanelInner({
   markets,
   loading,
   onLoad,
@@ -124,10 +124,13 @@ export function OverviewPanel({
     return 0;
   };
 
-  const sorted = [...markets].sort(sortFn);
+  // PERF-P0: memoize sort/filter pipelines + aggregates (400+ markets)
+  const sorted = useMemo(() => [...markets].sort(sortFn),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markets, sort, sortDir]);
 
   // Apply expiry filter
-  const filteredByExpiry = [...markets].filter(m => {
+  const filteredByExpiry = useMemo(() => [...markets].filter(m => {
     if (!showExpired) {
       // UI-013: expired = past expiryDate OR PM reports the market closed
       const isExpired =
@@ -146,13 +149,18 @@ export function OverviewPanel({
     if (!showArbOnly) return true;
     const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
     return roi > 0;
-  }).sort(sortFn);
+  }).sort(sortFn),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markets, showExpired, expiryFilter, showArbOnly, sort, sortDir]);
 
   // Aggregate stats (respect current filter)
-  const totalMarkets = filteredByExpiry.length;
-  const totalProfit = filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0), 0);
-  const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
-  const arbOpportunities = filteredByExpiry.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
+  const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
+    const totalMarkets = filteredByExpiry.length;
+    const totalProfit = filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0), 0);
+    const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
+    const arbOpportunities = filteredByExpiry.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
+    return { totalMarkets, totalProfit, avgRoi, arbOpportunities };
+  }, [filteredByExpiry]);
 
   return (
     <div className="space-y-5">
@@ -387,3 +395,5 @@ export function OverviewPanel({
   );
 }
 
+// PERF-P0: memoized export — skip re-render when props are shallow-equal
+export const OverviewPanel = React.memo(OverviewPanelInner);

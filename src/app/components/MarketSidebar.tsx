@@ -53,7 +53,7 @@ function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.Re
 }
 
 /* ── Market Sidebar ── */
-export function MarketSidebar({
+function MarketSidebarInner({
   markets,
   activeId,
   viewMode,
@@ -150,8 +150,8 @@ export function MarketSidebar({
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
-  // Filter + sort
-  const filtered = markets.filter(m => {
+  // Filter + sort (memoized — PERF-P0: avoid re-running over 400+ markets on every parent render)
+  const filtered = useMemo(() => markets.filter(m => {
     // UI-013: expired = past expiryDate OR PM reports the market closed
     // (PM endDate is often far future even after resolution).
     const isExpired =
@@ -199,7 +199,7 @@ export function MarketSidebar({
       return mul * (sa - sb);
     }
     return 0;
-  });
+  }), [markets, showExpired, expiryFilter, sidebarCategory, sidebarSearch, sidebarFavoritesOnly, favoriteIds, showArbOnly, sort, sortDir]);
 
   return (
     <>
@@ -450,3 +450,5 @@ export function MarketSidebar({
   );
 }
 
+// PERF-P0: memoized export — skip re-render when props are shallow-equal
+export const MarketSidebar = React.memo(MarketSidebarInner);
