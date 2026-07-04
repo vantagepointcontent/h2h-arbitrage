@@ -231,7 +231,7 @@ export function MarketSidebar({
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <h2 className="text-xs font-semibold text-[#8A9BA8] tracking-wide uppercase">Saved Markets ({markets.length})</h2>
+                  <h2 className="text-xs font-semibold text-[#8A9BA8] tracking-wide uppercase">Saved Markets ({filtered.length}{filtered.length !== markets.length ? `/${markets.length}` : ""})</h2>
                   <button
                     onClick={onToggleSidebarFavorites}
                     className={`p-0.5 rounded transition-colors ${
