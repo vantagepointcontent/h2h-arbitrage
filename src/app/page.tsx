@@ -215,7 +215,24 @@ export default function Home() {
               handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
             }
           } else {
+            // Market not in saved_markets — fall back to scan_results for URLs
             setViewMode("scan");
+            fetch(`/api/saved-markets?id=${encodeURIComponent(state.marketId)}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(d => {
+                const fm = d?.market;
+                if (fm?.kalshiUrl && fm?.polymarketUrl) {
+                  setKalshiUrl(fm.kalshiUrl);
+                  setPmUrl(fm.polymarketUrl);
+                  kalshiUrlRef.current = fm.kalshiUrl;
+                  pmUrlRef.current = fm.polymarketUrl;
+                  setResult(null);
+                  previousPricesRef.current = new Map();
+                  setPriceChanges(new Map());
+                  handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
+                }
+              })
+              .catch(() => {});
           }
         } else {
           setViewMode("scan");
@@ -252,7 +269,23 @@ export default function Home() {
           setViewMode("scan");
           handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
         } else {
+          // Market not in saved_markets (archived/never saved).
+          // Fall back to scan_results to find URLs and auto-rescan.
           setViewMode("scan");
+          try {
+            const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(marketId)}`);
+            if (r.ok) {
+              const d = await r.json();
+              const fm = d?.market;
+              if (fm?.kalshiUrl && fm?.polymarketUrl) {
+                setKalshiUrl(fm.kalshiUrl);
+                setPmUrl(fm.polymarketUrl);
+                kalshiUrlRef.current = fm.kalshiUrl;
+                pmUrlRef.current = fm.polymarketUrl;
+                handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
+              }
+            }
+          } catch { /* market not found anywhere — show empty form */ }
         }
       } else if (view === "overview") {
         // Backwards compat: old ?view=overview URLs redirect to Markets (now "overview" viewMode)

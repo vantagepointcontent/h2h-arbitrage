@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult } from '@/lib/persistence';
+import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult, getMarketUrlsById } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
@@ -14,6 +14,16 @@ export async function GET(request: NextRequest) {
     // Single full market by id — used by loadMarket() for instant-load allArbs
     if (id) {
       const market = markets.find((m: any) => m.id === id) ?? null;
+      // Fallback: if market isn't in saved_markets (archived/never saved),
+      // look up URLs from scan_results so the scan page can auto-rescan.
+      if (!market) {
+        const urls = await getMarketUrlsById(id);
+        if (urls) {
+          return NextResponse.json({ market: { id, kalshiUrl: urls.kalshiUrl, polymarketUrl: urls.polymarketUrl, eventTitle: '', fromScanResults: true } }, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }
+          });
+        }
+      }
       return NextResponse.json({ market }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -109,6 +119,8 @@ export async function POST(request: NextRequest) {
           totalStake: body.scanResult.totalStake,
           raw: body.scanResult.raw,
           marketTitle: market.eventTitle,
+          kalshiUrl: body.kalshiUrl,
+          polymarketUrl: body.polymarketUrl,
         });
         return NextResponse.json({ market, scanResultId: saved.id }, { status: 201 });
       } catch (scanErr: any) {

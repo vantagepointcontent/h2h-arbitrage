@@ -359,6 +359,8 @@ export async function POST(request: NextRequest) {
           // zero-arb scans (vast majority) get NULL, keeping the DB lean.
           raw: (scanResult.allArbs?.length ?? 0) > 0 ? { allArbs: scanResult.allArbs } : undefined,
           marketTitle: pmEvent.title || market.eventTitle,
+          kalshiUrl,
+          polymarketUrl,
         });
 
         // ── Arb lifecycle tracking: open/extend/close episodes ──

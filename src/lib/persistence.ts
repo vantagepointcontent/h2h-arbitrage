@@ -43,13 +43,19 @@ async function initDb(): Promise<void> {
       total_stake     REAL    NOT NULL DEFAULT 0,
       scanned_at      TEXT    NOT NULL,
       raw_result      TEXT,   -- full JSON payload for later drill-down
-      market_title    TEXT    -- human-readable market name (BUG-030: prevents raw IDs in Logs)
+      market_title    TEXT,   -- human-readable market name (BUG-030: prevents raw IDs in Logs)
+      kalshi_url      TEXT,   -- source Kalshi URL for re-scanning (not in saved_markets)
+      polymarket_url  TEXT    -- source Polymarket URL for re-scanning
     )
   `);
-  // Migration: add market_title column if missing (existing DBs)
-  try {
-    await c.execute(`ALTER TABLE scan_results ADD COLUMN market_title TEXT`);
-  } catch { /* column already exists */ }
+  // Migration: add columns if missing (existing DBs)
+  for (const ddl of [
+    `ALTER TABLE scan_results ADD COLUMN market_title TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN kalshi_url TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN polymarket_url TEXT`,
+  ]) {
+    try { await c.execute(ddl); } catch { /* column already exists */ }
+  }
   // Index for fast per-market lookups
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_market_id ON scan_results(market_id)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_scanned_at ON scan_results(scanned_at DESC)`);
@@ -122,6 +128,8 @@ export async function saveScanResult(
     totalStake?: number;
     raw?: unknown;
     marketTitle?: string;
+    kalshiUrl?: string;
+    polymarketUrl?: string;
   },
 ): Promise<{ id: number }> {
   await ensureDb();
@@ -130,8 +138,9 @@ export async function saveScanResult(
     sql: `INSERT INTO scan_results
       (market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
-       positive_arb_count, total_stake, scanned_at, raw_result, market_title)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       positive_arb_count, total_stake, scanned_at, raw_result, market_title,
+       kalshi_url, polymarket_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
       result.bestRoiPct ?? 0,
@@ -146,6 +155,8 @@ export async function saveScanResult(
       result.scannedAt ?? new Date().toISOString(),
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
+      result.kalshiUrl ?? null,
+      result.polymarketUrl ?? null,
     ],
   });
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
@@ -169,6 +180,23 @@ export async function getScanCount(): Promise<number> {
   const c = getClient();
   const result = await c.execute('SELECT COUNT(*) AS cnt FROM scan_results');
   return (result.rows as any[])?.[0]?.cnt ?? 0;
+}
+
+/** PERF-P1: Look up Kalshi & Polymarket URLs from scan_results by market_id.
+ * Uses the idx_scan_results_market_id index — single-column SELECT, no blob.
+ * Returns the most recent non-null pair, or null if none found. */
+export async function getMarketUrlsById(marketId: string): Promise<{ kalshiUrl: string; polymarketUrl: string } | null> {
+  await ensureDb();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT kalshi_url, polymarket_url FROM scan_results
+          WHERE market_id = ? AND kalshi_url IS NOT NULL AND polymarket_url IS NOT NULL
+          ORDER BY scanned_at DESC LIMIT 1`,
+    args: [marketId],
+  });
+  const row = (res.rows as any[])[0];
+  if (!row?.kalshi_url || !row?.polymarket_url) return null;
+  return { kalshiUrl: String(row.kalshi_url), polymarketUrl: String(row.polymarket_url) };
 }
 
 /** Return scan history for a given market (newest first). */
