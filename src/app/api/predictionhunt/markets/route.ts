@@ -22,6 +22,20 @@ import { clientSafeError } from '@/lib/error-handler';
      - category: comma-separated list (e.g. sports,politics)
      - maxDays: number 1-365, filters eventDate <= now + maxDays
    ═══════════════════════════════════════════════════════════════ */
+/** BUG-037: apply the maxDays expiry window to market rows regardless of
+ *  source (fresh fetch OR cached fallback). Undated / invalid / already
+ *  expired rows are excluded. */
+function applyDateWindow(markets: PredictionHuntMarket[], maxDays: number): PredictionHuntMarket[] {
+  const now = Date.now();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + maxDays);
+  return markets.filter((m) => {
+    if (!m.eventDate) return false;
+    const t = new Date(m.eventDate).getTime();
+    return !isNaN(t) && t >= now && t <= cutoff.getTime();
+  });
+}
+
 let phQuotaExhausted = false;
 let phQuotaResetAt = 0;
 
@@ -58,7 +72,8 @@ export async function GET(request: NextRequest) {
 
     // If quota is exhausted, skip fresh calls entirely and return cached data
     if (isPhQuotaExhausted()) {
-      const cached = await getPredictionHuntMarkets();
+      const cachedAll = await getPredictionHuntMarkets();
+      const cached = applyDateWindow(cachedAll, maxDays); // BUG-037
       return NextResponse.json({
         success: true,
         count: cached.length,
@@ -99,9 +114,11 @@ export async function GET(request: NextRequest) {
       let warning: string | undefined;
 
       if (!isPhQuotaExhausted()) {
-        matches = buildMatchedMarketsFromSearch(allEvents, fetchCount);
+        // BUG-037: defensive re-filter — buildMatchedMarketsFromSearch input is
+        // pre-filtered per-term, but enforce the window on the final rows too.
+        matches = applyDateWindow(buildMatchedMarketsFromSearch(allEvents, fetchCount), maxDays);
       } else {
-        matches = await getPredictionHuntMarkets();
+        matches = applyDateWindow(await getPredictionHuntMarkets(), maxDays); // BUG-037
         cachedFallback = true;
         warning = 'PredictionHunt monthly quota exceeded during fetch. Showing cached markets only.';
       }

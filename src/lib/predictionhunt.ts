@@ -336,13 +336,16 @@ function mapEvent(e: any, useTitleFallback: boolean): PhSearchEvent {
   };
 }
 
-/** Filter events by date cutoff. */
+/** Filter events by date cutoff: must expire within [now, now+maxDays]. */
 function filterByDate(events: PhSearchEvent[], maxDays: number): PhSearchEvent[] {
+  const now = Date.now();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + maxDays);
   return events.filter((e) => {
-    if (!e.event_date) return true;
-    return new Date(e.event_date).getTime() <= cutoff.getTime();
+    if (!e.event_date) return false; // BUG-037: undated events must not bypass the expiry window
+    const t = new Date(e.event_date).getTime();
+    if (isNaN(t)) return false;
+    return t >= now && t <= cutoff.getTime(); // BUG-037: also exclude already-expired events
   });
 }
 
