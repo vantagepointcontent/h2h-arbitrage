@@ -334,11 +334,11 @@ export default function DashboardPanel() {
               icon={<Activity className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
                 <span className="text-xs text-[#8A9BA8]">
-                  Scans &amp; ROI trend
+                  {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
             >
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={260} key={`timeline-${range}`}>
                 <LineChart data={data!.timeline}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
@@ -393,7 +393,7 @@ export default function DashboardPanel() {
                 </span>
               }
             >
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={260} key={`scans-${range}`}>
                 <BarChart data={data!.scansPerDay}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
@@ -444,7 +444,7 @@ export default function DashboardPanel() {
                 </span>
               }
             >
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={260} key={`roi-${range}`}>
                 <BarChart
                   data={data!.roiDistribution.map((b) => ({
                     ...b,
@@ -565,11 +565,11 @@ export default function DashboardPanel() {
             icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
             rightElement={
               <span className="text-xs text-[#8A9BA8]">
-                Potential profit per hour
+                {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
               </span>
             }
           >
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={260} key={`profit-${range}`}>
               <AreaChart data={data!.profitTimeline}>
                 <defs>
                   <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
