@@ -387,20 +387,15 @@ export function calculateArbitrageMax(
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
   let hasCandidate = false;
 
-  // Use a small epsilon to avoid floating-point false positives.
-  // 0.06 + 0.94 = 0.9999999999999999 in IEEE 754, which is < 1 but break-even.
-  const SPREAD_EPSILON = 1e-10;
-
-  // UI-03: We track the best candidate strategy even when it's negative (net of
-  // fees), so the UI can show how close a pair is to being profitable. When no
-  // strategy produces a spread < 1 (i.e. no candidate at all), we return 'No arb'
-  // with roiPct 0 — the true "nothing to compute" case.
-
-  if (kYes + pNo < 1 - SPREAD_EPSILON) {
+  // UI-03: Always compute both strategies regardless of spread, so we return
+  // the actual (negative) net ROI even when no arb exists. Victor wants to see
+  // how close a pair is to being profitable. The < 1 gate was hiding all
+  // negative-spread pairs, showing 0.0% instead of the real number.
+  {
+    // Strategy 1: Buy YES Kalshi + NO PM
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
     const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
     const capital = Math.min(capK, capP, maxCapital);
-    // Cap at user's capital; if no depth constraint, use maxCapital
     const effectiveCapital = isFinite(capital) ? capital : maxCapital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
@@ -439,7 +434,8 @@ export function calculateArbitrageMax(
     }
   }
 
-  if (pYes + kNo < 1 - SPREAD_EPSILON) {
+  {
+    // Strategy 2: Buy YES PM + NO Kalshi
     const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
     const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
     const capital = Math.min(capP, capK, maxCapital);
@@ -481,8 +477,9 @@ export function calculateArbitrageMax(
     }
   }
 
-  // UI-03: If no candidate was found (no spread < 1), return 'No arb' with 0.
-  // If a candidate exists but is negative, return it with the actual net roiPct.
+  // UI-03: hasCandidate is now always true when both kalshi and pm have valid
+  // prices — we always computed at least one strategy. The only way it's false
+  // is if effectiveCapital was 0 for both (e.g. zero-depth on all legs).
   if (!hasCandidate) {
     return {
       strategy: 'No arb',
