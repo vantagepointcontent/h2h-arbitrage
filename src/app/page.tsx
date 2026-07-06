@@ -1664,7 +1664,6 @@ export default function Home() {
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi No</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM No</th>
-                              <th className="text-right px-4 py-3.5 font-medium">Spread</th>
                               <th className="text-right px-4 py-3.5 font-medium">ROI</th>
                               <th className="text-right px-4 py-3.5 font-medium">Profit</th>
                               <th className="text-right px-4 py-3.5 font-medium">Stake</th>

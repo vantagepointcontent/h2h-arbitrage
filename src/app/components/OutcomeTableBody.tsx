@@ -107,21 +107,6 @@ function OutcomeTableBodyInner({
         const k = o.kalshi;
         const p = o.polymarket;
         const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
-        // Compute spread based on the actual arbitrage strategy used
-        let spread: number | null = null;
-        if (hasPrices) {
-          const strategy = o.arbitrage.strategy;
-          if (strategy === 'Buy YES Kalshi + NO PM') {
-            spread = (1 - (k!.yesAsk + p!.noPrice)) * 100;
-          } else if (strategy === 'Buy YES PM + NO Kalshi') {
-            spread = (1 - (p!.yesPrice + k!.noAsk)) * 100;
-          } else if (strategy.startsWith('Buy YES both sides')) {
-            spread = (1 - (k!.yesAsk + p!.yesPrice)) * 100;
-          } else {
-            // Fallback: use the simpler spread calculation
-            spread = (p!.yesPrice - k!.yesAsk) * 100;
-          }
-        }
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
         const roiColor = !hasPrices ? "text-[#5E6875]" : o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#5E6875]";
         const isExpanded = expandedArtist === o.artist;
@@ -156,9 +141,6 @@ function OutcomeTableBodyInner({
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
               <td className="px-4 py-3 text-right text-[#5E6875]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
-              <td className={`px-4 py-3 text-right font-medium ${spread != null && spread > 0 ? "text-[#5DBE81]" : spread != null && spread < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
-                {spread != null ? `${spread > 0 ? "+" : ""}${spread.toFixed(2)}` : "—"}
-              </td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className="relative px-4 py-3 text-right group">
                 {!hasPrices || profit <= 0 ? (
@@ -252,7 +234,7 @@ function OutcomeTableBodyInner({
             </tr>
             {isExpanded && (
               <tr className="bg-[#17212B]/50">
-                <td colSpan={8} className="px-4 py-3">
+                <td colSpan={9} className="px-4 py-3">
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Total Stake:</span>
@@ -282,10 +264,10 @@ function OutcomeTableBodyInner({
       })}
       {/* EXEC-002: token-resolution error + confirmation modal */}
       {execError && (
-        <tr><td colSpan={10} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
+        <tr><td colSpan={9} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
       )}
       {executingArb && (
-        <tr><td colSpan={10}>
+        <tr><td colSpan={9}>
           <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
         </td></tr>
       )}
