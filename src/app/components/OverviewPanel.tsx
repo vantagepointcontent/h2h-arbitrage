@@ -156,7 +156,10 @@ function OverviewPanelInner({
   // Aggregate stats (respect current filter)
   const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
     const totalMarkets = filteredByExpiry.length;
-    const totalProfit = filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0), 0);
+    const totalProfit = filteredByExpiry.reduce((sum, m) => {
+      const p = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+      return sum + (p > 0 ? p : 0);
+    }, 0);
     const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
     const arbOpportunities = filteredByExpiry.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
     return { totalMarkets, totalProfit, avgRoi, arbOpportunities };
@@ -167,14 +170,14 @@ function OverviewPanelInner({
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-          <TrendingUp className="w-3 h-3 text-[#5DBE81]" />
+          <TrendingUp className={`w-3 h-3 ${avgRoi > 0 ? "text-[#5DBE81]" : avgRoi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`} />
           <span className="text-[10px] text-[#5E6875]">Avg Yield</span>
-          <span className="text-xs font-bold text-[#5DBE81]">{avgRoi > 0 ? "+" : ""}{formatPercent(avgRoi)}</span>
+          <span className={`text-xs font-bold ${avgRoi > 0 ? "text-[#5DBE81]" : avgRoi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>{avgRoi > 0 ? "+" : ""}{formatPercent(avgRoi)}</span>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-          <DollarSign className="w-3 h-3 text-[#5DBE81]" />
+          <DollarSign className={`w-3 h-3 ${totalProfit > 0 ? "text-[#5DBE81]" : totalProfit < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`} />
           <span className="text-[10px] text-[#5E6875]">Total Profit</span>
-          <span className="text-xs font-bold text-[#5DBE81]">{formatCurrency(totalProfit)}</span>
+          <span className={`text-xs font-bold ${totalProfit > 0 ? "text-[#5DBE81]" : totalProfit < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>{formatCurrency(totalProfit)}</span>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
           <Zap className="w-3 h-3 text-[#facc15]" />

@@ -12,6 +12,7 @@ interface Outcome {
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
+    apyPct?: number;
     kalshiStake?: number;
     pmStake?: number;
     strategy: string;
@@ -142,6 +143,9 @@ function OutcomeTableBodyInner({
               </td>
               <td className="px-4 py-3 text-right text-[#5E6875]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
+              <td className={`px-4 py-3 text-right font-medium ${roiColor}`}>
+                {hasPrices && o.arbitrage.apyPct != null ? formatPercent(o.arbitrage.apyPct) : "—"}
+              </td>
               <td className="relative px-4 py-3 text-right group">
                 {!hasPrices || profit <= 0 ? (
                   <span className="text-[#5E6875]">—</span>
@@ -234,7 +238,7 @@ function OutcomeTableBodyInner({
             </tr>
             {isExpanded && (
               <tr className="bg-[#17212B]/50">
-                <td colSpan={9} className="px-4 py-3">
+                <td colSpan={10} className="px-4 py-3">
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Total Stake:</span>
@@ -264,10 +268,10 @@ function OutcomeTableBodyInner({
       })}
       {/* EXEC-002: token-resolution error + confirmation modal */}
       {execError && (
-        <tr><td colSpan={9} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
+        <tr><td colSpan={10} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
       )}
       {executingArb && (
-        <tr><td colSpan={9}>
+        <tr><td colSpan={10}>
           <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
         </td></tr>
       )}

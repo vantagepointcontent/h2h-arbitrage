@@ -375,7 +375,7 @@ export function calculateArbitrageMax(
   const pYes = pm.bestAsk;
   const pNo = pm.noPrice;
 
-  let maxProfit = 0;
+  let maxProfit = -Infinity;
   let strategy = 'No arb';
   let bestCapital = 0;
   let kalshiStakeResult = 0;
@@ -385,10 +385,16 @@ export function calculateArbitrageMax(
   let sellPlatform: 'kalshi' | 'polymarket' | null = null;
   let sellPrice = 0;
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
+  let hasCandidate = false;
 
   // Use a small epsilon to avoid floating-point false positives.
   // 0.06 + 0.94 = 0.9999999999999999 in IEEE 754, which is < 1 but break-even.
   const SPREAD_EPSILON = 1e-10;
+
+  // UI-03: We track the best candidate strategy even when it's negative (net of
+  // fees), so the UI can show how close a pair is to being profitable. When no
+  // strategy produces a spread < 1 (i.e. no candidate at all), we return 'No arb'
+  // with roiPct 0 — the true "nothing to compute" case.
 
   if (kYes + pNo < 1 - SPREAD_EPSILON) {
     const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
@@ -408,8 +414,8 @@ export function calculateArbitrageMax(
         pNo,
         category,
       );
-      // Only accept if net profit after fees is positive
-      if (fees.worstCaseNetProfit > maxProfit && fees.worstCaseNetProfit > 0) {
+      // UI-03: Track best candidate regardless of sign (not just > 0)
+      if (fees.worstCaseNetProfit > maxProfit) {
         maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES Kalshi + NO PM';
         bestCapital = effectiveCapital;
@@ -428,6 +434,7 @@ export function calculateArbitrageMax(
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         };
+        hasCandidate = true;
       }
     }
   }
@@ -449,8 +456,8 @@ export function calculateArbitrageMax(
         pNo,
         category,
       );
-      // Only accept if net profit after fees is positive
-      if (fees.worstCaseNetProfit > maxProfit && fees.worstCaseNetProfit > 0) {
+      // UI-03: Track best candidate regardless of sign (not just > 0)
+      if (fees.worstCaseNetProfit > maxProfit) {
         maxProfit = fees.worstCaseNetProfit;
         strategy = 'Buy YES PM + NO Kalshi';
         bestCapital = effectiveCapital;
@@ -469,8 +476,27 @@ export function calculateArbitrageMax(
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         };
+        hasCandidate = true;
       }
     }
+  }
+
+  // UI-03: If no candidate was found (no spread < 1), return 'No arb' with 0.
+  // If a candidate exists but is negative, return it with the actual net roiPct.
+  if (!hasCandidate) {
+    return {
+      strategy: 'No arb',
+      kalshiStake: 0,
+      pmStake: 0,
+      expectedProfit: 0,
+      roiPct: 0,
+      maxCapital: 0,
+      buyPlatform: null,
+      buyPrice: 0,
+      sellPlatform: null,
+      sellPrice: 0,
+      fees: undefined,
+    };
   }
 
   return {

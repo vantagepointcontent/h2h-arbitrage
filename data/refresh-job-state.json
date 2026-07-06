@@ -1,9 +1,10 @@
 {
   "running": false,
-  "startedAt": "2026-06-30T17:57:38.512Z",
-  "total": 0,
-  "processed": 0,
-  "succeeded": 0,
+  "startedAt": "2026-07-04T06:45:59.523Z",
+  "total": 272,
+  "processed": 272,
+  "succeeded": 272,
   "failed": 0,
-  "errors": []
+  "errors": [],
+  "finishedAt": "2026-07-04T06:57:54.018Z"
 }

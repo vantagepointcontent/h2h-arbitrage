@@ -478,7 +478,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
   const fmt = (n: number | null) => (n === null ? "—" : n.toFixed(4));
   const fmtUsd = (n: number) =>
     n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-  const roiColor = (roi: number) => (roi > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]");
+  const roiColor = (roi: number) => (roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]");
   const strategyColor = (s: string) => (s !== "No arb" ? "text-[#5DBE81]" : "text-[#FFFFFF]");
 
   return (
@@ -503,7 +503,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
               {selectedMarket ? (
                 <span className="flex items-center gap-2 truncate">
                   <span className="truncate">{selectedMarket.eventTitle}</span>
-                  <span className={`text-xs font-medium ${(selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                  <span className={`text-xs font-medium ${(selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : (selectedMarket.lastScanResult?.bestRoiPct ?? 0) < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
                     {(() => {
                       const roi = selectedMarket.lastScanResult?.bestRoiPct ?? 0;
                       return `${roi > 0 ? "+" : ""}${roi.toFixed(1)}%`;
@@ -857,8 +857,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   const fresh = activeTab.result.outcomes.filter((o) => !o.stale);
                   const staleCount = activeTab.result.outcomes.length - fresh.length;
                   const positiveArbs = fresh.filter((o) => o.roiPct > 0);
-                  const bestRoi = positiveArbs.length > 0
-                    ? Math.max(...positiveArbs.map((o) => o.roiPct))
+                  // UI-03: Best net ROI includes negative values so Victor can see
+                  // how close a pair is to being profitable.
+                  const netArbs = fresh.filter((o) => o.strategy !== 'No arb');
+                  const bestRoi = netArbs.length > 0
+                    ? Math.max(...netArbs.map((o) => o.roiPct))
                     : 0;
                   const totalProfit = fresh.reduce((s, o) => s + o.expectedProfit, 0);
                   return (
@@ -878,8 +881,8 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
                         <div className="text-[10px] text-[#5E6875]">Best ROI</div>
-                        <div className={`text-lg font-bold ${bestRoi > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
-                          {bestRoi > 0 ? `+${bestRoi.toFixed(2)}%` : "0.00%"}
+                        <div className={`text-lg font-bold ${bestRoi > 0 ? "text-[#5DBE81]" : bestRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]"}`}>
+                          {bestRoi > 0 ? `+${bestRoi.toFixed(2)}%` : `${bestRoi.toFixed(2)}%`}
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">

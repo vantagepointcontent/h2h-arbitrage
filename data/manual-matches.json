@@ -3,7 +3,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B70.5",
     "pmConditionId": "0x17f4f170236f32b8cf3acd28282cd24bf308a06f0c165fd28c3234bbc71475fe",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B70.5",
-    "pmTitle": "70-71\u00b0F",
+    "pmTitle": "70-71°F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552284999-i5lhldt",
@@ -13,7 +13,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B72.5",
     "pmConditionId": "0x159075046c879b2c5e66856014ea45973ca55d431ff935ea42aed50a5b9718fa",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B72.5",
-    "pmTitle": "72-73\u00b0F",
+    "pmTitle": "72-73°F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552297191-dpp511v",
@@ -23,7 +23,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B74.5",
     "pmConditionId": "0x4e842a0577a06bfadd37a336f302fbf7e3bf9e5a60d4955859dab5a6546b73fa",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B74.5",
-    "pmTitle": "74-75\u00b0F",
+    "pmTitle": "74-75°F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552306796-axzxykk",
@@ -33,7 +33,7 @@
     "kalshiTicker": "KXHIGHTSEA-26MAY23-B76.5",
     "pmConditionId": "0x350d83b6af8e472ba37c3cac25ecca1a0afde37a005e83a563e6f43331a7f08b",
     "kalshiTitle": "KXHIGHTSEA-26MAY23-B76.5",
-    "pmTitle": "76-77\u00b0F",
+    "pmTitle": "76-77°F",
     "kalshiUrl": "https://kalshi.com/markets/kxhightsea/seattle-maximum-temperature-daily/kxhightsea-26may23",
     "polymarketUrl": "https://polymarket.com/event/highest-temperature-in-seattle-on-may-23-2026",
     "id": "1779552329728-9uh8d9x",
@@ -315,7 +315,7 @@
     "kalshiTicker": "KXNY7D-26-JGUT",
     "pmConditionId": "0x1fcbb222f49bb80d4d54f5004d44c6c7dfc808fd01bc17455c9178e57aaa4744",
     "kalshiTitle": "KXNY7D-26-JGUT",
-    "pmTitle": "Jennifer G\u00fatierrez",
+    "pmTitle": "Jennifer Gútierrez",
     "id": "1781993365267-mlo0ge0",
     "createdAt": "2026-06-20T22:09:25.267Z"
   },
@@ -344,5 +344,53 @@
     "polymarketUrl": "https://polymarket.com/event/spacex-ipo-by",
     "id": "1782688598016-ur1sfah",
     "createdAt": "2026-06-28T23:16:38.016Z"
+  },
+  {
+    "kalshiTicker": "KXALLSVENSKANGAME-26JUL06HACDJU-TIE",
+    "pmConditionId": "0x24e5347b74eb6eddc78a5db464ad8fe61a5eb7352ec1eea1a10b8848225f1ddc",
+    "kalshiTitle": "KXALLSVENSKANGAME-26JUL06HACDJU-TIE",
+    "pmTitle": "Draw (BK Hacken vs. Djurgardens IF)",
+    "id": "1783353697290-8da4bdq",
+    "createdAt": "2026-07-06T16:01:37.290Z"
+  },
+  {
+    "kalshiTicker": "KXALLSVENSKANGAME-26JUL06HACDJU-DJU",
+    "pmConditionId": "0xf07c933a9cc3d375456412ac2957dac977ca8ff133fbc2d4b3696f893c51b0c9",
+    "kalshiTitle": "KXALLSVENSKANGAME-26JUL06HACDJU-DJU",
+    "pmTitle": "Djurgardens IF",
+    "id": "1783353722661-hkvvmh9",
+    "createdAt": "2026-07-06T16:02:02.661Z"
+  },
+  {
+    "kalshiTicker": "KXALLSVENSKANGAME-26JUL06HACDJU-TIE",
+    "pmConditionId": "0x5c8838e05d11c9774c7571ca2ba47f6c9635a339044a5a0e5a352035965c9b84",
+    "kalshiTitle": "KXALLSVENSKANGAME-26JUL06HACDJU-TIE",
+    "pmTitle": "Draw (IF Brommapojkarna vs. GAIS)",
+    "id": "1783354053306-1f7v3rz",
+    "createdAt": "2026-07-06T16:07:33.306Z"
+  },
+  {
+    "kalshiTicker": "KXALLSVENSKANGAME-26JUL06BROGAIS-BRO",
+    "pmConditionId": "0xce7440f2cdf99288fb6c83b871d0e4ecc8a4192e95e30830553c5e437a6b63b9",
+    "kalshiTitle": "KXALLSVENSKANGAME-26JUL06BROGAIS-BRO",
+    "pmTitle": "IF Brommapojkarna",
+    "id": "1783354065048-oopkko0",
+    "createdAt": "2026-07-06T16:07:45.048Z"
+  },
+  {
+    "kalshiTicker": "KXFEDDECISION-26JUL-C25",
+    "pmConditionId": "0x4ede078cae84a5877ac32d7fb48811e5c23549a1904b7df06ff7935c6d79d831",
+    "kalshiTitle": "KXFEDDECISION-26JUL-C25",
+    "pmTitle": "25 bps decrease",
+    "id": "1783354745456-12w55or",
+    "createdAt": "2026-07-06T16:19:05.456Z"
+  },
+  {
+    "kalshiTicker": "KXFEDDECISION-26JUL-H0",
+    "pmConditionId": "0x8bf1c1536ecb1c08fe13c6b71e8ab1f58bf3461c4cb79f5f1679f869a06aef86",
+    "kalshiTitle": "KXFEDDECISION-26JUL-H0",
+    "pmTitle": "No change",
+    "id": "1783354757887-jd8ox39",
+    "createdAt": "2026-07-06T16:19:17.887Z"
   }
 ]

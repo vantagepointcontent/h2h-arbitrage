@@ -176,6 +176,11 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const matchedCount = withArbitrage.filter(o => o.kalshi && o.polymarket).length;
 
   const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
+  // UI-03: Track best net arb (positive OR negative) for display.
+  const netArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
+  const bestNetArb = netArbs.length > 0
+    ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
+    : null;
   const bestArb = positiveArbs.length > 0
     ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
     : null;
@@ -183,16 +188,16 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   return {
     id: market.id,
     eventTitle: market.eventTitle,
-    bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
-    bestProfit: bestArb ? bestArb.arbitrage!.expectedProfit : 0,
-    strategy: bestArb ? bestArb.arbitrage!.strategy : 'No arb',
+    bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
+    bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
+    strategy: bestNetArb ? bestNetArb.arbitrage!.strategy : 'No arb',
     matchedCount,
     kalshiCount,
     pmCount,
     scannedAt: new Date().toISOString(),
-    totalStake: bestArb ? (bestArb.arbitrage!.kalshiStake ?? 0) + (bestArb.arbitrage!.pmStake ?? 0) : 0,
+    totalStake: bestNetArb ? (bestNetArb.arbitrage!.kalshiStake ?? 0) + (bestNetArb.arbitrage!.pmStake ?? 0) : 0,
     expiryDate: pmEvent.endDate,
-    allArbs: positiveArbs.map(o => ({
+    allArbs: netArbs.map(o => ({
       artist: o.artist,
       roiPct: o.arbitrage!.roiPct,
       expectedProfit: o.arbitrage!.expectedProfit,

@@ -1502,7 +1502,7 @@ export default function Home() {
                             { label: "Kalshi", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><span className="text-[8px] font-bold text-[#FFFFFF]">K</span></div>, value: String(result.kalshiCount), valueClass: "text-[#FFFFFF]", dim: false },
                             { label: "Polymarket", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]"><span className="text-[7px] font-bold text-[#FFFFFF]">PM</span></div>, value: String(result.pmCount), valueClass: "text-[#FFFFFF]", dim: false },
                             { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><Check className="w-2.5 h-2.5 text-[#FFFFFF]" /></div>, value: String(result.matchedCount), valueClass: "text-[#FFFFFF]", dim: false },
-                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[#5DBE81]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit ?? 0), 0)), valueClass: "text-[#5DBE81]", dim: !!result.expired },
+                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[#5DBE81]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit > 0 ? o.arbitrage.expectedProfit : 0), 0)), valueClass: "text-[#5DBE81]", dim: !!result.expired },
                             { label: "Expiry", icon: <Clock className="w-3 h-3 text-[#facc15]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[#FFFFFF]", dim: false },
                           ] as const).map((chip) => (
                             <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${chip.dim ? "opacity-50" : ""}`}>
@@ -1665,6 +1665,7 @@ export default function Home() {
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM No</th>
                               <th className="text-right px-4 py-3.5 font-medium">ROI</th>
+                              <th className="text-right px-4 py-3.5 font-medium">APY</th>
                               <th className="text-right px-4 py-3.5 font-medium">Profit</th>
                               <th className="text-right px-4 py-3.5 font-medium">Stake</th>
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>

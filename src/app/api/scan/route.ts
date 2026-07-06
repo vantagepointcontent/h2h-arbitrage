@@ -308,13 +308,21 @@ export async function POST(request: NextRequest) {
         if (suspiciousCount > 0) {
           console.log(`[scan] ${market.eventTitle}: ${suspiciousCount} suspicious arb(s) excluded from stats (ROI > threshold with unknown depth)`);
         }
+        // UI-03: Track best net arb (positive OR negative) for display.
+        // positiveArbs still used for alerts/lifecycle — we don't want to trigger
+        // alerts on negative arbs. netArbs includes the best candidate even when
+        // negative, so the UI shows how close a pair is to profitability.
+        const netArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
+        const bestNetArb = netArbs.length > 0
+          ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
+          : null;
         const bestArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
         const scanResult = {
-          bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
-          bestProfit: bestArb ? bestArb.arbitrage!.expectedProfit : 0,
-          strategy: bestArb ? bestArb.arbitrage!.strategy : 'No arb',
+          bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
+          bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
+          strategy: bestNetArb ? bestNetArb.arbitrage!.strategy : 'No arb',
           outcomeCount: withArbitrage.length,
           matchedCount,
           kalshiCount,
@@ -324,7 +332,7 @@ export async function POST(request: NextRequest) {
           // resolves. Persist PM's own closed signal so the UI can treat
           // closed-but-not-yet-past-endDate markets as expired.
           pmClosed: Boolean(pmEvent.closed) && !pmEvent.active,
-          allArbs: positiveArbs.map(o => ({
+          allArbs: netArbs.map(o => ({
             artist: o.artist,
             roiPct: o.arbitrage!.roiPct,
             expectedProfit: o.arbitrage!.expectedProfit,
@@ -352,7 +360,7 @@ export async function POST(request: NextRequest) {
           matchedCount: scanResult.matchedCount,
           kalshiCount: scanResult.kalshiCount,
           pmCount: scanResult.pmCount,
-          positiveArbCount: scanResult.allArbs?.length ?? 0,
+          positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
           // PERF-P2: raw blob only stored when there are arbs to drill into —
