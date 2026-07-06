@@ -77,7 +77,7 @@ export default function CouplingPanel({
       );
       return {
         kalshiTicker: o.kalshi.ticker,
-        kalshiTitle: o.kalshi.ticker,
+        kalshiTitle: o.artist,
         pmConditionId: o.polymarket.conditionId,
         pmTitle: o.artist,
         source: manualMatch ? "manual" : "auto",

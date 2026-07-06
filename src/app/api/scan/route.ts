@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
       .filter(o => o.kalshi && !o.polymarket)
       .map(o => ({
         ticker: o.kalshi!.ticker,
-        title: o.kalshi!.ticker,
+        title: o.artist,
         artist: o.artist,
         yesAsk: o.kalshi!.yesAsk,
         noAsk: o.kalshi!.noAsk,
