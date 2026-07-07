@@ -106,8 +106,60 @@ async function initDb(): Promise<void> {
 
 // Lazy-init: first call guarantees the table exists
 let _dbInited = false;
+
+/**
+ * CORRUPT-001: Startup integrity guard.
+ * Runs PRAGMA integrity_check on the SQLite DB. If corrupt, attempts to
+ * restore from the latest good backup in data/backups/ before initDb().
+ * Logs to stderr so it shows up in PM2/process logs.
+ */
+async function checkAndRestoreDb(): Promise<void> {
+  const c = getClient();
+  try {
+    const result = await c.execute('PRAGMA integrity_check');
+    const status = (result.rows as any[])[0]?.['integrity_check'] ?? 'ok';
+    if (status === 'ok') return;
+
+    console.error(`[persistence] DB CORRUPT: integrity_check = ${status}. Attempting restore...`);
+
+    // Find latest backup
+    const backupDir = path.join(process.cwd(), 'data', 'backups');
+    const fs2 = await import('fs');
+    if (!fs2.existsSync(backupDir)) {
+      console.error(`[persistence] No backup directory at ${backupDir}. Cannot restore.`);
+      return;
+    }
+    const backups = fs2.readdirSync(backupDir)
+      .filter((f: string) => f.startsWith('edgefinder-') && f.endsWith('.db'))
+      .sort()
+      .reverse();
+    if (backups.length === 0) {
+      console.error(`[persistence] No backups found in ${backupDir}. Cannot restore.`);
+      return;
+    }
+
+    const latest = backups[0];
+    const backupPath = path.join(backupDir, latest);
+    console.error(`[persistence] Restoring from ${backupPath}`);
+
+    // Close current client, copy backup over DB, reset client
+    _client = null;
+    // Remove WAL/SHM — they belong to the old corrupt DB
+    for (const ext of ['-wal', '-shm']) {
+      const p = SQLITE_PATH + ext;
+      try { fs2.unlinkSync(p); } catch { /* may not exist */ }
+    }
+    fs2.copyFileSync(backupPath, SQLITE_PATH);
+    console.error(`[persistence] Restored DB from ${latest}. Re-initializing.`);
+  } catch (err) {
+    // Non-fatal: if integrity check itself fails, let initDb try anyway
+    console.error(`[persistence] Integrity check error (non-fatal):`, err);
+  }
+}
+
 async function ensureDb(): Promise<void> {
   if (_dbInited) return;
+  await checkAndRestoreDb();
   await initDb();
   _dbInited = true;
 }
