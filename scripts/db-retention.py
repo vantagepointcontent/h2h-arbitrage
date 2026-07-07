@@ -23,7 +23,7 @@ from pathlib import Path
 DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "edgefinder.db")
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "backups")
 RETAIN_DAYS = int(os.environ.get("H2H_RETAIN_DAYS", "30"))
-MAX_BACKUPS = int(os.environ.get("H2H_DB_BACKUPS", "7"))
+MAX_BACKUPS = int(os.environ.get("H2H_DB_BACKUPS", "28"))
 
 
 def check_integrity(conn: sqlite3.Connection) -> bool:
