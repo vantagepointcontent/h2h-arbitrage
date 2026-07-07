@@ -177,36 +177,35 @@ export async function POST(request: NextRequest) {
       clobMapLower.set(key.toLowerCase(), val);
     }
 
-    // Enrich markets with CLOB prices (async for neg-risk token orderbooks)
-    const pmMarkets: any[] = [];
-    for (const m of pmMarketsRaw) {
-      const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
-      if (!clob) {
-        pmMarkets.push(m);
-        continue;
-      }
-      const live = await getClobPrices(clob);
-      if (!live) {
-        pmMarkets.push(m);
-        continue;
-      }
-      
-      // DEBUG: Check neg_risk flag
-      if (DEBUG_H2H) {
-        logger.debug('[scan] CLOB neg_risk', { negRisk: clob.neg_risk, conditionId: m.conditionId?.slice(0, 12), question: m.question?.slice(0, 40) });
-      }
-      
-      pmMarkets.push({
-        ...m,
-        // If CLOB has orderbook data, use it. Otherwise keep gamma's bestBid/bestAsk.
-        outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
-        bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
-        bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
-        lastTradePrice: live.lastTradePrice,
-        noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
-        neg_risk: clob.neg_risk, // Preserve neg_risk flag for correct price handling
-      });
-    }
+    // Enrich markets with CLOB prices in PARALLEL (was sequential — neg-risk
+    // markets each make 2 HTTP calls, so 20 outcomes = 40 sequential requests).
+    // getClobPrices already uses the internal CLOB semaphore for book fetches.
+    const pmMarkets: any[] = await Promise.all(
+      pmMarketsRaw.map(async (m) => {
+        const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
+        if (!clob) return m;
+        try {
+          const live = await getClobPrices(clob);
+          if (!live) return m;
+
+          if (DEBUG_H2H) {
+            logger.debug('[scan] CLOB neg_risk', { negRisk: clob.neg_risk, conditionId: m.conditionId?.slice(0, 12), question: m.question?.slice(0, 40) });
+          }
+
+          return {
+            ...m,
+            outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
+            bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
+            bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
+            lastTradePrice: live.lastTradePrice,
+            noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
+            neg_risk: clob.neg_risk,
+          };
+        } catch {
+          return m;
+        }
+      }),
+    );
 
     // Step 1: auto-match (skip if manual mode requested)
     const kalshiRawCount = kalshiMarkets.length;

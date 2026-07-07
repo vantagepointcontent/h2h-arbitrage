@@ -40,13 +40,12 @@ describe('Kalshi/Polymarket fees', () => {
     const r = calculateArbitrageMax(kalshi, pm, 100000, 100000, 100000, 100000, 'Sports');
 
     // PM YES (0.69) + Kalshi NO (0.30) = 0.99 < 1 → gross spread 0.01
-    // But after fees (Kalshi NO sell + PM YES buy), worst-case net is negative
-    // → should be rejected as "No arb"
-    expect(r.strategy).toBe('No arb');
-    expect(r.expectedProfit).toBe(0);
-    expect(r.roiPct).toBe(0);
-    expect(r.kalshiStake).toBe(0);
-    expect(r.pmStake).toBe(0);
+    // But after fees (Kalshi NO sell + PM YES buy), worst-case net is negative.
+    // UI-03: We now return the actual strategy with negative roiPct so the UI
+    // can show how close a pair is to profitability — not 'No arb'.
+    expect(r.strategy).not.toBe('No arb');
+    expect(r.expectedProfit).toBeLessThan(0);
+    expect(r.roiPct).toBeLessThan(0);
   });
 
   it('gross ROI without fees is higher than net worst-case profit', () => {
@@ -134,8 +133,8 @@ describe('Kalshi/Polymarket fees', () => {
     const r = calculateArbitrageMax(kalshi, pm, 10000, 10000, 10000, 10000, 'Sports');
 
     // Kalshi YES (0.50) + PM NO (0.499) = 0.999 → gross spread 0.001
-    // After fees this is negative → No arb
-    expect(r.strategy).toBe('No arb');
-    expect(r.expectedProfit).toBe(0);
+    // After fees this is negative. UI-03: return actual strategy with negative roiPct.
+    expect(r.strategy).not.toBe('No arb');
+    expect(r.expectedProfit).toBeLessThan(0);
   });
 });

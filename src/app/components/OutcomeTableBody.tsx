@@ -116,14 +116,11 @@ function OutcomeTableBodyInner({
     return arr;
   }, [safeOutcomes, filterMode, sortField, sortDir]);
 
-  const profitableOutcomes = safeOutcomes.filter(o => o.kalshi && o.polymarket && o.arbitrage.expectedProfit > 0);
-  const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
-  const highestProfitOutcome = profitableOutcomes.length > 0
-    ? profitableOutcomes.reduce((best, o) => o.arbitrage.expectedProfit > best.arbitrage.expectedProfit ? o : best)
-    : null;
-  const showTotal = profitableOutcomes.length > 1;
+  const profitableOutcomes = displayOutcomes.filter(o => o.kalshi && o.polymarket && o.arbitrage.expectedProfit > 0);
+  const accumulatedProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
 
   return (
+    <>
     <tbody className="divide-y divide-[#182533]">
       {displayOutcomes.map((o, idx) => {
         const k = o.kalshi;
@@ -137,7 +134,6 @@ function OutcomeTableBodyInner({
           ? Math.max(o.arbitrage.kalshiStake ?? 0, o.arbitrage.pmStake ?? 0) / Math.min(o.arbitrage.kalshiStake ?? 0, o.arbitrage.pmStake ?? 0)
           : 1;
         const isBalanced = totalStake > 0 && stakeRatio <= 1.25;
-        const isHighestProfit = highestProfitOutcome !== null && o.artist === highestProfitOutcome.artist && showTotal;
 
         return (
           <React.Fragment key={`${idx}-${o.artist}`}>
@@ -171,54 +167,23 @@ function OutcomeTableBodyInner({
                 {!hasPrices || profit <= 0 ? (
                   <span className="text-[#5E6875]">—</span>
                 ) : profit > 0 ? (
-                  isHighestProfit ? (
-                    <div className="group inline-block">
-                      <span className="text-[#FFFFFF] cursor-help">
-                        {formatCurrency(profit)} <span className="text-[#5E6875]">({formatCurrency(totalProfit)} total)</span>
-                      </span>
+                  <div className="group inline-block">
+                    <span className="text-[#FFFFFF] cursor-help">{formatCurrency(profit)}</span>
+                    {o.arbitrage.fees && (
                       <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                        <div className="font-bold text-[#FFFFFF] mb-2">Total Profit Potential (after fees)</div>
-                        <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(totalProfit)}</div>
-                        <div className="text-[#5E6875] text-[10px] mb-2">{profitableOutcomes.length} profitable outcome{profitableOutcomes.length > 1 ? "s" : ""}</div>
-                        {o.arbitrage.fees && (
-                          <div className="border-t border-[#182533] pt-2 mb-2 space-y-1">
-                            <div className="text-[#5E6875]">{o.arbitrage.fees.kalshiFeeDetails}</div>
-                            <div className="text-[#5E6875]">{o.arbitrage.fees.pmFeeDetails}</div>
-                            <div className="flex justify-between text-[#FFFFFF] font-medium">
-                              <span>Worst-case net profit</span>
-                              <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
-                            </div>
-                          </div>
-                        )}
+                        <div className="font-bold text-[#FFFFFF] mb-2">Profit after fees</div>
+                        <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(profit)}</div>
                         <div className="border-t border-[#182533] pt-2 space-y-1">
-                          {profitableOutcomes.map((po, pidx) => (
-                            <div key={`${pidx}-${po.artist}`} className="flex justify-between items-center">
-                              <span className={po.artist === o.artist ? "text-[#FFFFFF] font-medium" : "text-[#5E6875]"}>{po.artist}</span>
-                              <span className={po.artist === o.artist ? "text-[#5DBE81] font-bold" : "text-[#8A9BA8]"}>{formatCurrency(po.arbitrage.expectedProfit)}</span>
-                            </div>
-                          ))}
+                          <div className="text-[#5E6875]">{o.arbitrage.fees.kalshiFeeDetails}</div>
+                          <div className="text-[#5E6875]">{o.arbitrage.fees.pmFeeDetails}</div>
+                          <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-1">
+                            <span>Worst-case net profit</span>
+                            <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="group inline-block">
-                      <span className="text-[#FFFFFF] cursor-help">{formatCurrency(profit)}</span>
-                      {o.arbitrage.fees && (
-                        <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                          <div className="font-bold text-[#FFFFFF] mb-2">Profit after fees</div>
-                          <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(profit)}</div>
-                          <div className="border-t border-[#182533] pt-2 space-y-1">
-                            <div className="text-[#5E6875]">{o.arbitrage.fees.kalshiFeeDetails}</div>
-                            <div className="text-[#5E6875]">{o.arbitrage.fees.pmFeeDetails}</div>
-                            <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-1">
-                              <span>Worst-case net profit</span>
-                              <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
+                    )}
+                  </div>
                 ) : "—"}
               </td>
               <td className="px-4 py-3 text-right">
@@ -300,6 +265,27 @@ function OutcomeTableBodyInner({
         </td></tr>
       )}
     </tbody>
+    {profitableOutcomes.length > 0 && (
+      <tfoot className="bg-[#17212B] border-t-2 border-[#5DBE81]/30">
+        <tr>
+          <td colSpan={5} className="px-4 py-3">
+            <span className="text-[10px] uppercase tracking-wider text-[#5E6875] font-medium">
+              Accumulated Arb Profit
+            </span>
+            <span className="ml-2 text-[10px] text-[#5E6875]">
+              ({profitableOutcomes.length} opportun{profitableOutcomes.length > 1 ? "ities" : "y"})
+            </span>
+          </td>
+          <td colSpan={5} className="px-4 py-3 text-right">
+            <span className="text-lg font-bold text-[#5DBE81]">
+              {formatCurrency(accumulatedProfit)}
+            </span>
+            <span className="ml-2 text-[10px] text-[#5E6875]">net of fees</span>
+          </td>
+        </tr>
+      </tfoot>
+    )}
+    </>
   );
 }
 
