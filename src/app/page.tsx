@@ -477,7 +477,7 @@ export default function Home() {
 
       let status: any = {};
       let attempts = 0;
-      const maxAttempts = 600; // ~10 min at 1s polling
+      const maxAttempts = 360; // ~6 min at 1s polling (backend has 5 min timeout)
 
       while (attempts < maxAttempts) {
         await new Promise(r => setTimeout(r, 1000));
@@ -498,7 +498,11 @@ export default function Home() {
 
       await loadSavedMarkets();
 
-      if (status.failed > 0) {
+      // Check for timeout error from backend
+      if (status.errors?.some((e: any) => e.id === '__timeout__')) {
+        const timeoutErr = status.errors.find((e: any) => e.id === '__timeout__');
+        setScanAllError(timeoutErr.error);
+      } else if (status.failed > 0) {
         setScanAllError(`${status.failed} market${status.failed > 1 ? 's' : ''} failed to refresh`);
       }
     } catch (e: any) {
@@ -1511,7 +1515,7 @@ export default function Home() {
                             title="Refresh"
                           >
                             {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#5E6875]" />}
-                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? (scanningAll && scanProgress.total > 0 ? `Refreshing ${scanProgress.current}/${scanProgress.total}…` : "Refreshing prices…") : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
                           </button>
 
                           {/* Data chips (config-driven) */}

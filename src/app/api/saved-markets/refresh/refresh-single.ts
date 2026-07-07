@@ -134,32 +134,29 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     clobMap = new Map();
   }
 
-  const pmMarkets: any[] = [];
-  for (const m of pmMarketsRaw) {
-    const clob = clobMap.get(m.conditionId);
-    if (!clob) {
-      pmMarkets.push(m);
-      continue;
-    }
-    try {
-      const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
-      if (!live) {
-        pmMarkets.push(m);
-        continue;
+  // Enrich markets with CLOB prices in PARALLEL (was sequential loop).
+  // getClobPrices already uses the internal CLOB semaphore for book fetches.
+  const pmMarkets: any[] = await Promise.all(
+    pmMarketsRaw.map(async (m) => {
+      const clob = clobMap.get(m.conditionId);
+      if (!clob) return m;
+      try {
+        const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
+        if (!live) return m;
+        return {
+          ...m,
+          outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
+          bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
+          bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
+          lastTradePrice: live.lastTradePrice,
+          noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
+        };
+      } catch (e: any) {
+        console.warn(`[refresh-single] CLOB timeout for ${market.eventTitle}: ${e.message}`);
+        return m;
       }
-      pmMarkets.push({
-        ...m,
-        outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
-        bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
-        bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
-        lastTradePrice: live.lastTradePrice,
-        noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
-      });
-    } catch (e: any) {
-      console.warn(`[refresh-single] CLOB timeout for ${market.eventTitle}: ${e.message}`);
-      pmMarkets.push(m);
-    }
-  }
+    }),
+  );
 
   const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
   const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);

@@ -307,7 +307,12 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
               COUNT(*) AS total_scans,
               COUNT(DISTINCT market_id) AS markets_tracked,
               SUM(CASE WHEN best_roi_pct <= ? THEN positive_arb_count ELSE 0 END) AS total_arbs,
-              SUM(CASE WHEN best_roi_pct <= ? AND positive_arb_count > 0 AND scanned_at >= ? THEN 1 ELSE 0 END) AS active_arbs,
+              -- BUG-01: Count total arb OUTCOMES (not scan rows). Previously this
+              -- was 'THEN 1 ELSE 0' which counted 1 per market scan that had any
+              -- arbs -- e.g. 47 markets x 1 = 47, while the Arb Only filter showed
+              -- the actual outcome count (297). Now sums positive_arb_count so the
+              -- counter matches what the UI filter displays.
+              SUM(CASE WHEN best_roi_pct <= ? AND positive_arb_count > 0 AND scanned_at >= ? THEN positive_arb_count ELSE 0 END) AS active_arbs,
               AVG(CASE WHEN best_roi_pct <= ? THEN best_roi_pct END) AS avg_roi,
               SUM(CASE WHEN best_roi_pct <= ? THEN best_profit ELSE 0 END) AS total_profit
             FROM scan_results ${w}`,

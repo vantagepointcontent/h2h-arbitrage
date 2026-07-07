@@ -64,6 +64,7 @@ async function runRefreshJob(marketIds?: string[]) {
   // 470 markets × ~1-4s each ≈ 10+ min). Worker-pool of 4 respects upstream
   // rate limiters (which serialize per-API anyway) while overlapping I/O waits.
   const CONCURRENCY = Math.max(1, Number(process.env.H2H_REFRESH_CONCURRENCY || 4));
+  const JOB_TIMEOUT_MS = Math.max(60_000, Number(process.env.H2H_REFRESH_TIMEOUT_MS || 300_000)); // 5 min default
   let nextIdx = 0;
 
   async function worker(): Promise<void> {
@@ -75,12 +76,10 @@ async function runRefreshJob(marketIds?: string[]) {
       const expMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
       if (expMs > 0 && expMs <= Date.now()) {
         newState.processed++;
-        await writeState(newState);
         continue;
       }
       newState.currentMarketId = market.id;
       newState.currentMarketTitle = market.eventTitle;
-      await writeState(newState);
 
       try {
         const result = await refreshSingleMarket(market, manualMatches);
@@ -104,11 +103,36 @@ async function runRefreshJob(marketIds?: string[]) {
       }
 
       newState.processed++;
-      await writeState(newState);
+      // PERF: debounce state writes — every 5 markets instead of every 1.
+      // Reduces disk I/O from ~1,400 writes to ~280 for 470 markets.
+      // Final state is always written after the loop completes.
+      if (newState.processed % 5 === 0 || newState.processed === newState.total) {
+        await writeState(newState);
+      }
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, markets.length) }, () => worker()));
+  // Race the workers against a hard timeout. If the job exceeds the limit,
+  // we stop processing and mark the job as failed so the UI can show a warning
+  // instead of spinning forever.
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      console.error(`[refresh-job] timed out after ${JOB_TIMEOUT_MS}ms, processed ${newState.processed}/${newState.total}`);
+      newState.running = false;
+      newState.finishedAt = new Date().toISOString();
+      newState.errors.push({
+        id: '__timeout__',
+        title: 'Job timeout',
+        error: `Refresh exceeded ${Math.round(JOB_TIMEOUT_MS / 1000)}s limit after processing ${newState.processed}/${newState.total} markets`,
+      });
+      resolve();
+    }, JOB_TIMEOUT_MS);
+  });
+
+  await Promise.race([
+    Promise.all(Array.from({ length: Math.min(CONCURRENCY, markets.length) }, () => worker())),
+    timeoutPromise,
+  ]);
 
   newState.running = false;
   newState.finishedAt = new Date().toISOString();

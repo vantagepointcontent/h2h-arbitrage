@@ -296,6 +296,8 @@ export default function DashboardPanel() {
           value={kpis.totalArbsFound.toLocaleString()}
           color="#5DBE81"
         />
+        {/* BUG-01: "Active Arbs Now" = total arb outcomes (not market count) from
+            scans in the last 5 minutes. Matches the "Arb Only" filter row count. */}
         <KPICard
           icon={<Eye className="w-4 h-4" />}
           label="Active Arbs Now"
