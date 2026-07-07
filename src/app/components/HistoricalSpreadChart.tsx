@@ -55,7 +55,7 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
       <div className="px-4 py-3 border-b border-[#182533] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-[#5DBE81]" />
-          <span className="text-sm font-semibold">Spread History</span>
+          <span className="text-sm font-semibold">Arbitrage History</span>
         </div>
         <div className="flex items-center gap-1">
           {(Object.keys(TIME_RANGES) as TimeRange[]).map((range) => (

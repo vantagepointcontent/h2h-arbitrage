@@ -1668,6 +1668,7 @@ export default function Home() {
                               <th className="text-right px-4 py-3.5 font-medium">APY</th>
                               <th className="text-right px-4 py-3.5 font-medium">Profit</th>
                               <th className="text-right px-4 py-3.5 font-medium">Stake</th>
+                              <th className="text-right px-4 py-3.5 font-medium">Arbitrage History</th>
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
                             </tr>
                           </thead>
@@ -1680,6 +1681,7 @@ export default function Home() {
                             priceChanges={priceChanges}
                             filterMode={outcomeFilter}
                             marketTitle={result.eventTitle}
+                            marketId={activeMarketId ?? undefined}
                           />
                         </table>
                       </div>

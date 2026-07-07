@@ -1,0 +1,83 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { getSpreads, SpreadPoint } from "@/lib/spreadHistory";
+
+interface Props {
+  marketId: string;
+  outcomeArtist: string;
+}
+
+/**
+ * Mini inline sparkline showing recent ROI history for a market.
+ * Data comes from the existing IndexedDB spreadHistory store.
+ * Renders "—" when no historical data is available.
+ */
+export function ArbHistoryCell({ marketId, outcomeArtist }: Props) {
+  const [points, setPoints] = useState<SpreadPoint[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const now = Date.now();
+    const from = now - 24 * 60 * 60 * 1000; // last 24h
+    getSpreads(marketId, from, now)
+      .then((pts) => {
+        if (!cancelled) setPoints(pts);
+      })
+      .catch(() => {
+        if (!cancelled) setPoints([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [marketId]);
+
+  const sparkData = useMemo(() => {
+    if (points.length < 2) return null;
+    // Sample to max 30 points for the sparkline
+    const maxPoints = 30;
+    let sampled = points;
+    if (points.length > maxPoints) {
+      const step = Math.ceil(points.length / maxPoints);
+      sampled = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+    }
+    const rois = sampled.map((p) => p.roiPct);
+    const min = Math.min(...rois);
+    const max = Math.max(...rois);
+    const range = max - min || 1;
+    return { rois, min, max, range };
+  }, [points]);
+
+  if (!sparkData) {
+    return <span className="text-[#5E6875] text-xs">—</span>;
+  }
+
+  // Build SVG sparkline path
+  const width = 60;
+  const height = 20;
+  const { rois, min, range } = sparkData;
+  const stepX = width / (rois.length - 1);
+
+  const pathParts = rois.map((roi, i) => {
+    const x = i * stepX;
+    const y = height - ((roi - min) / range) * height;
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const path = pathParts.join(" ");
+
+  const lastRoi = rois[rois.length - 1];
+  const strokeColor = lastRoi > 0 ? "#5DBE81" : lastRoi < 0 ? "#ef4444" : "#5E6875";
+  const bestRoi = sparkData.max;
+  const avgRoi = rois.reduce((s, r) => s + r, 0) / rois.length;
+
+  return (
+    <div className="inline-flex items-center gap-1.5" title={`24h ROI: best ${bestRoi.toFixed(2)}%, avg ${avgRoi.toFixed(2)}%, ${rois.length} samples`}>
+      <svg width={width} height={height} className="inline-block">
+        <path d={path} fill="none" stroke={strokeColor} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+      <span className={`text-[10px] font-mono ${lastRoi > 0 ? "text-[#5DBE81]" : lastRoi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
+        {lastRoi > 0 ? "+" : ""}{lastRoi.toFixed(1)}%
+      </span>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
+import { ArbHistoryCell } from './ArbHistoryCell';
 
 interface Outcome {
   artist: string;
@@ -38,6 +39,8 @@ interface OutcomeTableBodyProps {
   filterMode?: "all" | "matched" | "arb";
   /** EXEC-002: market title for the manual-execute modal. Execute buttons render only when provided. */
   marketTitle?: string;
+  /** UI-05: market id for arbitrage history sparkline */
+  marketId?: string;
 }
 
 function OutcomeTableBodyInner({
@@ -49,6 +52,7 @@ function OutcomeTableBodyInner({
   priceChanges,
   filterMode,
   marketTitle,
+  marketId,
 }: OutcomeTableBodyProps) {
   const safeOutcomes = outcomes ?? [];
 
@@ -207,6 +211,9 @@ function OutcomeTableBodyInner({
                     {formatCurrency(totalStake)}
                   </span>
                 ) : "—"}
+              </td>
+              <td className="px-4 py-3 text-right">
+                {marketId ? <ArbHistoryCell marketId={marketId} outcomeArtist={o.artist} /> : <span className="text-[#5E6875] text-xs">—</span>}
               </td>
               <td className="px-4 py-3 text-xs">
                 {!hasPrices ? (
