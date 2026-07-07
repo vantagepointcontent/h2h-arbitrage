@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
@@ -41,6 +41,10 @@ interface OutcomeTableBodyProps {
   marketTitle?: string;
   /** UI-05: market id for arbitrage history sparkline */
   marketId?: string;
+  /** UI-06: sort field for the outcome table */
+  sortField?: "roi" | "apy" | "profit";
+  /** UI-06: sort direction for the outcome table */
+  sortDir?: "asc" | "desc";
 }
 
 function OutcomeTableBodyInner({
@@ -53,6 +57,8 @@ function OutcomeTableBodyInner({
   filterMode,
   marketTitle,
   marketId,
+  sortField,
+  sortDir,
 }: OutcomeTableBodyProps) {
   const safeOutcomes = outcomes ?? [];
 
@@ -93,11 +99,22 @@ function OutcomeTableBodyInner({
     }
   };
 
-  const displayOutcomes = filterMode === "arb"
-    ? safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0)
-    : filterMode === "matched"
-      ? safeOutcomes.filter(o => o.kalshi && o.polymarket)
-      : safeOutcomes;
+  const displayOutcomes = useMemo(() => {
+    let arr = filterMode === "arb"
+      ? safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0)
+      : filterMode === "matched"
+        ? safeOutcomes.filter(o => o.kalshi && o.polymarket)
+        : safeOutcomes;
+    if (sortField) {
+      const mul = sortDir === "asc" ? 1 : -1;
+      arr = [...arr].sort((a, b) => {
+        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? (a.arbitrage.apyPct ?? 0) : a.arbitrage.expectedProfit;
+        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? (b.arbitrage.apyPct ?? 0) : b.arbitrage.expectedProfit;
+        return mul * (va - vb);
+      });
+    }
+    return arr;
+  }, [safeOutcomes, filterMode, sortField, sortDir]);
 
   const profitableOutcomes = safeOutcomes.filter(o => o.kalshi && o.polymarket && o.arbitrage.expectedProfit > 0);
   const totalProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);

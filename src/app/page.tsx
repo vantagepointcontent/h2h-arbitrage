@@ -828,6 +828,10 @@ export default function Home() {
   const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy" | "scanned">("apy");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("desc");
 
+  // Outcome table sort — default APY desc (highest first)
+  const [outcomeSort, setOutcomeSort] = useState<"roi" | "apy" | "profit">("apy");
+  const [outcomeSortDir, setOutcomeSortDir] = useState<"asc" | "desc">("desc");
+
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
   useEffect(() => { loadManualMatches(); loadDecoupledPairs(); }, []);
@@ -1108,8 +1112,21 @@ export default function Home() {
       setSidebarSortDir(d => (d === "asc" ? "desc" : "asc"));
     } else {
       setSidebarSort(field);
-      // For "scanned": desc = stalest first (longest since last scan), asc = most recent first
-      setSidebarSortDir(field === "scanned" ? "desc" : "asc");
+      // Text columns default to asc (A→Z); numeric columns default to desc (high→low)
+      const textFields: ("name" | "roi" | "expiry" | "apy" | "scanned")[] = ["name"];
+      if (textFields.includes(field)) setSidebarSortDir("asc");
+      else setSidebarSortDir("desc");
+    }
+  };
+
+  // Toggle outcome table sort
+  const toggleOutcomeSort = (field: "roi" | "apy" | "profit") => {
+    if (outcomeSort === field) {
+      setOutcomeSortDir(d => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setOutcomeSort(field);
+      // All outcome-table numeric columns default to desc (high→low)
+      setOutcomeSortDir("desc");
     }
   };
 
@@ -1664,9 +1681,30 @@ export default function Home() {
                               <th className="text-right px-4 py-3.5 font-medium">Kalshi No</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
                               <th className="text-right px-4 py-3.5 font-medium">PM No</th>
-                              <th className="text-right px-4 py-3.5 font-medium">ROI</th>
-                              <th className="text-right px-4 py-3.5 font-medium">APY</th>
-                              <th className="text-right px-4 py-3.5 font-medium">Profit</th>
+                              <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  ROI
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "roi" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                    {outcomeSort === "roi" && outcomeSortDir === "asc" ? "▲" : "▼"}
+                                  </span>
+                                </span>
+                              </th>
+                              <th onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  APY
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "apy" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                    {outcomeSort === "apy" && outcomeSortDir === "asc" ? "▲" : "▼"}
+                                  </span>
+                                </span>
+                              </th>
+                              <th onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  Profit
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "profit" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                    {outcomeSort === "profit" && outcomeSortDir === "asc" ? "▲" : "▼"}
+                                  </span>
+                                </span>
+                              </th>
                               <th className="text-right px-4 py-3.5 font-medium">Stake</th>
                               <th className="text-right px-4 py-3.5 font-medium">Arbitrage History</th>
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
@@ -1682,6 +1720,8 @@ export default function Home() {
                             filterMode={outcomeFilter}
                             marketTitle={result.eventTitle}
                             marketId={activeMarketId ?? undefined}
+                            sortField={outcomeSort}
+                            sortDir={outcomeSortDir}
                           />
                         </table>
                       </div>
