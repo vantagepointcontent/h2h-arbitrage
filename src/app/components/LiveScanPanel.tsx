@@ -491,7 +491,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-5 h-5 text-[#5DBE81]" />
           <h2 className="text-sm font-bold text-[#FFFFFF]">Live WebSocket Scanner</h2>
-          <span className="ml-auto text-xs px-2 py-1 rounded-full bg-[#182533] text-[#5E6875]">
+          <span className="ml-auto text-xs px-2 py-1 rounded-full bg-[#182533] text-[#8A9BA8]">
             {tabs.filter((t) => t.running).length} active
           </span>
         </div>
@@ -506,7 +506,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
               {selectedMarket ? (
                 <span className="flex items-center gap-2 truncate">
                   <span className="truncate">{selectedMarket.eventTitle}</span>
-                  <span className={`text-xs font-medium ${(selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : (selectedMarket.lastScanResult?.bestRoiPct ?? 0) < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
+                  <span className={`text-xs font-medium ${(selectedMarket.lastScanResult?.bestRoiPct ?? 0) > 0 ? "text-[#5DBE81]" : (selectedMarket.lastScanResult?.bestRoiPct ?? 0) < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
                     {(() => {
                       const roi = selectedMarket.lastScanResult?.bestRoiPct ?? 0;
                       return `${roi > 0 ? "+" : ""}${roi.toFixed(1)}%`;
@@ -514,9 +514,9 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   </span>
                 </span>
               ) : (
-                <span className="text-[#5E6875]">Choose a market...</span>
+                <span className="text-[#8A9BA8]">Choose a market...</span>
               )}
-              <ChevronDown className={`w-4 h-4 text-[#5E6875] transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-4 h-4 text-[#8A9BA8] transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
             {dropdownOpen && (
@@ -555,7 +555,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         );
                       }
                     }}
-                    className="w-full bg-transparent text-sm text-[#FFFFFF] placeholder-[#5E6875] px-3 py-2.5 outline-none"
+                    className="w-full bg-transparent text-sm text-[#FFFFFF] placeholder-[#8A9BA8] px-3 py-2.5 outline-none"
                     autoFocus
                   />
                   {searchQuery && (
@@ -565,7 +565,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         setFocusedIdx(-1);
                         searchInputRef.current?.focus();
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -579,7 +579,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   onMouseMove={() => setFocusedIdx(-1)}
                 >
                   {filteredOptions.length === 0 ? (
-                    <div className="px-3 py-2.5 text-xs text-[#5E6875]">No markets found.</div>
+                    <div className="px-3 py-2.5 text-xs text-[#8A9BA8]">No markets found.</div>
                   ) : (
                     filteredOptions.map((m, idx) => {
                       const roi = m.roiPct;
@@ -604,7 +604,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           }`}
                         >
                           <span className="truncate text-[#FFFFFF] text-left pr-2">{m.eventTitle}</span>
-                          <span className={`shrink-0 text-xs font-medium ${isPositive ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                          <span className={`shrink-0 text-xs font-medium ${isPositive ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
                             {isPositive ? "+" : ""}{roi.toFixed(1)}%
                           </span>
                         </button>
@@ -676,11 +676,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-xs font-medium transition-colors shrink-0 ${
                   isActive
                     ? "bg-[#17212B] border-t border-l border-r border-[#182533] text-[#FFFFFF]"
-                    : "bg-[#121E2B] border border-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
+                    : "bg-[#121E2B] border border-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]"
                 }`}
               >
                 <span className="truncate max-w-[120px]">{tab.marketTitle}</span>
-                <span className={`text-[10px] ${roi > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+                <span className={`text-[10px] ${roi > 0 ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
                   {roi > 0 ? `+${roi.toFixed(1)}%` : ""}
                 </span>
                 {tab.running && <span className="w-1.5 h-1.5 rounded-full bg-[#5DBE81] animate-pulse" />}
@@ -720,9 +720,9 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                 <Square className="w-3.5 h-3.5" /> Stop
               </button>
             )}
-            <span className="text-xs text-[#5E6875]">{activeTab.status}</span>
+            <span className="text-xs text-[#8A9BA8]">{activeTab.status}</span>
             {activeTab.result && (
-              <span className="text-xs text-[#5E6875]">
+              <span className="text-xs text-[#8A9BA8]">
                 Last update: {new Date(activeTab.result.lastUpdate).toLocaleTimeString()}
               </span>
             )}
@@ -744,19 +744,19 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-[#182533]">
-                      <th className="text-left py-2 px-2 text-[#5E6875] font-medium">OUTCOME</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">K YES</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">K NO</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PM YES</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PM NO</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">SPREAD</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">ROI</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PROFIT</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Orderbook depth: how much capital can be deployed">DEPTH</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
-                      <th className="text-center py-2 px-2 text-[#5E6875] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
-                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">DECAY</th>
-                      <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
+                      <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">OUTCOME</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">K YES</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">K NO</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PM YES</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PM NO</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">SPREAD</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">ROI</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PROFIT</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium" title="Orderbook depth: how much capital can be deployed">DEPTH</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
+                      <th className="text-center py-2 px-2 text-[#8A9BA8] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">DECAY</th>
+                      <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">STRATEGY</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -813,7 +813,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           {(() => {
                             // UI-10: Hide stake/depth for negative-arb rows — no point showing
                             // deployable capital when there's no profitable arb.
-                            if (o.roiPct <= 0) return <span className="text-[#5E6875]">—</span>;
+                            if (o.roiPct <= 0) return <span className="text-[#8A9BA8]">—</span>;
                             // Compute liquidity from the numeric depth fields already on the outcome
                             const kDepth = Math.max(o.kalshiYesDepth, o.kalshiNoDepth) || 0;
                             const pmDepth = (o.pmYesDepth > 0 || o.pmNoDepth > 0)
@@ -851,7 +851,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                               {o.persistence.score}
                             </span>
                           ) : (
-                            <span className="text-[#5E6875]">—</span>
+                            <span className="text-[#8A9BA8]">—</span>
                           )}
                         </td>
                         <td className="py-2 px-2 text-center" title={o.formation ? `Predicted spread in 1 min: ${(o.formation.predictedSpread * 100).toFixed(2)}% · K vel ${(o.formation.kalshiVelocity1min * 100).toFixed(2)}¢/min · PM vel ${(o.formation.pmVelocity1min * 100).toFixed(2)}¢/min${o.formation.minutesToArb != null ? ` · ~${o.formation.minutesToArb} min to arb` : ""}` : "Formation signal: needs a few ticks of history"}>
@@ -862,11 +862,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                                 : o.formation.signal}
                             </span>
                           ) : (
-                            <span className="text-[#5E6875] text-[10px]">·</span>
+                            <span className="text-[#8A9BA8] text-[10px]">·</span>
                           )}
                         </td>
                         <td className="py-2 px-2 text-right">
-                          {o.roiPct > 0 ? <ArbDecayCurve marketId={activeTab.marketId} outcome={o.artist} /> : <span className="text-[#5E6875] text-xs">—</span>}
+                          {o.roiPct > 0 ? <ArbDecayCurve marketId={activeTab.marketId} outcome={o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
                           <span className="inline-flex items-center gap-2">
@@ -911,7 +911,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   return (
                     <>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                        <div className="text-[10px] text-[#5E6875]">Total Outcomes</div>
+                        <div className="text-[10px] text-[#8A9BA8]">Total Outcomes</div>
                         <div className="text-lg font-bold text-[#FFFFFF]">
                           {activeTab.result.outcomes.length}
                           {staleCount > 0 && (
@@ -920,17 +920,17 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                        <div className="text-[10px] text-[#5E6875]">Positive Arbs</div>
+                        <div className="text-[10px] text-[#8A9BA8]">Positive Arbs</div>
                         <div className={`text-lg font-bold ${positiveArbs.length > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>{positiveArbs.length}</div>
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                        <div className="text-[10px] text-[#5E6875]">Best ROI</div>
+                        <div className="text-[10px] text-[#8A9BA8]">Best ROI</div>
                         <div className={`text-lg font-bold ${bestRoi > 0 ? "text-[#5DBE81]" : bestRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]"}`}>
                           {bestRoi > 0 ? `+${bestRoi.toFixed(2)}%` : `${bestRoi.toFixed(2)}%`}
                         </div>
                       </div>
                       <div className="rounded-lg bg-[#121E2B] p-3 border border-[#182533]">
-                        <div className="text-[10px] text-[#5E6875]">Combined Profit</div>
+                        <div className="text-[10px] text-[#8A9BA8]">Combined Profit</div>
                         <div className={`text-lg font-bold ${totalProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
                           {fmtUsd(totalProfit)}
                         </div>
@@ -943,7 +943,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
           )}
 
           {activeTab.result && activeTab.result.outcomes.length === 0 && !activeTab.error && (
-            <div className="text-sm text-[#5E6875] py-8 text-center">No matched outcomes found for this market.</div>
+            <div className="text-sm text-[#8A9BA8] py-8 text-center">No matched outcomes found for this market.</div>
           )}
         </div>
       )}

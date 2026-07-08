@@ -90,11 +90,11 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
   }, [episode]);
 
   if (loading) {
-    return <span className="text-[#5E6875] text-xs">···</span>;
+    return <span className="text-[#8A9BA8] text-xs">···</span>;
   }
 
   if (!episode || !chartData) {
-    return <span className="text-[#5E6875] text-xs">—</span>;
+    return <span className="text-[#8A9BA8] text-xs">—</span>;
   }
 
   const { rois, min, range, timeMins, maxTime, pts } = chartData;
@@ -178,7 +178,7 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
       <span className={`text-[10px] font-mono ${arrowColor}`} title={`Trend: ${trend}`}>
         {arrow}
       </span>
-      <span className="text-[10px] font-mono text-[#5E6875]" title="Act speed: time profitable">
+      <span className="text-[10px] font-mono text-[#8A9BA8]" title="Act speed: time profitable">
         {actSpeedLabel}
       </span>
     </div>

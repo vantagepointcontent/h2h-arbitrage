@@ -87,28 +87,28 @@ function TelegramSettingsSection() {
 
       <div className="space-y-2">
         <div>
-          <label className="text-[10px] text-[#5E6875] uppercase tracking-wider">Bot Token</label>
+          <label className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">Bot Token</label>
           <input
             type="password"
             value={botToken}
             onChange={(e) => setBotToken(e.target.value)}
             placeholder="123456:ABC-DEF..."
-            className="w-full px-2 py-1.5 text-xs rounded-md bg-[#0E1621] border border-[#232E3C] text-[#FFFFFF] placeholder-[#5E6875] focus:border-[#5DBE81]/50 focus:outline-none"
+            className="w-full px-2 py-1.5 text-xs rounded-md bg-[#0E1621] border border-[#232E3C] text-[#FFFFFF] placeholder-[#8A9BA8] focus:border-[#5DBE81]/50 focus:outline-none"
           />
         </div>
         <div>
-          <label className="text-[10px] text-[#5E6875] uppercase tracking-wider">Chat ID</label>
+          <label className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">Chat ID</label>
           <input
             type="text"
             value={chatId}
             onChange={(e) => setChatId(e.target.value)}
             placeholder="-1001234567890"
-            className="w-full px-2 py-1.5 text-xs rounded-md bg-[#0E1621] border border-[#232E3C] text-[#FFFFFF] placeholder-[#5E6875] focus:border-[#5DBE81]/50 focus:outline-none"
+            className="w-full px-2 py-1.5 text-xs rounded-md bg-[#0E1621] border border-[#232E3C] text-[#FFFFFF] placeholder-[#8A9BA8] focus:border-[#5DBE81]/50 focus:outline-none"
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[10px] text-[#5E6875] uppercase tracking-wider">Min ROI %</label>
+            <label className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">Min ROI %</label>
             <input
               type="text"
               value={minRoi}
@@ -117,7 +117,7 @@ function TelegramSettingsSection() {
             />
           </div>
           <div>
-            <label className="text-[10px] text-[#5E6875] uppercase tracking-wider">Min Profit $</label>
+            <label className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">Min Profit $</label>
             <input
               type="text"
               value={minProfit}
@@ -164,7 +164,7 @@ export function AlertSettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />

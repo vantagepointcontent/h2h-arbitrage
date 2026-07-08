@@ -78,8 +78,8 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
           <span className="text-sm font-semibold text-[#FFFFFF]">Stake Calculator</span>
         </div>
         <div className="flex items-center gap-2">
-          <Wallet className="w-3.5 h-3.5 text-[#5E6875]" />
-          <span className="text-xs text-[#5E6875]">Capital:</span>
+          <Wallet className="w-3.5 h-3.5 text-[#8A9BA8]" />
+          <span className="text-xs text-[#8A9BA8]">Capital:</span>
           <input
             type="number"
             value={capital}
@@ -92,19 +92,19 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3 p-4 border-b border-[#182533]">
         <div className="rounded-lg bg-[#121E2B] border border-[#182533] p-3">
-          <div className="text-[10px] text-[#5E6875] uppercase tracking-wider mb-1">Total Allocated</div>
+          <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-1">Total Allocated</div>
           <div className="text-lg font-bold text-[#FFFFFF]">
             ${distribution.reduce((sum, d) => sum + d.allocatedCapital, 0).toFixed(2)}
           </div>
         </div>
         <div className="rounded-lg bg-[#121E2B] border border-[#182533] p-3">
-          <div className="text-[10px] text-[#5E6875] uppercase tracking-wider mb-1">Expected Profit</div>
+          <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-1">Expected Profit</div>
           <div className="text-lg font-bold text-[#5DBE81]">
             +${totalProfit.toFixed(2)}
           </div>
         </div>
         <div className="rounded-lg bg-[#121E2B] border border-[#182533] p-3">
-          <div className="text-[10px] text-[#5E6875] uppercase tracking-wider mb-1">Avg ROI</div>
+          <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-1">Avg ROI</div>
           <div className="text-lg font-bold text-[#5DBE81]">
             {avgRoi.toFixed(1)}%
           </div>
@@ -114,7 +114,7 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
       {/* Distribution table */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-[#5E6875]">Auto-distribution across {distribution.length} opportunities</span>
+          <span className="text-xs text-[#8A9BA8]">Auto-distribution across {distribution.length} opportunities</span>
           <button
             onClick={() => setShowDetails(!showDetails)}
             className="text-xs text-[#5DBE81] hover:text-[#4DA66E] transition-colors"
@@ -129,13 +129,13 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
               <div key={i} className="flex items-center gap-3 rounded-lg bg-[#121E2B] border border-[#182533] p-3">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-[#FFFFFF] truncate">{d.artist}</div>
-                  <div className="text-[10px] text-[#5E6875] mt-0.5">{d.strategy}</div>
+                  <div className="text-[10px] text-[#8A9BA8] mt-0.5">{d.strategy}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-xs font-bold text-[#5DBE81]">
                     ${d.allocatedCapital.toFixed(2)}
                   </div>
-                  <div className="text-[10px] text-[#5E6875]">
+                  <div className="text-[10px] text-[#8A9BA8]">
                     K: ${d.allocatedKalshi.toFixed(0)} / PM: ${d.allocatedPm.toFixed(0)}
                   </div>
                 </div>
@@ -143,7 +143,7 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
                   <div className="text-xs font-bold text-[#5DBE81]">
                     +${d.scaledProfit.toFixed(2)}
                   </div>
-                  <div className="text-[10px] text-[#5E6875]">
+                  <div className="text-[10px] text-[#8A9BA8]">
                     {d.roiPct.toFixed(1)}% ROI
                   </div>
                 </div>

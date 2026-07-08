@@ -75,7 +75,7 @@ export function EmbeddedBrowserPanel({
           <span className={`text-xs font-semibold ${accentTextClass} shrink-0`}>
             {platformName}
           </span>
-          <span className="text-[10px] text-[#5E6875] truncate">
+          <span className="text-[10px] text-[#8A9BA8] truncate">
             {urlLabel}
           </span>
         </div>
@@ -91,7 +91,7 @@ export function EmbeddedBrowserPanel({
           </a>
           <button
             onClick={toggleVisibility}
-            className="p-1 rounded hover:bg-white/10 text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
             title="Hide panel"
           >
             <EyeOff className="w-3.5 h-3.5" />
@@ -105,13 +105,13 @@ export function EmbeddedBrowserPanel({
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
             {stats.map((s, i) => (
               <div key={i} className="flex items-center justify-between text-[11px]">
-                <span className="text-[#5E6875]">{s.label}</span>
+                <span className="text-[#8A9BA8]">{s.label}</span>
                 <span className="text-[#8A9BA8] font-medium">{s.value}</span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-[11px] text-[#5E6875]">
+          <div className="flex items-center gap-2 text-[11px] text-[#8A9BA8]">
             <TrendingUp className="w-3 h-3" />
             <span>Market data available in the outcomes table above</span>
           </div>
@@ -196,7 +196,7 @@ export function DualBrowserPanels({
                   className={`p-1.5 transition-colors ${
                     !isSideBySide
                       ? "bg-[#5DBE81]/15 text-[#5DBE81]"
-                      : "text-[#5E6875] hover:text-[#FFFFFF]"
+                      : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                   }`}
                   title="Stacked layout"
                 >
@@ -207,14 +207,14 @@ export function DualBrowserPanels({
                   className={`p-1.5 transition-colors ${
                     isSideBySide
                       ? "bg-[#5DBE81]/15 text-[#5DBE81]"
-                      : "text-[#5E6875] hover:text-[#FFFFFF]"
+                      : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                   }`}
                   title="Side-by-side layout"
                 >
                   <Columns2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <span className="text-[10px] text-[#232E3C]">Quick access</span>
+              <span className="text-[10px] text-[#8A9BA8]">Quick access</span>
             </div>
           </>
         )}

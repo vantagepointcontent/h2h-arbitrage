@@ -49,7 +49,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist }: Props) {
   }, [points]);
 
   if (!sparkData) {
-    return <span className="text-[#5E6875] text-xs">—</span>;
+    return <span className="text-[#8A9BA8] text-xs">—</span>;
   }
 
   // Build SVG sparkline path
@@ -75,7 +75,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist }: Props) {
       <svg width={width} height={height} className="inline-block">
         <path d={path} fill="none" stroke={strokeColor} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
       </svg>
-      <span className={`text-[10px] font-mono ${lastRoi > 0 ? "text-[#5DBE81]" : lastRoi < 0 ? "text-[#ef4444]" : "text-[#5E6875]"}`}>
+      <span className={`text-[10px] font-mono ${lastRoi > 0 ? "text-[#5DBE81]" : lastRoi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
         {lastRoi > 0 ? "+" : ""}{lastRoi.toFixed(1)}%
       </span>
     </div>

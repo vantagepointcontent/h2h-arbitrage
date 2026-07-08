@@ -131,7 +131,7 @@ export function MarketFinderPanel({
             <Globe className="w-5 h-5 text-[#5DBE81]" />
             MarketFinder
           </h2>
-          <p className="text-xs text-[#5E6875] mt-0.5">
+          <p className="text-xs text-[#8A9BA8] mt-0.5">
             {showAllPlatforms
               ? `All platforms — ${allMarkets.length} markets`
               : `PredictionHunt matched events — Kalshi + Polymarket only`}
@@ -139,7 +139,7 @@ export function MarketFinderPanel({
         </div>
         <div className="flex items-center gap-2">
           {lastSync && !showAllPlatforms && (
-            <span className="text-[10px] text-[#232E3C]">
+            <span className="text-[10px] text-[#8A9BA8]">
               Last sync: {getTimeAgo(lastSync.finishedAt || lastSync.startedAt)}
             </span>
           )}
@@ -164,16 +164,16 @@ export function MarketFinderPanel({
 
       {/* View toggle: Matched vs All Platforms */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-        <span className="text-xs text-[#5E6875]">View:</span>
+        <span className="text-xs text-[#8A9BA8]">View:</span>
         <button
           onClick={() => !showAllPlatforms && onToggleShowAllPlatforms()}
-          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#5E6875] hover:text-[#8A9BA8]'}`}
+          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#8A9BA8]'}`}
         >
           All Platforms
         </button>
         <button
           onClick={() => showAllPlatforms && onToggleShowAllPlatforms()}
-          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${!showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#5E6875] hover:text-[#8A9BA8]'}`}
+          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${!showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#8A9BA8]'}`}
         >
           Matched Only
         </button>
@@ -182,12 +182,12 @@ export function MarketFinderPanel({
       {/* Matched/Unmatched filter (only in All Platforms mode) */}
       {showAllPlatforms && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-          <span className="text-xs text-[#5E6875]">Match:</span>
+          <span className="text-xs text-[#8A9BA8]">Match:</span>
           {(["all", "matched", "unmatched"] as const).map(f => (
             <button
               key={f}
               onClick={() => onSetMatchFilter(f)}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${matchFilter === f ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#5E6875] hover:text-[#8A9BA8]'}`}
+              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${matchFilter === f ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#8A9BA8]'}`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -197,8 +197,8 @@ export function MarketFinderPanel({
 
       {/* Spread threshold control */}
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-        <Filter className="w-3.5 h-3.5 text-[#5E6875]" />
-        <span className="text-xs text-[#5E6875]">Spread threshold:</span>
+        <Filter className="w-3.5 h-3.5 text-[#8A9BA8]" />
+        <span className="text-xs text-[#8A9BA8]">Spread threshold:</span>
         <input
           type="range"
           min="1"
@@ -213,8 +213,8 @@ export function MarketFinderPanel({
 
       {/* Expiry days control */}
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-        <Calendar className="w-3.5 h-3.5 text-[#5E6875]" />
-        <span className="text-xs text-[#5E6875]">Expiry within:</span>
+        <Calendar className="w-3.5 h-3.5 text-[#8A9BA8]" />
+        <span className="text-xs text-[#8A9BA8]">Expiry within:</span>
         <input
           type="range"
           min="1"
@@ -229,8 +229,8 @@ export function MarketFinderPanel({
 
       {/* Fetch count control */}
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-        <Hash className="w-3.5 h-3.5 text-[#5E6875]" />
-        <span className="text-xs text-[#5E6875]" title="Maximum number of matched markets to show in results">Max results:</span>
+        <Hash className="w-3.5 h-3.5 text-[#8A9BA8]" />
+        <span className="text-xs text-[#8A9BA8]" title="Maximum number of matched markets to show in results">Max results:</span>
         <input
           type="range"
           min="1"
@@ -249,8 +249,8 @@ export function MarketFinderPanel({
 
       {/* Category filter — multi-select chips */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
-        <Filter className="w-3.5 h-3.5 text-[#5E6875] shrink-0" />
-        <span className="text-xs text-[#5E6875]">Category:</span>
+        <Filter className="w-3.5 h-3.5 text-[#8A9BA8] shrink-0" />
+        <span className="text-xs text-[#8A9BA8]">Category:</span>
         {CATEGORIES.map(c => {
           const isActive = categories.includes(c);
           return (
@@ -268,7 +268,7 @@ export function MarketFinderPanel({
               className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
                 isActive
                   ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                  : "bg-[#182533] text-[#5E6875] border-[#232E3C] hover:text-[#8A9BA8] hover:border-[#232E3C]"
+                  : "bg-[#182533] text-[#8A9BA8] border-[#232E3C] hover:text-[#8A9BA8] hover:border-[#232E3C]"
               }`}
             >
               {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -281,20 +281,20 @@ export function MarketFinderPanel({
               onSetCategories([]);
               onFetch();
             }}
-            className="px-2 py-0.5 rounded-full text-[11px] text-[#232E3C] hover:text-[#8A9BA8] transition-colors"
+            className="px-2 py-0.5 rounded-full text-[11px] text-[#8A9BA8] hover:text-[#8A9BA8] transition-colors"
           >
             Clear
           </button>
         )}
         {categories.length > 0 && (
-          <span className="text-[10px] text-[#232E3C] ml-auto">
+          <span className="text-[10px] text-[#8A9BA8] ml-auto">
             {sorted.length} of {filtered.length} markets
           </span>
         )}
       </div>
 
       {hiddenCount > 0 && (
-        <div className="text-xs text-[#5E6875] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50">
+        <div className="text-xs text-[#8A9BA8] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#5DBE81]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in H2H)
         </div>
@@ -330,7 +330,7 @@ export function MarketFinderPanel({
           ))}
         </div>
       ) : sorted.length === 0 ? (
-        <div className="py-20 text-center text-sm text-[#232E3C]">
+        <div className="py-20 text-center text-sm text-[#8A9BA8]">
           No markets found. Try syncing to fetch from PredictionHunt.
         </div>
       ) : (
@@ -338,11 +338,11 @@ export function MarketFinderPanel({
           {/* Bulk action bar */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#182533] bg-[#17212B]">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#5E6875]">
+              <span className="text-xs text-[#8A9BA8]">
                 {selectedVisibleCount}/{sorted.length} selected
               </span>
               {selectedVisibleCount > 0 && (
-                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#182533] text-[#232E3C] border border-[#232E3C]">⌘↵</kbd>
+                <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[#182533] text-[#8A9BA8] border border-[#232E3C]">⌘↵</kbd>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -359,7 +359,7 @@ export function MarketFinderPanel({
 
           <table className="w-full text-sm">
             <thead className="bg-[#17212B] border-b border-[#182533]">
-              <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+              <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                 <th className="px-4 py-3 font-medium w-10">
                   <input
                     type="checkbox"
@@ -405,7 +405,7 @@ export function MarketFinderPanel({
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#FFFFFF] text-sm">{m.title}</div>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.eventType}</span>
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.eventType}</span>
                         {showAllPlatforms && matchBadge}
                       </div>
                     </td>
@@ -421,7 +421,7 @@ export function MarketFinderPanel({
                       <span className="text-xs font-mono text-[#a855f7]">{fmtPrice(m.pmPrice?.yesAsk)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-mono ${m.spreadPct != null ? (m.spreadPct <= spreadThreshold ? "text-[#5DBE81]" : "text-[#5E6875]") : "text-[#232E3C]"}`}>{m.spreadPct != null ? `${m.spreadPct.toFixed(1)}%` : "—"}</span>
+                      <span className={`text-xs font-mono ${m.spreadPct != null ? (m.spreadPct <= spreadThreshold ? "text-[#5DBE81]" : "text-[#8A9BA8]") : "text-[#8A9BA8]"}`}>{m.spreadPct != null ? `${m.spreadPct.toFixed(1)}%` : "—"}</span>
                     </td>
                     <td className="px-4 py-3">
                       {showAllPlatforms ? (
@@ -433,19 +433,19 @@ export function MarketFinderPanel({
                           {m.kalshiUrl ? (
                             <a href={m.kalshiUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#facc15] hover:underline">Kalshi →</a>
                           ) : (
-                            <span className="text-xs text-[#232E3C]">—</span>
+                            <span className="text-xs text-[#8A9BA8]">—</span>
                           )}
                           {m.polymarketUrl ? (
                             <a href={m.polymarketUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-[#5DBE81] hover:underline">Polymarket →</a>
                           ) : (
-                            <span className="text-xs text-[#232E3C]">—</span>
+                            <span className="text-xs text-[#8A9BA8]">—</span>
                           )}
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {isSaving ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-[#5E6875]">
+                        <span className="inline-flex items-center gap-1 text-xs text-[#8A9BA8]">
                           <Loader2 className="w-3 h-3 animate-spin" /> Saving
                         </span>
                       ) : (

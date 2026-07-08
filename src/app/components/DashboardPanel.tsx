@@ -164,7 +164,7 @@ function Panel({
 // ── Empty state ──────────────────────────────────────────────────
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-16 text-center text-sm text-[#5E6875]">
+    <div className="py-16 text-center text-sm text-[#8A9BA8]">
       <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
       {message}
     </div>
@@ -227,7 +227,7 @@ export default function DashboardPanel() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-[#5E6875]">
+      <div className="py-20 text-center text-sm text-[#8A9BA8]">
         <Activity className="w-6 h-6 animate-spin mx-auto mb-3" />
         Loading dashboard…
       </div>
@@ -749,7 +749,7 @@ export default function DashboardPanel() {
                           <td className="px-3 py-2 text-right text-xs font-mono text-[#5DBE81]">
                             {arb.positive_arb_count}
                           </td>
-                          <td className="px-3 py-2 text-right text-xs text-[#5E6875] font-mono whitespace-nowrap">
+                          <td className="px-3 py-2 text-right text-xs text-[#8A9BA8] font-mono whitespace-nowrap">
                             {fmtTime(arb.scanned_at)}
                           </td>
                         </tr>

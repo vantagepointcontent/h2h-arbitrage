@@ -116,7 +116,7 @@ function movementArrow(direction: "up" | "down" | "stable" | null): React.ReactN
     case "down":
       return <ArrowDown className="w-2.5 h-2.5 text-[#ef4444]" />;
     case "stable":
-      return <Minus className="w-2.5 h-2.5 text-[#5E6875]" />;
+      return <Minus className="w-2.5 h-2.5 text-[#8A9BA8]" />;
     default:
       return null;
   }
@@ -332,7 +332,7 @@ export function Bookmaker1on1({
             </span>
           )}
           {wsConnectionStatus === "idle" && (
-            <span className="text-[10px] text-[#5E6875]">Idle</span>
+            <span className="text-[10px] text-[#8A9BA8]">Idle</span>
           )}
           {wsError && (
             <span className="text-[10px] text-[#ef4444] ml-2">Error: {wsError}</span>
@@ -355,10 +355,10 @@ export function Bookmaker1on1({
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-1 mt-1">
-            <span className="text-[9px] text-[#5E6875] uppercase text-center">
+            <span className="text-[9px] text-[#8A9BA8] uppercase text-center">
               Yes Bid
             </span>
-            <span className="text-[9px] text-[#5E6875] uppercase text-center">
+            <span className="text-[9px] text-[#8A9BA8] uppercase text-center">
               Yes Ask
             </span>
           </div>
@@ -384,10 +384,10 @@ export function Bookmaker1on1({
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-1 mt-1">
-            <span className="text-[9px] text-[#5E6875] uppercase text-center">
+            <span className="text-[9px] text-[#8A9BA8] uppercase text-center">
               Best Bid
             </span>
-            <span className="text-[9px] text-[#5E6875] uppercase text-center">
+            <span className="text-[9px] text-[#8A9BA8] uppercase text-center">
               Best Ask
             </span>
           </div>
@@ -514,7 +514,7 @@ export function Bookmaker1on1({
 
                 {/* Spread detail tooltip */}
                 <div className="relative group">
-                  <Info className="w-3 h-3 text-[#5E6875] cursor-help" />
+                  <Info className="w-3 h-3 text-[#8A9BA8] cursor-help" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded bg-[#232E3C] text-[10px] text-[#8A9BA8] whitespace-nowrap z-10 hidden group-hover:block border border-[#3f3f3f] shadow-lg">
                     <div>{platformAName} ask: {fmtPrice(a.yesAsk)}</div>
                     <div>{platformBName} price: {fmtPrice(b.yesPrice)}</div>
@@ -585,7 +585,7 @@ export function Bookmaker1on1({
 
       {/* ── Footer Legend ── */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-[#232E3C] bg-[#17212B]">
-        <div className="flex items-center gap-4 text-[10px] text-[#5E6875]">
+        <div className="flex items-center gap-4 text-[10px] text-[#8A9BA8]">
           <span className="flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-[#5DBE81]" />
             &#8805;{thresholds.green}&cent;
@@ -599,7 +599,7 @@ export function Bookmaker1on1({
             &#60;{thresholds.yellow}&cent;
           </span>
         </div>
-        <div className="text-[10px] text-[#5E6875]">
+        <div className="text-[10px] text-[#8A9BA8]">
           {validOutcomes.length} outcome{validOutcomes.length !== 1 ? "s" : ""}
         </div>
       </div>

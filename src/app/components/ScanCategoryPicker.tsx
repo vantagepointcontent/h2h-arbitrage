@@ -99,7 +99,7 @@ export default function ScanCategoryPicker({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-[#FFFFFF] truncate group-hover:text-[#5DBE81]">{m.title}</span>
-                    <span className="text-[10px] text-[#5E6875] shrink-0">
+                    <span className="text-[10px] text-[#8A9BA8] shrink-0">
                       {m.eventDate ? new Date(m.eventDate).toLocaleDateString() : '—'}
                     </span>
                   </div>

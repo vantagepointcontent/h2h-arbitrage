@@ -126,7 +126,7 @@ export function freshnessColor(level: FreshnessLevel): string {
     case 'recent': return 'text-[#8A9BA8]';
     case 'stale': return 'text-[#facc15]';
     case 'dead': return 'text-[#ef4444]';
-    case 'never': return 'text-[#5E6875]';
+    case 'never': return 'text-[#8A9BA8]';
   }
 }
 

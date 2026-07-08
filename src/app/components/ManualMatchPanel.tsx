@@ -278,7 +278,7 @@ export default function ManualMatchPanel({
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
         <Link2 className="w-4 h-4 text-[#5DBE81]" />
         <h3 className="text-sm font-semibold text-[#FFFFFF]">Manual Market Matching</h3>
-        <span className="text-[10px] text-[#5E6875]">
+        <span className="text-[10px] text-[#8A9BA8]">
           ({kalshiList.length} Kalshi · {pmList.length} Polymarket)
         </span>
         <div className="flex-1" />
@@ -288,7 +288,7 @@ export default function ManualMatchPanel({
           className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
             browseMode
               ? "bg-[#5DBE81]/20 text-[#5DBE81] border border-[#5DBE81]/30"
-              : "text-[#5E6875] hover:text-[#FFFFFF] border border-[#182533]"
+              : "text-[#8A9BA8] hover:text-[#FFFFFF] border border-[#182533]"
           }`}
           title="Toggle between scan-only and all-platforms browse mode"
         >
@@ -298,7 +298,7 @@ export default function ManualMatchPanel({
           <button
             onClick={loadAllMarkets}
             disabled={loadingAll}
-            className="px-2 py-1 rounded-md text-[10px] text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+            className="px-2 py-1 rounded-md text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
           >
             {loadingAll ? "Loading…" : "Refresh"}
           </button>
@@ -308,19 +308,19 @@ export default function ManualMatchPanel({
       {/* Active matches */}
       {activeMatches.length > 0 && (
         <div className="px-4 py-3 border-b border-[#182533] bg-[#0E1621]">
-          <div className="text-[10px] text-[#5E6875] uppercase tracking-wider mb-2">Matched Pairs ({activeMatches.length})</div>
+          <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-2">Matched Pairs ({activeMatches.length})</div>
           <div className="space-y-1.5">
             {activeMatches.map(mm => (
               <div key={mm.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#17212B] border border-[#5DBE81]/20">
                 <div className="flex-1 grid grid-cols-[1fr_auto_1fr] gap-2 items-center text-xs">
-                  <div className="min-w-0">
-                    <span className="text-[10px] text-[#5DBE81]">K</span>
-                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
+                  <div className="min-w-0 flex items-center gap-1">
+                    <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm shrink-0" />
+                    <span className="text-[#FFFFFF] truncate" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
                   </div>
                   <ArrowRight className="w-3 h-3 text-[#5E6875] shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-[10px] text-[#a855f7]">PM</span>
-                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.pmTitle}>{mm.pmTitle}</span>
+                  <div className="min-w-0 flex items-center gap-1">
+                    <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm shrink-0" />
+                    <span className="text-[#FFFFFF] truncate" title={mm.pmTitle}>{mm.pmTitle}</span>
                   </div>
                 </div>
                 <button
@@ -342,25 +342,25 @@ export default function ManualMatchPanel({
         <div className="border-r border-[#182533]">
           <div className="px-4 py-2.5 border-b border-[#182533]">
             <div className="flex items-center gap-1.5 mb-2">
-              <img src="/kalshi-icon.png" alt="" className="w-3.5 h-3.5 rounded-sm" />
-              <span className="text-[10px] uppercase tracking-wider text-[#5E6875]">Kalshi Markets</span>
-              <span className="text-[9px] text-[#5E6875]">({filteredKalshi.length})</span>
+              <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
+              <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8]">Kalshi Markets</span>
+              <span className="text-[9px] text-[#8A9BA8]">({filteredKalshi.length})</span>
             </div>
             {/* Search input */}
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#5E6875]" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#8A9BA8]" />
               <input
                 type="text"
                 value={kalshiSearch}
                 onChange={e => setKalshiSearch(e.target.value)}
                 placeholder="Search Kalshi markets…"
-                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#5E6875] focus:outline-none focus:border-[#5DBE81]"
+                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
               />
             </div>
           </div>
           <div className="max-h-[400px] overflow-y-auto">
             {filteredKalshi.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-[#5E6875]">
+              <div className="px-4 py-6 text-center text-xs text-[#8A9BA8]">
                 {loadingAll ? "Loading all markets…" : "No Kalshi markets found"}
               </div>
             ) : (
@@ -387,11 +387,11 @@ export default function ManualMatchPanel({
                       <div className="text-xs text-[#FFFFFF] truncate" title={k.title}>{k.title}</div>
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-[9px] text-[#5E6875] font-mono truncate">{k.ticker}</span>
+                      <span className="text-[9px] text-[#8A9BA8] font-mono truncate">{k.ticker}</span>
                       {k.yesAsk > 0 && <span className="text-[9px] text-[#5DBE81]">Y {fmtPct(k.yesAsk)}</span>}
                       {k.noAsk > 0 && <span className="text-[9px] text-[#ef4444]">N {fmtPct(k.noAsk)}</span>}
                     </div>
-                    {isMatched && <span className="text-[8px] text-[#5E6875]">✓ matched</span>}
+                    {isMatched && <span className="text-[8px] text-[#8A9BA8]">✓ matched</span>}
                   </button>
                 );
               })
@@ -420,25 +420,25 @@ export default function ManualMatchPanel({
         <div className="border-l border-[#182533] border-t md:border-t-0 border-[#182533]">
           <div className="px-4 py-2.5 border-b border-[#182533]">
             <div className="flex items-center gap-1.5 mb-2">
-              <img src="/polymarket-icon.png" alt="" className="w-3.5 h-3.5 rounded-sm" />
-              <span className="text-[10px] uppercase tracking-wider text-[#5E6875]">Polymarket Markets</span>
-              <span className="text-[9px] text-[#5E6875]">({filteredPm.length})</span>
+              <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
+              <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8]">Polymarket Markets</span>
+              <span className="text-[9px] text-[#8A9BA8]">({filteredPm.length})</span>
             </div>
             {/* Search input */}
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#5E6875]" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#8A9BA8]" />
               <input
                 type="text"
                 value={pmSearch}
                 onChange={e => setPmSearch(e.target.value)}
                 placeholder="Search Polymarket markets…"
-                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#5E6875] focus:outline-none focus:border-[#a855f7]"
+                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#a855f7]"
               />
             </div>
           </div>
           <div className="max-h-[400px] overflow-y-auto">
             {filteredPm.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-[#5E6875]">
+              <div className="px-4 py-6 text-center text-xs text-[#8A9BA8]">
                 {loadingAll ? "Loading all markets…" : "No Polymarket markets found"}
               </div>
             ) : (
@@ -465,11 +465,11 @@ export default function ManualMatchPanel({
                       <div className="text-xs text-[#FFFFFF] truncate" title={p.title}>{p.title}</div>
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-[9px] text-[#5E6875] font-mono truncate">{p.conditionId.slice(0, 16)}…</span>
+                      <span className="text-[9px] text-[#8A9BA8] font-mono truncate">{p.conditionId.slice(0, 16)}…</span>
                       {p.yesPrice > 0 && <span className="text-[9px] text-[#5DBE81]">Y {fmtPct(p.yesPrice)}</span>}
                       {p.noPrice > 0 && <span className="text-[9px] text-[#ef4444]">N {fmtPct(p.noPrice)}</span>}
                     </div>
-                    {isMatched && <span className="text-[8px] text-[#5E6875]">✓ matched</span>}
+                    {isMatched && <span className="text-[8px] text-[#8A9BA8]">✓ matched</span>}
                   </button>
                 );
               })
@@ -480,7 +480,7 @@ export default function ManualMatchPanel({
 
       {/* Selection hint */}
       <div className="px-4 py-2 border-t border-[#182533] bg-[#0E1621]">
-        <div className="text-[10px] text-[#5E6875] text-center">
+        <div className="text-[10px] text-[#8A9BA8] text-center">
           {canPair
             ? "Click Link to pair selected markets"
             : selectedKalshi

@@ -279,42 +279,42 @@ export default function LogsPanel() {
       {/* Filters */}
       <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4 space-y-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <Filter className="w-4 h-4 text-[#5E6875]" />
+          <Filter className="w-4 h-4 text-[#8A9BA8]" />
           <span className="text-xs font-semibold text-[#8A9BA8] uppercase tracking-wide">Filters</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {/* Search */}
           <div className="md:col-span-2">
-            <label className="block text-[10px] text-[#5E6875] mb-1">Search (market name, ID, or strategy)</label>
+            <label className="block text-[10px] text-[#8A9BA8] mb-1">Search (market name, ID, or strategy)</label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5E6875]" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A9BA8]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#5E6875] focus:outline-none focus:border-[#5DBE81]"
+                className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
               />
             </div>
           </div>
 
           {/* Min ROI */}
           <div>
-            <label className="block text-[10px] text-[#5E6875] mb-1">Min ROI %</label>
+            <label className="block text-[10px] text-[#8A9BA8] mb-1">Min ROI %</label>
             <input
               type="number"
               step="0.1"
               value={minRoi}
               onChange={(e) => setMinRoi(e.target.value)}
               placeholder="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#5E6875] focus:outline-none focus:border-[#5DBE81]"
+              className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
 
           {/* From Date */}
           <div>
-            <label className="block text-[10px] text-[#5E6875] mb-1">From Date</label>
+            <label className="block text-[10px] text-[#8A9BA8] mb-1">From Date</label>
             <input
               type="date"
               value={fromDate}
@@ -325,7 +325,7 @@ export default function LogsPanel() {
 
           {/* To Date */}
           <div>
-            <label className="block text-[10px] text-[#5E6875] mb-1">To Date</label>
+            <label className="block text-[10px] text-[#8A9BA8] mb-1">To Date</label>
             <input
               type="date"
               value={toDate}
@@ -348,7 +348,7 @@ export default function LogsPanel() {
           </label>
           {/* Event type filter pills */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[#5E6875] uppercase tracking-wide">Type:</span>
+            <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Type:</span>
             <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
               {EVENT_TYPE_OPTIONS.map((opt) => (
                 <button
@@ -357,7 +357,7 @@ export default function LogsPanel() {
                   className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                     eventType === opt.key
                       ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                      : "text-[#5E6875] hover:text-[#FFFFFF]"
+                      : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                   }`}
                 >
                   {opt.label}
@@ -379,12 +379,12 @@ export default function LogsPanel() {
       {/* Table */}
       <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-sm text-[#5E6875]">
+          <div className="py-16 text-center text-sm text-[#8A9BA8]">
             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
             Loading logs...
           </div>
         ) : sorted.length === 0 ? (
-          <div className="py-16 text-center text-sm text-[#5E6875]">
+          <div className="py-16 text-center text-sm text-[#8A9BA8]">
             <FileText className="w-6 h-6 mx-auto mb-2 opacity-40" />
             No log entries. Run a scan to generate data.
           </div>
@@ -450,7 +450,7 @@ export default function LogsPanel() {
 
       {/* Count */}
       {!loading && sorted.length > 0 && (
-        <div className="text-xs text-[#5E6875] text-right">
+        <div className="text-xs text-[#8A9BA8] text-right">
           Showing {sorted.length} of {logs.length} entries
         </div>
       )}
@@ -476,7 +476,7 @@ function LogRow({
   savedMarkets: Map<string, string>;
 }) {
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
-  const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#5E6875]";
+  const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
 
   const marketName = log.market_name ?? log.market_title ?? savedMarkets.get(log.market_id);
   const hasMarketName = !!marketName;
@@ -510,7 +510,7 @@ function LogRow({
             tabIndex={0}
             onClick={handleNavigate}
             onKeyDown={(e) => { if (e.key === "Enter") handleNavigate(e as unknown as React.MouseEvent); }}
-            className={`cursor-pointer hover:underline ${hasMarketName ? "text-[#5DBE81]" : "text-[#5E6875]"}`}
+            className={`cursor-pointer hover:underline ${hasMarketName ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
           >
             {hasMarketName ? marketName : log.market_id}
           </span>
@@ -519,14 +519,14 @@ function LogRow({
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#5E6875]">{log.kalshi_count} / {log.pm_count}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#5E6875]">{log.total_stake ? fmtUsd(log.total_stake) : "\u2014"}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.total_stake ? fmtUsd(log.total_stake) : "\u2014"}</td>
         <td className="px-3 py-2 text-center">
           <button
             onClick={handleNavigate}
             title="Open in Scan"
-            className="p-1 rounded text-[#5E6875] hover:text-[#5DBE81] transition-colors"
+            className="p-1 rounded text-[#8A9BA8] hover:text-[#5DBE81] transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </button>
@@ -547,12 +547,12 @@ function LogRow({
                           {fmtPct(arb.roiPct)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] text-[#5E6875]">
+                      <div className="flex items-center justify-between text-[10px] text-[#8A9BA8]">
                         <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(arb.expectedProfit)}</span></span>
                         <span>{arb.strategy}</span>
                       </div>
                       {arb.fees && (
-                        <div className="text-[10px] text-[#5E6875] mt-1 pt-1 border-t border-[#182533]">
+                        <div className="text-[10px] text-[#8A9BA8] mt-1 pt-1 border-t border-[#182533]">
                           Fees — Kalshi: {fmtUsd(arb.fees.kalshiFee ?? 0)} · PM: {fmtUsd(arb.fees.pmFee ?? 0)} · Net: {fmtUsd(arb.fees.worstCaseNetProfit ?? arb.fees.netProfitIfKalshiWins ?? 0)}
                         </div>
                       )}
@@ -561,7 +561,7 @@ function LogRow({
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-[#5E6875]">No detailed arb data available for this scan.</div>
+              <div className="text-xs text-[#8A9BA8]">No detailed arb data available for this scan.</div>
             )}
           </td>
         </tr>
@@ -573,7 +573,7 @@ function LogRow({
 function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="rounded-lg border border-[#182533] bg-[#17212B] p-2.5">
-      <div className="text-[10px] text-[#5E6875] mb-0.5">{label}</div>
+      <div className="text-[10px] text-[#8A9BA8] mb-0.5">{label}</div>
       <div className="text-sm font-bold" style={{ color: color || "#FFFFFF" }}>
         {value}
       </div>

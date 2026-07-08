@@ -29,7 +29,7 @@ function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.Re
         className={`w-full flex items-center justify-center p-3 rounded-lg transition-colors ${
           active
             ? "bg-[#5DBE81]/10 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-            : "text-[#5E6875] hover:bg-[#182533] hover:text-[#FFFFFF]"
+            : "text-[#8A9BA8] hover:bg-[#182533] hover:text-[#FFFFFF]"
         }`}
         title={label}
       >
@@ -249,7 +249,7 @@ function MarketSidebarInner({
                   <button
                     onClick={onToggleSidebarFavorites}
                     className={`p-0.5 rounded transition-colors ${
-                      sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#232E3C] hover:text-[#5E6875]"
+                      sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                     }`}
                     title={sidebarFavoritesOnly ? "Show all markets" : "Show favorites only"}
                   >
@@ -260,7 +260,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("apy")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
                     }`}
                     title="Sort by APY"
                   >
@@ -269,7 +269,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("roi")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "roi" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "roi" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
                     }`}
                     title="Sort by ROI"
                   >
@@ -278,7 +278,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("name")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "name" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "name" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
                     }`}
                     title="Sort by Name"
                   >
@@ -287,21 +287,21 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("scanned")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
                     }`}
                     title="Sort by last scan time (click to toggle asc/desc)"
                   >
                     Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
                   </button>
                   <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
-                  <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#5E6875] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
+                  <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#8A9BA8] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
                     {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               {scanningAll && scanProgress.total > 0 && (
-                <div className="flex items-center gap-2 text-[10px] text-[#5E6875]">
+                <div className="flex items-center gap-2 text-[10px] text-[#8A9BA8]">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Scanning {scanProgress.current}/{scanProgress.total}...
                 </div>
@@ -343,7 +343,7 @@ function MarketSidebarInner({
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                       showExpired
                         ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                        : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                        : "bg-[#0E1621] text-[#8A9BA8] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
                     }`}
                     title={showExpired ? "Hide expired markets" : "Show expired markets"}
                   >
@@ -354,7 +354,7 @@ function MarketSidebarInner({
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                       showArbOnly
                         ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                        : "bg-[#0E1621] text-[#5E6875] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                        : "bg-[#0E1621] text-[#8A9BA8] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
                     }`}
                     title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
                   >
@@ -389,7 +389,7 @@ function MarketSidebarInner({
                         className={`shrink-0 p-0.5 rounded transition-colors ${
                           favoriteIds.has(m.id)
                             ? "text-[#facc15]"
-                            : "text-[#232E3C] group-hover:text-[#5E6875]"
+                            : "text-[#8A9BA8] group-hover:text-[#FFFFFF]"
                         }`}
                         title={favoriteIds.has(m.id) ? "Remove favorite" : "Add favorite"}
                       >
@@ -409,9 +409,9 @@ function MarketSidebarInner({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {m.category && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#5E6875]">{m.category}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.category}</span>
                           )}
-                          <span className="text-[9px] text-[#5E6875]">{timeUntilExpiry(m.expiryDate)}</span>
+                          <span className="text-[9px] text-[#8A9BA8]">{timeUntilExpiry(m.expiryDate)}</span>
                           {(() => {
                             // WS-106: last-tick freshness — prefer live WS result, fall back to poller scan
                             const f = tickFreshness(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt ?? null);
@@ -432,17 +432,17 @@ function MarketSidebarInner({
                           </span>
                         )}
                         {apy > 0 && (
-                          <span className="text-[10px] text-[#5E6875] ml-1">({formatPercent(apy)})</span>
+                          <span className="text-[10px] text-[#8A9BA8] ml-1">({formatPercent(apy)})</span>
                         )}
                       </div>
                     </div>
                   );
                 })}
                 {filtered.length === 0 && markets.length > 0 && (
-                  <div className="text-xs text-[#232E3C] text-center py-4">No markets match filters.</div>
+                  <div className="text-xs text-[#8A9BA8] text-center py-4">No markets match filters.</div>
                 )}
                 {markets.length === 0 && (
-                  <div className="text-xs text-[#232E3C] text-center py-4">No saved markets yet.</div>
+                  <div className="text-xs text-[#8A9BA8] text-center py-4">No saved markets yet.</div>
                 )}
               </div>
             </>

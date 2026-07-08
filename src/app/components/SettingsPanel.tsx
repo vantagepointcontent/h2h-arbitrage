@@ -183,7 +183,7 @@ export default function SettingsPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-[#5E6875]">
+      <div className="flex items-center justify-center h-64 text-[#8A9BA8]">
         <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading settings…
       </div>
     );
@@ -195,7 +195,7 @@ export default function SettingsPanel() {
         <SettingsIcon className="w-6 h-6 text-[#5DBE81]" />
         <h2 className="text-xl font-bold">Settings</h2>
       </div>
-      <p className="text-sm text-[#5E6875] mb-6">
+      <p className="text-sm text-[#8A9BA8] mb-6">
         DB-backed overrides — changes apply live within ~10 seconds, no restart. Source shows where each value comes from (db → env → default).
       </p>
 
@@ -228,12 +228,12 @@ export default function SettingsPanel() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{s.label}</span>
                         {isDirty && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#5DBE81]/20 text-[#5DBE81]">unsaved</span>}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.source === "db" ? "bg-blue-500/20 text-blue-400" : s.source === "env" ? "bg-amber-500/20 text-amber-400" : "bg-[#182533] text-[#5E6875]"}`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.source === "db" ? "bg-blue-500/20 text-blue-400" : s.source === "env" ? "bg-amber-500/20 text-amber-400" : "bg-[#182533] text-[#8A9BA8]"}`}>
                           {s.source}
                         </span>
                         {s.dangerous && <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
                       </div>
-                      <p className="text-xs text-[#5E6875] mt-0.5">{s.description}</p>
+                      <p className="text-xs text-[#8A9BA8] mt-0.5">{s.description}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {s.type === "boolean" ? (
@@ -290,7 +290,7 @@ export default function SettingsPanel() {
                         />
                       )}
                       {s.source === "db" && (
-                        <button onClick={() => resetKey(s.key)} className="p-1.5 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-white" title="Reset to env/default">
+                        <button onClick={() => resetKey(s.key)} className="p-1.5 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-white" title="Reset to env/default">
                           <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -326,49 +326,49 @@ export default function SettingsPanel() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Kalshi WS</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Kalshi WS</div>
                   <div className={`text-sm font-medium ${watcherHealth.kalshiConnected ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
                     {watcherHealth.kalshiConnected ? "connected" : "disconnected"}
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">PM WS</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">PM WS</div>
                   <div className="text-sm font-medium">{watcherHealth.pmConnections ?? "—"}</div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">HOT pairs</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">HOT pairs</div>
                   <div className="text-sm font-medium text-[#5DBE81]">
                     {watcherHealth.hotPairs ?? 0}
-                    <span className="text-[#5E6875] font-normal"> / {watcherHealth.tierStats?.pairs ?? "?"}</span>
+                    <span className="text-[#8A9BA8] font-normal"> / {watcherHealth.tierStats?.pairs ?? "?"}</span>
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Msgs/sec</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Msgs/sec</div>
                   <div className="text-sm font-medium tabular-nums">{msgRate === null ? "—" : msgRate}</div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Subscriptions</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Subscriptions</div>
                   <div className="text-sm font-medium">
                     <span className="text-[#facc15]">{watcherHealth.kalshiTickers ?? 0}K</span>
-                    <span className="text-[#5E6875]"> · </span>
+                    <span className="text-[#8A9BA8]"> · </span>
                     <span className="text-[#a78bfa]">{watcherHealth.pmTokens ?? 0}P</span>
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Last tick</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Last tick</div>
                   {(() => {
                     const f = tickFreshness(watcherHealth.lastTickAt);
                     return <div className={`text-sm font-medium ${freshnessColor(f.level)}`}>{f.label}</div>;
                   })()}
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Degraded</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Degraded</div>
                   <div className={`text-sm font-medium ${watcherHealth.integrity?.degraded ? "text-[#ef4444]" : "text-[#5DBE81]"}`}>
                     {watcherHealth.integrity?.degraded ? "YES" : "no"}
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">Last reconcile</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Last reconcile</div>
                   {(() => {
                     const f = tickFreshness(watcherHealth.integrity?.lastReconcileAt ?? null);
                     return <div className={`text-sm font-medium ${freshnessColor(f.level)}`}>{f.label}</div>;
@@ -376,7 +376,7 @@ export default function SettingsPanel() {
                 </div>
               </div>
               {watcherHealth.integrity && (
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#5E6875]">
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8A9BA8]">
                   <span>seq gaps: <span className="text-[#8A9BA8]">{watcherHealth.integrity.seqGaps ?? 0}</span></span>
                   <span>stale reseeds: <span className="text-[#8A9BA8]">{watcherHealth.integrity.staleReseeds ?? 0}</span></span>
                   <span>reconcile passes: <span className="text-[#8A9BA8]">{watcherHealth.integrity.reconcilePasses ?? 0}</span></span>
@@ -389,7 +389,7 @@ export default function SettingsPanel() {
               )}
             </>
           ) : (
-            <span className="text-[#5E6875]">Watcher health endpoint unavailable.</span>
+            <span className="text-[#8A9BA8]">Watcher health endpoint unavailable.</span>
           )}
         </div>
       </div>
@@ -404,7 +404,7 @@ export default function SettingsPanel() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {Object.entries(health).map(([k, v]) => (
                 <div key={k} className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">{k}</div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">{k}</div>
                   <div className={`text-sm font-medium truncate ${k === "status" && v === "ok" ? "text-[#5DBE81]" : ""}`} title={String(typeof v === "object" ? JSON.stringify(v) : v)}>
                     {typeof v === "object" ? JSON.stringify(v) : String(v)}
                   </div>
@@ -412,7 +412,7 @@ export default function SettingsPanel() {
               ))}
             </div>
           ) : (
-            <span className="text-[#5E6875]">Health endpoint unavailable.</span>
+            <span className="text-[#8A9BA8]">Health endpoint unavailable.</span>
           )}
         </div>
       </div>
@@ -421,7 +421,7 @@ export default function SettingsPanel() {
       {dirtyCount > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-[#182533] bg-[#0E1621] shadow-xl">
           <span className="text-sm text-[#8A9BA8]">{dirtyCount} unsaved change{dirtyCount > 1 ? "s" : ""}</span>
-          <button onClick={() => setDirty({})} className="px-3 py-1.5 rounded-lg text-sm text-[#5E6875] hover:text-white hover:bg-[#182533]">
+          <button onClick={() => setDirty({})} className="px-3 py-1.5 rounded-lg text-sm text-[#8A9BA8] hover:text-white hover:bg-[#182533]">
             Discard
           </button>
           <button

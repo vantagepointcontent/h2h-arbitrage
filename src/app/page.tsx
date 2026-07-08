@@ -57,11 +57,11 @@ import { CATEGORIES, CategoryName } from "@/lib/categories";
 import dynamic from "next/dynamic";
 // PERF-P1: lazy-load heavy conditionally-rendered components into separate chunks
 const Bookmaker1on1 = dynamic(() => import("@/app/components/Bookmaker1on1").then(m => m.Bookmaker1on1), {
-  loading: () => <div className="p-4 text-sm text-[#5E6875]">Loading...</div>,
+  loading: () => <div className="p-4 text-sm text-[#8A9BA8]">Loading...</div>,
   ssr: false,
 });
 const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSuggestions").then(m => m.CouplingSuggestions), {
-  loading: () => <div className="p-4 text-sm text-[#5E6875]">Loading...</div>,
+  loading: () => <div className="p-4 text-sm text-[#8A9BA8]">Loading...</div>,
   ssr: false,
 });
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
@@ -1163,7 +1163,7 @@ export default function Home() {
           <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
             <Rows3 className="w-5 h-5" />
           </button>
-          <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+          <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
             <PanelLeft className={`w-5 h-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
           </button>
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
@@ -1172,16 +1172,16 @@ export default function Home() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "live" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#5E6875] hover:text-[#FFFFFF]"}`} title="Live WebSocket scan">
+            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "live" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Live WebSocket scan">
               <Activity className="w-4 h-4" />
             </button>
-            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Alert settings">
+            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
-            <button onClick={goToSettings} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "settings" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#5E6875] hover:text-[#FFFFFF]"}`} title="App settings">
+            <button onClick={goToSettings} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "settings" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="App settings">
               <SettingsIconLucide className="w-4 h-4" />
             </button>
-            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]" title="Toggle theme">
+            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]" title="Toggle theme">
               {theme.theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
@@ -1383,14 +1383,14 @@ export default function Home() {
 
                   {/* Auto/Manual match toggle */}
                   <div className="flex items-center gap-2 mb-4 flex-col sm:flex-row">
-                    <span className="text-xs text-[#5E6875]">Match Mode:</span>
+                    <span className="text-xs text-[#8A9BA8]">Match Mode:</span>
                     <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
                       <button
                         onClick={() => setMatchMode("auto")}
                         className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "auto"
                             ? "bg-[#5DBE81] text-black"
-                            : "text-[#5E6875] hover:text-[#FFFFFF]"
+                            : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                         }`}
                       >
                         Auto Match
@@ -1400,7 +1400,7 @@ export default function Home() {
                         className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "manual"
                             ? "bg-[#a855f7] text-white"
-                            : "text-[#5E6875] hover:text-[#FFFFFF]"
+                            : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                         }`}
                       >
                         Manual Match
@@ -1425,14 +1425,14 @@ export default function Home() {
                     )}
 
                     <div className="flex items-center gap-2 ml-auto">
-                      <label className="text-xs text-[#5E6875]">Capital:</label>
+                      <label className="text-xs text-[#8A9BA8]">Capital:</label>
                       <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
                       <button
                         onClick={() => setCouplingPanelOpen(v => !v)}
                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                           couplingPanelOpen
                             ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
-                            : "border-[#182533] bg-[#121E2B] text-[#5E6875] hover:text-[#FFFFFF]"
+                            : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
                         }`}
                         title="Toggle coupling panel"
                       >
@@ -1452,7 +1452,7 @@ export default function Home() {
 
                 {/* Loading state */}
                 {loading && (
-                  <div className="py-20 text-center text-sm text-[#5E6875]">
+                  <div className="py-20 text-center text-sm text-[#8A9BA8]">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
                     Scanning markets...
                   </div>
@@ -1468,7 +1468,7 @@ export default function Home() {
                         <div className="flex items-center gap-2 mb-3">
                           <h2 className="text-sm font-bold text-[#FFFFFF] truncate">{result.eventTitle}</h2>
                           {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[#182533] text-[#5E6875]">
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[#182533] text-[#8A9BA8]">
                               {savedMarkets.find(m => m.id === activeMarketId)?.category}
                             </span>
                           )}
@@ -1484,10 +1484,8 @@ export default function Home() {
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] hover:border-[#5DBE81]/50 transition-colors"
                             title="Open Kalshi market"
                           >
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]">
-                              <span className="text-[8px] font-bold text-[#FFFFFF]">K</span>
-                            </div>
-                            <span className="text-[10px] text-[#5E6875]">Kalshi</span>
+                            <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />
+                            <span className="text-[10px] text-[#8A9BA8]">Kalshi</span>
                           </a>
 
                           {/* Polymarket link chip */}
@@ -1498,10 +1496,8 @@ export default function Home() {
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] hover:border-[#a855f7]/50 transition-colors"
                             title="Open Polymarket"
                           >
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]">
-                              <span className="text-[7px] font-bold text-[#FFFFFF]">PM</span>
-                            </div>
-                            <span className="text-[10px] text-[#5E6875]">Polymarket</span>
+                            <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />
+                            <span className="text-[10px] text-[#8A9BA8]">Polymarket</span>
                           </a>
 
                           {/* Refresh chip */}
@@ -1514,21 +1510,21 @@ export default function Home() {
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
                             title="Refresh"
                           >
-                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#5E6875]" />}
+                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#8A9BA8]" />}
                             <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? (scanningAll && scanProgress.total > 0 ? `Refreshing ${scanProgress.current}/${scanProgress.total}…` : "Refreshing prices…") : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
                           </button>
 
                           {/* Data chips (config-driven) */}
                           {([
-                            { label: "Kalshi", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><span className="text-[8px] font-bold text-[#FFFFFF]">K</span></div>, value: String(result.kalshiCount), valueClass: "text-[#FFFFFF]", dim: false },
-                            { label: "Polymarket", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7]"><span className="text-[7px] font-bold text-[#FFFFFF]">PM</span></div>, value: String(result.pmCount), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Kalshi", icon: <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />, value: String(result.kalshiCount), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Polymarket", icon: <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />, value: String(result.pmCount), valueClass: "text-[#FFFFFF]", dim: false },
                             { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><Check className="w-2.5 h-2.5 text-[#FFFFFF]" /></div>, value: String(result.matchedCount), valueClass: "text-[#FFFFFF]", dim: false },
                             { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[#5DBE81]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit > 0 ? o.arbitrage.expectedProfit : 0), 0)), valueClass: "text-[#5DBE81]", dim: !!result.expired },
                             { label: "Expiry", icon: <Clock className="w-3 h-3 text-[#facc15]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[#FFFFFF]", dim: false },
                           ] as const).map((chip) => (
                             <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${chip.dim ? "opacity-50" : ""}`}>
                               {chip.icon}
-                              <span className="text-[10px] text-[#5E6875]">{chip.label}</span>
+                              <span className="text-[10px] text-[#8A9BA8]">{chip.label}</span>
                               <span className={`text-xs font-bold ${chip.valueClass}`}>{chip.value}</span>
                             </div>
                           ))}
@@ -1539,7 +1535,7 @@ export default function Home() {
                             className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#ef4444]/10 transition-colors"
                             title="Delete market"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-[#5E6875] hover:text-[#ef4444]" />
+                            <Trash2 className="w-3.5 h-3.5 text-[#8A9BA8] hover:text-[#ef4444]" />
                           </button>
 
                           {/* Coupling panel toggle */}
@@ -1548,7 +1544,7 @@ export default function Home() {
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                               couplingPanelOpen
                                 ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
-                                : "border-[#182533] bg-[#121E2B] text-[#5E6875] hover:text-[#FFFFFF]"
+                                : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
                             }`}
                             title="Toggle coupling panel"
                           >
@@ -1609,7 +1605,7 @@ export default function Home() {
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               !bookmakerView
                                 ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                                : "bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
+                                : "bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]"
                             }`}
                           >
                             <Rows3 className="w-3.5 h-3.5" /> Outcomes Table
@@ -1619,7 +1615,7 @@ export default function Home() {
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               bookmakerView
                                 ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                                : "bg-[#182533] text-[#5E6875] hover:text-[#FFFFFF]"
+                                : "bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]"
                             }`}
                           >
                             <BarChart3 className="w-3.5 h-3.5" /> 1on1 Bookmaker
@@ -1670,7 +1666,7 @@ export default function Home() {
                               className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                                 outcomeFilter === mode
                                   ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                                  : "text-[#5E6875] hover:text-[#FFFFFF]"
+                                  : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                               }`}
                             >
                               {mode === "all" ? "Show All" : mode === "matched" ? "Matched Only" : "Arb Only"}
@@ -1679,12 +1675,32 @@ export default function Home() {
                         </div>
                         <table className="w-full text-sm">
                           <thead className="bg-[#17212B] border-b border-[#182533]">
-                            <tr className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+                            <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                               <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
-                              <th className="text-right px-4 py-3.5 font-medium">Kalshi Yes</th>
-                              <th className="text-right px-4 py-3.5 font-medium">Kalshi No</th>
-                              <th className="text-right px-4 py-3.5 font-medium">PM Yes</th>
-                              <th className="text-right px-4 py-3.5 font-medium">PM No</th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
+                                  Yes
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
+                                  No
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
+                                  Yes
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
+                                  No
+                                </span>
+                              </th>
                               <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   ROI
@@ -1818,7 +1834,7 @@ export default function Home() {
                           <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
                             <Link2 className="w-4 h-4 text-[#5DBE81]" />
                             <h3 className="text-sm font-semibold text-[#FFFFFF]">Active Couplings</h3>
-                            <span className="text-[10px] text-[#5E6875]">({marketCouplings.length})</span>
+                            <span className="text-[10px] text-[#8A9BA8]">({marketCouplings.length})</span>
                           </div>
                           <div className="p-3 space-y-2">
                             {marketCouplings.map(mm => (

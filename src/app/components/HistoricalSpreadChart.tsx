@@ -65,7 +65,7 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
                 timeRange === range
                   ? "bg-[#5DBE81]/15 text-[#5DBE81] border border-[#5DBE81]/30"
-                  : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                  : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
               }`}
             >
               {range}
@@ -77,14 +77,14 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
       {/* Chart area */}
       <div className="relative" style={{ height: 240 }}>
         {loading && data.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-[#232E3C] text-sm">
+          <div className="absolute inset-0 flex items-center justify-center text-[#8A9BA8] text-sm">
             Loading...
           </div>
         ) : data.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#232E3C] text-sm gap-2">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8A9BA8] text-sm gap-2">
             <Clock className="w-5 h-5" />
             <span>No historical data yet</span>
-            <span className="text-[11px] text-[#232E3C]">Samples collected every 30s during active scans</span>
+            <span className="text-[11px] text-[#8A9BA8]">Samples collected every 30s during active scans</span>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -123,16 +123,16 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
                   const p = props.payload[0]?.payload as SpreadPoint;
                   return (
                     <div className="rounded-lg border border-[#232E3C] bg-[#17212B] p-3 shadow-xl text-xs space-y-1">
-                      <div className="text-[#5E6875] text-[10px]">
+                      <div className="text-[#8A9BA8] text-[10px]">
                         {new Date(p.ts).toLocaleString()}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[#5DBE81] font-bold">
                           {formatTooltip(p.spread)}
                         </span>
-                        <span className="text-[#232E3C]">{p.strategy}</span>
+                        <span className="text-[#8A9BA8]">{p.strategy}</span>
                       </div>
-                      <div className="text-[#5E6875] text-[10px]">
+                      <div className="text-[#8A9BA8] text-[10px]">
                         K: {p.kalshiYesBid.toFixed(3)} / {p.kalshiYesAsk.toFixed(3)}
                         {"  "}PM: {p.pmYesBid.toFixed(3)} / {p.pmYesAsk.toFixed(3)}
                       </div>
@@ -170,7 +170,7 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
 
       {/* Footer stats */}
       {data.length > 0 && (
-        <div className="px-4 py-2 border-t border-[#182533] flex items-center justify-between text-[11px] text-[#5E6875]">
+        <div className="px-4 py-2 border-t border-[#182533] flex items-center justify-between text-[11px] text-[#8A9BA8]">
           <div className="flex items-center gap-3">
             <span>{data.length} samples</span>
             <span>·</span>
@@ -189,7 +189,7 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
             <div className="flex items-center gap-1.5">
               <ZoomIn className="w-3 h-3" />
               <span>Live:</span>
-              <span className={`font-bold ${currentSpread > 0 ? "text-[#5DBE81]" : "text-[#5E6875]"}`}>
+              <span className={`font-bold ${currentSpread > 0 ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
                 {currentSpread > 0 ? "+" : ""}{currentSpread.toFixed(2)}%
               </span>
             </div>

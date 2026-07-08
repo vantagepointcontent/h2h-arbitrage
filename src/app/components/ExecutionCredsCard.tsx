@@ -125,12 +125,12 @@ export function ExecutionCredsCard() {
                 <div className="flex items-center gap-2 min-w-0">
                   {isSet
                     ? <CheckCircle2 className="w-4 h-4 text-[#5DBE81] shrink-0" />
-                    : <XCircle className="w-4 h-4 text-[#5E6875] shrink-0" />}
+                    : <XCircle className="w-4 h-4 text-[#8A9BA8] shrink-0" />}
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
-                      <span className="text-[#5E6875]">{f.platform} · </span>{f.label}
+                      <span className="text-[#8A9BA8]">{f.platform} · </span>{f.label}
                     </div>
-                    <div className="text-[10px] text-[#5E6875] font-mono">{f.key} — {isSet ? "set" : "not set"}</div>
+                    <div className="text-[10px] text-[#8A9BA8] font-mono">{f.key} — {isSet ? "set" : "not set"}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">

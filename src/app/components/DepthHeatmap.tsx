@@ -54,7 +54,7 @@ function DepthHeatmapInner({
   compact = false,
 }: DepthHeatmapProps) {
   if (maxFillableStake == null || maxFillableStake <= 0) {
-    return <span className="text-[#5E6875] text-xs">—</span>;
+    return <span className="text-[#8A9BA8] text-xs">—</span>;
   }
 
   const tier = getTier(maxFillableStake);
@@ -84,17 +84,17 @@ function DepthHeatmapInner({
         <div className="font-bold text-[#FFFFFF] mb-2">Liquidity Breakdown</div>
         <div className="space-y-1">
           <div className="flex justify-between">
-            <span className="text-[#5E6875]">Max fillable stake</span>
+            <span className="text-[#8A9BA8]">Max fillable stake</span>
             <span className="font-bold text-[#FFFFFF]">{formatStake(maxFillableStake)}</span>
           </div>
           {slippageEstimate != null && (
             <div className="flex justify-between">
-              <span className="text-[#5E6875]">Est. slippage</span>
+              <span className="text-[#8A9BA8]">Est. slippage</span>
               <span className="text-[#FFFFFF]">~{slippageEstimate.toFixed(1)}%</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span className="text-[#5E6875]">Warning level</span>
+            <span className="text-[#8A9BA8]">Warning level</span>
             <span
               className={
                 warningLevel === 'none'
@@ -109,13 +109,13 @@ function DepthHeatmapInner({
           </div>
           {kalshiDepth != null && (
             <div className="flex justify-between">
-              <span className="text-[#5E6875]">Kalshi depth</span>
+              <span className="text-[#8A9BA8]">Kalshi depth</span>
               <span className="text-[#8A9BA8]">{kalshiDepth > 0 ? formatStake(kalshiDepth) : '—'}</span>
             </div>
           )}
           {polymarketDepth != null && (
             <div className="flex justify-between">
-              <span className="text-[#5E6875]">Polymarket depth</span>
+              <span className="text-[#8A9BA8]">Polymarket depth</span>
               <span className="text-[#8A9BA8]">
                 {Number.isFinite(polymarketDepth) ? formatStake(polymarketDepth) : '∞ (rule)'}
               </span>

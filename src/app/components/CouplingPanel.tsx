@@ -184,13 +184,13 @@ export default function CouplingPanel({
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-[#5DBE81]" />
             <h3 className="text-sm font-semibold text-[#FFFFFF]">Couplings</h3>
-            <span className="text-[10px] text-[#5E6875]">
+            <span className="text-[10px] text-[#8A9BA8]">
               ({coupledPairs.length} active)
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#182533] text-[#5E6875] transition-colors"
+            className="p-1 rounded hover:bg-[#182533] text-[#8A9BA8] transition-colors"
             title="Close panel"
           >
             <X className="w-4 h-4" />
@@ -210,12 +210,12 @@ export default function CouplingPanel({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                  : "text-[#5E6875] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                  : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
               }`}
             >
               {tab.label}
               {tab.count !== null && (
-                <span className="text-[9px] text-[#5E6875]">({tab.count})</span>
+                <span className="text-[9px] text-[#8A9BA8]">({tab.count})</span>
               )}
             </button>
           ))}
@@ -227,7 +227,7 @@ export default function CouplingPanel({
           {activeTab === "current" && (
             <div className="space-y-2">
               {coupledPairs.length === 0 ? (
-                <div className="text-center py-8 text-sm text-[#5E6875]">
+                <div className="text-center py-8 text-sm text-[#8A9BA8]">
                   No active couplings. Run a scan to see matched pairs.
                 </div>
               ) : (
@@ -248,9 +248,7 @@ export default function CouplingPanel({
                         <div className="flex-1 min-w-0 space-y-1.5">
                           {/* Kalshi side */}
                           <div className="flex items-center gap-1.5">
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81] shrink-0">
-                              <span className="text-[8px] font-bold text-[#FFFFFF]">K</span>
-                            </div>
+                            <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm shrink-0" />
                             <span className="text-xs text-[#FFFFFF] truncate" title={pair.kalshiTitle}>
                               {pair.kalshiTitle}
                             </span>
@@ -262,9 +260,7 @@ export default function CouplingPanel({
                           </div>
                           {/* PM side */}
                           <div className="flex items-center gap-1.5">
-                            <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#a855f7] shrink-0">
-                              <span className="text-[7px] font-bold text-[#FFFFFF]">PM</span>
-                            </div>
+                            <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm shrink-0" />
                             <span className="text-xs text-[#FFFFFF] truncate" title={pair.pmTitle}>
                               {pair.pmTitle}
                             </span>
@@ -309,7 +305,7 @@ export default function CouplingPanel({
                       {/* Edit mode */}
                       {isEditing && (
                         <div className="border-t border-[#182533] p-3 space-y-2">
-                          <div className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+                          <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                             Replace with:
                           </div>
                           {/* Kalshi selector */}
@@ -385,7 +381,7 @@ export default function CouplingPanel({
               {/* Decoupled pairs section */}
               {decoupledPairs.length > 0 && (
                 <div className="pt-3 mt-3 border-t border-[#182533]">
-                  <div className="text-[10px] text-[#5E6875] uppercase tracking-wider mb-2">
+                  <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-2">
                     Decoupled (auto-match blocked)
                   </div>
                   {decoupledPairs.map(dp => (
@@ -393,9 +389,9 @@ export default function CouplingPanel({
                       key={dp.id}
                       className="flex items-center gap-2 p-2 mb-1 rounded-lg bg-[#0E1621] border border-[#182533] opacity-60"
                     >
-                      <div className="flex-1 min-w-0 text-xs text-[#5E6875] truncate">
-                        <span className="text-[#5DBE81]">K:</span> {dp.kalshiTitle} ↔{" "}
-                        <span className="text-[#a855f7]">PM:</span> {dp.pmTitle}
+                      <div className="flex-1 min-w-0 text-xs text-[#8A9BA8] truncate">
+                        <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {dp.kalshiTitle} ↔{" "}
+                        <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {dp.pmTitle}
                       </div>
                       <button
                         onClick={() => handleReconcple(dp)}
@@ -420,7 +416,7 @@ export default function CouplingPanel({
           {activeTab === "available" && (
             <div className="space-y-3">
               {availableKalshi.length === 0 && availablePm.length === 0 ? (
-                <div className="text-center py-8 text-sm text-[#5E6875]">
+                <div className="text-center py-8 text-sm text-[#8A9BA8]">
                   No unmatched markets available. All markets are coupled.
                 </div>
               ) : (
@@ -430,7 +426,7 @@ export default function CouplingPanel({
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <div className="w-3 h-3 rounded-sm bg-[#5DBE81]" />
-                        <span className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+                        <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                           Unmatched Kalshi ({availableKalshi.length})
                         </span>
                       </div>
@@ -441,7 +437,7 @@ export default function CouplingPanel({
                             className="px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533]"
                           >
                             <div className="text-xs text-[#FFFFFF] truncate">{k.title}</div>
-                            <div className="text-[10px] text-[#5E6875] font-mono">{k.ticker}</div>
+                            <div className="text-[10px] text-[#8A9BA8] font-mono">{k.ticker}</div>
                           </div>
                         ))}
                       </div>
@@ -453,7 +449,7 @@ export default function CouplingPanel({
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <div className="w-3 h-3 rounded-sm bg-[#a855f7]" />
-                        <span className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+                        <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                           Unmatched Polymarket ({availablePm.length})
                         </span>
                       </div>
@@ -464,7 +460,7 @@ export default function CouplingPanel({
                             className="px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533]"
                           >
                             <div className="text-xs text-[#FFFFFF] truncate">{p.title}</div>
-                            <div className="text-[10px] text-[#5E6875] font-mono truncate">
+                            <div className="text-[10px] text-[#8A9BA8] font-mono truncate">
                               {p.conditionId?.slice(0, 20)}...
                             </div>
                           </div>
@@ -481,12 +477,12 @@ export default function CouplingPanel({
           {activeTab === "add" && (
             <div className="space-y-3">
               {availableKalshi.length === 0 || availablePm.length === 0 ? (
-                <div className="text-center py-8 text-sm text-[#5E6875]">
+                <div className="text-center py-8 text-sm text-[#8A9BA8]">
                   Need at least one unmatched market on each platform to create a new coupling.
                 </div>
               ) : (
                 <>
-                  <div className="text-[10px] text-[#5E6875] uppercase tracking-wider">
+                  <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
                     Create manual coupling
                   </div>
 

@@ -64,7 +64,7 @@ export default function TradesPanel() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  filter === f ? 'bg-[#5DBE81] text-black' : 'text-[#5E6875] hover:text-[#FFFFFF]'
+                  filter === f ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
                 }`}
               >
                 {f === 'all' ? 'All' : f === 'real' ? 'Real' : 'Dry-run'}
@@ -73,7 +73,7 @@ export default function TradesPanel() {
           </div>
           <button
             onClick={load}
-            className="p-1.5 rounded-lg border border-[#232E3C] text-[#5E6875] hover:text-[#FFFFFF] transition-colors"
+            className="p-1.5 rounded-lg border border-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -84,19 +84,19 @@ export default function TradesPanel() {
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#5E6875]">Total trades</div>
+          <div className="text-[10px] uppercase text-[#8A9BA8]">Total trades</div>
           <div className="text-lg font-bold text-[#FFFFFF]">{trades.length}</div>
         </div>
         <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#5E6875]">Real (successful)</div>
+          <div className="text-[10px] uppercase text-[#8A9BA8]">Real (successful)</div>
           <div className="text-lg font-bold text-[#5DBE81]">{realTrades.length}</div>
         </div>
         <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#5E6875]">Dry-run</div>
+          <div className="text-[10px] uppercase text-[#8A9BA8]">Dry-run</div>
           <div className="text-lg font-bold text-[#8A9BA8]">{trades.filter(t => t.dryRun).length}</div>
         </div>
         <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#5E6875]">Est. net profit (real)</div>
+          <div className="text-[10px] uppercase text-[#8A9BA8]">Est. net profit (real)</div>
           <div className={`text-lg font-bold ${totalEstProfit >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtUsd(totalEstProfit)}</div>
         </div>
       </div>
@@ -104,18 +104,18 @@ export default function TradesPanel() {
       {error && <div className="text-sm text-[#ef4444] mb-3">{error}</div>}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-[#5E6875] py-8 justify-center">
+        <div className="flex items-center gap-2 text-sm text-[#8A9BA8] py-8 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading trades…
         </div>
       ) : visible.length === 0 ? (
-        <div className="text-sm text-[#5E6875] py-8 text-center">
+        <div className="text-sm text-[#8A9BA8] py-8 text-center">
           No trades recorded yet. Executions (dry-run or real) will appear here.
         </div>
       ) : (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-[10px] uppercase text-[#5E6875] border-b border-[#182533]">
+              <tr className="text-[10px] uppercase text-[#8A9BA8] border-b border-[#182533]">
                 <th className="text-left px-4 py-3 font-medium">Time</th>
                 <th className="text-left px-4 py-3 font-medium">Market</th>
                 <th className="text-left px-4 py-3 font-medium">Strategy</th>

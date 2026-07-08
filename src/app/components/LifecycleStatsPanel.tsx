@@ -55,9 +55,9 @@ const fmtUsd = (n: number | null | undefined) =>
 function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div className="bg-[#0E1621] rounded-lg p-3">
-      <div className="text-[10px] uppercase tracking-wide text-[#5E6875]">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">{label}</div>
       <div className="text-lg font-bold" style={{ color: color ?? '#FFFFFF' }}>{value}</div>
-      {sub && <div className="text-[10px] text-[#5E6875]">{sub}</div>}
+      {sub && <div className="text-[10px] text-[#8A9BA8]">{sub}</div>}
     </div>
   );
 }
@@ -79,7 +79,7 @@ function LifecycleStatsPanelInner({ days = 30 }: { days?: number }) {
     return <div className="text-xs text-[#ef4444] py-4 text-center">Lifecycle stats unavailable: {error}</div>;
   }
   if (!data) {
-    return <div className="text-xs text-[#5E6875] py-4 text-center">Loading lifecycle stats…</div>;
+    return <div className="text-xs text-[#8A9BA8] py-4 text-center">Loading lifecycle stats…</div>;
   }
 
   const t = data.totals;
@@ -148,7 +148,7 @@ function LifecycleStatsPanelInner({ days = 30 }: { days?: number }) {
               <div key={`${d.market_id}-${d.outcome}-${i}`} className="flex items-center gap-2 text-xs bg-[#0E1621] rounded px-3 py-1.5">
                 <span className="font-mono text-[#5DBE81] w-14 shrink-0">{fmtDuration(d.duration_sec)}</span>
                 <span className="text-[#FFFFFF] truncate flex-1">{d.market_title || d.market_id}</span>
-                <span className="text-[#5E6875] truncate max-w-[160px]">{d.outcome}</span>
+                <span className="text-[#8A9BA8] truncate max-w-[160px]">{d.outcome}</span>
                 <span className="font-mono text-[#facc15] w-16 text-right shrink-0">+{Number(d.peak_roi_pct).toFixed(2)}%</span>
                 <span className="font-mono text-[#8A9BA8] w-14 text-right shrink-0">{d.scan_count}×</span>
               </div>
@@ -158,7 +158,7 @@ function LifecycleStatsPanelInner({ days = 30 }: { days?: number }) {
       )}
 
       {episodes === 0 && (
-        <div className="text-xs text-[#5E6875] py-2 text-center flex items-center justify-center gap-1.5">
+        <div className="text-xs text-[#8A9BA8] py-2 text-center flex items-center justify-center gap-1.5">
           <Zap className="w-3.5 h-3.5" /> No arb episodes recorded yet — data accumulates as the poller scans.
         </div>
       )}

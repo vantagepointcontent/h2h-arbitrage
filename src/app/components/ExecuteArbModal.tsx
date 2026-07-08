@@ -160,18 +160,18 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           </div>
 
           <div className="rounded-lg bg-[#0E1621] border border-[#182533] divide-y divide-[#182533] text-xs">
-            <div className="px-3 py-2 flex justify-between"><span className="text-[#5E6875]">Market</span><span className="font-medium truncate ml-2">{arb.marketTitle}</span></div>
-            <div className="px-3 py-2 flex justify-between"><span className="text-[#5E6875]">Strategy</span><span className="font-medium">{arb.strategy}</span></div>
+            <div className="px-3 py-2 flex justify-between"><span className="text-[#8A9BA8]">Market</span><span className="font-medium truncate ml-2">{arb.marketTitle}</span></div>
+            <div className="px-3 py-2 flex justify-between"><span className="text-[#8A9BA8]">Strategy</span><span className="font-medium">{arb.strategy}</span></div>
             <div className="px-3 py-2 flex justify-between">
-              <span className="text-[#5E6875]">Kalshi leg</span>
+              <span className="text-[#8A9BA8]">Kalshi leg</span>
               <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {arb.kalshiOrder.price.toFixed(2)} · {fmt(arb.kalshiOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
-              <span className="text-[#5E6875]">Polymarket leg</span>
+              <span className="text-[#8A9BA8]">Polymarket leg</span>
               <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {arb.polymarketOrder.price.toFixed(2)} · {fmt(arb.polymarketOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
-              <span className="text-[#5E6875]">Est. net profit</span>
+              <span className="text-[#8A9BA8]">Est. net profit</span>
               <span className="font-mono font-bold text-[#5DBE81]">{fmt(arb.expectedProfit)} ({arb.roiPct.toFixed(2)}%)</span>
             </div>
           </div>
@@ -196,7 +196,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
                 if (!leg) return null;
                 return (
                   <div key={k} className="px-3 py-2 flex justify-between">
-                    <span className="text-[#5E6875]">{leg.platform}</span>
+                    <span className="text-[#8A9BA8]">{leg.platform}</span>
                     <span className="font-mono">
                       {leg.status}{leg.filledSize ? ` · ${fmt(leg.filledSize)} @ ${leg.filledPrice?.toFixed(3)}` : ""}{leg.error ? ` · ${leg.error.slice(0, 60)}` : ""}
                     </span>
@@ -205,7 +205,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
               })}
               {result.result?.actualProfit != null && (
                 <div className="px-3 py-2 flex justify-between">
-                  <span className="text-[#5E6875]">Actual profit</span>
+                  <span className="text-[#8A9BA8]">Actual profit</span>
                   <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
                 </div>
               )}

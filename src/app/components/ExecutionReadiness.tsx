@@ -78,43 +78,43 @@ function ExecutionReadinessInner({ kalshi, polymarket, arbitrage, formatCurrency
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
         {/* Max fillable stake */}
         <div>
-          <div className="text-[#5E6875] text-[10px] uppercase">Max fillable</div>
+          <div className="text-[#8A9BA8] text-[10px] uppercase">Max fillable</div>
           <div className="font-bold text-[#FFFFFF] text-sm">{formatCurrency(liq.maxFillableStake)}</div>
-          <div className="text-[10px] text-[#5E6875]">binding: {bindingSide}</div>
+          <div className="text-[10px] text-[#8A9BA8]">binding: {bindingSide}</div>
         </div>
 
         {/* Slippage */}
         <div>
-          <div className="text-[#5E6875] text-[10px] uppercase">Est. slippage</div>
+          <div className="text-[#8A9BA8] text-[10px] uppercase">Est. slippage</div>
           <div className={`font-bold text-sm ${liq.slippageEstimate >= 2 ? 'text-[#ef4444]' : liq.slippageEstimate >= 1 ? 'text-[#f59e0b]' : 'text-[#5DBE81]'}`}>
             ~{liq.slippageEstimate.toFixed(1)}%
           </div>
-          <div className="text-[10px] text-[#5E6875]">at max fill</div>
+          <div className="text-[10px] text-[#8A9BA8]">at max fill</div>
         </div>
 
         {/* Realistic profit */}
         <div>
-          <div className="text-[#5E6875] text-[10px] uppercase">Realistic profit</div>
+          <div className="text-[#8A9BA8] text-[10px] uppercase">Realistic profit</div>
           <div className={`font-bold text-sm ${liq.realisticProfit > 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
             {formatCurrency(liq.realisticProfit)}
           </div>
-          <div className="text-[10px] text-[#5E6875]">{captureRatio}% of theoretical</div>
+          <div className="text-[10px] text-[#8A9BA8]">{captureRatio}% of theoretical</div>
         </div>
 
         {/* Fees */}
         <div>
-          <div className="text-[#5E6875] text-[10px] uppercase">Fees (both legs)</div>
+          <div className="text-[#8A9BA8] text-[10px] uppercase">Fees (both legs)</div>
           <div className="font-bold text-sm text-[#FFFFFF]">
             {formatCurrency((arbitrage.fees?.kalshiFee ?? 0) + (arbitrage.fees?.pmFee ?? 0))}
           </div>
-          <div className="text-[10px] text-[#5E6875]">
+          <div className="text-[10px] text-[#8A9BA8]">
             K {formatCurrency(arbitrage.fees?.kalshiFee ?? 0)} · PM {formatCurrency(arbitrage.fees?.pmFee ?? 0)}
           </div>
         </div>
       </div>
 
       {/* Depth detail row */}
-      <div className="mt-2 pt-2 border-t border-[#182533] flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[#5E6875]">
+      <div className="mt-2 pt-2 border-t border-[#182533] flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[#8A9BA8]">
         <span>Kalshi depth: <span className="text-[#8A9BA8] font-medium">{kalshiDepth > 0 ? formatCurrency(kalshiDepth) : '—'}</span></span>
         <span>PM depth: <span className="text-[#8A9BA8] font-medium">{Number.isFinite(pmDepth) ? formatCurrency(pmDepth) : '∞ (project rule)'}</span></span>
         {arbitrage.fees && (
