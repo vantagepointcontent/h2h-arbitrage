@@ -5,6 +5,8 @@ import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
 import { ArbHistoryCell } from './ArbHistoryCell';
+import { ArbDecayCurve } from './ArbDecayCurve';
+import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 
 interface Outcome {
   artist: string;
@@ -191,15 +193,34 @@ function OutcomeTableBodyInner({
                 ) : "—"}
               </td>
               <td className="px-4 py-3 text-right">
-                {totalStake > 0 ? (
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${isBalanced ? "bg-[#5DBE81]" : "bg-[#ef4444]"}`}></span>
-                    {formatCurrency(totalStake)}
-                  </span>
-                ) : "—"}
+                {(() => {
+                  if (!hasPrices || !k || !p) return <span className="text-[#5E6875]">—</span>;
+                  const liq = computeLiquidityFromOutcome(k, p, o.arbitrage);
+                  if (!liq) return <span className="text-[#5E6875]">—</span>;
+                  return (
+                    <div className="flex flex-col items-end gap-0.5">
+                      <DepthHeatmap
+                        maxFillableStake={liq.maxFillableStake}
+                        slippageEstimate={liq.slippageEstimate}
+                        warningLevel={liq.warningLevel}
+                        kalshiDepth={liq.kalshiDepth}
+                        polymarketDepth={liq.polymarketDepth}
+                        compact
+                      />
+                      {totalStake > 0 && (
+                        <span className={`text-[10px] font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                          {formatCurrency(totalStake)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </td>
               <td className="px-4 py-3 text-right">
                 {marketId ? <ArbHistoryCell marketId={marketId} outcomeArtist={o.artist} /> : <span className="text-[#5E6875] text-xs">—</span>}
+              </td>
+              <td className="px-4 py-3 text-right">
+                {marketId && o.arbitrage.roiPct > 0 ? <ArbDecayCurve marketId={marketId} outcome={o.artist} /> : <span className="text-[#5E6875] text-xs">—</span>}
               </td>
               <td className="px-4 py-3 text-xs">
                 {!hasPrices ? (
@@ -231,7 +252,7 @@ function OutcomeTableBodyInner({
             </tr>
             {isExpanded && (
               <tr className="bg-[#17212B]/50">
-                <td colSpan={10} className="px-4 py-3">
+                <td colSpan={11} className="px-4 py-3">
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Total Stake:</span>
@@ -261,10 +282,10 @@ function OutcomeTableBodyInner({
       })}
       {/* EXEC-002: token-resolution error + confirmation modal */}
       {execError && (
-        <tr><td colSpan={10} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
+        <tr><td colSpan={11} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
       )}
       {executingArb && (
-        <tr><td colSpan={10}>
+        <tr><td colSpan={11}>
           <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
         </td></tr>
       )}
@@ -272,7 +293,7 @@ function OutcomeTableBodyInner({
     {profitableOutcomes.length > 0 && (
       <tfoot className="bg-[#17212B] border-t-2 border-[#5DBE81]/30">
         <tr>
-          <td colSpan={5} className="px-4 py-3">
+          <td colSpan={6} className="px-4 py-3">
             <span className="text-[10px] uppercase tracking-wider text-[#5E6875] font-medium">
               Accumulated Arb Profit
             </span>

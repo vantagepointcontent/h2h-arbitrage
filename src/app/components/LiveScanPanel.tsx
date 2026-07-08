@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, ExternalLink, Zap } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
+import { DepthHeatmap } from "@/app/components/DepthHeatmap";
+import { analyzeLiquidity } from "@/lib/liquidity-sizing";
 
 interface LiveArbOutcome {
   artist: string;
@@ -749,6 +751,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">SPREAD</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">ROI</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium">PROFIT</th>
+                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Orderbook depth: how much capital can be deployed">DEPTH</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
                       <th className="text-center py-2 px-2 text-[#5E6875] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
                       <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
@@ -804,6 +807,39 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         <FlashCell flash={activeTab.flashes[`${idx}-profit`]} className={`py-2 px-2 text-right font-mono font-bold ${o.expectedProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
                           {fmtUsd(o.expectedProfit)}
                         </FlashCell>
+                        <td className="py-2 px-2 text-right">
+                          {(() => {
+                            // Compute liquidity from the numeric depth fields already on the outcome
+                            const kDepth = Math.max(o.kalshiYesDepth, o.kalshiNoDepth) || 0;
+                            const pmDepth = (o.pmYesDepth > 0 || o.pmNoDepth > 0)
+                              ? Math.max(o.pmYesDepth, o.pmNoDepth)
+                              : Infinity;
+                            const totalStake = (o.kalshiStake ?? 0) + (o.pmStake ?? 0);
+                            const feeRates = {
+                              kalshiFee: totalStake > 0 && o.fees ? o.fees.kalshiFee / totalStake : 0,
+                              pmFee: totalStake > 0 && o.fees ? o.fees.pmFee / totalStake : 0,
+                            };
+                            const liq = analyzeLiquidity(
+                              o.kalshiYesAsk ?? 0,
+                              kDepth,
+                              o.pmYesAsk ?? 0,
+                              pmDepth,
+                              o.kalshiNoAsk ?? 0,
+                              o.pmNoAsk ?? 0,
+                              feeRates,
+                            );
+                            return (
+                              <DepthHeatmap
+                                maxFillableStake={liq.maxFillableStake}
+                                slippageEstimate={liq.slippageEstimate}
+                                warningLevel={liq.warningLevel}
+                                kalshiDepth={liq.kalshiDepth}
+                                polymarketDepth={liq.polymarketDepth}
+                                compact
+                              />
+                            );
+                          })()}
+                        </td>
                         <td className="py-2 px-2 text-right font-mono" title={o.persistence?.interpretation ?? "Persistence score: needs a few ticks of history"}>
                           {o.persistence && o.roiPct > 0 ? (
                             <span className={`font-bold ${o.persistence.score >= 70 ? "text-[#5DBE81]" : o.persistence.score >= 40 ? "text-[#facc15]" : "text-[#ef4444]"}`}>

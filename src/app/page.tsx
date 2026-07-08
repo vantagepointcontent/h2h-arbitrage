@@ -1709,8 +1709,9 @@ export default function Home() {
                                   </span>
                                 </span>
                               </th>
-                              <th className="text-right px-4 py-3.5 font-medium">Stake</th>
+                              <th className="text-right px-4 py-3.5 font-medium" title="Orderbook depth heatmap: how much capital can be deployed">Depth</th>
                               <th className="text-right px-4 py-3.5 font-medium">Arbitrage History</th>
+                              <th className="text-right px-4 py-3.5 font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">Decay</th>
                               <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
                             </tr>
                           </thead>
