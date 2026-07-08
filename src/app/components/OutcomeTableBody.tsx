@@ -124,6 +124,11 @@ function OutcomeTableBodyInner({
 
   const profitableOutcomes = displayOutcomes.filter(o => o.kalshi && o.polymarket && o.arbitrage.expectedProfit > 0);
   const accumulatedProfit = profitableOutcomes.reduce((s, o) => s + o.arbitrage.expectedProfit, 0);
+  // UI-13: Accumulated fee totals for footer hover breakdown
+  const accumulatedKalshiFees = profitableOutcomes.reduce((s, o) => s + (o.arbitrage.fees?.kalshiFee ?? 0), 0);
+  const accumulatedPmFees = profitableOutcomes.reduce((s, o) => s + (o.arbitrage.fees?.pmFee ?? 0), 0);
+  const accumulatedGrossProfit = accumulatedProfit + accumulatedKalshiFees + accumulatedPmFees;
+  const hasFeeBreakdown = profitableOutcomes.some(o => o.arbitrage.fees);
 
   return (
     <>
@@ -177,13 +182,30 @@ function OutcomeTableBodyInner({
                     <span className="text-[#FFFFFF] cursor-help">{formatCurrency(profit)}</span>
                     {o.arbitrage.fees && (
                       <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                        <div className="font-bold text-[#FFFFFF] mb-2">Profit after fees</div>
-                        <div className="text-[#5DBE81] font-bold text-sm mb-1">{formatCurrency(profit)}</div>
-                        <div className="border-t border-[#182533] pt-2 space-y-1">
-                          <div className="text-[#8A9BA8]">{o.arbitrage.fees.kalshiFeeDetails}</div>
-                          <div className="text-[#8A9BA8]">{o.arbitrage.fees.pmFeeDetails}</div>
+                        <div className="font-bold text-[#FFFFFF] mb-2">Fee Breakdown</div>
+                        <div className="space-y-1 mb-2">
+                          <div className="flex justify-between text-[#8A9BA8]">
+                            <span>Gross profit</span>
+                            <span className="text-[#FFFFFF]">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
+                          </div>
+                          <div className="flex justify-between text-[#8A9BA8]">
+                            <span>Kalshi fee</span>
+                            <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
+                          </div>
+                          <div className="flex justify-between text-[#8A9BA8]">
+                            <span>Polymarket fee</span>
+                            <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-2">
+                          <span>Net profit (after fees)</span>
+                          <span className="text-[#5DBE81] font-bold">{formatCurrency(profit)}</span>
+                        </div>
+                        <div className="border-t border-[#182533] pt-2 mt-2 space-y-1">
+                          <div className="text-[#8A9BA8] text-[10px]">{o.arbitrage.fees.kalshiFeeDetails}</div>
+                          <div className="text-[#8A9BA8] text-[10px]">{o.arbitrage.fees.pmFeeDetails}</div>
                           <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-1">
-                            <span>Worst-case net profit</span>
+                            <span>Worst-case net</span>
                             <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
                           </div>
                         </div>
@@ -271,6 +293,34 @@ function OutcomeTableBodyInner({
                       {isBalanced ? "● Balanced" : "● Imbalanced"}
                     </div>
                   </div>
+                  {/* UI-13: Fee breakdown in expanded row */}
+                  {o.arbitrage.fees && (
+                    <div className="mt-3 pt-3 border-t border-[#182533]">
+                      <div className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium mb-2">Fee Breakdown</div>
+                      <div className="flex items-center gap-6 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9BA8]">Gross:</span>
+                          <span className="text-[#FFFFFF] font-medium">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9BA8]">Kalshi fee:</span>
+                          <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9BA8]">PM fee:</span>
+                          <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9BA8]">Net:</span>
+                          <span className="text-[#5DBE81] font-bold">{formatCurrency(profit)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 text-[10px] text-[#8A9BA8] space-y-0.5">
+                        <div>{o.arbitrage.fees.kalshiFeeDetails}</div>
+                        <div>{o.arbitrage.fees.pmFeeDetails}</div>
+                      </div>
+                    </div>
+                  )}
                   <ExecutionReadiness
                     kalshi={o.kalshi}
                     polymarket={o.polymarket}
@@ -305,10 +355,35 @@ function OutcomeTableBodyInner({
             </span>
           </td>
           <td colSpan={5} className="px-4 py-3 text-right">
-            <span className="text-lg font-bold text-[#5DBE81]">
-              {formatCurrency(accumulatedProfit)}
-            </span>
-            <span className="ml-2 text-[10px] text-[#8A9BA8]">net of fees</span>
+            <div className="group inline-block">
+              <span className="text-lg font-bold text-[#5DBE81]">
+                {formatCurrency(accumulatedProfit)}
+              </span>
+              <span className="ml-2 text-[10px] text-[#8A9BA8]">after fees</span>
+              {hasFeeBreakdown && (accumulatedKalshiFees > 0 || accumulatedPmFees > 0) && (
+                <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
+                  <div className="font-bold text-[#FFFFFF] mb-2">Accumulated Fee Breakdown</div>
+                  <div className="space-y-1 mb-2">
+                    <div className="flex justify-between text-[#8A9BA8]">
+                      <span>Gross profit (before fees)</span>
+                      <span className="text-[#FFFFFF]">{formatCurrency(accumulatedGrossProfit)}</span>
+                    </div>
+                    <div className="flex justify-between text-[#8A9BA8]">
+                      <span>Kalshi fees total</span>
+                      <span className="text-[#ef4444]">-{formatCurrency(accumulatedKalshiFees)}</span>
+                    </div>
+                    <div className="flex justify-between text-[#8A9BA8]">
+                      <span>Polymarket fees total</span>
+                      <span className="text-[#ef4444]">-{formatCurrency(accumulatedPmFees)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-2">
+                    <span>Net profit (after fees)</span>
+                    <span className="text-[#5DBE81] font-bold">{formatCurrency(accumulatedProfit)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </td>
         </tr>
       </tfoot>

@@ -1,115 +1,85 @@
 {
-  "status": "aborted",
+  "status": "degraded",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 448,
-  "startedAt": "2026-07-08T10:24:21.595Z",
-  "finishedAt": "2026-07-08T10:24:24.156Z",
-  "durationMs": 2561,
-  "successCount": 0,
-  "failureCount": 19,
-  "skippedCount": 319,
-  "avgScanMs": 42131,
+  "startedAt": "2026-07-08T10:28:44.974Z",
+  "finishedAt": "2026-07-08T10:33:28.298Z",
+  "durationMs": 283324,
+  "successCount": 179,
+  "failureCount": 13,
+  "skippedCount": 247,
+  "avgScanMs": 9628,
   "maxScanMs": 60000,
   "errors": [
     {
-      "market": "CA-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 40662
-    },
-    {
-      "market": "CA-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38376
-    },
-    {
-      "market": "Next UK Chancellor of the Exchequer in 2026?",
-      "error": "fetch failed",
+      "market": "MLS Cup Winner 2026",
+      "error": "timeout after 60000ms (adaptive)",
       "durationMs": 60000
     },
     {
-      "market": "NBA: LeBron James Next Team",
-      "error": "fetch failed",
+      "market": "World Cup Winner ",
+      "error": "timeout after 60000ms (adaptive)",
       "durationMs": 60000
     },
     {
-      "market": "CA-02 House Election Winner",
+      "market": "WI-01 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38319
+      "durationMs": 45009
     },
     {
-      "market": "CA-05 House Election Winner",
+      "market": "WA-09 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38328
+      "durationMs": 45084
     },
     {
-      "market": "CA-06 House Election Winner",
+      "market": "WI-03 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38385
+      "durationMs": 45123
     },
     {
-      "market": "CA-08 House Election Winner",
+      "market": "WA-10 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38334
+      "durationMs": 45060
     },
     {
-      "market": "CA-09 House Election Winner",
+      "market": "WI-02 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38295
+      "durationMs": 45216
     },
     {
-      "market": "CA-15 House Election Winner",
+      "market": "WY At-Large House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38388
+      "durationMs": 45093
     },
     {
-      "market": "CA-17 House Election Winner",
+      "market": "WI-04 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 40470
+      "durationMs": 45111
     },
     {
-      "market": "CA-18 House Election Winner",
+      "market": "WI-05 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 40350
+      "durationMs": 45114
     },
     {
-      "market": "CA-19 House Election Winner",
+      "market": "WI-06 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38244
+      "durationMs": 45072
     },
     {
-      "market": "CA-20 House Election Winner",
+      "market": "WI-07 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 38328
+      "durationMs": 43299
     },
     {
-      "market": "CA-21 House Election Winner",
+      "market": "Fed Decision in July?",
       "error": "fetch failed",
-      "durationMs": 38292
-    },
-    {
-      "market": "CA-23 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38235
-    },
-    {
-      "market": "CA-24 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49008
-    },
-    {
-      "market": "CA-26 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 39399
-    },
-    {
-      "market": "CA-30 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49083
+      "durationMs": 15000
     }
   ],
-  "breakerSkipped": 6,
-  "openBreakers": 12
+  "breakerSkipped": 9,
+  "openBreakers": 13
 }
