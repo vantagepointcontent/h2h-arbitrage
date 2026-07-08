@@ -5,6 +5,7 @@ import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, Externa
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
+import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
 
 interface LiveArbOutcome {
@@ -754,6 +755,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Orderbook depth: how much capital can be deployed">DEPTH</th>
                       <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
                       <th className="text-center py-2 px-2 text-[#5E6875] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
+                      <th className="text-right py-2 px-2 text-[#5E6875] font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">DECAY</th>
                       <th className="text-left py-2 px-2 text-[#5E6875] font-medium">STRATEGY</th>
                     </tr>
                   </thead>
@@ -809,6 +811,9 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         </FlashCell>
                         <td className="py-2 px-2 text-right">
                           {(() => {
+                            // UI-10: Hide stake/depth for negative-arb rows — no point showing
+                            // deployable capital when there's no profitable arb.
+                            if (o.roiPct <= 0) return <span className="text-[#5E6875]">—</span>;
                             // Compute liquidity from the numeric depth fields already on the outcome
                             const kDepth = Math.max(o.kalshiYesDepth, o.kalshiNoDepth) || 0;
                             const pmDepth = (o.pmYesDepth > 0 || o.pmNoDepth > 0)
@@ -859,6 +864,9 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           ) : (
                             <span className="text-[#5E6875] text-[10px]">·</span>
                           )}
+                        </td>
+                        <td className="py-2 px-2 text-right">
+                          {o.roiPct > 0 ? <ArbDecayCurve marketId={activeTab.marketId} outcome={o.artist} /> : <span className="text-[#5E6875] text-xs">—</span>}
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
                           <span className="inline-flex items-center gap-2">

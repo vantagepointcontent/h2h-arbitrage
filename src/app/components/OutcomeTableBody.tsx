@@ -195,6 +195,9 @@ function OutcomeTableBodyInner({
               <td className="px-4 py-3 text-right">
                 {(() => {
                   if (!hasPrices || !k || !p) return <span className="text-[#5E6875]">—</span>;
+                  // UI-10: Hide stake/depth for negative-arb rows — no point showing
+                  // deployable capital when there's no profitable arb.
+                  if (o.arbitrage.roiPct <= 0) return <span className="text-[#5E6875]">—</span>;
                   const liq = computeLiquidityFromOutcome(k, p, o.arbitrage);
                   if (!liq) return <span className="text-[#5E6875]">—</span>;
                   return (
@@ -252,7 +255,7 @@ function OutcomeTableBodyInner({
             </tr>
             {isExpanded && (
               <tr className="bg-[#17212B]/50">
-                <td colSpan={11} className="px-4 py-3">
+                <td colSpan={12} className="px-4 py-3">
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#5E6875]">Total Stake:</span>
@@ -282,10 +285,10 @@ function OutcomeTableBodyInner({
       })}
       {/* EXEC-002: token-resolution error + confirmation modal */}
       {execError && (
-        <tr><td colSpan={11} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
+        <tr><td colSpan={12} className="px-4 py-2 text-xs text-[#ef4444]">{execError}</td></tr>
       )}
       {executingArb && (
-        <tr><td colSpan={11}>
+        <tr><td colSpan={12}>
           <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
         </td></tr>
       )}
@@ -293,7 +296,7 @@ function OutcomeTableBodyInner({
     {profitableOutcomes.length > 0 && (
       <tfoot className="bg-[#17212B] border-t-2 border-[#5DBE81]/30">
         <tr>
-          <td colSpan={6} className="px-4 py-3">
+          <td colSpan={7} className="px-4 py-3">
             <span className="text-[10px] uppercase tracking-wider text-[#5E6875] font-medium">
               Accumulated Arb Profit
             </span>

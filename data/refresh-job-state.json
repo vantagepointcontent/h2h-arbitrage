@@ -1,10 +1,18 @@
 {
   "running": false,
-  "startedAt": "2026-07-04T06:45:59.523Z",
-  "total": 272,
-  "processed": 272,
-  "succeeded": 272,
+  "startedAt": "2026-07-08T09:40:46.371Z",
+  "total": 277,
+  "processed": 255,
+  "succeeded": 255,
   "failed": 0,
-  "errors": [],
-  "finishedAt": "2026-07-04T06:57:54.018Z"
+  "errors": [
+    {
+      "id": "__timeout__",
+      "title": "Job timeout",
+      "error": "Refresh exceeded 300s limit after processing 24/277 markets"
+    }
+  ],
+  "currentMarketId": "1782999196727-house-va04",
+  "currentMarketTitle": "VA-04 House Election Winner",
+  "finishedAt": "2026-07-08T09:45:46.370Z"
 }

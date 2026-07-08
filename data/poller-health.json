@@ -1,200 +1,25 @@
 {
-  "status": "aborted",
+  "status": "degraded",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 472,
-  "startedAt": "2026-07-06T17:09:08.222Z",
-  "finishedAt": "2026-07-06T17:12:01.960Z",
-  "durationMs": 173738,
-  "successCount": 21,
-  "failureCount": 36,
-  "skippedCount": 359,
-  "avgScanMs": 38172,
-  "maxScanMs": 60000,
+  "marketCount": 448,
+  "startedAt": "2026-07-08T10:03:13.228Z",
+  "finishedAt": "2026-07-08T10:03:51.149Z",
+  "durationMs": 37921,
+  "successCount": 10,
+  "failureCount": 1,
+  "skippedCount": 436,
+  "avgScanMs": 18728,
+  "maxScanMs": 42534,
   "errors": [
     {
-      "market": "Top Spotify Artist 2026",
-      "error": "timeout after 21159ms (adaptive)",
-      "durationMs": 21159
-    },
-    {
-      "market": "Who will win the 2026 Fields Medal?",
-      "error": "timeout after 15000ms (adaptive)",
-      "durationMs": 15000
-    },
-    {
-      "market": "Which countries will recognize Palestine before 2027?",
-      "error": "timeout after 15000ms (adaptive)",
-      "durationMs": 15000
-    },
-    {
-      "market": "MLS Cup Winner 2026",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "Alaska Governor Election Winner  ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "F1 Drivers' Champion",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "Michigan Governor Republican Primary Winner",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "World Cup Winner ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "Next UK Chancellor of the Exchequer in 2026?",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "CA-27 House Election Winner",
+      "market": "TN-01 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 51828
-    },
-    {
-      "market": "CA-30 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49881
-    },
-    {
-      "market": "CA-32 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50793
-    },
-    {
-      "market": "CA-35 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51117
-    },
-    {
-      "market": "CA-38 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51372
-    },
-    {
-      "market": "CA-41 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50802
-    },
-    {
-      "market": "CA-43 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49053
-    },
-    {
-      "market": "CA-47 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49068
-    },
-    {
-      "market": "CA-51 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49494
-    },
-    {
-      "market": "CA-42 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49086
-    },
-    {
-      "market": "CA-52 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48684
-    },
-    {
-      "market": "CA-48 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48594
-    },
-    {
-      "market": "CA-39 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49860
-    },
-    {
-      "market": "CA-44 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49149
-    },
-    {
-      "market": "CO-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49185
-    },
-    {
-      "market": "CO-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48693
-    },
-    {
-      "market": "FL-26 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51096
-    },
-    {
-      "market": "FL-27 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50742
-    },
-    {
-      "market": "FL-28 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49956
-    },
-    {
-      "market": "GA-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50148
-    },
-    {
-      "market": "GA-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51054
-    },
-    {
-      "market": "GA-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51042
-    },
-    {
-      "market": "GA-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50829
-    },
-    {
-      "market": "GA-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51036
-    },
-    {
-      "market": "GA-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51138
-    },
-    {
-      "market": "GA-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 51054
-    },
-    {
-      "market": "GA-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 50817
+      "durationMs": 42534
     }
   ],
-  "breakerSkipped": 3,
-  "openBreakers": 11
+  "breakerSkipped": 1,
+  "openBreakers": 6
 }
