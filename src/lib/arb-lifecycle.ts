@@ -63,6 +63,25 @@ async function ensureDb(): Promise<void> {
   `);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episodes_market ON arb_episodes(market_id, outcome, status)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episodes_status ON arb_episodes(status, first_seen_at DESC)`);
+
+  // UI-09: per-scan ROI data points for the decay curve. Each row = one scan
+  // that saw a positive arb for this episode. This is the time series the
+  // decay curve visualizes (distinct from the aggregate fields on arb_episodes).
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS arb_episode_points (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      episode_id      INTEGER NOT NULL REFERENCES arb_episodes(id),
+      market_id       TEXT NOT NULL,
+      outcome         TEXT NOT NULL,
+      seen_at         TEXT NOT NULL,
+      roi_pct         REAL NOT NULL,
+      expected_profit REAL NOT NULL DEFAULT 0,
+      total_stake     REAL NOT NULL DEFAULT 0
+    )
+  `);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episode_points_ep ON arb_episode_points(episode_id, seen_at)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episode_points_market ON arb_episode_points(market_id, outcome, seen_at)`);
+
   _inited = true;
 }
 
@@ -115,9 +134,15 @@ export async function recordArbObservations(
               WHERE id = ?`,
         args: [now, arb.roiPct, arb.strategy, arb.roiPct, arb.expectedProfit, arb.totalStake, existing.id],
       });
+      // UI-09: record per-scan ROI data point for the decay curve
+      await c.execute({
+        sql: `INSERT INTO arb_episode_points (episode_id, market_id, outcome, seen_at, roi_pct, expected_profit, total_stake)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [existing.id, marketId, arb.outcome, now, arb.roiPct, arb.expectedProfit, arb.totalStake],
+      });
       extended++;
     } else {
-      await c.execute({
+      const ins = await c.execute({
         sql: `INSERT INTO arb_episodes
                 (market_id, market_title, category, outcome, strategy, status,
                  first_seen_at, last_seen_at, scan_count,
@@ -128,6 +153,15 @@ export async function recordArbObservations(
                now, now, arb.roiPct, arb.roiPct, arb.roiPct,
                arb.expectedProfit, arb.expectedProfit, arb.totalStake, arb.totalStake],
       });
+      // UI-09: first data point for the new episode
+      const episodeId = Number((ins as any).lastInsertRowid ?? 0);
+      if (episodeId) {
+        await c.execute({
+          sql: `INSERT INTO arb_episode_points (episode_id, market_id, outcome, seen_at, roi_pct, expected_profit, total_stake)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          args: [episodeId, marketId, arb.outcome, now, arb.roiPct, arb.expectedProfit, arb.totalStake],
+        });
+      }
       opened++;
     }
   }
@@ -301,4 +335,118 @@ export async function getOpenEpisodeAgeSec(marketId: string, outcome: string): P
   const row = (r.rows as any[])[0];
   if (!row) return 0;
   return Math.max(0, (Date.now() - new Date(String(row.first_seen_at)).getTime()) / 1000);
+}
+
+// UI-09: Active episode decay data — per-scan ROI time series for the
+// currently open episode matching (marketId, outcome). Returns null when
+// no open episode exists. Uses idx_arb_episode_points_market for the scan
+// point lookup and idx_arb_episodes_market for the episode header.
+export interface EpisodeDecayPoint {
+  seenAt: string;
+  roiPct: number;
+  expectedProfit: number;
+  totalStake: number;
+}
+export interface ActiveEpisodeDecay {
+  episodeId: number;
+  outcome: string;
+  strategy: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  scanCount: number;
+  firstRoiPct: number;
+  peakRoiPct: number;
+  lastRoiPct: number;
+  durationSec: number;
+  points: EpisodeDecayPoint[];
+  /** rising | plateau | declining — computed from last 3 scan points */
+  trend: 'rising' | 'plateau' | 'declining';
+}
+
+export async function getActiveEpisodeDecay(
+  marketId: string,
+  outcome: string,
+): Promise<ActiveEpisodeDecay | null> {
+  await ensureDb();
+  const c = getClient();
+
+  // Find the open episode for this (market, outcome)
+  const ep = await c.execute({
+    sql: `SELECT id, outcome, strategy, first_seen_at, last_seen_at, scan_count,
+                 first_roi_pct, peak_roi_pct, last_roi_pct
+          FROM arb_episodes
+          WHERE market_id = ? AND outcome = ? AND status = 'open'
+          LIMIT 1`,
+    args: [marketId, outcome],
+  });
+  const epRow = (ep.rows as any[])[0];
+  if (!epRow) return null;
+
+  const episodeId = Number(epRow.id);
+  const firstSeenAt = String(epRow.first_seen_at);
+  const lastSeenAt = String(epRow.last_seen_at);
+  const durationSec = Math.max(0, (Date.now() - new Date(firstSeenAt).getTime()) / 1000);
+
+  // Fetch per-scan ROI points, ordered by time
+  const pts = await c.execute({
+    sql: `SELECT seen_at, roi_pct, expected_profit, total_stake
+          FROM arb_episode_points
+          WHERE episode_id = ?
+          ORDER BY seen_at ASC`,
+    args: [episodeId],
+  });
+  const points: EpisodeDecayPoint[] = (pts.rows as any[]).map(r => ({
+    seenAt: String(r.seen_at),
+    roiPct: Number(r.roi_pct),
+    expectedProfit: Number(r.expected_profit),
+    totalStake: Number(r.total_stake),
+  }));
+
+  // Compute trend from last 3 scan points
+  let trend: 'rising' | 'plateau' | 'declining' = 'plateau';
+  if (points.length >= 3) {
+    const last3 = points.slice(-3);
+    const slope = last3[2].roiPct - last3[0].roiPct;
+    const threshold = 0.1; // 0.1% ROI difference over 3 scans = directional
+    if (slope > threshold) trend = 'rising';
+    else if (slope < -threshold) trend = 'declining';
+  } else if (points.length === 2) {
+    const slope = points[1].roiPct - points[0].roiPct;
+    if (slope > 0.1) trend = 'rising';
+    else if (slope < -0.1) trend = 'declining';
+  }
+
+  return {
+    episodeId,
+    outcome: String(epRow.outcome),
+    strategy: String(epRow.strategy ?? ''),
+    firstSeenAt,
+    lastSeenAt,
+    scanCount: Number(epRow.scan_count),
+    firstRoiPct: Number(epRow.first_roi_pct),
+    peakRoiPct: Number(epRow.peak_roi_pct),
+    lastRoiPct: Number(epRow.last_roi_pct),
+    durationSec,
+    points,
+    trend,
+  };
+}
+
+/** UI-09: All active episodes for a market (all outcomes), with decay data. */
+export async function getActiveEpisodesForMarket(
+  marketId: string,
+): Promise<ActiveEpisodeDecay[]> {
+  await ensureDb();
+  const c = getClient();
+
+  const eps = await c.execute({
+    sql: `SELECT id, outcome FROM arb_episodes WHERE market_id = ? AND status = 'open'`,
+    args: [marketId],
+  });
+  const results: ActiveEpisodeDecay[] = [];
+  for (const row of eps.rows as any[]) {
+    const decay = await getActiveEpisodeDecay(marketId, String(row.outcome));
+    if (decay) results.push(decay);
+  }
+  return results;
 }
