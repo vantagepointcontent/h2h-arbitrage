@@ -5,6 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime } from "@/app/lib/page-shared";
+import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
 /* ── Overview Panel ── */
 function OverviewPanelInner({
@@ -294,7 +295,7 @@ function OverviewPanelInner({
                 className="rounded-xl border border-[#182533] bg-[#17212B] p-4 space-y-3 cursor-pointer hover:border-[#5DBE81]/40 transition-colors"
               >
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-sm text-[#FFFFFF]">{m.eventTitle}</h3>
+                  <h3 className="font-semibold text-sm text-[#FFFFFF]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: scannedAt })}>{m.eventTitle}</h3>
                   <div className="flex items-center gap-1.5">
                     {arbCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#5DBE81]/10 text-[#5DBE81] font-medium">{arbCount} arb{arbCount > 1 ? "s" : ""}</span>}
                     {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.category}</span>}
@@ -309,9 +310,13 @@ function OverviewPanelInner({
                   <div className={`text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                   </div>
-                  <div className="text-[#8A9BA8]">APY</div>
+                  <div className="text-[#8A9BA8] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
                   <div className={`text-right font-bold ${apy > 0 ? "text-[#5DBE81]" : apy < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
-                    {apy !== 0 ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}` : "—"}
+                    {apy !== 0 ? (
+                      <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
+                        {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
+                      </ApyValueTooltip>
+                    ) : "—"}
                   </div>
                   <div className="text-[#8A9BA8]">Est. Profit</div>
                   <div className="text-[#FFFFFF] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
@@ -338,11 +343,11 @@ function OverviewPanelInner({
                   { key: "matched", label: "Matched", align: "right" },
                   { key: "arbs", label: "Arbs", align: "right" },
                   { key: "roi", label: "ROI", align: "right" },
-                  { key: "apy", label: "APY", align: "right" },
+                  { key: "apy", label: "APY", align: "right", info: true },
                   { key: "profit", label: "Profit", align: "right" },
                   { key: "strategy", label: "Strategy", align: "left" },
                   { key: "scanned", label: "Scanned", align: "right" },
-                ] as { key: OverviewSort; label: string; align: "left" | "right" }[]).map(({ key, label, align }) => (
+                ] as { key: OverviewSort; label: string; align: "left" | "right"; info?: boolean }[]).map(({ key, label, align, info }) => (
                   <th
                     key={key}
                     onClick={() => onToggleSort(key)}
@@ -350,6 +355,7 @@ function OverviewPanelInner({
                   >
                     <span className={align === "right" ? "inline-flex items-center gap-1 flex-row-reverse" : "inline-flex items-center gap-1"}>
                       {label}
+                      {info && <ApyHeaderInfo />}
                       <span className={`text-[8px] transition-opacity ${sort === key ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
                         {sort === key && sortDir === "asc" ? "▲" : "▼"}
                       </span>
@@ -374,7 +380,7 @@ function OverviewPanelInner({
                     onClick={() => onSelectMarket(m)}
                     className="cursor-pointer hover:bg-[#182533]/50 transition-colors"
                   >
-                    <td className="px-4 py-3 font-medium text-[#FFFFFF]">{m.eventTitle}</td>
+                    <td className="px-4 py-3 font-medium text-[#FFFFFF]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>{m.eventTitle}</td>
                     <td className="px-4 py-3 text-right text-[#FFFFFF]">{formatExpiry(m.expiryDate)}</td>
                     <td className="px-4 py-3 text-right text-[#8A9BA8]">{matchedCount > 0 ? matchedCount : "—"}</td>
                     <td className="px-4 py-3 text-right font-bold text-[#5DBE81]">{arbCount > 0 ? arbCount : "—"}</td>
@@ -382,7 +388,11 @@ function OverviewPanelInner({
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
                     <td className={`px-4 py-3 text-right font-bold ${apy > 0 ? "text-[#5DBE81]" : apy < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
-                      {apy !== 0 ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}` : "—"}
+                      {apy !== 0 ? (
+                        <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
+                          {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
+                        </ApyValueTooltip>
+                      ) : "—"}
                     </td>
                     <td className="px-4 py-3 text-right text-[#FFFFFF]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-[#8A9BA8]">{strategy || "—"}</td>

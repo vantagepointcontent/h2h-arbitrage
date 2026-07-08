@@ -8,6 +8,7 @@ import { ArbHistoryCell } from './ArbHistoryCell';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 import { parseArbLegs, formatConciseStrategy, LegBreakdown } from './ArbLegBreakdown';
+import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
 
 interface Outcome {
   artist: string;
@@ -48,6 +49,8 @@ interface OutcomeTableBodyProps {
   sortField?: "roi" | "apy" | "profit";
   /** UI-06: sort direction for the outcome table */
   sortDir?: "asc" | "desc";
+  /** UI-15: market expiry date for APY tooltip breakdown */
+  marketExpiryDate?: string | null;
 }
 
 function OutcomeTableBodyInner({
@@ -62,6 +65,7 @@ function OutcomeTableBodyInner({
   marketId,
   sortField,
   sortDir,
+  marketExpiryDate,
 }: OutcomeTableBodyProps) {
   const safeOutcomes = outcomes ?? [];
 
@@ -154,7 +158,7 @@ function OutcomeTableBodyInner({
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
             >
               <td className="px-4 py-3 font-medium text-[#FFFFFF]">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" title={buildMarketTooltip({ eventTitle: marketTitle ?? o.artist, expiryDate: marketExpiryDate })}>
                   <span className={`transition-transform text-[#8A9BA8] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                   {o.artist}
                 </div>
@@ -173,7 +177,11 @@ function OutcomeTableBodyInner({
               <td className="px-4 py-3 text-right text-[#8A9BA8]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${roiColor}`}>
-                {hasPrices && o.arbitrage.apyPct != null ? formatPercent(o.arbitrage.apyPct) : "—"}
+                {hasPrices && o.arbitrage.apyPct != null ? (
+                  <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
+                    {formatPercent(o.arbitrage.apyPct)}
+                  </ApyValueTooltip>
+                ) : "—"}
               </td>
               <td className="relative px-4 py-3 text-right group">
                 {!hasPrices || profit <= 0 ? (

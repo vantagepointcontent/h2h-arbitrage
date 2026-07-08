@@ -75,6 +75,7 @@ const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr:
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
+import { ApyHeaderInfo } from "@/app/components/ApyTooltip";
 const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalSpreadChart").then(m => m.HistoricalSpreadChart), { ssr: false });
 import { saveSpread } from "@/lib/spreadHistory";
 import { computeApy } from "@/lib/matcher";
@@ -1711,7 +1712,7 @@ export default function Home() {
                               </th>
                               <th onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
-                                  APY
+                                  APY <ApyHeaderInfo />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "apy" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
                                     {outcomeSort === "apy" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
@@ -1741,6 +1742,7 @@ export default function Home() {
                             filterMode={outcomeFilter}
                             marketTitle={result.eventTitle}
                             marketId={activeMarketId ?? undefined}
+                            marketExpiryDate={result.expiryDate}
                             sortField={outcomeSort}
                             sortDir={outcomeSortDir}
                           />

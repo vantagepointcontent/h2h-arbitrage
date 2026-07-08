@@ -6,6 +6,7 @@ import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, R
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
+import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
 /** Format a "time ago" string from an ISO timestamp for the sidebar hover tooltip. */
 function formatTimeAgo(scannedAt: string | null | undefined): string {
@@ -262,9 +263,9 @@ function MarketSidebarInner({
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
                       sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
                     }`}
-                    title="Sort by APY"
+                    title="Sort by APY — Annualized ROI = ROI × (365 ÷ days to expiry)"
                   >
-                    APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")}
+                    APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")} <ApyHeaderInfo />
                   </button>
                   <button
                     onClick={() => onToggleSort("roi")}
@@ -397,7 +398,7 @@ function MarketSidebarInner({
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 min-w-0">
-                          <div className="text-xs font-medium text-[#FFFFFF] truncate">{m.eventTitle}</div>
+                          <div className="text-xs font-medium text-[#FFFFFF] truncate" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt })}>{m.eventTitle}</div>
                           {hotIds.has(m.id) && (
                             <span
                               className="shrink-0 inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-px rounded-full bg-[#f97316]/15 text-[#f97316] ring-1 ring-[#f97316]/30 uppercase"
@@ -432,7 +433,11 @@ function MarketSidebarInner({
                           </span>
                         )}
                         {apy > 0 && (
-                          <span className="text-[10px] text-[#8A9BA8] ml-1">({formatPercent(apy)})</span>
+                          <span className="text-[10px] text-[#8A9BA8] ml-1">
+                            (<ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
+                              {formatPercent(apy)}
+                            </ApyValueTooltip>)
+                          </span>
                         )}
                       </div>
                     </div>
