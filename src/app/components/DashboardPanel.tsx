@@ -296,8 +296,10 @@ export default function DashboardPanel() {
           value={kpis.totalArbsFound.toLocaleString()}
           color="#5DBE81"
         />
-        {/* BUG-01: "Active Arbs Now" = total arb outcomes (not market count) from
-            scans in the last 5 minutes. Matches the "Arb Only" filter row count. */}
+        {/* BUG-01: "Active Arbs Now" = count of markets where the latest scan
+            (liveResult ?? lastScanResult) has bestRoiPct > 0. Computed in the
+            stats route from saved_markets — same data source and criteria as
+            the MarketSidebar "Arb Only" filter. */}
         <KPICard
           icon={<Eye className="w-4 h-4" />}
           label="Active Arbs Now"

@@ -52,6 +52,19 @@ export async function GET(request: NextRequest) {
     // ── Market Coverage (pie chart data) ───────────────────────
     // classifyMarket is JS-only — runs over ~500 saved markets, cheap.
     const savedMarkets = await getSavedMarkets();
+
+    // BUG-01: "Active Arbs Now" counter — count distinct markets where the
+    // latest scan (liveResult ?? lastScanResult) has bestRoiPct > 0.
+    // This matches the MarketSidebar "Arb Only" filter exactly: same data
+    // source (saved_markets), same criteria (roi > 0), no time window.
+    // Previously the counter summed positive_arb_count from scan_results in
+    // the last 5 minutes — a different metric (outcome count, time-limited)
+    // that never matched the sidebar filter count.
+    const activeArbsCount = savedMarkets.filter(m => {
+      const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+      return roi > 0;
+    }).length;
+    agg.kpis.activeArbs = activeArbsCount;
     const marketCategoryCounts: Record<string, number> = {
       Politics: 0,
       Sports: 0,

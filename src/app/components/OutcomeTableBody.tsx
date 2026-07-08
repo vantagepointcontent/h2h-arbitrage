@@ -101,10 +101,9 @@ function OutcomeTableBodyInner({
 
   const displayOutcomes = useMemo(() => {
     // BUG-01: "Arb Only" filter definition — an outcome counts as an active arb
-    // when expectedProfit > 0 (net of fees). This matches the scan route's
-    // positiveArbCount (roiPct > 0 implies expectedProfit > 0 since profit
-    // drives ROI). The Dashboard "Active Arbs Now" counter sums the same
-    // positive_arb_count values from scan_results.
+    // when expectedProfit > 0 (net of fees). This is the per-market outcome
+    // filter, separate from the dashboard "Active Arbs Now" counter which
+    // counts markets (not outcomes) with bestRoiPct > 0 from saved_markets.
     let arr = filterMode === "arb"
       ? safeOutcomes.filter(o => o.arbitrage.expectedProfit > 0)
       : filterMode === "matched"
