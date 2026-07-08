@@ -1748,7 +1748,7 @@ export default function Home() {
                     )}
 
                     {/* Manual matching panel — two-list pairing interface */}
-                    {matchMode === "manual" && result && (result.unmatchedKalshi.length > 0 || result.unmatchedPolymarket.length > 0 || manualMatches.length > 0) && (() => {
+                    {matchMode === "manual" && result && (() => {
                       const marketCouplings = manualMatches.filter(mm => {
                         const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
                           o.kalshi && o.kalshi.ticker === mm.kalshiTicker
