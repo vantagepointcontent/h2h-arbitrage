@@ -5,24 +5,24 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 447,
-  "startedAt": "2026-07-08T11:20:34.184Z",
-  "finishedAt": "2026-07-08T11:23:59.710Z",
-  "durationMs": 205526,
-  "successCount": 42,
-  "failureCount": 6,
-  "skippedCount": 393,
-  "avgScanMs": 20707,
+  "startedAt": "2026-07-08T13:39:42.744Z",
+  "finishedAt": "2026-07-08T13:43:38.103Z",
+  "durationMs": 235359,
+  "successCount": 41,
+  "failureCount": 22,
+  "skippedCount": 381,
+  "avgScanMs": 28622,
   "maxScanMs": 60000,
   "errors": [
     {
-      "market": "MLB: 2026 AL Cy Young Winner",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
+      "market": "Who will win the 2026 Fields Medal?",
+      "error": "timeout after 15000ms (adaptive)",
+      "durationMs": 15000
     },
     {
-      "market": "AZ-01 Republican Primary Winner",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
+      "market": "Which countries will recognize Palestine before 2027?",
+      "error": "timeout after 15000ms (adaptive)",
+      "durationMs": 15000
     },
     {
       "market": "F1 Drivers' Champion",
@@ -30,21 +30,101 @@
       "durationMs": 60000
     },
     {
-      "market": "What kind of product will OpenAI announce in 2026?",
-      "error": "timeout after 15000ms (adaptive)",
-      "durationMs": 15000
+      "market": "MLB: 2026 NL Hank Aaron Winner",
+      "error": "timeout after 50352ms (adaptive)",
+      "durationMs": 50352
     },
     {
-      "market": "TIME Person of the Year 2026",
-      "error": "timeout after 17388ms (adaptive)",
-      "durationMs": 17388
-    },
-    {
-      "market": "MLB: Home Runs Leader",
+      "market": "Michigan Governor Republican Primary Winner",
       "error": "timeout after 60000ms (adaptive)",
       "durationMs": 60000
+    },
+    {
+      "market": "MLB: Doubles Leader",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
+    },
+    {
+      "market": "Next UK Chancellor of the Exchequer in 2026?",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
+    },
+    {
+      "market": "NBA: LeBron James Next Team",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
+    },
+    {
+      "market": "VA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46965
+    },
+    {
+      "market": "UT-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46905
+    },
+    {
+      "market": "VA-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46914
+    },
+    {
+      "market": "VA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46968
+    },
+    {
+      "market": "TX-37 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47064
+    },
+    {
+      "market": "UT-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46989
+    },
+    {
+      "market": "VA-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47007
+    },
+    {
+      "market": "WA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 45309
+    },
+    {
+      "market": "WA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 45297
+    },
+    {
+      "market": "WA-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46443
+    },
+    {
+      "market": "WA-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46467
+    },
+    {
+      "market": "WA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46506
+    },
+    {
+      "market": "WA-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46461
+    },
+    {
+      "market": "WA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 46311
     }
   ],
-  "breakerSkipped": 6,
-  "openBreakers": 11
+  "breakerSkipped": 3,
+  "openBreakers": 8
 }
