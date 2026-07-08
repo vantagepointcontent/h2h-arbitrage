@@ -132,9 +132,9 @@ export function HistoricalSpreadChart({ marketId, currentSpread, currentRoi }: P
                         </span>
                         <span className="text-[#8A9BA8]">{p.strategy}</span>
                       </div>
-                      <div className="text-[#8A9BA8] text-[10px]">
-                        K: {p.kalshiYesBid.toFixed(3)} / {p.kalshiYesAsk.toFixed(3)}
-                        {"  "}PM: {p.pmYesBid.toFixed(3)} / {p.pmYesAsk.toFixed(3)}
+                      <div className="text-[#8A9BA8] text-[10px] flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-0.5"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm inline" /> {p.kalshiYesBid.toFixed(3)} / {p.kalshiYesAsk.toFixed(3)}</span>
+                        <span className="inline-flex items-center gap-0.5"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm inline" /> {p.pmYesBid.toFixed(3)} / {p.pmYesAsk.toFixed(3)}</span>
                       </div>
                       <div className="text-[#facc15] text-[10px]">
                         ROI: {p.roiPct.toFixed(2)}%

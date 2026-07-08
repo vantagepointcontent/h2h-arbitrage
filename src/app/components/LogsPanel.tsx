@@ -553,7 +553,7 @@ function LogRow({
                       </div>
                       {arb.fees && (
                         <div className="text-[10px] text-[#8A9BA8] mt-1 pt-1 border-t border-[#182533]">
-                          Fees — Kalshi: {fmtUsd(arb.fees.kalshiFee ?? 0)} · PM: {fmtUsd(arb.fees.pmFee ?? 0)} · Net: {fmtUsd(arb.fees.worstCaseNetProfit ?? arb.fees.netProfitIfKalshiWins ?? 0)}
+                          Fees — <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.kalshiFee ?? 0)} · <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.pmFee ?? 0)} · Net: {fmtUsd(arb.fees.worstCaseNetProfit ?? arb.fees.netProfitIfKalshiWins ?? 0)}
                         </div>
                       )}
                     </div>

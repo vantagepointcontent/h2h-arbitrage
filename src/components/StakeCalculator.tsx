@@ -135,8 +135,10 @@ export function StakeCalculator({ suggestions, defaultCapital = 1000, onCapitalC
                   <div className="text-xs font-bold text-[#5DBE81]">
                     ${d.allocatedCapital.toFixed(2)}
                   </div>
-                  <div className="text-[10px] text-[#8A9BA8]">
-                    K: ${d.allocatedKalshi.toFixed(0)} / PM: ${d.allocatedPm.toFixed(0)}
+                  <div className="text-[10px] text-[#8A9BA8] flex items-center justify-end gap-1">
+                    <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm inline" /> ${d.allocatedKalshi.toFixed(0)}
+                    <span className="text-[#8A9BA8]">/</span>
+                    <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm inline" /> ${d.allocatedPm.toFixed(0)}
                   </div>
                 </div>
                 <div className="text-right shrink-0 w-20">

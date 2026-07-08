@@ -1840,13 +1840,13 @@ export default function Home() {
                             {marketCouplings.map(mm => (
                               <div key={mm.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533]">
                                 <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
-                                  <div>
-                                    <span className="text-[10px] text-[#5DBE81]">K:</span>
-                                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm shrink-0" />
+                                    <span className="text-[#FFFFFF] truncate" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
                                   </div>
-                                  <div>
-                                    <span className="text-[10px] text-[#a855f7]">PM:</span>
-                                    <span className="text-[#FFFFFF] truncate ml-1" title={mm.pmTitle}>{mm.pmTitle}</span>
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm shrink-0" />
+                                    <span className="text-[#FFFFFF] truncate" title={mm.pmTitle}>{mm.pmTitle}</span>
                                   </div>
                                 </div>
                                 <button
