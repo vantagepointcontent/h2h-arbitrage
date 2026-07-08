@@ -1651,7 +1651,7 @@ export default function Home() {
                         kalshiUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.kalshiUrl : undefined}
                         pmUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.polymarketUrl : undefined}
                         capital={capital}
-                        useLivePrices={bookmakerView}
+                        liveMode={bookmakerView}
                       />
                     )}
 

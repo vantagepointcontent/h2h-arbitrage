@@ -16,11 +16,11 @@ const THRESHOLDS: SpreadThresholds = {
 };
 
 interface PlatformPrice {
-  yesBid: number;
-  yesAsk: number;
-  noBid: number;
-  noAsk: number;
-  lastPrice: number;
+  yesBid: number | null;
+  yesAsk: number | null;
+  noBid: number | null;
+  noAsk: number | null;
+  lastPrice: number | null;
   lastUpdated?: Date | null;
   // Depth of market (optional)
   bidVolume?: number;
@@ -31,11 +31,11 @@ interface OutcomeEntry {
   artist: string;
   platformA: PlatformPrice | null;
   platformB: {
-    yesPrice: number;
-    noPrice: number;
-    bestBid: number;
-    bestAsk: number;
-    lastTradePrice: number;
+    yesPrice: number | null;
+    noPrice: number | null;
+    bestBid: number | null;
+    bestAsk: number | null;
+    lastTradePrice: number | null;
     lastUpdated?: Date | null;
     bidVolume?: number;
     askVolume?: number;
@@ -49,11 +49,12 @@ interface Bookmaker1on1Props {
   kalshiUrl?: string;
   pmUrl?: string;
   capital?: number;
-  useLivePrices?: boolean;
+  liveMode?: boolean;
 }
 
 /** Determine spread color class based on thresholds */
-function spreadColorClass(spread: number, thresholds: SpreadThresholds): string {
+function spreadColorClass(spread: number | null, thresholds: SpreadThresholds): string {
+  if (spread == null) return "text-[#8A9BA8]";
   const abs = Math.abs(spread);
   if (abs >= thresholds.green) return "text-[#5DBE81]";
   if (abs >= thresholds.yellow) return "text-[#facc15]";
@@ -61,7 +62,8 @@ function spreadColorClass(spread: number, thresholds: SpreadThresholds): string 
 }
 
 /** Background tint for spread badge */
-function spreadBgClass(spread: number, thresholds: SpreadThresholds): string {
+function spreadBgClass(spread: number | null, thresholds: SpreadThresholds): string {
+  if (spread == null) return "bg-[#8A9BA8]/15 ring-[#8A9BA8]/30";
   const abs = Math.abs(spread);
   if (abs >= thresholds.green) return "bg-[#5DBE81]/15 ring-[#5DBE81]/30";
   if (abs >= thresholds.yellow) return "bg-[#facc15]/15 ring-[#facc15]/30";
@@ -69,25 +71,28 @@ function spreadBgClass(spread: number, thresholds: SpreadThresholds): string {
 }
 
 /** Bar fill color */
-function spreadBarClass(spread: number, thresholds: SpreadThresholds): string {
+function spreadBarClass(spread: number | null, thresholds: SpreadThresholds): string {
+  if (spread == null) return "bg-[#8A9BA8]";
   const abs = Math.abs(spread);
   if (abs >= thresholds.green) return "bg-[#5DBE81]";
   if (abs >= thresholds.yellow) return "bg-[#facc15]";
   return "bg-red-400";
 }
 
-/** Format a price as cents display (e.g. 42.00) */
-function fmtPrice(n: number): string {
+/** Format a price as cents display (e.g. 42.00) — null-safe, shows "—" for missing data */
+function fmtPrice(n: number | null | undefined): string {
+  if (n == null) return "—";
   return n.toFixed(2);
 }
 
-/** Format spread with sign */
-function fmtSpread(n: number): string {
+/** Format spread with sign — null-safe */
+function fmtSpread(n: number | null | undefined): string {
+  if (n == null) return "—";
   return (n >= 0 ? "+" : "") + n.toFixed(2);
 }
 
 /** Relative time string */
-function timeAgo(date: Date | null): string {
+function timeAgo(date: Date | null | undefined): string {
   if (!date) return "never";
   const diff = Date.now() - date.getTime();
   if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
@@ -99,8 +104,8 @@ function timeAgo(date: Date | null): string {
  * Compute price movement direction for flash animation.
  * Returns 'up' | 'down' | 'stable' | null (no previous).
  */
-function priceDelta(current: number, previous: number | null): "up" | "down" | "stable" | null {
-  if (previous === null) return null;
+function priceDelta(current: number | null, previous: number | null): "up" | "down" | "stable" | null {
+  if (current == null || previous === null) return null;
   const diff = current - previous;
   if (Math.abs(diff) < 0.001) return "stable";
   return diff > 0 ? "up" : "down";
@@ -135,7 +140,7 @@ function flashClass(direction: "up" | "down" | "stable" | null): string {
 /**
  * Depth bar width percentage (normalized against max depth in dataset).
  */
-function depthPercent(volume: number | undefined, maxVolume: number): number {
+function depthPercent(volume: number | null | undefined, maxVolume: number): number {
   if (volume == null || maxVolume === 0) return 0;
   return Math.min((volume / maxVolume) * 100, 100);
 }
@@ -161,7 +166,7 @@ export function Bookmaker1on1({
   kalshiUrl,
   pmUrl,
   capital = 10,
-  useLivePrices = false,
+  liveMode = false,
 }: Bookmaker1on1Props) {
   const platformAName = "Kalshi";
   const platformBName = "Polymarket";
@@ -172,7 +177,7 @@ export function Bookmaker1on1({
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   // Previous prices for detecting changes (flash animation)
-  const prevPricesRef = useRef<Map<string, { yesBid: number; yesAsk: number; noBid: number; noAsk: number; yesPrice: number; bestBid: number; bestAsk: number }>>(new Map());
+  const prevPricesRef = useRef<Map<string, { yesBid: number | null; yesAsk: number | null; noBid: number | null; noAsk: number | null; yesPrice: number | null; bestBid: number | null; bestAsk: number | null }>>(new Map());
 
   // Track which cells are currently flashing
   const [flashingCells, setFlashingCells] = useState<Map<string, "up" | "down">>(new Map());
@@ -186,11 +191,11 @@ export function Bookmaker1on1({
     kalshiUrl,
     pmUrl,
     capital,
-    enabled: useLivePrices && !!kalshiUrl && !!pmUrl,
+    enabled: liveMode && !!kalshiUrl && !!pmUrl,
   });
 
   // Use live outcomes if available and enabled, otherwise fall back to static outcomes
-  const displayOutcomes = useLivePrices && wsConnectionStatus === "active" && liveOutcomes.length > 0
+  const displayOutcomes = liveMode && wsConnectionStatus === "active" && liveOutcomes.length > 0
     ? liveOutcomes.map(lo => ({
         artist: lo.artist,
         platformA: lo.platformA,
@@ -220,7 +225,7 @@ export function Bookmaker1on1({
       const prevEntry = prev.get(key);
 
       // Check each price field
-      const fields: Array<{ field: string; currentVal: number }> = [
+      const fields: Array<{ field: string; currentVal: number | null }> = [
         { field: `${key}-aYesBid`, currentVal: curr.yesBid },
         { field: `${key}-aYesAsk`, currentVal: curr.yesAsk },
         { field: `${key}-aNoBid`, currentVal: curr.noBid },
@@ -251,7 +256,8 @@ export function Bookmaker1on1({
     });
 
     // Update previous prices
-    const newPrev = new Map<string, typeof prevPricesRef.current[number]>();
+    type PrevEntry = { yesBid: number | null; yesAsk: number | null; noBid: number | null; noAsk: number | null; yesPrice: number | null; bestBid: number | null; bestAsk: number | null };
+    const newPrev = new Map<string, PrevEntry>();
     displayOutcomes.forEach((o) => {
       if (o.platformA && o.platformB) {
         newPrev.set(o.artist, {
@@ -276,13 +282,16 @@ export function Bookmaker1on1({
 
   // Compute spreads for all outcomes
   const spreads = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, number | null>();
     displayOutcomes.forEach((o) => {
       if (o.platformA && o.platformB) {
-        map.set(
-          o.artist,
-          +(o.platformB.yesPrice - o.platformA.yesAsk).toFixed(2)
-        );
+        const ask = o.platformA.yesAsk;
+        const yesPrice = o.platformB.yesPrice;
+        if (ask == null || yesPrice == null) {
+          map.set(o.artist, null);
+        } else {
+          map.set(o.artist, +(yesPrice - ask).toFixed(2));
+        }
       }
     });
     return map;
@@ -300,7 +309,14 @@ export function Bookmaker1on1({
     return { maxBid: maxBid || 1, maxAsk: maxAsk || 1 };
   }, [displayOutcomes]);
 
-  const validOutcomes = (displayOutcomes ?? []).filter((o) => o.platformA && o.platformB);
+  const validOutcomes = (displayOutcomes ?? []).filter(
+    (o) => o.platformA && o.platformB
+  );
+
+  // Check if any outcomes have null prices (CLOB timeout scenario)
+  const allPricesNull = validOutcomes.length > 0 && validOutcomes.every(
+    (o) => o.platformA!.yesBid == null && o.platformA!.yesAsk == null
+  );
 
   if (validOutcomes.length === 0) {
     return (
@@ -310,10 +326,18 @@ export function Bookmaker1on1({
     );
   }
 
+  if (allPricesNull) {
+    return (
+      <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] p-8 text-center">
+        <p className="text-[#8A9BA8] text-sm">No live price data available for this market.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-[#232E3C] bg-[#0E1621] overflow-hidden">
       {/* ── Live WS Connection Status ── */}
-      {useLivePrices && (
+      {liveMode && (
         <div className="border-b border-[#232E3C] bg-[#17212B]/60 px-3 py-1.5 flex items-center gap-2">
           <span className="text-[10px] text-[#8A9BA8]">Live WS:</span>
           {wsConnectionStatus === "connecting" && (
@@ -397,7 +421,7 @@ export function Bookmaker1on1({
       {/* ── Outcome Rows ── */}
       <div className="divide-y divide-zinc-800">
         {validOutcomes.map((outcome: OutcomeEntry, oidx: number) => {
-          const spread = spreads.get(outcome.artist) ?? 0;
+          const spread = spreads.get(outcome.artist) ?? null;
           const isHovered = hoveredRow === outcome.artist;
           const a = outcome.platformA!;
           const b = outcome.platformB!;
@@ -507,7 +531,7 @@ export function Bookmaker1on1({
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${spreadBarClass(spread, thresholds)}`}
                     style={{
-                      width: `${Math.min(Math.abs(spread) * 8, 100)}%`,
+                      width: `${spread != null ? Math.min(Math.abs(spread) * 8, 100) : 0}%`,
                     }}
                   />
                 </div>
@@ -567,6 +591,7 @@ export function Bookmaker1on1({
                     onHover={() => setHoveredCell(`${outcome.artist}-bNoBid`)}
                     onLeave={() => setHoveredCell(null)}
                     lastUpdated={b.lastUpdated ?? lastUpdated}
+                    flashDir={null}
                   />
                   <PriceCellWithFlash
                     value={b.noPrice}
@@ -575,6 +600,7 @@ export function Bookmaker1on1({
                     onHover={() => setHoveredCell(`${outcome.artist}-bNoAsk`)}
                     onLeave={() => setHoveredCell(null)}
                     lastUpdated={b.lastUpdated ?? lastUpdated}
+                    flashDir={null}
                   />
                 </div>
               </div>
@@ -621,12 +647,12 @@ function PriceCellWithFlash({
   maxVolume,
   depthSide,
 }: {
-  value: number;
+  value: number | null;
   cellKey: string;
   isHovered: boolean;
   onHover: () => void;
   onLeave: () => void;
-  lastUpdated: Date | null;
+  lastUpdated: Date | null | undefined;
   flashDir: "up" | "down" | null;
   primary?: boolean;
   depthVolume?: number;

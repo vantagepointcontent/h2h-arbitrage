@@ -4,37 +4,47 @@
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 448,
-  "startedAt": "2026-07-08T11:03:55.709Z",
-  "finishedAt": "2026-07-08T11:07:21.147Z",
-  "durationMs": 205438,
-  "successCount": 140,
-  "failureCount": 4,
-  "skippedCount": 295,
-  "avgScanMs": 8023,
-  "maxScanMs": 38478,
+  "marketCount": 447,
+  "startedAt": "2026-07-08T11:20:34.184Z",
+  "finishedAt": "2026-07-08T11:23:59.710Z",
+  "durationMs": 205526,
+  "successCount": 42,
+  "failureCount": 6,
+  "skippedCount": 393,
+  "avgScanMs": 20707,
+  "maxScanMs": 60000,
   "errors": [
     {
-      "market": "WA-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38448
+      "market": "MLB: 2026 AL Cy Young Winner",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "WA-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38406
+      "market": "AZ-01 Republican Primary Winner",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "WA-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38412
+      "market": "F1 Drivers' Champion",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "WA-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38478
+      "market": "What kind of product will OpenAI announce in 2026?",
+      "error": "timeout after 15000ms (adaptive)",
+      "durationMs": 15000
+    },
+    {
+      "market": "TIME Person of the Year 2026",
+      "error": "timeout after 17388ms (adaptive)",
+      "durationMs": 17388
+    },
+    {
+      "market": "MLB: Home Runs Leader",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     }
   ],
-  "breakerSkipped": 9,
-  "openBreakers": 13
+  "breakerSkipped": 6,
+  "openBreakers": 11
 }
