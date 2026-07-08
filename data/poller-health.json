@@ -5,79 +5,34 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 448,
-  "startedAt": "2026-07-08T10:28:44.974Z",
-  "finishedAt": "2026-07-08T10:33:28.298Z",
-  "durationMs": 283324,
-  "successCount": 179,
-  "failureCount": 13,
-  "skippedCount": 247,
-  "avgScanMs": 9628,
-  "maxScanMs": 60000,
+  "startedAt": "2026-07-08T11:03:55.709Z",
+  "finishedAt": "2026-07-08T11:07:21.147Z",
+  "durationMs": 205438,
+  "successCount": 140,
+  "failureCount": 4,
+  "skippedCount": 295,
+  "avgScanMs": 8023,
+  "maxScanMs": 38478,
   "errors": [
     {
-      "market": "MLS Cup Winner 2026",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "World Cup Winner ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "WI-01 House Election Winner",
+      "market": "WA-08 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45009
+      "durationMs": 38448
     },
     {
-      "market": "WA-09 House Election Winner",
+      "market": "WA-05 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45084
+      "durationMs": 38406
     },
     {
-      "market": "WI-03 House Election Winner",
+      "market": "WA-06 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45123
+      "durationMs": 38412
     },
     {
-      "market": "WA-10 House Election Winner",
+      "market": "WA-07 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45060
-    },
-    {
-      "market": "WI-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 45216
-    },
-    {
-      "market": "WY At-Large House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 45093
-    },
-    {
-      "market": "WI-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 45111
-    },
-    {
-      "market": "WI-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 45114
-    },
-    {
-      "market": "WI-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 45072
-    },
-    {
-      "market": "WI-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 43299
-    },
-    {
-      "market": "Fed Decision in July?",
-      "error": "fetch failed",
-      "durationMs": 15000
+      "durationMs": 38478
     }
   ],
   "breakerSkipped": 9,
