@@ -94,32 +94,32 @@ function OverviewPanelInner({
     if (sort === "roi") {
       const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
       const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
-      return mul * (rb - ra);
+      return mul * (ra - rb);
     }
     if (sort === "apy") {
-      return mul * (getMarketApy(b) - getMarketApy(a));
+      return mul * (getMarketApy(a) - getMarketApy(b));
     }
     if (sort === "profit") {
       const pa = a.liveResult?.bestProfit ?? a.lastScanResult?.bestProfit ?? 0;
       const pb = b.liveResult?.bestProfit ?? b.lastScanResult?.bestProfit ?? 0;
-      return mul * (pb - pa);
+      return mul * (pa - pb);
     }
     if (sort === "matched") {
       const ma = a.liveResult?.matchedCount ?? a.lastScanResult?.matchedCount ?? 0;
       const mb = b.liveResult?.matchedCount ?? b.lastScanResult?.matchedCount ?? 0;
-      return mul * (mb - ma);
+      return mul * (ma - mb);
     }
     if (sort === "arbs") {
       const aa = a.liveResult?.allArbs ?? a.lastScanResult?.allArbs;
       const ab = b.liveResult?.allArbs ?? b.lastScanResult?.allArbs;
       const ca = aa ? aa.filter(x => x.expectedProfit > 0).length : 0;
       const cb = ab ? ab.filter(x => x.expectedProfit > 0).length : 0;
-      return mul * (cb - ca);
+      return mul * (ca - cb);
     }
     if (sort === "scanned") {
       const ta = new Date(a.liveResult?.scannedAt ?? a.lastScanResult?.scannedAt ?? 0).getTime() || 0;
       const tb = new Date(b.liveResult?.scannedAt ?? b.lastScanResult?.scannedAt ?? 0).getTime() || 0;
-      return mul * (tb - ta);
+      return mul * (ta - tb);
     }
     return 0;
   };

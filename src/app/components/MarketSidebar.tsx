@@ -185,12 +185,12 @@ function MarketSidebarInner({
     if (sort === "roi") {
       const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
       const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
-      return mul * (rb - ra);
+      return mul * (ra - rb);
     }
     if (sort === "apy") {
       const aa = computeApy(a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0, a.expiryDate);
       const ab = computeApy(b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0, b.expiryDate);
-      return mul * (ab - aa);
+      return mul * (aa - ab);
     }
     if (sort === "scanned") {
       // desc = stalest first (longest since last scan), asc = most recent first
