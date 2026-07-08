@@ -7,6 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './Execu
 import { ArbHistoryCell } from './ArbHistoryCell';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
+import { parseArbLegs, formatConciseStrategy, LegBreakdown } from './ArbLegBreakdown';
 
 interface Outcome {
   artist: string;
@@ -250,29 +251,31 @@ function OutcomeTableBodyInner({
               <td className="px-4 py-3 text-xs">
                 {!hasPrices ? (
                   <span className="text-[#8A9BA8]">—</span>
-                ) : o.arbitrage.strategy === 'No arb' ? (
-                  <span className="text-[#8A9BA8]">No arb</span>
-                ) : o.arbitrage.strategy.startsWith('Buy YES both sides') ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
-                    <span className="text-[#8A9BA8]">{o.arbitrage.strategy.replace(/^Buy YES both sides: Kalshi (.+?) \+ PM (.+)$/, '$1 + $2')}</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="text-[#8A9BA8]">{o.arbitrage.strategy}</span>
-                    {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
-                    {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); startExecute(o); }}
-                        disabled={resolvingArtist === o.artist}
-                        className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
-                        title="Manually execute this arb (opens confirmation)"
-                      >
-                        <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
-                      </button>
-                    )}
-                  </span>
-                )}
+                ) : (() => {
+                  const { text: conciseText, isCross: isCrossArb } = formatConciseStrategy(o.arbitrage.strategy);
+                  if (o.arbitrage.strategy === 'No arb') {
+                    return <span className="text-[#8A9BA8]">No arb</span>;
+                  }
+                  return (
+                    <span className="inline-flex items-center gap-1.5">
+                      {isCrossArb && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
+                      )}
+                      <span className="text-[#8A9BA8]">{conciseText}</span>
+                      {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
+                      {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                          disabled={resolvingArtist === o.artist}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                          title="Manually execute this arb (opens confirmation)"
+                        >
+                          <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
+                        </button>
+                      )}
+                    </span>
+                  );
+                })()}
               </td>
             </tr>
             {isExpanded && (
@@ -321,6 +324,24 @@ function OutcomeTableBodyInner({
                       </div>
                     </div>
                   )}
+
+                  {/* UI-14: Leg breakdown — clear buy/side mapping per platform */}
+                  {hasPrices && o.arbitrage.strategy !== 'No arb' && (() => {
+                    const breakdown = parseArbLegs(
+                      o.arbitrage.strategy,
+                      o.artist,
+                      o.kalshi?.yesAsk,
+                      o.kalshi?.noAsk,
+                      o.polymarket?.yesPrice,
+                      o.polymarket?.noPrice,
+                      o.arbitrage.kalshiStake,
+                      o.arbitrage.pmStake,
+                      o.arbitrage.fees,
+                      o.arbitrage.expectedProfit,
+                    );
+                    return <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />;
+                  })()}
+
                   <ExecutionReadiness
                     kalshi={o.kalshi}
                     polymarket={o.polymarket}

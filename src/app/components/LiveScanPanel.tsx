@@ -7,6 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/c
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
+import { parseArbLegs, formatConciseStrategy, LegBreakdown } from "@/app/components/ArbLegBreakdown";
 
 interface LiveArbOutcome {
   artist: string;
@@ -138,6 +139,8 @@ interface TabState {
   flashesRef: Record<string, FlashEntry>;
   prevValues: Map<string, PrevCellValues>;
   flashTimers: Map<string, ReturnType<typeof setTimeout>>;
+  /** UI-14: expanded artist for leg breakdown */
+  expandedArtist: string | null;
 }
 
 const MAX_TABS = 8;
@@ -256,6 +259,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
           loading: true,
           status: "Connecting...",
           eventSource: null,
+          expandedArtist: null,
         };
       })
     );
@@ -469,6 +473,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
       flashesRef: {},
       prevValues: new Map(),
       flashTimers: new Map(),
+      expandedArtist: null,
     };
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(tabId);
@@ -483,6 +488,17 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
     n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
   const roiColor = (roi: number) => (roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]");
   const strategyColor = (s: string) => (s !== "No arb" ? "text-[#5DBE81]" : "text-[#FFFFFF]");
+
+  // UI-14: Toggle leg breakdown expansion for a row in the active tab
+  const toggleExpandedArtist = useCallback((artist: string) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabId
+          ? { ...t, expandedArtist: t.expandedArtist === artist ? null : artist }
+          : t,
+      ),
+    );
+  }, [activeTabId]);
 
   return (
     <div className="space-y-5">
@@ -760,18 +776,24 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeTab.result.outcomes.map((o, idx) => (
+                    {activeTab.result.outcomes.map((o, idx) => {
+                      const isRowExpanded = activeTab.expandedArtist === o.artist;
+                      return (
+                      <React.Fragment key={`${o.artist}-${idx}`}>
                       <tr
-                        key={`${o.artist}-${idx}`}
-                        className={`border-b border-[#182533]/50 transition-colors ${
+                        className={`border-b border-[#182533]/50 transition-colors cursor-pointer ${
+                          isRowExpanded ? "bg-[#182533]/30" : ""
+                        } ${
                           o.stale
                             ? "opacity-40 grayscale hover:opacity-60"
                             : "hover:bg-[#182533]"
                         }`}
                         title={o.stale ? "Stale: orderbook data older than 30s — prices may be wrong" : undefined}
+                        onClick={() => toggleExpandedArtist(o.artist)}
                       >
                         <td className="py-2 px-2 text-[#FFFFFF] font-medium">
                           <span className="inline-flex items-center gap-1.5">
+                            <span className={`transition-transform text-[#8A9BA8] text-[10px] ${isRowExpanded ? "rotate-90" : ""}`}>▶</span>
                             {o.artist}
                             {o.stale && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#5E6875]/30 text-[#8A9BA8] uppercase tracking-wide">
@@ -869,26 +891,74 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           {o.roiPct > 0 ? <ArbDecayCurve marketId={activeTab.marketId} outcome={o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
-                          <span className="inline-flex items-center gap-2">
-                            {o.strategy}
-                            {(() => {
-                              if (o.stale || o.roiPct <= 0) return null;
-                              const exec = buildExecutableArb(o, activeTab.marketTitle);
-                              if (!exec) return null;
-                              return (
-                                <button
-                                  onClick={() => setExecutingArb(exec)}
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
-                                  title="Manually execute this arb (opens confirmation)"
-                                >
-                                  <Zap className="w-2.5 h-2.5" /> Execute
-                                </button>
-                              );
-                            })()}
-                          </span>
+                          {(() => {
+                            const { text: conciseText, isCross } = formatConciseStrategy(o.strategy);
+                            if (o.strategy === 'No arb') {
+                              return <span className="text-[#FFFFFF]">No arb</span>;
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1.5">
+                                {isCross && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
+                                )}
+                                <span>{conciseText}</span>
+                                {(() => {
+                                  if (o.stale || o.roiPct <= 0) return null;
+                                  const exec = buildExecutableArb(o, activeTab.marketTitle);
+                                  if (!exec) return null;
+                                  return (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
+                                      title="Manually execute this arb (opens confirmation)"
+                                    >
+                                      <Zap className="w-2.5 h-2.5" /> Execute
+                                    </button>
+                                  );
+                                })()}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
-                    ))}
+                      {/* UI-14: Expanded leg breakdown */}
+                      {isRowExpanded && o.strategy !== 'No arb' && (() => {
+                        const breakdown = parseArbLegs(
+                          o.strategy,
+                          o.artist,
+                          o.kalshiYesAsk,
+                          o.kalshiNoAsk,
+                          o.pmYesAsk,
+                          o.pmNoAsk,
+                          o.kalshiStake,
+                          o.pmStake,
+                          o.fees,
+                          o.expectedProfit,
+                        );
+                        return (
+                          <tr className="bg-[#17212B]/50">
+                            <td colSpan={13} className="px-4 py-3">
+                              <div className="flex items-center gap-6 text-xs mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[#8A9BA8]">Total Stake:</span>
+                                  <span className="font-bold text-[#FFFFFF]">{fmtUsd((o.kalshiStake ?? 0) + (o.pmStake ?? 0))}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[#8A9BA8]">K:</span>
+                                  <span className="text-[#5DBE81]">{fmtUsd(o.kalshiStake ?? 0)}</span>
+                                  <span className="text-[#8A9BA8]">|</span>
+                                  <span className="text-[#8A9BA8]">PM:</span>
+                                  <span className="text-[#a855f7]">{fmtUsd(o.pmStake ?? 0)}</span>
+                                </div>
+                              </div>
+                              <LegBreakdown breakdown={breakdown} formatCurrency={fmtUsd} />
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                      </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
