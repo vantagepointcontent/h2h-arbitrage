@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, ExternalLink, Zap } from "lucide-react";
+import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, Zap } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
@@ -628,7 +628,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#182533] text-[#8A9BA8] text-xs font-medium hover:text-[#5DBE81] hover:bg-[#232E3C] transition-colors"
                   title="Open in Kalshi"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
                   Kalshi
                 </a>
               )}
@@ -640,7 +640,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#182533] text-[#8A9BA8] text-xs font-medium hover:text-[#5DBE81] hover:bg-[#232E3C] transition-colors"
                   title="Open in Polymarket"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
                   Polymarket
                 </a>
               )}
@@ -745,10 +745,10 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   <thead>
                     <tr className="border-b border-[#182533]">
                       <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">OUTCOME</th>
-                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">K YES</th>
-                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">K NO</th>
-                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PM YES</th>
-                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PM NO</th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm" />Yes</span></th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm" />No</span></th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm" />Yes</span></th>
+                      <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm" />No</span></th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">SPREAD</th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">ROI</th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium">PROFIT</th>

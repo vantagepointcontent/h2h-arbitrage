@@ -1,25 +1,115 @@
 {
-  "status": "degraded",
+  "status": "aborted",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 448,
-  "startedAt": "2026-07-08T10:03:13.228Z",
-  "finishedAt": "2026-07-08T10:03:51.149Z",
-  "durationMs": 37921,
-  "successCount": 10,
-  "failureCount": 1,
-  "skippedCount": 436,
-  "avgScanMs": 18728,
-  "maxScanMs": 42534,
+  "startedAt": "2026-07-08T10:24:21.595Z",
+  "finishedAt": "2026-07-08T10:24:24.156Z",
+  "durationMs": 2561,
+  "successCount": 0,
+  "failureCount": 19,
+  "skippedCount": 319,
+  "avgScanMs": 42131,
+  "maxScanMs": 60000,
   "errors": [
     {
-      "market": "TN-01 House Election Winner",
+      "market": "CA-01 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 42534
+      "durationMs": 40662
+    },
+    {
+      "market": "CA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38376
+    },
+    {
+      "market": "Next UK Chancellor of the Exchequer in 2026?",
+      "error": "fetch failed",
+      "durationMs": 60000
+    },
+    {
+      "market": "NBA: LeBron James Next Team",
+      "error": "fetch failed",
+      "durationMs": 60000
+    },
+    {
+      "market": "CA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38319
+    },
+    {
+      "market": "CA-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38328
+    },
+    {
+      "market": "CA-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38385
+    },
+    {
+      "market": "CA-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38334
+    },
+    {
+      "market": "CA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38295
+    },
+    {
+      "market": "CA-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38388
+    },
+    {
+      "market": "CA-17 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 40470
+    },
+    {
+      "market": "CA-18 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 40350
+    },
+    {
+      "market": "CA-19 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38244
+    },
+    {
+      "market": "CA-20 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38328
+    },
+    {
+      "market": "CA-21 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38292
+    },
+    {
+      "market": "CA-23 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 38235
+    },
+    {
+      "market": "CA-24 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49008
+    },
+    {
+      "market": "CA-26 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 39399
+    },
+    {
+      "market": "CA-30 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49083
     }
   ],
-  "breakerSkipped": 1,
-  "openBreakers": 6
+  "breakerSkipped": 6,
+  "openBreakers": 12
 }

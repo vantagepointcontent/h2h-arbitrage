@@ -2,11 +2,6 @@
   "paused": false,
   "scanRecords": [
     {
-      "category": "science",
-      "lastScannedAt": "2026-06-08T17:44:05.326Z",
-      "marketsAdded": 0
-    },
-    {
       "category": "weather",
       "lastScannedAt": "2026-06-29T21:23:08.042Z",
       "marketsAdded": 0
@@ -250,9 +245,14 @@
       "category": "politics",
       "lastScannedAt": "2026-07-08T07:10:23.574Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-08T10:14:25.056Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-08T07:10:23.574Z",
+  "lastScanAt": "2026-07-08T10:14:25.056Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }

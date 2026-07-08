@@ -371,8 +371,8 @@ export function MarketFinderPanel({
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Matched Event</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Expiry</th>
-                <th className="text-right px-4 py-3 font-medium w-24">Kalshi</th>
-                <th className="text-right px-4 py-3 font-medium w-24">PM</th>
+                <th className="text-right px-4 py-3 font-medium w-24"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" /></span></th>
+                <th className="text-right px-4 py-3 font-medium w-24"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" /></span></th>
                 <th className="text-right px-4 py-3 font-medium w-24">Spread</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Links</th>
                 <th className="text-center px-4 py-3 font-medium w-32"></th>

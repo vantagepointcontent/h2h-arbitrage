@@ -249,7 +249,7 @@ export function CouplingSuggestions({
                     </div>
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1">
-                        <img src="/polymarket-icon.png" alt="" className="w-3.5 h-3.5 rounded-sm" />
+                        <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
                         <span className="text-[10px] text-[#8A9BA8]">Polymarket</span>
                       </div>
                       <div className="text-xs text-[#FFFFFF] truncate" title={s.pmTitle}>
