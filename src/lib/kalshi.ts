@@ -269,10 +269,20 @@ export function extractKalshiSeriesFromUrl(url: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-/** BUG-05 Sub-Issue 3: Fetch markets from ALL related Kalshi series for a match.
- *  Given the original event ticker (e.g. KXWCADVANCE-26JUL09FRAMAR) and the
+/** BUG-07/BUG-05c: Fetch markets from ALL related Kalshi series for a match.
+ *  Given the original event ticker (e.g. KXWCADVANCE-26JUL09FRAMARFRA-FRA) and the
  *  series ticker (KXWCADVANCE), discovers sibling series (KXWCGAME, KXWCTOTAL,
- *  etc.) and fetches their event markets for the same match key suffix.
+ *  etc.) and fetches their event markets for the same match.
+ *
+ *  Key insight: different series use different event ticker formats for the same
+ *  match. The "advances" series uses team suffixes (KXWCADVANCE-26JUL09FRAMARFRA-FRA),
+ *  but "game"/Moneyline uses a single event without team suffix
+ *  (KXWCGAME-26JUL09FRAMARFRA). So we try multiple suffix variants per sibling:
+ *    1. Full suffix (with team): KXWCGAME-26JUL09FRAMARFRA-FRA
+ *    2. Match-only suffix (strip last -TEAM): KXWCGAME-26JUL09FRAMARFRA
+ *    3. Date-only suffix: KXWCGAME-26JUL09
+ *  The first variant that returns markets wins.
+ *
  *  Returns the combined array of markets from all series. */
 export async function fetchKalshiMultiSeriesMarkets(
   eventTicker: string,
@@ -283,12 +293,32 @@ export async function fetchKalshiMultiSeriesMarkets(
   const seriesFetched = [eventTicker];
 
   // Extract the match suffix from the event ticker
-  // KXWCADVANCE-26JUL09FRAMAR → suffix = 26JUL09FRAMAR
+  // KXWCADVANCE-26JUL09FRAMARFRA-FRA → suffix = 26JUL09FRAMARFRA-FRA
   const suffixMatch = eventTicker.match(/^[A-Z]+-(.+)$/);
   if (!suffixMatch) {
     return { markets: originalMarkets, seriesFetched };
   }
-  const matchSuffix = suffixMatch[1];
+  const fullSuffix = suffixMatch[1]; // e.g. 26JUL09FRAMARFRA-FRA
+
+  // Build candidate suffixes to try for sibling series.
+  // Different Kalshi bet types use different event ticker formats:
+  //   ADVANCE: KXWCADVANCE-26JUL09FRAMARFRA-FRA (with team)
+  //   GAME:    KXWCGAME-26JUL09FRAMARFRA (no team — single moneyline market)
+  //   TOTAL:   KXWCTOTAL-26JUL09FRAMARFRA (no team)
+  //   SPREAD:  KXWCSPREAD-26JUL09FRAMARFRA-FRA (with team)
+  const suffixVariants: string[] = [fullSuffix];
+
+  // Strip the last -TEAM segment (e.g. -FRA, -MOR, -POR)
+  const teamStripped = fullSuffix.replace(/-[A-Z]{2,4}$/, '');
+  if (teamStripped !== fullSuffix) {
+    suffixVariants.push(teamStripped); // 26JUL09FRAMARFRA
+  }
+
+  // Strip to date-only (e.g. 26JUL09) — some series use date-only event tickers
+  const dateOnly = fullSuffix.match(/^(\d{2}[A-Z]{3}\d{2})/);
+  if (dateOnly) {
+    suffixVariants.push(dateOnly[1]); // 26JUL09
+  }
 
   // Get sibling series tickers (constructed locally — no API call)
   const siblings = getSiblingSeriesTickers(seriesTicker);
@@ -299,19 +329,23 @@ export async function fetchKalshiMultiSeriesMarkets(
     return { markets: originalMarkets, seriesFetched };
   }
 
-  // Construct event tickers for each sibling series
-  const siblingEventTickers = otherSeries.map(s => `${s}-${matchSuffix}`);
-
-  // Fetch all sibling event markets in parallel (with individual error handling)
+  // For each sibling series, try each suffix variant until one returns markets.
+  // All siblings are fetched in parallel; within each, variants are tried sequentially.
   const results = await Promise.all(
-    siblingEventTickers.map(async (ticker) => {
-      try {
-        const markets = await fetchKalshiEventMarkets(ticker);
-        if (markets.length > 0) seriesFetched.push(ticker);
-        return markets;
-      } catch {
-        return [] as KalshiMarket[];
+    otherSeries.map(async (series) => {
+      for (const suffix of suffixVariants) {
+        const ticker = `${series}-${suffix}`;
+        try {
+          const markets = await fetchKalshiEventMarkets(ticker);
+          if (markets.length > 0) {
+            seriesFetched.push(ticker);
+            return markets;
+          }
+        } catch {
+          // Try next variant
+        }
       }
+      return [] as KalshiMarket[];
     }),
   );
 

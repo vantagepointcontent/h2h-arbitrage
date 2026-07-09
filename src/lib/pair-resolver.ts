@@ -3,7 +3,7 @@
 // Kalshi tickers and Polymarket CLOB token IDs, ready for orderbook streaming.
 
 import { LiveMatchedOutcome } from './live-arb-engine';
-import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, KalshiMarket } from './kalshi';
+import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiMultiSeriesMarkets, extractKalshiSeriesFromUrl, KalshiMarket } from './kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from './polymarket';
 import { matchOutcomes, applyManualMatches, UnifiedOutcome } from './matcher';
 import { getManualMatches } from './manual-matches';
@@ -53,10 +53,23 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
   if (!kalshiEventTicker) throw new PairResolveError('bad_kalshi_url', 'Could not extract Kalshi event ticker from URL');
   if (!pmSlug) throw new PairResolveError('bad_pm_url', 'Could not extract Polymarket slug from URL');
 
-  // ── Resolve ALL Kalshi markets for the event (with fallbacks, same as scan route) ──
+  // ── Resolve ALL Kalshi markets for the event (with multi-series + fallbacks) ──
+  // BUG-07: Fetch ALL market types per event (Moneyline, totals, spreads, etc.)
+  const kalshiSeriesTicker = extractKalshiSeriesFromUrl(kalshiUrl);
   let kalshiMarkets: KalshiMarket[] = [];
   try {
-    kalshiMarkets = await fetchKalshiEventMarkets(kalshiEventTicker);
+    // Try multi-series first to get all market types
+    if (kalshiSeriesTicker) {
+      try {
+        const multi = await fetchKalshiMultiSeriesMarkets(kalshiEventTicker, kalshiSeriesTicker);
+        kalshiMarkets = multi.markets;
+      } catch {
+        // Fall through to single event fetch
+      }
+    }
+    if (kalshiMarkets.length === 0) {
+      kalshiMarkets = await fetchKalshiEventMarkets(kalshiEventTicker);
+    }
     if (kalshiMarkets.length === 0) {
       // Fallback: try series prefix
       const seriesMatch = kalshiEventTicker.match(/^([A-Z]+)/);

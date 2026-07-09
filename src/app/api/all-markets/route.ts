@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
-import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets } from '@/lib/kalshi';
+import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets, fetchKalshiMultiSeriesMarkets, extractKalshiSeriesFromUrl } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -48,14 +48,27 @@ async function fetchKalshiEventScoped(kalshiUrl: string): Promise<KalshiMarketLi
   const eventTicker = extractKalshiEventTicker(kalshiUrl);
   if (!eventTicker) return [];
 
-  // Fetch all markets for this event
-  let markets = await fetchKalshiEventMarkets(eventTicker);
+  // BUG-07: Try multi-series fetch first to get ALL market types
+  const seriesTicker = extractKalshiSeriesFromUrl(kalshiUrl);
+  let markets: import('@/lib/kalshi').KalshiMarket[] = [];
+
+  if (seriesTicker) {
+    try {
+      const multi = await fetchKalshiMultiSeriesMarkets(eventTicker, seriesTicker);
+      markets = multi.markets;
+    } catch {
+      // Fall through to single event fetch
+    }
+  }
+
+  if (markets.length === 0) {
+    // Fallback: single event_ticker
+    markets = await fetchKalshiEventMarkets(eventTicker);
+  }
 
   if (markets.length === 0) {
     // Fallback: try series_ticker (first segment is the series)
-    const seriesMatch = kalshiUrl.match(/kalshi\.com\/markets\/([^\/]+)/);
-    if (seriesMatch) {
-      const seriesTicker = seriesMatch[1].toUpperCase();
+    if (seriesTicker) {
       markets = await fetchKalshiSeriesMarkets(seriesTicker);
     }
   }

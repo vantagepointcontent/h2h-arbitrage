@@ -4,6 +4,8 @@ import {
   filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
+  fetchKalshiMultiSeriesMarkets,
+  extractKalshiSeriesFromUrl,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
@@ -76,12 +78,29 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     };
   }
 
+  const kalshiSeriesTicker = market.kalshiUrl ? extractKalshiSeriesFromUrl(market.kalshiUrl) : null;
+
   let [kalshiMarkets, pmEvent] = await Promise.all([
     (async () => {
+      // BUG-07: Try multi-series fetch first to get ALL market types (Moneyline,
+      // totals, spreads, etc.) — not just the one series in the URL.
+      if (kalshiSeriesTicker) {
+        try {
+          const multi = await withTimeout(
+            fetchKalshiMultiSeriesMarkets(kalshiTicker, kalshiSeriesTicker),
+            KALSHI_TIMEOUT_MS * 2, 'Kalshi multi-series',
+          );
+          if (multi.markets.length > 0) return multi.markets;
+        } catch (e: any) {
+          if (e.message?.includes('timed out')) throw e;
+        }
+      }
+      // Fallback: single event_ticker
       try {
         const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), KALSHI_TIMEOUT_MS, 'Kalshi event markets');
         if (m.length > 0) return m;
       } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
+      // Fallback: series prefix
       const seriesMatch = kalshiTicker.match(/^([A-Z]+)/);
       const seriesFallback = seriesMatch ? seriesMatch[1] : null;
       if (seriesFallback && seriesFallback !== kalshiTicker) {
