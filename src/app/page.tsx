@@ -75,6 +75,7 @@ const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr:
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
+import { ArbOpportunitiesPanel } from "@/app/components/ArbOpportunitiesPanel";
 import { ApyHeaderInfo } from "@/app/components/ApyTooltip";
 const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalSpreadChart").then(m => m.HistoricalSpreadChart), { ssr: false });
 import { saveSpread } from "@/lib/spreadHistory";
@@ -1748,6 +1749,15 @@ export default function Home() {
                           />
                         </table>
                       </div>
+                    )}
+
+                    {/* UI-16b: Arb Opportunities — always-visible section below outcomes table */}
+                    {result && !result.expired && (
+                      <ArbOpportunitiesPanel
+                        outcomes={result.outcomes}
+                        formatCurrency={formatCurrency}
+                        marketExpiryDate={result.expiryDate}
+                      />
                     )}
 
                     {/* HOOKUP-07: historical spread chart for the active saved market */}

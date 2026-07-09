@@ -103,6 +103,27 @@ export function parseArbLegs(
     return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, netProfit };
   }
 
+  // Same-platform YES+YES: "Same-platform YES+YES Kalshi: <A> + <B>"
+  //                         "Same-platform YES+YES Polymarket: <A> + <B>"
+  const samePlatformMatch = strategy.match(/^Same-platform YES\+YES (Kalshi|Polymarket): (.+?) \+ (.+)$/);
+  if (samePlatformMatch) {
+    const [, platform, outcomeA, outcomeB] = samePlatformMatch;
+    const plat = platform as 'Kalshi' | 'Polymarket';
+    const priceA = plat === 'Kalshi' ? kalshiYesAsk : pmYesPrice;
+    const priceB = plat === 'Kalshi' ? kalshiYesAsk : pmYesPrice; // complement price — not available from current row
+    const stakeA = plat === 'Kalshi' ? kalshiStake : pmStake;
+    const stakeB = null; // complement stake not available from single outcome
+    const legs: ArbLeg[] = [
+      { platform: plat, side: 'YES', outcome: outcomeA, price: priceA ?? null, stake: stakeA ?? null },
+      { platform: plat, side: 'YES', outcome: outcomeB, price: priceB ?? null, stake: stakeB },
+    ];
+    const totalCost = (priceA != null && priceB != null) ? priceA + priceB : null;
+    const grossProfit = totalCost != null ? 1 - totalCost : null;
+    const totalFees = fees ? fees.kalshiFee + fees.pmFee : null;
+    const netProfit = expectedProfit ?? fees?.worstCaseNetProfit ?? null;
+    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, netProfit };
+  }
+
   // Unknown strategy format
   return { isCross: false, legs: [], totalCost: null, grossProfit: null, fees: null, netProfit: null };
 }
@@ -129,6 +150,13 @@ export function formatConciseStrategy(strategy: string): { text: string; isCross
 
   if (strategy === 'Buy YES Kalshi + NO PM') return { text: 'K-YES · PM-NO', isCross: false };
   if (strategy === 'Buy YES PM + NO Kalshi') return { text: 'PM-YES · K-NO', isCross: false };
+
+  const samePlatformMatch = strategy.match(/^Same-platform YES\+YES (Kalshi|Polymarket): (.+?) \+ (.+)$/);
+  if (samePlatformMatch) {
+    const [, platform, a, b] = samePlatformMatch;
+    const prefix = platform === 'Kalshi' ? 'K' : 'PM';
+    return { text: `Same: ${prefix}-YES(${a}) + ${prefix}-YES(${b})`, isCross: false };
+  }
 
   return { text: strategy, isCross: false };
 }
