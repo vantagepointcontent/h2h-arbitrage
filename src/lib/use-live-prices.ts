@@ -82,10 +82,12 @@ export function useLivePrices({ kalshiUrl, pmUrl, capital = 10, enabled = true }
         }
         if (data.type === "result") {
           const newOutcomes: LivePriceOutcome[] = data.result.outcomes.map((o: any) => {
-            // Map from LiveArbOutcome format to LivePriceOutcome format
             const artist = o.artist;
-            
-            // Platform A (Kalshi)
+
+            // Platform A (Kalshi) — the live engine only provides ask prices
+            // (it stores asks in the orderbook). We don't have separate bid
+            // values, so we set bid = ask (the Bookmaker1on1 component only
+            // uses yesAsk/noAsk for spread calculations; bid is cosmetic).
             const platformA: PlatformPrice | null = o.kalshiYesAsk !== null || o.kalshiNoAsk !== null ? {
               yesBid: o.kalshiYesAsk ?? 0,
               yesAsk: o.kalshiYesAsk ?? 0,
@@ -97,12 +99,14 @@ export function useLivePrices({ kalshiUrl, pmUrl, capital = 10, enabled = true }
               askVolume: o.kalshiYesDepth || o.kalshiNoDepth || 0,
             } : null;
 
-            // Platform B (Polymarket)
+            // Platform B (Polymarket) — pmYesAsk is the YES ask, pmNoAsk is the NO ask.
+            // bestAsk should be the YES ask (pmYesAsk), NOT the NO ask (pmNoAsk).
+            // bestBid is not available from the live engine; use 0 as sentinel.
             const platformB: PmOutcomePrice | null = o.pmYesAsk !== null || o.pmNoAsk !== null ? {
               yesPrice: o.pmYesAsk ?? 0,
               noPrice: o.pmNoAsk ?? 0,
-              bestBid: o.pmYesAsk ?? 0,
-              bestAsk: o.pmNoAsk ?? 0,
+              bestBid: 0,
+              bestAsk: o.pmYesAsk ?? 0,
               lastTradePrice: 0,
               lastUpdated: new Date(o.lastUpdate),
               bidVolume: o.pmYesDepth || o.pmNoDepth || 0,
@@ -138,15 +142,19 @@ export function useLivePrices({ kalshiUrl, pmUrl, capital = 10, enabled = true }
 
     es.onerror = () => {
       // BUG-06: Don't close the EventSource on transient errors. EventSource
-      // has built-in auto-reconnect — closing here killed the live scan
-      // permanently after ~1 minute (any transient SSE error = dead connection).
-      // Only update status; the browser will retry automatically.
-      setConnectionStatus("disconnected");
-      setError("Stream disrupted — reconnecting...");
-      // Do NOT call es.close() — let EventSource auto-reconnect.
-      // Clear ref only if the readyState is CLOSED (server permanently closed).
+      // has built-in auto-reconnect — closing on every error killed the live
+      // scan permanently after ~1 minute (any transient SSE error = dead).
+      // Only treat CLOSED readyState as fatal (server explicitly closed).
       if (es.readyState === EventSource.CLOSED) {
-        eventSourceRef.current = null;
+        setConnectionStatus("disconnected");
+        setError("Stream disconnected by server.");
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      } else {
+        // readyState === CONNECTING — browser is auto-reconnecting.
+        setConnectionStatus("connecting");
       }
     };
   }, [kalshiUrl, pmUrl, capital, enabled]);
