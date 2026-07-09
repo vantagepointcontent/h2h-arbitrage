@@ -244,11 +244,19 @@ function extractBetType(text: string): string {
   if (/anytime/i.test(lower)) return 'anytime';
   if (/series\s*price|series\s*winner/i.test(lower)) return 'series';
   if (/game\s*props|player\s*props/i.test(lower)) return 'props';
+  // BUG-05 Sub-Issue 4: "advance" and "advances" are a distinct bet type.
+  // Without this, "France advances" (PM) would fuzzy-match "France"
+  // (Kalshi Moneyline) because the bet-type prefix isn't applied.
+  if (/advance/i.test(lower)) return 'advance';
+  // Moneyline / regulation time winner — distinct from "winner" (tournament)
+  if (/moneyline|regulation\s*time/i.test(lower)) return 'moneyline';
+  // Both teams to score
+  if (/both\s*teams\s*to\s*score|btts/i.test(lower)) return 'btts';
   return '';
 }
 
 /** Strip a bet-type prefix (added for matching) from the display name */
-const BET_TYPE_PREFIXES = ['top-scorer', 'mvp', 'winner', 'totals', 'spread', 'first', 'anytime', 'series', 'props'];
+const BET_TYPE_PREFIXES = ['top-scorer', 'mvp', 'winner', 'totals', 'spread', 'first', 'anytime', 'series', 'props', 'advance', 'moneyline', 'btts'];
 function stripBetTypePrefix(name: string): string {
   for (const prefix of BET_TYPE_PREFIXES) {
     if (name.toLowerCase().startsWith(prefix + ' ')) {

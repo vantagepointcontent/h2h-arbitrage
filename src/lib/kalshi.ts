@@ -243,50 +243,24 @@ export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<Ka
 //   KXWCBTTS-26JUL09FRAMAR → Both teams to score
 //
 // When the user pastes an "advances" URL, we only fetch KXWCADVANCE markets
-// and miss Moneyline, totals, etc. This function discovers all sibling
-// series that share the same sport prefix (KXWC) and fetches their event
-// markets for the same match key in parallel.
+// and miss Moneyline, totals, etc. We construct sibling event tickers by
+// swapping the bet-type suffix on the series ticker and fetching each in
+// parallel. This avoids the 14MB+ series API call.
 
-const seriesListMemo = createTtlMemo<string[]>(60_000); // 1-min cache
+/** Known bet-type suffixes that Kalshi uses for match-specific series.
+ *  The original series is always included automatically. */
+const BET_TYPE_SUFFIXES = ['GAME', 'ADVANCE', 'TOTAL', 'SPREAD', 'SCORE', 'BTTS', 'MATCHUP'];
 
-/** Fetch all series tickers that share a sport prefix (e.g. all KXWC* series).
- *  Uses the Kalshi series API filtered by category+tags. */
-async function fetchSiblingSeries(seriesTicker: string): Promise<string[]> {
-  return seriesListMemo(`siblings:${seriesTicker}`, async () => {
-    // Extract the sport prefix: KXWCADVANCE → KXWC
-    // The prefix is the leading KX + uppercase letters before the bet-type suffix
-    const prefixMatch = seriesTicker.match(/^(KX[A-Z]+)/);
-    if (!prefixMatch) return [seriesTicker];
-    const prefix = prefixMatch[1];
-
-    try {
-      const res = await rateLimiters.kalshi.execute(() =>
-        fetch(
-          `https://external-api.kalshi.com/trade-api/v2/series?status=open&_t=${Date.now()}`,
-          { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
-        ),
-      );
-      if (!res.ok) return [seriesTicker];
-      const data = await res.json();
-      const allSeries: string[] = (data.series || [])
-        .map((s: any) => s.ticker as string)
-        .filter((t: string) => t && t.startsWith(prefix));
-      // Always include the original series
-      if (!allSeries.includes(seriesTicker)) allSeries.push(seriesTicker);
-      // Limit to avoid fetching too many series (some sports have 100+ series
-      // for props, awards, etc. that are not match-specific). Focus on the
-      // common bet-type suffixes + the original.
-      const PRIORITY_SUFFIXES = ['GAME', 'ADVANCE', 'TOTAL', 'SPREAD', 'SCORE', 'BTTS', 'MATCHUP'];
-      const prioritized = PRIORITY_SUFFIXES
-        .map(suffix => `${prefix}${suffix}`)
-        .filter(t => allSeries.includes(t));
-      const others = allSeries.filter(t => !prioritized.includes(t));
-      // Return prioritised bet-type series first, then up to 10 others
-      return [...prioritized, ...others.slice(0, 10)];
-    } catch {
-      return [seriesTicker];
-    }
-  });
+/** Given a series ticker (e.g. KXWCADVANCE), return candidate sibling series
+ *  tickers (KXWCGAME, KXWCTOTAL, etc.) by swapping the bet-type suffix.
+ *  No API call needed — constructed locally. */
+function getSiblingSeriesTickers(seriesTicker: string): string[] {
+  const prefixMatch = seriesTicker.match(/^(KX[A-Z]+?)(GAME|ADVANCE|TOTAL|SPREAD|SCORE|BTTS|MATCHUP|STAGEOFELIM|WINNER|CHAMPION)$/i);
+  if (!prefixMatch) return [];
+  const prefix = prefixMatch[1].toUpperCase();
+  return BET_TYPE_SUFFIXES
+    .map(suffix => `${prefix}${suffix}`)
+    .filter(t => t !== seriesTicker.toUpperCase());
 }
 
 /** Extract the series ticker from a Kalshi URL (first path segment after /markets/). */
@@ -316,8 +290,8 @@ export async function fetchKalshiMultiSeriesMarkets(
   }
   const matchSuffix = suffixMatch[1];
 
-  // Get sibling series
-  const siblings = await fetchSiblingSeries(seriesTicker);
+  // Get sibling series tickers (constructed locally — no API call)
+  const siblings = getSiblingSeriesTickers(seriesTicker);
   // Filter out the original series (already fetched)
   const otherSeries = siblings.filter(s => s !== seriesTicker);
 
