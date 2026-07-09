@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, Zap } from "lucide-react";
 import { parseArbLegs, formatConciseStrategy, LegBreakdown } from "./ArbLegBreakdown";
+import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { computeApy } from "@/lib/matcher";
 
 interface Outcome {
@@ -35,21 +36,60 @@ interface Props {
   outcomes: Outcome[];
   formatCurrency: (n: number) => string;
   marketExpiryDate?: string | null;
+  /** Market title — when provided, Execute buttons render for simple 2-leg arbs */
+  marketTitle?: string;
 }
 
 /**
- * UI-16b: Arb Opportunities — always-visible section below the outcomes table.
+ * UI-16: Arb Opportunities — always-visible section below the outcomes table.
  *
  * Shows ONLY positive-arb rows with full leg mapping (no expanding needed).
- * Each row shows strategy type badge, leg breakdown, ROI, profit, APY.
+ * Each row shows strategy type badge, leg breakdown (with fees + net profit), ROI, profit, APY.
+ * Execute button renders when marketTitle + ticker + conditionId are available.
  * Distinct from the outcomes table which shows ALL outcomes (including non-arb).
  */
-export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDate }: Props) {
+export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDate, marketTitle }: Props) {
+  const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
+  const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
+  const [execError, setExecError] = useState<string | null>(null);
+
   const arbOpps = useMemo(() => {
     return outcomes
       .filter(o => o.arbitrage.expectedProfit > 0 && o.arbitrage.roiPct > 0)
       .sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct);
   }, [outcomes]);
+
+  const startExecute = async (o: Outcome) => {
+    if (!marketTitle || !o.kalshi?.ticker || !o.polymarket?.conditionId) return;
+    setResolvingArtist(o.artist);
+    setExecError(null);
+    try {
+      const res = await fetch(`/api/pm-tokens?conditionId=${encodeURIComponent(o.polymarket.conditionId)}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Token resolution failed');
+      const exec = buildExecutableArb({
+        artist: o.artist,
+        strategy: o.arbitrage.strategy,
+        roiPct: o.arbitrage.roiPct,
+        expectedProfit: o.arbitrage.expectedProfit,
+        kalshiStake: o.arbitrage.kalshiStake ?? 0,
+        pmStake: o.arbitrage.pmStake ?? 0,
+        kalshiYesAsk: o.kalshi.yesAsk ?? null,
+        kalshiNoAsk: o.kalshi.noAsk ?? null,
+        pmYesAsk: o.polymarket.yesPrice ?? null,
+        pmNoAsk: o.polymarket.noPrice ?? null,
+        kalshiTicker: o.kalshi.ticker,
+        pmYesTokenId: data.yesTokenId,
+        pmNoTokenId: data.noTokenId,
+      }, marketTitle);
+      if (!exec) throw new Error('Strategy not executable from this button (cross-outcome or missing prices)');
+      setExecutingArb(exec);
+    } catch (e: any) {
+      setExecError(`${o.artist}: ${e.message}`);
+    } finally {
+      setResolvingArtist(null);
+    }
+  };
 
   if (arbOpps.length === 0) {
     return (
@@ -88,6 +128,8 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
             o.polymarket?.noPrice ?? null,
             o.arbitrage.kalshiStake ?? 0,
             o.arbitrage.pmStake ?? 0,
+            o.arbitrage.fees,
+            o.arbitrage.expectedProfit,
           );
           const concise = formatConciseStrategy(o.arbitrage.strategy);
           const isSamePlatform = o.arbitrage.strategy.startsWith("Same-platform");
@@ -100,9 +142,11 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
 
           const apy = o.arbitrage.apyPct ?? computeApy(o.arbitrage.roiPct, marketExpiryDate);
 
+          const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId;
+
           return (
             <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
-              {/* Row 1: badge + concise strategy + ROI + profit + APY */}
+              {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
               <div className="flex items-center gap-3 flex-wrap">
                 <span className={`px-2 py-0.5 rounded text-[9px] font-medium border ${badgeColor}`}>
                   {badgeText}
@@ -120,6 +164,16 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                     APY {apy.toFixed(0)}x
                   </span>
                 )}
+                {canExecute && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                    disabled={resolvingArtist === o.artist}
+                    className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                    title="Manually execute this arb (opens confirmation)"
+                  >
+                    <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
+                  </button>
+                )}
               </div>
 
               {/* Row 2: leg breakdown (always visible, no expanding) */}
@@ -132,6 +186,16 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
           );
         })}
       </div>
+
+      {/* Execute error */}
+      {execError && (
+        <div className="px-4 py-2 text-xs text-[#ef4444] border-t border-[#182533]">{execError}</div>
+      )}
+
+      {/* Execute confirmation modal */}
+      {executingArb && (
+        <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
+      )}
     </div>
   );
 }

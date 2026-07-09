@@ -1783,6 +1783,7 @@ export default function Home() {
                         outcomes={result.outcomes}
                         formatCurrency={formatCurrency}
                         marketExpiryDate={result.expiryDate}
+                        marketTitle={result.eventTitle}
                       />
                     )}
 

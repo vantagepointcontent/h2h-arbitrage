@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import logger from '@/lib/logger';
 import {
   extractKalshiEventTicker,
+  extractKalshiSeriesFromUrl,
   extractKalshiMatchKey,
   filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
+  fetchKalshiMultiSeriesMarkets,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
@@ -49,13 +51,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // BUG-05 Sub-Issue 3: Fetch markets from ALL related Kalshi series for the
+    // same match. When the URL is for an "advances" market (KXWCADVANCE), we
+    // also fetch Moneyline (KXWCGAME), totals (KXWCTOTAL), etc. by discovering
+    // sibling series with the same sport prefix.
+    const kalshiSeriesTicker = kalshiUrl ? extractKalshiSeriesFromUrl(kalshiUrl) : null;
+
     // Kalshi: try event_ticker first, fallback to series_ticker
-    let kalshiFetchSource: 'event_ticker' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
+    let kalshiFetchSource: 'event_ticker' | 'multi_series' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
+    let kalshiSeriesFetched: string[] = [];
     let [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
       (async () => {
+        // First try the event_ticker from the URL
         try {
           const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi event markets');
           if (m.length > 0) {
+            // BUG-05 Sub-Issue 3: If we have a series ticker, fetch sibling
+            // series (KXWCGAME, KXWCTOTAL, etc.) for the same match in parallel.
+            if (kalshiSeriesTicker) {
+              try {
+                const multi = await withTimeout(
+                  fetchKalshiMultiSeriesMarkets(kalshiTicker, kalshiSeriesTicker),
+                  API_TIMEOUT_MS * 2, 'Kalshi multi-series',
+                );
+                console.log(`[scan] multi-series: ${multi.markets.length} markets from ${multi.seriesFetched.length} series (original: ${m.length})`, { seriesFetched: multi.seriesFetched });
+                if (multi.markets.length > m.length) {
+                  kalshiFetchSource = 'multi_series';
+                  kalshiSeriesFetched = multi.seriesFetched;
+                  return multi.markets;
+                }
+              } catch (e: any) {
+                console.log(`[scan] multi-series failed:`, e.message);
+                if (e.message?.includes('timed out')) throw e;
+                // Multi-series failed (series API unavailable, etc.) — fall
+                // through to single event_ticker result
+              }
+            }
             kalshiFetchSource = 'event_ticker';
             return m;
           }
@@ -414,6 +445,7 @@ export async function POST(request: NextRequest) {
       pmRawCount,
       pmFilteredCount,
       kalshiFetchSource,
+      kalshiSeriesFetched: kalshiSeriesFetched.length > 0 ? kalshiSeriesFetched : undefined,
       clobHitCount: clobMap.size,
       clobMissCount: conditionIds.length - clobMap.size,
       outcomes: withArbitrage,

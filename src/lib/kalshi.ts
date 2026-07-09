@@ -232,6 +232,127 @@ export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<Ka
   });
 }
 
+// ── BUG-05 Sub-Issue 3: Multi-series fetch for same match ──────────────
+//
+// Kalshi organises markets for the same match into separate series:
+//   KXWCGAME-26JUL09FRAMAR  → Moneyline (Regulation Time)
+//   KXWCADVANCE-26JUL09FRAMAR → Advance (who progresses)
+//   KXWCTOTAL-26JUL09FRAMAR → Total goals
+//   KXWCSPREAD-26JUL09FRAMAR → Spread
+//   KXWCSCORE-26JUL09FRAMAR → Correct score
+//   KXWCBTTS-26JUL09FRAMAR → Both teams to score
+//
+// When the user pastes an "advances" URL, we only fetch KXWCADVANCE markets
+// and miss Moneyline, totals, etc. This function discovers all sibling
+// series that share the same sport prefix (KXWC) and fetches their event
+// markets for the same match key in parallel.
+
+const seriesListMemo = createTtlMemo<string[]>(60_000); // 1-min cache
+
+/** Fetch all series tickers that share a sport prefix (e.g. all KXWC* series).
+ *  Uses the Kalshi series API filtered by category+tags. */
+async function fetchSiblingSeries(seriesTicker: string): Promise<string[]> {
+  return seriesListMemo(`siblings:${seriesTicker}`, async () => {
+    // Extract the sport prefix: KXWCADVANCE → KXWC
+    // The prefix is the leading KX + uppercase letters before the bet-type suffix
+    const prefixMatch = seriesTicker.match(/^(KX[A-Z]+)/);
+    if (!prefixMatch) return [seriesTicker];
+    const prefix = prefixMatch[1];
+
+    try {
+      const res = await rateLimiters.kalshi.execute(() =>
+        fetch(
+          `https://external-api.kalshi.com/trade-api/v2/series?status=open&_t=${Date.now()}`,
+          { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
+        ),
+      );
+      if (!res.ok) return [seriesTicker];
+      const data = await res.json();
+      const allSeries: string[] = (data.series || [])
+        .map((s: any) => s.ticker as string)
+        .filter((t: string) => t && t.startsWith(prefix));
+      // Always include the original series
+      if (!allSeries.includes(seriesTicker)) allSeries.push(seriesTicker);
+      // Limit to avoid fetching too many series (some sports have 100+ series
+      // for props, awards, etc. that are not match-specific). Focus on the
+      // common bet-type suffixes + the original.
+      const PRIORITY_SUFFIXES = ['GAME', 'ADVANCE', 'TOTAL', 'SPREAD', 'SCORE', 'BTTS', 'MATCHUP'];
+      const prioritized = PRIORITY_SUFFIXES
+        .map(suffix => `${prefix}${suffix}`)
+        .filter(t => allSeries.includes(t));
+      const others = allSeries.filter(t => !prioritized.includes(t));
+      // Return prioritised bet-type series first, then up to 10 others
+      return [...prioritized, ...others.slice(0, 10)];
+    } catch {
+      return [seriesTicker];
+    }
+  });
+}
+
+/** Extract the series ticker from a Kalshi URL (first path segment after /markets/). */
+export function extractKalshiSeriesFromUrl(url: string): string | null {
+  const match = url.match(/kalshi\.com\/markets\/([^\/]+)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+/** BUG-05 Sub-Issue 3: Fetch markets from ALL related Kalshi series for a match.
+ *  Given the original event ticker (e.g. KXWCADVANCE-26JUL09FRAMAR) and the
+ *  series ticker (KXWCADVANCE), discovers sibling series (KXWCGAME, KXWCTOTAL,
+ *  etc.) and fetches their event markets for the same match key suffix.
+ *  Returns the combined array of markets from all series. */
+export async function fetchKalshiMultiSeriesMarkets(
+  eventTicker: string,
+  seriesTicker: string,
+): Promise<{ markets: KalshiMarket[]; seriesFetched: string[] }> {
+  // Always fetch the original event ticker first
+  const originalMarkets = await fetchKalshiEventMarkets(eventTicker).catch(() => []);
+  const seriesFetched = [eventTicker];
+
+  // Extract the match suffix from the event ticker
+  // KXWCADVANCE-26JUL09FRAMAR → suffix = 26JUL09FRAMAR
+  const suffixMatch = eventTicker.match(/^[A-Z]+-(.+)$/);
+  if (!suffixMatch) {
+    return { markets: originalMarkets, seriesFetched };
+  }
+  const matchSuffix = suffixMatch[1];
+
+  // Get sibling series
+  const siblings = await fetchSiblingSeries(seriesTicker);
+  // Filter out the original series (already fetched)
+  const otherSeries = siblings.filter(s => s !== seriesTicker);
+
+  if (otherSeries.length === 0) {
+    return { markets: originalMarkets, seriesFetched };
+  }
+
+  // Construct event tickers for each sibling series
+  const siblingEventTickers = otherSeries.map(s => `${s}-${matchSuffix}`);
+
+  // Fetch all sibling event markets in parallel (with individual error handling)
+  const results = await Promise.all(
+    siblingEventTickers.map(async (ticker) => {
+      try {
+        const markets = await fetchKalshiEventMarkets(ticker);
+        if (markets.length > 0) seriesFetched.push(ticker);
+        return markets;
+      } catch {
+        return [] as KalshiMarket[];
+      }
+    }),
+  );
+
+  // Combine all markets, dedup by ticker
+  const allMarkets = [...originalMarkets, ...results.flat()];
+  const seen = new Set<string>();
+  const deduped = allMarkets.filter(m => {
+    if (seen.has(m.ticker)) return false;
+    seen.add(m.ticker);
+    return true;
+  });
+
+  return { markets: deduped, seriesFetched };
+}
+
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {
   return kalshiSingleMemo(`market:${ticker}`, async () => {
   const res = await rateLimiters.kalshi.execute(() =>
