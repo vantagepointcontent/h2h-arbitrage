@@ -61,7 +61,11 @@ function computeSingleOutcome(
   const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId } = outcome;
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
-  const STALE_MS = Number(process.env.H2H_BOOK_STALE_MS || 30_000);
+  // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
+  // caused "Stale" status after ~1 minute when WS updates paused briefly.
+  // WS auto-reconnect takes up to 30s (exponential backoff), so the stale
+  // window must be longer than the reconnect window.
+  const STALE_MS = Number(process.env.H2H_BOOK_STALE_MS || 60_000);
   const stale =
     orderbookState.isStale(kalshiTicker, STALE_MS) ||
     orderbookState.isStale(pmYesTokenId, STALE_MS) ||
@@ -72,14 +76,25 @@ function computeSingleOutcome(
   const pYes = orderbookState.getWeightedAsk(pmYesTokenId, 'yes', capital);
   const pNo = orderbookState.getWeightedAsk(pmNoTokenId, 'no', capital);
 
-  // If no weighted price is available, fall back to top-of-book when possible
-  const fallback = (res: WeightedAskResult): number | null =>
-    res.avgPrice > 0 ? res.avgPrice : null;
+  // BUG-06: Use top-of-book price for ROI calculation to match the scan API,
+  // which uses yesAsk/noAsk from REST (top-of-book). The weighted average
+  // price (avgPrice) was causing ROI mismatch because it includes slippage
+  // from deeper orderbook levels. The scan API doesn't account for slippage
+  // either, so using top-of-book makes both paths consistent.
+  // We still pass totalCost (fillable depth) to calculateArbitrageMax for
+  // depth-based capital capping.
 
-  const kalshiYesAsk = fallback(kYes);
-  const kalshiNoAsk = fallback(kNo);
-  const pmYesAsk = fallback(pYes);
-  const pmNoAsk = fallback(pNo);
+  // Get the actual top-of-book price directly from the orderbook
+  const getTopAsk = (id: typeof kalshiTicker, side: 'yes' | 'no'): number | null => {
+    const book = orderbookState.getBook(id);
+    const asks = book?.[side].asks;
+    return asks && asks.length > 0 ? asks[0].price : null;
+  };
+
+  const kalshiYesAsk = getTopAsk(kalshiTicker, 'yes') ?? (kYes.avgPrice > 0 ? kYes.avgPrice : null);
+  const kalshiNoAsk = getTopAsk(kalshiTicker, 'no') ?? (kNo.avgPrice > 0 ? kNo.avgPrice : null);
+  const pmYesAsk = getTopAsk(pmYesTokenId, 'yes') ?? (pYes.avgPrice > 0 ? pYes.avgPrice : null);
+  const pmNoAsk = getTopAsk(pmNoTokenId, 'no') ?? (pNo.avgPrice > 0 ? pNo.avgPrice : null);
 
   // Depth = how many dollars of ask liquidity exists at the top of book for display
   const kYesBook = orderbookState.getBook(kalshiTicker)?.yes.asks;

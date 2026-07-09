@@ -137,10 +137,15 @@ export function useLivePrices({ kalshiUrl, pmUrl, capital = 10, enabled = true }
     };
 
     es.onerror = () => {
+      // BUG-06: Don't close the EventSource on transient errors. EventSource
+      // has built-in auto-reconnect — closing here killed the live scan
+      // permanently after ~1 minute (any transient SSE error = dead connection).
+      // Only update status; the browser will retry automatically.
       setConnectionStatus("disconnected");
-      setError("Stream disconnected.");
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+      setError("Stream disrupted — reconnecting...");
+      // Do NOT call es.close() — let EventSource auto-reconnect.
+      // Clear ref only if the readyState is CLOSED (server permanently closed).
+      if (es.readyState === EventSource.CLOSED) {
         eventSourceRef.current = null;
       }
     };
