@@ -27,48 +27,59 @@ export interface KalshiMarket {
 }
 
 export function extractKalshiEventTicker(url: string): string | null {
-  // Try to extract the full event_ticker pattern first:
+  // Try to extract the full event_ticker from the URL path.
   // Format: https://kalshi.com/markets/{series_ticker}/{event_slug}/{market_ticker}
-  // The event_ticker is typically series_ticker + date suffix derived from the URL
-  // Or: just return the series_ticker and let event_ticker fallback handle it
+  //
+  // BUG-05: Previously stripped team suffixes from sports event tickers
+  // (e.g. KXWCADVANCE-26JUL09FRAMAR → KXWCADVANCE-26JUL09), producing an
+  // invalid event_ticker that returns 0 markets. The code then fell back
+  // to the series_ticker (KXWCADVANCE), which fetched ALL matches in the
+  // series — causing unrelated outcomes like "Argentina advances" to appear
+  // in a France vs Morocco market.
+  //
+  // Fix: The market_ticker in the URL path IS the specific market. We derive
+  // the event_ticker by taking the full path segment (which includes team
+  // codes). The event_ticker for a specific match is e.g. KXWCADVANCE-26JUL09FRAMAR,
+  // NOT KXWCADVANCE-26JUL09. We try the full ticker first, then fall back to
+  // progressively shorter prefixes only if the full ticker returns no markets.
+
+  // First, try to extract the full market ticker from the deepest path segment
+  const deeper = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([^\/\?#]+)/i);
+  if (deeper) {
+    const marketTicker = deeper[1].toUpperCase();
+    // The event_ticker is the market ticker with the final team/outcome suffix removed
+    // e.g. KXWCADVANCE-26JUL09FRAMAR-FRA → event_ticker = KXWCADVANCE-26JUL09FRAMAR
+    // e.g. KXWCGAME-26JUL09FRAMAR-TIE → event_ticker = KXWCGAME-26JUL09FRAMAR
+    // Pattern: SERIES-YYMMMDD[TEAMCODES]-OUTCOMESUFFIX
+    // The event_ticker includes the date + team codes but NOT the outcome suffix
+    //
+    // For non-sports markets: KXTRUMPSAYMONTH-26JUN01 → event_ticker = KXTRUMPSAYMONTH-26JUN01
+    // (no team codes, no outcome suffix)
+    //
+    // Strategy: Try the full market ticker as event_ticker first (works for markets
+    // where the ticker IS the event_ticker). Then try stripping the last segment
+    // after the final hyphen (outcome suffix). The scan route already has fallback
+    // to series_ticker, so we just need to return the most specific valid ticker.
+
+    // Remove the outcome suffix: everything after the last hyphen
+    // But only if what remains still contains a date pattern (to avoid stripping
+    // the date from a simple SERIES-DATE ticker)
+    const lastHyphen = marketTicker.lastIndexOf('-');
+    if (lastHyphen > 0) {
+      const withoutSuffix = marketTicker.slice(0, lastHyphen);
+      // Check if withoutSuffix still has a date pattern (YYMMMDD)
+      if (/-\d{2}[A-Z]{3}\d{2}/.test(withoutSuffix)) {
+        return withoutSuffix;
+      }
+    }
+    // Fall back: return the full market ticker (works when ticker == event_ticker)
+    return marketTicker;
+  }
+
+  // Fallback: just return the series_ticker (first path segment)
   const match = url.match(/kalshi\.com\/markets\/([^\/]+)/);
   if (!match) return null;
-
-  const firstSegment = match[1].toUpperCase();
-
-  // Try to extract explicit event_ticker from deeper path if available
-  // e.g. /markets/kxtrumpsaymonth/trump-monthly/kxtrumpsaymonth-26jun01 -> event_ticker = KXTRUMPSAYMONTH-26JUN01
-  // For sports: /markets/kxwcadvance/world-cup-advance/kxwcadvance-26jul02por -> strip team suffix -> KXWCADVANCE-26JUL02
-  const deeper = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([A-Z0-9-]+)/i);
-  if (deeper) {
-    const deepTicker = deeper[1].toUpperCase();
-    // Strip team/outcome suffix from sports market tickers
-    // Pattern: SERIES-YYMMMDDXXX -> SERIES-YYMMMDD (XXX = team code like POR, CRO, ENG)
-    // e.g. KXWCADVANCE-26JUL02POR -> KXWCADVANCE-26JUL02
-    const eventLevel = deepTicker.replace(/^([A-Z]+-\d{2}[A-Z]{3}\d{2})[A-Z]{2,}$/, '$1');
-    if (eventLevel !== deepTicker && eventLevel.length > firstSegment.length) {
-      return eventLevel;
-    }
-    // Multi-game extended format: SERIES-SYYYYT#-MATCHKEY
-    // e.g. KXMVESPORTSMULTIGAMEEXTENDED-S2026T1-FRAMOR -> KXMVESPORTSMULTIGAMEEXTENDED-S2026T1
-    // The SYYYYT# part is the season/tournament identifier, FRAMOR is the match key
-    const multiGameEventLevel = deepTicker.replace(/^([A-Z]+-S\d+T\d+)-[A-Z]+$/, '$1');
-    if (multiGameEventLevel !== deepTicker && multiGameEventLevel.length > firstSegment.length) {
-      return multiGameEventLevel;
-    }
-    // Only return deeper ticker if it's longer (has date suffix)
-    if (deepTicker.length > firstSegment.length) {
-      return deepTicker;
-    }
-  }
-
-  // Also look for any pattern like SERIES-YYYYMMDD in the URL
-  const dateMatch = url.match(/kalshi\.com\/markets\/[^\/]+.*[\-_]\/(.*?)(?:\?|#|$)/);
-  if (dateMatch && dateMatch[1].includes(firstSegment)) {
-    return dateMatch[1].toUpperCase();
-  }
-
-  return firstSegment;
+  return match[1].toUpperCase();
 }
 
 /**

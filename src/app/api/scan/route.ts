@@ -106,45 +106,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check expiry: if event end date has passed AND market is no longer active,
-    // return empty result with expired flag. Note: for sports markets, endDate
-    // is often the match start time — the market stays live until resolution.
     const expiryDate = pmEvent.endDate;
-    if (expiryDate && !force) {
-      const expiryMs = new Date(expiryDate).getTime();
-      const isMarketLive = pmEvent.active && !pmEvent.closed;
-      if (expiryMs > 0 && expiryMs <= Date.now() && !isMarketLive) {
-        return NextResponse.json({
-          eventTitle: pmEvent.title,
-          kalshiEventTicker: kalshiTicker,
-          pmEventSlug: pmSlug,
-          pmEventId: pmEvent.id,
-          expiryDate,
-          kalshiCount: 0,
-          pmCount: 0,
-          matchedCount: 0,
-          kalshiRawCount: 0,
-          pmRawCount: 0,
-          pmFilteredCount: 0,
-          kalshiFetchSource,
-          clobHitCount: 0,
-          clobMissCount: 0,
-          outcomes: [],
-          unmatchedKalshi: [],
-          unmatchedPolymarket: [],
-          expired: true,
-          _ts: Date.now(),
-          _kalshiFetchedAt: new Date().toISOString(),
-          _pmFetchedAt: new Date().toISOString(),
-        }, {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          }
-        });
-      }
-    }
 
     // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
     const pmRawCount = (pmEvent.markets || []).length;
@@ -275,6 +237,24 @@ export async function POST(request: NextRequest) {
       },
     }));
 
+    // BUG-05b2: Smart expiry — compute priceResolved once, reuse for DB save + response.
+    // In-play markets (trading at 68/32 etc) are NOT expired even if closeTime passed.
+    const priceResolved = computePriceResolved(withArbitrage.map(o => ({
+      kalshi: o.kalshi ? { yesAsk: o.kalshi.yesAsk, noAsk: o.kalshi.noAsk } : null,
+      polymarket: o.polymarket ? { yesPrice: o.polymarket.yesPrice, noPrice: o.polymarket.noPrice } : null,
+    })));
+
+    // Smart expiry check: only expired when closeTime passed AND prices at resolution
+    // (or PM explicitly closed). In-play markets proceed normally.
+    const pmClosed = Boolean(pmEvent.closed) && !pmEvent.active;
+    let expired = false;
+    if (expiryDate && !force) {
+      const expiryMs = new Date(expiryDate).getTime();
+      if (expiryMs > 0 && expiryMs <= Date.now()) {
+        expired = priceResolved || pmClosed;
+      }
+    }
+
     const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
     const pmCount = withArbitrage.filter(o => o.polymarket).length;
     const matchedCount = withArbitrage.filter(o => o.kalshi && o.polymarket).length;
@@ -336,11 +316,8 @@ export async function POST(request: NextRequest) {
           // UI-013: PM often keeps endDate far in the future even after a market
           // resolves. Persist PM's own closed signal so the UI can treat
           // closed-but-not-yet-past-endDate markets as expired.
-          pmClosed: Boolean(pmEvent.closed) && !pmEvent.active,
-          priceResolved: computePriceResolved(withArbitrage.map(o => ({
-            kalshi: o.kalshi ? { yesAsk: o.kalshi.yesAsk, noAsk: o.kalshi.noAsk } : null,
-            polymarket: o.polymarket ? { yesPrice: o.polymarket.yesPrice, noPrice: o.polymarket.noPrice } : null,
-          }))),
+          pmClosed,
+          priceResolved,
           allArbs: netArbs.map(o => ({
             artist: o.artist,
             roiPct: o.arbitrage!.roiPct,
@@ -442,6 +419,8 @@ export async function POST(request: NextRequest) {
       outcomes: withArbitrage,
       unmatchedKalshi,
       unmatchedPolymarket,
+      expired,
+      priceResolved,
       _ts: Date.now(),
       _kalshiFetchedAt: new Date().toISOString(),
       _pmFetchedAt: new Date().toISOString(),

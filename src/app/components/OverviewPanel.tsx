@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
-import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime } from "@/app/lib/page-shared";
+import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
 /* ── Overview Panel ── */
@@ -133,10 +133,8 @@ function OverviewPanelInner({
   // Apply expiry filter
   const filteredByExpiry = useMemo(() => [...markets].filter(m => {
     if (!showExpired) {
-      // UI-013: expired = past expiryDate OR PM reports the market closed
-      const isExpired =
-        (m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false) ||
-        Boolean(m.lastScanResult?.pmClosed);
+      // BUG-05b2: use smart expiry — in-play markets (trading prices) are NOT expired
+      const isExpired = isMarketExpired(m);
       if (isExpired) return false;
     }
     if (expiryFilter === "all") return true;

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
-import { SavedMarket, formatPercent } from "@/app/lib/page-shared";
+import { SavedMarket, formatPercent, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
@@ -153,11 +153,8 @@ function MarketSidebarInner({
 
   // Filter + sort (memoized — PERF-P0: avoid re-running over 400+ markets on every parent render)
   const filtered = useMemo(() => markets.filter(m => {
-    // UI-013: expired = past expiryDate OR PM reports the market closed
-    // (PM endDate is often far future even after resolution).
-    const isExpired =
-      (m.expiryDate ? new Date(m.expiryDate).getTime() < Date.now() : false) ||
-      Boolean(m.lastScanResult?.pmClosed);
+    // BUG-05b2: use smart expiry — in-play markets (trading prices) are NOT expired
+    const isExpired = isMarketExpired(m);
     if (!showExpired && isExpired) return false;
 
     if (expiryFilter !== "all") {

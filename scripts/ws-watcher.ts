@@ -22,6 +22,7 @@ import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
 import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
 import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '../src/lib/persistence';
+import { computePriceResolved } from '../src/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '../src/lib/matcher';
 import logger from '../src/lib/logger';
 
@@ -358,6 +359,14 @@ async function writeLiveResult(
     kalshiCount: results.filter((r) => r.kalshiYesAsk != null).length,
     pmCount: results.filter((r) => r.pmYesAsk != null).length,
     scannedAt: new Date().toISOString(),
+    priceResolved: computePriceResolved(results.map((r) => ({
+      kalshi: r.kalshiYesAsk != null && r.kalshiNoAsk != null
+        ? { yesAsk: r.kalshiYesAsk, noAsk: r.kalshiNoAsk }
+        : null,
+      polymarket: r.pmYesAsk != null && r.pmNoAsk != null
+        ? { yesPrice: r.pmYesAsk, noPrice: r.pmNoAsk }
+        : null,
+    }))),
     allArbs: clean.map((r) => ({
       artist: r.artist,
       roiPct: r.roiPct,
