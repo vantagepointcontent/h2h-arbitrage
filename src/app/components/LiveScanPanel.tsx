@@ -8,6 +8,7 @@ import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
 import { parseArbLegs, formatConciseStrategy, LegBreakdown } from "@/app/components/ArbLegBreakdown";
+import { TrendingUp } from "lucide-react";
 
 interface LiveArbOutcome {
   artist: string;
@@ -1009,6 +1010,96 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                   );
                 })()}
               </div>
+
+              {/* UI-16: Arb Opportunities — always-visible section below outcomes table */}
+              {(() => {
+                const arbOpps = activeTab.result.outcomes
+                  .filter(o => !o.stale && o.expectedProfit > 0 && o.roiPct > 0)
+                  .sort((a, b) => b.roiPct - a.roiPct);
+                if (arbOpps.length === 0) {
+                  return (
+                    <div className="mt-4 rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+                      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
+                        <TrendingUp className="w-4 h-4 text-[#5DBE81]" />
+                        <h3 className="text-sm font-semibold text-[#FFFFFF]">Arb Opportunities</h3>
+                        <span className="text-[10px] text-[#8A9BA8]">(0)</span>
+                      </div>
+                      <div className="px-4 py-8 text-center text-xs text-[#8A9BA8]">
+                        No active arbitrage opportunities
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="mt-4 rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
+                      <TrendingUp className="w-4 h-4 text-[#facc15]" />
+                      <h3 className="text-sm font-semibold text-[#FFFFFF]">Arb Opportunities</h3>
+                      <span className="text-[10px] text-[#8A9BA8]">({arbOpps.length})</span>
+                      <span className="text-[10px] text-[#5E6875] ml-auto">Sorted by ROI ↓</span>
+                    </div>
+                    <div className="divide-y divide-[#182533]">
+                      {arbOpps.map((o, idx) => {
+                        const breakdown = parseArbLegs(
+                          o.strategy,
+                          o.artist,
+                          o.kalshiYesAsk,
+                          o.kalshiNoAsk,
+                          o.pmYesAsk,
+                          o.pmNoAsk,
+                          o.kalshiStake,
+                          o.pmStake,
+                          o.fees,
+                          o.expectedProfit,
+                        );
+                        const concise = formatConciseStrategy(o.strategy);
+                        const isSamePlatform = o.strategy.startsWith("Same-platform");
+                        const badgeText = isSamePlatform ? "Same-Platform" : concise.isCross ? "Cross" : "Regular";
+                        const badgeColor = isSamePlatform
+                          ? "bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/30"
+                          : concise.isCross
+                            ? "bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/30"
+                            : "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30";
+                        return (
+                          <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-medium border ${badgeColor}`}>
+                                {badgeText}
+                              </span>
+                              <span className="text-xs text-[#FFFFFF] font-mono">{concise.text}</span>
+                              <div className="flex-1" />
+                              <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
+                                {o.roiPct.toFixed(2)}%
+                              </span>
+                              <span className="text-xs text-[#5DBE81]" title="Expected profit (net of fees)">
+                                {fmtUsd(o.expectedProfit)}
+                              </span>
+                              {(() => {
+                                const exec = buildExecutableArb(o, activeTab.marketTitle);
+                                if (!exec) return null;
+                                return (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
+                                    title="Manually execute this arb (opens confirmation)"
+                                  >
+                                    <Zap className="w-2.5 h-2.5" /> Execute
+                                  </button>
+                                );
+                              })()}
+                            </div>
+                            {breakdown.legs.length > 0 && (
+                              <div className="mt-2">
+                                <LegBreakdown breakdown={breakdown} formatCurrency={fmtUsd} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
 
