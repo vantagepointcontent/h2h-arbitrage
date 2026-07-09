@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
-import { extractKalshiEventTicker, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets } from '@/lib/kalshi';
+import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -49,25 +49,19 @@ async function fetchKalshiEventScoped(kalshiUrl: string): Promise<KalshiMarketLi
   if (!eventTicker) return [];
 
   // Fetch all markets for this event
-  const markets = await fetchKalshiEventMarkets(eventTicker);
+  let markets = await fetchKalshiEventMarkets(eventTicker);
 
   if (markets.length === 0) {
     // Fallback: try series_ticker (first segment is the series)
     const seriesMatch = kalshiUrl.match(/kalshi\.com\/markets\/([^\/]+)/);
     if (seriesMatch) {
       const seriesTicker = seriesMatch[1].toUpperCase();
-      const seriesMarkets = await fetchKalshiSeriesMarkets(seriesTicker);
-      return seriesMarkets.map(m => ({
-        ticker: m.ticker,
-        title: m.title || m.yes_sub_title || m.ticker,
-        yesAsk: m.yes_ask_dollars ? parseFloat(m.yes_ask_dollars) : 0,
-        noAsk: m.no_ask_dollars ? parseFloat(m.no_ask_dollars) : 0,
-        eventTicker: m.event_ticker || null,
-        closeTime: m.close_time || null,
-      }));
+      markets = await fetchKalshiSeriesMarkets(seriesTicker);
     }
-    return [];
   }
+
+  // Filter to the specific match within a multi-game/multi-match event
+  markets = filterKalshiMarketsToMatch(markets, extractKalshiMatchKey(kalshiUrl));
 
   return markets.map(m => ({
     ticker: m.ticker,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import logger from '@/lib/logger';
 import {
   extractKalshiEventTicker,
+  extractKalshiMatchKey,
+  filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
@@ -16,6 +18,7 @@ import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
+import { computePriceResolved } from '@/app/lib/page-shared';
 
 const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Kalshi: try event_ticker first, fallback to series_ticker
     let kalshiFetchSource: 'event_ticker' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
-    const [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
+    let [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
       (async () => {
         try {
           const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), API_TIMEOUT_MS, 'Kalshi event markets');
@@ -92,6 +95,9 @@ export async function POST(request: NextRequest) {
       getManualMatches(),
       getDecoupledPairs(),
     ]);
+
+    // Filter Kalshi markets to the specific match within a multi-game event
+    kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(kalshiUrl));
 
     if (!pmEvent) {
       return NextResponse.json(
@@ -331,6 +337,10 @@ export async function POST(request: NextRequest) {
           // resolves. Persist PM's own closed signal so the UI can treat
           // closed-but-not-yet-past-endDate markets as expired.
           pmClosed: Boolean(pmEvent.closed) && !pmEvent.active,
+          priceResolved: computePriceResolved(withArbitrage.map(o => ({
+            kalshi: o.kalshi ? { yesAsk: o.kalshi.yesAsk, noAsk: o.kalshi.noAsk } : null,
+            polymarket: o.polymarket ? { yesPrice: o.polymarket.yesPrice, noPrice: o.polymarket.noPrice } : null,
+          }))),
           allArbs: netArbs.map(o => ({
             artist: o.artist,
             roiPct: o.arbitrage!.roiPct,

@@ -392,5 +392,21 @@
     "pmTitle": "No change",
     "id": "1783354757887-jd8ox39",
     "createdAt": "2026-07-06T16:19:17.887Z"
+  },
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUL09FRAMAR-MAR",
+    "pmConditionId": "0x17e6ca6b83b4937b4cd575f2acbbefa194b3d52b62e8af192feae6f1c38da0c1",
+    "kalshiTitle": "Morocco advances",
+    "pmTitle": "Morocco",
+    "id": "1783627837182-cyepppq",
+    "createdAt": "2026-07-09T20:10:37.182Z"
+  },
+  {
+    "kalshiTicker": "KXWCADVANCE-26JUL09FRAMAR-FRA",
+    "pmConditionId": "0xc09537a0976d0927901432859fbb6dfe5d23d1d69bb4e8355253e7b142a44e83",
+    "kalshiTitle": "France advances",
+    "pmTitle": "France",
+    "id": "1783627841446-hwx250n",
+    "createdAt": "2026-07-09T20:10:41.446Z"
   }
 ]

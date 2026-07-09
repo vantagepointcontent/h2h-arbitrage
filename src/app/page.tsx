@@ -90,7 +90,7 @@ import {
   getStoredCustomTitles, setCustomTitle,
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
-  formatCurrency, formatPercent, formatExpiry, timeUntilExpiry,
+  formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -600,9 +600,7 @@ export default function Home() {
     setViewMode("scan");
     window.history.pushState({ view: "scan", marketId: m.id }, "", `/?view=scan&id=${m.id}`);
 
-    const now = Date.now();
-    const expiryMs = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
-    const isExpired = expiryMs > 0 && expiryMs <= now;
+    const isExpired = isMarketExpired(m);
 
     // Build cached result from lastScanResult/liveResult to show instantly.
     // Sidebar payload (fields=basic) strips allArbs — fetch the single full
@@ -1560,7 +1558,7 @@ export default function Home() {
                     {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices) && (
                       <div className={`rounded-xl border p-3 flex items-start gap-3 text-sm ${result.expired ? 'border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444]' : 'border-[#facc15]/30 bg-[#facc15]/10 text-[#facc15]'}`}>
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                        <div className="space-y-1">
+                        <div className="space-y-1 flex-1">
                           <div className="font-semibold">{result.expired ? 'Market expired' : result.noPrices ? 'No live prices' : 'Market data warning'}</div>
                           <div className="text-xs text-[#8A9BA8]">
                             {result.expired && <span className="mr-3">This market has expired. Data is no longer being captured or updated — prices and arbitrage calculations are frozen and no longer valid.</span>}
@@ -1569,9 +1567,37 @@ export default function Home() {
                             {!result.expired && !result.noPrices && result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
                             {!result.expired && !result.noPrices && result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
                           </div>
-                          {!result.expired && !result.noPrices && (
-                            <div className="text-[11px] text-[#8A9BA8]">
-                              Raw: K {result.kalshiRawCount ?? result.kalshiCount} / PM {result.pmRawCount ?? result.pmCount}; PM filtered {result.pmFilteredCount ?? result.pmCount}; Kalshi source {result.kalshiFetchSource ?? "unknown"}; CLOB {result.clobHitCount ?? 0} hit / {result.clobMissCount ?? 0} miss
+                          {/* UI-17: Red box (expired) — action buttons clickable */}
+                          {result.expired && activeMarketId && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <button
+                                onClick={() => {
+                                  const market = savedMarkets.find(m => m.id === activeMarketId);
+                                  if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                                }}
+                                disabled={loading}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors disabled:opacity-50"
+                                title="Re-scan this expired market"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                Re-scan
+                              </button>
+                              <button
+                                onClick={() => setMatchMode("manual")}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors"
+                                title="Switch to manual matching mode"
+                              >
+                                <Link2 className="w-3 h-3" />
+                                Manual Match
+                              </button>
+                              <button
+                                onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors"
+                                title="Delete this market"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Delete
+                              </button>
                             </div>
                           )}
                         </div>

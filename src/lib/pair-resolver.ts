@@ -3,7 +3,7 @@
 // Kalshi tickers and Polymarket CLOB token IDs, ready for orderbook streaming.
 
 import { LiveMatchedOutcome } from './live-arb-engine';
-import { extractKalshiEventTicker, fetchKalshiEventMarkets, KalshiMarket } from './kalshi';
+import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, KalshiMarket } from './kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from './polymarket';
 import { matchOutcomes, applyManualMatches, UnifiedOutcome } from './matcher';
 import { getManualMatches } from './manual-matches';
@@ -74,6 +74,10 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
     logger.error('[pair-resolver] failed to fetch Kalshi event markets', { err, kalshiEventTicker });
     throw new PairResolveError('kalshi_fetch_failed', 'Failed to fetch Kalshi event markets');
   }
+
+  // Filter Kalshi markets to the specific match within a multi-game event
+  const matchKey = extractKalshiMatchKey(kalshiUrl);
+  kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, matchKey);
 
   // ── Resolve ALL Polymarket markets for the event ──
   let pmEvent: Awaited<ReturnType<typeof fetchPolymarketEvent>> | null = null;

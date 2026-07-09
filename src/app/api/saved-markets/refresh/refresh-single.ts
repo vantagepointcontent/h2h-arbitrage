@@ -1,5 +1,7 @@
 import {
   extractKalshiEventTicker,
+  extractKalshiMatchKey,
+  filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
   fetchKalshiSeriesMarkets,
 } from '@/lib/kalshi';
@@ -74,7 +76,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     };
   }
 
-  const [kalshiMarkets, pmEvent] = await Promise.all([
+  let [kalshiMarkets, pmEvent] = await Promise.all([
     (async () => {
       try {
         const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), KALSHI_TIMEOUT_MS, 'Kalshi event markets');
@@ -101,6 +103,9 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       PM_TIMEOUT_MS, 'Polymarket event',
     ),
   ]);
+
+  // Filter Kalshi markets to the specific match within a multi-game event
+  kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(market.kalshiUrl));
 
   if (!pmEvent) {
     return {

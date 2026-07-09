@@ -148,6 +148,7 @@ export interface LastScanResult {
   pmCount: number;
   scannedAt: string;
   pmClosed?: boolean; // UI-013: PM reports market closed (endDate may still be future)
+  priceResolved?: boolean; // BUG-05b: at least one outcome at 99/1 extremes
   allArbs?: {
     artist: string;
     roiPct: number;
@@ -245,10 +246,13 @@ export function formatExpiry(iso?: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function timeUntilExpiry(iso?: string | null): string {
+export function timeUntilExpiry(iso?: string | null, priceResolved?: boolean): string {
   if (!iso) return "";
   const diff = new Date(iso).getTime() - Date.now();
-  if (diff < 0) return "Expired";
+  if (diff < 0) {
+    // BUG-05b: closeTime passed but prices still trading → in-play, not expired
+    return priceResolved === false ? "In play" : "Expired";
+  }
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   if (days > 0) return `${days}d ${hours}h`;
@@ -272,6 +276,54 @@ export function formatRelativeTime(iso?: string | null): string {
 export function isMatched(m: SavedMarket): boolean {
   if (m.liveResult && m.liveResult.allArbs && m.liveResult.allArbs.length > 0) return true;
   return (m.lastScanResult?.matchedCount ?? 0) > 0;
+}
+
+/** BUG-05b: Check if prices are at resolution extremes (one side >=99%, other <=1%).
+ *  Prices are decimal (0.99 = 99%). Returns true only when at least one matched
+ *  outcome shows a clear resolution signal on BOTH Kalshi and Polymarket. */
+export function pricesAtResolution(scan: { priceResolved?: boolean } | null | undefined): boolean {
+  if (!scan) return false;
+  return scan.priceResolved === true;
+}
+
+/** BUG-05b: Detect resolution extremes in a set of matched outcomes.
+ *  Returns true if at least one outcome has prices pinned at 99/1 (or 1/99)
+ *  on BOTH Kalshi and Polymarket. Prices are decimal (0.99 = 99%).
+ *  This is the signal that a market has actually resolved, not just that
+ *  closeTime has passed (in-play markets still trade at 68/32 etc). */
+export function computePriceResolved(outcomes: { kalshi: { yesAsk: number; noAsk: number } | null; polymarket: { yesPrice: number; noPrice: number } | null }[]): boolean {
+  const RES_THRESHOLD = 0.99;  // >=99% on one side
+  const OTHER_THRESHOLD = 0.01; // <=1% on the other
+  return outcomes.some(o => {
+    if (!o.kalshi || !o.polymarket) return false;
+    // Kalshi YES resolved (yesAsk >= 0.99, noAsk <= 0.01) AND PM YES resolved
+    const kYesRes = o.kalshi.yesAsk >= RES_THRESHOLD && o.kalshi.noAsk <= OTHER_THRESHOLD;
+    const kNoRes  = o.kalshi.noAsk >= RES_THRESHOLD && o.kalshi.yesAsk <= OTHER_THRESHOLD;
+    const pYesRes = o.polymarket.yesPrice >= RES_THRESHOLD && o.polymarket.noPrice <= OTHER_THRESHOLD;
+    const pNoRes  = o.polymarket.noPrice >= RES_THRESHOLD && o.polymarket.yesPrice <= OTHER_THRESHOLD;
+    // Both platforms must agree on resolution (same direction or at least both at extremes)
+    return (kYesRes && pYesRes) || (kNoRes && pNoRes) || (kYesRes && pNoRes) || (kNoRes && pYesRes);
+  });
+}
+
+/** BUG-05b: Smart expiry detection.
+ *  A market is truly expired ONLY when:
+ *  1. closeTime has passed (expiryDate < now) AND prices are at resolution extremes (>=99/<=1)
+ *  2. OR PM explicitly reports the market as closed (pmClosed)
+ *  In-play markets with trading prices (e.g. 68/32) are NOT expired even if closeTime passed. */
+export function isMarketExpired(m: SavedMarket): boolean {
+  // PM's own closed signal is authoritative regardless of prices
+  if (m.lastScanResult?.pmClosed) return true;
+
+  const expiryMs = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
+  if (expiryMs > 0 && expiryMs <= Date.now()) {
+    // closeTime passed — check if prices are at resolution extremes
+    const scan = m.liveResult ?? m.lastScanResult;
+    if (pricesAtResolution(scan)) return true;
+    // closeTime passed but prices still trading → NOT expired (in-play market)
+    return false;
+  }
+  return false;
 }
 
 

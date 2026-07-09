@@ -500,6 +500,7 @@ export interface LastScanResult {
   pmCount: number;
   scannedAt: string;        // ISO timestamp
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
+  priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
     artist: string;
     roiPct: number;

@@ -49,6 +49,13 @@ export function extractKalshiEventTicker(url: string): string | null {
     if (eventLevel !== deepTicker && eventLevel.length > firstSegment.length) {
       return eventLevel;
     }
+    // Multi-game extended format: SERIES-SYYYYT#-MATCHKEY
+    // e.g. KXMVESPORTSMULTIGAMEEXTENDED-S2026T1-FRAMOR -> KXMVESPORTSMULTIGAMEEXTENDED-S2026T1
+    // The SYYYYT# part is the season/tournament identifier, FRAMOR is the match key
+    const multiGameEventLevel = deepTicker.replace(/^([A-Z]+-S\d+T\d+)-[A-Z]+$/, '$1');
+    if (multiGameEventLevel !== deepTicker && multiGameEventLevel.length > firstSegment.length) {
+      return multiGameEventLevel;
+    }
     // Only return deeper ticker if it's longer (has date suffix)
     if (deepTicker.length > firstSegment.length) {
       return deepTicker;
@@ -62,6 +69,78 @@ export function extractKalshiEventTicker(url: string): string | null {
   }
 
   return firstSegment;
+}
+
+/**
+ * Extract a match-key from a Kalshi URL to identify the specific match within a
+ * multi-game or multi-match event. Returns null when the URL's event ticker
+ * already uniquely identifies one match (no filtering needed).
+ *
+ * Three ticker formats are handled:
+ *
+ * 1. Multi-game extended:
+ *    Ticker: KXMVESPORTSMULTIGAMEEXTENDED-S2026T1-FRAMOR
+ *    Match key: FRAMOR (last segment after the SYYYYT# season identifier)
+ *
+ * 2. Compound sports (two-team match):
+ *    Ticker: KXWCADVANCE-26JUL09FRAMAR-FRA
+ *    Match key: 26JUL09FRAMAR (date + match-teams portion, shared by both sides)
+ *    Both -FRA and -MAR markets share this key, while ARGNED-ARG/-NED don't.
+ *
+ * 3. Simple sports (single team suffix):
+ *    Ticker: KXWCADVANCE-26JUL02POR
+ *    Match key: 26JUL02POR (date + team code, unique per match)
+ */
+export function extractKalshiMatchKey(url: string): string | null {
+  const deeper = url.match(/kalshi\.com\/markets\/[^\/]+\/[^\/]+\/([A-Z0-9-]+)/i);
+  if (!deeper) return null;
+  const marketTicker = deeper[1].toUpperCase();
+
+  // Multi-game extended: SERIES-SYYYYT#-MATCHKEY  →  match key = MATCHKEY
+  const multiMatch = marketTicker.match(/^[A-Z]+-S\d+T\d+-([A-Z]+)$/);
+  if (multiMatch) return multiMatch[1];
+
+  // Compound sports: SERIES-YYMMMDD<matchkey>-<teamcode>
+  // e.g. KXWCADVANCE-26JUL09FRAMAR-FRA → match key = 26JUL09FRAMAR
+  // The date+match portion (without the trailing -TEAM) is shared by both teams.
+  const compoundMatch = marketTicker.match(/^[A-Z]+-(\d{2}[A-Z]{3}\d{2}[A-Z]+)-[A-Z]+$/);
+  if (compoundMatch) return compoundMatch[1];
+
+  // Simple sports: SERIES-YYMMMDD<teamcode>  →  match key = YYMMMDD<teamcode>
+  // e.g. KXWCADVANCE-26JUL02POR → match key = 26JUL02POR
+  const sportsMatch = marketTicker.match(/^[A-Z]+-(\d{2}[A-Z]{3}\d{2}[A-Z]{2,})$/);
+  if (sportsMatch) return sportsMatch[1];
+
+  return null;
+}
+
+/**
+ * Filter Kalshi markets to only those belonging to a specific match within a
+ * multi-game or multi-match event. When a matchKey is available (extracted from
+ * the URL's market ticker), only markets whose ticker contains the match key
+ * are kept. This prevents surfacing outcomes from other matches in the same
+ * event (e.g. "Argentina advances" when looking at France vs Morocco).
+ *
+ * Returns the original array unchanged if no matchKey is provided or if
+ * filtering eliminates everything (falls back to unfiltered as safety net).
+ */
+export function filterKalshiMarketsToMatch(
+  kMarkets: KalshiMarket[],
+  matchKey: string | null,
+): KalshiMarket[] {
+  if (!matchKey) return kMarkets;
+  const key = matchKey.toUpperCase();
+  const filtered = kMarkets.filter(km => {
+    const ticker = km.ticker.toUpperCase();
+    // The match key is a substring that uniquely identifies the match within
+    // the event. For multi-game: ticker ends with -MATCHKEY. For compound
+    // sports: ticker contains DATE+MATCHKEY. For simple sports: ticker ends
+    // with DATE+TEAMCODE. All three are covered by includes().
+    return ticker.includes(key);
+  });
+  // If filtering eliminates everything (shouldn't happen with correct data),
+  // fall back to unfiltered to avoid breaking the scan entirely.
+  return filtered.length > 0 ? filtered : kMarkets;
 }
 
 export function extractKalshiMarketTicker(url: string): string | null {
