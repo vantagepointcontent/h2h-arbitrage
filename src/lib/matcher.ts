@@ -924,7 +924,13 @@ export function matchOutcomes(
   capital = 1000,
   expiryDate?: string,
 ): UnifiedOutcome[] {
-  const kMarkets = pmEventTitle ? filterKalshiMarketsByEventTitle(kalshiMarkets, pmEventTitle) : kalshiMarkets;
+  // BUG-05c/05d: Skip title-based filtering when Kalshi markets were already
+  // filtered by match key (small set = precise). Title-based filtering can
+  // surface WRONG markets (e.g. Moneyline when looking for "advances") because
+  // title words like "France" match multiple market types.
+  const kMarkets = (pmEventTitle && kalshiMarkets.length > 30)
+    ? filterKalshiMarketsByEventTitle(kalshiMarkets, pmEventTitle)
+    : kalshiMarkets;
 
   // Build Kalshi name map with collision detection
   const kalshiMap = new Map<string, KalshiMarket>();

@@ -132,6 +132,14 @@ export function extractKalshiMatchKey(url: string): string | null {
  * are kept. This prevents surfacing outcomes from other matches in the same
  * event (e.g. "Argentina advances" when looking at France vs Morocco).
  *
+ * BUG-05c: Previously this filtered too aggressively — different market types
+ * (Moneyline, totals, props) for the SAME match often have different ticker
+ * patterns that don't contain the exact match key. Now we use a two-pass
+ * approach: first try exact match-key filtering, and if that yields fewer
+ * than 4 markets (typically just the two "advances" sides), fall back to
+ * filtering by the date portion only (which is shared across all market types
+ * for the same match). This surfaces ALL market types per event.
+ *
  * Returns the original array unchanged if no matchKey is provided or if
  * filtering eliminates everything (falls back to unfiltered as safety net).
  */
@@ -141,17 +149,40 @@ export function filterKalshiMarketsToMatch(
 ): KalshiMarket[] {
   if (!matchKey) return kMarkets;
   const key = matchKey.toUpperCase();
-  const filtered = kMarkets.filter(km => {
+
+  // Pass 1: exact match-key filtering (original behavior)
+  const exactFiltered = kMarkets.filter(km => {
     const ticker = km.ticker.toUpperCase();
-    // The match key is a substring that uniquely identifies the match within
-    // the event. For multi-game: ticker ends with -MATCHKEY. For compound
-    // sports: ticker contains DATE+MATCHKEY. For simple sports: ticker ends
-    // with DATE+TEAMCODE. All three are covered by includes().
     return ticker.includes(key);
   });
-  // If filtering eliminates everything (shouldn't happen with correct data),
-  // fall back to unfiltered to avoid breaking the scan entirely.
-  return filtered.length > 0 ? filtered : kMarkets;
+
+  // If exact filtering gives us a good set (4+ markets = likely includes
+  // multiple market types), return it.
+  if (exactFiltered.length >= 4) return exactFiltered;
+
+  // Pass 2 (BUG-05c): Extract the date portion from the match key and filter
+  // by that. The date (e.g. "26JUL02") is shared across ALL market types for
+  // the same match — advances, Moneyline, totals, props, etc.
+  // Match key formats: "26JUL02POR", "26JUL09FRAMAR", "FRAMOR" (multi-game)
+  const dateMatch = key.match(/^(\d{2}[A-Z]{3}\d{2})/);
+  if (dateMatch) {
+    const dateKey = dateMatch[1];
+    const dateFiltered = kMarkets.filter(km => {
+      const ticker = km.ticker.toUpperCase();
+      return ticker.includes(dateKey);
+    });
+    if (dateFiltered.length > exactFiltered.length) {
+      return dateFiltered;
+    }
+  }
+
+  // For multi-game match keys (no date, e.g. "FRAMOR"), try filtering by
+  // the full key as substring — this catches multi-game extended format
+  // markets that share the match key in their ticker.
+  if (exactFiltered.length > 0) return exactFiltered;
+
+  // Fall back to unfiltered to avoid breaking the scan entirely.
+  return kMarkets;
 }
 
 export function extractKalshiMarketTicker(url: string): string | null {
