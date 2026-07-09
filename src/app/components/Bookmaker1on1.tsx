@@ -194,23 +194,36 @@ export function Bookmaker1on1({
     enabled: liveMode && !!kalshiUrl && !!pmUrl,
   });
 
-  // Use live outcomes if available and enabled, otherwise fall back to static outcomes
-  const displayOutcomes = liveMode && wsConnectionStatus === "active" && liveOutcomes.length > 0
-    ? liveOutcomes.map(lo => ({
-        artist: lo.artist,
-        platformA: lo.platformA,
-        platformB: lo.platformB ? {
-          yesPrice: lo.platformB.yesPrice,
-          noPrice: lo.platformB.noPrice,
-          bestBid: lo.platformB.bestBid,
-          bestAsk: lo.platformB.bestAsk,
-          lastTradePrice: lo.platformB.lastTradePrice,
-          lastUpdated: lo.platformB.lastUpdated,
-          bidVolume: lo.platformB.bidVolume,
-          askVolume: lo.platformB.askVolume,
-        } : null,
-      }))
-    : outcomes;
+  // Merge live WS prices with static outcomes.
+  // When WS returns data, we MERGE it into the static outcomes rather than
+  // replacing them entirely. If WS drops one side (e.g. PM prices null),
+  // we fall back to the static outcome for that side. This prevents the
+  // Polymarket column from disappearing when WS only returns Kalshi prices.
+  const displayOutcomes = useMemo(() => {
+    if (!liveMode || wsConnectionStatus !== "active" || liveOutcomes.length === 0) {
+      return outcomes;
+    }
+
+    // Build a lookup of live outcomes by artist name
+    const liveMap = new Map<string, typeof liveOutcomes[number]>();
+    for (const lo of liveOutcomes) {
+      liveMap.set(lo.artist, lo);
+    }
+
+    // Merge: start from static outcomes, overlay live data where available
+    return outcomes.map(so => {
+      const lo = liveMap.get(so.artist);
+      if (!lo) return so; // no live data for this outcome, keep static
+
+      return {
+        artist: so.artist,
+        // Use live platformA if available, otherwise fall back to static
+        platformA: lo.platformA ?? so.platformA,
+        // Use live platformB if available, otherwise fall back to static
+        platformB: lo.platformB ?? so.platformB,
+      };
+    });
+  }, [liveMode, wsConnectionStatus, liveOutcomes, outcomes]);
 
   // Detect price changes and trigger flash animations
   useEffect(() => {

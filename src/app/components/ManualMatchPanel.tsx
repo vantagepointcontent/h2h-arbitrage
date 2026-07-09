@@ -86,7 +86,7 @@ export default function ManualMatchPanel({
   const [pairing, setPairing] = useState(false);
 
   // All-markets browse mode
-  const [browseMode, setBrowseMode] = useState(false);
+  const [browseMode, setBrowseMode] = useState(true);
   const [allMarkets, setAllMarkets] = useState<AllMarketsResponse | null>(null);
   const [loadingAll, setLoadingAll] = useState(false);
   const [kalshiSearch, setKalshiSearch] = useState("");
@@ -105,11 +105,16 @@ export default function ManualMatchPanel({
     return s;
   }, [activeMatches]);
 
-  // ── Browse mode: fetch all markets from /api/all-markets ──
+  // ── Browse mode: fetch event-scoped markets from /api/all-markets ──
   const loadAllMarkets = useCallback(async () => {
     setLoadingAll(true);
     try {
-      const res = await fetch("/api/all-markets", {
+      // Pass the Kalshi + Polymarket URLs to scope results to the linked events
+      const params = new URLSearchParams();
+      if (kalshiUrl) params.set('kalshiUrl', kalshiUrl);
+      if (polymarketUrl) params.set('pmUrl', polymarketUrl);
+
+      const res = await fetch(`/api/all-markets?${params.toString()}`, {
         headers: { 'Cache-Control': 'no-cache' },
       });
       if (res.ok) {
@@ -118,7 +123,7 @@ export default function ManualMatchPanel({
       }
     } catch { /* ignore */ }
     setLoadingAll(false);
-  }, []);
+  }, [kalshiUrl, polymarketUrl]);
 
   useEffect(() => {
     if (browseMode && !allMarkets && !loadingAll) {
@@ -292,7 +297,7 @@ export default function ManualMatchPanel({
           }`}
           title="Toggle between scan-only and all-platforms browse mode"
         >
-          {browseMode ? "Browse All" : "Scan Only"}
+          {browseMode ? "Showing Event Markets" : "Showing Scan Results"}
         </button>
         {browseMode && (
           <button
@@ -488,7 +493,7 @@ export default function ManualMatchPanel({
             : selectedPm
             ? "← Now select a Kalshi market"
             : browseMode
-            ? "Browse all markets · Select one from each side to pair"
+            ? "Browse event markets · Select one from each side to pair"
             : "Select one market from each side to pair them"}
         </div>
       </div>

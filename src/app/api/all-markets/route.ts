@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rateLimiters } from '@/lib/rate-limiter';
-import { createTtlMemo } from '@/lib/ttl-cache';
 import { clientSafeError } from '@/lib/error-handler';
-import { getPredictionHuntMarkets } from '@/lib/predictionhunt';
+import { extractKalshiEventTicker, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets } from '@/lib/kalshi';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 
 /* ═══════════════════════════════════════════════════════════════
-   GET /api/all-markets
-   Returns all active Kalshi + Polymarket markets for the manual
-   matching panel. Uses a 60s TTL cache to avoid hammering APIs.
+   GET /api/all-markets?kalshiUrl=...&pmUrl=...
+   Returns all markets that belong to the specific Kalshi event and
+   Polymarket event referenced by the provided URLs.
+
+   This is event-scoped, NOT global. "All markets" means all outcomes
+   from the two linked events, not every market on the platform.
 
    Response:
    {
@@ -39,186 +41,117 @@ interface AllMarketsResponse {
   kalshi: KalshiMarketLite[];
   polymarket: PolymarketLite[];
   cached: boolean;
-  source: 'api' | 'predictionhunt';
+  source: string;
 }
 
-const allMarketsMemo = createTtlMemo<AllMarketsResponse>(60_000); // 60s TTL
+async function fetchKalshiEventScoped(kalshiUrl: string): Promise<KalshiMarketLite[]> {
+  const eventTicker = extractKalshiEventTicker(kalshiUrl);
+  if (!eventTicker) return [];
 
-async function fetchKalshiAllMarkets(): Promise<KalshiMarketLite[]> {
-  const all: KalshiMarketLite[] = [];
-  let cursor: string | null = null;
+  // Fetch all markets for this event
+  const markets = await fetchKalshiEventMarkets(eventTicker);
 
-  for (let page = 0; page < 10; page++) {
-    const url = new URL('https://external-api.kalshi.com/trade-api/v2/markets');
-    url.searchParams.set('status', 'open');
-    url.searchParams.set('limit', '1000');
-    if (cursor) url.searchParams.set('cursor', cursor);
-
-    const res = await rateLimiters.kalshi.execute(() =>
-      fetch(url.toString(), {
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(8000),
-      }),
-    );
-    if (!res.ok) break;
-
-    const data = await res.json();
-    const markets: any[] = data.markets || [];
-    if (markets.length === 0) break;
-
-    for (const m of markets) {
-      const title = m.title || m.subtitle || m.yes_sub_title || m.ticker;
-      const yesAsk = m.yes_ask_dollars ? parseFloat(m.yes_ask_dollars) : NaN;
-      const noAsk = m.no_ask_dollars ? parseFloat(m.no_ask_dollars) : NaN;
-      all.push({
+  if (markets.length === 0) {
+    // Fallback: try series_ticker (first segment is the series)
+    const seriesMatch = kalshiUrl.match(/kalshi\.com\/markets\/([^\/]+)/);
+    if (seriesMatch) {
+      const seriesTicker = seriesMatch[1].toUpperCase();
+      const seriesMarkets = await fetchKalshiSeriesMarkets(seriesTicker);
+      return seriesMarkets.map(m => ({
         ticker: m.ticker,
-        title,
-        yesAsk: isNaN(yesAsk) ? 0 : yesAsk,
-        noAsk: isNaN(noAsk) ? 0 : noAsk,
+        title: m.title || m.yes_sub_title || m.ticker,
+        yesAsk: m.yes_ask_dollars ? parseFloat(m.yes_ask_dollars) : 0,
+        noAsk: m.no_ask_dollars ? parseFloat(m.no_ask_dollars) : 0,
         eventTicker: m.event_ticker || null,
         closeTime: m.close_time || null,
-      });
+      }));
     }
-
-    cursor = data.cursor || null;
-    if (!cursor) break;
+    return [];
   }
 
-  return all;
+  return markets.map(m => ({
+    ticker: m.ticker,
+    title: m.title || m.yes_sub_title || m.ticker,
+    yesAsk: m.yes_ask_dollars ? parseFloat(m.yes_ask_dollars) : 0,
+    noAsk: m.no_ask_dollars ? parseFloat(m.no_ask_dollars) : 0,
+    eventTicker: m.event_ticker || eventTicker,
+    closeTime: m.close_time || null,
+  }));
 }
 
-async function fetchPolymarketAllMarkets(): Promise<PolymarketLite[]> {
-  const all: PolymarketLite[] = [];
-  let offset = 0;
-  const limit = 100; // gamma API max per page
+async function fetchPolymarketEventScoped(pmUrl: string): Promise<PolymarketLite[]> {
+  const slug = extractPolymarketSlug(pmUrl);
+  if (!slug) return [];
 
-  for (let page = 0; page < 50; page++) { // up to 5000 markets
-    const url = new URL('https://gamma-api.polymarket.com/markets');
-    url.searchParams.set('active', 'true');
-    url.searchParams.set('closed', 'false');
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('offset', String(offset));
-
-    const res = await rateLimiters.gamma.execute(() =>
-      fetch(url.toString(), {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(8000),
-      }),
-    );
-    if (!res.ok) break;
-
-    const data = await res.json();
-    const markets: any[] = Array.isArray(data) ? data : (data.markets || []);
-    if (markets.length === 0) break;
-
-    for (const m of markets) {
-      // Parse outcome prices
-      let yesPrice = 0;
-      let noPrice = 0;
-      try {
-        const prices = typeof m.outcomePrices === 'string'
-          ? JSON.parse(m.outcomePrices) as string[]
-          : m.outcomePrices;
-        if (Array.isArray(prices) && prices.length >= 2) {
-          yesPrice = parseFloat(prices[0]) || 0;
-          noPrice = parseFloat(prices[1]) || 0;
-        }
-      } catch { /* ignore parse errors */ }
-
-      all.push({
-        conditionId: m.conditionId || m.id,
-        slug: m.slug || '',
-        title: m.question || m.groupItemTitle || m.slug || m.id,
-        yesPrice,
-        noPrice,
-        endDate: m.endDate || null,
-      });
-    }
-
-    if (markets.length < limit) break;
-    offset += limit;
+  // For /market/ URLs, use fetchPolymarketMarketAsEvent (resolves parent event)
+  // For /event/ URLs, use fetchPolymarketEvent directly
+  let pmEvent;
+  if (isPolymarketMarketUrl(pmUrl)) {
+    pmEvent = await fetchPolymarketMarketAsEvent(slug);
+  } else {
+    pmEvent = await fetchPolymarketEvent(slug);
   }
 
-  return all;
+  if (!pmEvent || !pmEvent.markets) return [];
+
+  return pmEvent.markets.map(m => {
+    let yesPrice = 0;
+    let noPrice = 0;
+    try {
+      const prices = typeof m.outcomePrices === 'string'
+        ? JSON.parse(m.outcomePrices) as string[]
+        : m.outcomePrices;
+      if (Array.isArray(prices) && prices.length >= 2) {
+        yesPrice = parseFloat(prices[0]) || 0;
+        noPrice = parseFloat(prices[1]) || 0;
+      }
+    } catch { /* ignore parse errors */ }
+
+    return {
+      conditionId: m.conditionId || m.id,
+      slug: m.slug || '',
+      title: m.question || m.groupItemTitle || m.slug || m.id,
+      yesPrice,
+      noPrice,
+      endDate: m.endDate || null,
+    };
+  });
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const usePH = searchParams.get('source') === 'predictionhunt';
+    const kalshiUrl = searchParams.get('kalshiUrl');
+    const pmUrl = searchParams.get('pmUrl');
 
-    const result = await allMarketsMemo('all-markets', async () => {
-      // Try direct API fetch first (most up-to-date)
-      if (!usePH) {
-        try {
-          const [kalshi, polymarket] = await Promise.all([
-            fetchKalshiAllMarkets(),
-            fetchPolymarketAllMarkets(),
-          ]);
+    // If no URLs provided, return empty (don't fetch global market lists)
+    if (!kalshiUrl && !pmUrl) {
+      return NextResponse.json({
+        kalshi: [],
+        polymarket: [],
+        cached: false,
+        source: 'event-scoped',
+      } as AllMarketsResponse, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+    }
 
-          if (kalshi.length > 0 || polymarket.length > 0) {
-            return {
-              kalshi,
-              polymarket,
-              cached: false,
-              source: 'api' as const,
-            };
-          }
-        } catch (e: any) {
-          console.warn('[all-markets] Direct API fetch failed, falling back to PredictionHunt cache:', e.message);
-        }
-      }
+    // Fetch event-scoped markets in parallel
+    const [kalshi, polymarket] = await Promise.all([
+      kalshiUrl ? fetchKalshiEventScoped(kalshiUrl).catch(() => []) : Promise.resolve([] as KalshiMarketLite[]),
+      pmUrl ? fetchPolymarketEventScoped(pmUrl).catch(() => []) : Promise.resolve([] as PolymarketLite[]),
+    ]);
 
-      // Fallback: use cached PredictionHunt data
-      const phMarkets = await getPredictionHuntMarkets();
+    const result: AllMarketsResponse = {
+      kalshi,
+      polymarket,
+      cached: false,
+      source: 'event-scoped',
+    };
 
-      const kalshiMap = new Map<string, KalshiMarketLite>();
-      const pmMap = new Map<string, PolymarketLite>();
-
-      for (const m of phMarkets) {
-        // Kalshi markets from PH
-        if (m.kalshiUrl && m.kalshiId) {
-          const ticker = m.kalshiId;
-          if (!kalshiMap.has(ticker)) {
-            kalshiMap.set(ticker, {
-              ticker,
-              title: m.title,
-              yesAsk: m.kalshiPrice?.yesAsk ?? 0,
-              noAsk: 0,
-              eventTicker: null,
-              closeTime: m.eventDate,
-            });
-          }
-        }
-
-        // Polymarket markets from PH
-        if (m.polymarketUrl && m.polymarketId) {
-          const cid = m.polymarketId;
-          if (!pmMap.has(cid)) {
-            pmMap.set(cid, {
-              conditionId: cid,
-              slug: m.polymarketUrl?.split('/').pop() || '',
-              title: m.title,
-              yesPrice: m.pmPrice?.yesAsk ?? 0,
-              noPrice: 0,
-              endDate: m.eventDate,
-            });
-          }
-        }
-      }
-
-      return {
-        kalshi: Array.from(kalshiMap.values()),
-        polymarket: Array.from(pmMap.values()),
-        cached: true,
-        source: 'predictionhunt' as const,
-      };
-    });
-
-    // The memo always returns cached=true after first call within TTL window
-    // Override to reflect actual cache state (first call in window = fresh)
     return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',

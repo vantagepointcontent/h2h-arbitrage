@@ -1,130 +1,120 @@
 {
-  "status": "degraded",
+  "status": "aborted",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 447,
-  "startedAt": "2026-07-08T13:39:42.744Z",
-  "finishedAt": "2026-07-08T13:43:38.103Z",
-  "durationMs": 235359,
-  "successCount": 41,
-  "failureCount": 22,
-  "skippedCount": 381,
-  "avgScanMs": 28622,
-  "maxScanMs": 60000,
+  "marketCount": 446,
+  "startedAt": "2026-07-09T16:07:58.613Z",
+  "finishedAt": "2026-07-09T16:11:10.302Z",
+  "durationMs": 191689,
+  "successCount": 50,
+  "failureCount": 20,
+  "skippedCount": 368,
+  "avgScanMs": 24709,
+  "maxScanMs": 49086,
   "errors": [
     {
-      "market": "Who will win the 2026 Fields Medal?",
+      "market": "Will Democrats win all \"core four\" senate races?",
       "error": "timeout after 15000ms (adaptive)",
       "durationMs": 15000
     },
     {
-      "market": "Which countries will recognize Palestine before 2027?",
+      "market": "Will Anthropic or OpenAI IPO first?",
       "error": "timeout after 15000ms (adaptive)",
       "durationMs": 15000
     },
     {
-      "market": "F1 Drivers' Champion",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
+      "market": "TIME Person of the Year 2026",
+      "error": "timeout after 17388ms (adaptive)",
+      "durationMs": 17388
     },
     {
-      "market": "MLB: 2026 NL Hank Aaron Winner",
-      "error": "timeout after 50352ms (adaptive)",
-      "durationMs": 50352
-    },
-    {
-      "market": "Michigan Governor Republican Primary Winner",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "MLB: Doubles Leader",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "Next UK Chancellor of the Exchequer in 2026?",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "NBA: LeBron James Next Team",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "VA-03 House Election Winner",
+      "market": "OH-11 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46965
+      "durationMs": 49011
     },
     {
-      "market": "UT-02 House Election Winner",
+      "market": "OH-12 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46905
+      "durationMs": 49005
     },
     {
-      "market": "VA-01 House Election Winner",
+      "market": "OH-10 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46914
+      "durationMs": 49011
     },
     {
-      "market": "VA-04 House Election Winner",
+      "market": "OH-09 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46968
+      "durationMs": 48975
     },
     {
-      "market": "TX-37 House Election Winner",
+      "market": "OK-01 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 47064
+      "durationMs": 49032
     },
     {
-      "market": "UT-01 House Election Winner",
+      "market": "OR-03 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46989
+      "durationMs": 48981
     },
     {
-      "market": "VA-05 House Election Winner",
+      "market": "OR-04 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 47007
+      "durationMs": 48948
     },
     {
-      "market": "WA-03 House Election Winner",
+      "market": "OR-06 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45309
+      "durationMs": 49056
     },
     {
-      "market": "WA-04 House Election Winner",
+      "market": "PA-02 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 45297
+      "durationMs": 49047
     },
     {
-      "market": "WA-05 House Election Winner",
+      "market": "PA-03 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46443
+      "durationMs": 48993
     },
     {
-      "market": "WA-06 House Election Winner",
+      "market": "PA-06 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46467
+      "durationMs": 49005
     },
     {
-      "market": "WA-07 House Election Winner",
+      "market": "PA-10 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46506
+      "durationMs": 48987
     },
     {
-      "market": "WA-08 House Election Winner",
+      "market": "PA-11 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46461
+      "durationMs": 49044
     },
     {
-      "market": "WA-09 House Election Winner",
+      "market": "PA-12 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 46311
+      "durationMs": 48975
+    },
+    {
+      "market": "PA-13 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49086
+    },
+    {
+      "market": "PA-15 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 48966
+    },
+    {
+      "market": "SC-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49062
     }
   ],
-  "breakerSkipped": 3,
-  "openBreakers": 8
+  "breakerSkipped": 8,
+  "openBreakers": 11
 }
