@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
+import { classifyArbType } from '@/lib/arb-types';
 
 /**
  * GET /api/logs/export
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
       'Market Name',
       'Market ID',
       'Strategy',
+      'Arb Type',
       'ROI %',
       'Profit ($)',
       'Matched Count',
@@ -96,6 +98,7 @@ export async function GET(request: NextRequest) {
         r.market_title ?? nameMap.get(r.market_id) ?? '',
         r.market_id,
         r.strategy,
+        classifyArbType(r.strategy) ?? '',
         r.best_roi_pct,
         r.best_profit,
         r.matched_count,
