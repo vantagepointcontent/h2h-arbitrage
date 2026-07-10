@@ -713,6 +713,35 @@ export function calculateBestArbitrageForOutcome(
   // Sanity guard: flag phantom arbs (huge ROI on legs with unknown depth).
   const depthUnknown =
     !isFinite(depthPYes) || !isFinite(depthPNo) || depthKYes <= 0 || depthKNo <= 0;
+
+  // BUG-08: Filter false-positive arbs on near-resolved markets.
+  // When prices are at extremes (e.g. 0.01/0.99), the market is essentially
+  // resolved. Any "arb" with < 0.5% ROI after fees is noise from floating-point
+  // precision, not a real opportunity. Zero it out.
+  if (best.strategy !== 'No arb') {
+    const MIN_NET_ROI = 0.5; // % — must beat this after fees to count as arb
+    const hasExtremePrice =
+      (kalshiYesAsk != null && kalshiYesAsk <= 0.02) ||
+      (kalshiNoAsk != null && kalshiNoAsk <= 0.02) ||
+      (pmYesAsk != null && pmYesAsk <= 0.02) ||
+      (pmNoAsk != null && pmNoAsk <= 0.02) ||
+      (kalshiYesAsk != null && kalshiYesAsk >= 0.98) ||
+      (kalshiNoAsk != null && kalshiNoAsk >= 0.98) ||
+      (pmYesAsk != null && pmYesAsk >= 0.98) ||
+      (pmNoAsk != null && pmNoAsk >= 0.98);
+    const netRoi = best.fees
+      ? (best.fees.worstCaseNetProfit / Math.max(best.kalshiStake + best.pmStake, 0.01)) * 100
+      : best.roiPct;
+    if (hasExtremePrice && netRoi < MIN_NET_ROI) {
+      best.strategy = 'No arb';
+      best.roiPct = 0;
+      best.expectedProfit = 0;
+      best.kalshiStake = 0;
+      best.pmStake = 0;
+      if (best.fees) best.fees.worstCaseNetProfit = 0;
+    }
+  }
+
   return markSuspiciousArb(best, depthUnknown);
 }
 
