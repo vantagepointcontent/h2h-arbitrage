@@ -278,6 +278,76 @@ describe('telegram-alerts', () => {
       });
       expect(msg).toContain('view=scan&id=abc%2Fdef%26ghi');
     });
+
+    // ── ARB-01d: arb type tag in alert messages ──
+
+    it('includes [DIRECT] tag for direct arb strategy', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'Buy YES Kalshi + NO PM',
+      });
+      expect(msg).toContain('[DIRECT]');
+    });
+
+    it('includes [DIRECT] tag for Buy YES PM strategy', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'Buy YES PM + NO Kalshi',
+      });
+      expect(msg).toContain('[DIRECT]');
+    });
+
+    it('includes [CROSS] tag for cross-outcome strategy', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'Buy YES both sides: Kalshi France + PM Morocco',
+      });
+      expect(msg).toContain('[CROSS]');
+    });
+
+    it('includes [INTERNAL] tag for same-platform strategy', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'Same-platform YES+YES: Kalshi France + Kalshi Morocco',
+      });
+      expect(msg).toContain('[INTERNAL]');
+    });
+
+    it('uses explicit arbType when provided (overrides strategy)', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'cross',
+      });
+      expect(msg).toContain('[CROSS]');
+      expect(msg).not.toContain('[DIRECT]');
+    });
+
+    it('omits tag when strategy is "No arb"', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        strategy: 'No arb',
+      });
+      expect(msg).not.toContain('[DIRECT]');
+      expect(msg).not.toContain('[CROSS]');
+      expect(msg).not.toContain('[INTERNAL]');
+    });
+
+    it('includes tag in spread widened message', () => {
+      const msg = formatSpreadWidenedMessage(
+        { ...baseArb, strategy: 'Buy YES both sides: Kalshi A + PM B' },
+        3.0,
+      );
+      expect(msg).toContain('[CROSS]');
+    });
+
+    it('includes tag in vanishing message', () => {
+      const msg = formatVanishingMessage(
+        { ...baseArb, strategy: 'Same-platform YES+YES: Kalshi A + Kalshi B' },
+        8.0,
+      );
+      expect(msg).toContain('[INTERNAL]');
+    });
   });
 
   // ── Spread Widened alert ────────────────────────────────────
