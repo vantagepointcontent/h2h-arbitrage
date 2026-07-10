@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
       marketCoverage,
       profitTimeline: agg.profitTimeline,
       lifecycleFunnel,
+      arbTypeBreakdown: agg.arbTypeBreakdown,
       range,
     }, {
       headers: {

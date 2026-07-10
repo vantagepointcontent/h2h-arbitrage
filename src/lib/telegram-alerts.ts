@@ -24,6 +24,30 @@
 
 // ─── Types ────────────────────────────────────────────────────────
 
+/** Arb type classification — derived from strategy string. */
+export type ArbType = 'cross' | 'direct' | 'internal';
+
+/**
+ * Classify an arb type from its strategy string.
+ * - "Buy YES both sides" → cross (YES on Kalshi for outcome A + YES on PM for outcome B)
+ * - "Same-platform YES+YES" → internal (YES on both outcomes, same platform)
+ * - "Buy YES Kalshi + NO PM" / "Buy YES PM + NO Kalshi" → direct (classic cross-platform)
+ * - Everything else (incl. "No arb") → null
+ */
+export function classifyArbType(strategy: string): ArbType | null {
+  if (!strategy || strategy === 'No arb') return null;
+  if (strategy.includes('both sides')) return 'cross';
+  if (strategy.startsWith('Same-platform')) return 'internal';
+  if (strategy.startsWith('Buy YES')) return 'direct';
+  return null;
+}
+
+/** Short uppercase tag for display in alerts and UI. */
+export function arbTypeTag(strategy: string): string {
+  const t = classifyArbType(strategy);
+  return t ? `[${t.toUpperCase()}]` : '';
+}
+
 export interface ArbAlertInput {
   marketTitle: string;
   marketId: string;
@@ -33,6 +57,8 @@ export interface ArbAlertInput {
   totalStake?: number;
   /** Outcome name — enables the episode-persistence filter (ALERT-001). */
   outcome?: string;
+  /** Explicit arb type — if omitted, derived from strategy via classifyArbType(). */
+  arbType?: ArbType;
   fees?: {
     kalshiFee: number;
     pmFee: number;
@@ -203,9 +229,12 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     ? `Net: $${arb.fees.worstCaseNetProfit.toFixed(2)}`
     : '';
   const deepLink = buildDeepLink(arb.marketId);
+  const tag = arb.arbType
+    ? `[${arb.arbType.toUpperCase()}]`
+    : arbTypeTag(arb.strategy);
 
   return [
-    '🟢 <b>Arbitrage Found</b>',
+    `🟢 <b>Arbitrage Found</b> ${tag}`,
     '',
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
@@ -226,9 +255,12 @@ export function formatArbMessage(arb: ArbAlertInput): string {
 export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number): string {
   const delta = arb.roiPct - prevRoi;
   const deepLink = buildDeepLink(arb.marketId);
+  const tag = arb.arbType
+    ? `[${arb.arbType.toUpperCase()}]`
+    : arbTypeTag(arb.strategy);
 
   return [
-    '📈 <b>ARB SPREAD WIDENED</b>',
+    `📈 <b>ARB SPREAD WIDENED</b> ${tag}`,
     '',
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
@@ -248,9 +280,12 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
 export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): string {
   const dropPct = ((prevRoi - arb.roiPct) / Math.abs(prevRoi) * 100);
   const deepLink = buildDeepLink(arb.marketId);
+  const tag = arb.arbType
+    ? `[${arb.arbType.toUpperCase()}]`
+    : arbTypeTag(arb.strategy);
 
   return [
-    '⚠️ <b>ARB VANISHING</b>',
+    `⚠️ <b>ARB VANISHING</b> ${tag}`,
     '',
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',

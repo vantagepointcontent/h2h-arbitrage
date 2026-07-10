@@ -31,6 +31,11 @@ export interface LiveArbResult {
   kalshiTicker?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
+  /** ARB-01a: classification of the arb strategy.
+   *  - "direct": regular YES/NO across platforms (within-outcome)
+   *  - "cross": cross-outcome YES+YES across platforms
+   *  - "internal": same-platform YES+YES (FEAT-016) */
+  arbType: 'cross' | 'direct' | 'internal';
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
   /** HOOKUP-03 (FEAT-005): arb-formation signal, attached by persistence-tracker. */
@@ -172,6 +177,7 @@ function computeSingleOutcome(
     kalshiTicker,
     pmYesTokenId,
     pmNoTokenId,
+    arbType: 'direct',
     lastUpdate: new Date().toISOString(),
   };
 }
@@ -217,6 +223,7 @@ export function computeAllLiveArbitrages(
       );
       if (fees.worstCaseNetProfit > cur.expectedProfit) {
         cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
+        cur.arbType = 'cross';
         cur.roiPct = effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0;
         cur.expectedProfit = fees.worstCaseNetProfit;
         cur.kalshiStake = kalshiStake;

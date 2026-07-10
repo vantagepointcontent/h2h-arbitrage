@@ -90,6 +90,13 @@ interface LifecycleFunnel {
   expired: number;
 }
 
+interface ArbTypeItem {
+  type: string;
+  count: number;
+  totalProfit: number;
+  avgRoi: number;
+}
+
 interface DashboardData {
   kpis: KPISummary;
   scansPerDay: ScanPerDay[];
@@ -99,6 +106,7 @@ interface DashboardData {
   marketCoverage: MarketCoverageItem[];
   profitTimeline: ProfitTimelinePoint[];
   lifecycleFunnel: LifecycleFunnel;
+  arbTypeBreakdown: ArbTypeItem[];
   range: string;
 }
 
@@ -675,6 +683,76 @@ export default function DashboardPanel() {
             <LifecycleStatsPanel
               days={range === "today" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365}
             />
+          </Panel>
+
+          {/* ── Row 4c: Arb Type Breakdown ─────────────────── */}
+          <Panel
+            title="Arb Type Breakdown"
+            icon={<Layers className="w-4 h-4 text-[#60a5fa]" />}
+            rightElement={
+              <span className="text-xs text-[#8A9BA8]">
+                Count & profit by type · Net of fees
+              </span>
+            }
+          >
+            {(!data!.arbTypeBreakdown || data!.arbTypeBreakdown.length === 0) ? (
+              <EmptyState message="No arb type data in this period." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(() => {
+                  const TYPE_META: Record<string, { label: string; color: string; desc: string }> = {
+                    cross: { label: 'Cross Arb', color: '#60a5fa', desc: 'YES+YES across platforms' },
+                    direct: { label: 'Direct Arb', color: '#5DBE81', desc: 'YES+NO same outcome' },
+                    internal: { label: 'Internal Arb', color: '#a855f7', desc: 'YES+YES same platform' },
+                    unknown: { label: 'Unknown', color: '#5E6875', desc: 'Unclassified' },
+                  };
+                  const types = ['cross', 'direct', 'internal'];
+                  return types.map((t) => {
+                    const item = data!.arbTypeBreakdown.find((a) => a.type === t);
+                    const meta = TYPE_META[t] ?? TYPE_META.unknown;
+                    const count = item?.count ?? 0;
+                    const profit = item?.totalProfit ?? 0;
+                    const avgRoi = item?.avgRoi ?? 0;
+                    return (
+                      <div
+                        key={t}
+                        className="rounded-lg border border-[#182533] bg-[#0E1621] p-3 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                            style={{
+                              backgroundColor: `${meta.color}20`,
+                              color: meta.color,
+                              border: `1px solid ${meta.color}40`,
+                            }}
+                          >
+                            {meta.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-[#5E6875]">{meta.desc}</div>
+                        <div className="flex items-baseline justify-between pt-1">
+                          <div>
+                            <div className="text-lg font-bold" style={{ color: meta.color }}>
+                              {count.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-[#5E6875]">scans</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-mono font-semibold" style={{ color: count > 0 ? '#facc15' : '#5E6875' }}>
+                              {count > 0 ? fmtUsd(profit) : '—'}
+                            </div>
+                            <div className="text-[10px] text-[#5E6875]">
+                              {count > 0 ? `avg ${fmtPct(avgRoi)}` : 'no data'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </Panel>
 
           {/* ── Row 3: Top Active Arbs Table ───────────────── */}

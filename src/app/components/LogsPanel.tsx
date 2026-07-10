@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { classifyArbType, getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
 
 interface LogEntry {
   id: number;
@@ -32,6 +33,15 @@ interface LogEntry {
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
 }
+
+type ArbTypeFilter = "all" | ArbType;
+
+const ARB_TYPE_FILTER_OPTIONS: { key: ArbTypeFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "direct", label: "Direct" },
+  { key: "cross", label: "Cross" },
+  { key: "internal", label: "Internal" },
+];
 
 type EventType = "all" | "scan" | "arb" | "system";
 
@@ -58,6 +68,7 @@ export default function LogsPanel() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [eventType, setEventType] = useState<EventType>("all");
+  const [arbTypeFilter, setArbTypeFilter] = useState<ArbTypeFilter>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const lastLogCountRef = useRef(0);
 
@@ -119,7 +130,7 @@ export default function LogsPanel() {
       .catch(() => {});
   }, []);
 
-  // Filter by search query (market_id, market name, or strategy) + event type
+  // Filter by search query (market_id, market name, or strategy) + event type + arb type
   const filtered = useMemo(() => {
     let result = logs;
     
@@ -131,6 +142,11 @@ export default function LogsPanel() {
         if (eventType === "system") return l.matched_count === 0 || l.kalshi_count === 0 || l.pm_count === 0;
         return true;
       });
+    }
+    
+    // Arb type filter
+    if (arbTypeFilter !== "all") {
+      result = result.filter((l) => classifyArbType(l.strategy) === arbTypeFilter);
     }
     
     if (!searchQuery.trim()) return result;
@@ -145,7 +161,7 @@ export default function LogsPanel() {
         );
       }
     );
-  }, [logs, searchQuery, savedMarkets, eventType]);
+  }, [logs, searchQuery, savedMarkets, eventType, arbTypeFilter]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -203,6 +219,18 @@ export default function LogsPanel() {
     if (toDate) params.set("toDate", toDate);
     return `/api/logs/export?${params.toString()}`;
   }, [minRoi, positiveArbOnly, fromDate, toDate]);
+
+  // Arb type summary counts (from all logs, not filtered)
+  const arbTypeCounts = useMemo(() => {
+    let direct = 0, cross = 0, internal = 0;
+    for (const l of logs) {
+      const t = classifyArbType(l.strategy);
+      if (t === 'direct') direct++;
+      else if (t === 'cross') cross++;
+      else if (t === 'internal') internal++;
+    }
+    return { direct, cross, internal };
+  }, [logs]);
 
   // Stats summary
   const stats = useMemo(() => {
@@ -273,6 +301,30 @@ export default function LogsPanel() {
           <StatBox label="Avg ROI" value={fmtPct(stats.avgRoi)} color={stats.avgRoi > 0 ? "#5DBE81" : "#ef4444"} />
           <StatBox label="Best ROI" value={fmtPct(stats.bestRoi)} color="#5DBE81" />
           <StatBox label="Total Profit" value={fmtUsd(stats.totalProfit)} color="#facc15" />
+        </div>
+      )}
+
+      {/* Arb Type Summary */}
+      {logs.length > 0 && (
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-[#8A9BA8] font-semibold uppercase tracking-wide">Arb Types:</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${ARB_TYPES.direct.dotClass}`} />
+            <span className="text-[#FFFFFF] font-medium">Direct:</span>
+            <span className="text-emerald-400 font-mono font-semibold">{arbTypeCounts.direct}</span>
+          </span>
+          <span className="text-[#182533]">|</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${ARB_TYPES.cross.dotClass}`} />
+            <span className="text-[#FFFFFF] font-medium">Cross:</span>
+            <span className="text-blue-400 font-mono font-semibold">{arbTypeCounts.cross}</span>
+          </span>
+          <span className="text-[#182533]">|</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${ARB_TYPES.internal.dotClass}`} />
+            <span className="text-[#FFFFFF] font-medium">Internal:</span>
+            <span className="text-purple-400 font-mono font-semibold">{arbTypeCounts.internal}</span>
+          </span>
         </div>
       )}
 
@@ -365,6 +417,31 @@ export default function LogsPanel() {
               ))}
             </div>
           </div>
+          {/* Arb type filter pills */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Arb Type:</span>
+            <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
+              {ARB_TYPE_FILTER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setArbTypeFilter(opt.key)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                    arbTypeFilter === opt.key
+                      ? opt.key === "direct"
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : opt.key === "cross"
+                        ? "bg-blue-500/20 text-blue-400"
+                        : opt.key === "internal"
+                        ? "bg-purple-500/20 text-purple-400"
+                        : "bg-[#5DBE81]/20 text-[#5DBE81]"
+                      : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -404,6 +481,9 @@ export default function LogsPanel() {
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Strategy
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    Arb Type
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
@@ -477,6 +557,7 @@ function LogRow({
 }) {
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
+  const arbTypeMeta = getArbTypeMeta(log.strategy);
 
   const marketName = log.market_name ?? log.market_title ?? savedMarkets.get(log.market_id);
   const hasMarketName = !!marketName;
@@ -516,6 +597,16 @@ function LogRow({
           </span>
         </td>
         <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={log.strategy}>{log.strategy || "\u2014"}</td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          {arbTypeMeta ? (
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${arbTypeMeta.badgeClass}`}>
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${arbTypeMeta.dotClass}`} />
+              {arbTypeMeta.label}
+            </span>
+          ) : (
+            <span className="text-[#8A9BA8]">—</span>
+          )}
+        </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
@@ -534,7 +625,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={10} className="px-4 py-3">
+          <td colSpan={11} className="px-4 py-3">
             {rawArbs.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
@@ -543,9 +634,20 @@ function LogRow({
                     <div key={i} className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-[#FFFFFF]">{arb.artist || arb.strategy || "\u2014"}</span>
-                        <span className={`text-xs font-mono font-semibold ${arb.roiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                          {fmtPct(arb.roiPct)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const meta = getArbTypeMeta(arb.strategy);
+                            return meta ? (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.badgeClass}`}>
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
+                                {meta.label}
+                              </span>
+                            ) : null;
+                          })()}
+                          <span className={`text-xs font-mono font-semibold ${arb.roiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                            {fmtPct(arb.roiPct)}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-[#8A9BA8]">
                         <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(arb.expectedProfit)}</span></span>

@@ -1,6 +1,7 @@
 import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
+import { classifyArbType, type ArbType } from './arb-types';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -34,6 +35,8 @@ export interface UnifiedOutcome {
   } | null;
   arbitrage: {
     strategy: string;
+    /** Arb type classification: "cross" | "direct" | "internal" | null */
+    arbType: ArbType | null;
     kalshiStake: number;
     pmStake: number;
     expectedProfit: number;
@@ -48,6 +51,11 @@ export interface UnifiedOutcome {
      *  unknown/assumed-infinite — almost certainly a phantom quote on an
      *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
     suspicious?: boolean;
+    /** ARB-01a: classification of the arb strategy.
+     *  - "direct": regular YES/NO across platforms (within-outcome)
+     *  - "cross": cross-outcome YES+YES across platforms
+     *  - "internal": same-platform YES+YES (FEAT-016) */
+    arbType?: 'cross' | 'direct' | 'internal';
     /** Fee-adjusted profit per winning platform for the buy side */
     fees?: {
       kalshiFee: number;
@@ -501,6 +509,7 @@ export function calculateArbitrageMax(
       sellPlatform: null,
       sellPrice: 0,
       fees: undefined,
+      arbType: 'direct',
     };
   }
 
@@ -516,6 +525,7 @@ export function calculateArbitrageMax(
     sellPlatform,
     sellPrice,
     fees: feeInfo,
+    arbType: 'direct',
   };
 }
 
@@ -527,7 +537,7 @@ export function calculateBestArbitrageForOutcome(
   maxCapital = 1000,
 ): UnifiedOutcome['arbitrage'] {
   if (!current.kalshi || !current.polymarket) {
-    return { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+    return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
   }
 
   const depthKYes = parseDepth(current.kalshi.yesAskDepth);
@@ -581,6 +591,7 @@ export function calculateBestArbitrageForOutcome(
         if (fees.worstCaseNetProfit > best.expectedProfit) {
           best = {
             strategy: `Buy YES both sides: Kalshi ${current.artist} + PM ${complement.artist}`,
+            arbType: 'cross',
             kalshiStake,
             pmStake,
             expectedProfit: fees.worstCaseNetProfit,
@@ -636,6 +647,7 @@ export function calculateBestArbitrageForOutcome(
         if (netProfit > best.expectedProfit) {
           best = {
             strategy: `Same-platform YES+YES Kalshi: ${current.artist} + ${complement.artist}`,
+            arbType: 'internal',
             kalshiStake: kalshiStakeA + kalshiStakeB,
             pmStake: 0,
             expectedProfit: netProfit,
@@ -686,6 +698,7 @@ export function calculateBestArbitrageForOutcome(
         if (netProfit > best.expectedProfit) {
           best = {
             strategy: `Same-platform YES+YES Polymarket: ${current.artist} + ${complement.artist}`,
+            arbType: 'internal',
             kalshiStake: 0,
             pmStake: pmStakeA + pmStakeB,
             expectedProfit: netProfit,
@@ -734,6 +747,7 @@ export function calculateBestArbitrageForOutcome(
       : best.roiPct;
     if (hasExtremePrice && netRoi < MIN_NET_ROI) {
       best.strategy = 'No arb';
+      best.arbType = null;
       best.roiPct = 0;
       best.expectedProfit = 0;
       best.kalshiStake = 0;
@@ -1055,7 +1069,7 @@ export function matchOutcomes(
   const usedKalshi = new Set<string>();
   const usedPm = new Set<number>();
 
-  const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, arbType: 'direct' };
 
   // Exact match pass
   const placeholderArb = noArbResult;
@@ -1200,7 +1214,7 @@ export function applyManualMatches(
       : pmRaw;
 
     // Use placeholder - arbitrage will be calculated by caller with depth info
-    const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+    const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, arbType: 'direct' };
 
     merged[kIdx] = {
       artist: `${outcomes[kIdx].artist} + ${outcomes[pIdx].artist}`,

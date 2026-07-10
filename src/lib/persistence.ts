@@ -45,7 +45,8 @@ async function initDb(): Promise<void> {
       raw_result      TEXT,   -- full JSON payload for later drill-down
       market_title    TEXT,   -- human-readable market name (BUG-030: prevents raw IDs in Logs)
       kalshi_url      TEXT,   -- source Kalshi URL for re-scanning (not in saved_markets)
-      polymarket_url  TEXT    -- source Polymarket URL for re-scanning
+      polymarket_url  TEXT,   -- source Polymarket URL for re-scanning
+      arb_type        TEXT    -- ARB-01a: "cross" | "direct" | "internal"
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -53,6 +54,7 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN market_title TEXT`,
     `ALTER TABLE scan_results ADD COLUMN kalshi_url TEXT`,
     `ALTER TABLE scan_results ADD COLUMN polymarket_url TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN arb_type TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -182,6 +184,7 @@ export async function saveScanResult(
     marketTitle?: string;
     kalshiUrl?: string;
     polymarketUrl?: string;
+    arbType?: 'cross' | 'direct' | 'internal';
   },
 ): Promise<{ id: number }> {
   await ensureDb();
@@ -191,8 +194,8 @@ export async function saveScanResult(
       (market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
-       kalshi_url, polymarket_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       kalshi_url, polymarket_url, arb_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
       result.bestRoiPct ?? 0,
@@ -209,6 +212,7 @@ export async function saveScanResult(
       result.marketTitle ?? null,
       result.kalshiUrl ?? null,
       result.polymarketUrl ?? null,
+      result.arbType ?? null,
     ],
   });
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
@@ -345,6 +349,7 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
   topActiveArbs: any[];
   recurringArbs: number;
   vanishedArbs: number;
+  arbTypeBreakdown: { type: string; count: number; totalProfit: number; avgRoi: number }[];
 }> {
   await ensureDb();
   const c = getClient();
@@ -353,7 +358,7 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
   const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 3600000).toISOString();
 
-  const [kpiRes, perDayRes, bucketRes, hourRes, profitRes, topRes, recurRes, vanishedRes] = await Promise.all([
+  const [kpiRes, perDayRes, bucketRes, hourRes, profitRes, topRes, recurRes, vanishedRes, arbTypeRes] = await Promise.all([
     c.execute({
       sql: `SELECT
               COUNT(*) AS total_scans,
@@ -428,6 +433,25 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
             )`,
       args: [...args, dayAgo],
     }),
+    c.execute({
+      // Arb type breakdown — classify from strategy string.
+      // Only counts positive-arb scans (positive_arb_count > 0) with non-phantom ROI.
+      sql: `SELECT
+              CASE
+                WHEN strategy LIKE '%both sides%' THEN 'cross'
+                WHEN strategy LIKE 'Same-platform%' THEN 'internal'
+                WHEN strategy LIKE 'Buy YES%' THEN 'direct'
+                ELSE 'unknown'
+              END AS arb_type,
+              COUNT(*) AS cnt,
+              SUM(best_profit) AS total_profit,
+              AVG(best_roi_pct) AS avg_roi
+            FROM scan_results ${w}
+              AND positive_arb_count > 0
+              AND best_roi_pct <= ?
+            GROUP BY arb_type`,
+      args: [...args, suspiciousRoi],
+    }),
   ]);
 
   const k = (kpiRes.rows as any[])[0] ?? {};
@@ -487,6 +511,12 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
     })),
     recurringArbs: Number((recurRes.rows as any[])[0]?.cnt ?? 0),
     vanishedArbs: Number((vanishedRes.rows as any[])[0]?.cnt ?? 0),
+    arbTypeBreakdown: (arbTypeRes.rows as any[]).map((r) => ({
+      type: r.arb_type,
+      count: Number(r.cnt ?? 0),
+      totalProfit: +Number(r.total_profit ?? 0).toFixed(2),
+      avgRoi: +Number(r.avg_roi ?? 0).toFixed(2),
+    })),
   };
 }
 
