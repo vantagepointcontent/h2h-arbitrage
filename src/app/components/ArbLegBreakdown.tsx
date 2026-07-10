@@ -16,6 +16,82 @@ import React from 'react';
  *   "No arb"                                    → no legs
  */
 
+export type ArbType = 'direct' | 'cross' | 'internal';
+
+export interface ArbTypeInfo {
+  type: ArbType;
+  label: string;       // "DIRECT" | "CROSS" | "INTERNAL"
+  color: string;       // hex color
+  description: string; // tooltip text
+}
+
+const ARB_TYPE_META: Record<ArbType, ArbTypeInfo> = {
+  direct: {
+    type: 'direct',
+    label: 'DIRECT',
+    color: '#5DBE81',
+    description: 'Direct Arb: Buy YES on one platform + NO on the other for the same outcome. Classic cross-platform arbitrage.',
+  },
+  cross: {
+    type: 'cross',
+    label: 'CROSS',
+    color: '#3b82f6',
+    description: 'Cross Arb: Buy YES on both platforms for different outcomes. One must resolve YES for profit.',
+  },
+  internal: {
+    type: 'internal',
+    label: 'INTERNAL',
+    color: '#a855f7',
+    description: 'Internal Arb: Buy YES on BOTH outcomes on the same platform (e.g. PM YES+YES when sum < $1.00).',
+  },
+};
+
+/**
+ * Classify an arb type from its strategy string.
+ *
+ * If an explicit `arbType` field is present (ARB-01a), it takes precedence.
+ * Otherwise we derive the type from the strategy string pattern:
+ *   - "Buy YES both sides: ..."          → cross
+ *   - "Same-platform YES+YES ..."        → internal
+ *   - "Buy YES Kalshi + NO PM" / reverse → direct
+ */
+export function classifyArbType(strategy: string, arbType?: ArbType | null): ArbTypeInfo | null {
+  if (!strategy || strategy === 'No arb') return null;
+
+  // Explicit field wins when present
+  if (arbType && ARB_TYPE_META[arbType]) return ARB_TYPE_META[arbType];
+
+  // Derive from strategy string
+  if (/^Buy YES both sides:/.test(strategy)) return ARB_TYPE_META.cross;
+  if (/^Same-platform YES\+YES/.test(strategy)) return ARB_TYPE_META.internal;
+  // "Buy YES Kalshi + NO PM" and "Buy YES PM + NO Kalshi" → direct
+  if (/^Buy YES (Kalshi|PM) \+ NO (Kalshi|PM)$/.test(strategy)) return ARB_TYPE_META.direct;
+
+  return null;
+}
+
+/**
+ * Compact pill-shaped badge with color-coded arb type + hover tooltip.
+ */
+export function ArbTypeBadge({ strategy, arbType }: { strategy: string; arbType?: ArbType | null }) {
+  const info = classifyArbType(strategy, arbType);
+  if (!info) return null;
+
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide cursor-help"
+      style={{
+        backgroundColor: `${info.color}20`,
+        color: info.color,
+        border: `1px solid ${info.color}50`,
+      }}
+      title={info.description}
+    >
+      {info.label}
+    </span>
+  );
+}
+
 export interface ArbLeg {
   platform: 'Kalshi' | 'Polymarket';
   side: 'YES' | 'NO';

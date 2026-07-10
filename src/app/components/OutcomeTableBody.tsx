@@ -7,7 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './Execu
 import { ArbHistoryCell } from './ArbHistoryCell';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
-import { parseArbLegs, formatConciseStrategy, LegBreakdown } from './ArbLegBreakdown';
+import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
 import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
 
 interface Outcome {
@@ -260,15 +260,13 @@ function OutcomeTableBodyInner({
                 {!hasPrices ? (
                   <span className="text-[#8A9BA8]">—</span>
                 ) : (() => {
-                  const { text: conciseText, isCross: isCrossArb } = formatConciseStrategy(o.arbitrage.strategy);
+                  const { text: conciseText } = formatConciseStrategy(o.arbitrage.strategy);
                   if (o.arbitrage.strategy === 'No arb') {
                     return <span className="text-[#8A9BA8]">No arb</span>;
                   }
                   return (
                     <span className="inline-flex items-center gap-1.5">
-                      {isCrossArb && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
-                      )}
+                      <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
                       <span className="text-[#8A9BA8]">{conciseText}</span>
                       {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
                       {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (

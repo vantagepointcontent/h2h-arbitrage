@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { TrendingUp, Zap } from "lucide-react";
-import { parseArbLegs, formatConciseStrategy, LegBreakdown } from "./ArbLegBreakdown";
+import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { computeApy } from "@/lib/matcher";
 
@@ -132,13 +132,6 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
             o.arbitrage.expectedProfit,
           );
           const concise = formatConciseStrategy(o.arbitrage.strategy);
-          const isSamePlatform = o.arbitrage.strategy.startsWith("Same-platform");
-          const badgeText = isSamePlatform ? "Same-Platform" : concise.isCross ? "Cross" : "Regular";
-          const badgeColor = isSamePlatform
-            ? "bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/30"
-            : concise.isCross
-              ? "bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/30"
-              : "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30";
 
           const apy = o.arbitrage.apyPct ?? computeApy(o.arbitrage.roiPct, marketExpiryDate);
 
@@ -148,9 +141,7 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
             <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
               {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
               <div className="flex items-center gap-3 flex-wrap">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-medium border ${badgeColor}`}>
-                  {badgeText}
-                </span>
+                <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
                 <span className="text-xs text-[#FFFFFF] font-mono">{concise.text}</span>
                 <div className="flex-1" />
                 <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">

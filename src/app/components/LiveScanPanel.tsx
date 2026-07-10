@@ -7,7 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/c
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
-import { parseArbLegs, formatConciseStrategy, LegBreakdown } from "@/app/components/ArbLegBreakdown";
+import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from "@/app/components/ArbLegBreakdown";
 import { TrendingUp } from "lucide-react";
 
 interface LiveArbOutcome {
@@ -893,15 +893,13 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
                           {(() => {
-                            const { text: conciseText, isCross } = formatConciseStrategy(o.strategy);
+                            const { text: conciseText } = formatConciseStrategy(o.strategy);
                             if (o.strategy === 'No arb') {
                               return <span className="text-[#FFFFFF]">No arb</span>;
                             }
                             return (
                               <span className="inline-flex items-center gap-1.5">
-                                {isCross && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ef4444]/20 text-[#ef4444]">CROSS</span>
-                                )}
+                                <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} />
                                 <span>{conciseText}</span>
                                 {(() => {
                                   if (o.stale || o.roiPct <= 0) return null;
@@ -1053,19 +1051,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           o.expectedProfit,
                         );
                         const concise = formatConciseStrategy(o.strategy);
-                        const isSamePlatform = o.strategy.startsWith("Same-platform");
-                        const badgeText = isSamePlatform ? "Same-Platform" : concise.isCross ? "Cross" : "Regular";
-                        const badgeColor = isSamePlatform
-                          ? "bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/30"
-                          : concise.isCross
-                            ? "bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/30"
-                            : "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30";
+
                         return (
                           <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-medium border ${badgeColor}`}>
-                                {badgeText}
-                              </span>
+                              <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} />
                               <span className="text-xs text-[#FFFFFF] font-mono">{concise.text}</span>
                               <div className="flex-1" />
                               <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
