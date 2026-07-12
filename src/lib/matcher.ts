@@ -732,6 +732,10 @@ export function calculateBestArbitrageForOutcome(
   // resolved. Any "arb" with < 0.5% ROI after fees is noise from floating-point
   // precision, not a real opportunity. Zero it out.
   if (best.strategy !== 'No arb') {
+    const kalshiYesAsk = current.kalshi.yesAsk;
+    const kalshiNoAsk = current.kalshi.noAsk;
+    const pmYesAsk = current.polymarket.bestAsk;
+    const pmNoAsk = current.polymarket.noPrice;
     const MIN_NET_ROI = 0.5; // % — must beat this after fees to count as arb
     const hasExtremePrice =
       (kalshiYesAsk != null && kalshiYesAsk <= 0.02) ||
