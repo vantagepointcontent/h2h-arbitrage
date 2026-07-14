@@ -339,6 +339,7 @@ export async function POST(request: NextRequest) {
           bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
           bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
           strategy: bestNetArb ? bestNetArb.arbitrage!.strategy : 'No arb',
+          arbType: bestNetArb ? (bestNetArb.arbitrage as any).arbType ?? null : null,
           outcomeCount: withArbitrage.length,
           matchedCount,
           kalshiCount,
@@ -354,6 +355,7 @@ export async function POST(request: NextRequest) {
             roiPct: o.arbitrage!.roiPct,
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
+            arbType: o.arbitrage!.arbType,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
             fees: o.arbitrage!.fees,
           })),
@@ -380,6 +382,8 @@ export async function POST(request: NextRequest) {
           positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
+          // ARB-01a: persist the best arb's type classification
+          arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
           // PERF-P2: raw blob only stored when there are arbs to drill into —
           // zero-arb scans (vast majority) get NULL, keeping the DB lean.
           raw: (scanResult.allArbs?.length ?? 0) > 0 ? { allArbs: scanResult.allArbs } : undefined,
@@ -419,6 +423,7 @@ export async function POST(request: NextRequest) {
             roiPct: o.arbitrage!.roiPct,
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
+            arbType: (o.arbitrage as any).arbType,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
             fees: o.arbitrage!.fees,
           }));

@@ -408,5 +408,45 @@
     "pmTitle": "France",
     "id": "1783627841446-hwx250n",
     "createdAt": "2026-07-09T20:10:41.446Z"
+  },
+  {
+    "kalshiTicker": "KXCLACTONBYELECTION-26SEP01-CBIN",
+    "pmConditionId": "0x513bf1706e9cbf61b7cc56f12803b1b72a522bae3c5157e7b356abdf36e2e72d",
+    "kalshiTitle": "Count Binface Party (CBIN, Sep 2026)",
+    "pmTitle": "Count Binface",
+    "id": "1783863128751-mn8gh47",
+    "createdAt": "2026-07-12T13:32:08.751Z"
+  },
+  {
+    "kalshiTicker": "KXSWEDENPM-26SEP13-UKRI",
+    "pmConditionId": "0x8a42bb4cb9b9f157b539611f6a8c122388f652570cfc3c07d538e7df2bb78894",
+    "kalshiTitle": "Ulf Kristersson (UKRI, Sep 13, 2026)",
+    "pmTitle": "Ulf Kristersson",
+    "id": "1783863452005-tu605o7",
+    "createdAt": "2026-07-12T13:37:32.005Z"
+  },
+  {
+    "kalshiTicker": "KXSWEDENPM-26SEP13-MAND",
+    "pmConditionId": "0x58d5cc2bf06a3289b127049239aee051f3b941f219efebbca02d3f50f0eb2a64",
+    "kalshiTitle": "Magdalena Andersson (MAND, Sep 13, 2026)",
+    "pmTitle": "Magdalena Andersson",
+    "id": "1783863454715-8gaofq9",
+    "createdAt": "2026-07-12T13:37:34.715Z"
+  },
+  {
+    "kalshiTicker": "KXSWEDENPM-26SEP13-JAKE",
+    "pmConditionId": "0x86fa2351e7a9469fd8bcd9a28ad5e300a59c3764747ad1eb7d6248546efbabfd",
+    "kalshiTitle": "Jimmie Åkesson (JAKE, Sep 13, 2026)",
+    "pmTitle": "Jimmie Åkesson",
+    "id": "1783863455984-cdauww2",
+    "createdAt": "2026-07-12T13:37:35.984Z"
+  },
+  {
+    "kalshiTicker": "KXSWEDENPM-26SEP13-EBUS",
+    "pmConditionId": "0xa5b2b9d0e333d50db759139a364c01af812a3db60e5c653b9f959b6ef5d7139e",
+    "kalshiTitle": "Ebba Busch (EBUS, Sep 13, 2026)",
+    "pmTitle": "Ebba Busch",
+    "id": "1783863457808-gzwrphh",
+    "createdAt": "2026-07-12T13:37:37.808Z"
   }
 ]

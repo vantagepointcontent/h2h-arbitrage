@@ -152,7 +152,7 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                 </span>
                 {apy > 0 && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
-                    APY {apy.toFixed(0)}x
+                    APY {apy.toFixed(0)}%
                   </span>
                 )}
                 {canExecute && (

@@ -817,7 +817,8 @@ export function calculateAllArbitrages(
 
 /** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
 export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
-  if (!expiryDate) return roiPct; // No expiry = return raw ROI
+  if (roiPct <= 0) return 0;
+  if (!expiryDate) return Math.max(0, roiPct);
   const expiry = new Date(expiryDate).getTime();
   const now = Date.now();
   if (expiry <= now) return 0;
@@ -936,8 +937,11 @@ export function buildPmArbShape(market: PMMarket) {
     yesPrice = 1 - rawBestBid;
     noPrice = rawBestBid;
   } else {
-    yesPrice = prices[0] ?? 0;
-    noPrice = prices[1] ?? (1 - yesPrice);
+    // No orderbook data at all — gamma outcomePrices are aggressively cached
+    // and stale. Using them produces "ghost prices" that show fake ROI.
+    // Zero out so no arb is computed (BUG-086).
+    yesPrice = 0;
+    noPrice = 0;
   }
 
   return {

@@ -269,7 +269,55 @@ export default function Home() {
           pmUrlRef.current = m.polymarketUrl;
           activeMarketIdRef.current = m.id;
           setViewMode("scan");
-          handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+
+          // UI-087/UI-084: show cached data instantly, then silent background refresh
+          const isExpired = isMarketExpired(m);
+          let cached = m.liveResult ?? m.lastScanResult;
+          const hasFullArbs = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.artist !== undefined);
+          if (cached && !hasFullArbs && !isExpired) {
+            try {
+              const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`);
+              if (r.ok) {
+                const d = await r.json();
+                const full = d.market?.liveResult ?? d.market?.lastScanResult;
+                if (full) cached = full;
+              }
+            } catch { /* fall back to blob-less cached */ }
+          }
+          if (cached && !isExpired) {
+            const cachedResult: ScanResult = {
+              eventTitle: m.eventTitle,
+              kalshiCount: cached.kalshiCount ?? 0,
+              pmCount: cached.pmCount ?? 0,
+              matchedCount: cached.matchedCount ?? 0,
+              expiryDate: m.expiryDate ?? undefined,
+              outcomes: (cached.allArbs ?? []).map((a: any) => ({
+                artist: a.artist,
+                kalshi: null,
+                polymarket: null,
+                arbitrage: {
+                  strategy: a.strategy,
+                  kalshiStake: 0,
+                  pmStake: 0,
+                  expectedProfit: a.expectedProfit ?? 0,
+                  roiPct: a.roiPct ?? 0,
+                  apyPct: a.roiPct ?? 0,
+                  buyPlatform: null,
+                  buyPrice: 0,
+                  sellPlatform: null,
+                  sellPrice: 0,
+                },
+              })),
+              unmatchedKalshi: [],
+              unmatchedPolymarket: [],
+            };
+            setResult(cachedResult);
+            setLastUpdated(new Date(cached.scannedAt));
+          }
+          // Background refresh (silent) — skip for expired markets
+          if (!isExpired) {
+            handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
+          }
         } else {
           // Market not in saved_markets (archived/never saved).
           // Fall back to scan_results to find URLs and auto-rescan.

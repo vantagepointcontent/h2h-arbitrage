@@ -2,7 +2,7 @@
 // and runs the existing matcher fee/arb logic against weighted ask prices.
 
 import { orderbookState, WeightedAskResult } from './orderbook-state';
-import { calculateArbitrageMax, computeArbitrageFees } from './matcher';
+import { calculateArbitrageMax, computeArbitrageFees, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
 
 export interface LiveArbResult {
   artist: string;
@@ -236,6 +236,79 @@ export function computeAllLiveArbitrages(
       }
     }
   }
+
+    // Internal arb pass: same-platform YES+YES on strict binary markets.
+    // Mirrors FEAT-016 in matcher.ts (lines 619-719).
+    if (results.length === 2) {
+      for (let i = 0; i < 2; i++) {
+        const cur = results[i];
+        const comp = results[1 - i];
+        if (cur.stale || comp.stale) continue;
+
+        // ── Kalshi same-platform YES+YES ──
+        const kYesA = cur.kalshiYesAsk;
+        const kYesB = comp.kalshiYesAsk;
+        if (kYesA != null && kYesB != null && kYesA > 0 && kYesB > 0 && kYesA + kYesB < 1) {
+          const capKA = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : Infinity;
+          const capKB = comp.kalshiYesDepth > 0 ? comp.kalshiYesDepth / kYesB : Infinity;
+          const capped = Math.min(capKA, capKB, capital);
+          const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+          if (effectiveCapital > 0) {
+            const stakeA = effectiveCapital * kYesA;
+            const stakeB = effectiveCapital * kYesB;
+            const grossProfit = effectiveCapital - stakeA - stakeB;
+            const contractsA = stakeA / kYesA;
+            const contractsB = stakeB / kYesB;
+            const feeA = calcKalshiFee(contractsA, kYesA);
+            const feeB = calcKalshiFee(contractsB, kYesB);
+            const totalFee = feeA + feeB;
+            const netProfit = grossProfit - totalFee;
+            const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
+            if (netProfit > cur.expectedProfit) {
+              cur.strategy = `Same-platform YES+YES Kalshi: ${cur.artist} + ${comp.artist}`;
+              cur.arbType = 'internal';
+              cur.roiPct = roiPct;
+              cur.expectedProfit = netProfit;
+              cur.kalshiStake = stakeA + stakeB;
+              cur.pmStake = 0;
+              cur.fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit };
+            }
+          }
+        }
+
+        // ── Polymarket same-platform YES+YES ──
+        const pYesA = cur.pmYesAsk;
+        const pYesB = comp.pmYesAsk;
+        if (pYesA != null && pYesB != null && pYesA > 0 && pYesB > 0 && pYesA + pYesB < 1) {
+          const capPA = cur.pmYesDepth > 0 ? cur.pmYesDepth / pYesA : Infinity;
+          const capPB = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : Infinity;
+          const capped = Math.min(capPA, capPB, capital);
+          const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+          if (effectiveCapital > 0) {
+            const stakeA = effectiveCapital * pYesA;
+            const stakeB = effectiveCapital * pYesB;
+            const grossProfit = effectiveCapital - stakeA - stakeB;
+            const pmTheta = getPolymarketTheta(category);
+            const contractsA = stakeA / pYesA;
+            const contractsB = stakeB / pYesB;
+            const feeA = calcPolymarketFee(contractsA, pYesA, pmTheta);
+            const feeB = calcPolymarketFee(contractsB, pYesB, pmTheta);
+            const totalFee = feeA + feeB;
+            const netProfit = grossProfit - totalFee;
+            const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
+            if (netProfit > cur.expectedProfit) {
+              cur.strategy = `Same-platform YES+YES Polymarket: ${cur.artist} + ${comp.artist}`;
+              cur.arbType = 'internal';
+              cur.roiPct = roiPct;
+              cur.expectedProfit = netProfit;
+              cur.kalshiStake = 0;
+              cur.pmStake = stakeA + stakeB;
+              cur.fees = { kalshiFee: 0, pmFee: totalFee, worstCaseNetProfit: netProfit };
+            }
+          }
+        }
+      }
+    }
 
   return results;
 }

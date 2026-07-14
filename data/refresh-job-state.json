@@ -1,18 +1,1423 @@
 {
   "running": false,
-  "startedAt": "2026-07-08T09:40:46.371Z",
-  "total": 277,
-  "processed": 255,
-  "succeeded": 255,
-  "failed": 0,
+  "startedAt": "2026-07-12T10:07:43.280Z",
+  "total": 281,
+  "processed": 281,
+  "succeeded": 0,
+  "failed": 281,
   "errors": [
+    {
+      "id": "1779565300940-jqb54rc",
+      "title": "Maine Senate Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779565414697-01jpgss",
+      "title": "Oklahoma Senate Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779615969341-4z00t8d",
+      "title": "Minnesota Republican Senate Primary Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779652525824-sl6nqkx",
+      "title": "FL-23 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779617150327-ntzesfy",
+      "title": "Wisconsin Governor Democratic Primary Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779918758511-quuqz22",
+      "title": "Pro Football: 2027 AFC Champion ",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779652505195-fchs4a3",
+      "title": "MLS Cup Winner 2026",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780516372802-ky4zbp8",
+      "title": "OH-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1779918332608-3at7dls",
+      "title": "Alaska Governor Election Winner  ",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780516130290-bbhg6o1",
+      "title": "F1 Drivers' Champion",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780525145160-9gggiip",
+      "title": "MLB: 2026 American League Champion",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780525241216-nevhd9n",
+      "title": "Will Anthropic or OpenAI IPO first?",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780515890597-uyepmew",
+      "title": "MLB: 2026 AL Cy Young Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780612499359-fuv0rf2",
+      "title": "MI-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780612579960-z55igki",
+      "title": "New Mexico Governor Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780524935254-y4p559m",
+      "title": "Who will be Trump's next Director of National Intelligence?",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780947342746-x2ck9fp",
+      "title": "MLB: NL Manager of the Year",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780947485064-f22ikcd",
+      "title": "TIME Person of the Year 2026",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1781177189235-6heq6ti",
+      "title": "What kind of product will OpenAI announce in 2026?",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780524929760-fwvrvx2",
+      "title": "Who will win the Ballon d'Or in 2026?",
+      "error": "kalshiYesAsk is not defined"
+    },
     {
       "id": "__timeout__",
       "title": "Job timeout",
-      "error": "Refresh exceeded 300s limit after processing 24/277 markets"
+      "error": "Refresh exceeded 300s limit after processing 20/281 markets"
+    },
+    {
+      "id": "1781519846014-mod39v9",
+      "title": "Venezuela de facto leader end of 2026?",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1781993194195-7cj9e17",
+      "title": "Montana Senate Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782650649084-gy4qfq6",
+      "title": "PA-17 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1780616584214-jghi7cb",
+      "title": "MLB: Home Runs Leader",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-akal",
+      "title": "AK At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-al01",
+      "title": "AL-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1781521870595-oqgkld7",
+      "title": "MLB: Stolen Bases Leader",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-al03",
+      "title": "AL-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-al04",
+      "title": "AL-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-al05",
+      "title": "AL-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782686030954-mvnvq47",
+      "title": "Next UK Chancellor of the Exchequer in 2026?",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1781522252009-181a6ca",
+      "title": "MLB: Doubles Leader",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-al06",
+      "title": "AL-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ar01",
+      "title": "AR-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ar03",
+      "title": "AR-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ar04",
+      "title": "AR-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az01",
+      "title": "AZ-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az03",
+      "title": "AZ-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az04",
+      "title": "AZ-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az06",
+      "title": "AZ-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az08",
+      "title": "AZ-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-az09",
+      "title": "AZ-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca01",
+      "title": "CA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca02",
+      "title": "CA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca03",
+      "title": "CA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca05",
+      "title": "CA-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca06",
+      "title": "CA-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca08",
+      "title": "CA-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca09",
+      "title": "CA-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca15",
+      "title": "CA-15 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca17",
+      "title": "CA-17 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca18",
+      "title": "CA-18 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca19",
+      "title": "CA-19 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca20",
+      "title": "CA-20 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca21",
+      "title": "CA-21 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca22",
+      "title": "CA-22 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca23",
+      "title": "CA-23 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca24",
+      "title": "CA-24 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca26",
+      "title": "CA-26 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca30",
+      "title": "CA-30 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca31",
+      "title": "CA-31 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca32",
+      "title": "CA-32 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca33",
+      "title": "CA-33 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca35",
+      "title": "CA-35 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca38",
+      "title": "CA-38 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca39",
+      "title": "CA-39 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca41",
+      "title": "CA-41 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca42",
+      "title": "CA-42 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca43",
+      "title": "CA-43 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca44",
+      "title": "CA-44 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca49",
+      "title": "CA-49 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca50",
+      "title": "CA-50 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ca51",
+      "title": "CA-51 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-co02",
+      "title": "CO-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-co04",
+      "title": "CO-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-co05",
+      "title": "CO-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-co06",
+      "title": "CO-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-co07",
+      "title": "CO-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ct02",
+      "title": "CT-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ct03",
+      "title": "CT-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ct04",
+      "title": "CT-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-deal",
+      "title": "DE At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl01",
+      "title": "FL-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl02",
+      "title": "FL-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl03",
+      "title": "FL-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl07",
+      "title": "FL-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl09",
+      "title": "FL-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl10",
+      "title": "FL-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl12",
+      "title": "FL-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl16",
+      "title": "FL-16 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl17",
+      "title": "FL-17 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl19",
+      "title": "FL-19 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl20",
+      "title": "FL-20 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl22",
+      "title": "FL-22 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl26",
+      "title": "FL-26 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-fl28",
+      "title": "FL-28 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga01",
+      "title": "GA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga04",
+      "title": "GA-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga05",
+      "title": "GA-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga06",
+      "title": "GA-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga07",
+      "title": "GA-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga08",
+      "title": "GA-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga10",
+      "title": "GA-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ga13",
+      "title": "GA-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-hi01",
+      "title": "HI-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-id01",
+      "title": "ID-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il01",
+      "title": "IL-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il02",
+      "title": "IL-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il03",
+      "title": "IL-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il05",
+      "title": "IL-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il06",
+      "title": "IL-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il07",
+      "title": "IL-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il09",
+      "title": "IL-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il10",
+      "title": "IL-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il11",
+      "title": "IL-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il12",
+      "title": "IL-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il13",
+      "title": "IL-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il14",
+      "title": "IL-14 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-il16",
+      "title": "IL-16 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in02",
+      "title": "IN-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in03",
+      "title": "IN-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in04",
+      "title": "IN-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in05",
+      "title": "IN-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in06",
+      "title": "IN-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in08",
+      "title": "IN-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-in09",
+      "title": "IN-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ia02",
+      "title": "IA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ia04",
+      "title": "IA-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ks03",
+      "title": "KS-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ky03",
+      "title": "KY-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ky05",
+      "title": "KY-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-la01",
+      "title": "LA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-la02",
+      "title": "LA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-la03",
+      "title": "LA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-la06",
+      "title": "LA-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-me01",
+      "title": "ME-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-md04",
+      "title": "MD-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-md05",
+      "title": "MD-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-md06",
+      "title": "MD-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-md08",
+      "title": "MD-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma01",
+      "title": "MA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma02",
+      "title": "MA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma03",
+      "title": "MA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma04",
+      "title": "MA-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma05",
+      "title": "MA-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma07",
+      "title": "MA-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma08",
+      "title": "MA-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ma09",
+      "title": "MA-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi01",
+      "title": "MI-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi02",
+      "title": "MI-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi06",
+      "title": "MI-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi09",
+      "title": "MI-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi11",
+      "title": "MI-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi12",
+      "title": "MI-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mi13",
+      "title": "MI-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mn03",
+      "title": "MN-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mn04",
+      "title": "MN-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mn05",
+      "title": "MN-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mn06",
+      "title": "MN-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ms01",
+      "title": "MS-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ms02",
+      "title": "MS-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ms03",
+      "title": "MS-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-ms04",
+      "title": "MS-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mo01",
+      "title": "MO-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mo02",
+      "title": "MO-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196726-house-mo03",
+      "title": "MO-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-mo05",
+      "title": "MO-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-mo06",
+      "title": "MO-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-mo08",
+      "title": "MO-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ne01",
+      "title": "NE-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nv03",
+      "title": "NV-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nh02",
+      "title": "NH-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj01",
+      "title": "NJ-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj03",
+      "title": "NJ-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj04",
+      "title": "NJ-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj06",
+      "title": "NJ-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj08",
+      "title": "NJ-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj09",
+      "title": "NJ-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj10",
+      "title": "NJ-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj11",
+      "title": "NJ-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nj12",
+      "title": "NJ-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny02",
+      "title": "NY-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny06",
+      "title": "NY-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny07",
+      "title": "NY-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny08",
+      "title": "NY-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny09",
+      "title": "NY-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny10",
+      "title": "NY-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny12",
+      "title": "NY-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny13",
+      "title": "NY-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny14",
+      "title": "NY-14 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny15",
+      "title": "NY-15 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny16",
+      "title": "NY-16 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny17",
+      "title": "NY-17 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny18",
+      "title": "NY-18 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny20",
+      "title": "NY-20 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny23",
+      "title": "NY-23 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ny25",
+      "title": "NY-25 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc02",
+      "title": "NC-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc03",
+      "title": "NC-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc04",
+      "title": "NC-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc05",
+      "title": "NC-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc07",
+      "title": "NC-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc09",
+      "title": "NC-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc10",
+      "title": "NC-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc11",
+      "title": "NC-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc13",
+      "title": "NC-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-nc14",
+      "title": "NC-14 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ndal",
+      "title": "ND At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh02",
+      "title": "OH-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh03",
+      "title": "OH-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh04",
+      "title": "OH-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh05",
+      "title": "OH-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh06",
+      "title": "OH-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh07",
+      "title": "OH-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh15",
+      "title": "OH-15 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh09",
+      "title": "OH-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh10",
+      "title": "OH-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh11",
+      "title": "OH-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-oh12",
+      "title": "OH-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ok01",
+      "title": "OK-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ok02",
+      "title": "OK-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-or03",
+      "title": "OR-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-or04",
+      "title": "OR-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-or06",
+      "title": "OR-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa02",
+      "title": "PA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa03",
+      "title": "PA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa06",
+      "title": "PA-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa10",
+      "title": "PA-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa11",
+      "title": "PA-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa12",
+      "title": "PA-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa13",
+      "title": "PA-13 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-pa15",
+      "title": "PA-15 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-sc05",
+      "title": "SC-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-sdal",
+      "title": "SD At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tn01",
+      "title": "TN-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tn05",
+      "title": "TN-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tn07",
+      "title": "TN-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tn08",
+      "title": "TN-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tn09",
+      "title": "TN-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx01",
+      "title": "TX-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx02",
+      "title": "TX-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx03",
+      "title": "TX-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx04",
+      "title": "TX-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx05",
+      "title": "TX-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx08",
+      "title": "TX-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx09",
+      "title": "TX-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx12",
+      "title": "TX-12 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx14",
+      "title": "TX-14 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx17",
+      "title": "TX-17 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx18",
+      "title": "TX-18 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx19",
+      "title": "TX-19 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx23",
+      "title": "TX-23 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx24",
+      "title": "TX-24 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx25",
+      "title": "TX-25 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx26",
+      "title": "TX-26 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx30",
+      "title": "TX-30 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx36",
+      "title": "TX-36 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-tx37",
+      "title": "TX-37 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-ut02",
+      "title": "UT-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va01",
+      "title": "VA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va03",
+      "title": "VA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va04",
+      "title": "VA-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va05",
+      "title": "VA-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va08",
+      "title": "VA-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va09",
+      "title": "VA-09 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va10",
+      "title": "VA-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-va11",
+      "title": "VA-11 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-vtal",
+      "title": "VT At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa01",
+      "title": "WA-01 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa02",
+      "title": "WA-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa03",
+      "title": "WA-03 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa05",
+      "title": "WA-05 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa06",
+      "title": "WA-06 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa07",
+      "title": "WA-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa08",
+      "title": "WA-08 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wa10",
+      "title": "WA-10 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wi02",
+      "title": "WI-02 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wyal",
+      "title": "WY At-Large House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wi04",
+      "title": "WI-04 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "1782999196727-house-wi07",
+      "title": "WI-07 House Election Winner",
+      "error": "kalshiYesAsk is not defined"
+    },
+    {
+      "id": "451ba098-39e1-4701-84d3-184855e7cae3",
+      "title": "Fed Decision in July?",
+      "error": "kalshiYesAsk is not defined"
     }
   ],
-  "currentMarketId": "1782999196727-house-va04",
-  "currentMarketTitle": "VA-04 House Election Winner",
-  "finishedAt": "2026-07-08T09:45:46.370Z"
+  "currentMarketId": "451ba098-39e1-4701-84d3-184855e7cae3",
+  "currentMarketTitle": "Fed Decision in July?",
+  "finishedAt": "2026-07-12T10:12:43.280Z"
 }
