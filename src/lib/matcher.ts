@@ -540,6 +540,14 @@ export function calculateBestArbitrageForOutcome(
     return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
   }
 
+  // BUG-086b: Zero prices mean no orderbook/liquidity — don't compute arbitrage
+  if ((current.kalshi.yesAsk ?? 0) === 0 && (current.kalshi.noAsk ?? 0) === 0) {
+    return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
+  if ((current.polymarket.bestAsk ?? 0) === 0 && (current.polymarket.noPrice ?? 0) === 0 && (current.polymarket.yesPrice ?? 0) === 0) {
+    return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
+
   const depthKYes = parseDepth(current.kalshi.yesAskDepth);
   const depthKNo = parseDepth(current.kalshi.noAskDepth) || parseDepth(current.kalshi.yesAskDepth);
   const depthPYes = current.polymarket.askDepth != null && current.polymarket.askDepth > 0 ? current.polymarket.askDepth : Infinity;
@@ -939,7 +947,7 @@ export function buildPmArbShape(market: PMMarket) {
   } else {
     // No orderbook data at all — gamma outcomePrices are aggressively cached
     // and stale. Using them produces "ghost prices" that show fake ROI.
-    // Zero out so no arb is computed (BUG-086).
+    // Zero out so no arb is computed (BUG-086/BUG-086b).
     yesPrice = 0;
     noPrice = 0;
   }
@@ -949,8 +957,8 @@ export function buildPmArbShape(market: PMMarket) {
     conditionId: market.conditionId,
     yesPrice,
     noPrice,
-    bestBid: rawBestBid ?? prices[0] ?? 0,
-    bestAsk: rawBestAsk ?? prices[0] ?? 0,
+    bestBid: rawBestBid != null ? rawBestBid : 0,
+    bestAsk: rawBestAsk != null ? rawBestAsk : 0,
     lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
     volume: market.volume,
     liquidity: market.liquidity,
