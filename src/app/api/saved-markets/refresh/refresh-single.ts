@@ -166,7 +166,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       if (!clob) return m;
       try {
         const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
-        if (!live) return m;
+        if (!live) {
+          // CLOB orderbook is empty — don't trust gamma's cached bestAsk/bestBid (BUG-086b)
+          return { ...m, bestAsk: undefined, bestBid: undefined };
+        }
         return {
           ...m,
           outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),

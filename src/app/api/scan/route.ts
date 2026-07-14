@@ -185,7 +185,10 @@ export async function POST(request: NextRequest) {
         if (!clob) return m;
         try {
           const live = await getClobPrices(clob);
-          if (!live) return m;
+          if (!live) {
+            // CLOB orderbook is empty — don't trust gamma's cached bestAsk/bestBid (BUG-086b)
+            return { ...m, bestAsk: undefined, bestBid: undefined };
+          }
 
           if (DEBUG_H2H) {
             logger.debug('[scan] CLOB neg_risk', { negRisk: clob.neg_risk, conditionId: m.conditionId?.slice(0, 12), question: m.question?.slice(0, 40) });
