@@ -1867,12 +1867,16 @@ export default function Home() {
                         outcomeArtists={(result.outcomes ?? [])
                           .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket)
                           .map((o: UnifiedOutcome) => o.artist)}
-                        currentSpread={(() => {
-                          const b = result.outcomes?.find((o: UnifiedOutcome) => o.kalshi && o.polymarket);
-                          return b && b.kalshi && b.polymarket ? Math.abs(b.kalshi.yesAsk - b.polymarket.yesPrice) * 100 : undefined;
+                        currentAvgRoi={(() => {
+                          const rois = (result.outcomes ?? [])
+                            .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket)
+                            .map((o: UnifiedOutcome) => o.arbitrage?.roiPct ?? 0);
+                          return rois.length ? rois.reduce((s: number, r: number) => s + r, 0) / rois.length : undefined;
                         })()}
                         currentRoi={(() => {
-                          const rois = (result.outcomes ?? []).map((o: UnifiedOutcome) => o.arbitrage?.roiPct ?? 0);
+                          const rois = (result.outcomes ?? [])
+                            .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket)
+                            .map((o: UnifiedOutcome) => o.arbitrage?.roiPct ?? 0);
                           return rois.length ? Math.max(...rois) : undefined;
                         })()}
                       />

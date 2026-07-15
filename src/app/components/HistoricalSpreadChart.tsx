@@ -18,14 +18,15 @@ interface Props {
   marketId: string;
   /** Current outcome names from the scan result (for toggle UI) */
   outcomeArtists?: string[];
-  /** Current spread for live indicator */
-  currentSpread?: number;
+  /** Current average ROI for live indicator (average mode) */
+  currentAvgRoi?: number;
+  /** Current best ROI for live indicator (per-outcome mode) */
   currentRoi?: number;
 }
 
 type ViewMode = "average" | string; // "average" or an outcome artist name
 
-export function HistoricalSpreadChart({ marketId, outcomeArtists, currentSpread, currentRoi }: Props) {
+export function HistoricalSpreadChart({ marketId, outcomeArtists, currentAvgRoi, currentRoi }: Props) {
   const [timeRange, setTimeRange] = useState<TimeRange>("24h");
   const [data, setData] = useState<SpreadPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,7 +229,7 @@ export function HistoricalSpreadChart({ marketId, outcomeArtists, currentSpread,
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[#5DBE81] font-bold">
-                          {formatTooltip(p.spread)}
+                          {formatTooltip(p.roiPct)}
                         </span>
                         <span className="text-[#8A9BA8]">{p.strategy}</span>
                       </div>
@@ -249,20 +250,18 @@ export function HistoricalSpreadChart({ marketId, outcomeArtists, currentSpread,
                           <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm inline" /> {p.pmYesBid.toFixed(3)} / {p.pmYesAsk.toFixed(3)}
                         </span>
                       </div>
-                      <div className="text-[#facc15] text-[10px]">
-                        ROI: {p.roiPct.toFixed(2)}%
-                      </div>
                     </div>
                   );
                 }) as any}
               />
-              {/* Zero spread reference line */}
+              {/* Zero ROI reference line */}
               <ReferenceLine y={0} stroke="#232E3C" strokeDasharray="4 2" />
 
-              {/* Spread area */}
+              {/* ROI area — uses roiPct (net arbitrage ROI) not raw spread,
+                  so the chart matches the per-row ROI shown in the outcome table */}
               <Area
                 type="monotone"
-                dataKey="spread"
+                dataKey="roiPct"
                 stroke="#5DBE81"
                 strokeWidth={1.5}
                 fill="url(#positiveGradient)"
@@ -288,21 +287,21 @@ export function HistoricalSpreadChart({ marketId, outcomeArtists, currentSpread,
             <span>·</span>
             <span>
               Best: <span className="text-[#5DBE81] font-bold">
-                {(+Math.max(...chartData.map(d => d.spread)).toFixed(2))}%
+                {(+Math.max(...chartData.map(d => d.roiPct)).toFixed(2))}%
               </span>
             </span>
             <span>
               Avg: <span className="text-[#FFFFFF] font-mono">
-                {(chartData.reduce((s, d) => s + d.spread, 0) / chartData.length).toFixed(2)}%
+                {(chartData.reduce((s, d) => s + d.roiPct, 0) / chartData.length).toFixed(2)}%
               </span>
             </span>
           </div>
-          {currentSpread !== undefined && viewMode === "average" && (
+          {currentAvgRoi !== undefined && viewMode === "average" && (
             <div className="flex items-center gap-1.5">
               <ZoomIn className="w-3 h-3" />
-              <span>Live:</span>
-              <span className={`font-bold ${currentSpread > 0 ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
-                {currentSpread > 0 ? "+" : ""}{currentSpread.toFixed(2)}%
+              <span>Live ROI:</span>
+              <span className={`font-bold ${currentAvgRoi > 0 ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
+                {currentAvgRoi > 0 ? "+" : ""}{currentAvgRoi.toFixed(2)}%
               </span>
             </div>
           )}
