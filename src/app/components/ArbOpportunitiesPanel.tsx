@@ -64,7 +64,13 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
     setResolvingArtist(o.artist);
     setExecError(null);
     try {
-      const res = await fetch(`/api/pm-tokens?conditionId=${encodeURIComponent(o.polymarket.conditionId)}`, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`/api/pm-tokens?conditionId=${encodeURIComponent(o.polymarket.conditionId)}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Token resolution failed');
       const exec = buildExecutableArb({
@@ -85,7 +91,11 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
       if (!exec) throw new Error('Strategy not executable from this button (cross-outcome or missing prices)');
       setExecutingArb(exec);
     } catch (e: any) {
-      setExecError(`${o.artist}: ${e.message}`);
+      const msg = e.name === 'AbortError'
+        ? `Timed out resolving Polymarket tokens for ${o.artist}. The CLOB API may be slow. Try again.`
+        : `${o.artist}: ${e.message}`;
+      setExecError(msg);
+      setTimeout(() => setExecError(null), 8000);
     } finally {
       setResolvingArtist(null);
     }
@@ -180,7 +190,11 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
 
       {/* Execute error */}
       {execError && (
-        <div className="px-4 py-2 text-xs text-[#ef4444] border-t border-[#182533]">{execError}</div>
+        <div className="mx-4 my-2 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-2.5 text-xs text-[#ef4444] flex items-center gap-2">
+          <span className="text-sm">⚠️</span>
+          <span>{execError}</span>
+          <button onClick={() => setExecError(null)} className="ml-auto text-[#ef4444]/60 hover:text-[#ef4444] text-xs">✕</button>
+        </div>
       )}
 
       {/* Execute confirmation modal */}
