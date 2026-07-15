@@ -107,3 +107,56 @@ export async function cancelPmOrder(orderId: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Poll a single order's status (used to confirm fills after placement). */
+export async function getPmOrder(orderId: string): Promise<PmOrderResponse | null> {
+  try {
+    const client = await getClobClient();
+    const order = await client.getOrder(orderId);
+    if (!order) return null;
+    const status = String(order.status ?? 'unknown');
+    return {
+      orderId: String(order.id ?? order.order_id ?? orderId),
+      status,
+      success: true,
+      raw: order,
+    };
+  } catch (err) {
+    logger.warn('[pm-orders] get order failed', { orderId, err });
+    return null;
+  }
+}
+
+/** Place a SELL order to close an existing position (auto-close on partial-fill failure). */
+export async function placePmSellOrder(p: PmOrderParams): Promise<PmOrderResponse> {
+  if (p.price <= 0 || p.price >= 1) throw new Error(`PM price out of range: ${p.price}`);
+  if (p.size <= 0) throw new Error(`PM size must be > 0, got ${p.size}`);
+
+  const client = await getClobClient();
+  const { Side, OrderType } = await import('@polymarket/clob-client');
+
+  const resp = await client.createAndPostOrder(
+    {
+      tokenID: p.tokenId,
+      price: p.price,
+      side: Side.SELL,
+      size: p.size,
+    },
+    undefined,
+    OrderType.GTC,
+  );
+
+  const success = Boolean(resp?.success);
+  if (!success) {
+    const msg = resp?.errorMsg || JSON.stringify(resp ?? {}).slice(0, 300);
+    logger.error('[pm-orders] sell order rejected', { tokenId: p.tokenId, msg });
+    throw new Error(`Polymarket sell order failed: ${msg}`);
+  }
+
+  return {
+    orderId: resp?.orderID ?? resp?.orderId ?? '',
+    status: resp?.status ?? 'unknown',
+    success,
+    raw: resp,
+  };
+}

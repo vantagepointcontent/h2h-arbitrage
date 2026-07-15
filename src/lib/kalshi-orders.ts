@@ -87,6 +87,46 @@ export async function cancelKalshiOrder(orderId: string): Promise<boolean> {
   return true;
 }
 
+/** Place a SELL order to close an existing position (auto-close on partial-fill failure). */
+export async function placeKalshiSellOrder(p: KalshiOrderParams): Promise<KalshiOrderResponse> {
+  if (p.priceCents < 1 || p.priceCents > 99) throw new Error(`Kalshi price out of range: ${p.priceCents}¢`);
+  if (p.count < 1) throw new Error(`Kalshi count must be >= 1, got ${p.count}`);
+
+  const path = '/trade-api/v2/portfolio/orders';
+  const body = {
+    ticker: p.ticker,
+    client_order_id: p.clientOrderId,
+    action: 'sell',
+    side: p.side,
+    count: Math.floor(p.count),
+    type: 'limit',
+    ...(p.side === 'yes' ? { yes_price: Math.round(p.priceCents) } : { no_price: Math.round(p.priceCents) }),
+  };
+
+  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/orders`, {
+    method: 'POST',
+    headers: { ...makeKalshiAuthHeaders('POST', path), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (data as any)?.error?.message || (data as any)?.message || `HTTP ${res.status}`;
+    logger.error('[kalshi-orders] sell order rejected', { ticker: p.ticker, status: res.status, msg });
+    throw new Error(`Kalshi sell order failed: ${msg}`);
+  }
+
+  const order = (data as any)?.order ?? data;
+  return {
+    orderId: order?.order_id ?? '',
+    status: order?.status ?? 'unknown',
+    filledCount: Number(order?.taker_fill_count ?? order?.fill_count ?? 0),
+    remainingCount: Number(order?.remaining_count ?? 0),
+    raw: data,
+  };
+}
+
 /** Poll a single order's status (used to confirm fills after placement). */
 export async function getKalshiOrder(orderId: string): Promise<KalshiOrderResponse | null> {
   const path = `/trade-api/v2/portfolio/orders/${orderId}`;

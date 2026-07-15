@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, RefreshCw, Receipt, X, CheckCircle2, XCircle, Clock, Ban } from 'lucide-react';
+import { Loader2, RefreshCw, Receipt, X, CheckCircle2, XCircle, Clock, Ban, ShieldAlert } from 'lucide-react';
 
 interface ExecutionRecord {
   id: number;
@@ -20,7 +20,15 @@ interface ExecutionRecord {
   strategy?: string | null;
   kalshiOrder?: { ticker?: string; outcome?: string; side?: string; size?: number; price?: number; platform?: string } | null;
   polymarketOrder?: { outcome?: string; side?: string; size?: number; price?: number; platform?: string; conditionId?: string } | null;
-  result?: { error?: string; kalshiResult?: { status?: string; orderId?: string }; polymarketResult?: { status?: string; orderId?: string } } | null;
+  result?: {
+    error?: string;
+    kalshiResult?: { status?: string; orderId?: string; filledSize?: number; filledPrice?: number; error?: string };
+    polymarketResult?: { status?: string; orderId?: string; filledSize?: number; filledPrice?: number; error?: string };
+    rollbackExecuted?: boolean;
+    unhedged?: boolean;
+    netExposure?: number;
+    actualProfit?: number;
+  } | null;
   estimatedProfit: number;
 }
 
@@ -129,6 +137,10 @@ export default function TradesPanel() {
   const realTrades = trades.filter(t => !t.dryRun && t.success);
   const totalEstProfit = realTrades.reduce((s, t) => s + (t.estimatedProfit || 0), 0);
   const pendingCount = trades.filter(t => tradeStatus(t) === 'pending').length;
+  const unhedgedCount = trades.filter(t => t.result?.unhedged).length;
+  const unhedgedExposure = trades
+    .filter(t => t.result?.unhedged)
+    .reduce((s, t) => s + (t.result?.netExposure ?? 0), 0);
 
   return (
     <div className="p-4 sm:p-6">
@@ -183,6 +195,16 @@ export default function TradesPanel() {
         </div>
       </div>
 
+      {/* Unhedged exposure warning */}
+      {unhedgedCount > 0 && (
+        <div className="mb-4 p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-sm flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <span>
+            <b>{unhedgedCount} unhedged trade{unhedgedCount > 1 ? 's' : ''}</b> — ${fmtUsd(unhedgedExposure)} total exposure from failed auto-closes. Close manually on the platform.
+          </span>
+        </div>
+      )}
+
       {error && (
         <div className="text-sm text-[#ef4444] mb-3 flex items-center gap-2">
           <XCircle className="w-4 h-4" /> {error}
@@ -209,6 +231,7 @@ export default function TradesPanel() {
                 <th className="text-left px-4 py-3 font-medium">Side</th>
                 <th className="text-right px-4 py-3 font-medium">Size</th>
                 <th className="text-right px-4 py-3 font-medium">Price</th>
+                <th className="text-center px-4 py-3 font-medium">Fill</th>
                 <th className="text-center px-4 py-3 font-medium">Status</th>
                 <th className="text-right px-4 py-3 font-medium">Est. P&L</th>
                 <th className="text-center px-4 py-3 font-medium">Mode</th>
@@ -218,13 +241,23 @@ export default function TradesPanel() {
             <tbody className="divide-y divide-[#182533]">
               {visible.map(t => {
                 const status = tradeStatus(t);
+                const isUnhedged = Boolean(t.result?.unhedged);
+                // Per-leg fill status from result
+                const legResults = [
+                  t.result?.kalshiResult,
+                  t.result?.polymarketResult,
+                ];
                 // Render both legs as sub-rows when both exist
                 const legs = [
                   t.kalshiOrder ? { ...t.kalshiOrder, platform: 'Kalshi' } : null,
                   t.polymarketOrder ? { ...t.polymarketOrder, platform: 'Polymarket' } : null,
                 ].filter(Boolean) as { platform: string; outcome?: string; side?: string; size?: number; price?: number }[];
 
-                return legs.map((leg, i) => (
+                return legs.map((leg, i) => {
+                  const legResult = legResults[i];
+                  const legFill = legResult?.status ?? '—';
+                  const legFilledSize = legResult?.filledSize;
+                  return (
                   <tr key={`${t.id}-${i}`} className="hover:bg-[#182533]/50 transition-colors">
                     {i === 0 && (
                       <>
@@ -248,10 +281,33 @@ export default function TradesPanel() {
                     <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
                       {leg.price != null ? leg.price.toFixed(3) : '—'}
                     </td>
+                    <td className="px-4 py-3 text-xs text-center whitespace-nowrap">
+                      <span className={`text-[9px] font-medium uppercase ${
+                        legFill === 'filled' ? 'text-[#5DBE81]' :
+                        legFill === 'partial' ? 'text-amber-400' :
+                        legFill === 'pending' ? 'text-amber-400' :
+                        legFill === 'rejected' || legFill === 'cancelled' ? 'text-[#ef4444]' :
+                        'text-[#8A9BA8]'
+                      }`}>
+                        {legFill}{legFilledSize ? ` · $${legFilledSize.toFixed(0)}` : ''}
+                      </span>
+                    </td>
                     {i === 0 && (
                       <>
                         <td rowSpan={legs.length} className="px-4 py-3 text-center align-top">
-                          <StatusBadge status={status} />
+                          <div className="flex flex-col items-center gap-1">
+                            <StatusBadge status={status} />
+                            {isUnhedged && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-500/20 text-red-400">
+                                <ShieldAlert className="w-2.5 h-2.5" /> Unhedged
+                              </span>
+                            )}
+                            {t.result?.rollbackExecuted && !isUnhedged && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/15 text-amber-400">
+                                Rolled back
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td rowSpan={legs.length} className={`px-4 py-3 text-xs text-right font-medium align-top ${t.estimatedProfit >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
                           {fmtUsd(t.estimatedProfit)}
@@ -277,7 +333,8 @@ export default function TradesPanel() {
                       </>
                     )}
                   </tr>
-                ));
+                  );
+                });
               })}
             </tbody>
           </table>

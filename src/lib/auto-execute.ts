@@ -59,6 +59,7 @@ export interface ExecutionResult {
   actualProfit?: number;
   netExposure?: number;      // if partial fills, the net dollar exposure
   rollbackExecuted: boolean;
+  unhedged: boolean;          // true if auto-close failed and exposure remains
   executionTimeMs: number;
   error?: string;
 }
@@ -113,18 +114,44 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
 // ─── Dry Run Simulator ──────────────────────────────────────────
 
 function simulateOrder(req: OrderRequest): OrderResult {
-  // Simulate a successful fill at the requested price
-  // Add small random slippage (0-0.5%)
+  // Simulate fill behavior — sometimes returns pending to exercise poll loop
+  const roll = Math.random();
+  if (roll < 0.15) {
+    // 15% chance: order is pending (not yet filled)
+    return {
+      platform: req.platform,
+      status: 'pending',
+      filledSize: 0,
+      filledPrice: req.price,
+      orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  // 85% chance: filled (with random slippage + partial fill ratio)
   const slippage = (Math.random() - 0.5) * 0.005;
   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
   const fillRatio = 0.85 + Math.random() * 0.15; // 85-100% fill
-
   return {
     platform: req.platform,
     status: fillRatio >= 0.99 ? 'filled' : 'partial',
     filledSize: req.size * fillRatio,
     filledPrice,
     orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** Simulate polling a pending dry-run order — fills after 1-3 polls. */
+function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
+  const slippage = (Math.random() - 0.5) * 0.005;
+  const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
+  const fillRatio = 0.85 + Math.random() * 0.15;
+  return {
+    platform: req.platform,
+    status: fillRatio >= 0.99 ? 'filled' : 'partial',
+    filledSize: req.size * fillRatio,
+    filledPrice,
+    orderId,
     timestamp: new Date().toISOString(),
   };
 }
@@ -200,6 +227,109 @@ async function cancelLeg(result: OrderResult): Promise<boolean> {
 
 // ─── Execution Engine ────────────────────────────────────────────
 
+const POLL_INTERVAL_MS = 2000;
+const DEFAULT_TIMEOUT_MS = 15000;
+
+/** Determine if an order status is "settled" (no longer changing). */
+function isSettled(status: OrderStatus): boolean {
+  return status === 'filled' || status === 'rejected' || status === 'cancelled' || status === 'expired';
+}
+
+/** Determine if an order has any fill (partial or full). */
+function hasFill(r: OrderResult): boolean {
+  return (r.filledSize ?? 0) > 0;
+}
+
+/** Close a filled position by placing a sell order at the fill price.
+ *  Returns true if the close succeeded, false if it failed (exposure remains). */
+async function autoCloseLeg(
+  leg: OrderResult,
+  req: OrderRequest,
+  arbId: string,
+  dryRun: boolean,
+): Promise<boolean> {
+  if (!hasFill(leg) || !leg.orderId) return true; // nothing to close
+
+  if (dryRun) {
+    // Simulate: 90% success rate for close
+    return Math.random() > 0.1;
+  }
+
+  try {
+    if (leg.platform === 'kalshi') {
+      const { placeKalshiSellOrder } = await import('./kalshi-orders');
+      const priceCents = Math.round((leg.filledPrice ?? req.price) * 100);
+      const count = Math.max(1, Math.floor((leg.filledSize ?? 0) / (leg.filledPrice ?? req.price)));
+      const r = await placeKalshiSellOrder({
+        ticker: req.ticker!,
+        side: req.outcome,
+        count,
+        priceCents,
+        clientOrderId: `h2h-close-${arbId}-k`.slice(0, 64),
+      });
+      return r.status === 'executed' || r.filledCount > 0;
+    } else {
+      const { placePmSellOrder } = await import('./polymarket-orders');
+      const size = (leg.filledSize ?? 0) / (leg.filledPrice ?? req.price);
+      const r = await placePmSellOrder({
+        tokenId: req.conditionId!,
+        price: leg.filledPrice ?? req.price,
+        size,
+      });
+      return r.status === 'matched' || r.success;
+    }
+  } catch {
+    return false; // close failed — exposure remains
+  }
+}
+
+/** Poll a pending order for fill status. Returns updated OrderResult. */
+async function pollOrder(
+  leg: OrderResult,
+  req: OrderRequest,
+  dryRun: boolean,
+): Promise<OrderResult> {
+  if (!leg.orderId || isSettled(leg.status)) return leg;
+
+  if (dryRun) {
+    // Simulate: 70% chance of filling on each poll
+    if (Math.random() < 0.7) {
+      return simulatePollResult(req, leg.orderId);
+    }
+    return leg; // still pending
+  }
+
+  try {
+    if (leg.platform === 'kalshi') {
+      const { getKalshiOrder } = await import('./kalshi-orders');
+      const updated = await getKalshiOrder(leg.orderId);
+      if (!updated) return leg;
+      return {
+        platform: 'kalshi',
+        status: updated.status === 'executed' ? 'filled' : (updated.status as OrderStatus),
+        filledSize: updated.filledCount * (leg.filledPrice ?? req.price),
+        filledPrice: leg.filledPrice ?? req.price,
+        orderId: leg.orderId,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      const { getPmOrder } = await import('./polymarket-orders');
+      const updated = await getPmOrder(leg.orderId);
+      if (!updated) return leg;
+      return {
+        platform: 'polymarket',
+        status: updated.status === 'matched' ? 'filled' : (updated.status as OrderStatus),
+        filledSize: updated.status === 'matched' ? req.size : leg.filledSize,
+        filledPrice: leg.filledPrice ?? req.price,
+        orderId: leg.orderId,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch {
+    return leg; // poll failed, return current state
+  }
+}
+
 export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult> {
   const startTime = Date.now();
   const limits = getSafetyLimitsFromEnv();
@@ -215,48 +345,142 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       kalshiResult: emptyResult('kalshi', 'rejected'),
       polymarketResult: emptyResult('polymarket', 'rejected'),
       rollbackExecuted: false,
+      unhedged: false,
       executionTimeMs: Date.now() - startTime,
       error: validation.errors.join('; '),
     };
   }
 
-  // Execute both legs simultaneously
+  // ── Phase 1: Fire both legs simultaneously ──
   let kalshiResult: OrderResult;
   let polymarketResult: OrderResult;
 
   if (effectiveDryRun) {
-    // Dry run: simulate both orders
     [kalshiResult, polymarketResult] = await Promise.all([
       Promise.resolve(simulateOrder(req.kalshiOrder)),
       Promise.resolve(simulateOrder(req.polymarketOrder)),
     ]);
   } else {
-    // REAL EXECUTION (HOOKUP-04 step 2): both legs in parallel, limit orders.
     [kalshiResult, polymarketResult] = await Promise.all([
       placeRealKalshiLeg(req.kalshiOrder, req.arbId),
       placeRealPmLeg(req.polymarketOrder),
     ]);
   }
 
-  // Check for failures and rollback
-  let rollbackExecuted = false;
-  const kalshiFailed = kalshiResult.status === 'rejected' || kalshiResult.status === 'cancelled';
-  const polymarketFailed = polymarketResult.status === 'rejected' || polymarketResult.status === 'cancelled';
+  // ── Phase 2: Poll loop — wait for fills or timeout ──
+  const timeoutMs = req.timeoutMs || limits.orderTimeoutMs || DEFAULT_TIMEOUT_MS;
+  const deadline = startTime + timeoutMs;
 
-  if (kalshiFailed || polymarketFailed) {
-    // Rollback: cancel the successful leg
-    if (!kalshiFailed && polymarketFailed) {
-      if (!effectiveDryRun) await cancelLeg(kalshiResult);
-      kalshiResult = { ...kalshiResult, status: 'cancelled' };
-      rollbackExecuted = true;
-    } else if (!polymarketFailed && kalshiFailed) {
-      if (!effectiveDryRun) await cancelLeg(polymarketResult);
-      polymarketResult = { ...polymarketResult, status: 'cancelled' };
-      rollbackExecuted = true;
-    }
+  while (
+    !isSettled(kalshiResult.status) ||
+    !isSettled(polymarketResult.status)
+  ) {
+    if (Date.now() >= deadline) break;
+
+    await sleep(POLL_INTERVAL_MS);
+    if (Date.now() >= deadline) break;
+
+    // Poll both legs in parallel
+    [kalshiResult, polymarketResult] = await Promise.all([
+      pollOrder(kalshiResult, req.kalshiOrder, effectiveDryRun),
+      pollOrder(polymarketResult, req.polymarketOrder, effectiveDryRun),
+    ]);
   }
 
-  // Calculate actual profit and net exposure
+  // ── Phase 3: Risk handling — manage partial fills and failures ──
+  let rollbackExecuted = false;
+  let unhedged = false;
+
+  const kFailed = kalshiResult.status === 'rejected' || kalshiResult.status === 'cancelled' || kalshiResult.status === 'expired';
+  const pFailed = polymarketResult.status === 'rejected' || polymarketResult.status === 'cancelled' || polymarketResult.status === 'expired';
+  const kFilled = hasFill(kalshiResult);
+  const pFilled = hasFill(polymarketResult);
+
+  if (kFailed && pFailed) {
+    // Both failed — clean failure, no exposure
+  } else if (kFailed && pFilled) {
+    // Kalshi failed, Polymarket filled — auto-close Polymarket
+    if (!effectiveDryRun) await cancelLeg(polymarketResult);
+    const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
+    if (!closed) {
+      unhedged = true;
+    } else {
+      polymarketResult = { ...polymarketResult, status: 'cancelled' };
+    }
+    rollbackExecuted = true;
+  } else if (pFailed && kFilled) {
+    // Polymarket failed, Kalshi filled — auto-close Kalshi
+    if (!effectiveDryRun) await cancelLeg(kalshiResult);
+    const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
+    if (!closed) {
+      unhedged = true;
+    } else {
+      kalshiResult = { ...kalshiResult, status: 'cancelled' };
+    }
+    rollbackExecuted = true;
+  } else if (kFilled && pFilled) {
+    // Both have fills — check if matched
+    const kFill = kalshiResult.filledSize ?? 0;
+    const pFill = polymarketResult.filledSize ?? 0;
+    const minFill = Math.min(kFill, pFill);
+    const maxFill = Math.max(kFill, pFill);
+
+    if (minFill < maxFill) {
+      // Mismatched fills — cancel both and close the excess
+      if (!effectiveDryRun) {
+        await cancelLeg(kalshiResult);
+        await cancelLeg(polymarketResult);
+      }
+      // Close the excess from the larger leg
+      const excess = maxFill - minFill;
+      const largerLeg = kFill > pFill ? kalshiResult : polymarketResult;
+      const largerReq = kFill > pFill ? req.kalshiOrder : req.polymarketOrder;
+      const closed = await autoCloseLeg(
+        { ...largerLeg, filledSize: excess },
+        largerReq,
+        req.arbId,
+        effectiveDryRun,
+      );
+      if (!closed) {
+        unhedged = true;
+      }
+      rollbackExecuted = true;
+    }
+    // If matched fills, no rollback needed — both sides hedged
+  } else if (!kFilled && !pFilled) {
+    // Both pending at timeout — cancel both, no exposure
+    if (!effectiveDryRun) {
+      await cancelLeg(kalshiResult);
+      await cancelLeg(polymarketResult);
+    }
+    kalshiResult = { ...kalshiResult, status: 'cancelled' };
+    polymarketResult = { ...polymarketResult, status: 'cancelled' };
+    rollbackExecuted = true;
+  } else if (kFilled && !pFilled && !pFailed) {
+    // Kalshi filled, Polymarket still pending — cancel PM, auto-close Kalshi
+    if (!effectiveDryRun) await cancelLeg(polymarketResult);
+    polymarketResult = { ...polymarketResult, status: 'cancelled' };
+    const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
+    if (!closed) {
+      unhedged = true;
+    } else {
+      kalshiResult = { ...kalshiResult, status: 'cancelled' };
+    }
+    rollbackExecuted = true;
+  } else if (pFilled && !kFilled && !kFailed) {
+    // Polymarket filled, Kalshi still pending — cancel Kalshi, auto-close Polymarket
+    if (!effectiveDryRun) await cancelLeg(kalshiResult);
+    kalshiResult = { ...kalshiResult, status: 'cancelled' };
+    const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
+    if (!closed) {
+      unhedged = true;
+    } else {
+      polymarketResult = { ...polymarketResult, status: 'cancelled' };
+    }
+    rollbackExecuted = true;
+  }
+
+  // ── Calculate actual profit and net exposure ──
   let actualProfit: number | undefined;
   let netExposure: number | undefined;
 
@@ -265,16 +489,20 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     const pmFilled = polymarketResult.filledSize;
     const minFill = Math.min(kalshiFilled, pmFilled);
     const maxFill = Math.max(kalshiFilled, pmFilled);
-    netExposure = maxFill - minFill; // unmatched exposure
+    netExposure = unhedged ? (maxFill - minFill) : 0;
 
     // Profit = minFill * (1 - buyYesPrice - buyNoPrice) — simplified
     const spread = 1 - kalshiResult.filledPrice - polymarketResult.filledPrice;
     actualProfit = minFill * spread;
+  } else if (unhedged) {
+    // One leg filled, other didn't — all of the filled amount is exposure
+    netExposure = (kalshiResult.filledSize ?? 0) + (polymarketResult.filledSize ?? 0);
   }
 
   const success = !rollbackExecuted &&
     kalshiResult.status !== 'rejected' &&
-    polymarketResult.status !== 'rejected';
+    polymarketResult.status !== 'rejected' &&
+    !unhedged;
 
   return {
     success,
@@ -283,8 +511,13 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     actualProfit,
     netExposure,
     rollbackExecuted,
+    unhedged,
     executionTimeMs: Date.now() - startTime,
   };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function emptyResult(platform: 'kalshi' | 'polymarket', status: OrderStatus): OrderResult {

@@ -1,17 +1,95 @@
 {
-  "status": "running",
+  "status": "degraded",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 450,
-  "startedAt": "2026-07-15T16:50:05.286Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
-  "failureCount": 0,
-  "skippedCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "startedAt": "2026-07-15T17:20:53.677Z",
+  "finishedAt": "2026-07-15T17:22:29.756Z",
+  "durationMs": 96079,
+  "successCount": 64,
+  "failureCount": 15,
+  "skippedCount": 364,
+  "avgScanMs": 15177,
+  "maxScanMs": 49140,
+  "errors": [
+    {
+      "market": "CA-52 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47739
+    },
+    {
+      "market": "MA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49092
+    },
+    {
+      "market": "TN-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49074
+    },
+    {
+      "market": "TN-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49086
+    },
+    {
+      "market": "TX-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49044
+    },
+    {
+      "market": "TX-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49059
+    },
+    {
+      "market": "TX-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49140
+    },
+    {
+      "market": "TX-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49032
+    },
+    {
+      "market": "TX-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49062
+    },
+    {
+      "market": "WA-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47448
+    },
+    {
+      "market": "WA-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47487
+    },
+    {
+      "market": "WI-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47502
+    },
+    {
+      "market": "WI-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47475
+    },
+    {
+      "market": "WI-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47547
+    },
+    {
+      "market": "WI-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 47943
+    }
+  ],
+  "breakerSkipped": 7,
+  "openBreakers": 11
 }

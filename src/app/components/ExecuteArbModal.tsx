@@ -209,6 +209,29 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
                   <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
                 </div>
               )}
+              {result.result?.netExposure != null && result.result.netExposure > 0 && (
+                <div className="px-3 py-2 flex justify-between">
+                  <span className="text-[#8A9BA8]">Net exposure</span>
+                  <span className="font-mono font-bold text-amber-400">{fmt(result.result.netExposure)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {result?.result?.unhedged && (
+            <div className="p-2.5 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <b>UNHEDGED EXPOSURE</b> — auto-close failed. You have ${fmt(result.result.netExposure ?? 0)} of unhedged position.
+                Check the Trades tab and close manually.
+              </div>
+            </div>
+          )}
+
+          {result?.result?.rollbackExecuted && !result?.result?.unhedged && (
+            <div className="p-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-400 text-xs flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              Partial fill detected — auto-close executed to eliminate exposure. Both legs cancelled.
             </div>
           )}
         </div>
