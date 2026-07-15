@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { getSpreads, SpreadPoint, TIME_RANGES, type TimeRange } from "@/lib/spreadHistory";
+import { getSpreadsForOutcome, SpreadPoint, TIME_RANGES, type TimeRange } from "@/lib/spreadHistory";
 
 interface Props {
   marketId: string;
@@ -32,7 +32,7 @@ export function ExpandedChart({ marketId, outcomeArtist, onClose }: Props) {
     const now = Date.now();
     const from = now - TIME_RANGES[range];
     setLoading(true);
-    getSpreads(marketId, from, now)
+    getSpreadsForOutcome(marketId, outcomeArtist, from, now)
       .then((pts) => {
         if (!cancelled) {
           setPoints(pts);
@@ -48,7 +48,7 @@ export function ExpandedChart({ marketId, outcomeArtist, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [marketId, range]);
+  }, [marketId, outcomeArtist, range]);
 
   // Responsive: observe container width
   useEffect(() => {

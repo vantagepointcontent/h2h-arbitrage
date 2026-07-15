@@ -154,11 +154,83 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun });
     }
 
+    if (action === 'test-connection') {
+      // TRADES-001: validate stored credentials by hitting a read-only
+      // authenticated endpoint on each platform. Never places orders.
+      const platform = body?.platform;
+      const results: Record<string, { ok: boolean; detail: string }> = {};
+
+      if (platform === 'kalshi' || platform === 'both') {
+        results.kalshi = await testKalshiConnection();
+      }
+      if (platform === 'polymarket' || platform === 'both') {
+        results.polymarket = await testPmConnection();
+      }
+
+      const allOk = Object.values(results).every((r) => r.ok);
+      return NextResponse.json({ success: allOk, results });
+    }
+
     return NextResponse.json(
-      { error: 'Unknown action. Use "execute", "set-credential", or "remove-credential".' },
+      { error: 'Unknown action. Use "execute", "set-credential", "remove-credential", or "test-connection".' },
       { status: 400 },
     );
   } catch (err) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
+  }
+}
+
+/* ── Credential validation: read-only auth checks ── */
+
+async function testKalshiConnection(): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const keyId = process.env.KALSHI_API_KEY_ID;
+    const privateKey = process.env.KALSHI_API_PRIVATE_KEY;
+    if (!keyId || !privateKey) {
+      return { ok: false, detail: 'Missing KALSHI_API_KEY_ID or KALSHI_API_PRIVATE_KEY' };
+    }
+    // Hit GET /portfolio/orders (read-only, authed) — validates RSA signing works.
+    const { makeKalshiAuthHeaders } = await import('@/lib/kalshi-auth');
+    const path = '/trade-api/v2/portfolio/orders';
+    const res = await fetch('https://api.elections.kalshi.com' + path, {
+      method: 'GET',
+      headers: makeKalshiAuthHeaders('GET', path),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.ok) return { ok: true, detail: `Connected (HTTP ${res.status})` };
+    if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, detail: `Auth rejected: ${(data as any)?.error?.message ?? res.status}` };
+    }
+    return { ok: false, detail: `HTTP ${res.status}` };
+  } catch (err) {
+    return { ok: false, detail: `Connection error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+async function testPmConnection(): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const pk = process.env.POLYMARKET_PRIVATE_KEY;
+    const apiKey = process.env.POLYMARKET_API_KEY;
+    const secret = process.env.POLYMARKET_API_SECRET;
+    const passphrase = process.env.POLYMARKET_API_PASSPHRASE;
+    if (!pk || !apiKey || !secret || !passphrase) {
+      return { ok: false, detail: 'Missing Polymarket credentials (need all 4 keys)' };
+    }
+    // Derive L2 API credentials and hit GET /data/orders — read-only.
+    const { ClobClient } = await import('@polymarket/clob-client');
+    const { createWalletClient, http } = await import('viem');
+    const { privateKeyToAccount } = await import('viem/accounts');
+    const { polygon } = await import('viem/chains');
+
+    const account = privateKeyToAccount((pk.startsWith('0x') ? pk : `0x${pk}`) as `0x${string}`);
+    const wallet = createWalletClient({ account, chain: polygon, transport: http('https://polygon-rpc.com') });
+    const client = new ClobClient('https://clob.polymarket.com', 137, wallet, { key: apiKey, secret, passphrase });
+
+    // getOrders() is read-only — validates L2 auth + wallet signing.
+    const orders = await client.getOrders();
+    return { ok: true, detail: `Connected (${Array.isArray(orders) ? orders.length : 0} open orders)` };
+  } catch (err) {
+    return { ok: false, detail: `Connection error: ${err instanceof Error ? err.message : String(err)}` };
   }
 }

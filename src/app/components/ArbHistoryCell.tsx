@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getSpreads, SpreadPoint } from "@/lib/spreadHistory";
+import { getSpreadsForOutcome, SpreadPoint } from "@/lib/spreadHistory";
 
 interface Props {
   marketId: string;
@@ -22,7 +22,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
     let cancelled = false;
     const now = Date.now();
     const from = now - 24 * 60 * 60 * 1000; // last 24h
-    getSpreads(marketId, from, now)
+    getSpreadsForOutcome(marketId, outcomeArtist, from, now)
       .then((pts) => {
         if (!cancelled) setPoints(pts);
       })
@@ -32,7 +32,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
     return () => {
       cancelled = true;
     };
-  }, [marketId]);
+  }, [marketId, outcomeArtist]);
 
   const sparkData = useMemo(() => {
     if (points.length < 2) return null;

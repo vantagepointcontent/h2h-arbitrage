@@ -2,13 +2,14 @@
 // Stores per-market spread samples every ~30s for charting (24h / 7d / 30d)
 
 const DB_NAME = "h2h-spread-history";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const STORE_NAME = "spreads";
 
 export interface SpreadPoint {
-  id?: string;           // computed key (marketId + ts)
+  id?: string;           // computed key (marketId + outcomeArtist + ts)
   ts: number;           // epoch ms
   marketId: string;     // saved market id
+  outcomeArtist: string; // outcome/artist name (e.g. "Yes", "No", candidate name)
   kalshiYesBid: number;
   kalshiYesAsk: number;
   pmYesBid: number;     // bestBid from polymarket
@@ -23,10 +24,17 @@ function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (evt: any) => {
       const db = evt.target.result as IDBDatabase;
+      const oldVersion = evt.oldVersion;
+      // v3: key structure changed to include outcomeArtist — clear old data
+      if (oldVersion < 3 && db.objectStoreNames.contains(STORE_NAME)) {
+        db.deleteObjectStore(STORE_NAME);
+      }
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
         store.createIndex("marketId_ts", ["marketId", "ts"], { unique: false });
         store.createIndex("ts_marketId", ["ts", "marketId"], { unique: false });
+        store.createIndex("marketId_artist", ["marketId", "outcomeArtist"], { unique: false });
+        store.createIndex("marketId_artist_ts", ["marketId", "outcomeArtist", "ts"], { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -35,8 +43,8 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 /** Generate a unique id for a spread point */
-function pointId(marketId: string, ts: number): string {
-  return `${marketId}:${ts}`;
+function pointId(marketId: string, outcomeArtist: string, ts: number): string {
+  return `${marketId}:${outcomeArtist}:${ts}`;
 }
 
 /** Save a single spread point */
@@ -45,7 +53,7 @@ export async function saveSpread(point: SpreadPoint): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    point.id = pointId(point.marketId, point.ts);
+    point.id = pointId(point.marketId, point.outcomeArtist, point.ts);
     store.put(point);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
@@ -67,6 +75,52 @@ export async function getSpreads(
     const range = IDBKeyRange.bound([marketId, fromMs], [marketId, toMs]);
     const req = index.getAll(range);
     req.onsuccess = () => resolve(req.result as SpreadPoint[]);
+    req.onerror = () => resolve([]);
+  });
+}
+
+/** Retrieve spread points for a specific outcome within a time window */
+export async function getSpreadsForOutcome(
+  marketId: string,
+  outcomeArtist: string,
+  fromMs: number,
+  toMs: number,
+): Promise<SpreadPoint[]> {
+  const db = await openDb();
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    const index = store.index("marketId_artist_ts");
+    const range = IDBKeyRange.bound(
+      [marketId, outcomeArtist, fromMs],
+      [marketId, outcomeArtist, toMs],
+    );
+    const req = index.getAll(range);
+    req.onsuccess = () => resolve(req.result as SpreadPoint[]);
+    req.onerror = () => resolve([]);
+  });
+}
+
+/** Get unique outcome artist names for a market (for toggle UI) */
+export async function getUniqueArtists(marketId: string): Promise<string[]> {
+  const db = await openDb();
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    const index = store.index("marketId_artist");
+    const range = IDBKeyRange.only([marketId]);
+    const req = index.openCursor(range);
+    const artists = new Set<string>();
+    req.onsuccess = (evt: any) => {
+      const cursor = evt.target.result;
+      if (cursor) {
+        const val = cursor.value as SpreadPoint;
+        if (val.outcomeArtist) artists.add(val.outcomeArtist);
+        cursor.continue();
+      } else {
+        resolve([...artists].sort());
+      }
+    };
     req.onerror = () => resolve([]);
   });
 }

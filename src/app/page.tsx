@@ -72,6 +72,7 @@ const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { 
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
+const ExecutionModeBadge = dynamic(() => import("@/app/components/ExecutionModeBadge"), { ssr: false });
 const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -420,24 +421,24 @@ export default function Home() {
         });
         previousPricesRef.current = prices;
         // HOOKUP-07: record spread point for historical chart (IndexedDB, client-side)
+        // Save per-outcome so each row's sparkline shows its own ROI history.
         try {
           const mid = activeMarketIdRef.current;
           if (mid && Array.isArray(data.outcomes)) {
-            const best = data.outcomes
-              .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket && o.arbitrage)
-              .reduce((b: UnifiedOutcome | null, o: UnifiedOutcome) =>
-                (!b || (o.arbitrage.roiPct ?? -Infinity) > (b.arbitrage.roiPct ?? -Infinity)) ? o : b, null);
-            if (best && best.kalshi && best.polymarket) {
+            const now = Date.now();
+            for (const o of data.outcomes) {
+              if (!o.kalshi || !o.polymarket || !o.arbitrage) continue;
               void saveSpread({
-                ts: Date.now(),
+                ts: now,
                 marketId: mid,
-                kalshiYesBid: best.kalshi.yesBid,
-                kalshiYesAsk: best.kalshi.yesAsk,
-                pmYesBid: best.polymarket.bestBid,
-                pmYesAsk: best.polymarket.bestAsk,
-                spread: Math.abs(best.kalshi.yesAsk - best.polymarket.yesPrice) * 100,
-                strategy: best.arbitrage.strategy ?? "",
-                roiPct: best.arbitrage.roiPct ?? 0,
+                outcomeArtist: o.artist,
+                kalshiYesBid: o.kalshi.yesBid,
+                kalshiYesAsk: o.kalshi.yesAsk,
+                pmYesBid: o.polymarket.bestBid,
+                pmYesAsk: o.polymarket.bestAsk,
+                spread: Math.abs(o.kalshi.yesAsk - o.polymarket.yesPrice) * 100,
+                strategy: o.arbitrage.strategy ?? "",
+                roiPct: o.arbitrage.roiPct ?? 0,
               }).catch(() => {});
             }
           }
@@ -1215,6 +1216,7 @@ export default function Home() {
             <PanelLeft className={`w-5 h-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
           </button>
           <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
+          <ExecutionModeBadge />
 
           <div className="flex items-center gap-2 ml-4">
           </div>
@@ -1862,6 +1864,9 @@ export default function Home() {
                     {activeMarketId && result && !result.expired && (
                       <HistoricalSpreadChart
                         marketId={activeMarketId}
+                        outcomeArtists={(result.outcomes ?? [])
+                          .filter((o: UnifiedOutcome) => o.kalshi && o.polymarket)
+                          .map((o: UnifiedOutcome) => o.artist)}
                         currentSpread={(() => {
                           const b = result.outcomes?.find((o: UnifiedOutcome) => o.kalshi && o.polymarket);
                           return b && b.kalshi && b.polymarket ? Math.abs(b.kalshi.yesAsk - b.polymarket.yesPrice) * 100 : undefined;

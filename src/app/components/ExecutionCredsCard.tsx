@@ -4,7 +4,7 @@
 // never read back — the UI only shows set/missing status per key.
 
 import { useState, useEffect, useCallback } from "react";
-import { KeyRound, Trash2, ShieldAlert, CheckCircle2, XCircle } from "lucide-react";
+import { KeyRound, Trash2, ShieldAlert, CheckCircle2, XCircle, Plug, Loader2 } from "lucide-react";
 
 interface CredStatus {
   kalshi: { keyId: boolean; privateKey: boolean; ready: boolean };
@@ -35,6 +35,9 @@ export function ExecutionCredsCard() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ kalshi?: { ok: boolean; detail: string }; polymarket?: { ok: boolean; detail: string } } | null>(null);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/execute");
@@ -46,6 +49,24 @@ export function ExecutionCredsCard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test-connection", platform: "both" }),
+      });
+      const data = await res.json();
+      setTestResult(data.results || {});
+    } catch (e: any) {
+      setTestResult({ kalshi: { ok: false, detail: e.message || "Network error" } });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const save = async (key: string) => {
     if (!draft.trim()) return;
@@ -96,12 +117,41 @@ export function ExecutionCredsCard() {
         <div className="flex items-center gap-2 text-[#8A9BA8] font-semibold text-sm uppercase tracking-wide">
           <KeyRound className="w-4 h-4" /> Trading Credentials
         </div>
-        {status && (
-          <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wide ${status.allReady ? "border-[#5DBE81]/40 bg-[#5DBE81]/10 text-[#5DBE81]" : "border-amber-500/40 bg-amber-500/10 text-amber-400"}`}>
-            {status.allReady ? "ready" : "incomplete"}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wide ${status.allReady ? "border-[#5DBE81]/40 bg-[#5DBE81]/10 text-[#5DBE81]" : "border-amber-500/40 bg-amber-500/10 text-amber-400"}`}>
+              {status.allReady ? "ready" : "incomplete"}
+            </span>
+          )}
+          <button
+            onClick={testConnection}
+            disabled={testing || !status?.allReady}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0E1621] border border-[#182533] text-xs hover:border-[#5DBE81] transition-colors disabled:opacity-50"
+            title="Test API connection with stored credentials"
+          >
+            {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plug className="w-3 h-3" />}
+            {testing ? "Testing..." : "Test"}
+          </button>
+        </div>
       </div>
+
+      {/* Test connection results */}
+      {testResult && (
+        <div className="mx-4 mt-3 space-y-1.5">
+          {testResult.kalshi && (
+            <div className={`flex items-center gap-2 p-2 rounded-lg text-xs ${testResult.kalshi.ok ? "border border-[#5DBE81]/40 bg-[#5DBE81]/10 text-[#5DBE81]" : "border border-red-800 bg-red-950/40 text-red-400"}`}>
+              {testResult.kalshi.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <XCircle className="w-3.5 h-3.5 shrink-0" />}
+              <span className="font-medium">Kalshi:</span> <span className="font-mono text-[10px]">{testResult.kalshi.detail}</span>
+            </div>
+          )}
+          {testResult.polymarket && (
+            <div className={`flex items-center gap-2 p-2 rounded-lg text-xs ${testResult.polymarket.ok ? "border border-[#5DBE81]/40 bg-[#5DBE81]/10 text-[#5DBE81]" : "border border-red-800 bg-red-950/40 text-red-400"}`}>
+              {testResult.polymarket.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <XCircle className="w-3.5 h-3.5 shrink-0" />}
+              <span className="font-medium">Polymarket:</span> <span className="font-mono text-[10px]">{testResult.polymarket.detail}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="px-4 py-3 flex items-start gap-2 text-xs text-amber-400/90 bg-amber-500/5 border-b border-[#182533]">
         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />

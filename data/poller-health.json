@@ -1,110 +1,55 @@
 {
-  "status": "aborted",
+  "status": "degraded",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 450,
-  "startedAt": "2026-07-15T12:15:03.006Z",
-  "finishedAt": "2026-07-15T12:16:03.019Z",
-  "durationMs": 60013,
-  "successCount": 6,
-  "failureCount": 18,
-  "skippedCount": 364,
-  "avgScanMs": 39395,
+  "startedAt": "2026-07-15T12:38:01.922Z",
+  "finishedAt": "2026-07-15T12:41:01.972Z",
+  "durationMs": 180050,
+  "successCount": 49,
+  "failureCount": 7,
+  "skippedCount": 382,
+  "avgScanMs": 20238,
   "maxScanMs": 60000,
   "errors": [
     {
-      "market": "NV-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49062
+      "market": "MLB: NL Manager of the Year",
+      "error": "timeout after 26541ms (adaptive)",
+      "durationMs": 26541
     },
     {
-      "market": "CA-20 House Election Winner",
-      "error": "timeout after 48963ms (adaptive)",
-      "durationMs": 48963
+      "market": "MLS Cup Winner 2026",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "NH-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49020
-    },
-    {
-      "market": "NJ-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49032
-    },
-    {
-      "market": "NJ-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48972
-    },
-    {
-      "market": "NJ-03 House Election Winner",
+      "market": "MO-03 House Election Winner",
       "error": "fetch failed",
       "durationMs": 49002
     },
     {
-      "market": "NJ-04 House Election Winner",
+      "market": "MO-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49071
+    },
+    {
+      "market": "MO-06 House Election Winner",
       "error": "fetch failed",
       "durationMs": 49092
     },
     {
-      "market": "NJ-05 House Election Winner",
+      "market": "MO-08 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 48984
+      "durationMs": 48987
     },
     {
-      "market": "NJ-06 House Election Winner",
+      "market": "MT-02 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 49041
-    },
-    {
-      "market": "NJ-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49008
-    },
-    {
-      "market": "NJ-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49050
-    },
-    {
-      "market": "NJ-09 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49119
-    },
-    {
-      "market": "NJ-10 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48936
-    },
-    {
-      "market": "NJ-11 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49524
-    },
-    {
-      "market": "NJ-12 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48939
-    },
-    {
-      "market": "CA-22 House Election Winner",
-      "error": "timeout after 48963ms (adaptive)",
-      "durationMs": 48963
-    },
-    {
-      "market": "CA-24 House Election Winner",
-      "error": "timeout after 48990ms (adaptive)",
-      "durationMs": 48990
-    },
-    {
-      "market": "MLB: 2026 American League Champion",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
+      "durationMs": 49011
     }
   ],
-  "breakerSkipped": 5,
-  "openBreakers": 15
+  "breakerSkipped": 12,
+  "openBreakers": 19
 }
