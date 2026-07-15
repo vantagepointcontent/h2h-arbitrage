@@ -144,6 +144,9 @@ function loadAdaptiveConfig() {
         intervalSec: t.intervalSec ?? t.defaultIntervalSec,
       })),
       globalMultiplier: cfg.globalMultiplier ?? 1,
+      // DATA-002: category multipliers — low-yield categories poll less often.
+      // Based on 7-day lifecycle data: Politics/Sports produce 97% of durable arbs.
+      categoryMultipliers: cfg.categoryMultipliers || {},
     };
   } catch {
     return null;
@@ -168,14 +171,21 @@ function getAdaptiveIntervalMs(market, config) {
   if (secondsToExpiry <= 0) return Infinity; // expired — never poll again (BUG-033)
   const mult = config.globalMultiplier;
 
+  // DATA-002: apply category multiplier on top of the global multiplier.
+  // Low-yield categories (entertainment, tech, finances, etc.) get slower
+  // polling based on 7-day lifecycle data showing they rarely produce arbs.
+  const catKey = (market.category || 'uncategorized').toLowerCase();
+  const catMult = config.categoryMultipliers?.[catKey] ?? 1;
+  const totalMult = mult * catMult;
+
   for (const tier of config.tiers) {
     if (secondsToExpiry <= tier.maxSeconds) {
-      return tier.intervalSec * 1000 * mult;
+      return tier.intervalSec * 1000 * totalMult;
     }
   }
   // Fallback to last tier
   const last = config.tiers[config.tiers.length - 1];
-  return last.intervalSec * 1000 * mult;
+  return last.intervalSec * 1000 * totalMult;
 }
 
 /**

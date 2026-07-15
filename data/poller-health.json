@@ -1,55 +1,17 @@
 {
-  "status": "degraded",
+  "status": "running",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 450,
-  "startedAt": "2026-07-15T12:38:01.922Z",
-  "finishedAt": "2026-07-15T12:41:01.972Z",
-  "durationMs": 180050,
-  "successCount": 49,
-  "failureCount": 7,
-  "skippedCount": 382,
-  "avgScanMs": 20238,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "MLB: NL Manager of the Year",
-      "error": "timeout after 26541ms (adaptive)",
-      "durationMs": 26541
-    },
-    {
-      "market": "MLS Cup Winner 2026",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "MO-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49002
-    },
-    {
-      "market": "MO-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49071
-    },
-    {
-      "market": "MO-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49092
-    },
-    {
-      "market": "MO-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48987
-    },
-    {
-      "market": "MT-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49011
-    }
-  ],
-  "breakerSkipped": 12,
-  "openBreakers": 19
+  "startedAt": "2026-07-15T16:50:05.286Z",
+  "finishedAt": null,
+  "durationMs": null,
+  "successCount": 0,
+  "failureCount": 0,
+  "skippedCount": 0,
+  "avgScanMs": 0,
+  "maxScanMs": 0,
+  "errors": []
 }

@@ -6,5 +6,20 @@
     { "label": "6-24h", "maxSeconds": 86400, "defaultIntervalSec": 600 },
     { "label": ">24h", "maxSeconds": -1, "defaultIntervalSec": 1800 }
   ],
-  "globalMultiplier": 1
+  "globalMultiplier": 1,
+  "categoryMultipliers": {
+    "politics": 1.0,
+    "sports": 1.0,
+    "election": 1.0,
+    "uncategorized": 1.5,
+    "entertainment": 3.0,
+    "tech": 3.0,
+    "technology": 3.0,
+    "finances": 3.0,
+    "economics": 2.0,
+    "crypto": 2.0,
+    "science": 3.0,
+    "weather": 4.0,
+    "international": 2.0
+  }
 }
