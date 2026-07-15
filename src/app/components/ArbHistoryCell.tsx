@@ -6,6 +6,8 @@ import { getSpreads, SpreadPoint } from "@/lib/spreadHistory";
 interface Props {
   marketId: string;
   outcomeArtist: string;
+  onExpand?: () => void;
+  isExpanded?: boolean;
 }
 
 /**
@@ -13,7 +15,7 @@ interface Props {
  * Data comes from the existing IndexedDB spreadHistory store.
  * Renders "—" when no historical data is available.
  */
-export function ArbHistoryCell({ marketId, outcomeArtist }: Props) {
+export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }: Props) {
   const [points, setPoints] = useState<SpreadPoint[]>([]);
 
   useEffect(() => {
@@ -70,14 +72,23 @@ export function ArbHistoryCell({ marketId, outcomeArtist }: Props) {
   const bestRoi = sparkData.max;
   const avgRoi = rois.reduce((s, r) => s + r, 0) / rois.length;
 
+  const clickable = !!onExpand;
+
   return (
-    <div className="inline-flex items-center gap-1.5" title={`24h ROI: best ${bestRoi.toFixed(2)}%, avg ${avgRoi.toFixed(2)}%, ${rois.length} samples`}>
-      <svg width={width} height={height} className="inline-block">
+    <div
+      className={`inline-flex items-center gap-1.5 ${clickable ? "cursor-pointer hover:bg-[#182533]/40 rounded px-1 -mx-1 transition-colors" : ""}`}
+      title={`24h ROI: best ${bestRoi.toFixed(2)}%, avg ${avgRoi.toFixed(2)}%, ${rois.length} samples${clickable ? " — click to expand" : ""}`}
+      onClick={clickable ? (e) => { e.stopPropagation(); onExpand!(); } : undefined}
+    >
+      <svg width={width} height={height} className={`inline-block ${isExpanded ? "opacity-60" : ""}`}>
         <path d={path} fill="none" stroke={strokeColor} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
       </svg>
       <span className={`text-[10px] font-mono ${lastRoi > 0 ? "text-[#5DBE81]" : lastRoi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
         {lastRoi > 0 ? "+" : ""}{lastRoi.toFixed(1)}%
       </span>
+      {clickable && (
+        <span className={`text-[#8A9BA8] text-[9px] transition-transform ${isExpanded ? "rotate-180" : ""}`}>▾</span>
+      )}
     </div>
   );
 }

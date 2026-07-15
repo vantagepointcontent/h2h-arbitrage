@@ -3,46 +3,6 @@
   "scanRecords": [
     {
       "category": "politics",
-      "lastScannedAt": "2026-07-07T18:30:26.409Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-07T21:40:24.737Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-08T00:50:24.407Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-08T04:00:20.531Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-08T07:10:23.574Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-08T10:14:25.056Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-08T13:14:57.736Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-08T16:24:08.961Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
       "lastScannedAt": "2026-07-08T19:34:12.165Z",
       "marketsAdded": 0
     },
@@ -250,9 +210,49 @@
       "category": "sports",
       "lastScannedAt": "2026-07-14T10:25:01.050Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "entertainment",
+      "lastScannedAt": "2026-07-14T13:34:27.130Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-14T16:44:27.426Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-14T19:54:33.237Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-14T23:05:19.851Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-15T02:06:47.237Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-15T05:16:53.053Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-15T08:26:54.371Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-15T11:36:55.026Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-14T10:25:01.050Z",
+  "lastScanAt": "2026-07-15T11:36:55.026Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }

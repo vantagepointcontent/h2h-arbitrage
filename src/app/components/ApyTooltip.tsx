@@ -1,8 +1,25 @@
 // ApyTooltip.tsx — UI-15: APY explanation tooltip + market title hover tooltips
+// UI-20: Generic HeaderInfo for all column headers
 'use client';
 
 import React from 'react';
 import { Info } from 'lucide-react';
+
+/* ── Generic Header Info Icon ── */
+// Small info icon with native title tooltip — works on desktop (hover)
+// and mobile (tap-hold). Not clipped by overflow-hidden containers.
+// Use this for ANY column header that needs an explanation.
+
+export function HeaderInfo({ text }: { text: string }) {
+  return (
+    <span
+      className="inline-flex items-center text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors cursor-help"
+      title={text}
+    >
+      <Info className="w-3 h-3" />
+    </span>
+  );
+}
 
 /* ── APY Header Info Icon ── */
 // Small info icon to place next to "APY" column headers.
@@ -10,12 +27,7 @@ import { Info } from 'lucide-react';
 
 export function ApyHeaderInfo() {
   return (
-    <span
-      className="inline-flex items-center text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors cursor-help"
-      title="Annualized ROI = ROI × (365 ÷ days to expiry).\nExample: 2% ROI on a 7-day market = 10,400% annualized (104x).\nHigher APY = better return relative to time held."
-    >
-      <Info className="w-3 h-3" />
-    </span>
+    <HeaderInfo text="Annualized ROI = ROI × (365 ÷ days to expiry).\nExample: 2% ROI on a 7-day market = 10,400% annualized (104x).\nHigher APY = better return relative to time held." />
   );
 }
 

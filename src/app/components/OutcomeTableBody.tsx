@@ -5,6 +5,7 @@ import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
 import { ArbHistoryCell } from './ArbHistoryCell';
+import { ExpandedChart } from './ExpandedChart';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
@@ -144,6 +145,8 @@ function OutcomeTableBodyInner({
         const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
         const roiColor = !hasPrices ? "text-[#8A9BA8]" : o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]";
+        // APY color: gray for non-actionable (no prices, ROI <= 0, or APY <= 0); green only when ROI is positive and APY is positive
+        const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || (o.arbitrage.apyPct ?? 0) <= 0 ? "text-[#8A9BA8]" : "text-[#5DBE81]";
         const isExpanded = expandedArtist === o.artist;
         const totalStake = (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0);
         const stakeRatio = totalStake > 0
@@ -176,7 +179,7 @@ function OutcomeTableBodyInner({
               </td>
               <td className="px-4 py-3 text-right text-[#8A9BA8]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
-              <td className={`px-4 py-3 text-right font-medium ${roiColor}`}>
+              <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (
                   <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
                     {formatPercent(o.arbitrage.apyPct)}
