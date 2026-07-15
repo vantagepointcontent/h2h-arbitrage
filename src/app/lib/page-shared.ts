@@ -154,6 +154,25 @@ export interface LastScanResult {
     roiPct: number;
     expectedProfit: number;
     strategy: string;
+    arbType?: string;
+    totalStake?: number;
+    kalshiTicker?: string;
+    kalshiYesAsk?: number;
+    kalshiNoAsk?: number;
+    kalshiYesBid?: number;
+    kalshiNoBid?: number;
+    pmConditionId?: string;
+    pmYesPrice?: number;
+    pmNoPrice?: number;
+    pmBestBid?: number;
+    pmBestAsk?: number;
+    kalshiStake?: number;
+    pmStake?: number;
+    apyPct?: number;
+    buyPlatform?: string | null;
+    buyPrice?: number;
+    sellPlatform?: string | null;
+    sellPrice?: number;
   }[];
 }
 
