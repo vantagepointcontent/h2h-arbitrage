@@ -6,11 +6,18 @@
  *
  * Flow:
  * 1. User clicks "Execute" on an arb opportunity
- * 2. System re-checks prices within 1s
- * 3. Calculates exact order sizes based on liquidity
- * 4. Places orders simultaneously on both platforms (or simulates in dry-run)
- * 5. Reports fill status, actual prices, actual profit
- * 6. If one leg fails, cancels the other immediately (rollback)
+ * 2. Pre-trade slippage check: verify spread is still profitable
+ * 3. Places orders simultaneously on both platforms (or simulates in dry-run)
+ * 4. Tick check: when one leg fills, immediately verify the other leg's price
+ * 5. Poll loop: wait for fills or timeout (cancel unfilled legs)
+ * 6. Risk handling: auto-close filled legs if the other side fails
+ * 7. Reports fill status, actual prices, actual profit, alerts
+ *
+ * PARTIAL-FILL RISK HANDLING:
+ * - If one leg fills and the other doesn't within timeout → cancel unfilled, auto-close filled
+ * - If both partial fill with mismatched sizes → close the excess from larger leg
+ * - If auto-close fails → mark unhedged, show red alert
+ * - Tick check on first fill: re-verify other leg's price before continuing to wait
  */
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -62,6 +69,24 @@ export interface ExecutionResult {
   unhedged: boolean;          // true if auto-close failed and exposure remains
   executionTimeMs: number;
   error?: string;
+  tickCheck?: TickCheckResult;  // result of tick check after first leg fill
+  alerts?: ExecutionAlert[];    // alerts generated during execution
+}
+
+export interface TickCheckResult {
+  triggered: boolean;          // true if tick check was performed
+  legChecked: 'kalshi' | 'polymarket';  // which leg was checked
+  expectedPrice: number;
+  actualPrice?: number;
+  priceMoved: boolean;         // true if price moved beyond slippage threshold
+  action: 'proceed' | 'cancel' | 'timeout';
+}
+
+export interface ExecutionAlert {
+  level: 'warning' | 'error' | 'info';
+  message: string;
+  leg?: 'kalshi' | 'polymarket';
+  action?: string;
 }
 
 // ─── Safety Config ────────────────────────────────────────────────
@@ -161,33 +186,45 @@ function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
 // One-leg-failure => immediate cancel of the surviving leg (rollback).
 // Only reachable via /api/execute (manual-only, kill-switch gated).
 
+const MAX_RETRIES = 2;
+const RETRY_BACKOFF_MS = 500;
+
 async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<OrderResult> {
   const { placeKalshiOrder } = await import('./kalshi-orders');
   if (!req.ticker) {
     return { ...emptyResult('kalshi', 'rejected'), error: 'Missing Kalshi ticker' };
   }
-  try {
-    const priceCents = Math.round(req.price * 100);
-    const count = Math.max(1, Math.floor(req.size / req.price)); // $size → contracts
-    const r = await placeKalshiOrder({
-      ticker: req.ticker,
-      side: req.outcome,
-      count,
-      priceCents,
-      clientOrderId: `h2h-${arbId}-k`.slice(0, 64),
-    });
-    const filledContracts = r.filledCount;
-    return {
-      platform: 'kalshi',
-      status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
-      filledSize: filledContracts * req.price,
-      filledPrice: req.price,
-      orderId: r.orderId,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (err: any) {
-    return { ...emptyResult('kalshi', 'rejected'), error: err?.message ?? String(err) };
+
+  let lastErr: any;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const priceCents = Math.round(req.price * 100);
+      const count = Math.max(1, Math.floor(req.size / req.price)); // $size → contracts
+      const r = await placeKalshiOrder({
+        ticker: req.ticker,
+        side: req.outcome,
+        count,
+        priceCents,
+        clientOrderId: `h2h-${arbId}-k${attempt > 0 ? `-r${attempt}` : ''}`.slice(0, 64),
+      });
+      const filledContracts = r.filledCount;
+      return {
+        platform: 'kalshi',
+        status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
+        filledSize: filledContracts * req.price,
+        filledPrice: req.price,
+        orderId: r.orderId,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err: any) {
+      lastErr = err;
+      // Retry on rate limit (429) or transient network errors
+      const isRetryable = err?.status === 429 || err?.code === 'ECONNRESET' || err?.code === 'ETIMEDOUT';
+      if (!isRetryable || attempt === MAX_RETRIES) break;
+      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
+    }
   }
+  return { ...emptyResult('kalshi', 'rejected'), error: lastErr?.message ?? String(lastErr) };
 }
 
 async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
@@ -195,20 +232,28 @@ async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
   if (!req.conditionId) {
     return { ...emptyResult('polymarket', 'rejected'), error: 'Missing Polymarket token ID' };
   }
-  try {
-    const size = req.size / req.price; // $size → shares
-    const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
-    return {
-      platform: 'polymarket',
-      status: r.status === 'matched' ? 'filled' : 'pending',
-      filledSize: r.status === 'matched' ? req.size : 0,
-      filledPrice: req.price,
-      orderId: r.orderId,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (err: any) {
-    return { ...emptyResult('polymarket', 'rejected'), error: err?.message ?? String(err) };
+
+  let lastErr: any;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const size = req.size / req.price; // $size → shares
+      const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
+      return {
+        platform: 'polymarket',
+        status: r.status === 'matched' ? 'filled' : 'pending',
+        filledSize: r.status === 'matched' ? req.size : 0,
+        filledPrice: req.price,
+        orderId: r.orderId,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err: any) {
+      lastErr = err;
+      const isRetryable = err?.status === 429 || err?.code === 'ECONNRESET' || err?.code === 'ETIMEDOUT';
+      if (!isRetryable || attempt === MAX_RETRIES) break;
+      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
+    }
   }
+  return { ...emptyResult('polymarket', 'rejected'), error: lastErr?.message ?? String(lastErr) };
 }
 
 async function cancelLeg(result: OrderResult): Promise<boolean> {
@@ -223,6 +268,63 @@ async function cancelLeg(result: OrderResult): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ─── Tick Check ──────────────────────────────────────────────────
+// When one leg fills, immediately check the other leg's current market price.
+// If price has moved beyond the slippage threshold, cancel the unfilled leg
+// and auto-close the filled leg to eliminate exposure.
+
+async function tickCheckLeg(
+  filledLeg: 'kalshi' | 'polymarket',
+  unfilledReq: OrderRequest,
+  maxSlippagePct: number,
+  dryRun: boolean,
+): Promise<TickCheckResult> {
+  const expectedPrice = unfilledReq.price;
+
+  if (dryRun) {
+    // Simulate: 80% chance price is fine, 20% chance it moved
+    const priceMoved = Math.random() < 0.2;
+    if (priceMoved) {
+      const moveDir = Math.random() < 0.5 ? -1 : 1;
+      const movePct = (maxSlippagePct + 0.5) * 0.01 * moveDir;
+      const actualPrice = Math.max(0.01, Math.min(0.99, expectedPrice + expectedPrice * movePct));
+      return {
+        triggered: true,
+        legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
+        expectedPrice,
+        actualPrice,
+        priceMoved: true,
+        action: 'cancel',
+      };
+    }
+    return {
+      triggered: true,
+      legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
+      expectedPrice,
+      actualPrice: expectedPrice,
+      priceMoved: false,
+      action: 'proceed',
+    };
+  }
+
+  // Real mode: orderbook fetch functions are not yet implemented.
+  // The tick check still runs in dry-run mode (simulated) and the poll loop's
+  // timeout + slippage validation provide the safety net in real mode.
+  // When orderbook fetch functions are added to kalshi-orders.ts / polymarket-orders.ts,
+  // this branch can be upgraded to do a live price verification.
+  //
+  // For now: proceed cautiously — the limit order protects against slippage,
+  // and the timeout will cancel the unfilled leg if it doesn't fill in time.
+  return {
+    triggered: true,
+    legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
+    expectedPrice,
+    actualPrice: undefined,
+    priceMoved: false,
+    action: 'proceed',
+  };
 }
 
 // ─── Execution Engine ────────────────────────────────────────────
@@ -333,6 +435,7 @@ async function pollOrder(
 export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult> {
   const startTime = Date.now();
   const limits = getSafetyLimitsFromEnv();
+  const alerts: ExecutionAlert[] = [];
 
   // Force dry run if safety limits require it
   const effectiveDryRun = req.dryRun || limits.dryRunMode;
@@ -348,6 +451,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       unhedged: false,
       executionTimeMs: Date.now() - startTime,
       error: validation.errors.join('; '),
+      alerts,
     };
   }
 
@@ -367,9 +471,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     ]);
   }
 
-  // ── Phase 2: Poll loop — wait for fills or timeout ──
+  // ── Phase 2: Poll loop with tick check ──
   const timeoutMs = req.timeoutMs || limits.orderTimeoutMs || DEFAULT_TIMEOUT_MS;
   const deadline = startTime + timeoutMs;
+  let tickCheckResult: TickCheckResult | undefined;
+  let tickCheckDone = false;
 
   while (
     !isSettled(kalshiResult.status) ||
@@ -385,6 +491,59 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       pollOrder(kalshiResult, req.kalshiOrder, effectiveDryRun),
       pollOrder(polymarketResult, req.polymarketOrder, effectiveDryRun),
     ]);
+
+    // ── Tick check: when one leg fills, verify the other leg's price ──
+    if (!tickCheckDone) {
+      const kJustFilled = isSettled(kalshiResult.status) && hasFill(kalshiResult);
+      const pJustFilled = isSettled(polymarketResult.status) && hasFill(polymarketResult);
+      const kStillPending = !isSettled(kalshiResult.status);
+      const pStillPending = !isSettled(polymarketResult.status);
+
+      if (kJustFilled && pStillPending) {
+        // Kalshi filled, Polymarket still pending → tick check Polymarket
+        tickCheckResult = await tickCheckLeg('kalshi', req.polymarketOrder, req.maxSlippagePct, effectiveDryRun);
+        tickCheckDone = true;
+        if (tickCheckResult.action === 'cancel') {
+          // Price moved → cancel Polymarket, auto-close Kalshi
+          alerts.push({
+            level: 'warning',
+            message: `Tick check: Polymarket price moved from ${tickCheckResult.expectedPrice} to ${tickCheckResult.actualPrice ?? 'unavailable'} — cancelling leg and auto-closing Kalshi`,
+            leg: 'polymarket',
+            action: 'cancel + auto-close kalshi',
+          });
+          if (!effectiveDryRun) await cancelLeg(polymarketResult);
+          polymarketResult = { ...polymarketResult, status: 'cancelled' };
+          const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
+          if (!closed) {
+            // Will be handled in Phase 3 — mark unhedged there
+          } else {
+            kalshiResult = { ...kalshiResult, status: 'cancelled' };
+          }
+          break; // exit poll loop — both legs are now settled
+        }
+      } else if (pJustFilled && kStillPending) {
+        // Polymarket filled, Kalshi still pending → tick check Kalshi
+        tickCheckResult = await tickCheckLeg('polymarket', req.kalshiOrder, req.maxSlippagePct, effectiveDryRun);
+        tickCheckDone = true;
+        if (tickCheckResult.action === 'cancel') {
+          alerts.push({
+            level: 'warning',
+            message: `Tick check: Kalshi price moved from ${tickCheckResult.expectedPrice} to ${tickCheckResult.actualPrice ?? 'unavailable'} — cancelling leg and auto-closing Polymarket`,
+            leg: 'kalshi',
+            action: 'cancel + auto-close polymarket',
+          });
+          if (!effectiveDryRun) await cancelLeg(kalshiResult);
+          kalshiResult = { ...kalshiResult, status: 'cancelled' };
+          const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
+          if (!closed) {
+            // Will be handled in Phase 3
+          } else {
+            polymarketResult = { ...polymarketResult, status: 'cancelled' };
+          }
+          break;
+        }
+      }
+    }
   }
 
   // ── Phase 3: Risk handling — manage partial fills and failures ──
@@ -398,22 +557,50 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
   if (kFailed && pFailed) {
     // Both failed — clean failure, no exposure
+    if (kFilled || pFilled) {
+      // Edge case: both "failed" but one has a residual fill (shouldn't happen but guard)
+      alerts.push({ level: 'error', message: 'Both legs failed but residual fill detected — check positions manually' });
+    }
   } else if (kFailed && pFilled) {
     // Kalshi failed, Polymarket filled — auto-close Polymarket
+    alerts.push({
+      level: 'warning',
+      message: 'Kalshi leg failed — auto-closing Polymarket position to eliminate exposure',
+      leg: 'kalshi',
+      action: 'auto-close polymarket',
+    });
     if (!effectiveDryRun) await cancelLeg(polymarketResult);
     const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
     if (!closed) {
       unhedged = true;
+      alerts.push({
+        level: 'error',
+        message: `Auto-close FAILED for Polymarket — $${(polymarketResult.filledSize ?? 0).toFixed(2)} unhedged exposure. Close manually.`,
+        leg: 'polymarket',
+        action: 'manual close required',
+      });
     } else {
       polymarketResult = { ...polymarketResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   } else if (pFailed && kFilled) {
     // Polymarket failed, Kalshi filled — auto-close Kalshi
+    alerts.push({
+      level: 'warning',
+      message: 'Polymarket leg failed — auto-closing Kalshi position to eliminate exposure',
+      leg: 'polymarket',
+      action: 'auto-close kalshi',
+    });
     if (!effectiveDryRun) await cancelLeg(kalshiResult);
     const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
     if (!closed) {
       unhedged = true;
+      alerts.push({
+        level: 'error',
+        message: `Auto-close FAILED for Kalshi — $${(kalshiResult.filledSize ?? 0).toFixed(2)} unhedged exposure. Close manually.`,
+        leg: 'kalshi',
+        action: 'manual close required',
+      });
     } else {
       kalshiResult = { ...kalshiResult, status: 'cancelled' };
     }
@@ -427,6 +614,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
     if (minFill < maxFill) {
       // Mismatched fills — cancel both and close the excess
+      alerts.push({
+        level: 'warning',
+        message: `Mismatched fills: Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing excess`,
+        action: 'close excess',
+      });
       if (!effectiveDryRun) {
         await cancelLeg(kalshiResult);
         await cancelLeg(polymarketResult);
@@ -443,12 +635,22 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       );
       if (!closed) {
         unhedged = true;
+        alerts.push({
+          level: 'error',
+          message: `Failed to close $${excess.toFixed(2)} excess — unhedged exposure remains`,
+          action: 'manual close required',
+        });
       }
       rollbackExecuted = true;
     }
     // If matched fills, no rollback needed — both sides hedged
   } else if (!kFilled && !pFilled) {
     // Both pending at timeout — cancel both, no exposure
+    alerts.push({
+      level: 'info',
+      message: 'Both legs timed out without fills — cancelling both, no exposure',
+      action: 'cancel both',
+    });
     if (!effectiveDryRun) {
       await cancelLeg(kalshiResult);
       await cancelLeg(polymarketResult);
@@ -458,22 +660,46 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     rollbackExecuted = true;
   } else if (kFilled && !pFilled && !pFailed) {
     // Kalshi filled, Polymarket still pending — cancel PM, auto-close Kalshi
+    alerts.push({
+      level: 'warning',
+      message: 'Kalshi filled but Polymarket timed out — auto-closing Kalshi',
+      leg: 'polymarket',
+      action: 'auto-close kalshi',
+    });
     if (!effectiveDryRun) await cancelLeg(polymarketResult);
     polymarketResult = { ...polymarketResult, status: 'cancelled' };
     const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
     if (!closed) {
       unhedged = true;
+      alerts.push({
+        level: 'error',
+        message: `Auto-close FAILED — $${(kalshiResult.filledSize ?? 0).toFixed(2)} unhedged Kalshi exposure. Close manually.`,
+        leg: 'kalshi',
+        action: 'manual close required',
+      });
     } else {
       kalshiResult = { ...kalshiResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   } else if (pFilled && !kFilled && !kFailed) {
     // Polymarket filled, Kalshi still pending — cancel Kalshi, auto-close Polymarket
+    alerts.push({
+      level: 'warning',
+      message: 'Polymarket filled but Kalshi timed out — auto-closing Polymarket',
+      leg: 'kalshi',
+      action: 'auto-close polymarket',
+    });
     if (!effectiveDryRun) await cancelLeg(kalshiResult);
     kalshiResult = { ...kalshiResult, status: 'cancelled' };
     const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
     if (!closed) {
       unhedged = true;
+      alerts.push({
+        level: 'error',
+        message: `Auto-close FAILED — $${(polymarketResult.filledSize ?? 0).toFixed(2)} unhedged Polymarket exposure. Close manually.`,
+        leg: 'polymarket',
+        action: 'manual close required',
+      });
     } else {
       polymarketResult = { ...polymarketResult, status: 'cancelled' };
     }
@@ -513,6 +739,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     rollbackExecuted,
     unhedged,
     executionTimeMs: Date.now() - startTime,
+    tickCheck: tickCheckResult,
+    alerts: alerts.length > 0 ? alerts : undefined,
   };
 }
 

@@ -5,91 +5,46 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 450,
-  "startedAt": "2026-07-15T17:20:53.677Z",
-  "finishedAt": "2026-07-15T17:22:29.756Z",
-  "durationMs": 96079,
-  "successCount": 64,
-  "failureCount": 15,
-  "skippedCount": 364,
-  "avgScanMs": 15177,
-  "maxScanMs": 49140,
+  "startedAt": "2026-07-15T18:21:49.332Z",
+  "finishedAt": "2026-07-15T18:25:58.513Z",
+  "durationMs": 249181,
+  "successCount": 43,
+  "failureCount": 6,
+  "skippedCount": 398,
+  "avgScanMs": 21479,
+  "maxScanMs": 60000,
   "errors": [
     {
-      "market": "CA-52 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47739
+      "market": "F1 Drivers' Champion",
+      "error": "timeout after 38844ms (adaptive)",
+      "durationMs": 38844
     },
     {
-      "market": "MA-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49092
+      "market": "NBA: Giannis Antetokounmpo Next Team",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "TN-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49074
+      "market": "Who will be Trump's next Director of National Intelligence?",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     },
     {
-      "market": "TN-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49086
+      "market": "ME-02 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 157
     },
     {
-      "market": "TX-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49044
+      "market": "Sweden Parliamentary Election Winner",
+      "error": "timeout after 32916ms (adaptive)",
+      "durationMs": 32916
     },
     {
-      "market": "TX-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49059
-    },
-    {
-      "market": "TX-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49140
-    },
-    {
-      "market": "TX-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49032
-    },
-    {
-      "market": "TX-09 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49062
-    },
-    {
-      "market": "WA-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47448
-    },
-    {
-      "market": "WA-09 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47487
-    },
-    {
-      "market": "WI-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47502
-    },
-    {
-      "market": "WI-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47475
-    },
-    {
-      "market": "WI-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47547
-    },
-    {
-      "market": "WI-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 47943
+      "market": "Clacton by-election Winner",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     }
   ],
-  "breakerSkipped": 7,
-  "openBreakers": 11
+  "breakerSkipped": 3,
+  "openBreakers": 10
 }

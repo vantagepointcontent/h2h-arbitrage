@@ -79,12 +79,24 @@ function OutcomeTableBodyInner({
   const [expandedChartArtist, setExpandedChartArtist] = useState<string | null>(null);
 
   const startExecute = async (o: Outcome) => {
-    if (!marketTitle || !o.kalshi?.ticker || !o.polymarket?.conditionId) return;
+    // Show clear error instead of silent return
+    if (!marketTitle) {
+      setExecError('Cannot execute: market title missing. Wait for scan to complete.');
+      return;
+    }
+    if (!o.kalshi?.ticker) {
+      setExecError(`Cannot execute ${o.artist}: Kalshi ticker missing. Wait for live scan to complete.`);
+      return;
+    }
+    if (!o.polymarket?.conditionId) {
+      setExecError(`Cannot execute ${o.artist}: Polymarket conditionId missing. Wait for live scan to complete.`);
+      return;
+    }
     setResolvingArtist(o.artist);
     setExecError(null);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(`/api/pm-tokens?conditionId=${encodeURIComponent(o.polymarket.conditionId)}`, {
         cache: 'no-store',
         signal: controller.signal,
@@ -107,15 +119,32 @@ function OutcomeTableBodyInner({
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
       }, marketTitle);
-      if (!exec) throw new Error('Strategy not executable from this button (cross-outcome or missing prices)');
+      if (!exec) {
+        // Provide specific reason why it's not executable
+        const kStake = o.arbitrage.kalshiStake ?? 0;
+        const pmStake = o.arbitrage.pmStake ?? 0;
+        const kYesAsk = o.kalshi?.yesAsk ?? null;
+        const kNoAsk = o.kalshi?.noAsk ?? null;
+        const pmYes = o.polymarket?.yesPrice ?? null;
+        const pmNo = o.polymarket?.noPrice ?? null;
+        let reason = 'Unknown reason';
+        if (o.arbitrage.strategy !== 'Buy YES Kalshi + NO PM' && o.arbitrage.strategy !== 'Buy YES PM + NO Kalshi') {
+          reason = `Strategy "${o.arbitrage.strategy}" not supported for direct execution (only 2-leg arbs)`;
+        } else if (kStake <= 0 || pmStake <= 0) {
+          reason = `Stakes are zero (Kalshi: ${kStake}, PM: ${pmStake}). Wait for live scan data.`;
+        } else if (o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' && (kYesAsk == null || pmNo == null)) {
+          reason = `Missing prices: Kalshi YES ask=${kYesAsk}, PM NO price=${pmNo}`;
+        } else if (o.arbitrage.strategy === 'Buy YES PM + NO Kalshi' && (kNoAsk == null || pmYes == null)) {
+          reason = `Missing prices: Kalshi NO ask=${kNoAsk}, PM YES price=${pmYes}`;
+        }
+        throw new Error(`${o.artist}: ${reason}`);
+      }
       setExecutingArb(exec);
     } catch (e: any) {
       const msg = e.name === 'AbortError'
         ? `Timed out resolving Polymarket tokens for ${o.artist}. The CLOB API may be slow. Try again.`
         : `${o.artist}: ${e.message}`;
       setExecError(msg);
-      // Auto-clear error after 8 seconds so it doesn't linger
-      setTimeout(() => setExecError(null), 8000);
     } finally {
       setResolvingArtist(null);
     }
