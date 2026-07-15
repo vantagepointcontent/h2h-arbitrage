@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ApiTokenProvider } from "@/components/ApiTokenProvider";
 
 export const metadata: Metadata = {
-  title: "H2H Arbitrage — Kalshi x Polymarket",
+  title: "EdgeFinder — Kalshi x Polymarket",
   description: "Real-time head-to-head arbitrage scanner",
 };
 

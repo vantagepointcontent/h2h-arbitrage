@@ -296,7 +296,7 @@ export function MarketFinderPanel({
       {hiddenCount > 0 && (
         <div className="text-xs text-[#8A9BA8] flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#5DBE81]"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in H2H)
+          {hiddenCount} market{hiddenCount !== 1 ? 's' : ''} hidden (already in EdgeFinder)
         </div>
       )}
 

@@ -47,6 +47,7 @@ import {
   PanelRight,
   FileText,
   PanelLeft,
+  Radar,
   Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -1152,7 +1153,7 @@ export default function Home() {
     if (failed > 0) {
       setMfBulkMsg(`${saved} saved, ${failed} failed`);
     } else {
-      setMfBulkMsg(`${saved} market${saved !== 1 ? "s" : ""} saved to H2H`);
+      setMfBulkMsg(`${saved} market${saved !== 1 ? "s" : ""} saved to EdgeFinder`);
     }
     setTimeout(() => setMfBulkMsg(""), 3000);
   }, [mfSelectedIds, mfBulkSaving, mfMarkets]);
@@ -1302,11 +1303,13 @@ export default function Home() {
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
             <PanelLeft className={`w-5 h-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
           </button>
-          <h1 className="text-base font-bold tracking-tight">H2H Arbitrage</h1>
-          <ExecutionModeBadge />
-
-          <div className="flex items-center gap-2 ml-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#5DBE81]/15 border border-[#5DBE81]/30">
+              <Radar className="w-4 h-4 text-[#5DBE81]" />
+            </div>
+            <h1 className="text-base font-bold tracking-tight">EdgeFinder</h1>
           </div>
+          <ExecutionModeBadge />
 
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "live" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Live WebSocket scan">

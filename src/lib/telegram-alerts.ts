@@ -599,7 +599,7 @@ export async function sendTestMessage(
   chatId: string,
 ): Promise<TelegramAlertResult> {
   const message = [
-    '✅ <b>H2H Arbitrage — Test Alert</b>',
+    '✅ <b>EdgeFinder — Test Alert</b>',
     '',
     'Telegram alerts are working correctly.',
     `Configured at ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
