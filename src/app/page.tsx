@@ -76,7 +76,7 @@ const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPane
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { ArbOpportunitiesPanel } from "@/app/components/ArbOpportunitiesPanel";
-import { ApyHeaderInfo } from "@/app/components/ApyTooltip";
+import { ApyHeaderInfo, HeaderInfo } from "@/app/components/ApyTooltip";
 const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalSpreadChart").then(m => m.HistoricalSpreadChart), { ssr: false });
 import { saveSpread } from "@/lib/spreadHistory";
 import { computeApy } from "@/lib/matcher";
@@ -1752,34 +1752,38 @@ export default function Home() {
                         <table className="w-full text-sm">
                           <thead className="bg-[#17212B] border-b border-[#182533]">
                             <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
-                              <th className="text-left px-4 py-3.5 font-medium">Outcome</th>
-                              <th className="text-right px-4 py-3.5 font-medium">
-                                <span className="inline-flex items-center gap-1 flex-row-reverse">
-                                  <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
-                                  Yes
+                              <th className="text-left px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1">
+                                  Outcome <HeaderInfo text="The market question being predicted (e.g. 'Will X win?'). Each outcome is a Yes/No pair you can bet on." />
                                 </span>
                               </th>
                               <th className="text-right px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
-                                  No
+                                  Yes <HeaderInfo text="Kalshi Yes ask price — the cost to buy a Yes share on Kalshi. Lower = cheaper to buy Yes." />
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
+                                  No <HeaderInfo text="Kalshi No ask price — the cost to buy a No share on Kalshi. Lower = cheaper to buy No." />
                                 </span>
                               </th>
                               <th className="text-right px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
-                                  Yes
+                                  Yes <HeaderInfo text="Polymarket Yes price — current best ask for a Yes share on Polymarket. Lower = cheaper to buy Yes." />
                                 </span>
                               </th>
                               <th className="text-right px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
-                                  No
+                                  No <HeaderInfo text="Polymarket No price — current best ask for a No share on Polymarket. Lower = cheaper to buy No." />
                                 </span>
                               </th>
                               <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
-                                  ROI
+                                  ROI <HeaderInfo text="Return on Investment — net profit as a percentage of total stake, after Kalshi and Polymarket trading fees.\nExample: $2 profit on $100 stake = 2% ROI." />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "roi" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
                                     {outcomeSort === "roi" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
@@ -1795,16 +1799,35 @@ export default function Home() {
                               </th>
                               <th onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
-                                  Profit
+                                  Profit <HeaderInfo text="Net profit in dollars for this arbitrage opportunity, after all trading fees on both Kalshi and Polymarket.\nThis is the absolute dollar amount you'd earn from the arb trade at the current prices and stake." />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "profit" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
                                     {outcomeSort === "profit" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
                                 </span>
                               </th>
-                              <th className="text-right px-4 py-3.5 font-medium" title="Orderbook depth heatmap: how much capital can be deployed">Depth</th>
-                              <th className="text-right px-4 py-3.5 font-medium">Arbitrage History</th>
-                              <th className="text-right px-4 py-3.5 font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">Decay</th>
-                              <th className="text-left px-4 py-3.5 font-medium">Strategy</th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <HeaderInfo text="Orderbook depth heatmap: how much capital can be deployed at the current prices.\nGreen = deep orderbook (large fills won't move the price). Red = thin orderbook (large fills will move the price against you).\nThe colored bars show available liquidity at each price level." />
+                                  Depth
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <HeaderInfo text="Recent arbitrage history for this market: spread snapshots over time showing whether the arb opportunity is widening, narrowing, or stable.\nEach bar represents a past scan. Taller = wider spread = more profitable." />
+                                  Arbitrage History
+                                </span>
+                              </th>
+                              <th className="text-right px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1 flex-row-reverse">
+                                  <HeaderInfo text="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?\nThe curve shows how ROI has evolved over the market's lifetime.\nA rising curve means the arb is getting better; a falling curve means it's drying up." />
+                                  Decay
+                                </span>
+                              </th>
+                              <th className="text-left px-4 py-3.5 font-medium">
+                                <span className="inline-flex items-center gap-1">
+                                  Strategy <HeaderInfo text="Recommended execution strategy for this arb — which side to buy on which platform, suggested stake sizing, and any risk notes.\nStrategies are computed from the current spread, depth, and time to expiry." />
+                                </span>
+                              </th>
                             </tr>
                           </thead>
                           <OutcomeTableBody

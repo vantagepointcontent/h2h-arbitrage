@@ -75,6 +75,9 @@ function OutcomeTableBodyInner({
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
 
+  // Sparkline expand state — which artist's chart is expanded (independent of row expand)
+  const [expandedChartArtist, setExpandedChartArtist] = useState<string | null>(null);
+
   const startExecute = async (o: Outcome) => {
     if (!marketTitle || !o.kalshi?.ticker || !o.polymarket?.conditionId) return;
     setResolvingArtist(o.artist);
@@ -254,7 +257,11 @@ function OutcomeTableBodyInner({
                 })()}
               </td>
               <td className="px-4 py-3 text-right">
-                {marketId ? <ArbHistoryCell marketId={marketId} outcomeArtist={o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
+                {marketId ? <ArbHistoryCell marketId={marketId} outcomeArtist={o.artist} onExpand={() => {
+                  // Toggle chart expansion; also expand the row if not already
+                  setExpandedChartArtist(prev => prev === o.artist ? null : o.artist);
+                  if (expandedArtist !== o.artist) setExpandedArtist(o.artist);
+                }} isExpanded={expandedChartArtist === o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
               </td>
               <td className="px-4 py-3 text-right">
                 {marketId && o.arbitrage.roiPct > 0 ? <ArbDecayCurve marketId={marketId} outcome={o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
@@ -357,6 +364,15 @@ function OutcomeTableBodyInner({
                     arbitrage={o.arbitrage}
                     formatCurrency={formatCurrency}
                   />
+
+                  {/* Sparkline expand: full ROI history chart with axes */}
+                  {marketId && expandedChartArtist === o.artist && (
+                    <ExpandedChart
+                      marketId={marketId}
+                      outcomeArtist={o.artist}
+                      onClose={() => setExpandedChartArtist(null)}
+                    />
+                  )}
                 </td>
               </tr>
             )}

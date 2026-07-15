@@ -5,54 +5,29 @@
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 450,
-  "startedAt": "2026-07-15T12:11:15.716Z",
-  "finishedAt": "2026-07-15T12:14:02.997Z",
-  "durationMs": 167281,
-  "successCount": 37,
-  "failureCount": 29,
-  "skippedCount": 363,
-  "avgScanMs": 32096,
+  "startedAt": "2026-07-15T12:15:03.006Z",
+  "finishedAt": "2026-07-15T12:16:03.019Z",
+  "durationMs": 60013,
+  "successCount": 6,
+  "failureCount": 18,
+  "skippedCount": 364,
+  "avgScanMs": 39395,
   "maxScanMs": 60000,
   "errors": [
     {
-      "market": "Venezuela de facto leader end of 2026?",
-      "error": "timeout after 52071ms (adaptive)",
-      "durationMs": 52071
-    },
-    {
-      "market": "Alaska Governor Election Winner  ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
+      "market": "NV-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49062
     },
     {
       "market": "CA-20 House Election Winner",
-      "error": "fetch failed",
+      "error": "timeout after 48963ms (adaptive)",
       "durationMs": 48963
     },
     {
-      "market": "CA-22 House Election Winner",
+      "market": "NH-02 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 48963
-    },
-    {
-      "market": "CA-24 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48990
-    },
-    {
-      "market": "CA-26 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48987
-    },
-    {
-      "market": "CA-28 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48963
-    },
-    {
-      "market": "NH-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49050
+      "durationMs": 49020
     },
     {
       "market": "NJ-01 House Election Winner",
@@ -60,29 +35,14 @@
       "durationMs": 49032
     },
     {
-      "market": "NJ-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49002
-    },
-    {
-      "market": "NJ-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48984
-    },
-    {
       "market": "NJ-02 House Election Winner",
       "error": "fetch failed",
       "durationMs": 48972
     },
     {
-      "market": "NV-04 House Election Winner",
+      "market": "NJ-03 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 49062
-    },
-    {
-      "market": "NJ-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49041
+      "durationMs": 49002
     },
     {
       "market": "NJ-04 House Election Winner",
@@ -90,9 +50,14 @@
       "durationMs": 49092
     },
     {
-      "market": "NH-02 House Election Winner",
+      "market": "NJ-05 House Election Winner",
       "error": "fetch failed",
-      "durationMs": 49020
+      "durationMs": 48984
+    },
+    {
+      "market": "NJ-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 49041
     },
     {
       "market": "NJ-07 House Election Winner",
@@ -125,39 +90,19 @@
       "durationMs": 48939
     },
     {
-      "market": "NM-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49002
-    },
-    {
-      "market": "NM-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49008
-    },
-    {
-      "market": "NM-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48978
-    },
-    {
-      "market": "NY-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49020
-    },
-    {
-      "market": "NY-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48975
-    },
-    {
-      "market": "NY-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49029
-    },
-    {
-      "market": "WA-04 House Election Winner",
-      "error": "fetch failed",
+      "market": "CA-22 House Election Winner",
+      "error": "timeout after 48963ms (adaptive)",
       "durationMs": 48963
+    },
+    {
+      "market": "CA-24 House Election Winner",
+      "error": "timeout after 48990ms (adaptive)",
+      "durationMs": 48990
+    },
+    {
+      "market": "MLB: 2026 American League Champion",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
     }
   ],
   "breakerSkipped": 5,

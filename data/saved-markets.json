@@ -499,7 +499,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-15T11:44:23.617Z",
+      "scannedAt": "2026-07-15T12:15:04.064Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -543,7 +543,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-15T11:44:23.617Z"
+    "lastMatchedAt": "2026-07-15T12:15:04.064Z"
   },
   {
     "id": "1779918190243-xbh0u7e",
@@ -785,42 +785,24 @@
     "expiryDate": "2026-07-30T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": -0.8785196000000004,
-      "bestProfit": -0.13474226993865038,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "arbType": "direct",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "arbType": null,
       "outcomeCount": 11,
       "matchedCount": 10,
       "kalshiCount": 10,
       "pmCount": 11,
-      "scannedAt": "2026-07-15T11:44:29.762Z",
+      "scannedAt": "2026-07-15T12:15:04.019Z",
       "pmClosed": false,
       "priceResolved": false,
-      "allArbs": [
-        {
-          "artist": "John Pardon",
-          "roiPct": -0.8785196000000004,
-          "expectedProfit": -0.13474226993865038,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "arbType": "direct",
-          "totalStake": 15.383435582822086,
-          "fees": {
-            "kalshiFee": 0.07,
-            "pmFee": 0.01873,
-            "kalshiFeeDetails": "Kalshi YES buy 15 @ $0.98 + NO sell 16 @ $0.97 = $0.07",
-            "pmFeeDetails": "Polymarket NO buy 17 @ $0.02 (θ=0.05) = $0.02",
-            "netProfitIfKalshiWins": -0.13474226993865038,
-            "netProfitIfPmWins": -0.13474226993865038,
-            "worstCaseNetProfit": -0.13474226993865038
-          }
-        }
-      ]
+      "allArbs": []
     },
     "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-15T11:44:29.762Z"
+    "lastMatchedAt": "2026-07-15T12:15:04.019Z"
   },
   {
     "id": "1779918758511-quuqz22",
@@ -2139,42 +2121,24 @@
     "expiryDate": "2027-12-31T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": -4.150499999999996,
-      "bestProfit": -9.54614999999999,
-      "strategy": "Buy YES Kalshi + NO PM",
-      "arbType": "direct",
+      "bestRoiPct": 0,
+      "bestProfit": 0,
+      "strategy": "No arb",
+      "arbType": null,
       "outcomeCount": 3,
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-15T11:44:44.959Z",
+      "scannedAt": "2026-07-15T12:15:03.723Z",
       "pmClosed": false,
       "priceResolved": false,
-      "allArbs": [
-        {
-          "artist": "Anthropic",
-          "roiPct": -4.150499999999996,
-          "expectedProfit": -9.54614999999999,
-          "strategy": "Buy YES Kalshi + NO PM",
-          "arbType": "direct",
-          "totalStake": 232.29999999999998,
-          "fees": {
-            "kalshiFee": 5.29,
-            "pmFee": 1.95615,
-            "kalshiFeeDetails": "Kalshi YES buy 230 @ $0.80 + NO sell 233 @ $0.79 = $5.29",
-            "pmFeeDetails": "Polymarket NO buy 254 @ $0.19 (θ=0.05) = $1.96",
-            "netProfitIfKalshiWins": -9.54614999999999,
-            "netProfitIfPmWins": -9.54614999999999,
-            "worstCaseNetProfit": -9.54614999999999
-          }
-        }
-      ]
+      "allArbs": []
     },
     "liveResult": null,
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-15T11:44:44.959Z"
+    "lastMatchedAt": "2026-07-15T12:15:03.723Z"
   },
   {
     "id": "1780612499359-fuv0rf2",
