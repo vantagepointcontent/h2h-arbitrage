@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { TrendingUp, Zap } from "lucide-react";
-import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
+import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { computeApy } from "@/lib/matcher";
 
@@ -171,8 +171,6 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
             o.arbitrage.fees,
             o.arbitrage.expectedProfit,
           );
-          const concise = formatConciseStrategy(o.arbitrage.strategy);
-
           const apy = o.arbitrage.apyPct ?? computeApy(o.arbitrage.roiPct, marketExpiryDate);
 
           const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId;
@@ -182,7 +180,6 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
               {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
               <div className="flex items-center gap-3 flex-wrap">
                 <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
-                <span className="text-xs text-[#FFFFFF] font-mono">{concise.text}</span>
                 <div className="flex-1" />
                 <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
                   {o.arbitrage.roiPct.toFixed(2)}%
@@ -196,14 +193,17 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                   </span>
                 )}
                 {canExecute && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); startExecute(o); }}
-                    disabled={resolvingArtist === o.artist}
-                    className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
-                    title="Manually execute this arb (opens confirmation)"
-                  >
-                    <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
-                  </button>
+                  <span className="flex flex-col items-center">
+                    <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                      disabled={resolvingArtist === o.artist}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                      title="Manually execute this arb (opens confirmation)"
+                    >
+                      <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
+                    </button>
+                  </span>
                 )}
               </div>
 

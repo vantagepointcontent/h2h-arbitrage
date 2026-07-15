@@ -132,6 +132,58 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
 
 /* ── Main App ── */
 
+/**
+ * Build a ScanResult from cached allArbs data (from lastScanResult/liveResult).
+ * Populates kalshi and polymarket price fields so the detail view shows
+ * cached prices immediately instead of "—" while a background refresh runs.
+ */
+function buildCachedResult(
+  eventTitle: string,
+  expiryDate: string | null | undefined,
+  cached: { kalshiCount?: number; pmCount?: number; matchedCount?: number; scannedAt?: string; allArbs?: any[] },
+): ScanResult {
+  return {
+    eventTitle,
+    kalshiCount: cached.kalshiCount ?? 0,
+    pmCount: cached.pmCount ?? 0,
+    matchedCount: cached.matchedCount ?? 0,
+    expiryDate: expiryDate ?? undefined,
+    outcomes: (cached.allArbs ?? []).map((a: any): UnifiedOutcome => ({
+      artist: a.artist,
+      kalshi: (a.kalshiYesAsk != null || a.kalshiNoAsk != null || a.kalshiYesBid != null) ? {
+        ticker: a.kalshiTicker ?? "",
+        yesBid: a.kalshiYesBid ?? 0,
+        yesAsk: a.kalshiYesAsk ?? 0,
+        noBid: a.kalshiNoBid ?? 0,
+        noAsk: a.kalshiNoAsk ?? 0,
+        lastPrice: 0,
+      } : null,
+      polymarket: (a.pmYesPrice != null || a.pmNoPrice != null || a.pmBestAsk != null) ? {
+        marketId: "",
+        conditionId: a.pmConditionId ?? "",
+        yesPrice: a.pmYesPrice ?? 0,
+        noPrice: a.pmNoPrice ?? 0,
+        bestBid: a.pmBestBid ?? 0,
+        bestAsk: a.pmBestAsk ?? 0,
+        lastTradePrice: 0,
+      } : null,
+      arbitrage: {
+        strategy: a.strategy ?? "",
+        kalshiStake: a.kalshiStake ?? 0,
+        pmStake: a.pmStake ?? 0,
+        expectedProfit: a.expectedProfit ?? 0,
+        roiPct: a.roiPct ?? 0,
+        apyPct: a.apyPct ?? a.roiPct ?? 0,
+        buyPlatform: a.buyPlatform ?? null,
+        buyPrice: a.buyPrice ?? 0,
+        sellPlatform: a.sellPlatform ?? null,
+        sellPrice: a.sellPrice ?? 0,
+      },
+    })),
+    unmatchedKalshi: [],
+    unmatchedPolymarket: [],
+  };
+}
 
 export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("");
@@ -274,8 +326,13 @@ export default function Home() {
           // UI-087/UI-084: show cached data instantly, then silent background refresh
           const isExpired = isMarketExpired(m);
           let cached = m.liveResult ?? m.lastScanResult;
-          const hasFullArbs = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.artist !== undefined);
-          if (cached && !hasFullArbs && !isExpired) {
+          // Check if allArbs entries have price fields (not just artist/roi).
+          // liveResult.allArbs from the watcher only stores { artist, roiPct,
+          // expectedProfit, strategy } — no prices. lastScanResult.allArbs from
+          // refresh-single.ts has full price fields. If the cached blob is sparse,
+          // fetch the full market by id to get prices.
+          const hasPrices = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.kalshiYesAsk !== undefined || (cached!.allArbs![0] as any)?.pmYesPrice !== undefined);
+          if (cached && !hasPrices && !isExpired) {
             try {
               const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`);
               if (r.ok) {
@@ -1857,7 +1914,7 @@ export default function Home() {
                               </th>
                               <th className="text-left px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1">
-                                  Strategy <HeaderInfo text="Recommended execution strategy for this arb — which side to buy on which platform, suggested stake sizing, and any risk notes.\nStrategies are computed from the current spread, depth, and time to expiry." />
+                                  Arb Type <HeaderInfo text="Color-coded arb type badge. Click a row to expand full leg breakdown with stakes, fees, and execution details." />
                                 </span>
                               </th>
                             </tr>

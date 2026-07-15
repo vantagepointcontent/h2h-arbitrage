@@ -8,7 +8,7 @@ import { ArbHistoryCell } from './ArbHistoryCell';
 import { ExpandedChart } from './ExpandedChart';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
-import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
+import { parseArbLegs, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
 import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
 
 interface Outcome {
@@ -52,6 +52,19 @@ interface OutcomeTableBodyProps {
   sortDir?: "asc" | "desc";
   /** UI-15: market expiry date for APY tooltip breakdown */
   marketExpiryDate?: string | null;
+}
+
+/** Format days-to-expiry as human-readable string:
+ *  >1 day → "X days", <1 day → "X hours" or "X min", expired → "Expired" */
+function formatTimeToExpiry(expiryDate?: string | null): string {
+  const days = getDaysToExpiry(expiryDate);
+  if (days == null) return "Expired";
+  if (days >= 1) return `${Math.round(days)} days`;
+  const hours = days * 24;
+  if (hours >= 1) return `${Math.round(hours)} hours`;
+  const mins = hours * 60;
+  if (mins >= 1) return `${Math.round(mins)} min`;
+  return "Expired";
 }
 
 function OutcomeTableBodyInner({
@@ -310,24 +323,25 @@ function OutcomeTableBodyInner({
                 {!hasPrices ? (
                   <span className="text-[#8A9BA8]">—</span>
                 ) : (() => {
-                  const { text: conciseText } = formatConciseStrategy(o.arbitrage.strategy);
                   if (o.arbitrage.strategy === 'No arb') {
                     return <span className="text-[#8A9BA8]">No arb</span>;
                   }
                   return (
                     <span className="inline-flex items-center gap-1.5">
                       <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
-                      <span className="text-[#8A9BA8]">{conciseText}</span>
                       {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
                       {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); startExecute(o); }}
-                          disabled={resolvingArtist === o.artist}
-                          className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
-                          title="Manually execute this arb (opens confirmation)"
-                        >
-                          <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
-                        </button>
+                        <span className="flex flex-col items-center">
+                          <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                            disabled={resolvingArtist === o.artist}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                            title="Manually execute this arb (opens confirmation)"
+                          >
+                            <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
+                          </button>
+                        </span>
                       )}
                     </span>
                   );
@@ -350,6 +364,22 @@ function OutcomeTableBodyInner({
                     </div>
                     <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
                       {isBalanced ? "● Balanced" : "● Imbalanced"}
+                    </div>
+                    {/* APY in expanded detail — same value as scan table column */}
+                    {hasPrices && o.arbitrage.apyPct != null && o.arbitrage.apyPct > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#8A9BA8]">APY:</span>
+                        <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
+                          <span className="font-bold text-[#5DBE81]">{formatPercent(o.arbitrage.apyPct)}</span>
+                        </ApyValueTooltip>
+                      </div>
+                    )}
+                    {/* Days to expiry in expanded detail */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#8A9BA8]">Days to expiry:</span>
+                      <span className={`font-medium ${formatTimeToExpiry(marketExpiryDate) === "Expired" ? "text-[#ef4444]" : "text-[#FFFFFF]"}`}>
+                        {formatTimeToExpiry(marketExpiryDate)}
+                      </span>
                     </div>
                   </div>
                   {/* UI-13: Fee breakdown in expanded row */}

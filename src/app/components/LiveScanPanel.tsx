@@ -7,7 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/c
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
-import { parseArbLegs, formatConciseStrategy, LegBreakdown, ArbTypeBadge } from "@/app/components/ArbLegBreakdown";
+import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "@/app/components/ArbLegBreakdown";
 import { TrendingUp } from "lucide-react";
 
 interface LiveArbOutcome {
@@ -773,7 +773,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium" title="Persistence: likelihood the arb lasts (depth, velocity, history)">PERSIST</th>
                       <th className="text-center py-2 px-2 text-[#8A9BA8] font-medium" title="Arb formation signal from price velocity: FORMING = spread converging toward arb, DIVERGING = moving away, quiet = stable">SIGNAL</th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium" title="Per-episode ROI trajectory: is THIS specific arb opportunity peaking or fading?">DECAY</th>
-                      <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">STRATEGY</th>
+                      <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">ARB TYPE</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -893,26 +893,27 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         </td>
                         <td className={`py-2 px-2 text-left font-medium ${strategyColor(o.strategy)}`}>
                           {(() => {
-                            const { text: conciseText } = formatConciseStrategy(o.strategy);
                             if (o.strategy === 'No arb') {
                               return <span className="text-[#FFFFFF]">No arb</span>;
                             }
                             return (
                               <span className="inline-flex items-center gap-1.5">
                                 <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} />
-                                <span>{conciseText}</span>
                                 {(() => {
                                   if (o.stale || o.roiPct <= 0) return null;
                                   const exec = buildExecutableArb(o, activeTab.marketTitle);
                                   if (!exec) return null;
                                   return (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
-                                      title="Manually execute this arb (opens confirmation)"
-                                    >
-                                      <Zap className="w-2.5 h-2.5" /> Execute
-                                    </button>
+                                    <span className="flex flex-col items-center">
+                                      <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
+                                        className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
+                                        title="Manually execute this arb (opens confirmation)"
+                                      >
+                                        <Zap className="w-2.5 h-2.5" /> Execute
+                                      </button>
+                                    </span>
                                   );
                                 })()}
                               </span>
@@ -1050,13 +1051,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           o.fees,
                           o.expectedProfit,
                         );
-                        const concise = formatConciseStrategy(o.strategy);
 
                         return (
                           <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
                             <div className="flex items-center gap-3 flex-wrap">
                               <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} />
-                              <span className="text-xs text-[#FFFFFF] font-mono">{concise.text}</span>
                               <div className="flex-1" />
                               <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
                                 {o.roiPct.toFixed(2)}%
@@ -1068,13 +1067,16 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                                 const exec = buildExecutableArb(o, activeTab.marketTitle);
                                 if (!exec) return null;
                                 return (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
-                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
-                                    title="Manually execute this arb (opens confirmation)"
-                                  >
-                                    <Zap className="w-2.5 h-2.5" /> Execute
-                                  </button>
+                                  <span className="flex flex-col items-center">
+                                    <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setExecutingArb(exec); }}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1"
+                                      title="Manually execute this arb (opens confirmation)"
+                                    >
+                                      <Zap className="w-2.5 h-2.5" /> Execute
+                                    </button>
+                                  </span>
                                 );
                               })()}
                             </div>
