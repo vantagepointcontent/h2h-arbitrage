@@ -761,7 +761,7 @@ export default function DashboardPanel() {
             icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
             rightElement={
               <span className="text-xs text-[#8A9BA8]">
-                Sorted by ROI ↓ · Click to open scan
+                Live · Sorted by ROI ↓ · Click to open scan
               </span>
             }
           >

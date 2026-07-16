@@ -96,6 +96,35 @@ export async function GET(request: NextRequest) {
       (m) => m.expiryDate && new Date(m.expiryDate) < now
     ).length;
 
+    // ── Top Active Arbs (live data) ────────────────────────────
+    // BUG: topActiveArbs previously came from scan_results with
+    // ROW_NUMBER ORDER BY best_roi_pct DESC — it showed the HIGHEST ROI
+    // ever recorded for each market in the time range, not current ROI.
+    // Now computed from savedMarkets using liveResult ?? lastScanResult,
+    // the same data source as the MarketSidebar. This ensures the
+    // dashboard table and sidebar show consistent ROI for the same market.
+    const SUSPICIOUS_ROI_THRESHOLD = SUSPICIOUS_ROI;
+    const topActiveArbs = savedMarkets
+      .map(m => {
+        const live = m.liveResult ?? m.lastScanResult;
+        if (!live || live.bestRoiPct <= 0 || live.bestRoiPct > SUSPICIOUS_ROI_THRESHOLD) return null;
+        const allArbs = live.allArbs ?? [];
+        const positiveArbCount = allArbs.filter(a => a.expectedProfit > 0).length;
+        return {
+          id: 0, // no DB row id — using market id instead
+          market_id: m.id,
+          market_title: m.eventTitle || null,
+          best_roi_pct: live.bestRoiPct,
+          best_profit: live.bestProfit,
+          strategy: live.strategy || '',
+          positive_arb_count: positiveArbCount,
+          scanned_at: live.scannedAt || '',
+        };
+      })
+      .filter((a): a is NonNullable<typeof a> => a !== null)
+      .sort((a, b) => b.best_roi_pct - a.best_roi_pct)
+      .slice(0, 10);
+
     const lifecycleFunnel = {
       found: agg.kpis.totalArbsFound,
       active: agg.kpis.activeArbs,
@@ -109,7 +138,7 @@ export async function GET(request: NextRequest) {
       scansPerDay: agg.scansPerDay,
       roiDistribution: agg.roiBuckets,
       timeline: agg.timeline,
-      topActiveArbs: agg.topActiveArbs,
+      topActiveArbs,
       marketCoverage,
       profitTimeline: agg.profitTimeline,
       lifecycleFunnel,

@@ -346,7 +346,8 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
   roiBuckets: { label: string; low: number; high: number; count: number }[];
   timeline: { time: string; scans: number; avgRoi: number }[];
   profitTimeline: { time: string; profit: number }[];
-  topActiveArbs: any[];
+  // NOTE: topActiveArbs removed from SQL — now computed from savedMarkets
+  // in the stats route to match the sidebar's live data source.
   recurringArbs: number;
   vanishedArbs: number;
   arbTypeBreakdown: { type: string; count: number; totalProfit: number; avgRoi: number }[];
@@ -358,7 +359,8 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
   const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 3600000).toISOString();
 
-  const [kpiRes, perDayRes, bucketRes, hourRes, profitRes, topRes, recurRes, vanishedRes, arbTypeRes] = await Promise.all([
+  // topActiveArbs SQL removed — computed from savedMarkets in stats route
+  const [kpiRes, perDayRes, bucketRes, hourRes, profitRes, recurRes, vanishedRes, arbTypeRes] = await Promise.all([
     c.execute({
       sql: `SELECT
               COUNT(*) AS total_scans,
@@ -401,20 +403,6 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
                    SUM(best_profit) AS profit
             FROM scan_results ${w} GROUP BY hour ORDER BY hour`,
       args,
-    }),
-    c.execute({
-      // Best-ROI scan per market among non-phantom positive arbs, top 10.
-      sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit,
-                   strategy, positive_arb_count, scanned_at
-            FROM (
-              SELECT *, ROW_NUMBER() OVER (
-                PARTITION BY market_id ORDER BY best_roi_pct DESC
-              ) AS rn
-              FROM scan_results ${w}
-                AND positive_arb_count > 0 AND best_roi_pct <= ?
-            ) WHERE rn = 1
-            ORDER BY best_roi_pct DESC LIMIT 10`,
-      args: [...args, suspiciousRoi],
     }),
     c.execute({
       sql: `SELECT COUNT(*) AS cnt FROM (
@@ -499,16 +487,7 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
       time: r.hour,
       profit: +Number(r.profit ?? 0).toFixed(2),
     })),
-    topActiveArbs: (topRes.rows as any[]).map((r) => ({
-      id: r.id,
-      market_id: r.market_id,
-      market_title: r.market_title || null,
-      best_roi_pct: r.best_roi_pct,
-      best_profit: r.best_profit,
-      strategy: r.strategy,
-      positive_arb_count: r.positive_arb_count,
-      scanned_at: r.scanned_at,
-    })),
+    // topActiveArbs moved to stats route (computed from savedMarkets)
     recurringArbs: Number((recurRes.rows as any[])[0]?.cnt ?? 0),
     vanishedArbs: Number((vanishedRes.rows as any[])[0]?.cnt ?? 0),
     arbTypeBreakdown: (arbTypeRes.rows as any[]).map((r) => ({
