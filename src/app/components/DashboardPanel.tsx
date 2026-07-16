@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
+import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import {
   ResponsiveContainer,
   LineChart,
@@ -815,8 +816,8 @@ export default function DashboardPanel() {
                           >
                             {arb.market_title || arb.market_id}
                           </td>
-                          <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={arb.strategy}>
-                            {arb.strategy || "—"}
+                          <td className="px-3 py-2 text-xs truncate max-w-[200px]" title={arb.strategy}>
+                            <CompactStrategyDisplay strategy={arb.strategy} />
                           </td>
                           <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>
                             {fmtPct(arb.best_roi_pct)}

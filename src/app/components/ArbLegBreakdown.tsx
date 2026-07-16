@@ -73,19 +73,20 @@ export function classifyArbType(strategy: string, arbType?: ArbType | null): Arb
 /**
  * Compact pill-shaped badge with color-coded arb type + hover tooltip.
  */
-export function ArbTypeBadge({ strategy, arbType }: { strategy: string; arbType?: ArbType | null }) {
+export function ArbTypeBadge({ strategy, arbType, onClick }: { strategy: string; arbType?: ArbType | null; onClick?: () => void }) {
   const info = classifyArbType(strategy, arbType);
   if (!info) return null;
 
   return (
     <span
-      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide cursor-help"
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${onClick ? "cursor-pointer hover:opacity-80" : "cursor-help"}`}
       style={{
         backgroundColor: `${info.color}20`,
         color: info.color,
         border: `1px solid ${info.color}50`,
       }}
       title={info.description}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
     >
       {info.label}
     </span>
@@ -235,6 +236,34 @@ export function formatConciseStrategy(strategy: string): { text: string; isCross
   }
 
   return { text: strategy, isCross: false };
+}
+
+/**
+ * Compact visual strategy display: platform icon + YES/NO side.
+ * Uses parseArbLegs() to extract platform + side from strategy string.
+ * Renders: [K icon] YES · [PM icon] NO  (direct)
+ *          [K icon] YES(A) · [PM icon] YES(B)  (cross)
+ *          [K icon] YES(A) · [K icon] YES(B)  (internal)
+ */
+export function CompactStrategyDisplay({ strategy }: { strategy: string }) {
+  if (!strategy || strategy === 'No arb') return <span className="text-[#8A9BA8]">No arb</span>;
+
+  const breakdown = parseArbLegs(strategy, 0, 0, 0, 0);
+  if (breakdown.legs.length === 0) return <span className="text-[#8A9BA8]">{strategy}</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      {breakdown.legs.map((leg, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          {i > 0 && <span className="text-[#5E6875] text-[10px]">·</span>}
+          <PlatformIcon platform={leg.platform} />
+          <span className={`text-[10px] font-medium ${leg.side === 'YES' ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+            {leg.side}{breakdown.isCross && leg.outcome ? `(${leg.outcome})` : ''}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────

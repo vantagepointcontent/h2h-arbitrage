@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { classifyArbType, getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
+import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 
 interface LogEntry {
   id: number;
@@ -596,7 +597,7 @@ function LogRow({
             {hasMarketName ? marketName : log.market_id}
           </span>
         </td>
-        <td className="px-3 py-2 text-xs text-[#8A9BA8] truncate max-w-[200px]" title={log.strategy}>{log.strategy || "\u2014"}</td>
+        <td className="px-3 py-2 text-xs truncate max-w-[200px]" title={log.strategy}><CompactStrategyDisplay strategy={log.strategy} /></td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           {arbTypeMeta ? (
             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${arbTypeMeta.badgeClass}`}>

@@ -6,6 +6,7 @@ import { Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "
 import { computeApy } from "@/lib/matcher";
 import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
+import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 
 /* ── Overview Panel ── */
 function OverviewPanelInner({
@@ -393,7 +394,7 @@ function OverviewPanelInner({
                       ) : "—"}
                     </td>
                     <td className="px-4 py-3 text-right text-[#FFFFFF]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-[#8A9BA8]">{strategy || "—"}</td>
+                    <td className="px-4 py-3 text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
                     <td className="px-4 py-3 text-right text-xs text-[#8A9BA8]">{formatRelativeTime(scannedAt)}</td>
                   </tr>
                 );

@@ -328,7 +328,7 @@ function OutcomeTableBodyInner({
                   }
                   return (
                     <span className="inline-flex items-center gap-1.5">
-                      <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
+                      <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} onClick={() => setExpandedArtist(expandedArtist === o.artist ? null : o.artist)} />
                       {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
                       {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
                         <span className="flex flex-col items-center">

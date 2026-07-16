@@ -898,7 +898,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                             }
                             return (
                               <span className="inline-flex items-center gap-1.5">
-                                <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} />
+                                <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} onClick={() => toggleExpandedArtist(o.artist)} />
                                 {(() => {
                                   if (o.stale || o.roiPct <= 0) return null;
                                   const exec = buildExecutableArb(o, activeTab.marketTitle);
