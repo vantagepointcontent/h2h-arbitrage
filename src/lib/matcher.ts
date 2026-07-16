@@ -1233,7 +1233,10 @@ export function applyManualMatches(
     const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, arbType: 'direct' };
 
     merged[kIdx] = {
-      artist: `${outcomes[kIdx].artist} + ${outcomes[pIdx].artist}`,
+      // UI: Show only the Polymarket name in the Outcome column after coupling.
+      // Previously this concatenated both platform names ("KalshiName + PMName")
+      // which cluttered the display. The PM name alone is sufficient.
+      artist: outcomes[pIdx].artist,
       kalshi,
       polymarket: pmShape,
       arbitrage: noArbResult,
