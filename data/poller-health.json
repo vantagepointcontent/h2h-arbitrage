@@ -1,95 +1,17 @@
 {
-  "status": "degraded",
+  "status": "running",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 450,
-  "startedAt": "2026-07-15T18:33:54.515Z",
-  "finishedAt": "2026-07-15T18:34:49.704Z",
-  "durationMs": 55189,
-  "successCount": 15,
-  "failureCount": 15,
-  "skippedCount": 417,
-  "avgScanMs": 27465,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "FL-25 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48600
-    },
-    {
-      "market": "FL-27 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48570
-    },
-    {
-      "market": "GA-01 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 48834
-    },
-    {
-      "market": "TX-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 35973
-    },
-    {
-      "market": "TX-10 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37041
-    },
-    {
-      "market": "WA-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 35844
-    },
-    {
-      "market": "MLB: Stolen Bases Leader",
-      "error": "fetch failed",
-      "durationMs": 60000
-    },
-    {
-      "market": "TX-11 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 38031
-    },
-    {
-      "market": "WA-10 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37299
-    },
-    {
-      "market": "World Cup Winner ",
-      "error": "fetch failed",
-      "durationMs": 60000
-    },
-    {
-      "market": "TX-09 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37701
-    },
-    {
-      "market": "WI-02 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37320
-    },
-    {
-      "market": "WY At-Large House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37032
-    },
-    {
-      "market": "WI-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 37107
-    },
-    {
-      "market": "WI-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 36219
-    }
-  ],
-  "breakerSkipped": 3,
-  "openBreakers": 8
+  "marketCount": 449,
+  "startedAt": "2026-07-16T13:44:29.443Z",
+  "finishedAt": null,
+  "durationMs": null,
+  "successCount": 0,
+  "failureCount": 0,
+  "skippedCount": 0,
+  "avgScanMs": 0,
+  "maxScanMs": 0,
+  "errors": []
 }

@@ -3,36 +3,6 @@
   "scanRecords": [
     {
       "category": "politics",
-      "lastScannedAt": "2026-07-09T01:54:15.366Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-09T05:04:10.443Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-09T08:14:10.675Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "entertainment",
-      "lastScannedAt": "2026-07-09T11:17:38.565Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-09T14:27:38.546Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-09T17:31:42.278Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
       "lastScannedAt": "2026-07-09T21:12:31.811Z",
       "marketsAdded": 0
     },
@@ -250,9 +220,39 @@
       "category": "politics",
       "lastScannedAt": "2026-07-15T17:45:18.524Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-15T20:52:40.173Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-16T00:02:28.888Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "entertainment",
+      "lastScannedAt": "2026-07-16T03:12:28.964Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-16T06:22:23.747Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-07-16T09:32:25.908Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-07-16T12:34:41.170Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-15T17:45:18.524Z",
+  "lastScanAt": "2026-07-16T12:34:41.170Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }
