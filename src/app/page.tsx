@@ -52,8 +52,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { AlertSettingsPanel } from "@/components/AlertSystem";
-import { syncArbDurations, getArbDurationString, getArbDurationColor, formatDuration, loadArbDurations } from "@/lib/arb-duration";
-import { CATEGORIES, CategoryName } from "@/lib/categories";
+import { CATEGORIES } from "@/lib/categories";
 
 import dynamic from "next/dynamic";
 // PERF-P1: lazy-load heavy conditionally-rendered components into separate chunks
@@ -81,7 +80,7 @@ import { ArbOpportunitiesPanel } from "@/app/components/ArbOpportunitiesPanel";
 import { ApyHeaderInfo, HeaderInfo } from "@/app/components/ApyTooltip";
 const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalSpreadChart").then(m => m.HistoricalSpreadChart), { ssr: false });
 import { saveSpread } from "@/lib/spreadHistory";
-import { computeApy } from "@/lib/matcher";
+
 
 import { MarketSidebar } from "@/app/components/MarketSidebar";
 import { OverviewPanel } from "@/app/components/OverviewPanel";
@@ -205,8 +204,6 @@ export default function Home() {
   const [decoupledPairs, setDecoupledPairs] = useState<any[]>([]);
   const previousPricesRef = useRef<Map<string, { kYes: number; pYes: number }>>(new Map());
   const [priceChanges, setPriceChanges] = useState<Map<string, "up" | "down" | null>>(new Map());
-  const activeScanRef = useRef(false);
-
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(() => getStoredSidebarOpen());
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

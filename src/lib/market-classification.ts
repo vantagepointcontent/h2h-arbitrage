@@ -11,11 +11,11 @@
 
 // ─── Types ────────────────────────────────────────────────────────
 
-export type MarketType = 'binary' | 'multi-outcome' | 'bracket';
 export type BetType = 'moneyline' | 'spread' | 'total' | 'advance' | 'exact-score' | 'draw' | 'top-n' | 'special';
-export type Domain = 'politics' | 'sports' | 'finance' | 'crypto' | 'entertainment' | 'world' | 'science' | 'weather';
+type MarketType = 'binary' | 'multi-outcome' | 'bracket';
+type Domain = 'politics' | 'sports' | 'finance' | 'crypto' | 'entertainment' | 'world' | 'science' | 'weather';
 
-export interface MarketClassification {
+interface MarketClassification {
   marketType: MarketType;
   betType: BetType;
   domain: Domain;

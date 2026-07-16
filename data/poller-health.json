@@ -1,17 +1,35 @@
 {
-  "status": "running",
+  "status": "degraded",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 449,
-  "startedAt": "2026-07-16T13:44:29.443Z",
-  "finishedAt": null,
-  "durationMs": null,
-  "successCount": 0,
-  "failureCount": 0,
-  "skippedCount": 0,
-  "avgScanMs": 0,
-  "maxScanMs": 0,
-  "errors": []
+  "marketCount": 450,
+  "startedAt": "2026-07-16T16:51:37.507Z",
+  "finishedAt": "2026-07-16T16:55:20.551Z",
+  "durationMs": 223044,
+  "successCount": 104,
+  "failureCount": 3,
+  "skippedCount": 342,
+  "avgScanMs": 8968,
+  "maxScanMs": 60000,
+  "errors": [
+    {
+      "market": "ME-02 House Election Winner",
+      "error": "HTTP 404",
+      "durationMs": 170
+    },
+    {
+      "market": "Sweden Parliamentary Election Winner",
+      "error": "timeout after 32529ms (adaptive)",
+      "durationMs": 32529
+    },
+    {
+      "market": "Clacton by-election Winner",
+      "error": "timeout after 60000ms (adaptive)",
+      "durationMs": 60000
+    }
+  ],
+  "breakerSkipped": 1,
+  "openBreakers": 8
 }

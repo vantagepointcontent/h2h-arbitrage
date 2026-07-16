@@ -448,5 +448,53 @@
     "pmTitle": "Ebba Busch",
     "id": "1783863457808-gzwrphh",
     "createdAt": "2026-07-12T13:37:37.808Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-B72.5",
+    "pmConditionId": "0xc0a02dcbef3587630544771287827de6171842ab313b1cff35741f08669447d1",
+    "kalshiTitle": "the maximum temperature (72-73°F, Jul 16, 2026)",
+    "pmTitle": "72-73°F",
+    "id": "1784212702427-i5wvdjp",
+    "createdAt": "2026-07-16T14:38:22.427Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-B68.5",
+    "pmConditionId": "0x027ff098a8ba6c8cc9f1710e6fec504098e7a2c1ece1eb12ca208b4849d7542b",
+    "kalshiTitle": "the maximum temperature (68-69°F, Jul 16, 2026)",
+    "pmTitle": "68-69°F",
+    "id": "1784212714402-z5fmnwh",
+    "createdAt": "2026-07-16T14:38:34.402Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-B66.5",
+    "pmConditionId": "0xb0de3e80dd8db3c1926c6b80e137624d1ae8f73f5d1374e2e5cf8d8d52ce1701",
+    "kalshiTitle": "the maximum temperature (66-67°F, Jul 16, 2026)",
+    "pmTitle": "66-67°F",
+    "id": "1784212715521-gnnosce",
+    "createdAt": "2026-07-16T14:38:35.521Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-B70.5",
+    "pmConditionId": "0x2460939427a1d8e79428511ac294e2ab4fc5ea0268fea91c09e8063582bdb2bf",
+    "kalshiTitle": "the maximum temperature (70-71°F, Jul 16, 2026)",
+    "pmTitle": "70-71°F",
+    "id": "1784213081184-b97e0wn",
+    "createdAt": "2026-07-16T14:44:41.184Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-T66",
+    "pmConditionId": "0x0b4d28581502b6ca12a65e889aa38b088e15abc9140235f10931da99c65141e7",
+    "kalshiTitle": "the maximum temperature (>66°F, Jul 16, 2026)",
+    "pmTitle": "64-65°F",
+    "id": "1784213132572-3uw0yd8",
+    "createdAt": "2026-07-16T14:45:32.572Z"
+  },
+  {
+    "kalshiTicker": "KXHIGHTSFO-26JUL16-T73",
+    "pmConditionId": "0x4c12b54b5b3bd3b8d8ef7f2560452fbcdf04c35dddb17fa6830dff8c9a88b0df",
+    "kalshiTitle": "the maximum temperature (>73°F, Jul 16, 2026)",
+    "pmTitle": "74-75°F",
+    "id": "1784213310423-sxhqp3b",
+    "createdAt": "2026-07-16T14:48:30.423Z"
   }
 ]

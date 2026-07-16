@@ -782,9 +782,6 @@ let suspiciousRoiPct = SUSPICIOUS_ROI_PCT;
 export function setSuspiciousRoiPct(v: number): void {
   if (Number.isFinite(v) && v > 0) suspiciousRoiPct = v;
 }
-export function getSuspiciousRoiPct(): number {
-  return suspiciousRoiPct;
-}
 
 /** Flag an arb result as suspicious when ROI exceeds the sanity threshold and
  *  at least one leg's depth was unknown (assumed Infinity / zero-parsed). */
