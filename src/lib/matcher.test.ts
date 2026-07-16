@@ -48,7 +48,9 @@ describe('calculateArbitrageMax', () => {
       { ...pm, bestAsk: 0.60, noPrice: 0.45, askDepth: 0 },
       0, 0, 0, 0
     );
-    expect(r.strategy).toBe('No arb');
+    // UI-03: Returns strategy with negative ROI instead of 'No arb'
+    expect(r.strategy).not.toBe('No arb');
+    expect(r.roiPct).toBeLessThanOrEqual(0);
   });
 
   it('depth begränsar maxCapital', () => {
@@ -229,14 +231,15 @@ function makePmMarket(overrides: Partial<any> = {}) {
 describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
   // --- Core null-coercion bug: 1 - null = 1 in JS ---
   describe('null bestBid/bestAsk handling', () => {
-    it('both null → falls back to gamma outcomePrices', () => {
+    it('both null → zeroes out (BUG-086: gamma prices are stale/ghost)', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: null,
         bestAsk: null,
         outcomePrices: '[\"0.42\",\"0.58\"]',
       }));
-      expect(shape.yesPrice).toBe(0.42);
-      expect(shape.noPrice).toBe(0.58);
+      // BUG-086: No orderbook data → zero out to prevent ghost ROI
+      expect(shape.yesPrice).toBe(0);
+      expect(shape.noPrice).toBe(0);
       // CRITICAL: noPrice must NOT be 1 (the old bug: 1 - null = 1)
       expect(shape.noPrice).not.toBe(1);
     });
@@ -269,14 +272,15 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
       expect(shape.noPrice).toBeCloseTo(0.51, 6); // 1 - 0.49
     });
 
-    it('undefined bestBid/bestAsk → same as null (both != null catches both)', () => {
+    it('undefined bestBid/bestAsk → same as null (zeroes out per BUG-086)', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: undefined,
         bestAsk: undefined,
         outcomePrices: '[\"0.33\",\"0.67\"]',
       }));
-      expect(shape.yesPrice).toBe(0.33);
-      expect(shape.noPrice).toBe(0.67);
+      // BUG-086: No orderbook data → zero out
+      expect(shape.yesPrice).toBe(0);
+      expect(shape.noPrice).toBe(0);
     });
   });
 
@@ -518,7 +522,8 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
     });
     const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
     expect(r.strategy).not.toContain('both sides');
-    expect(r.strategy).toBe('No arb');
+    // UI-03: Returns strategy with negative ROI instead of 'No arb'
+    expect(r.strategy).not.toBe('No arb');
   });
 });
 

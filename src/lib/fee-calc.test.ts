@@ -104,11 +104,12 @@ describe('Kalshi/Polymarket fees', () => {
     // Kalshi YES (0.06) + PM NO (0.94) = 1.00 → exact break-even
     // Even without fees this is zero profit. With fees it's a loss.
     // Must NOT be flagged as arbitrage.
-    expect(r.strategy).toBe('No arb');
-    expect(r.expectedProfit).toBe(0);
-    expect(r.roiPct).toBe(0);
-    expect(r.kalshiStake).toBe(0);
-    expect(r.pmStake).toBe(0);
+    // UI-03: calculateArbitrageMax now always returns the best strategy with
+    // actual (negative) net ROI, even for break-even/loss. This lets the UI
+    // show how close a pair is to profitability instead of hiding it.
+    expect(r.strategy).not.toBe('No arb');
+    expect(r.expectedProfit).toBeLessThanOrEqual(0);
+    expect(r.roiPct).toBeLessThanOrEqual(0);
   });
 
   it('tiny spread (0.001) after fees should still be No arb', () => {
