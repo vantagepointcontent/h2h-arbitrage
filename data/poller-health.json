@@ -1,85 +1,19 @@
 {
-  "status": "degraded",
+  "status": "ok",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 451,
-  "startedAt": "2026-07-17T10:30:09.135Z",
-  "finishedAt": "2026-07-17T10:32:13.560Z",
-  "durationMs": 124425,
-  "successCount": 47,
-  "failureCount": 13,
-  "skippedCount": 386,
-  "avgScanMs": 16684,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "Alaska Governor Election Winner  ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    },
-    {
-      "market": "MD-03 House Election Winner",
-      "error": "timeout after 49005ms (adaptive)",
-      "durationMs": 49005
-    },
-    {
-      "market": "TN-05 House Election Winner",
-      "error": "timeout after 49038ms (adaptive)",
-      "durationMs": 49038
-    },
-    {
-      "market": "TN-06 House Election Winner",
-      "error": "timeout after 48996ms (adaptive)",
-      "durationMs": 48996
-    },
-    {
-      "market": "TX-07 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49059
-    },
-    {
-      "market": "TX-05 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49158
-    },
-    {
-      "market": "TX-06 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49125
-    },
-    {
-      "market": "TX-03 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49041
-    },
-    {
-      "market": "TX-08 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49002
-    },
-    {
-      "market": "TX-04 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49059
-    },
-    {
-      "market": "TX-09 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49014
-    },
-    {
-      "market": "TX-10 House Election Winner",
-      "error": "fetch failed",
-      "durationMs": 49140
-    },
-    {
-      "market": "Fed Decision in July?",
-      "error": "fetch failed",
-      "durationMs": 45549
-    }
-  ],
-  "breakerSkipped": 5,
+  "marketCount": 452,
+  "startedAt": "2026-07-17T10:34:42.066Z",
+  "finishedAt": "2026-07-17T10:35:17.150Z",
+  "durationMs": 35084,
+  "successCount": 30,
+  "failureCount": 0,
+  "skippedCount": 416,
+  "avgScanMs": 5456,
+  "maxScanMs": 10262,
+  "errors": [],
+  "breakerSkipped": 6,
   "openBreakers": 11
 }

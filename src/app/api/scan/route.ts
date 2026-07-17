@@ -22,7 +22,8 @@ import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 
-const API_TIMEOUT_MS = 15000; // 15s timeout for upstream APIs
+const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
+const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
               try {
                 const multi = await withTimeout(
                   fetchKalshiMultiSeriesMarkets(kalshiTicker, kalshiSeriesTicker),
-                  API_TIMEOUT_MS * 2, 'Kalshi multi-series',
+                  KALSHI_MULTI_TIMEOUT_MS, 'Kalshi multi-series',
                 );
                 console.log(`[scan] multi-series: ${multi.markets.length} markets from ${multi.seriesFetched.length} series (original: ${m.length})`, { seriesFetched: multi.seriesFetched });
                 if (multi.markets.length > m.length) {
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
     let clobMap: Map<string, any>;
     try {
       // Allow more time for large multi-outcome events (CLOB has 10-concurrent semaphore)
-      const clobTimeout = Math.max(API_TIMEOUT_MS, conditionIds.length * 2000);
+      const clobTimeout = Math.max(API_TIMEOUT_MS, conditionIds.length * 500);
       clobMap = await withTimeout(
         fetchClobMarkets(conditionIds),
         clobTimeout,
