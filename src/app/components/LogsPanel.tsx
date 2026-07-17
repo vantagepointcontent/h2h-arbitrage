@@ -79,13 +79,16 @@ export default function LogsPanel() {
 
   // Expand row
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError("");
+    setNextCursor(undefined);
     try {
       const params = new URLSearchParams();
-      params.set("limit", "500");
+      params.set("limit", "100");
       if (minRoi) params.set("minRoi", minRoi);
       if (positiveArbOnly) params.set("positiveArbOnly", "true");
       if (fromDate) params.set("fromDate", fromDate);
@@ -97,6 +100,7 @@ export default function LogsPanel() {
         setError(data.error);
       } else {
         setLogs(data.logs || []);
+        setNextCursor(data.nextCursor);
       }
     } catch (e: any) {
       setError(e.message || "Failed to fetch logs");
@@ -104,6 +108,33 @@ export default function LogsPanel() {
       setLoading(false);
     }
   }, [minRoi, positiveArbOnly, fromDate, toDate]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "100");
+      params.set("before", nextCursor);
+      if (minRoi) params.set("minRoi", minRoi);
+      if (positiveArbOnly) params.set("positiveArbOnly", "true");
+      if (fromDate) params.set("fromDate", fromDate);
+      if (toDate) params.set("toDate", toDate);
+
+      const res = await fetch(`/api/logs?${params.toString()}`, { cache: "no-store" });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setLogs(prev => [...prev, ...(data.logs || [])]);
+        setNextCursor(data.nextCursor);
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to load more logs");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, minRoi, positiveArbOnly, fromDate, toDate]);
 
   useEffect(() => {
     fetchLogs();
@@ -529,10 +560,21 @@ export default function LogsPanel() {
         )}
       </div>
 
-      {/* Count */}
+      {/* Count + Load More */}
       {!loading && sorted.length > 0 && (
-        <div className="text-xs text-[#8A9BA8] text-right">
-          Showing {sorted.length} of {logs.length} entries
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-[#A8B8C4]">
+            Showing {sorted.length} of {logs.length} entries
+          </div>
+          {nextCursor && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-3 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs font-medium text-[#A8B8C4] hover:text-[#FFFFFF] hover:border-[#5DBE81]/30 transition-colors disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : "Load More"}
+            </button>
+          )}
         </div>
       )}
     </div>

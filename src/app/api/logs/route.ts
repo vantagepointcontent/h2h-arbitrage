@@ -20,12 +20,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const marketId = searchParams.get('marketId') || undefined;
     const limitStr = searchParams.get('limit');
-    const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 200) : 100;
+    const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 500) : 100;
     const minRoiStr = searchParams.get('minRoi');
     const minRoi = minRoiStr !== null ? parseFloat(minRoiStr) : undefined;
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
     const fromDate = searchParams.get('fromDate') || undefined;
     const toDate = searchParams.get('toDate') || undefined;
+    const before = searchParams.get('before') || undefined; // MF-014: cursor
 
     const { rows: results, total } = await queryScanHistory({
       marketId,
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       fromDate,
       toDate,
       limit,
+      before,
     });
 
     const nextCursor = results.length === limit ? results[results.length - 1].scanned_at : undefined;

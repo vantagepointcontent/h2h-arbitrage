@@ -173,7 +173,7 @@ function Panel({
 // ── Empty state ──────────────────────────────────────────────────
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-16 text-center text-sm text-[#8A9BA8]">
+    <div className="py-16 text-center text-sm text-[#A8B8C4]">
       <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
       {message}
     </div>
@@ -185,7 +185,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-      <p className="text-xs text-[#8A9BA8] mb-1">{label}</p>
+      <p className="text-xs text-[#A8B8C4] mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-xs font-mono" style={{ color: entry.color }}>
           {entry.name}: {entry.value}
@@ -236,7 +236,7 @@ export default function DashboardPanel() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-[#8A9BA8]">
+      <div className="py-20 text-center text-sm text-[#A8B8C4]">
         <Activity className="w-6 h-6 animate-spin mx-auto mb-3" />
         Loading dashboard…
       </div>
@@ -273,7 +273,7 @@ export default function DashboardPanel() {
                 className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                   range === opt.key
                     ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                    : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                    : "text-[#A8B8C4] hover:text-[#FFFFFF]"
                 }`}
               >
                 {opt.label}
@@ -287,7 +287,7 @@ export default function DashboardPanel() {
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               autoRefresh
                 ? "bg-[#5DBE81]/10 text-[#5DBE81] border-[#5DBE81]/30"
-                : "bg-[#182533] text-[#8A9BA8] border-[#182533] hover:text-[#FFFFFF]"
+                : "bg-[#182533] text-[#A8B8C4] border-[#182533] hover:text-[#FFFFFF]"
             }`}
             title="Auto-refresh every 60s"
           >
@@ -346,7 +346,7 @@ export default function DashboardPanel() {
               title="Arb Discovery Timeline"
               icon={<Activity className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
-                <span className="text-xs text-[#8A9BA8]">
+                <span className="text-xs text-[#A8B8C4]">
                   {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
@@ -356,7 +356,7 @@ export default function DashboardPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
                     dataKey="time"
-                    tick={{ fontSize: 10, fill: "#8A9BA8" }}
+                    tick={{ fontSize: 10, fill: "#A8B8C4" }}
                     tickFormatter={(val: string) => val.slice(5)}
                     interval="preserveStartEnd"
                   />
@@ -371,7 +371,7 @@ export default function DashboardPanel() {
                     domain={[0, "dataMax"]}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ color: '#8A9BA8', fontSize: '11px' }} />
+                  <Legend wrapperStyle={{ color: '#A8B8C4', fontSize: '11px' }} />
                   <Line
                     yAxisId="left"
                     type="monotone"
@@ -401,7 +401,7 @@ export default function DashboardPanel() {
               title="Scans Per Day"
               icon={<BarChart3 className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
-                <span className="text-xs text-[#8A9BA8]">
+                <span className="text-xs text-[#A8B8C4]">
                   {range === "all" ? "Last 365 days" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
@@ -411,16 +411,16 @@ export default function DashboardPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: "#8A9BA8" }}
+                    tick={{ fontSize: 10, fill: "#A8B8C4" }}
                     interval="preserveStartEnd"
                   />
-                  <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#A8B8C4" }} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload, label }: any) => {
                       if (!active || !payload?.length) return null;
                       return (
                         <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                          <p className="text-xs text-[#8A9BA8]">{fmtShortDate(label)}</p>
+                          <p className="text-xs text-[#A8B8C4]">{fmtShortDate(label)}</p>
                           <p className="text-xs font-mono text-[#5DBE81]">
                             {payload[0].value} scans
                           </p>
@@ -452,7 +452,7 @@ export default function DashboardPanel() {
               title="ROI Distribution"
               icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
               rightElement={
-                <span className="text-xs text-[#8A9BA8]">
+                <span className="text-xs text-[#A8B8C4]">
                   Net of fees
                 </span>
               }
@@ -474,15 +474,15 @@ export default function DashboardPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: "#8A9BA8" }}
+                    tick={{ fontSize: 11, fill: "#A8B8C4" }}
                   />
-                  <YAxis tick={{ fontSize: 10, fill: "#8A9BA8" }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#A8B8C4" }} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload }: any) => {
                       if (!active || !payload?.length) return null;
                       return (
                         <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                          <p className="text-xs text-[#8A9BA8]">
+                          <p className="text-xs text-[#A8B8C4]">
                             ROI {payload[0]?.payload?.label}
                           </p>
                           <p className="text-xs font-mono text-[#5DBE81]">
@@ -514,7 +514,7 @@ export default function DashboardPanel() {
               title="Market Coverage"
               icon={<Globe className="w-4 h-4 text-[#a855f7]" />}
               rightElement={
-                <span className="text-xs text-[#8A9BA8]">
+                <span className="text-xs text-[#A8B8C4]">
                   By domain
                 </span>
               }
@@ -560,7 +560,7 @@ export default function DashboardPanel() {
                           <p className="text-xs font-semibold" style={{ color: payload[0].color }}>
                             {payload[0].name}
                           </p>
-                          <p className="text-xs font-mono text-[#8A9BA8]">
+                          <p className="text-xs font-mono text-[#A8B8C4]">
                             {payload[0].value} markets
                           </p>
                         </div>
@@ -577,7 +577,7 @@ export default function DashboardPanel() {
             title="Arb Profit Timeline"
             icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
             rightElement={
-              <span className="text-xs text-[#8A9BA8]">
+              <span className="text-xs text-[#A8B8C4]">
                 {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
               </span>
             }
@@ -593,7 +593,7 @@ export default function DashboardPanel() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
                 <XAxis
                   dataKey="time"
-                  tick={{ fontSize: 10, fill: "#8A9BA8" }}
+                  tick={{ fontSize: 10, fill: "#A8B8C4" }}
                   tickFormatter={(val: string) => val.slice(5)}
                   interval="preserveStartEnd"
                 />
@@ -606,7 +606,7 @@ export default function DashboardPanel() {
                     if (!active || !payload?.length) return null;
                     return (
                       <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                        <p className="text-xs text-[#8A9BA8]">{payload[0]?.payload?.time}</p>
+                        <p className="text-xs text-[#A8B8C4]">{payload[0]?.payload?.time}</p>
                         <p className="text-xs font-mono text-[#5DBE81]">
                           {fmtUsd(payload[0].value)}
                         </p>
@@ -632,7 +632,7 @@ export default function DashboardPanel() {
             title="Arb Lifecycle Funnel"
             icon={<Layers className="w-4 h-4 text-[#facc15]" />}
             rightElement={
-              <span className="text-xs text-[#8A9BA8]">
+              <span className="text-xs text-[#A8B8C4]">
                 Found → Active → Recurring → Vanished → Expired
               </span>
             }
@@ -650,7 +650,7 @@ export default function DashboardPanel() {
                 const maxVal = Math.max(...stages.map((s) => s.value), 1);
                 return stages.map((stage) => (
                   <div key={stage.label} className="flex items-center gap-3">
-                    <span className="text-xs font-medium w-20 text-[#8A9BA8] text-right shrink-0">
+                    <span className="text-xs font-medium w-20 text-[#A8B8C4] text-right shrink-0">
                       {stage.label}
                     </span>
                     <div className="flex-1 bg-[#0E1621] rounded-full overflow-hidden" style={{ height: 24 }}>
@@ -676,7 +676,7 @@ export default function DashboardPanel() {
             title="Arb Episode Stats"
             icon={<Clock className="w-4 h-4 text-[#5DBE81]" />}
             rightElement={
-              <span className="text-xs text-[#8A9BA8]">
+              <span className="text-xs text-[#A8B8C4]">
                 Durable (≥5m) vs phantom (&lt;1m) episodes
               </span>
             }
@@ -691,7 +691,7 @@ export default function DashboardPanel() {
             title="Arb Type Breakdown"
             icon={<Layers className="w-4 h-4 text-[#60a5fa]" />}
             rightElement={
-              <span className="text-xs text-[#8A9BA8]">
+              <span className="text-xs text-[#A8B8C4]">
                 Count & profit by type · Net of fees
               </span>
             }
@@ -761,7 +761,7 @@ export default function DashboardPanel() {
             title="Top Active Arbs"
             icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
             rightElement={
-              <span className="text-xs text-[#8A9BA8]">
+              <span className="text-xs text-[#A8B8C4]">
                 Live · Sorted by ROI ↓ · Click to open scan
               </span>
             }
@@ -773,22 +773,22 @@ export default function DashboardPanel() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#182533] bg-[#0E1621]">
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Market
                       </th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Strategy
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         ROI
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Profit
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Arbs
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Scanned
                       </th>
                     </tr>
@@ -828,7 +828,7 @@ export default function DashboardPanel() {
                           <td className="px-3 py-2 text-right text-xs font-mono text-[#5DBE81]">
                             {arb.positive_arb_count}
                           </td>
-                          <td className="px-3 py-2 text-right text-xs text-[#8A9BA8] font-mono whitespace-nowrap">
+                          <td className="px-3 py-2 text-right text-xs text-[#A8B8C4] font-mono whitespace-nowrap">
                             {fmtTime(arb.scanned_at)}
                           </td>
                         </tr>
@@ -844,7 +844,7 @@ export default function DashboardPanel() {
 
       {/* Footer note */}
       {hasData && (
-        <div className="flex items-center justify-between text-xs text-[#8A9BA8]">
+        <div className="flex items-center justify-between text-xs text-[#A8B8C4]">
           <span>All values net of fees</span>
           <span>
             Data range: {RANGE_OPTIONS.find((r) => r.key === range)?.label}
@@ -871,7 +871,7 @@ function KPICard({
     <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         {icon}
-        <span className="text-[10px] text-[#8A9BA8]">{label}</span>
+        <span className="text-[10px] text-[#A8B8C4]">{label}</span>
       </div>
       <div className="text-lg font-bold" style={{ color }}>
         {value}

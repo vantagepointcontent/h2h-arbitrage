@@ -288,10 +288,11 @@ export async function queryScanHistory(opts: {
   fromDate?: string;
   toDate?: string;
   limit?: number;
+  before?: string; // MF-014: cursor — scanned_at value for pagination
 }): Promise<{ rows: any[]; total: number }> {
   await ensureDb();
   const c = getClient();
-  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
 
   let where = ' WHERE 1=1';
   const args: (string | number)[] = [];
@@ -300,6 +301,7 @@ export async function queryScanHistory(opts: {
   if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
   if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+  if (opts.before) { where += ' AND scanned_at < ?'; args.push(opts.before); }
 
   const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM scan_results${where}`, args });
   const total = Number((countRes.rows as any[])[0]?.cnt ?? 0);
