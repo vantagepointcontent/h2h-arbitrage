@@ -5,10 +5,15 @@
  *
  * Columns per spec: market, platform, side, size, price, status, P&L.
  * Also: trade history with timestamps + ability to manually cancel pending trades.
+ *
+ * FEAT: Open Positions sub-tab — live positions management with Exit button.
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, RefreshCw, Receipt, X, CheckCircle2, XCircle, Clock, Ban, ShieldAlert } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Loader2, RefreshCw, Receipt, X, CheckCircle2, XCircle, Clock, Ban, ShieldAlert, Wallet } from 'lucide-react';
+
+const OpenPositionsPanel = dynamic(() => import('./OpenPositionsPanel'), { ssr: false });
 
 interface ExecutionRecord {
   id: number;
@@ -71,6 +76,7 @@ export default function TradesPanel() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'real' | 'dry' | 'pending'>('all');
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const [subTab, setSubTab] = useState<'positions' | 'history'>('positions');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,32 +155,60 @@ export default function TradesPanel() {
           <Receipt className="w-5 h-5 text-[#5DBE81]" /> Trades
         </h2>
         <div className="flex items-center gap-2">
+          {/* Sub-tab toggle: Open Positions vs History */}
           <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
-            {(['all', 'real', 'dry', 'pending'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-                  filter === f ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
-                }`}
-              >
-                {f === 'all' ? 'All' : f === 'real' ? 'Real' : f === 'dry' ? 'Dry-run' : 'Pending'}
-                {f === 'pending' && pendingCount > 0 && (
-                  <span className="px-1 rounded-full bg-amber-500/20 text-amber-400 text-[9px]">{pendingCount}</span>
-                )}
-              </button>
-            ))}
+            <button
+              onClick={() => setSubTab('positions')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                subTab === 'positions' ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
+              }`}
+            >
+              <Wallet className="w-3 h-3" /> Open Positions
+            </button>
+            <button
+              onClick={() => setSubTab('history')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                subTab === 'history' ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
+              }`}
+            >
+              <Receipt className="w-3 h-3" /> History
+            </button>
           </div>
-          <button
-            onClick={load}
-            className="p-1.5 rounded-lg border border-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+          {subTab === 'history' && (
+            <>
+              <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
+                {(['all', 'real', 'dry', 'pending'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                      filter === f ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
+                    }`}
+                  >
+                    {f === 'all' ? 'All' : f === 'real' ? 'Real' : f === 'dry' ? 'Dry-run' : 'Pending'}
+                    {f === 'pending' && pendingCount > 0 && (
+                      <span className="px-1 rounded-full bg-amber-500/20 text-amber-400 text-[9px]">{pendingCount}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={load}
+                className="p-1.5 rounded-lg border border-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Open Positions sub-tab */}
+      {subTab === 'positions' && <OpenPositionsPanel />}
+
+      {/* Trade History sub-tab */}
+      {subTab === 'history' && (<>
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
@@ -340,6 +374,7 @@ export default function TradesPanel() {
           </table>
         </div>
       )}
+      </>)}
     </div>
   );
 }
