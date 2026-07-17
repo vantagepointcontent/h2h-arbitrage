@@ -1,19 +1,150 @@
 {
-  "status": "ok",
+  "status": "aborted",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
   "marketCount": 451,
-  "startedAt": "2026-07-17T12:29:15.915Z",
-  "finishedAt": "2026-07-17T12:29:53.365Z",
-  "durationMs": 37450,
-  "successCount": 27,
-  "failureCount": 0,
-  "skippedCount": 423,
-  "avgScanMs": 6598,
-  "maxScanMs": 32671,
-  "errors": [],
+  "startedAt": "2026-07-17T12:34:04.110Z",
+  "finishedAt": "2026-07-17T12:34:23.934Z",
+  "durationMs": 19824,
+  "successCount": 9,
+  "failureCount": 26,
+  "skippedCount": 407,
+  "avgScanMs": 20661,
+  "maxScanMs": 47220,
+  "errors": [
+    {
+      "market": "CA-27 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23577
+    },
+    {
+      "market": "CA-30 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23664
+    },
+    {
+      "market": "CA-32 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23601
+    },
+    {
+      "market": "CA-35 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23739
+    },
+    {
+      "market": "CA-38 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23613
+    },
+    {
+      "market": "CA-41 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23589
+    },
+    {
+      "market": "IN-09 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23868
+    },
+    {
+      "market": "IA-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24096
+    },
+    {
+      "market": "NBA: Giannis Antetokounmpo Next Team",
+      "error": "fetch failed",
+      "durationMs": 47220
+    },
+    {
+      "market": "CA-39 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23637
+    },
+    {
+      "market": "IA-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24141
+    },
+    {
+      "market": "IN-08 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23976
+    },
+    {
+      "market": "IA-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23886
+    },
+    {
+      "market": "IA-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24165
+    },
+    {
+      "market": "KS-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24126
+    },
+    {
+      "market": "KS-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24096
+    },
+    {
+      "market": "KS-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24093
+    },
+    {
+      "market": "KS-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24078
+    },
+    {
+      "market": "KY-01 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24042
+    },
+    {
+      "market": "KY-02 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24006
+    },
+    {
+      "market": "KY-03 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 23991
+    },
+    {
+      "market": "KY-04 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24195
+    },
+    {
+      "market": "KY-05 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24015
+    },
+    {
+      "market": "KY-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 24009
+    },
+    {
+      "market": "SC-06 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 28236
+    },
+    {
+      "market": "SC-07 House Election Winner",
+      "error": "fetch failed",
+      "durationMs": 28236
+    }
+  ],
   "breakerSkipped": 1,
   "openBreakers": 1
 }

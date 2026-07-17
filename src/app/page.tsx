@@ -51,7 +51,8 @@ import {
   Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import { AlertSettingsPanel } from "@/components/AlertSystem";
+// UI-005: code-split heavy view components — only load when needed
+const AlertSettingsPanel = dynamic(() => import("@/components/AlertSystem").then(m => m.AlertSettingsPanel), { ssr: false });
 import { CATEGORIES } from "@/lib/categories";
 
 import dynamic from "next/dynamic";
@@ -83,8 +84,9 @@ import { saveSpread } from "@/lib/spreadHistory";
 
 
 import { MarketSidebar } from "@/app/components/MarketSidebar";
-import { OverviewPanel } from "@/app/components/OverviewPanel";
-import { MarketFinderPanel } from "@/app/components/MarketFinderPanel";
+// UI-005: code-split heavy view panels
+const OverviewPanel = dynamic(() => import("@/app/components/OverviewPanel").then(m => m.OverviewPanel), { ssr: false });
+const MarketFinderPanel = dynamic(() => import("@/app/components/MarketFinderPanel").then(m => m.MarketFinderPanel), { ssr: false });
 import {
   getStoredMfCategories, persistMfCategories, getStoredMfExpiryDays, persistMfExpiryDays,
   getStoredMfSelectedIds, persistMfSelectedIds, getStoredFavoriteIds, persistFavoriteIds,
