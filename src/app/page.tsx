@@ -891,7 +891,7 @@ export default function Home() {
       localStorage.setItem("overviewLayout", overviewLayout);
     }
   }, [overviewLayout]);
-  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("all");
+  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("lte30");
   const [showExpired, setShowExpired] = useState(false);
   const [showArbOnly, setShowArbOnly] = useState(true);
   const [scanningAll, setScanningAll] = useState(false);
