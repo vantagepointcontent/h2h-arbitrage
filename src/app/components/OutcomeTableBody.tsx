@@ -301,8 +301,8 @@ function OutcomeTableBodyInner({
                         compact
                       />
                       {totalStake > 0 && (
-                        <span className={`text-[10px] font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                          {formatCurrency(totalStake)}
+                        <span className={`text-[10px] font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`} title="Total stake (Kalshi + Polymarket)">
+                          <span className="text-[#8A9BA8]">Stake:</span> {formatCurrency(totalStake)}
                         </span>
                       )}
                     </div>

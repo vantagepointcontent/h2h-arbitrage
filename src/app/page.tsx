@@ -895,6 +895,7 @@ export default function Home() {
   const [showExpired, setShowExpired] = useState(false);
   const [showArbOnly, setShowArbOnly] = useState(true);
   const [scanningAll, setScanningAll] = useState(false);
+  const [copiedLinks, setCopiedLinks] = useState(false); // UI-013
   const [scanAllError, setScanAllError] = useState("");
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [bookmakerView, setBookmakerView] = useState(false);
@@ -1636,6 +1637,24 @@ export default function Home() {
                             <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />
                             <span className="text-[10px] text-[#8A9BA8]">Polymarket</span>
                           </a>
+
+                          {/* UI-013: Links button — copy URLs to clipboard */}
+                          <button
+                            onClick={() => {
+                              const market = savedMarkets.find(m => m.id === activeMarketId);
+                              if (!market) return;
+                              const text = `Kalshi: ${market.kalshiUrl}\nPolymarket: ${market.polymarketUrl}`;
+                              navigator.clipboard.writeText(text).then(() => {
+                                setCopiedLinks(true);
+                                setTimeout(() => setCopiedLinks(false), 2000);
+                              });
+                            }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors"
+                            title="Copy Kalshi + Polymarket URLs"
+                          >
+                            {copiedLinks ? <Check className="w-3 h-3 text-[#5DBE81]" /> : <Link2 className="w-3 h-3 text-[#8A9BA8]" />}
+                            <span className="text-[10px] text-[#8A9BA8]">{copiedLinks ? "Copied!" : "Copy URLs"}</span>
+                          </button>
 
                           {/* Refresh chip */}
                           <button

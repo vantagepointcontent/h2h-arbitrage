@@ -76,8 +76,9 @@ function DepthHeatmapInner({
       <span
         className={`text-xs font-mono font-medium ${compact ? 'hidden sm:inline' : ''}`}
         style={{ color: tier.color }}
+        title="Max fillable stake (min of Kalshi + PM depth)"
       >
-        {formatStake(maxFillableStake)}
+        <span className="text-[#8A9BA8] text-[10px]">Max:</span> {formatStake(maxFillableStake)}
       </span>
       {/* Tooltip on hover */}
       <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-56 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs pointer-events-none whitespace-normal">
