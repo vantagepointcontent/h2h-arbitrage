@@ -383,18 +383,17 @@ export async function POST(request: NextRequest) {
             fees: o.arbitrage!.fees,
           })),
         };
-        await updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate);
-        // Record in global scan history (JSON)
-        await appendScanHistory({
-          scanTimestamp: new Date().toISOString(),
-          marketId: market.id,
-          totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
-          bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
-          positiveArbCount: positiveArbs.length,
-          matchedCount,
-        });
-        // Also persist to SQLite for Dashboard & Logs
-        await saveScanResult(market.id, {
+        await Promise.all([
+          updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate),
+          appendScanHistory({
+            scanTimestamp: new Date().toISOString(),
+            marketId: market.id,
+            totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
+            bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
+            positiveArbCount: positiveArbs.length,
+            matchedCount,
+          }),
+          saveScanResult(market.id, {
           bestRoiPct: scanResult.bestRoiPct,
           bestProfit: scanResult.bestProfit,
           strategy: scanResult.strategy,
@@ -413,7 +412,8 @@ export async function POST(request: NextRequest) {
           marketTitle: pmEvent.title || market.eventTitle,
           kalshiUrl,
           polymarketUrl,
-        });
+        }),
+        ]);
 
         // ── Arb lifecycle tracking: open/extend/close episodes ──
         // Non-fatal: lifecycle data must never break a scan.
