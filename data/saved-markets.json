@@ -17,7 +17,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:53.646Z",
+      "scannedAt": "2026-07-17T12:35:30.550Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -35,7 +35,7 @@
           "kalshiNoBid": 0.65,
           "pmConditionId": "0x2c00cb09722a0f0501c5e49131b898ed57bb5c075db4dc2bcbc14908f45b8c48",
           "pmYesPrice": 0.35,
-          "pmNoPrice": 0.6599999999999999,
+          "pmNoPrice": 0.66,
           "pmBestBid": 0.34,
           "pmBestAsk": 0.35,
           "kalshiStake": 660,
@@ -95,7 +95,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:53.647Z"
+    "lastMatchedAt": "2026-07-17T12:35:30.550Z"
   },
   {
     "id": "1779565414697-01jpgss",
@@ -115,7 +115,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:53.731Z",
+      "scannedAt": "2026-07-17T12:35:30.741Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -133,12 +133,12 @@
           "kalshiNoBid": 0.961,
           "pmConditionId": "0x83337f7e7a080c796fea1192addc126b415f21ea534cbe2ba2b3af3483c08b88",
           "pmYesPrice": 0.063,
-          "pmNoPrice": 0.978,
-          "pmBestBid": 0.022,
+          "pmNoPrice": 0.977,
+          "pmBestBid": 0.023,
           "pmBestAsk": 0.063,
           "kalshiStake": 4,
           "pmStake": 96.41025641025641,
-          "apyPct": 7.064647053798947,
+          "apyPct": 7.0661222132948325,
           "buyPlatform": "kalshi",
           "buyPrice": 0.039,
           "sellPlatform": "polymarket",
@@ -172,7 +172,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 40,
           "pmStake": 940,
-          "apyPct": 4.874606467121259,
+          "apyPct": 4.875624327173419,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "kalshi",
@@ -193,7 +193,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:53.731Z"
+    "lastMatchedAt": "2026-07-17T12:35:30.741Z"
   },
   {
     "id": "1779565498134-v5tij6n",
@@ -205,56 +205,56 @@
     "expiryDate": "2026-12-06T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 0.732805,
-      "bestProfit": 7.328050000000001,
+      "bestRoiPct": 0.6873966942148817,
+      "bestProfit": 0.03868604651162823,
       "strategy": "Buy YES PM + NO Kalshi",
       "arbType": "direct",
       "outcomeCount": 11,
       "matchedCount": 11,
       "kalshiCount": 11,
       "pmCount": 11,
-      "scannedAt": "2026-07-17T12:02:53.246Z",
+      "scannedAt": "2026-07-17T12:35:33.124Z",
       "pmClosed": false,
       "priceResolved": true,
       "allArbs": [
         {
           "artist": "Ferrari",
-          "roiPct": 0.732805,
-          "expectedProfit": 7.328050000000001,
+          "roiPct": 0.6873966942148817,
+          "expectedProfit": 0.03868604651162823,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 979,
+          "totalStake": 5.509720930232558,
           "kalshiTicker": "KXF1CONSTRUCTORS-26-FER",
-          "kalshiYesAsk": 0.17,
+          "kalshiYesAsk": 0.16,
           "kalshiNoAsk": 0.86,
           "kalshiYesBid": 0.14,
-          "kalshiNoBid": 0.83,
+          "kalshiNoBid": 0.84,
           "pmConditionId": "0xfd516863c645e716dd507bd159267c85362b9b9b4a8bc9af340c2dda3b3751d7",
           "pmYesPrice": 0.119,
           "pmNoPrice": 0.884,
           "pmBestBid": 0.116,
           "pmBestAsk": 0.119,
-          "kalshiStake": 860,
-          "pmStake": 119,
-          "apyPct": 1.8903011686229112,
+          "kalshiStake": 4.84,
+          "pmStake": 0.6697209302325582,
+          "apyPct": 1.7734528469651147,
           "buyPlatform": "polymarket",
           "buyPrice": 0.119,
           "sellPlatform": "kalshi",
           "sellPrice": 0.86,
           "fees": {
-            "kalshiFee": 8.43,
-            "pmFee": 5.24195,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.86 = $8.43",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.12 (θ=0.05) = $5.24",
-            "netProfitIfKalshiWins": 7.328050000000001,
-            "netProfitIfPmWins": 7.328050000000001,
-            "worstCaseNetProfit": 7.328050000000001
+            "kalshiFee": 0.05,
+            "pmFee": 0.0295,
+            "kalshiFeeDetails": "Kalshi NO sell 6 @ $0.86 = $0.05",
+            "pmFeeDetails": "Polymarket YES buy 6 @ $0.12 (θ=0.05) = $0.03",
+            "netProfitIfKalshiWins": 0.03868604651162823,
+            "netProfitIfPmWins": 0.03868604651162823,
+            "worstCaseNetProfit": 0.03868604651162823
           }
         },
         {
           "artist": "Mercedes",
-          "roiPct": -1.586915034445492,
-          "expectedProfit": -9.789943333333317,
+          "roiPct": -1.58691503444549,
+          "expectedProfit": -9.789943333333303,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
           "totalStake": 610.7475000000001,
@@ -265,24 +265,24 @@
           "kalshiNoBid": 0.16,
           "pmConditionId": "0x9c4459a70fd67a346075c22a6b010b454794204f2f28d128983b9056fe8d64b5",
           "pmYesPrice": 0.86,
-          "pmNoPrice": 0.15000000000000002,
+          "pmNoPrice": 0.15,
           "pmBestBid": 0.85,
           "pmBestAsk": 0.86,
           "kalshiStake": 518.21,
-          "pmStake": 92.53750000000002,
+          "pmStake": 92.53750000000001,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.84,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.15000000000000002,
+          "sellPrice": 0.15,
           "fees": {
             "kalshiFee": 11.98,
             "pmFee": 3.97911,
             "kalshiFeeDetails": "Kalshi YES buy 617 @ $0.84 + NO sell 624 @ $0.83 = $11.98",
             "pmFeeDetails": "Polymarket NO buy 661 @ $0.14 (θ=0.05) = $3.98",
-            "netProfitIfKalshiWins": -9.789943333333317,
-            "netProfitIfPmWins": -9.789943333333317,
-            "worstCaseNetProfit": -9.789943333333317
+            "netProfitIfKalshiWins": -9.789943333333303,
+            "netProfitIfPmWins": -9.789943333333303,
+            "worstCaseNetProfit": -9.789943333333303
           }
         }
       ]
@@ -291,7 +291,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:53.246Z"
+    "lastMatchedAt": "2026-07-17T12:35:33.124Z"
   },
   {
     "id": "1779566094057-vc90yk8",
@@ -10829,7 +10829,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:41.827Z",
+      "scannedAt": "2026-07-17T12:35:35.966Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -10852,7 +10852,7 @@
           "pmBestAsk": 0.08,
           "kalshiStake": 32,
           "pmStake": 930,
-          "apyPct": 12.783794463479504,
+          "apyPct": 12.786323514282675,
           "buyPlatform": "kalshi",
           "buyPrice": 0.032,
           "sellPlatform": "polymarket",
@@ -10886,7 +10886,7 @@
           "pmBestAsk": 0.93,
           "kalshiStake": 38,
           "pmStake": 930,
-          "apyPct": 8.809043632268708,
+          "apyPct": 8.810786347933998,
           "buyPlatform": "polymarket",
           "buyPrice": 0.93,
           "sellPlatform": "kalshi",
@@ -10907,7 +10907,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:41.827Z"
+    "lastMatchedAt": "2026-07-17T12:35:35.966Z"
   },
   {
     "id": "1782999196726-house-ca25",
@@ -10927,7 +10927,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:52.383Z",
+      "scannedAt": "2026-07-17T12:35:36.085Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11005,7 +11005,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:52.383Z"
+    "lastMatchedAt": "2026-07-17T12:35:36.085Z"
   },
   {
     "id": "1782999196726-house-ca26",
@@ -11025,7 +11025,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:57.735Z",
+      "scannedAt": "2026-07-17T12:35:38.420Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11048,7 +11048,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 47,
           "pmStake": 940,
-          "apyPct": 2.368339833683259,
+          "apyPct": 2.368835292367075,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "kalshi",
@@ -11082,7 +11082,7 @@
           "pmBestAsk": 0.06,
           "kalshiStake": 11.95320447609359,
           "pmStake": 239.0640895218718,
-          "apyPct": 4.373354806517407,
+          "apyPct": 4.374269716018771,
           "buyPlatform": "kalshi",
           "buyPrice": 0.047,
           "sellPlatform": "polymarket",
@@ -11103,7 +11103,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:57.735Z"
+    "lastMatchedAt": "2026-07-17T12:35:38.420Z"
   },
   {
     "id": "1782999196726-house-ca27",
@@ -11123,7 +11123,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:58.574Z",
+      "scannedAt": "2026-07-17T12:35:41.277Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11201,7 +11201,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:58.574Z"
+    "lastMatchedAt": "2026-07-17T12:35:41.277Z"
   },
   {
     "id": "1782999196726-house-ca28",
@@ -11221,7 +11221,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:58.946Z",
+      "scannedAt": "2026-07-17T12:35:41.407Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11299,7 +11299,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:58.946Z"
+    "lastMatchedAt": "2026-07-17T12:35:41.407Z"
   },
   {
     "id": "1782999196726-house-ca30",
@@ -11319,7 +11319,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:02:59.103Z",
+      "scannedAt": "2026-07-17T12:35:43.743Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11342,7 +11342,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 45,
           "pmStake": 940,
-          "apyPct": 3.08489764799225,
+          "apyPct": 3.085544313665259,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "kalshi",
@@ -11376,7 +11376,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 45,
           "pmStake": 940,
-          "apyPct": 1.8805428410334435,
+          "apyPct": 1.8809370461710795,
           "buyPlatform": "kalshi",
           "buyPrice": 0.045,
           "sellPlatform": "polymarket",
@@ -11397,7 +11397,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:02:59.103Z"
+    "lastMatchedAt": "2026-07-17T12:35:43.743Z"
   },
   {
     "id": "1782999196726-house-ca31",
@@ -11417,7 +11417,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:03.040Z",
+      "scannedAt": "2026-07-17T12:35:46.578Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11440,7 +11440,7 @@
           "pmBestAsk": 0.95,
           "kalshiStake": 38,
           "pmStake": 950,
-          "apyPct": 2.3767514761705755,
+          "apyPct": 2.37724941851479,
           "buyPlatform": "polymarket",
           "buyPrice": 0.95,
           "sellPlatform": "kalshi",
@@ -11474,7 +11474,7 @@
           "pmBestAsk": 0.06,
           "kalshiStake": 37,
           "pmStake": 950,
-          "apyPct": 1.7056093395873773,
+          "apyPct": 1.7059666740084904,
           "buyPlatform": "kalshi",
           "buyPrice": 0.037,
           "sellPlatform": "polymarket",
@@ -11495,7 +11495,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:03.040Z"
+    "lastMatchedAt": "2026-07-17T12:35:46.578Z"
   },
   {
     "id": "1782999196726-house-ca32",
@@ -11515,7 +11515,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:03.886Z",
+      "scannedAt": "2026-07-17T12:35:46.737Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11538,7 +11538,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.711023898236636,
+          "apyPct": 9.713057698693447,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -11572,7 +11572,7 @@
           "pmBestAsk": 0.027,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.711023898236636,
+          "apyPct": 9.713057698693447,
           "buyPlatform": "polymarket",
           "buyPrice": 0.027,
           "sellPlatform": "polymarket",
@@ -11593,7 +11593,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:03.886Z"
+    "lastMatchedAt": "2026-07-17T12:35:46.737Z"
   },
   {
     "id": "1782999196726-house-ca33",
@@ -11613,7 +11613,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:04.262Z",
+      "scannedAt": "2026-07-17T12:35:49.052Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11636,7 +11636,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 14.102564102564102,
           "pmStake": 241.02564102564102,
-          "apyPct": 1.6820607119590645,
+          "apyPct": 1.6824133376072927,
           "buyPlatform": "kalshi",
           "buyPrice": 0.055,
           "sellPlatform": "polymarket",
@@ -11691,7 +11691,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:04.262Z"
+    "lastMatchedAt": "2026-07-17T12:35:49.052Z"
   },
   {
     "id": "1782999196726-house-ca35",
@@ -11711,7 +11711,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:04.425Z",
+      "scannedAt": "2026-07-17T12:35:51.873Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11734,7 +11734,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.358716834356702,
+          "apyPct": 9.360681441830474,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -11768,7 +11768,7 @@
           "pmBestAsk": 0.028,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.358716834356702,
+          "apyPct": 9.360681441830474,
           "buyPlatform": "polymarket",
           "buyPrice": 0.028,
           "sellPlatform": "polymarket",
@@ -11789,7 +11789,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:04.425Z"
+    "lastMatchedAt": "2026-07-17T12:35:51.873Z"
   },
   {
     "id": "1782999196726-house-ca36",
@@ -11809,7 +11809,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:08.048Z",
+      "scannedAt": "2026-07-17T12:35:52.069Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11887,7 +11887,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:08.048Z"
+    "lastMatchedAt": "2026-07-17T12:35:52.069Z"
   },
   {
     "id": "1782999196726-house-ca38",
@@ -11907,7 +11907,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:08.347Z",
+      "scannedAt": "2026-07-17T12:35:54.340Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -11930,7 +11930,7 @@
           "pmBestAsk": 0.023,
           "kalshiStake": 0,
           "pmStake": 963,
-          "apyPct": 11.120596011573753,
+          "apyPct": 11.122928751741663,
           "buyPlatform": "polymarket",
           "buyPrice": 0.023,
           "sellPlatform": "polymarket",
@@ -11964,7 +11964,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 963,
-          "apyPct": 11.120596011573753,
+          "apyPct": 11.122928751741663,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -11985,7 +11985,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:08.347Z"
+    "lastMatchedAt": "2026-07-17T12:35:54.340Z"
   },
   {
     "id": "1782999196726-house-ca39",
@@ -12005,7 +12005,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:09.186Z",
+      "scannedAt": "2026-07-17T12:35:57.177Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -12028,7 +12028,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.711029388664329,
+          "apyPct": 9.713068518336547,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -12062,7 +12062,7 @@
           "pmBestAsk": 0.027,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.711029388664329,
+          "apyPct": 9.713068518336547,
           "buyPlatform": "polymarket",
           "buyPrice": 0.027,
           "sellPlatform": "polymarket",
@@ -12083,7 +12083,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:09.186Z"
+    "lastMatchedAt": "2026-07-17T12:35:57.177Z"
   },
   {
     "id": "1782999196726-house-ca41",
@@ -12103,7 +12103,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:09.574Z",
+      "scannedAt": "2026-07-17T12:35:57.398Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -12126,7 +12126,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 12.939958592132507,
           "pmStake": 243.27122153209112,
-          "apyPct": 3.3641233302346993,
+          "apyPct": 3.3648296715991535,
           "buyPlatform": "kalshi",
           "buyPrice": 0.05,
           "sellPlatform": "polymarket",
@@ -12181,7 +12181,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:09.574Z"
+    "lastMatchedAt": "2026-07-17T12:35:57.398Z"
   },
   {
     "id": "1782999196726-house-ca42",
@@ -20839,7 +20839,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:09.801Z",
+      "scannedAt": "2026-07-17T12:35:59.642Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -20862,7 +20862,7 @@
           "pmBestAsk": 0.941,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.741778113744452,
+          "apyPct": 9.743825623540008,
           "buyPlatform": "polymarket",
           "buyPrice": 0.941,
           "sellPlatform": "polymarket",
@@ -20896,7 +20896,7 @@
           "pmBestAsk": 0.026,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.741778113744452,
+          "apyPct": 9.743825623540008,
           "buyPlatform": "polymarket",
           "buyPrice": 0.026,
           "sellPlatform": "polymarket",
@@ -20917,7 +20917,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:09.801Z"
+    "lastMatchedAt": "2026-07-17T12:35:59.642Z"
   },
   {
     "id": "1782999196726-house-in09",
@@ -20937,7 +20937,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:13.343Z",
+      "scannedAt": "2026-07-17T12:36:02.507Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -20994,7 +20994,7 @@
           "pmBestAsk": 0.93,
           "kalshiStake": 9,
           "pmStake": 0.6847826086956522,
-          "apyPct": 3.364124682816435,
+          "apyPct": 3.3648315058372082,
           "buyPlatform": "kalshi",
           "buyPrice": 0.92,
           "sellPlatform": "polymarket",
@@ -21015,7 +21015,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:13.343Z"
+    "lastMatchedAt": "2026-07-17T12:36:02.507Z"
   },
   {
     "id": "1782999196726-house-ia01",
@@ -21035,7 +21035,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:13.636Z",
+      "scannedAt": "2026-07-17T12:36:02.749Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21113,7 +21113,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:13.636Z"
+    "lastMatchedAt": "2026-07-17T12:36:02.749Z"
   },
   {
     "id": "1782999196726-house-ia02",
@@ -21133,7 +21133,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:14.518Z",
+      "scannedAt": "2026-07-17T12:36:04.930Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21190,7 +21190,7 @@
           "pmBestAsk": 0.41,
           "kalshiStake": 172.1311475409836,
           "pmStake": 233.60655737704917,
-          "apyPct": 3.3641251044891605,
+          "apyPct": 3.364832376104736,
           "buyPlatform": "kalshi",
           "buyPrice": 0.42,
           "sellPlatform": "polymarket",
@@ -21211,7 +21211,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:14.518Z"
+    "lastMatchedAt": "2026-07-17T12:36:04.930Z"
   },
   {
     "id": "1782999196726-house-ia03",
@@ -21231,7 +21231,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:14.934Z",
+      "scannedAt": "2026-07-17T12:36:07.810Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21249,12 +21249,12 @@
           "kalshiNoBid": 0.26,
           "pmConditionId": "0x87e411b5f2ee67fe075aa7f31214a54b5fbba9ceb114d3de78290326ef374d75",
           "pmYesPrice": 0.67,
-          "pmNoPrice": 0.36,
-          "pmBestBid": 0.64,
+          "pmNoPrice": 0.35,
+          "pmBestBid": 0.65,
           "pmBestAsk": 0.67,
           "kalshiStake": 251,
           "pmStake": 560.5666666666667,
-          "apyPct": 1.4146307410775456,
+          "apyPct": 1.4149258039345822,
           "buyPlatform": "polymarket",
           "buyPrice": 0.67,
           "sellPlatform": "kalshi",
@@ -21288,7 +21288,7 @@
           "pmBestAsk": 0.34,
           "kalshiStake": 108.54054054054055,
           "pmStake": 227.2567567567568,
-          "apyPct": 3.333402015691585,
+          "apyPct": 3.334097294744868,
           "buyPlatform": "kalshi",
           "buyPrice": 0.32,
           "sellPlatform": "polymarket",
@@ -21309,7 +21309,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:14.934Z"
+    "lastMatchedAt": "2026-07-17T12:36:07.810Z"
   },
   {
     "id": "1782999196726-house-ia04",
@@ -21329,7 +21329,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:15.148Z",
+      "scannedAt": "2026-07-17T12:36:08.095Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21352,7 +21352,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 249.99999999999997,
           "pmStake": 19.273127753303964,
-          "apyPct": 7.401075727270542,
+          "apyPct": 7.40263372650694,
           "buyPlatform": "kalshi",
           "buyPrice": 0.908,
           "sellPlatform": "polymarket",
@@ -21386,7 +21386,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 250.13,
           "pmStake": 19.283149779735684,
-          "apyPct": 4.327679848127783,
+          "apyPct": 4.328590867302186,
           "buyPlatform": "polymarket",
           "buyPrice": 0.07,
           "sellPlatform": "kalshi",
@@ -21407,7 +21407,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:15.148Z"
+    "lastMatchedAt": "2026-07-17T12:36:08.095Z"
   },
   {
     "id": "1782999196726-house-ks01",
@@ -21427,7 +21427,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:18.661Z",
+      "scannedAt": "2026-07-17T12:36:10.251Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21484,7 +21484,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 93.7,
           "pmStake": 6,
-          "apyPct": 1.0092379774946405,
+          "apyPct": 1.0094502858297845,
           "buyPlatform": "kalshi",
           "buyPrice": 0.937,
           "sellPlatform": "polymarket",
@@ -21505,7 +21505,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:18.661Z"
+    "lastMatchedAt": "2026-07-17T12:36:10.251Z"
   },
   {
     "id": "1782999196726-house-ks02",
@@ -21525,7 +21525,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:18.930Z",
+      "scannedAt": "2026-07-17T12:36:13.154Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21603,7 +21603,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:18.930Z"
+    "lastMatchedAt": "2026-07-17T12:36:13.154Z"
   },
   {
     "id": "1782999196726-house-ks03",
@@ -21623,7 +21623,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:19.836Z",
+      "scannedAt": "2026-07-17T12:36:13.458Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21646,7 +21646,7 @@
           "pmBestAsk": 0.13,
           "kalshiStake": 88,
           "pmStake": 880,
-          "apyPct": 5.002456868809826,
+          "apyPct": 5.003510296070264,
           "buyPlatform": "kalshi",
           "buyPrice": 0.088,
           "sellPlatform": "polymarket",
@@ -21680,7 +21680,7 @@
           "pmBestAsk": 0.89,
           "kalshiStake": 89,
           "pmStake": 890,
-          "apyPct": 3.5071024113881935,
+          "apyPct": 3.5078409439497307,
           "buyPlatform": "polymarket",
           "buyPrice": 0.89,
           "sellPlatform": "kalshi",
@@ -21701,7 +21701,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:19.836Z"
+    "lastMatchedAt": "2026-07-17T12:36:13.458Z"
   },
   {
     "id": "1782999196726-house-ks04",
@@ -21721,7 +21721,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:20.251Z",
+      "scannedAt": "2026-07-17T12:36:15.562Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21778,7 +21778,7 @@
           "pmBestAsk": 0.08,
           "kalshiStake": 10,
           "pmStake": 155.00000000000003,
-          "apyPct": 3.3641271618945194,
+          "apyPct": 3.364836192864866,
           "buyPlatform": "kalshi",
           "buyPrice": 0.06,
           "sellPlatform": "polymarket",
@@ -21799,7 +21799,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:20.251Z"
+    "lastMatchedAt": "2026-07-17T12:36:15.562Z"
   },
   {
     "id": "1782999196726-house-ky01",
@@ -21819,7 +21819,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:20.441Z",
+      "scannedAt": "2026-07-17T12:36:16.528Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21897,7 +21897,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:20.441Z"
+    "lastMatchedAt": "2026-07-17T12:36:16.528Z"
   },
   {
     "id": "1782999196726-house-ky02",
@@ -21917,7 +21917,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:23.942Z",
+      "scannedAt": "2026-07-17T12:36:18.471Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -21995,7 +21995,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:23.942Z"
+    "lastMatchedAt": "2026-07-17T12:36:18.471Z"
   },
   {
     "id": "1782999196726-house-ky03",
@@ -22015,7 +22015,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:24.200Z",
+      "scannedAt": "2026-07-17T12:36:18.772Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22038,7 +22038,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 14.388489208633093,
           "pmStake": 241.52106885919832,
-          "apyPct": 1.3456514317740336,
+          "apyPct": 1.3459349381305703,
           "buyPlatform": "kalshi",
           "buyPrice": 0.056,
           "sellPlatform": "polymarket",
@@ -22093,7 +22093,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:24.200Z"
+    "lastMatchedAt": "2026-07-17T12:36:18.772Z"
   },
   {
     "id": "1782999196726-house-ky04",
@@ -22113,7 +22113,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:25.332Z",
+      "scannedAt": "2026-07-17T12:36:20.878Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22191,7 +22191,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:25.332Z"
+    "lastMatchedAt": "2026-07-17T12:36:20.878Z"
   },
   {
     "id": "1782999196726-house-ky05",
@@ -22211,7 +22211,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:25.543Z",
+      "scannedAt": "2026-07-17T12:36:21.847Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22289,7 +22289,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:25.543Z"
+    "lastMatchedAt": "2026-07-17T12:36:21.847Z"
   },
   {
     "id": "1782999196726-house-ky06",
@@ -22309,7 +22309,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:03:25.744Z",
+      "scannedAt": "2026-07-17T12:36:23.788Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22326,13 +22326,13 @@
           "kalshiYesBid": 0.27,
           "kalshiNoBid": 0.69,
           "pmConditionId": "0x5090f85c57f8a31150a5aeae9bc124491fd57344cbf037714a8235320b654673",
-          "pmYesPrice": 0.34,
+          "pmYesPrice": 0.35,
           "pmNoPrice": 0.6699999999999999,
           "pmBestBid": 0.33,
-          "pmBestAsk": 0.34,
+          "pmBestAsk": 0.35,
           "kalshiStake": 35.24657534246575,
           "pmStake": 73.9041095890411,
-          "apyPct": 13.456516532693437,
+          "apyPct": 13.459356584734861,
           "buyPlatform": "kalshi",
           "buyPrice": 0.31,
           "sellPlatform": "polymarket",
@@ -22366,7 +22366,7 @@
           "pmBestAsk": 0.65,
           "kalshiStake": 83,
           "pmStake": 192.67857142857142,
-          "apyPct": 14.967025104891668,
+          "apyPct": 14.970183955854317,
           "buyPlatform": "polymarket",
           "buyPrice": 0.65,
           "sellPlatform": "kalshi",
@@ -22387,7 +22387,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:03:25.744Z"
+    "lastMatchedAt": "2026-07-17T12:36:23.788Z"
   },
   {
     "id": "1782999196726-house-la01",
@@ -22407,7 +22407,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:41.815Z",
+      "scannedAt": "2026-07-17T12:36:24.092Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22430,7 +22430,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 66.83636363636364,
           "pmStake": 4.363636363636364,
-          "apyPct": 7.064728509493956,
+          "apyPct": 7.066162436185929,
           "buyPlatform": "kalshi",
           "buyPrice": 0.919,
           "sellPlatform": "polymarket",
@@ -22464,7 +22464,7 @@
           "pmBestAsk": 0.06,
           "kalshiStake": 8,
           "pmStake": 0.5217391304347826,
-          "apyPct": 3.845298086153215,
+          "apyPct": 3.8460785656234333,
           "buyPlatform": "polymarket",
           "buyPrice": 0.06,
           "sellPlatform": "kalshi",
@@ -22485,7 +22485,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:41.815Z"
+    "lastMatchedAt": "2026-07-17T12:36:24.092Z"
   },
   {
     "id": "1782999196726-house-la02",
@@ -22505,7 +22505,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:41.821Z",
+      "scannedAt": "2026-07-17T12:36:26.217Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22528,7 +22528,7 @@
           "pmBestAsk": 0.942,
           "kalshiStake": 0,
           "pmStake": 976,
-          "apyPct": 6.6024934198130625,
+          "apyPct": 6.603835019817982,
           "buyPlatform": "polymarket",
           "buyPrice": 0.942,
           "sellPlatform": "polymarket",
@@ -22562,7 +22562,7 @@
           "pmBestAsk": 0.034,
           "kalshiStake": 0,
           "pmStake": 976,
-          "apyPct": 6.6024934198130625,
+          "apyPct": 6.603835019817982,
           "buyPlatform": "polymarket",
           "buyPrice": 0.034,
           "sellPlatform": "polymarket",
@@ -22583,7 +22583,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:41.821Z"
+    "lastMatchedAt": "2026-07-17T12:36:26.217Z"
   },
   {
     "id": "1782999196726-house-la03",
@@ -22603,7 +22603,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:41.838Z",
+      "scannedAt": "2026-07-17T12:36:27.137Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22626,7 +22626,7 @@
           "pmBestAsk": 0.027,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.71112537166672,
+          "apyPct": 9.713099567944257,
           "buyPlatform": "polymarket",
           "buyPrice": 0.027,
           "sellPlatform": "polymarket",
@@ -22660,7 +22660,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.71112537166672,
+          "apyPct": 9.713099567944257,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -22681,7 +22681,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:41.838Z"
+    "lastMatchedAt": "2026-07-17T12:36:27.137Z"
   },
   {
     "id": "1782999196726-house-la04",
@@ -22701,7 +22701,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:47.179Z",
+      "scannedAt": "2026-07-17T12:36:29.108Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22758,7 +22758,7 @@
           "pmBestAsk": 0.95,
           "kalshiStake": 93.8,
           "pmStake": 6,
-          "apyPct": 0.6728316716220646,
+          "apyPct": 0.6729682112372083,
           "buyPlatform": "kalshi",
           "buyPrice": 0.938,
           "sellPlatform": "polymarket",
@@ -22779,7 +22779,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:47.179Z"
+    "lastMatchedAt": "2026-07-17T12:36:29.108Z"
   },
   {
     "id": "1782999196726-house-la05",
@@ -22799,7 +22799,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:47.212Z",
+      "scannedAt": "2026-07-17T12:36:29.304Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22822,7 +22822,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 125,
           "pmStake": 8.02139037433155,
-          "apyPct": 1.6820791849766112,
+          "apyPct": 1.682420563277265,
           "buyPlatform": "kalshi",
           "buyPrice": 0.935,
           "sellPlatform": "polymarket",
@@ -22877,7 +22877,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:47.212Z"
+    "lastMatchedAt": "2026-07-17T12:36:29.304Z"
   },
   {
     "id": "1782999196726-house-la06",
@@ -22897,7 +22897,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T12:04:47.221Z",
+      "scannedAt": "2026-07-17T12:36:29.419Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -22920,7 +22920,7 @@
           "pmBestAsk": 0.89,
           "kalshiStake": 0,
           "pmStake": 980,
-          "apyPct": 3.703938369269752,
+          "apyPct": 3.704690126189558,
           "buyPlatform": "polymarket",
           "buyPrice": 0.89,
           "sellPlatform": "polymarket",
@@ -22954,7 +22954,7 @@
           "pmBestAsk": 0.09,
           "kalshiStake": 0,
           "pmStake": 980,
-          "apyPct": 3.703938369269752,
+          "apyPct": 3.704690126189558,
           "buyPlatform": "polymarket",
           "buyPrice": 0.09,
           "sellPlatform": "polymarket",
@@ -22975,7 +22975,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T12:04:47.221Z"
+    "lastMatchedAt": "2026-07-17T12:36:29.419Z"
   },
   {
     "id": "1782999196726-house-me01",
