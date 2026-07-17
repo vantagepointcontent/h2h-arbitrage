@@ -167,8 +167,9 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       try {
         const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
         if (!live) {
-          // CLOB orderbook is empty — don't trust gamma's cached bestAsk/bestBid (BUG-086b)
-          return { ...m, bestAsk: undefined, bestBid: undefined };
+          // BUG-022: CLOB orderbook is empty — keep gamma's outcomePrices
+          // as fallback. Let buildPmArbShape decide whether to use them.
+          return m;
         }
         return {
           ...m,

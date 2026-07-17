@@ -187,8 +187,10 @@ export async function POST(request: NextRequest) {
         try {
           const live = await getClobPrices(clob);
           if (!live) {
-            // CLOB orderbook is empty — don't trust gamma's cached bestAsk/bestBid (BUG-086b)
-            return { ...m, bestAsk: undefined, bestBid: undefined };
+            // BUG-022: CLOB orderbook is empty — keep gamma's outcomePrices
+            // as fallback. Don't zero out bestAsk/bestBid — let buildPmArbShape
+            // decide whether to use gamma prices or zero.
+            return m;
           }
 
           if (DEBUG_H2H) {

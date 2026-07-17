@@ -942,11 +942,13 @@ export function buildPmArbShape(market: PMMarket) {
     yesPrice = 1 - rawBestBid;
     noPrice = rawBestBid;
   } else {
-    // No orderbook data at all — gamma outcomePrices are aggressively cached
-    // and stale. Using them produces "ghost prices" that show fake ROI.
-    // Zero out so no arb is computed (BUG-086/BUG-086b).
-    yesPrice = 0;
-    noPrice = 0;
+    // No CLOB orderbook data — fall back to gamma outcomePrices.
+    // BUG-022: Previously zeroed out all prices when CLOB was empty, which
+    // hid legitimate markets that simply have no active CLOB orderbook but
+    // do have gamma-cached prices from last trade. These prices may be stale
+    // but they're far more useful than 0¢ for the user.
+    yesPrice = prices[0] ?? 0;
+    noPrice = prices[1] ?? (1 - yesPrice);
   }
 
   return {
@@ -954,8 +956,10 @@ export function buildPmArbShape(market: PMMarket) {
     conditionId: market.conditionId,
     yesPrice,
     noPrice,
-    bestBid: rawBestBid != null ? rawBestBid : 0,
-    bestAsk: rawBestAsk != null ? rawBestAsk : 0,
+    // When no CLOB orderbook, use gamma prices as bestAsk/bestBid so
+    // arb calculation doesn't zero them out. These are stale but non-zero.
+    bestBid: rawBestBid != null ? rawBestBid : (yesPrice > 0 ? yesPrice * 0.98 : 0),
+    bestAsk: rawBestAsk != null ? rawBestAsk : yesPrice,
     lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
     volume: market.volume,
     liquidity: market.liquidity,

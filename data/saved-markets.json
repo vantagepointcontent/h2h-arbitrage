@@ -3612,59 +3612,59 @@
     "expiryDate": "2026-11-04T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 6.999999999999998,
-      "bestProfit": 2.37125,
+      "bestRoiPct": 7.99999999999999,
+      "bestProfit": 2.7099999999999973,
       "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
       "arbType": "cross",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:48:00.910Z",
+      "scannedAt": "2026-07-17T10:50:57.328Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 1.5502597600000032,
-          "expectedProfit": 14.354257037037065,
+          "roiPct": 2.5317604399999887,
+          "expectedProfit": 23.44222629629619,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 888.8888888888888,
+          "totalStake": 879.6296296296297,
           "kalshiTicker": "HOUSEMI7-26-D",
           "kalshiYesAsk": 0.8,
           "kalshiNoAsk": 0.27,
           "kalshiYesBid": 0.73,
           "kalshiNoBid": 0.2,
           "pmConditionId": "0x192ddbbaa122191c951a73b780c808ef51190cc74d6400fae21e74685c60bdae",
-          "pmYesPrice": 0.69,
-          "pmNoPrice": 0.33999999999999997,
+          "pmYesPrice": 0.68,
+          "pmNoPrice": 0.34,
           "pmBestBid": 0.66,
-          "pmBestAsk": 0.69,
+          "pmBestAsk": 0.68,
           "kalshiStake": 250,
-          "pmStake": 638.8888888888888,
-          "apyPct": 5.165174502982413,
+          "pmStake": 629.6296296296297,
+          "apyPct": 8.435507746243234,
           "buyPlatform": "polymarket",
-          "buyPrice": 0.69,
+          "buyPrice": 0.68,
           "sellPlatform": "kalshi",
           "sellPrice": 0.27,
           "fees": {
             "kalshiFee": 12.78,
-            "pmFee": 9.90278,
+            "pmFee": 10.07407,
             "kalshiFeeDetails": "Kalshi NO sell 926 @ $0.27 = $12.78",
-            "pmFeeDetails": "Polymarket YES buy 926 @ $0.69 (θ=0.05) = $9.90",
-            "netProfitIfKalshiWins": 14.354257037037065,
-            "netProfitIfPmWins": 14.354257037037065,
-            "worstCaseNetProfit": 14.354257037037065
+            "pmFeeDetails": "Polymarket YES buy 926 @ $0.68 (θ=0.05) = $10.07",
+            "netProfitIfKalshiWins": 23.44222629629619,
+            "netProfitIfPmWins": 23.44222629629619,
+            "worstCaseNetProfit": 23.44222629629619
           }
         },
         {
           "artist": "Republican",
-          "roiPct": 6.999999999999998,
-          "expectedProfit": 2.37125,
+          "roiPct": 7.99999999999999,
+          "expectedProfit": 2.7099999999999973,
           "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
           "arbType": "cross",
-          "totalStake": 31.503750000000004,
+          "totalStake": 31.165000000000006,
           "kalshiTicker": "HOUSEMI7-26-R",
           "kalshiYesAsk": 0.24,
           "kalshiNoAsk": 0.8,
@@ -3676,20 +3676,20 @@
           "pmBestBid": 0.29,
           "pmBestAsk": 0.33,
           "kalshiStake": 8.13,
-          "pmStake": 23.373750000000005,
-          "apyPct": 23.32268594837088,
+          "pmStake": 23.035000000000007,
+          "apyPct": 26.654995039714773,
           "buyPlatform": "kalshi",
           "buyPrice": 0.24,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.69,
+          "sellPrice": 0.68,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 2.37125,
-            "netProfitIfPmWins": 2.37125,
-            "worstCaseNetProfit": 2.37125
+            "netProfitIfKalshiWins": 2.7099999999999973,
+            "netProfitIfPmWins": 2.7099999999999973,
+            "worstCaseNetProfit": 2.7099999999999973
           }
         }
       ]
@@ -3698,7 +3698,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:48:00.910Z"
+    "lastMatchedAt": "2026-07-17T10:50:57.328Z"
   },
   {
     "id": "1780612579960-z55igki",
@@ -3948,7 +3948,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:17:53.299Z",
+      "scannedAt": "2026-07-17T10:48:35.660Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -4000,7 +4000,7 @@
           "kalshiNoBid": 0.15,
           "pmConditionId": "0x8d65ff57f443011c4c10e7aa50aa54b3a3b5e2b940cb3ca97c0357bbcaee0b36",
           "pmYesPrice": 0.83,
-          "pmNoPrice": 0.18000000000000005,
+          "pmNoPrice": 0.18,
           "pmBestBid": 0.82,
           "pmBestAsk": 0.83,
           "kalshiStake": 170,
@@ -4026,7 +4026,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:17:53.299Z"
+    "lastMatchedAt": "2026-07-17T10:48:35.660Z"
   },
   {
     "id": "1780947342746-x2ck9fp",
@@ -5407,7 +5407,7 @@
       "matchedCount": 6,
       "kalshiCount": 8,
       "pmCount": 6,
-      "scannedAt": "2026-07-17T10:18:09.317Z",
+      "scannedAt": "2026-07-17T10:48:35.645Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -5527,8 +5527,8 @@
           "kalshiNoBid": 0.5,
           "pmConditionId": "0xc16fade4bbc06895f8e456e1e49c6aa51c1b2dc7f734b3ad8fe8a5900d6a4174",
           "pmYesPrice": 0.5,
-          "pmNoPrice": 0.546,
-          "pmBestBid": 0.454,
+          "pmNoPrice": 0.542,
+          "pmBestBid": 0.458,
           "pmBestAsk": 0.5,
           "kalshiStake": 278,
           "pmStake": 252.72727272727272,
@@ -5553,7 +5553,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:09.317Z"
+    "lastMatchedAt": "2026-07-17T10:48:35.645Z"
   },
   {
     "id": "1781520373665-ku233qk",
@@ -6595,7 +6595,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:17:43.468Z",
+      "scannedAt": "2026-07-17T10:48:39.216Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -6618,7 +6618,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 984,
-          "apyPct": 3.7238591162495362,
+          "apyPct": 3.724595951263097,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -6652,7 +6652,7 @@
           "pmBestAsk": 0.044,
           "kalshiStake": 0,
           "pmStake": 984,
-          "apyPct": 3.7238591162495362,
+          "apyPct": 3.724595951263097,
           "buyPlatform": "polymarket",
           "buyPrice": 0.044,
           "sellPlatform": "polymarket",
@@ -6673,7 +6673,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:17:43.468Z"
+    "lastMatchedAt": "2026-07-17T10:48:39.216Z"
   },
   {
     "id": "1782999196726-house-al02",
@@ -6693,7 +6693,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:17:43.657Z",
+      "scannedAt": "2026-07-17T10:48:35.785Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -6711,7 +6711,7 @@
           "kalshiNoBid": 0.28,
           "pmConditionId": "0x789e15c2a1581b37deaabb5fa555d0d8dbfba11b46424c65cd42e73cfe722eaa",
           "pmYesPrice": 0.71,
-          "pmNoPrice": 0.31000000000000005,
+          "pmNoPrice": 0.31,
           "pmBestBid": 0.69,
           "pmBestAsk": 0.71,
           "kalshiStake": 300,
@@ -6733,11 +6733,11 @@
         },
         {
           "artist": "Democratic",
-          "roiPct": -4.5113842808219164,
-          "expectedProfit": -18.55386211267605,
+          "roiPct": -4.511161694915245,
+          "expectedProfit": -18.743559154929542,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 419.49295774647885,
+          "totalStake": 423.80281690140845,
           "kalshiTicker": "KXHOUSERACE-AL02-26-D",
           "kalshiYesAsk": 0.32,
           "kalshiNoAsk": 0.71,
@@ -6748,21 +6748,21 @@
           "pmNoPrice": 0.71,
           "pmBestBid": 0.29,
           "pmBestAsk": 0.31,
-          "kalshiStake": 292,
-          "pmStake": 127.49295774647887,
+          "kalshiStake": 295,
+          "pmStake": 128.80281690140845,
           "apyPct": 0,
           "buyPlatform": "polymarket",
           "buyPrice": 0.31,
           "sellPlatform": "kalshi",
           "sellPrice": 0.71,
           "fees": {
-            "kalshiFee": 5.93,
-            "pmFee": 4.39851,
-            "kalshiFeeDetails": "Kalshi NO sell 411 @ $0.71 = $5.93",
-            "pmFeeDetails": "Polymarket YES buy 411 @ $0.31 (θ=0.05) = $4.40",
-            "netProfitIfKalshiWins": -18.55386211267605,
-            "netProfitIfPmWins": -18.55386211267605,
-            "worstCaseNetProfit": -18.55386211267605
+            "kalshiFee": 5.99,
+            "pmFee": 4.4437,
+            "kalshiFeeDetails": "Kalshi NO sell 415 @ $0.71 = $5.99",
+            "pmFeeDetails": "Polymarket YES buy 415 @ $0.31 (θ=0.05) = $4.44",
+            "netProfitIfKalshiWins": -18.743559154929542,
+            "netProfitIfPmWins": -18.743559154929542,
+            "worstCaseNetProfit": -18.743559154929542
           }
         }
       ]
@@ -6771,7 +6771,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:17:43.657Z"
+    "lastMatchedAt": "2026-07-17T10:48:35.785Z"
   },
   {
     "id": "1782999196726-house-al03",
@@ -6791,7 +6791,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:17:59.841Z",
+      "scannedAt": "2026-07-17T10:48:37.576Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -6809,12 +6809,12 @@
           "kalshiNoBid": 0.033,
           "pmConditionId": "0x1b3ae1da4a1715ab44dd02e4ffc69b2433404520240e3a6f302038a5af8556a4",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 970,
-          "apyPct": 8.64838608359735,
+          "apyPct": 8.650080718417128,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -6848,7 +6848,7 @@
           "pmBestAsk": 0.03,
           "kalshiStake": 0,
           "pmStake": 970,
-          "apyPct": 8.64838608359735,
+          "apyPct": 8.650080718417128,
           "buyPlatform": "polymarket",
           "buyPrice": 0.03,
           "sellPlatform": "polymarket",
@@ -6869,7 +6869,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:17:59.841Z"
+    "lastMatchedAt": "2026-07-17T10:48:37.576Z"
   },
   {
     "id": "1782999196726-house-al04",
@@ -6889,7 +6889,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:00.027Z",
+      "scannedAt": "2026-07-17T10:48:39.137Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -6912,7 +6912,7 @@
           "pmBestAsk": 0.026,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.41388190044485,
+          "apyPct": 9.415727904147442,
           "buyPlatform": "polymarket",
           "buyPrice": 0.026,
           "sellPlatform": "polymarket",
@@ -6941,12 +6941,12 @@
           "kalshiNoBid": 0.031,
           "pmConditionId": "0x15e7b9ff33e376f2c29065621fbce1d76a1dfba528ffbac4e9835b3a92ffb322",
           "pmYesPrice": 0.942,
-          "pmNoPrice": 0.05900000000000005,
+          "pmNoPrice": 0.059,
           "pmBestBid": 0.941,
           "pmBestAsk": 0.942,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.41388190044485,
+          "apyPct": 9.415727904147442,
           "buyPlatform": "polymarket",
           "buyPrice": 0.942,
           "sellPlatform": "polymarket",
@@ -6967,7 +6967,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:00.027Z"
+    "lastMatchedAt": "2026-07-17T10:48:39.137Z"
   },
   {
     "id": "1782999196726-house-al05",
@@ -6987,7 +6987,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:09.679Z",
+      "scannedAt": "2026-07-17T10:48:40.934Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -7010,7 +7010,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 0,
           "pmStake": 990,
-          "apyPct": 1.0304113176402951,
+          "apyPct": 1.030612512911421,
           "buyPlatform": "polymarket",
           "buyPrice": 0.07,
           "sellPlatform": "polymarket",
@@ -7044,7 +7044,7 @@
           "pmBestAsk": 0.92,
           "kalshiStake": 0,
           "pmStake": 990,
-          "apyPct": 1.0304113176402951,
+          "apyPct": 1.030612512911421,
           "buyPlatform": "polymarket",
           "buyPrice": 0.92,
           "sellPlatform": "polymarket",
@@ -7065,7 +7065,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:09.679Z"
+    "lastMatchedAt": "2026-07-17T10:48:40.934Z"
   },
   {
     "id": "1782999196726-house-al06",
@@ -7085,7 +7085,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:09.866Z",
+      "scannedAt": "2026-07-17T10:48:40.581Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -7103,7 +7103,7 @@
           "kalshiNoBid": 0.045,
           "pmConditionId": "0x58fb93f71b1dfaa0ec84253e65ef911eda11dec6a28cc5df341b84300f782243",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 60,
@@ -7163,7 +7163,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:09.866Z"
+    "lastMatchedAt": "2026-07-17T10:48:40.581Z"
   },
   {
     "id": "1782999196726-house-al07",
@@ -7183,7 +7183,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:16.206Z",
+      "scannedAt": "2026-07-17T10:48:43.022Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -7206,7 +7206,7 @@
           "pmBestAsk": 0.07,
           "kalshiStake": 10,
           "pmStake": 0.7641921397379914,
-          "apyPct": 1.764795600426491,
+          "apyPct": 1.765139354331952,
           "buyPlatform": "polymarket",
           "buyPrice": 0.07,
           "sellPlatform": "kalshi",
@@ -7235,12 +7235,12 @@
           "kalshiNoBid": 0.083,
           "pmConditionId": "0x236467170766297db2ac7db539cf9b43632532b588d2db12a03b7a3d3eccfb88",
           "pmYesPrice": 0.93,
-          "pmNoPrice": 0.07999999999999996,
+          "pmNoPrice": 0.08,
           "pmBestBid": 0.92,
           "pmBestAsk": 0.93,
           "kalshiStake": 107.88235294117646,
           "pmStake": 8.23529411764706,
-          "apyPct": 4.37042624745295,
+          "apyPct": 4.371277536458162,
           "buyPlatform": "kalshi",
           "buyPrice": 0.917,
           "sellPlatform": "polymarket",
@@ -7261,7 +7261,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:16.206Z"
+    "lastMatchedAt": "2026-07-17T10:48:43.022Z"
   },
   {
     "id": "1782999196726-house-ar01",
@@ -7281,7 +7281,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:16.384Z",
+      "scannedAt": "2026-07-17T10:48:45.528Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -7304,7 +7304,7 @@
           "pmBestAsk": 0.014,
           "kalshiStake": 31,
           "pmStake": 0.44558521560574954,
-          "apyPct": 3.168409649144278,
+          "apyPct": 3.1690275915502104,
           "buyPlatform": "polymarket",
           "buyPrice": 0.014,
           "sellPlatform": "kalshi",
@@ -7333,12 +7333,12 @@
           "kalshiNoBid": 0.026,
           "pmConditionId": "0x94fec7c18e1210413a4515fca3f7f38f8801929f34e59e69a91e1ee3df9737e3",
           "pmYesPrice": 0.996,
-          "pmNoPrice": 0.014000000000000012,
+          "pmNoPrice": 0.014,
           "pmBestBid": 0.986,
           "pmBestAsk": 0.996,
           "kalshiStake": 670.9777777777778,
           "pmStake": 9.644444444444446,
-          "apyPct": 4.034239689585334,
+          "apyPct": 4.035026496865941,
           "buyPlatform": "kalshi",
           "buyPrice": 0.974,
           "sellPlatform": "polymarket",
@@ -7359,7 +7359,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:16.384Z"
+    "lastMatchedAt": "2026-07-17T10:48:45.528Z"
   },
   {
     "id": "1782999196726-house-ar02",
@@ -17060,7 +17060,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:25.670Z",
+      "scannedAt": "2026-07-17T10:48:46.001Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17078,7 +17078,7 @@
           "kalshiNoBid": 0.042,
           "pmConditionId": "0xcdc8e74776e150e721ed61a4286dcd9fe8441c7e000bf5810bd791b83b7a6508",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 60,
@@ -17138,7 +17138,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:25.670Z"
+    "lastMatchedAt": "2026-07-17T10:48:46.001Z"
   },
   {
     "id": "1782999196726-house-ga10",
@@ -17158,7 +17158,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:26.000Z",
+      "scannedAt": "2026-07-17T10:48:47.444Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17181,7 +17181,7 @@
           "pmBestAsk": 0.89,
           "kalshiStake": 67,
           "pmStake": 890,
-          "apyPct": 11.337906084690207,
+          "apyPct": 11.340108032732118,
           "buyPlatform": "polymarket",
           "buyPrice": 0.89,
           "sellPlatform": "kalshi",
@@ -17215,7 +17215,7 @@
           "pmBestAsk": 0.11,
           "kalshiStake": 9,
           "pmStake": 89,
-          "apyPct": 6.7237397092306646,
+          "apyPct": 6.7250455346076325,
           "buyPlatform": "kalshi",
           "buyPrice": 0.09,
           "sellPlatform": "polymarket",
@@ -17236,7 +17236,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:26.000Z"
+    "lastMatchedAt": "2026-07-17T10:48:47.444Z"
   },
   {
     "id": "1782999196726-house-ga11",
@@ -17256,7 +17256,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:26.202Z",
+      "scannedAt": "2026-07-17T10:48:47.952Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17279,7 +17279,7 @@
           "pmBestAsk": 0.1,
           "kalshiStake": 100,
           "pmStake": 11.49425287356322,
-          "apyPct": 5.911179926275421,
+          "apyPct": 5.912328137021509,
           "buyPlatform": "polymarket",
           "buyPrice": 0.1,
           "sellPlatform": "kalshi",
@@ -17308,12 +17308,12 @@
           "kalshiNoBid": 0.13,
           "pmConditionId": "0x707dd8bd283b72a13ec9cf79b18b6238744a9250a8e5e18d9cab9dbbe55db8b2",
           "pmYesPrice": 0.92,
-          "pmNoPrice": 0.08999999999999997,
+          "pmNoPrice": 0.09,
           "pmBestBid": 0.91,
           "pmBestAsk": 0.92,
           "kalshiStake": 521,
           "pmStake": 59.885057471264375,
-          "apyPct": 10.085609779954844,
+          "apyPct": 10.087568848309152,
           "buyPlatform": "kalshi",
           "buyPrice": 0.87,
           "sellPlatform": "polymarket",
@@ -17334,7 +17334,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:26.202Z"
+    "lastMatchedAt": "2026-07-17T10:48:47.952Z"
   },
   {
     "id": "1782999196726-house-ga12",
@@ -17346,15 +17346,15 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 2.000000000000006,
-      "bestProfit": 5.7471264367816275,
-      "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
-      "arbType": "cross",
+      "bestRoiPct": 2.419,
+      "bestProfit": 24.19,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "arbType": "direct",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:32.605Z",
+      "scannedAt": "2026-07-17T10:48:49.589Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17372,12 +17372,12 @@
           "kalshiNoBid": 0.84,
           "pmConditionId": "0xe0cfc4f75bc903d74f5502ffebf8767f38afb11ae6f828798ed3904ba7de8b87",
           "pmYesPrice": 0.19,
-          "pmNoPrice": 0.8200000000000001,
+          "pmNoPrice": 0.82,
           "pmBestBid": 0.18,
           "pmBestAsk": 0.19,
           "kalshiStake": 45.97701149425288,
           "pmStake": 235.63218390804596,
-          "apyPct": 6.72374444284155,
+          "apyPct": 6.725047072695895,
           "buyPlatform": "kalshi",
           "buyPrice": 0.16,
           "sellPlatform": "polymarket",
@@ -17394,36 +17394,36 @@
         },
         {
           "artist": "Republican",
-          "roiPct": 0.3210000000000001,
-          "expectedProfit": 3.210000000000001,
+          "roiPct": 2.419,
+          "expectedProfit": 24.19,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 980,
+          "totalStake": 960,
           "kalshiTicker": "KXHOUSERACE-GA12-26-R",
           "kalshiYesAsk": 0.87,
-          "kalshiNoAsk": 0.16,
-          "kalshiYesBid": 0.84,
+          "kalshiNoAsk": 0.14,
+          "kalshiYesBid": 0.86,
           "kalshiNoBid": 0.13,
           "pmConditionId": "0xebe9cbc340bf815f03c029eb1985b866e8727051c587f45f56e5942f6eb5d0d8",
           "pmYesPrice": 0.82,
-          "pmNoPrice": 0.18999999999999995,
+          "pmNoPrice": 0.19,
           "pmBestBid": 0.81,
           "pmBestAsk": 0.82,
-          "kalshiStake": 160,
+          "kalshiStake": 140,
           "pmStake": 820,
-          "apyPct": 1.0791609830760658,
+          "apyPct": 8.13394443442566,
           "buyPlatform": "polymarket",
           "buyPrice": 0.82,
           "sellPlatform": "kalshi",
-          "sellPrice": 0.16,
+          "sellPrice": 0.14,
           "fees": {
-            "kalshiFee": 9.41,
+            "kalshiFee": 8.43,
             "pmFee": 7.38,
-            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.16 = $9.41",
+            "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.14 = $8.43",
             "pmFeeDetails": "Polymarket YES buy 1000 @ $0.82 (θ=0.05) = $7.38",
-            "netProfitIfKalshiWins": 3.210000000000001,
-            "netProfitIfPmWins": 3.210000000000001,
-            "worstCaseNetProfit": 3.210000000000001
+            "netProfitIfKalshiWins": 24.19,
+            "netProfitIfPmWins": 24.19,
+            "worstCaseNetProfit": 24.19
           }
         }
       ]
@@ -17432,7 +17432,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:32.605Z"
+    "lastMatchedAt": "2026-07-17T10:48:49.589Z"
   },
   {
     "id": "1782999196726-house-ga13",
@@ -17452,7 +17452,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:32.781Z",
+      "scannedAt": "2026-07-17T10:48:50.066Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17475,7 +17475,7 @@
           "pmBestAsk": 0.028,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.67387154544836,
+          "apyPct": 9.675746031038887,
           "buyPlatform": "polymarket",
           "buyPrice": 0.028,
           "sellPlatform": "polymarket",
@@ -17504,12 +17504,12 @@
           "kalshiNoBid": 0.04,
           "pmConditionId": "0xe45a876d7a7c8a76121709e80cb26f603f4e4f7fb20c55aca1ffd73d7bdfe13c",
           "pmYesPrice": 0.939,
-          "pmNoPrice": 0.06799999999999995,
+          "pmNoPrice": 0.068,
           "pmBestBid": 0.932,
           "pmBestAsk": 0.939,
           "kalshiStake": 0,
           "pmStake": 967,
-          "apyPct": 9.67387154544836,
+          "apyPct": 9.675746031038887,
           "buyPlatform": "polymarket",
           "buyPrice": 0.939,
           "sellPlatform": "polymarket",
@@ -17530,7 +17530,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:32.781Z"
+    "lastMatchedAt": "2026-07-17T10:48:50.066Z"
   },
   {
     "id": "1782999196726-house-ga14",
@@ -17550,7 +17550,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:42.220Z",
+      "scannedAt": "2026-07-17T10:49:57.203Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17568,7 +17568,7 @@
           "kalshiNoBid": 0.045,
           "pmConditionId": "0x47d18cabf16e781cb4b5d95ed4c400572bd575861252135fc54067cc50b0c30b",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 60,
@@ -17628,7 +17628,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:42.220Z"
+    "lastMatchedAt": "2026-07-17T10:49:57.203Z"
   },
   {
     "id": "1782999196726-house-hi01",
@@ -17648,7 +17648,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:42.358Z",
+      "scannedAt": "2026-07-17T10:49:56.702Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17666,12 +17666,12 @@
           "kalshiNoBid": 0.01,
           "pmConditionId": "0x716eada976e0bdc2802d0cfdacd8c7774b500fb19ca3e99c922bb09f52733132",
           "pmYesPrice": 0.95,
-          "pmNoPrice": 0.06000000000000005,
+          "pmNoPrice": 0.06,
           "pmBestBid": 0.94,
           "pmBestAsk": 0.95,
           "kalshiStake": 34,
           "pmStake": 950,
-          "apyPct": 3.8073242496834476,
+          "apyPct": 3.8080851556666406,
           "buyPlatform": "polymarket",
           "buyPrice": 0.95,
           "sellPlatform": "kalshi",
@@ -17705,7 +17705,7 @@
           "pmBestAsk": 0.05,
           "kalshiStake": 1.7171717171717173,
           "pmStake": 47.97979797979798,
-          "apyPct": 5.379001147455654,
+          "apyPct": 5.3800761581162355,
           "buyPlatform": "kalshi",
           "buyPrice": 0.034,
           "sellPlatform": "polymarket",
@@ -17726,7 +17726,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:42.358Z"
+    "lastMatchedAt": "2026-07-17T10:49:56.702Z"
   },
   {
     "id": "1782999196726-house-hi02",
@@ -17746,7 +17746,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:42.557Z",
+      "scannedAt": "2026-07-17T10:49:55.480Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17824,7 +17824,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:42.557Z"
+    "lastMatchedAt": "2026-07-17T10:49:55.480Z"
   },
   {
     "id": "1782999196726-house-id01",
@@ -17844,7 +17844,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:49.001Z",
+      "scannedAt": "2026-07-17T10:49:58.173Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17867,7 +17867,7 @@
           "pmBestAsk": 0.027,
           "kalshiStake": 0,
           "pmStake": 969,
-          "apyPct": 9.061824746326703,
+          "apyPct": 9.06363078505817,
           "buyPlatform": "polymarket",
           "buyPrice": 0.027,
           "sellPlatform": "polymarket",
@@ -17896,12 +17896,12 @@
           "kalshiNoBid": 0.035,
           "pmConditionId": "0x1b616d85ecd00125704a59ca4ff4d397e0006dd087dab815780ee16539da94af",
           "pmYesPrice": 0.942,
-          "pmNoPrice": 0.062000000000000055,
+          "pmNoPrice": 0.062,
           "pmBestBid": 0.938,
           "pmBestAsk": 0.942,
           "kalshiStake": 0,
           "pmStake": 969,
-          "apyPct": 9.061824746326703,
+          "apyPct": 9.06363078505817,
           "buyPlatform": "polymarket",
           "buyPrice": 0.942,
           "sellPlatform": "polymarket",
@@ -17922,7 +17922,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:49.001Z"
+    "lastMatchedAt": "2026-07-17T10:49:58.173Z"
   },
   {
     "id": "1782999196726-house-id02",
@@ -17942,7 +17942,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:49.148Z",
+      "scannedAt": "2026-07-17T10:49:57.690Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -17982,11 +17982,11 @@
         },
         {
           "artist": "Republican",
-          "roiPct": -3.106649999999986,
-          "expectedProfit": -0.03308466453674106,
+          "roiPct": -3.106649999999991,
+          "expectedProfit": -0.03308466453674112,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
-          "totalStake": 1.0745473908413203,
+          "totalStake": 1.0745473908413206,
           "kalshiTicker": "KXHOUSERACE-ID02-26-R",
           "kalshiYesAsk": 0.939,
           "kalshiNoAsk": 0.062,
@@ -17994,24 +17994,24 @@
           "kalshiNoBid": 0.061,
           "pmConditionId": "0x1424110417ab8e1dc362600f51eeaa965efa93969411de6b7828f8a51f0be35c",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 0.9999999999999999,
-          "pmStake": 0.0745473908413205,
+          "pmStake": 0.07454739084132056,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.939,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.06999999999999995,
+          "sellPrice": 0.07,
           "fees": {
             "kalshiFee": 0.02,
             "pmFee": 0.0035,
             "kalshiFeeDetails": "Kalshi YES buy 1 @ $0.94 + NO sell 1 @ $0.94 = $0.02",
             "pmFeeDetails": "Polymarket NO buy 1 @ $0.06 (θ=0.05) = $0.00",
-            "netProfitIfKalshiWins": -0.03308466453674106,
-            "netProfitIfPmWins": -0.03308466453674106,
-            "worstCaseNetProfit": -0.03308466453674106
+            "netProfitIfKalshiWins": -0.03308466453674112,
+            "netProfitIfPmWins": -0.03308466453674112,
+            "worstCaseNetProfit": -0.03308466453674112
           }
         }
       ]
@@ -18020,7 +18020,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:49.148Z"
+    "lastMatchedAt": "2026-07-17T10:49:57.690Z"
   },
   {
     "id": "1782999196726-house-il01",
@@ -18040,7 +18040,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:58.573Z",
+      "scannedAt": "2026-07-17T10:50:05.461Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18063,7 +18063,7 @@
           "pmBestAsk": 0.043,
           "kalshiStake": 0,
           "pmStake": 980,
-          "apyPct": 5.03976297998376,
+          "apyPct": 5.040766187126371,
           "buyPlatform": "polymarket",
           "buyPrice": 0.043,
           "sellPlatform": "polymarket",
@@ -18092,12 +18092,12 @@
           "kalshiNoBid": 0.025,
           "pmConditionId": "0x64d3a6c67ea8b2c51a026e38cf0babbc97fc7823394ca4b5e572e3106d2d8ca0",
           "pmYesPrice": 0.937,
-          "pmNoPrice": 0.06899999999999995,
+          "pmNoPrice": 0.069,
           "pmBestBid": 0.931,
           "pmBestAsk": 0.937,
           "kalshiStake": 0,
           "pmStake": 980,
-          "apyPct": 5.03976297998376,
+          "apyPct": 5.040766187126371,
           "buyPlatform": "polymarket",
           "buyPrice": 0.937,
           "sellPlatform": "polymarket",
@@ -18118,7 +18118,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:58.573Z"
+    "lastMatchedAt": "2026-07-17T10:50:05.461Z"
   },
   {
     "id": "1782999196726-house-il02",
@@ -18138,7 +18138,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:58.698Z",
+      "scannedAt": "2026-07-17T10:50:06.531Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18161,7 +18161,7 @@
           "pmBestAsk": 0.028,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.352485584327294,
+          "apyPct": 9.354348218699366,
           "buyPlatform": "polymarket",
           "buyPrice": 0.028,
           "sellPlatform": "polymarket",
@@ -18190,12 +18190,12 @@
           "kalshiNoBid": 0.011,
           "pmConditionId": "0x0a9995dd3ac5124bf50a73fd50c6c149253fadfb41d05a6c792611552a7ce01d",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.352485584327294,
+          "apyPct": 9.354348218699366,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -18216,7 +18216,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:58.698Z"
+    "lastMatchedAt": "2026-07-17T10:50:06.531Z"
   },
   {
     "id": "1782999196726-house-il03",
@@ -18236,7 +18236,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:18:58.899Z",
+      "scannedAt": "2026-07-17T10:50:02.478Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18259,7 +18259,7 @@
           "pmBestAsk": 0.937,
           "kalshiStake": 28,
           "pmStake": 937,
-          "apyPct": 10.132190187310494,
+          "apyPct": 10.134203508244523,
           "buyPlatform": "polymarket",
           "buyPrice": 0.937,
           "sellPlatform": "kalshi",
@@ -18293,7 +18293,7 @@
           "pmBestAsk": 0.029,
           "kalshiStake": 0,
           "pmStake": 966,
-          "apyPct": 9.964785290782263,
+          "apyPct": 9.96676534745887,
           "buyPlatform": "polymarket",
           "buyPrice": 0.029,
           "sellPlatform": "polymarket",
@@ -18314,7 +18314,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:18:58.899Z"
+    "lastMatchedAt": "2026-07-17T10:50:02.478Z"
   },
   {
     "id": "1782999196726-house-il04",
@@ -18326,50 +18326,50 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": -0.17119787234041542,
-      "bestProfit": -1.6092599999999049,
-      "strategy": "Buy YES Kalshi + NO PM",
+      "bestRoiPct": -0.157395,
+      "bestProfit": -1.57395,
+      "strategy": "Buy YES PM + NO Kalshi",
       "arbType": "direct",
       "outcomeCount": 3,
       "matchedCount": 2,
       "kalshiCount": 3,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:05.386Z",
+      "scannedAt": "2026-07-17T10:50:02.981Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": -0.25299999999999995,
-          "expectedProfit": -2.5299999999999994,
+          "roiPct": -0.157395,
+          "expectedProfit": -1.57395,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 996,
+          "totalStake": 995,
           "kalshiTicker": "KXHOUSERACE-IL04-26-D",
           "kalshiYesAsk": 0.974,
           "kalshiNoAsk": 0.056,
           "kalshiYesBid": 0.944,
           "kalshiNoBid": 0.026,
           "pmConditionId": "0xcf1687f8e90f5d5113d2cbc76729773851b254c136bfb83bd53cacc526002ef4",
-          "pmYesPrice": 0.94,
+          "pmYesPrice": 0.939,
           "pmNoPrice": 0.06499999999999995,
           "pmBestBid": 0.935,
-          "pmBestAsk": 0.94,
+          "pmBestAsk": 0.939,
           "kalshiStake": 56,
-          "pmStake": 940,
+          "pmStake": 939,
           "apyPct": 0,
           "buyPlatform": "polymarket",
-          "buyPrice": 0.94,
+          "buyPrice": 0.939,
           "sellPlatform": "kalshi",
           "sellPrice": 0.056,
           "fees": {
             "kalshiFee": 3.71,
-            "pmFee": 2.82,
+            "pmFee": 2.86395,
             "kalshiFeeDetails": "Kalshi NO sell 1000 @ $0.06 = $3.71",
-            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.94 (θ=0.05) = $2.82",
-            "netProfitIfKalshiWins": -2.5299999999999994,
-            "netProfitIfPmWins": -2.5299999999999994,
-            "worstCaseNetProfit": -2.5299999999999994
+            "pmFeeDetails": "Polymarket YES buy 1000 @ $0.94 (θ=0.05) = $2.86",
+            "netProfitIfKalshiWins": -1.57395,
+            "netProfitIfPmWins": -1.57395,
+            "worstCaseNetProfit": -1.57395
           }
         },
         {
@@ -18412,7 +18412,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:05.386Z"
+    "lastMatchedAt": "2026-07-17T10:50:02.981Z"
   },
   {
     "id": "1782999196726-house-il05",
@@ -18432,7 +18432,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:05.568Z",
+      "scannedAt": "2026-07-17T10:50:03.469Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18455,7 +18455,7 @@
           "pmBestAsk": 0.06,
           "kalshiStake": 30,
           "pmStake": 950,
-          "apyPct": 4.373811129625472,
+          "apyPct": 4.374677582555662,
           "buyPlatform": "kalshi",
           "buyPrice": 0.03,
           "sellPlatform": "polymarket",
@@ -18489,7 +18489,7 @@
           "pmBestAsk": 0.95,
           "kalshiStake": 30,
           "pmStake": 950,
-          "apyPct": 5.23949626865588,
+          "apyPct": 5.240534213999232,
           "buyPlatform": "polymarket",
           "buyPrice": 0.95,
           "sellPlatform": "kalshi",
@@ -18510,7 +18510,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:05.568Z"
+    "lastMatchedAt": "2026-07-17T10:50:03.469Z"
   },
   {
     "id": "1782999196726-house-il06",
@@ -18530,7 +18530,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:14.915Z",
+      "scannedAt": "2026-07-17T10:50:12.282Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18553,7 +18553,7 @@
           "pmBestAsk": 0.027,
           "kalshiStake": 0,
           "pmStake": 964,
-          "apyPct": 10.668915997319232,
+          "apyPct": 10.671028905263682,
           "buyPlatform": "polymarket",
           "buyPrice": 0.027,
           "sellPlatform": "polymarket",
@@ -18582,12 +18582,12 @@
           "kalshiNoBid": 0.01,
           "pmConditionId": "0x883f0bc124fb027f32503fed5cc6cf4820f267650fcc2402a8fecf9855414b1e",
           "pmYesPrice": 0.937,
-          "pmNoPrice": 0.06899999999999995,
+          "pmNoPrice": 0.069,
           "pmBestBid": 0.931,
           "pmBestAsk": 0.937,
           "kalshiStake": 0,
           "pmStake": 964,
-          "apyPct": 10.668915997319232,
+          "apyPct": 10.671028905263682,
           "buyPlatform": "polymarket",
           "buyPrice": 0.937,
           "sellPlatform": "polymarket",
@@ -18608,7 +18608,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:14.915Z"
+    "lastMatchedAt": "2026-07-17T10:50:12.282Z"
   },
   {
     "id": "1782999196726-house-il07",
@@ -18628,7 +18628,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:15.049Z",
+      "scannedAt": "2026-07-17T10:50:08.268Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": []
@@ -18637,7 +18637,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:15.049Z"
+    "lastMatchedAt": "2026-07-17T10:50:08.268Z"
   },
   {
     "id": "1782999196726-house-il08",
@@ -18657,7 +18657,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:15.232Z",
+      "scannedAt": "2026-07-17T10:50:08.750Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18735,7 +18735,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:15.232Z"
+    "lastMatchedAt": "2026-07-17T10:50:08.750Z"
   },
   {
     "id": "1782999196726-house-il09",
@@ -18755,7 +18755,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:21.711Z",
+      "scannedAt": "2026-07-17T10:50:10.737Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18778,7 +18778,7 @@
           "pmBestAsk": 0.06,
           "kalshiStake": 13.292433537832311,
           "pmStake": 240.28629856850714,
-          "apyPct": 2.6895118567737675,
+          "apyPct": 2.6900421046832372,
           "buyPlatform": "kalshi",
           "buyPrice": 0.052,
           "sellPlatform": "polymarket",
@@ -18812,7 +18812,7 @@
           "pmBestAsk": 0.94,
           "kalshiStake": 52,
           "pmStake": 940,
-          "apyPct": 0.5782450492063572,
+          "apyPct": 0.5783590525068932,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "kalshi",
@@ -18833,7 +18833,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:21.711Z"
+    "lastMatchedAt": "2026-07-17T10:50:10.737Z"
   },
   {
     "id": "1782999196726-house-il10",
@@ -18853,7 +18853,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:21.963Z",
+      "scannedAt": "2026-07-17T10:50:15.902Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18876,7 +18876,7 @@
           "pmBestAsk": 0.028,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.352508780997718,
+          "apyPct": 9.354357565483085,
           "buyPlatform": "polymarket",
           "buyPrice": 0.028,
           "sellPlatform": "polymarket",
@@ -18905,12 +18905,12 @@
           "kalshiNoBid": 0.03,
           "pmConditionId": "0x9869db62b15aae7453988011ca35fbc833aa9c495c0f58b434c35f60b918280f",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 0,
           "pmStake": 968,
-          "apyPct": 9.352508780997718,
+          "apyPct": 9.354357565483085,
           "buyPlatform": "polymarket",
           "buyPrice": 0.94,
           "sellPlatform": "polymarket",
@@ -18931,7 +18931,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:21.963Z"
+    "lastMatchedAt": "2026-07-17T10:50:15.902Z"
   },
   {
     "id": "1782999196726-house-il11",
@@ -18951,7 +18951,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:31.294Z",
+      "scannedAt": "2026-07-17T10:50:17.470Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -18991,8 +18991,8 @@
         },
         {
           "artist": "Democratic",
-          "roiPct": -4.33391531999999,
-          "expectedProfit": -11.251078193146391,
+          "roiPct": -4.333915319999996,
+          "expectedProfit": -11.251078193146405,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
           "totalStake": 268.17237798546205,
@@ -19003,24 +19003,24 @@
           "kalshiNoBid": 0.037,
           "pmConditionId": "0x68e1f9096971d3f0cf9f78a4258d47402dafc81eab256963a5a62cfb023495d8",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 249.99999999999997,
-          "pmStake": 18.172377985462084,
+          "pmStake": 18.1723779854621,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.963,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.06999999999999995,
+          "sellPrice": 0.07,
           "fees": {
             "kalshiFee": 1.83,
             "pmFee": 0.8541,
             "kalshiFeeDetails": "Kalshi YES buy 260 @ $0.96 + NO sell 268 @ $0.93 = $1.83",
             "pmFeeDetails": "Polymarket NO buy 303 @ $0.06 (θ=0.05) = $0.85",
-            "netProfitIfKalshiWins": -11.251078193146391,
-            "netProfitIfPmWins": -11.251078193146391,
-            "worstCaseNetProfit": -11.251078193146391
+            "netProfitIfKalshiWins": -11.251078193146405,
+            "netProfitIfPmWins": -11.251078193146405,
+            "worstCaseNetProfit": -11.251078193146405
           }
         }
       ]
@@ -19029,7 +19029,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:31.294Z"
+    "lastMatchedAt": "2026-07-17T10:50:17.470Z"
   },
   {
     "id": "1782999196726-house-il12",
@@ -28577,7 +28577,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:31.389Z",
+      "scannedAt": "2026-07-17T10:50:14.063Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -28655,7 +28655,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:31.389Z"
+    "lastMatchedAt": "2026-07-17T10:50:14.063Z"
   },
   {
     "id": "1782999196727-house-nj12",
@@ -28675,7 +28675,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:31.557Z",
+      "scannedAt": "2026-07-17T10:50:19.042Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -28693,7 +28693,7 @@
           "kalshiNoBid": 0.04,
           "pmConditionId": "0xf4ee74c007f4a166e2af9f7d2970bd9f0d1d7147e2b5fb41952054452113e176",
           "pmYesPrice": 0.94,
-          "pmNoPrice": 0.06999999999999995,
+          "pmNoPrice": 0.07,
           "pmBestBid": 0.93,
           "pmBestAsk": 0.94,
           "kalshiStake": 55,
@@ -28715,36 +28715,36 @@
         },
         {
           "artist": "Republican",
-          "roiPct": -3.246800510204076,
-          "expectedProfit": -1.6486344559585464,
+          "roiPct": -3.351172551020403,
+          "expectedProfit": -1.7016316580310857,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 52.14818652849741,
+          "totalStake": 52.19896373056995,
           "kalshiTicker": "KXHOUSERACE-NJ12-26-R",
           "kalshiYesAsk": 0.064,
           "kalshiNoAsk": 0.965,
           "kalshiYesBid": 0.035,
           "kalshiNoBid": 0.936,
           "pmConditionId": "0xb14e3a54e8f63511f004e5b40b3d1bdba426e52c1191982ee67e67e0441769fa",
-          "pmYesPrice": 0.062,
+          "pmYesPrice": 0.063,
           "pmNoPrice": 0.942,
           "pmBestBid": 0.058,
-          "pmBestAsk": 0.062,
+          "pmBestAsk": 0.063,
           "kalshiStake": 49,
-          "pmStake": 3.1481865284974093,
+          "pmStake": 3.1989637305699485,
           "apyPct": 0,
           "buyPlatform": "polymarket",
-          "buyPrice": 0.062,
+          "buyPrice": 0.063,
           "sellPlatform": "kalshi",
           "sellPrice": 0.965,
           "fees": {
             "kalshiFee": 0.13,
-            "pmFee": 0.14765,
+            "pmFee": 0.14987,
             "kalshiFeeDetails": "Kalshi NO sell 51 @ $0.96 = $0.13",
             "pmFeeDetails": "Polymarket YES buy 51 @ $0.06 (θ=0.05) = $0.15",
-            "netProfitIfKalshiWins": -1.6486344559585464,
-            "netProfitIfPmWins": -1.6486344559585464,
-            "worstCaseNetProfit": -1.6486344559585464
+            "netProfitIfKalshiWins": -1.7016316580310857,
+            "netProfitIfPmWins": -1.7016316580310857,
+            "worstCaseNetProfit": -1.7016316580310857
           }
         }
       ]
@@ -28753,7 +28753,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:31.557Z"
+    "lastMatchedAt": "2026-07-17T10:50:19.042Z"
   },
   {
     "id": "1782999196727-house-nm01",
@@ -28773,7 +28773,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:38.026Z",
+      "scannedAt": "2026-07-17T10:50:20.586Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -28825,12 +28825,12 @@
           "kalshiNoBid": 0.05,
           "pmConditionId": "0x4f94ead615e1ae80cb9351a7be1cdfcd01d756edab94d5f0d528c26b059d148d",
           "pmYesPrice": 0.93,
-          "pmNoPrice": 0.07999999999999996,
+          "pmNoPrice": 0.08,
           "pmBestBid": 0.92,
           "pmBestAsk": 0.93,
           "kalshiStake": 57,
           "pmStake": 930,
-          "apyPct": 2.008732661731748,
+          "apyPct": 2.0091273066220547,
           "buyPlatform": "polymarket",
           "buyPrice": 0.93,
           "sellPlatform": "kalshi",
@@ -28851,7 +28851,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:38.026Z"
+    "lastMatchedAt": "2026-07-17T10:50:20.586Z"
   },
   {
     "id": "1782999196727-house-nm02",
@@ -28871,7 +28871,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:38.295Z",
+      "scannedAt": "2026-07-17T10:50:22.043Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -28949,7 +28949,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:38.295Z"
+    "lastMatchedAt": "2026-07-17T10:50:22.043Z"
   },
   {
     "id": "1782999196727-house-nm03",
@@ -28969,7 +28969,7 @@
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:47.676Z",
+      "scannedAt": "2026-07-17T10:50:27.220Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -29009,8 +29009,8 @@
         },
         {
           "artist": "Democratic",
-          "roiPct": -3.838159960000003,
-          "expectedProfit": -10.544395494505503,
+          "roiPct": -3.838159960000004,
+          "expectedProfit": -10.544395494505507,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
           "totalStake": 280.21978021978026,
@@ -29021,24 +29021,24 @@
           "kalshiNoBid": 0.09,
           "pmConditionId": "0x9c76ad6476f3d09545596d3c2b916a4e24814e8200dfb763e07baf30a5b8e184",
           "pmYesPrice": 0.9,
-          "pmNoPrice": 0.10999999999999999,
+          "pmNoPrice": 0.11,
           "pmBestBid": 0.89,
           "pmBestAsk": 0.9,
           "kalshiStake": 250.00000000000003,
-          "pmStake": 30.21978021978022,
+          "pmStake": 30.219780219780223,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.91,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.10999999999999999,
+          "sellPrice": 0.11,
           "fees": {
             "kalshiFee": 3.69,
             "pmFee": 1.35989,
             "kalshiFeeDetails": "Kalshi YES buy 275 @ $0.91 + NO sell 284 @ $0.88 = $3.69",
             "pmFeeDetails": "Polymarket NO buy 302 @ $0.10 (θ=0.05) = $1.36",
-            "netProfitIfKalshiWins": -10.544395494505503,
-            "netProfitIfPmWins": -10.544395494505503,
-            "worstCaseNetProfit": -10.544395494505503
+            "netProfitIfKalshiWins": -10.544395494505507,
+            "netProfitIfPmWins": -10.544395494505507,
+            "worstCaseNetProfit": -10.544395494505507
           }
         }
       ]
@@ -29047,7 +29047,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:47.676Z"
+    "lastMatchedAt": "2026-07-17T10:50:27.220Z"
   },
   {
     "id": "1782999196727-house-ny01",
@@ -29059,25 +29059,25 @@
     "expiryDate": "2026-11-03T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": 5.0000000000000036,
-      "bestProfit": 5.8450704225352155,
+      "bestRoiPct": 4.000000000000005,
+      "bestProfit": 4.676056338028175,
       "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
       "arbType": "cross",
       "outcomeCount": 2,
       "matchedCount": 2,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:47.761Z",
+      "scannedAt": "2026-07-17T10:50:36.092Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
         {
           "artist": "Democratic",
-          "roiPct": 5.0000000000000036,
-          "expectedProfit": 5.8450704225352155,
+          "roiPct": 4.000000000000005,
+          "expectedProfit": 4.676056338028175,
           "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
           "arbType": "cross",
-          "totalStake": 111.05633802816902,
+          "totalStake": 112.22535211267606,
           "kalshiTicker": "KXHOUSERACE-NY01-26-D",
           "kalshiYesAsk": 0.32,
           "kalshiNoAsk": 0.71,
@@ -29089,54 +29089,54 @@
           "pmBestBid": 0.35,
           "pmBestAsk": 0.36,
           "kalshiStake": 37.40845070422535,
-          "pmStake": 73.64788732394366,
-          "apyPct": 16.80949578574274,
+          "pmStake": 74.8169014084507,
+          "apyPct": 13.450246886135542,
           "buyPlatform": "kalshi",
           "buyPrice": 0.32,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.63,
+          "sellPrice": 0.64,
           "fees": {
             "kalshiFee": 0,
             "pmFee": 0,
             "kalshiFeeDetails": "Kalshi: no fee (0 contracts or settled)",
             "pmFeeDetails": "Polymarket: no fee (0 contracts or settled)",
-            "netProfitIfKalshiWins": 5.8450704225352155,
-            "netProfitIfPmWins": 5.8450704225352155,
-            "worstCaseNetProfit": 5.8450704225352155
+            "netProfitIfKalshiWins": 4.676056338028175,
+            "netProfitIfPmWins": 4.676056338028175,
+            "worstCaseNetProfit": 4.676056338028175
           }
         },
         {
           "artist": "Republican",
-          "roiPct": 1.2838972289156636,
-          "expectedProfit": 3.2291960606060623,
+          "roiPct": 0.2973993975903565,
+          "expectedProfit": 0.748004545454533,
           "strategy": "Buy YES PM + NO Kalshi",
           "arbType": "direct",
-          "totalStake": 241.45454545454544,
+          "totalStake": 243.96969696969697,
           "kalshiTicker": "KXHOUSERACE-NY01-26-R",
           "kalshiYesAsk": 0.71,
           "kalshiNoAsk": 0.33,
           "kalshiYesBid": 0.67,
           "kalshiNoBid": 0.29,
           "pmConditionId": "0x14cf6280a2c40fef96816f47721044135d460621580e58c152774923f9f424b9",
-          "pmYesPrice": 0.63,
+          "pmYesPrice": 0.64,
           "pmNoPrice": 0.39,
           "pmBestBid": 0.61,
-          "pmBestAsk": 0.63,
+          "pmBestAsk": 0.64,
           "kalshiStake": 83,
-          "pmStake": 158.45454545454544,
-          "apyPct": 4.316333011756923,
+          "pmStake": 160.96969696969697,
+          "apyPct": 1.0000238303445683,
           "buyPlatform": "polymarket",
-          "buyPrice": 0.63,
+          "buyPrice": 0.64,
           "sellPlatform": "kalshi",
           "sellPrice": 0.33,
           "fees": {
             "kalshiFee": 3.9,
-            "pmFee": 2.93141,
+            "pmFee": 2.89745,
             "kalshiFeeDetails": "Kalshi NO sell 252 @ $0.33 = $3.90",
-            "pmFeeDetails": "Polymarket YES buy 252 @ $0.63 (θ=0.05) = $2.93",
-            "netProfitIfKalshiWins": 3.2291960606060623,
-            "netProfitIfPmWins": 3.2291960606060623,
-            "worstCaseNetProfit": 3.2291960606060623
+            "pmFeeDetails": "Polymarket YES buy 252 @ $0.64 (θ=0.05) = $2.90",
+            "netProfitIfKalshiWins": 0.748004545454533,
+            "netProfitIfPmWins": 0.748004545454533,
+            "worstCaseNetProfit": 0.748004545454533
           }
         }
       ]
@@ -29145,7 +29145,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:47.761Z"
+    "lastMatchedAt": "2026-07-17T10:50:36.093Z"
   },
   {
     "id": "1782999196727-house-ny02",
@@ -29263,7 +29263,7 @@
       "matchedCount": 1,
       "kalshiCount": 2,
       "pmCount": 2,
-      "scannedAt": "2026-07-17T10:19:54.360Z",
+      "scannedAt": "2026-07-17T10:51:46.259Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -29307,7 +29307,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:19:54.360Z"
+    "lastMatchedAt": "2026-07-17T10:51:46.260Z"
   },
   {
     "id": "1782999196727-house-ny04",
@@ -43565,7 +43565,7 @@
       "matchedCount": 4,
       "kalshiCount": 4,
       "pmCount": 10,
-      "scannedAt": "2026-07-17T10:04:36.586Z",
+      "scannedAt": "2026-07-17T10:50:38.554Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
@@ -43605,8 +43605,8 @@
         },
         {
           "artist": "Magdalena Andersson",
-          "roiPct": -0.7460499999999972,
-          "expectedProfit": -0.04844480519480501,
+          "roiPct": -0.7460500000000007,
+          "expectedProfit": -0.048444805194805235,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
           "totalStake": 6.298701298701299,
@@ -43617,24 +43617,24 @@
           "kalshiNoBid": 0.23,
           "pmConditionId": "0x58d5cc2bf06a3289b127049239aee051f3b941f219efebbca02d3f50f0eb2a64",
           "pmYesPrice": 0.82,
-          "pmNoPrice": 0.19999999999999996,
+          "pmNoPrice": 0.2,
           "pmBestBid": 0.8,
           "pmBestAsk": 0.82,
           "kalshiStake": 5,
-          "pmStake": 1.2987012987012985,
+          "pmStake": 1.2987012987012987,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.77,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.19999999999999996,
+          "sellPrice": 0.2,
           "fees": {
             "kalshiFee": 0.19,
             "pmFee": 0.05325,
             "kalshiFeeDetails": "Kalshi YES buy 6 @ $0.77 + NO sell 7 @ $0.72 = $0.19",
             "pmFeeDetails": "Polymarket NO buy 7 @ $0.18 (θ=0.05) = $0.05",
-            "netProfitIfKalshiWins": -0.04844480519480501,
-            "netProfitIfPmWins": -0.04844480519480501,
-            "worstCaseNetProfit": -0.04844480519480501
+            "netProfitIfKalshiWins": -0.048444805194805235,
+            "netProfitIfPmWins": -0.048444805194805235,
+            "worstCaseNetProfit": -0.048444805194805235
           }
         },
         {
@@ -43656,7 +43656,7 @@
           "pmBestAsk": 0.004,
           "kalshiStake": 500.64,
           "pmStake": 2.0227878787878786,
-          "apyPct": 3.225862839985542,
+          "apyPct": 3.227654762880927,
           "buyPlatform": "polymarket",
           "buyPrice": 0.004,
           "sellPlatform": "kalshi",
@@ -43677,7 +43677,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:04:36.586Z"
+    "lastMatchedAt": "2026-07-17T10:50:38.554Z"
   },
   {
     "id": "fdf69429-8442-4b60-8881-4139f689bb60",
@@ -43689,22 +43689,22 @@
     "expiryDate": "2026-09-13T00:00:00Z",
     "favorite": false,
     "lastScanResult": {
-      "bestRoiPct": -1.128906800000002,
-      "bestProfit": -0.05867498960498971,
+      "bestRoiPct": -1.1289067999999982,
+      "bestProfit": -0.058674989604989514,
       "strategy": "Buy YES Kalshi + NO PM",
       "arbType": "direct",
       "outcomeCount": 9,
       "matchedCount": 5,
       "kalshiCount": 5,
       "pmCount": 9,
-      "scannedAt": "2026-07-17T10:04:46.913Z",
+      "scannedAt": "2026-07-17T10:50:40.733Z",
       "pmClosed": false,
       "priceResolved": false,
       "allArbs": [
         {
           "artist": "Swedish Social Democratic Party",
-          "roiPct": -1.128906800000002,
-          "expectedProfit": -0.05867498960498971,
+          "roiPct": -1.1289067999999982,
+          "expectedProfit": -0.058674989604989514,
           "strategy": "Buy YES Kalshi + NO PM",
           "arbType": "direct",
           "totalStake": 5.1871101871101875,
@@ -43715,24 +43715,24 @@
           "kalshiNoBid": 0.038,
           "pmConditionId": "0xe5acfef8707df2e25a99a6e4d9568d033fa063b006022f68375ab3bbcf376818",
           "pmYesPrice": 0.97,
-          "pmNoPrice": 0.03600000000000003,
+          "pmNoPrice": 0.036,
           "pmBestBid": 0.964,
           "pmBestAsk": 0.97,
           "kalshiStake": 5,
-          "pmStake": 0.1871101871101873,
+          "pmStake": 0.1871101871101871,
           "apyPct": 0,
           "buyPlatform": "kalshi",
           "buyPrice": 0.962,
           "sellPlatform": "polymarket",
-          "sellPrice": 0.03600000000000003,
+          "sellPrice": 0.036,
           "fees": {
             "kalshiFee": 0.06,
             "pmFee": 0.00907,
             "kalshiFeeDetails": "Kalshi YES buy 5 @ $0.96 + NO sell 6 @ $0.90 = $0.06",
             "pmFeeDetails": "Polymarket NO buy 6 @ $0.03 (θ=0.05) = $0.01",
-            "netProfitIfKalshiWins": -0.05867498960498971,
-            "netProfitIfPmWins": -0.05867498960498971,
-            "worstCaseNetProfit": -0.05867498960498971
+            "netProfitIfKalshiWins": -0.058674989604989514,
+            "netProfitIfPmWins": -0.058674989604989514,
+            "worstCaseNetProfit": -0.058674989604989514
           }
         }
       ]
@@ -43741,7 +43741,7 @@
     "archived": false,
     "archivedAt": null,
     "archiveReason": null,
-    "lastMatchedAt": "2026-07-17T10:04:46.913Z"
+    "lastMatchedAt": "2026-07-17T10:50:40.733Z"
   },
   {
     "id": "e5927e3d-3905-4445-bf58-52d0a2a9b517",
