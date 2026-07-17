@@ -33,20 +33,45 @@ export async function GET(request: NextRequest) {
     }
 
     if (fields === 'basic') {
-      // Slim payload: keep all scalar fields but reduce allArbs entries to
-      // { expectedProfit } — the only field sidebar/overview read from the
-      // blob (arb counts + profit totals). Full blobs come from ?id= fetch.
-      const basic = markets.map((m: any) => ({
-        ...m,
-        lastScanResult: m.lastScanResult
-          ? {
-              ...m.lastScanResult,
-              allArbs: Array.isArray(m.lastScanResult.allArbs)
-                ? m.lastScanResult.allArbs.map((a: any) => ({ expectedProfit: a.expectedProfit ?? 0 }))
-                : m.lastScanResult.allArbs,
-            }
-          : null,
-      }));
+      // Slim payload: only scalar fields the sidebar/overview need.
+      // Full scan data comes from ?id= fetch when a market is selected.
+      const basic = markets.map((m: any) => {
+        const ls = m.lastScanResult;
+        const allArbs = Array.isArray(ls?.allArbs) ? ls.allArbs : [];
+        return {
+          id: m.id,
+          eventTitle: m.eventTitle,
+          kalshiUrl: m.kalshiUrl,
+          polymarketUrl: m.polymarketUrl,
+          expiryDate: m.expiryDate,
+          lastScanResult: ls ? {
+            bestRoiPct: ls.bestRoiPct ?? 0,
+            bestProfit: ls.bestProfit ?? 0,
+            strategy: ls.strategy ?? '',
+            scannedAt: ls.scannedAt ?? null,
+            matchedCount: ls.matchedCount ?? 0,
+            // Minimal arb objects — only fields sidebar/cached view reads
+            allArbs: allArbs.map((a: any) => ({
+              artist: a.artist ?? '',
+              roiPct: a.roiPct ?? 0,
+              expectedProfit: a.expectedProfit ?? 0,
+              strategy: a.strategy ?? '',
+            })),
+          } : null,
+          liveResult: m.liveResult ? {
+            bestRoiPct: m.liveResult.bestRoiPct ?? 0,
+            scannedAt: m.liveResult.scannedAt ?? null,
+            allArbs: Array.isArray(m.liveResult.allArbs)
+              ? m.liveResult.allArbs.map((a: any) => ({
+                  artist: a.artist ?? '',
+                  roiPct: a.roiPct ?? 0,
+                  expectedProfit: a.expectedProfit ?? 0,
+                  strategy: a.strategy ?? '',
+                }))
+              : [],
+          } : null,
+        };
+      });
       // PERF-P3: ETag/304 — the UI polls every 60s but poller tiers are
       // 5-30min, so most polls are unchanged. 304 skips the 370KB body.
       const body = JSON.stringify({ markets: basic });

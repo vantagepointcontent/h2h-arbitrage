@@ -536,5 +536,29 @@
     "pmTitle": "CAQ",
     "id": "1784283464850-jvxafhh",
     "createdAt": "2026-07-17T10:17:44.850Z"
+  },
+  {
+    "kalshiTicker": "KXAUSTPM-28SEP23-PHAN",
+    "pmConditionId": "0x074f5988c2167bdb11540f11b78485aaa3567b0fd496a2f92f60d3cfc3e7dd4d",
+    "kalshiTitle": "Pauline Hanson (PHAN, Sep 23, 2028)",
+    "pmTitle": "Pauline Hanson",
+    "id": "1784284263768-1d5ndr7",
+    "createdAt": "2026-07-17T10:31:03.768Z"
+  },
+  {
+    "kalshiTicker": "KXAUSTPM-28SEP23-ATAY",
+    "pmConditionId": "0x84d64bdd99ac9be101cf8682cb7e922b8299312c24cd1654e794946e3b397f0c",
+    "kalshiTitle": "Angus Taylor (ATAY, Sep 23, 2028)",
+    "pmTitle": "Angus Taylor",
+    "id": "1784284265462-3j4fto9",
+    "createdAt": "2026-07-17T10:31:05.462Z"
+  },
+  {
+    "kalshiTicker": "KXAUSTPM-28SEP23-AALB",
+    "pmConditionId": "0x1b79d38eaa46ca614c80ad8567b83f515c07427aa097e526f97b8ccb3740ae73",
+    "kalshiTitle": "Anthony Albanese (AALB, Sep 23, 2028)",
+    "pmTitle": "Anthony Albanese",
+    "id": "1784284266773-tq04eo1",
+    "createdAt": "2026-07-17T10:31:06.773Z"
   }
 ]
