@@ -496,5 +496,45 @@
     "pmTitle": "74-75°F",
     "id": "1784213310423-sxhqp3b",
     "createdAt": "2026-07-16T14:48:30.423Z"
+  },
+  {
+    "kalshiTicker": "KXQUEBECASSEMBLY-26OCT05-QS",
+    "pmConditionId": "0x4c7d3102ab3408414937b8ed71a34914c117650bfa484069534761babec02560",
+    "kalshiTitle": "QS (QS, Oct 05, 2026)",
+    "pmTitle": "QS",
+    "id": "1784283460004-yh8dgct",
+    "createdAt": "2026-07-17T10:17:40.004Z"
+  },
+  {
+    "kalshiTicker": "KXQUEBECASSEMBLY-26OCT05-PQ",
+    "pmConditionId": "0x30d4a64f70d80faee66508a797b347ef65e63913e4200bca954718fc824ea10e",
+    "kalshiTitle": "PQ (PQ, Oct 05, 2026)",
+    "pmTitle": "PQ",
+    "id": "1784283460941-n23f3c8",
+    "createdAt": "2026-07-17T10:17:40.941Z"
+  },
+  {
+    "kalshiTicker": "KXQUEBECASSEMBLY-26OCT05-PLQ",
+    "pmConditionId": "0x9b609d94cd0e303bf36f68a422a93f7dad9f58a2f8e4212eef51eed93480f323",
+    "kalshiTitle": "PLQ (PLQ, Oct 05, 2026)",
+    "pmTitle": "PLQ",
+    "id": "1784283461837-xe56cvs",
+    "createdAt": "2026-07-17T10:17:41.837Z"
+  },
+  {
+    "kalshiTicker": "KXQUEBECASSEMBLY-26OCT05-PCQ",
+    "pmConditionId": "0xb79b3e4a9eca37f56dbd00bb495be37079050b1bea9759e0281fe8fe475dc5aa",
+    "kalshiTitle": "PCQ (PCQ, Oct 05, 2026)",
+    "pmTitle": "PCQ",
+    "id": "1784283463855-8uxfa7a",
+    "createdAt": "2026-07-17T10:17:43.855Z"
+  },
+  {
+    "kalshiTicker": "KXQUEBECASSEMBLY-26OCT05-CAQ",
+    "pmConditionId": "0xc7bc5d759ecbd05cfbf3b41ec98f1cd7ab306234bf76fd6c1768d3be1d6b9e76",
+    "kalshiTitle": "CAQ (CAQ, Oct 05, 2026)",
+    "pmTitle": "CAQ",
+    "id": "1784283464850-jvxafhh",
+    "createdAt": "2026-07-17T10:17:44.850Z"
   }
 ]
