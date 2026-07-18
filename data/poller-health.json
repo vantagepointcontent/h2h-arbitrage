@@ -1,30 +1,19 @@
 {
-  "status": "degraded",
+  "status": "ok",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 451,
-  "startedAt": "2026-07-17T12:35:23.951Z",
-  "finishedAt": "2026-07-17T12:36:50.435Z",
-  "durationMs": 86484,
-  "successCount": 57,
-  "failureCount": 2,
-  "skippedCount": 391,
-  "avgScanMs": 7074,
-  "maxScanMs": 60000,
-  "errors": [
-    {
-      "market": "NBA: Giannis Antetokounmpo Next Team",
-      "error": "timeout after 47220ms (adaptive)",
-      "durationMs": 47220
-    },
-    {
-      "market": "Alaska Governor Election Winner  ",
-      "error": "timeout after 60000ms (adaptive)",
-      "durationMs": 60000
-    }
-  ],
-  "breakerSkipped": 1,
-  "openBreakers": 1
+  "marketCount": 455,
+  "startedAt": "2026-07-18T12:55:26.624Z",
+  "finishedAt": "2026-07-18T12:56:41.451Z",
+  "durationMs": 74827,
+  "successCount": 58,
+  "failureCount": 0,
+  "skippedCount": 395,
+  "avgScanMs": 6256,
+  "maxScanMs": 21718,
+  "errors": [],
+  "breakerSkipped": 2,
+  "openBreakers": 2
 }

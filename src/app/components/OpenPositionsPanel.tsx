@@ -6,11 +6,49 @@
  * and allows closing both legs simultaneously via SELL orders.
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Loader2, RefreshCw, TrendingUp, TrendingDown, X, AlertTriangle,
   LogOut, ArrowUpDown, ArrowUp, ArrowDown, Wallet,
 } from 'lucide-react';
+import { PlatformIcon } from '@/lib/platforms/PlatformIcon';
+
+// ── Fee helpers (client-safe, mirrors matcher.ts server-side math) ──
+
+/** Kalshi fee: round up to nearest cent. Default taker rate 0.07. */
+function calcKalshiExitFee(contracts: number, price: number, rate = 0.07): number {
+  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
+  const raw = rate * contracts * price * (1 - price);
+  return Math.ceil(raw * 100) / 100;
+}
+
+/** Polymarket fee: theta * contracts * price * (1 - price). Rounded to 5 decimals. */
+function calcPmExitFee(contracts: number, price: number, theta = 0.05): number {
+  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
+  const raw = theta * contracts * price * (1 - price);
+  return Math.round(raw * 100000) / 100000;
+}
+
+/** Compute exit fees for a pair. SELL orders pay fees on both legs. */
+function computeExitFees(pair: PairedPosition): { kalshiFee: number; pmFee: number; totalFees: number } {
+  let kalshiFee = 0;
+  let pmFee = 0;
+
+  if (pair.kalshi) {
+    const contracts = Math.floor(pair.kalshi.size);
+    const price = pair.kalshi.currentPrice;
+    kalshiFee = calcKalshiExitFee(contracts, price);
+  }
+
+  if (pair.polymarket) {
+    const contracts = Math.floor(pair.polymarket.size);
+    const price = pair.polymarket.currentPrice;
+    // Default theta 0.05 — same as matcher.ts default for 'other' category
+    pmFee = calcPmExitFee(contracts, price, 0.05);
+  }
+
+  return { kalshiFee, pmFee, totalFees: kalshiFee + pmFee };
+}
 
 // ── Types ──
 
@@ -30,6 +68,10 @@ interface KalshiPositionDto {
   roiPct: number;
   realizedPnl: number;
   lastPrice: number;
+  feesPaid: number;
+  netUnrealizedPnl: number;
+  netRoiPct: number;
+  exitFees: number;
 }
 
 interface PmPositionDto {
@@ -49,6 +91,32 @@ interface PmPositionDto {
   percentPnl: number;
   endDate: string;
   negativeRisk: boolean;
+  feesPaid: number;
+  netCashPnl: number;
+  netPercentPnl: number;
+  exitFees: number;
+}
+
+interface LegBreakdown {
+  platform: string;
+  side: string;
+  entryPrice: number;
+  currentPrice: number;
+  size: number;
+  grossPnl: number;
+  feesPaid: number;
+  exitFees: number;
+  netPnl: number;
+  roiPct: number;
+}
+
+interface RoiBreakdown {
+  legA: LegBreakdown | null;
+  legB: LegBreakdown | null;
+  totalGrossPnl: number;
+  totalFees: number;
+  totalNetPnl: number;
+  totalRoiPct: number;
 }
 
 interface PairedPosition {
@@ -60,6 +128,7 @@ interface PairedPosition {
   totalCost: number;
   totalUnrealizedPnl: number;
   totalRoiPct: number;
+  breakdown: RoiBreakdown;
 }
 
 interface PositionsResponse {
@@ -322,8 +391,11 @@ export default function OpenPositionsPanel() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      <span className={leg.platform === 'Kalshi' ? 'text-[#5DBE81]' : 'text-[#a78bfa]'}>
-                        {leg.platform}
+                      <span className="inline-flex items-center gap-1.5">
+                        <PlatformIcon platform={leg.platform} size="sm" />
+                        <span className={leg.platform === 'Kalshi' ? 'text-[#5DBE81]' : 'text-[#a78bfa]'}>
+                          {leg.platform}
+                        </span>
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs uppercase">
@@ -378,7 +450,14 @@ export default function OpenPositionsPanel() {
       )}
 
       {/* Exit confirmation dialog */}
-      {confirmExit && (
+      {confirmExit && (() => {
+        const fees = computeExitFees(confirmExit);
+        const netPnl = confirmExit.totalUnrealizedPnl - fees.totalFees;
+        const netRoi = confirmExit.totalCost > 0 ? (netPnl / confirmExit.totalCost) * 100 : 0;
+        const isPaired = !!(confirmExit.kalshi && confirmExit.polymarket);
+        const legCount = (confirmExit.kalshi ? 1 : 0) + (confirmExit.polymarket ? 1 : 0);
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmExit(null)}>
           <div
             className="rounded-xl border border-[#182533] bg-[#17212B] p-6 max-w-md w-full mx-4 space-y-4"
@@ -386,30 +465,63 @@ export default function OpenPositionsPanel() {
           >
             <div className="flex items-center gap-2">
               <LogOut className="w-5 h-5 text-[#ef4444]" />
-              <h3 className="text-sm font-bold text-[#FFFFFF]">Close positions?</h3>
+              <h3 className="text-sm font-bold text-[#FFFFFF]">
+                Close {isPaired ? 'both positions' : legCount === 1 ? 'position' : 'positions'}?
+                <span className={`ml-2 ${confirmExit.totalRoiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+                  Current ROI: {fmtPct(confirmExit.totalRoiPct)}
+                </span>
+              </h3>
             </div>
             <div className="text-xs text-[#8A9BA8] space-y-1">
               <div>Market: <span className="text-[#FFFFFF]">{confirmExit.marketTitle}</span></div>
               {confirmExit.kalshi && (
-                <div>Kalshi: Sell {confirmExit.kalshi.size} {confirmExit.kalshi.side} @ {fmtPrice(confirmExit.kalshi.side === 'YES' ? confirmExit.kalshi.currentPrice : confirmExit.kalshi.currentPrice)}</div>
+                <div>
+                  Kalshi: Sell {confirmExit.kalshi.size} {confirmExit.kalshi.side} @ {fmtPrice(confirmExit.kalshi.currentPrice)}
+                  <span className="text-[#5E6875]"> — fee: {fmtUsd(fees.kalshiFee)}</span>
+                </div>
               )}
               {confirmExit.polymarket && (
-                <div>Polymarket: Sell {confirmExit.polymarket.size} {confirmExit.polymarket.outcome} @ {fmtPrice(confirmExit.polymarket.currentPrice)}</div>
+                <div>
+                  Polymarket: Sell {confirmExit.polymarket.size} {confirmExit.polymarket.outcome} @ {fmtPrice(confirmExit.polymarket.currentPrice)}
+                  <span className="text-[#5E6875]"> — fee: {fmtUsd(fees.pmFee)}</span>
+                </div>
               )}
-              <div className="pt-2 border-t border-[#182533]">
-                Current ROI: <span className={confirmExit.totalRoiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
-                  {fmtPct(confirmExit.totalRoiPct)}
+            </div>
+            {/* P&L + fees summary */}
+            <div className="rounded-lg border border-[#182533] bg-[#0E1621] p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#8A9BA8]">Unrealized P&L (gross)</span>
+                <span className={confirmExit.totalUnrealizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
+                  {fmtUsd(confirmExit.totalUnrealizedPnl)}
                 </span>
               </div>
-              <div>
-                Unrealized P&L: <span className={confirmExit.totalUnrealizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
-                  {fmtUsd(confirmExit.totalUnrealizedPnl)}
+              <div className="flex justify-between">
+                <span className="text-[#8A9BA8]">Exit fees</span>
+                <span className="text-[#ef4444]">−{fmtUsd(fees.totalFees)}</span>
+              </div>
+              {fees.kalshiFee > 0 && (
+                <div className="flex justify-between pl-3 text-[10px] text-[#5E6875]">
+                  <span>Kalshi fee (7%)</span>
+                  <span>{fmtUsd(fees.kalshiFee)}</span>
+                </div>
+              )}
+              {fees.pmFee > 0 && (
+                <div className="flex justify-between pl-3 text-[10px] text-[#5E6875]">
+                  <span>Polymarket fee (θ=0.05)</span>
+                  <span>{fmtUsd(fees.pmFee)}</span>
+                </div>
+              )}
+              <div className="border-t border-[#182533] pt-1.5 flex justify-between font-bold">
+                <span className="text-[#FFFFFF]">Expected net P&L</span>
+                <span className={netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
+                  {fmtUsd(netPnl)}
+                  <span className="ml-1 text-[10px] font-normal opacity-80">({fmtPct(netRoi)})</span>
                 </span>
               </div>
             </div>
             <div className="text-[10px] text-amber-400 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
-              This will place SELL orders on both platforms. Execution is irreversible.
+              This will place SELL orders on {isPaired ? 'both platforms' : 'the platform'}. Execution is irreversible.
             </div>
             <div className="flex gap-2 justify-end">
               <button
@@ -420,14 +532,22 @@ export default function OpenPositionsPanel() {
               </button>
               <button
                 onClick={() => handleExit(confirmExit)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#ef4444]/20 border border-[#ef4444]/40 text-[#ef4444] hover:bg-[#ef4444]/30"
+                disabled={exiting === confirmExit.id}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#ef4444]/20 border border-[#ef4444]/40 text-[#ef4444] hover:bg-[#ef4444]/30 disabled:opacity-50 flex items-center gap-1.5"
               >
-                Close both positions
+                {exiting === confirmExit.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                {exiting === confirmExit.id
+                  ? 'Executing…'
+                  : isPaired
+                    ? 'Close both positions'
+                    : 'Close position'
+                }
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

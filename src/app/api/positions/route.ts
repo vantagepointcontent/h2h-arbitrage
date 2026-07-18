@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
 import { getSetting } from '@/lib/settings';
 import logger from '@/lib/logger';
+import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
 
 /**
  * Open Positions API.
@@ -31,10 +32,17 @@ interface KalshiPositionDto {
   currentPrice: number;   // current bid for the side we'd sell
   currentValue: number;   // USD
   totalCost: number;      // USD
-  unrealizedPnl: number;  // USD
-  roiPct: number;
+  unrealizedPnl: number;  // USD (gross)
+  roiPct: number;         // gross ROI %
   realizedPnl: number;
   lastPrice: number;
+  // Fee-adjusted (net) fields
+  feesPaid: number;       // estimated fees paid at entry (USD)
+  netUnrealizedPnl: number; // unrealizedPnl - exitFees
+  netRoiPct: number;      // net ROI %
+  exitFees: number;       // estimated fees to sell at current price (USD)
+  // Arb pair linkage
+  pairId: string | null;  // shared with the opposite leg if part of an arb pair
 }
 
 interface PmPositionDto {
@@ -50,10 +58,46 @@ interface PmPositionDto {
   currentPrice: number;   // curPrice (0-1)
   currentValue: number;   // USD
   initialValue: number;   // USD
-  cashPnl: number;        // USD
-  percentPnl: number;     // %
+  cashPnl: number;        // USD (gross)
+  percentPnl: number;     // % (gross)
   endDate: string;
   negativeRisk: boolean;
+  // Fee-adjusted (net) fields
+  feesPaid: number;       // estimated fees paid at entry (USD)
+  netCashPnl: number;     // cashPnl - exitFees
+  netPercentPnl: number;  // net % 
+  exitFees: number;       // estimated fees to sell at current price (USD)
+}
+
+interface RoiBreakdown {
+  legA: {
+    platform: string;
+    side: string;
+    entryPrice: number;
+    currentPrice: number;
+    size: number;
+    grossPnl: number;
+    feesPaid: number;   // entry fees
+    exitFees: number;   // estimated exit fees
+    netPnl: number;     // grossPnl - exitFees (entry fees already in cost basis)
+    roiPct: number;     // net ROI %
+  } | null;
+  legB: {
+    platform: string;
+    side: string;
+    entryPrice: number;
+    currentPrice: number;
+    size: number;
+    grossPnl: number;
+    feesPaid: number;
+    exitFees: number;
+    netPnl: number;
+    roiPct: number;
+  } | null;
+  totalGrossPnl: number;
+  totalFees: number;     // entry + exit fees for both legs
+  totalNetPnl: number;
+  totalRoiPct: number;   // net ROI %
 }
 
 interface PairedPosition {
@@ -63,8 +107,9 @@ interface PairedPosition {
   polymarket: PmPositionDto | null;
   totalValue: number;
   totalCost: number;
-  totalUnrealizedPnl: number;
-  totalRoiPct: number;
+  totalUnrealizedPnl: number;  // gross
+  totalRoiPct: number;         // net ROI %
+  breakdown: RoiBreakdown;
 }
 
 // ── GET: fetch all positions ──
@@ -229,46 +274,114 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
   const { getKalshiPositions } = await import('@/lib/kalshi-positions');
   const positions = await getKalshiPositions();
-  return positions.map(p => ({
-    platform: 'kalshi' as const,
-    ticker: p.ticker,
-    title: p.title,
-    eventTicker: p.eventTicker,
-    side: p.position > 0 ? 'YES' as const : 'NO' as const,
-    position: p.position,
-    size: Math.abs(p.position),
-    entryPrice: p.totalCost / Math.max(Math.abs(p.position), 1),
-    currentPrice: p.position > 0 ? p.currentYesBid : p.currentNoBid,
-    currentValue: p.currentValue,
-    totalCost: p.totalCost,
-    unrealizedPnl: p.unrealizedPnl,
-    roiPct: p.roiPct,
-    realizedPnl: p.realizedPnl,
-    lastPrice: p.lastPrice,
-  }));
+  return positions.map(p => {
+    const size = Math.abs(p.position);
+    const entryPrice = p.totalCost / Math.max(size, 1);
+    const currentPrice = p.position > 0 ? p.currentYesBid : p.currentNoBid;
+    // Entry fees: contracts * entryPrice * (1-entryPrice) * rate
+    const feesPaid = calcKalshiFee(size, entryPrice);
+    // Exit fees: selling at currentPrice
+    const exitFees = calcKalshiFee(size, currentPrice);
+    const netUnrealizedPnl = p.unrealizedPnl - exitFees;
+    const netRoiPct = p.totalCost > 0 ? (netUnrealizedPnl / p.totalCost) * 100 : 0;
+    return {
+      platform: 'kalshi' as const,
+      ticker: p.ticker,
+      title: p.title,
+      eventTicker: p.eventTicker,
+      side: p.position > 0 ? 'YES' as const : 'NO' as const,
+      position: p.position,
+      size,
+      entryPrice,
+      currentPrice,
+      currentValue: p.currentValue,
+      totalCost: p.totalCost,
+      unrealizedPnl: p.unrealizedPnl,
+      roiPct: p.roiPct,
+      realizedPnl: p.realizedPnl,
+      lastPrice: p.lastPrice,
+      feesPaid,
+      netUnrealizedPnl,
+      netRoiPct,
+      exitFees,
+    };
+  });
 }
 
 async function fetchPmPositions(): Promise<PmPositionDto[]> {
   const { getPolymarketPositions } = await import('@/lib/polymarket-positions');
   const positions = await getPolymarketPositions();
-  return positions.map(p => ({
-    platform: 'polymarket' as const,
-    asset: p.asset,
-    conditionId: p.conditionId,
-    title: p.title,
-    slug: p.slug,
-    outcome: p.outcome,
-    side: p.outcome.toLowerCase() === 'yes' ? 'YES' as const : 'NO' as const,
+  return positions.map(p => {
+    // Entry fees: theta * shares * entryPrice * (1-entryPrice)
+    const entryTheta = getPolymarketTheta(); // default category
+    const feesPaid = calcPolymarketFee(p.size, p.avgPrice, entryTheta);
+    // Exit fees: selling at current price
+    const exitFees = calcPolymarketFee(p.size, p.curPrice, entryTheta);
+    const netCashPnl = p.cashPnl - exitFees;
+    const netPercentPnl = p.initialValue > 0 ? (netCashPnl / p.initialValue) * 100 : 0;
+    return {
+      platform: 'polymarket' as const,
+      asset: p.asset,
+      conditionId: p.conditionId,
+      title: p.title,
+      slug: p.slug,
+      outcome: p.outcome,
+      side: p.outcome.toLowerCase() === 'yes' ? 'YES' as const : 'NO' as const,
+      size: p.size,
+      entryPrice: p.avgPrice,
+      currentPrice: p.curPrice,
+      currentValue: p.currentValue,
+      initialValue: p.initialValue,
+      cashPnl: p.cashPnl,
+      percentPnl: p.percentPnl,
+      endDate: p.endDate,
+      negativeRisk: p.negativeRisk,
+      feesPaid,
+      netCashPnl,
+      netPercentPnl,
+      exitFees,
+    };
+  });
+}
+
+/** Build a per-leg breakdown for ROI tooltip. */
+function buildBreakdown(
+  k: KalshiPositionDto | null,
+  p: PmPositionDto | null,
+): RoiBreakdown {
+  const legA = k ? {
+    platform: 'Kalshi',
+    side: k.side,
+    entryPrice: k.entryPrice,
+    currentPrice: k.currentPrice,
+    size: k.size,
+    grossPnl: k.unrealizedPnl,
+    feesPaid: k.feesPaid,
+    exitFees: k.exitFees,
+    netPnl: k.netUnrealizedPnl,
+    roiPct: k.netRoiPct,
+  } : null;
+
+  const legB = p ? {
+    platform: 'Polymarket',
+    side: p.side,
+    entryPrice: p.entryPrice,
+    currentPrice: p.currentPrice,
     size: p.size,
-    entryPrice: p.avgPrice,
-    currentPrice: p.curPrice,
-    currentValue: p.currentValue,
-    initialValue: p.initialValue,
-    cashPnl: p.cashPnl,
-    percentPnl: p.percentPnl,
-    endDate: p.endDate,
-    negativeRisk: p.negativeRisk,
-  }));
+    grossPnl: p.cashPnl,
+    feesPaid: p.feesPaid,
+    exitFees: p.exitFees,
+    netPnl: p.netCashPnl,
+    roiPct: p.netPercentPnl,
+  } : null;
+
+  const totalGrossPnl = (legA?.grossPnl ?? 0) + (legB?.grossPnl ?? 0);
+  const totalFees = (legA?.feesPaid ?? 0) + (legA?.exitFees ?? 0) + (legB?.feesPaid ?? 0) + (legB?.exitFees ?? 0);
+  const totalNetPnl = (legA?.netPnl ?? 0) + (legB?.netPnl ?? 0);
+  const totalCost = (k?.totalCost ?? 0) + (p?.initialValue ?? 0);
+  const totalRoiPct = totalCost > 0 ? (totalNetPnl / totalCost) * 100 : 0;
+
+  return { legA, legB, totalGrossPnl, totalFees, totalNetPnl, totalRoiPct };
 }
 
 /**
@@ -295,21 +408,21 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
     if (bestMatch) {
       usedPm.add(bestMatch.idx);
       const p = pm[bestMatch.idx];
-      const totalValue = k.currentValue + p.currentValue;
-      const totalCost = k.totalCost + p.initialValue;
-      const totalPnl = k.unrealizedPnl + p.cashPnl;
+      const breakdown = buildBreakdown(k, p);
       pairs.push({
         id: `pair-${k.ticker}-${p.asset.slice(0, 8)}`,
         marketTitle: k.title,
         kalshi: k,
         polymarket: p,
-        totalValue,
-        totalCost,
-        totalUnrealizedPnl: totalPnl,
-        totalRoiPct: totalCost > 0 ? (totalPnl / totalCost) * 100 : 0,
+        totalValue: k.currentValue + p.currentValue,
+        totalCost: k.totalCost + p.initialValue,
+        totalUnrealizedPnl: k.unrealizedPnl + p.cashPnl,
+        totalRoiPct: breakdown.totalRoiPct,
+        breakdown,
       });
     } else {
       // Unpaired Kalshi position
+      const breakdown = buildBreakdown(k, null);
       pairs.push({
         id: `solo-k-${k.ticker}`,
         marketTitle: k.title,
@@ -318,7 +431,8 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
         totalValue: k.currentValue,
         totalCost: k.totalCost,
         totalUnrealizedPnl: k.unrealizedPnl,
-        totalRoiPct: k.roiPct,
+        totalRoiPct: breakdown.totalRoiPct,
+        breakdown,
       });
     }
   }
@@ -327,6 +441,7 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
   for (let i = 0; i < pm.length; i++) {
     if (usedPm.has(i)) continue;
     const p = pm[i];
+    const breakdown = buildBreakdown(null, p);
     pairs.push({
       id: `solo-p-${p.asset.slice(0, 12)}`,
       marketTitle: p.title,
@@ -335,7 +450,8 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
       totalValue: p.currentValue,
       totalCost: p.initialValue,
       totalUnrealizedPnl: p.cashPnl,
-      totalRoiPct: p.percentPnl,
+      totalRoiPct: breakdown.totalRoiPct,
+      breakdown,
     });
   }
 

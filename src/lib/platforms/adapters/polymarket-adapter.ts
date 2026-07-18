@@ -17,7 +17,7 @@ import {
   type PMMarket,
   type PMEvent,
 } from '../../polymarket';
-import { fetchClobMarkets, getClobPrices, type ClobMarket } from '../../polymarket-clob';
+import { fetchClobMarkets, getClobPrices } from '../../polymarket-clob';
 
 export class PolymarketAdapter implements PlatformAdapter {
   readonly platformId = 'polymarket' as const;
@@ -106,7 +106,17 @@ export class PolymarketAdapter implements PlatformAdapter {
   }
 
   async getPositions(): Promise<Position[]> {
-    throw new Error('PolymarketAdapter.getPositions: Not implemented');
+    const { getPolymarketPositions } = await import('../../polymarket-positions');
+    const positions = await getPolymarketPositions();
+    return positions.map(p => ({
+      marketId: p.conditionId,
+      outcomeId: p.asset,
+      side: p.outcome.toLowerCase() === 'yes' ? 'yes' : 'no',
+      size: p.size,
+      avgEntryPrice: p.avgPrice,
+      currentPrice: p.curPrice,
+      unrealizedPnl: p.cashPnl,
+    }));
   }
 
   // ── Capabilities ──
@@ -121,15 +131,16 @@ export class PolymarketAdapter implements PlatformAdapter {
 
   // ── Private Mappers ──
 
-  private mapMarket(m: PMMarket, event: PMEvent): PlatformMarket {
-    const outcomeNames = parseOutcomes(m.outcomes);
-    const prices = m.outcomePrices ? JSON.parse(m.outcomePrices) as string[] : [];
+  private mapMarket(m: PMMarket, _event: PMEvent): PlatformMarket {
+    const parsed = parseOutcomes(m);
+    const outcomeNames: string[] = parsed.outcomes;
+    const priceVals: number[] = parsed.prices;
 
-    const outcomes: PlatformOutcome[] = outcomeNames.map((name, i) => ({
+    const outcomes: PlatformOutcome[] = outcomeNames.map((name: string, i: number) => ({
       nativeId: m.conditionId,
       name,
-      yesPrice: parseFloat(prices[i] ?? '0'),
-      noPrice: 1 - parseFloat(prices[i] ?? '0'),
+      yesPrice: priceVals[i] ?? 0,
+      noPrice: 1 - (priceVals[i] ?? 0),
       bestBid: m.bestBid ?? 0,
       bestAsk: m.bestAsk ?? 0,
       lastPrice: m.lastTradePrice ?? 0,
@@ -150,22 +161,5 @@ export class PolymarketAdapter implements PlatformAdapter {
       closed: m.closed,
       raw: m,
     };
-  }
-
-  private parsePriceOutcomes(priceData: unknown): PlatformOutcome[] {
-    // The CLOB price format is handled by polymarket-clob.ts
-    // This is a minimal mapper — full price parsing stays in the existing code
-    if (!priceData || typeof priceData !== 'object') return [];
-    const data = priceData as Record<string, unknown>;
-    return [{
-      nativeId: String(data.conditionId ?? ''),
-      name: String(data.outcome ?? 'Yes'),
-      yesPrice: Number(data.yesPrice ?? 0),
-      noPrice: Number(data.noPrice ?? 0),
-      bestBid: Number(data.bestBid ?? 0),
-      bestAsk: Number(data.bestAsk ?? 0),
-      lastPrice: Number(data.lastTradePrice ?? 0),
-      raw: priceData,
-    }];
   }
 }

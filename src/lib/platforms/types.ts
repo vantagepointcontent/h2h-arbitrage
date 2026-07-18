@@ -11,6 +11,7 @@
  */
 
 import type { PlatformId } from './registry';
+import { detectPlatformFromUrl } from './registry';
 
 // ── Common Types ──────────────────────────────────────────────────────
 
@@ -121,8 +122,6 @@ export interface CouplingPair {
  * Create a MarketLink from a URL, auto-detecting the platform.
  */
 export function createMarketLink(url: string, platformOverride?: PlatformId): MarketLink {
-  // Import here to avoid circular dependency at module load
-  const { detectPlatformFromUrl } = require('./registry');
   const platform = platformOverride ?? detectPlatformFromUrl(url);
   if (!platform) {
     throw new Error(`Could not detect platform for URL: ${url}`);

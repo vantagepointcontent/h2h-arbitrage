@@ -45,3 +45,9 @@ yarn-error.log*
 next-env.d.ts
 dist/
 data/watcher-health.json
+data/edgefinder.db
+data/edgefinder.db-wal
+data/edgefinder.db-shm
+data/edgefinder.db.bak*
+data/edgefinder.db.corrupt*
+data/edgefinder.db.pre-purge*

@@ -1056,3 +1056,104 @@ export async function getExecutions(limit = 200): Promise<ExecutionRecord[]> {
     estimatedProfit: Number(r.estimated_profit ?? 0),
   }));
 }
+
+// ─── Closed positions (trade history with full P&L) ───────────────
+
+let _closedPositionsReady = false;
+async function ensureClosedPositionsTable(): Promise<void> {
+  if (_closedPositionsReady) return;
+  const c = getClient();
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS closed_positions (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      market_title     TEXT    NOT NULL,
+      platform         TEXT    NOT NULL,
+      side             TEXT    NOT NULL,
+      size             REAL    NOT NULL DEFAULT 0,
+      entry_price      REAL    NOT NULL DEFAULT 0,
+      exit_price       REAL    NOT NULL DEFAULT 0,
+      realized_pnl     REAL    NOT NULL DEFAULT 0,
+      roi_pct          REAL    NOT NULL DEFAULT 0,
+      opened_at        TEXT,
+      closed_at        TEXT    NOT NULL,
+      duration_secs    INTEGER,
+      pair_id          TEXT,
+      fees_paid        REAL    NOT NULL DEFAULT 0,
+      ticker           TEXT,
+      condition_id     TEXT,
+      raw_data         TEXT
+    )`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_closed_at ON closed_positions(closed_at DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_pair_id ON closed_positions(pair_id)`);
+  _closedPositionsReady = true;
+}
+
+export interface ClosedPosition {
+  id?: number;
+  marketTitle: string;
+  platform: 'kalshi' | 'polymarket';
+  side: 'YES' | 'NO';
+  size: number;
+  entryPrice: number;
+  exitPrice: number;
+  realizedPnl: number;
+  roiPct: number;
+  openedAt?: string | null;
+  closedAt: string;
+  durationSecs?: number | null;
+  pairId?: string | null;
+  feesPaid?: number;
+  ticker?: string | null;
+  conditionId?: string | null;
+  rawData?: unknown;
+}
+
+export async function persistClosedPosition(cp: ClosedPosition): Promise<void> {
+  await ensureClosedPositionsTable();
+  const c = getClient();
+  await c.execute({
+    sql: `INSERT INTO closed_positions
+      (market_title, platform, side, size, entry_price, exit_price, realized_pnl, roi_pct,
+       opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, raw_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      cp.marketTitle, cp.platform, cp.side, cp.size,
+      cp.entryPrice, cp.exitPrice, cp.realizedPnl, cp.roiPct,
+      cp.openedAt ?? null, cp.closedAt,
+      cp.durationSecs ?? null,
+      cp.pairId ?? null,
+      cp.feesPaid ?? 0,
+      cp.ticker ?? null,
+      cp.conditionId ?? null,
+      cp.rawData != null ? JSON.stringify(cp.rawData) : null,
+    ],
+  });
+}
+
+export async function getClosedPositions(limit = 500): Promise<ClosedPosition[]> {
+  await ensureClosedPositionsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT * FROM closed_positions ORDER BY closed_at DESC LIMIT ?`,
+    args: [Math.min(5000, Math.max(1, limit))],
+  });
+  return (res.rows as any[]).map((r) => ({
+    id: Number(r.id),
+    marketTitle: String(r.market_title),
+    platform: String(r.platform) as 'kalshi' | 'polymarket',
+    side: String(r.side) as 'YES' | 'NO',
+    size: Number(r.size),
+    entryPrice: Number(r.entry_price),
+    exitPrice: Number(r.exit_price),
+    realizedPnl: Number(r.realized_pnl),
+    roiPct: Number(r.roi_pct),
+    openedAt: r.opened_at ?? null,
+    closedAt: String(r.closed_at),
+    durationSecs: r.duration_secs != null ? Number(r.duration_secs) : null,
+    pairId: r.pair_id ?? null,
+    feesPaid: Number(r.fees_paid ?? 0),
+    ticker: r.ticker ?? null,
+    conditionId: r.condition_id ?? null,
+    rawData: r.raw_data ? JSON.parse(String(r.raw_data)) : undefined,
+  }));
+}
