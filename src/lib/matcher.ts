@@ -32,6 +32,8 @@ export interface UnifiedOutcome {
     askDepth?: number;
     noAskDepth?: number;
     negRisk?: boolean;
+    /** False when prices are indicative only (no executable CLOB asks). */
+    isExecutable?: boolean;
   } | null;
   arbitrage: {
     strategy: string;
@@ -551,6 +553,9 @@ export function calculateBestArbitrageForOutcome(
   if ((current.kalshi.yesAsk ?? 0) === 0 && (current.kalshi.noAsk ?? 0) === 0) {
     return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
   }
+  if (current.polymarket.isExecutable === false) {
+    return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
+  }
   if ((current.polymarket.bestAsk ?? 0) === 0 && (current.polymarket.noPrice ?? 0) === 0 && (current.polymarket.yesPrice ?? 0) === 0) {
     return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 };
   }
@@ -922,14 +927,14 @@ export function buildPmArbShape(market: PMMarket) {
   const rawBestAsk = market.bestAsk;
   const rawBestBid = market.bestBid;
 
-  // A successful CLOB lookup that finds no asks is authoritative. Gamma's
-  // bestAsk/outcomePrices may describe an old trade, never executable liquidity.
+  // A successful CLOB lookup with no asks is non-executable. Preserve the
+  // CLOB token prices for display, but force the execution fields to zero.
   if (market.clobEmpty) {
     return {
       marketId: market.id,
       conditionId: market.conditionId,
-      yesPrice: 0,
-      noPrice: 0,
+      yesPrice: prices[0] ?? 0,
+      noPrice: prices[1] ?? 0,
       bestBid: 0,
       bestAsk: 0,
       lastTradePrice: 0,
@@ -938,6 +943,7 @@ export function buildPmArbShape(market: PMMarket) {
       askDepth: 0,
       noAskDepth: 0,
       negRisk: market.neg_risk === true,
+      isExecutable: false,
     } as NonNullable<UnifiedOutcome['polymarket']>;
   }
 

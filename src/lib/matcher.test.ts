@@ -236,11 +236,12 @@ describe('buildPmArbShape — CLOB-empty regression guard (BUG-086b)', () => {
       bestAsk: 0.60,
       outcomePrices: '["0.60","0.40"]',
     }));
-    expect(shape.yesPrice).toBe(0);
-    expect(shape.noPrice).toBe(0);
+    expect(shape.yesPrice).toBe(0.60);
+    expect(shape.noPrice).toBe(0.40);
     expect(shape.bestBid).toBe(0);
     expect(shape.bestAsk).toBe(0);
     expect(shape.askDepth).toBe(0);
+    expect(shape.isExecutable).toBe(false);
   });
 });
 

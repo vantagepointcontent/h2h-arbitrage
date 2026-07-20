@@ -167,9 +167,17 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       try {
         const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
         if (!live) {
-          // BUG-086b REGRESSION: An empty reachable CLOB is authoritative.
-          // Do not resurrect stale Gamma bestAsk/outcomePrices during refresh.
-          return { ...m, clobEmpty: true };
+          // CLOB token prices remain useful for display, but without asks they
+          // are non-executable and must not feed arbitrage calculation.
+          const yes = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'Yes')?.price ?? 0;
+          const no = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'No')?.price ?? 0;
+          return {
+            ...m,
+            clobEmpty: true,
+            outcomePrices: JSON.stringify([yes, no]),
+            bestAsk: 0,
+            bestBid: 0,
+          };
         }
         return {
           ...m,

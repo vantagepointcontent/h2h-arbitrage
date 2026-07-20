@@ -187,11 +187,18 @@ export async function POST(request: NextRequest) {
         try {
           const live = await getClobPrices(clob);
           if (!live) {
-            // BUG-086b REGRESSION: Gamma may retain stale bestAsk/outcomePrices
-            // after a real CLOB lookup returns no asks. Preserve the market for
-            // matching, but carry an explicit signal so the matcher renders no
-            // executable price and cannot calculate a phantom arb.
-            return { ...m, clobEmpty: true };
+            // The CLOB was reachable but has no executable asks. Keep its token
+            // prices for display (the same values shown by Polymarket), but mark
+            // them non-executable so they cannot create an arbitrage signal.
+            const yes = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'Yes')?.price ?? 0;
+            const no = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'No')?.price ?? 0;
+            return {
+              ...m,
+              clobEmpty: true,
+              outcomePrices: JSON.stringify([yes, no]),
+              bestAsk: 0,
+              bestBid: 0,
+            };
           }
 
           if (DEBUG_H2H) {
