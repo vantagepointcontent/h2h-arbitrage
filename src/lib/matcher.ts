@@ -3,6 +3,13 @@ import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
 import { classifyArbType, type ArbType } from './arb-types';
 
+/** Format a probability price (0–1) with adaptive decimal precision. */
+function formatPrice(price: number): string {
+  if (price >= 0.01) return price.toFixed(2);
+  if (price >= 0.001) return price.toFixed(3);
+  return price.toFixed(4);
+}
+
 export interface UnifiedOutcome {
   artist: string;
   kalshi: {
@@ -143,24 +150,24 @@ export function computeArbitrageFees(
     const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
     const kalshiNoContracts = kalshiStake / (1 - kalshiSellPrice);
     kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice) + calcKalshiFee(kalshiNoContracts, 1 - kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${kalshiBuyPrice.toFixed(2)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${(1 - kalshiSellPrice).toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${formatPrice(kalshiBuyPrice)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${formatPrice(1 - kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   } else if (strategy.includes('NO Kalshi')) {
     // Buy YES on PM, sell NO on Kalshi
     const kalshiNoContracts = kalshiStake / kalshiSellPrice;
     kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${kalshiSellPrice.toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${formatPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   }
 
   if (strategy.includes('YES PM')) {
     const pmYesContracts = pmStake / pmBuyPrice;
     const pmTheta = getPolymarketTheta(category);
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
-    pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${pmBuyPrice.toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+    pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${formatPrice(pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   } else if (strategy.includes('NO PM')) {
     const pmNoContracts = pmStake / (1 - pmBuyPrice);
     const pmTheta = getPolymarketTheta(category);
     pmFeeAmount = calcPolymarketFee(pmNoContracts, 1 - pmBuyPrice, pmTheta);
-    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${(1 - pmBuyPrice).toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${formatPrice(1 - pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   }
 
   // Both platforms charge trading fees at execution time, regardless of which

@@ -232,6 +232,21 @@ export function formatCurrency(dollars: number): string {
   return Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(dollars);
 }
 
+/**
+ * Format a probability price (0–1 range) with adaptive decimal precision.
+ * Sub-cent prices get enough decimals to be meaningful:
+ *   >= 0.01  → 2 decimals  (0.50, 0.95)
+ *   >= 0.001 → 3 decimals  (0.004 → "0.004")
+ *   <  0.001 → 4 decimals  (0.0004 → "0.0004")
+ * null/undefined → "—"
+ */
+export function formatPrice(price: number | null | undefined): string {
+  if (price == null) return "—";
+  if (price >= 0.01) return price.toFixed(2);
+  if (price >= 0.001) return price.toFixed(3);
+  return price.toFixed(4);
+}
+
 /** Sum of all positive expected profits from allArbs */
 export function getTotalProfit(allArbs?: { expectedProfit: number }[] | null): number {
   if (!allArbs) return 0;
