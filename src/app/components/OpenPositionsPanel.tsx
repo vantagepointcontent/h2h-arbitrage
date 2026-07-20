@@ -218,7 +218,8 @@ export default function OpenPositionsPanel() {
     setExiting(pair.id);
     setExitResult(null);
     try {
-      const body: any = { action: 'exit' };
+      const fees = computeExitFees(pair);
+      const body: any = { action: 'exit', pairId: pair.id };
       if (pair.kalshi) {
         body.kalshi = {
           ticker: pair.kalshi.ticker,
@@ -230,6 +231,12 @@ export default function OpenPositionsPanel() {
           ),
           unrealizedPnl: pair.kalshi.unrealizedPnl,
           title: pair.kalshi.title,
+          // Closed-position bookkeeping:
+          entryPrice: pair.kalshi.entryPrice,
+          exitPrice: pair.kalshi.currentPrice,
+          totalCost: pair.kalshi.totalCost,
+          feesPaid: pair.kalshi.feesPaid,
+          exitFees: fees.kalshiFee,
         };
       }
       if (pair.polymarket) {
@@ -237,11 +244,18 @@ export default function OpenPositionsPanel() {
           asset: pair.polymarket.asset,
           conditionId: pair.polymarket.conditionId,
           outcome: pair.polymarket.outcome,
+          side: pair.polymarket.side,
           size: pair.polymarket.size,
           // Sell at current price
           price: pair.polymarket.currentPrice,
           cashPnl: pair.polymarket.cashPnl,
           title: pair.polymarket.title,
+          // Closed-position bookkeeping:
+          entryPrice: pair.polymarket.entryPrice,
+          exitPrice: pair.polymarket.currentPrice,
+          totalCost: pair.polymarket.initialValue,
+          feesPaid: pair.polymarket.feesPaid,
+          exitFees: fees.pmFee,
         };
       }
 
@@ -512,8 +526,9 @@ export default function OpenPositionsPanel() {
                       </>
                     )}
                   </tr>
-                ));
-              })}
+                  );
+                })}
+              ))}
             </tbody>
           </table>
         </div>
