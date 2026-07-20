@@ -527,8 +527,8 @@ export default function OpenPositionsPanel() {
                     )}
                   </tr>
                   );
-                })}
-              ))}
+                });
+              })}
             </tbody>
           </table>
         </div>

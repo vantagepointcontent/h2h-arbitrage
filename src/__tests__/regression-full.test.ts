@@ -115,6 +115,27 @@ describe('REGRESSION: buildPmArbShape', () => {
     expect(shape.noPrice).toBe(0.65);
   });
 
+  it('R11b: BUG-086b regression — bestAsk=null → bestAsk=0 (no phantom arb)', () => {
+    // When CLOB orderbook is empty, gamma bestAsk must NOT survive as bestAsk.
+    // yesPrice/noPrice can carry gamma for display, but bestAsk must be 0
+    // so the arb guard (line 554) blocks phantom ROI computation.
+    const pm: PMMarket = {
+      id: 'pm-test',
+      conditionId: 'cond-test',
+      question: 'Test',
+      slug: 'test',
+      outcomes: '["Yes","No"]',
+      outcomePrices: '["0.35","0.65"]',
+      active: true,
+      closed: false,
+    };
+    const shape = buildPmArbShape(pm);
+    expect(shape.yesPrice).toBe(0.35);   // gamma display price
+    expect(shape.noPrice).toBe(0.65);    // gamma display price
+    expect(shape.bestAsk).toBe(0);       // CLOB empty → no phantom bestAsk
+    expect(shape.bestBid).toBe(0);       // CLOB empty → no phantom bestBid
+  });
+
   it('R12: bestAsk=0.40 → yesPrice=0.40', () => {
     const pm: PMMarket = {
       id: 'pm-test',
