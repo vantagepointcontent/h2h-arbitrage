@@ -1,141 +1,58 @@
-# Platform Research — Cross-Platform Arbitrage Expansion
+# Prediction-market platform API reconnaissance
 
-**Date:** June 29, 2026  
-**Project:** h2h-arbitrage — Adding 3rd-party platform integrations
+Research date: 2026-07-20. This is an architecture input, not authorization to place trades.
 
----
+## Recommendation
 
-## Executive Summary
+1. **Opinion.trade — first additional data integration.** Documented REST market/orderbook API, WebSocket, API-key authentication, and CLOB SDK for trading. Medium implementation effort.
+2. **Predict.fun — second.** Broad documented beta API (markets, orderbooks, orders, JWT auth and WebSocket). Medium effort, but beta/API stability risk.
+3. **IBKR Prediction Markets — last.** Powerful general Client Portal API, but account, IBKR Pro, funded-account, 2FA and market-entitlement constraints make it high-friction. Validate prediction-market contract access before implementation.
 
-We evaluated three prediction market platforms for potential integration into our cross-platform arbitrage scanner. Below is the ranking by integration priority.
+## Interactive Brokers Prediction Markets
 
----
+- **API:** Client Portal Web API supports HTTP and WebSocket access to trading, market data, scanners, and portfolio updates.
+- **Auth/account:** Active, funded **IBKR Pro** account plus supported 2FA. Demo accounts cannot subscribe to data. Supports OAuth 1.0a/2.0, SSO, or CP Gateway.
+- **Market data/orderbook:** General API supports live market data and portfolio updates; prediction-market contract discovery and entitlements require a live-account proof of access.
+- **Trading:** General API supports trading, but this project must retain manual-only execution and the server-side kill switch.
+- **Difficulty:** Hard — broker account/permissions/compliance and contract identifiers are the dependency.
+- **Next proof:** create a read-only adapter spike after an IBKR Pro account and prediction-market market-data entitlement are confirmed.
+- **Source:** https://www.interactivebrokers.com/campus/ibkr-api-page/cpapi-v1/
 
-## Ranking by Integration Priority
+## Opinion.trade
 
-| Rank | Platform | Priority | Difficulty | Verdict |
-|------|----------|----------|------------|---------|
-| 1 | **Predict.fun** | 🔴 HIGH | Medium | Integrate in Phase 2 |
-| 2 | **Opinion.trade** | 🟡 MEDIUM | Easy-Medium | Evaluate & monitor |
-| 3 | **Interactive Brokers** | 🟢 LOW | Medium-Hard | Defer to Phase 2+ |
+- **Read API:** REST OpenAPI exposes market metadata, prices, orderbooks, volumes, history and pagination.
+- **Realtime:** authenticated WebSocket supports market, price, orderbook and event updates.
+- **Auth/rate limit:** API key, 15 requests/sec per key. Access is requested through Opinion's application process.
+- **Trading:** the OpenAPI is read-only; place/cancel orders and positions use the Opinion CLOB SDK.
+- **Chain:** BNB Chain mainnet (chain ID 56).
+- **Difficulty:** Medium — clean documented read path; trading requires SDK/wallet work.
+- **Example market list:**
+  ```bash
+  curl 'https://proxy.opinion.trade:8443/openapi/market?status=activated&sortBy=5&limit=20' \
+    -H 'apikey: YOUR_API_KEY'
+  ```
+- **Sources:**
+  - https://docs.opinion.trade/developer-guide/opinion-open-api/overview
+  - https://docs.opinion.trade/developer-guide/opinion-websocket/overview
 
----
+## Predict.fun
 
-## Detailed Comparison Matrix
+- **API:** beta REST API documents categories, markets, market statistics, orderbooks, time series, orders and order-match events.
+- **Realtime:** WebSocket market/account streams; JSON frames. Server heartbeats every 15 seconds must be echoed, with reconnect + re-subscribe support.
+- **Auth:** signed auth message -> JWT flow. Docs include TypeScript and Python auth guides.
+- **Trading:** documented create/cancel orders, plus order retrieval. Treat beta stability as an operational risk.
+- **Difficulty:** Medium — API surface is broad; wallet/signing and beta compatibility need a proof-of-concept.
+- **Example orderbook endpoint:**
+  ```bash
+  curl 'https://api.predict.fun/v1/markets/MARKET_ID/orderbook'
+  ```
+- **Sources:**
+  - https://dev.predict.fun/
+  - https://dev.predict.fun/general-information-1915499m0
 
-| Criterion | Predict.fun | Opinion.trade | IBKR Pred. Markets |
-|---|---|---|---|
-| **REST API** | ✅ Comprehensive | ✅ Functional | ❌ No dedicated PM API |
-| **WebSocket** | ✅ Real-time feed | ⚠️ Limited | ❌ Not for PM |
-| **Auth (read)** | ❌ None needed | ❌ None needed | ✅ IBKR account required |
-| **Auth (write)** | Solana wallet | Web3 wallet | IBKR API credentials |
-| **Market listings** | ✅ Filtered endpoint | ✅ Paginated | ⚠️ Indirect via options API |
-| **Live prices** | ✅ REST + WS | ✅ REST | ⚠️ `reqMktData` callback |
-| **Depth model** | AMM (pool reserves) | Orderbook | Orderbook (options-style) |
-| **Trading fees** | 2-5% + ~$0 gas | ~5% + low gas | $0 commission, spread-based |
-| **Rate limits** | ~200 req/min | ~100 req/min | Soft, undocumented |
-| **Programmatic orders** | ✅ Solana programs | ✅ Smart contracts | ✅ TWS/FIX/API |
-| **Blockchain** | Solana | Polygon | ❌ Centralized |
-| **SDK availability** | JS/TS | JS | Python, Java, C++, Node |
-| **Testnet/sandbox** | ✅ Solana Devnet | ✅ Polygon Amoy | ✅ Paper trading |
-| **Market universe** | Large, growing | Medium, niche | Small, election-focused |
+## Architecture implications
 
----
-
-## Recommendations
-
-### 🥇 Predict.fun — HIGHEST PRIORITY
-
-**Why first:**
-- Best API maturity among the three candidates
-- Solana's speed enables high-frequency arbitrage scanning
-- Clean separation between read (free REST API) and write (wallet-signed txns)
-- Rapidly growing market universe with increasing Kalshi/Polymarket overlap
-
-**Action items:**
-1. Build REST API client mirroring existing Kalshi/Polymarket modules
-2. Implement AMM-aware arbitrage calculation (different from orderbook math)
-3. Add WebSocket subscription for real-time price alerts
-4. Validate against overlapping markets before enabling automated trading
-
-**Estimated effort:** 2-3 weeks for data ingestion, 1 week for trading
-
----
-
-### 🥈 Opinion.trade — MEDIUM PRIORITY
-
-**Why second:**
-- Solid REST API with familiar orderbook semantics
-- Polygon integration aligns with Polymarket's EVM experience
-- Smaller market universe → fewer immediate arbitrage opportunities
-- Lower liquidity outside popular categories
-
-**Action items:**
-1. Stand up basic market listing + price fetching
-2. Compare price overlap with Kalshi/Polymarket
-3. Assess whether sufficient arbitrage pairs justify full integration
-
-**Estimated effort:** 1-2 weeks for data ingestion
-
----
-
-### 🥉 Interactive Brokers Prediction Markets — LOWEST PRIORITY
-
-**Why last:**
-- No dedicated prediction market API surface
-- Small market universe with minimal cross-platform overlap
-- Complex contract model (option-style $100 settlement)
-- Requires IBKR brokerage relationship for any access
-- Pricing normalization adds significant engineering overhead
-
-**Revisit triggers:**
-- IBKR publishes a formal prediction market REST API
-- Market expansion beyond elections into sports/crypto/macroeconomics
-- Institutional demand for regulated prediction market exposure
-
-**Estimated effort:** 3-4 weeks minimum for proof-of-concept
-
----
-
-## Strategic Considerations
-
-### Arbitrage Viability Factors
-
-| Factor | Impact on Arbitrage |
-|---|---|
-| **Market overlap** | Critical — must share topics with Kalshi/Polymarket to find pairs |
-| **Latency** | Solana (ms) > Polygon (sec) >> IBKR (sec) — affects strategy |
-| **Liquidity** | Thinner markets = wider spreads = fewer profitable crosses |
-| **Fee structure** | AMM vs orderbook changes the math entirely |
-| **Regulatory** | Kalshi (CFTC-regulated) opens institutional capital; others don't |
-
-### Recommended Phased Rollout
-
-```
-Phase 1 (current): Kalshi ↔ Polymarket
-                    ↓
-Phase 2 (Q3 2026):  + Predict.fun (highest ROI)
-                    ↓
-Phase 3 (Q4 2026):  + Opinion.trade (if overlap validates)
-                    ↓
-Phase 4 (2027):     + IBKR (if API matures)
-```
-
----
-
-## Files in This Directory
-
-| File | Content |
-|---|---|
-| [`ibkr-prediction-markets.md`](./ibkr-prediction-markets.md) | Interactive Brokers Prediction Markets research |
-| [`opinion-trade.md`](./opinion-trade.md) | Opinion.trade research |
-| [`predict-fun.md`](./predict-fun.md) | Predict.fun research |
-| `README.md` | This file — comparison matrix and recommendations |
-
----
-
-## Methodology Notes
-
-Research conducted June 29, 2026. Information sourced from platform websites, developer documentation, API playgrounds, community forums, and on-chain explorers. API specifications and fee schedules may change — validate against current docs before committing to integration design.
-
-**Disclaimer:** Web search was unavailable during this research session (network proxy unreachable). Reports reflect known platform characteristics as of Q2/Q3 2026. Recommend validating all claims against live API endpoints before engineering investment.
+- Registry/adapters are justified, but **do not** refactor all existing PM/Kalshi code in one untested sweep.
+- Finish FEAT-1 registry and FEAT-2 adapter contracts first.
+- Keep Opinion, Predict.fun and IBKR adapters read-only/stubbed until their credential and entitlement proof is complete.
+- Any execution adapter remains manual-only, dry-run by default, and behind the existing kill switch.
