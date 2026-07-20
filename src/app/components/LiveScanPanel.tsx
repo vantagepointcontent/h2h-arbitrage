@@ -8,6 +8,7 @@ import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "@/app/components/ArbLegBreakdown";
+import { formatPrice } from "@/app/lib/page-shared";
 import { TrendingUp } from "lucide-react";
 
 interface LiveArbOutcome {
@@ -484,7 +485,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
 
   const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId) || null, [tabs, activeTabId]);
 
-  const fmt = (n: number | null) => (n === null ? "—" : n.toFixed(4));
+  const fmt = (n: number | null) => formatPrice(n);
   const fmtUsd = (n: number) =>
     n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
   const roiColor = (roi: number) => (roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]");

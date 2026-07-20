@@ -10,6 +10,7 @@ import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
 import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
+import { formatPrice } from "@/app/lib/page-shared";
 
 interface Outcome {
   artist: string;
@@ -223,17 +224,17 @@ function OutcomeTableBodyInner({
                 </div>
               </td>
               <td className="px-4 py-3 text-right text-[#FFFFFF]">
-                {o.kalshi?.yesAsk.toFixed(2) ?? "—"}
+                {formatPrice(o.kalshi?.yesAsk)}
                 {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
-              <td className="px-4 py-3 text-right text-[#8A9BA8]">{o.kalshi?.noAsk.toFixed(2) ?? "—"}</td>
+              <td className="px-4 py-3 text-right text-[#8A9BA8]">{formatPrice(o.kalshi?.noAsk)}</td>
               <td className="px-4 py-3 text-right text-[#FFFFFF]">
-                {o.polymarket?.yesPrice.toFixed(2) ?? "—"}
+                {formatPrice(o.polymarket?.yesPrice)}
                 {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
               </td>
-              <td className="px-4 py-3 text-right text-[#8A9BA8]">{o.polymarket?.noPrice.toFixed(2) ?? "—"}</td>
+              <td className="px-4 py-3 text-right text-[#8A9BA8]">{formatPrice(o.polymarket?.noPrice)}</td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (

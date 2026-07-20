@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatPrice } from "@/app/lib/page-shared";
 
 /**
  * UI-14: Cross-arb leg breakdown — shared helpers + LegBreakdown component.
@@ -313,7 +314,7 @@ export function LegBreakdown({ breakdown, formatCurrency }: LegBreakdownProps) {
             <span className="text-[#8A9BA8]">on {leg.platform}</span>
             <span className="text-[#FFFFFF]">— &ldquo;{leg.outcome}&rdquo;</span>
             <span className="text-[#8A9BA8]">@</span>
-            <span className="text-[#FFFFFF] font-mono font-bold">${leg.price != null ? leg.price.toFixed(2) : '—'}</span>
+            <span className="text-[#FFFFFF] font-mono font-bold">{leg.price != null ? formatPrice(leg.price) : '—'}</span>
             {leg.stake != null && leg.stake > 0 && (
               <span className="text-[#8A9BA8] text-[10px] ml-auto">stake: {formatCurrency(leg.stake)}</span>
             )}

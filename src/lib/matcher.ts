@@ -109,6 +109,13 @@ export function formatFee(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+/** Format a probability price (0–1) with adaptive precision for sub-cent values. */
+function fmtProbPrice(price: number): string {
+  if (price >= 0.01) return price.toFixed(2);
+  if (price >= 0.001) return price.toFixed(3);
+  return price.toFixed(4);
+}
+
 /** Compute gross profit and fee-adjusted net profit for a two-leg arbitrage. */
 export function computeArbitrageFees(
   strategy: string,
@@ -143,24 +150,24 @@ export function computeArbitrageFees(
     const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
     const kalshiNoContracts = kalshiStake / (1 - kalshiSellPrice);
     kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice) + calcKalshiFee(kalshiNoContracts, 1 - kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${kalshiBuyPrice.toFixed(2)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${(1 - kalshiSellPrice).toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${fmtProbPrice(kalshiBuyPrice)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(1 - kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   } else if (strategy.includes('NO Kalshi')) {
     // Buy YES on PM, sell NO on Kalshi
     const kalshiNoContracts = kalshiStake / kalshiSellPrice;
     kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${kalshiSellPrice.toFixed(2)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   }
 
   if (strategy.includes('YES PM')) {
     const pmYesContracts = pmStake / pmBuyPrice;
     const pmTheta = getPolymarketTheta(category);
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
-    pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${pmBuyPrice.toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+    pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${fmtProbPrice(pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   } else if (strategy.includes('NO PM')) {
     const pmNoContracts = pmStake / (1 - pmBuyPrice);
     const pmTheta = getPolymarketTheta(category);
     pmFeeAmount = calcPolymarketFee(pmNoContracts, 1 - pmBuyPrice, pmTheta);
-    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${(1 - pmBuyPrice).toFixed(2)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${fmtProbPrice(1 - pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   }
 
   // Both platforms charge trading fees at execution time, regardless of which
@@ -668,7 +675,7 @@ export function calculateBestArbitrageForOutcome(
             fees: {
               kalshiFee: totalKalshiFee,
               pmFee: 0,
-              kalshiFeeDetails: `Kalshi YES A ${contractsA.toFixed(0)} @ $${kYesA.toFixed(2)} (${formatFee(kalshiFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${kYesB.toFixed(2)} (${formatFee(kalshiFeeB)}) = ${formatFee(totalKalshiFee)}`,
+              kalshiFeeDetails: `Kalshi YES A ${contractsA.toFixed(0)} @ $${fmtProbPrice(kYesA)} (${formatFee(kalshiFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${fmtProbPrice(kYesB)} (${formatFee(kalshiFeeB)}) = ${formatFee(totalKalshiFee)}`,
               pmFeeDetails: 'Polymarket: not involved',
               netProfitIfKalshiWins: netProfit,
               netProfitIfPmWins: netProfit,
@@ -720,7 +727,7 @@ export function calculateBestArbitrageForOutcome(
               kalshiFee: 0,
               pmFee: totalPmFee,
               kalshiFeeDetails: 'Kalshi: not involved',
-              pmFeeDetails: `Polymarket YES A ${contractsA.toFixed(0)} @ $${pYesA.toFixed(2)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${pYesB.toFixed(2)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeB)}) = ${formatFee(totalPmFee)}`,
+              pmFeeDetails: `Polymarket YES A ${contractsA.toFixed(0)} @ $${fmtProbPrice(pYesA)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${fmtProbPrice(pYesB)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeB)}) = ${formatFee(totalPmFee)}`,
               netProfitIfKalshiWins: netProfit,
               netProfitIfPmWins: netProfit,
               worstCaseNetProfit: netProfit,

@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Zap, ShieldAlert, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { formatPrice } from "@/app/lib/page-shared";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -164,11 +165,11 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             <div className="px-3 py-2 flex justify-between"><span className="text-[#8A9BA8]">Strategy</span><span className="font-medium">{arb.strategy}</span></div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Kalshi leg</span>
-              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {arb.kalshiOrder.price.toFixed(2)} · {fmt(arb.kalshiOrder.size)}</span>
+              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(arb.kalshiOrder.price)} · {fmt(arb.kalshiOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Polymarket leg</span>
-              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {arb.polymarketOrder.price.toFixed(2)} · {fmt(arb.polymarketOrder.size)}</span>
+              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {fmt(arb.polymarketOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Est. net profit</span>

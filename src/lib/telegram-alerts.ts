@@ -185,17 +185,24 @@ export async function getConfigResolved(): Promise<TelegramAlertConfig | null> {
 
 // ─── Message formatting ───────────────────────────────────────────
 
+/** Format a probability price (0–1) with adaptive precision for sub-cent values. */
+function fmtProbPrice(price: number): string {
+  if (price >= 0.01) return price.toFixed(2);
+  if (price >= 0.001) return price.toFixed(3);
+  return price.toFixed(4);
+}
+
 /** Build the platform-prices line shared by all arb formatters. */
 function buildPricesLine(arb: ArbAlertInput): string {
   const parts: string[] = [];
   if (arb.kalshiYesPrice != null || arb.kalshiNoPrice != null) {
-    const kYes = arb.kalshiYesPrice != null ? `$${arb.kalshiYesPrice.toFixed(2)}` : '—';
-    const kNo = arb.kalshiNoPrice != null ? `$${arb.kalshiNoPrice.toFixed(2)}` : '—';
+    const kYes = arb.kalshiYesPrice != null ? `$${fmtProbPrice(arb.kalshiYesPrice)}` : '—';
+    const kNo = arb.kalshiNoPrice != null ? `$${fmtProbPrice(arb.kalshiNoPrice)}` : '—';
     parts.push(`<code>K: YES ${kYes} / NO ${kNo}</code>`);
   }
   if (arb.pmYesPrice != null || arb.pmNoPrice != null) {
-    const pYes = arb.pmYesPrice != null ? `$${arb.pmYesPrice.toFixed(2)}` : '—';
-    const pNo = arb.pmNoPrice != null ? `$${arb.pmNoPrice.toFixed(2)}` : '—';
+    const pYes = arb.pmYesPrice != null ? `$${fmtProbPrice(arb.pmYesPrice)}` : '—';
+    const pNo = arb.pmNoPrice != null ? `$${fmtProbPrice(arb.pmNoPrice)}` : '—';
     parts.push(`<code>PM: YES ${pYes} / NO ${pNo}</code>`);
   }
   return parts.length > 0 ? `\n📊 ${parts.join(' · ')}` : '';

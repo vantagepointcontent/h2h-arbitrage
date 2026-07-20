@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Info, Clock, ArrowUp, ArrowDown, Minus, RefreshCw } from "lucide-react";
 import { useLivePrices } from "@/lib/use-live-prices";
+import { formatPrice } from "@/app/lib/page-shared";
 
 // ── Threshold configuration (percentage points) ──
 interface SpreadThresholds {
@@ -81,8 +82,7 @@ function spreadBarClass(spread: number | null, thresholds: SpreadThresholds): st
 
 /** Format a price as cents display (e.g. 42.00) — null-safe, shows "—" for missing data */
 function fmtPrice(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return n.toFixed(2);
+  return formatPrice(n);
 }
 
 /** Format spread with sign — null-safe */
