@@ -161,7 +161,10 @@ export class RateLimiter {
   }
 
   private scheduleRefill(): ReturnType<typeof setInterval> {
-    return setInterval(() => this.refill(), this.config.refillIntervalMs);
+    return setInterval(() => {
+      this.refill();
+      this.drainQueue();
+    }, this.config.refillIntervalMs);
   }
 
   /**

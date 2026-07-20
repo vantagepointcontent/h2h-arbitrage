@@ -2,13 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock winston before importing logger
 vi.mock('winston', () => {
-  const mockFormat = {
-    combine: vi.fn((...args: any[]) => ({ combine: true, args })),
-    timestamp: vi.fn(() => ({ timestamp: true })),
-    json: vi.fn(() => ({ json: true })),
-    printf: vi.fn(() => ({ printf: true })),
-    errors: vi.fn(() => ({ errors: true })),
-  };
+  const mockFormat = Object.assign(
+    vi.fn((transform: any) => vi.fn(() => ({ transform }))),
+    {
+      combine: vi.fn((...args: any[]) => ({ combine: true, args })),
+      timestamp: vi.fn(() => ({ timestamp: true })),
+      json: vi.fn(() => ({ json: true })),
+      printf: vi.fn(() => ({ printf: true })),
+      errors: vi.fn(() => ({ errors: true })),
+      colorize: vi.fn(() => ({ colorize: true })),
+      simple: vi.fn(() => ({ simple: true })),
+    },
+  );
   const mockLogger = {
     info: vi.fn(),
     error: vi.fn(),
@@ -24,12 +29,14 @@ vi.mock('winston', () => {
       child: vi.fn(),
     })),
     on: vi.fn(),
+    add: vi.fn(),
     close: vi.fn(),
     transports: [],
   };
   return {
     default: {
       createLogger: vi.fn(() => mockLogger),
+      config: { npm: { levels: { error: 0, warn: 1, info: 2, http: 3, verbose: 4, debug: 5, silly: 6 } } },
       format: mockFormat,
       transports: {
         Console: vi.fn(),

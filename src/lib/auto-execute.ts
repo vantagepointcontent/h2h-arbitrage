@@ -166,15 +166,14 @@ function simulateOrder(req: OrderRequest): OrderResult {
   };
 }
 
-/** Simulate polling a pending dry-run order — fills after 1-3 polls. */
+/** Simulate polling a pending/partial dry-run order — the next poll fills the remainder. */
 function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
   const slippage = (Math.random() - 0.5) * 0.005;
   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
-  const fillRatio = 0.85 + Math.random() * 0.15;
   return {
     platform: req.platform,
-    status: fillRatio >= 0.99 ? 'filled' : 'partial',
-    filledSize: req.size * fillRatio,
+    status: 'filled',
+    filledSize: req.size,
     filledPrice,
     orderId,
     timestamp: new Date().toISOString(),

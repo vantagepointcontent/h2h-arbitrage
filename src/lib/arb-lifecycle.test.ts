@@ -12,7 +12,13 @@ const TEST_PREFIX = `test-lifecycle-${Date.now()}`;
 const db = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
 
 afterAll(async () => {
-  await db.execute({ sql: `DELETE FROM arb_episodes WHERE market_id LIKE ?`, args: [`${TEST_PREFIX}%`] });
+  const marketPattern = `${TEST_PREFIX}%`;
+  // Points reference episodes without ON DELETE CASCADE; clean children first.
+  await db.execute({
+    sql: `DELETE FROM arb_episode_points WHERE episode_id IN (SELECT id FROM arb_episodes WHERE market_id LIKE ?)`,
+    args: [marketPattern],
+  });
+  await db.execute({ sql: `DELETE FROM arb_episodes WHERE market_id LIKE ?`, args: [marketPattern] });
 });
 
 const arb = (outcome: string, roiPct: number, profit = 10, stake = 100) => ({

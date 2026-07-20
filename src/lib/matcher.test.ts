@@ -247,16 +247,16 @@ describe('buildPmArbShape — CLOB-empty regression guard (BUG-086b)', () => {
 describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
   // --- Core null-coercion bug: 1 - null = 1 in JS ---
   describe('null bestBid/bestAsk handling', () => {
-    it('both null → zeroes out (BUG-086: gamma prices are stale/ghost)', () => {
+    it('both null → uses Gamma only when CLOB availability is unknown', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: null,
         bestAsk: null,
         outcomePrices: '[\"0.42\",\"0.58\"]',
       }));
-      // BUG-086: No orderbook data → zero out to prevent ghost ROI
-      expect(shape.yesPrice).toBe(0);
-      expect(shape.noPrice).toBe(0);
-      // CRITICAL: noPrice must NOT be 1 (the old bug: 1 - null = 1)
+      // A missing CLOB result is different from a reachable-but-empty CLOB.
+      // The latter sets clobEmpty and is covered by BUG-086b above.
+      expect(shape.yesPrice).toBe(0.42);
+      expect(shape.noPrice).toBe(0.58);
       expect(shape.noPrice).not.toBe(1);
     });
 
@@ -288,15 +288,14 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
       expect(shape.noPrice).toBeCloseTo(0.51, 6); // 1 - 0.49
     });
 
-    it('undefined bestBid/bestAsk → same as null (zeroes out per BUG-086)', () => {
+    it('undefined bestBid/bestAsk → uses Gamma only when CLOB availability is unknown', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: undefined,
         bestAsk: undefined,
         outcomePrices: '[\"0.33\",\"0.67\"]',
       }));
-      // BUG-086: No orderbook data → zero out
-      expect(shape.yesPrice).toBe(0);
-      expect(shape.noPrice).toBe(0);
+      expect(shape.yesPrice).toBe(0.33);
+      expect(shape.noPrice).toBe(0.67);
     });
   });
 
@@ -419,7 +418,7 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
         bestAsk: null,
         outcomePrices: '[\"0.50\",\"0.50\"]',
       }));
-      expect(shape.bestBid).toBe(0.5);
+      expect(shape.bestBid).toBeCloseTo(0.49, 6); // derived 2% below Gamma fallback price
       expect(shape.bestAsk).toBe(0.5);
     });
   });

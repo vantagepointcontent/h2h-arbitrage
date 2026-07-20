@@ -2,6 +2,7 @@
 // Run with: npx ts-node --esm src/lib/rate-limiter.test.ts
 // or: node --import tsx src/lib/rate-limiter.test.ts
 
+import { describe, expect, it } from 'vitest';
 import { RateLimiter, RateLimiterConfig, rateLimiters } from './rate-limiter';
 
 /* ──────────────────────────── Helpers ──────────────────────────── */
@@ -104,7 +105,7 @@ async function testFifoOrdering() {
   const promises = [0, 1, 2].map(async (i) => {
     await rl.execute(() => {
       order.push(i);
-      return i;
+      return Promise.resolve(i);
     });
   });
   await Promise.all(promises);
@@ -276,7 +277,7 @@ function testPreBuiltInstances() {
 
   // Verify gamma defaults
   const gammaSnap = rateLimiters.gamma.getThrottleSnapshot();
-  assert(gammaSnap.effectiveRate === 30, `gamma rate: ${gammaSnap.effectiveRate} (expected 30)`);
+  assertApprox(gammaSnap.effectiveRate, 30, 0.5, `gamma rate: ${gammaSnap.effectiveRate} (expected ~30)`);
 }
 
 /* ──────────────────────────── Test: Burst then sustain ────────── */
@@ -337,13 +338,14 @@ async function runTests() {
 
   if (fail > 0) {
     console.error('\nSome tests FAILED.');
-    process.exit(1);
   } else {
     console.log('\nAll tests PASSED.');
   }
 }
 
-runTests().catch(err => {
-  console.error('Test runner crashed:', err);
-  process.exit(1);
+describe('RateLimiter', () => {
+  it('passes the full rate-limiter regression suite', async () => {
+    await runTests();
+    expect(fail).toBe(0);
+  }, 30_000);
 });

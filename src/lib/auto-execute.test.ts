@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   validateExecution,
   executeArb,
@@ -112,8 +112,15 @@ describe('validateExecution', () => {
 
 describe('executeArb', () => {
   beforeEach(() => {
-    // Ensure dry run mode is active
+    // Keep dry runs deterministic: avoid the simulator's pending-order branch,
+    // which intentionally waits for polling and makes unit tests time-sensitive.
     vi.stubEnv('H2H_DRY_RUN', 'true');
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('dry-run mode returns simulated success without placing real orders', async () => {
