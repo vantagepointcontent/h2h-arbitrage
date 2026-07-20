@@ -95,7 +95,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     iconPath: '/opinion-icon.png',
     color: '#6366f1',
     apiBaseUrl: '', // TBD when API integration ticket is done
-    urlPatterns: [/opinion\.com/i, /opinion\.finance/i],
+    urlPatterns: [/opinion\.trade/i, /opinion\.com/i, /opinion\.finance/i],
     credentialKeys: [],
     enabled: false,
     adapterReady: false,
