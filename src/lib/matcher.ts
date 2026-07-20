@@ -922,6 +922,25 @@ export function buildPmArbShape(market: PMMarket) {
   const rawBestAsk = market.bestAsk;
   const rawBestBid = market.bestBid;
 
+  // A successful CLOB lookup that finds no asks is authoritative. Gamma's
+  // bestAsk/outcomePrices may describe an old trade, never executable liquidity.
+  if (market.clobEmpty) {
+    return {
+      marketId: market.id,
+      conditionId: market.conditionId,
+      yesPrice: 0,
+      noPrice: 0,
+      bestBid: 0,
+      bestAsk: 0,
+      lastTradePrice: 0,
+      volume: market.volume,
+      liquidity: market.liquidity,
+      askDepth: 0,
+      noAskDepth: 0,
+      negRisk: market.neg_risk === true,
+    } as NonNullable<UnifiedOutcome['polymarket']>;
+  }
+
   let yesPrice: number;
   let noPrice: number;
 

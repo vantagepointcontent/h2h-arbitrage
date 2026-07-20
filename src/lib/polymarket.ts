@@ -21,6 +21,8 @@ export interface PMMarket {
   closed: boolean;
   endDate?: string; // ISO 8601, market close date
   neg_risk?: boolean; // true = independent binary outcomes (YES/NO don't sum to 1)
+  /** CLOB was reached but had no executable asks. Gamma values must not be used. */
+  clobEmpty?: boolean;
 }
 
 export interface PMEvent {

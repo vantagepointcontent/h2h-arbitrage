@@ -187,10 +187,11 @@ export async function POST(request: NextRequest) {
         try {
           const live = await getClobPrices(clob);
           if (!live) {
-            // BUG-022: CLOB orderbook is empty — keep gamma's outcomePrices
-            // as fallback. Don't zero out bestAsk/bestBid — let buildPmArbShape
-            // decide whether to use gamma prices or zero.
-            return m;
+            // BUG-086b REGRESSION: Gamma may retain stale bestAsk/outcomePrices
+            // after a real CLOB lookup returns no asks. Preserve the market for
+            // matching, but carry an explicit signal so the matcher renders no
+            // executable price and cannot calculate a phantom arb.
+            return { ...m, clobEmpty: true };
           }
 
           if (DEBUG_H2H) {

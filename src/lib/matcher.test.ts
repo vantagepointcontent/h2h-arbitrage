@@ -228,6 +228,22 @@ function makePmMarket(overrides: Partial<any> = {}) {
   };
 }
 
+describe('buildPmArbShape — CLOB-empty regression guard (BUG-086b)', () => {
+  it('zeros all executable prices when a reachable CLOB has no asks, regardless of Gamma values', () => {
+    const shape = buildPmArbShape(makePmMarket({
+      clobEmpty: true,
+      bestBid: 0.58,
+      bestAsk: 0.60,
+      outcomePrices: '["0.60","0.40"]',
+    }));
+    expect(shape.yesPrice).toBe(0);
+    expect(shape.noPrice).toBe(0);
+    expect(shape.bestBid).toBe(0);
+    expect(shape.bestAsk).toBe(0);
+    expect(shape.askDepth).toBe(0);
+  });
+});
+
 describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
   // --- Core null-coercion bug: 1 - null = 1 in JS ---
   describe('null bestBid/bestAsk handling', () => {
