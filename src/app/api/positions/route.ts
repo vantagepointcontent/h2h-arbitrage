@@ -65,8 +65,10 @@ interface PmPositionDto {
   // Fee-adjusted (net) fields
   feesPaid: number;       // estimated fees paid at entry (USD)
   netCashPnl: number;     // cashPnl - exitFees
-  netPercentPnl: number;  // net % 
+  netPercentPnl: number;  // net %
   exitFees: number;       // estimated fees to sell at current price (USD)
+  // Arb pair linkage
+  pairId: string | null;  // shared with the opposite leg if part of an arb pair
 }
 
 interface RoiBreakdown {
@@ -131,6 +133,9 @@ export async function GET(): Promise<NextResponse> {
 
     // Pair positions by title similarity (arb legs = same market on both platforms)
     const paired = pairPositions(kalshi, pm);
+
+    // Sort by market name by default (acceptance criteria)
+    paired.sort((a, b) => a.marketTitle.localeCompare(b.marketTitle));
 
     return NextResponse.json({
       success: true,
@@ -304,6 +309,7 @@ async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
       netUnrealizedPnl,
       netRoiPct,
       exitFees,
+      pairId: null,  // populated by pairPositions()
     };
   });
 }
@@ -340,6 +346,7 @@ async function fetchPmPositions(): Promise<PmPositionDto[]> {
       netCashPnl,
       netPercentPnl,
       exitFees,
+      pairId: null,  // populated by pairPositions()
     };
   });
 }
@@ -409,8 +416,12 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
       usedPm.add(bestMatch.idx);
       const p = pm[bestMatch.idx];
       const breakdown = buildBreakdown(k, p);
+      const pairId = `pair-${k.ticker}-${p.asset.slice(0, 8)}`;
+      // Link both legs with the shared pairId
+      k.pairId = pairId;
+      p.pairId = pairId;
       pairs.push({
-        id: `pair-${k.ticker}-${p.asset.slice(0, 8)}`,
+        id: pairId,
         marketTitle: k.title,
         kalshi: k,
         polymarket: p,
@@ -422,6 +433,7 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
       });
     } else {
       // Unpaired Kalshi position
+      k.pairId = null;
       const breakdown = buildBreakdown(k, null);
       pairs.push({
         id: `solo-k-${k.ticker}`,
@@ -441,6 +453,7 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
   for (let i = 0; i < pm.length; i++) {
     if (usedPm.has(i)) continue;
     const p = pm[i];
+    p.pairId = null;
     const breakdown = buildBreakdown(null, p);
     pairs.push({
       id: `solo-p-${p.asset.slice(0, 12)}`,

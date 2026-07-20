@@ -383,7 +383,12 @@ export default function OpenPositionsPanel() {
                 const isPaired = pair.kalshi && pair.polymarket;
                 const rowSpan = legs.length;
 
-                return legs.map((leg, i) => (
+                return legs.map((leg, i) => {
+                  // Per-leg net ROI from the breakdown object
+                  const legBreakdown = i === 0 ? pair.breakdown.legA : pair.breakdown.legB;
+                  const legRoiPct = legBreakdown?.roiPct ?? leg.roi;
+
+                  return (
                   <tr key={`${pair.id}-${i}`} className="hover:bg-[#182533]/50 transition-colors">
                     {i === 0 && (
                       <td rowSpan={rowSpan} className="px-4 py-3 text-xs text-[#FFFFFF] max-w-[200px] truncate align-top" title={pair.marketTitle}>
@@ -409,8 +414,13 @@ export default function OpenPositionsPanel() {
                     <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
                       {fmtPrice(leg.entry)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-right text-[#FFFFFF] whitespace-nowrap tabular-nums">
-                      {fmtPrice(leg.current)}
+                    <td className="px-4 py-3 text-xs text-right whitespace-nowrap tabular-nums">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[#FFFFFF]">{fmtPrice(leg.current)}</span>
+                        <span className={`text-[10px] font-normal ${legRoiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+                          {fmtPct(legRoiPct)}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
                       {fmtUsd(leg.value)}
@@ -418,11 +428,71 @@ export default function OpenPositionsPanel() {
                     {i === 0 && (
                       <>
                         <td rowSpan={rowSpan} className={`px-4 py-3 text-xs text-right font-bold align-top whitespace-nowrap tabular-nums ${
-                          pair.totalUnrealizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'
+                          pair.breakdown.totalNetPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'
                         }`}>
-                          <div className="flex flex-col items-end">
-                            <span>{fmtUsd(pair.totalUnrealizedPnl)}</span>
+                          <div className="flex flex-col items-end group/roi relative cursor-help">
+                            <span>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
                             <span className="text-[10px] font-normal opacity-80">{fmtPct(pair.totalRoiPct)}</span>
+                            {/* Tooltip: breakdown on hover */}
+                            <div className="absolute right-full top-0 mr-2 z-20 hidden group-hover/roi:block w-64 rounded-lg border border-[#232E3C] bg-[#0E1621] p-3 shadow-xl text-left whitespace-normal">
+                              <div className="text-[10px] uppercase text-[#8A9BA8] mb-2 font-semibold">ROI Breakdown (net of fees)</div>
+                              {pair.breakdown.legA && (
+                                <div className="space-y-0.5 mb-2">
+                                  <div className="text-[10px] text-[#5DBE81] font-medium">Leg A — {pair.breakdown.legA.platform} {pair.breakdown.legA.side}</div>
+                                  <div className="flex justify-between text-[10px] text-[#8A9BA8] pl-2">
+                                    <span>Gross P&L</span>
+                                    <span className={pair.breakdown.legA.grossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legA.grossPnl)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                    <span>Entry fee</span>
+                                    <span>−{fmtUsd(pair.breakdown.legA.feesPaid)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                    <span>Exit fee</span>
+                                    <span>−{fmtUsd(pair.breakdown.legA.exitFees)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] pl-2 font-medium">
+                                    <span className="text-[#8A9BA8]">Net P&L</span>
+                                    <span className={pair.breakdown.legA.netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legA.netPnl)}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {pair.breakdown.legB && (
+                                <div className="space-y-0.5 mb-2">
+                                  <div className="text-[10px] text-[#a78bfa] font-medium">Leg B — {pair.breakdown.legB.platform} {pair.breakdown.legB.side}</div>
+                                  <div className="flex justify-between text-[10px] text-[#8A9BA8] pl-2">
+                                    <span>Gross P&L</span>
+                                    <span className={pair.breakdown.legB.grossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legB.grossPnl)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                    <span>Entry fee</span>
+                                    <span>−{fmtUsd(pair.breakdown.legB.feesPaid)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                    <span>Exit fee</span>
+                                    <span>−{fmtUsd(pair.breakdown.legB.exitFees)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] pl-2 font-medium">
+                                    <span className="text-[#8A9BA8]">Net P&L</span>
+                                    <span className={pair.breakdown.legB.netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legB.netPnl)}</span>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="border-t border-[#232E3C] pt-1.5 space-y-0.5">
+                                <div className="flex justify-between text-[10px] text-[#8A9BA8]">
+                                  <span>Total gross P&L</span>
+                                  <span className={pair.breakdown.totalGrossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.totalGrossPnl)}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-[#5E6875]">
+                                  <span>Total fees</span>
+                                  <span className="text-[#ef4444]">−{fmtUsd(pair.breakdown.totalFees)}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-[#FFFFFF]">Total net P&L</span>
+                                  <span className={pair.breakdown.totalNetPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td rowSpan={rowSpan} className="px-4 py-3 text-center align-top">
