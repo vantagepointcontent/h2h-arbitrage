@@ -8,6 +8,7 @@ import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "@/app/components/ArbLegBreakdown";
+import { ProfitDistributionPanel } from "@/app/components/ProfitDistributionPanel";
 import { formatPrice } from "@/app/lib/page-shared";
 import { TrendingUp } from "lucide-react";
 
@@ -941,9 +942,27 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           o.fees,
                           o.expectedProfit,
                         );
+                        const exec = buildExecutableArb(o, activeTab.marketTitle);
+                        const supportedStrategy = o.strategy === 'Buy YES Kalshi + NO PM' || o.strategy === 'Buy YES PM + NO Kalshi';
                         return (
                           <tr className="bg-[#17212B]/50">
                             <td colSpan={13} className="px-4 py-3">
+                              {exec ? (
+                                <div className="mb-3 rounded-lg border border-[#5DBE81]/30 bg-[#5DBE81]/10 px-3 py-2.5 text-xs">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-bold text-[#5DBE81]">Live executable liquidity: {exec.shares.toLocaleString()} matched shares</span>
+                                    <span className="text-[#8A9BA8]">Hedged 1:1 · limited by {exec.limitingConstraint}</span>
+                                  </div>
+                                  <div className="mt-1.5 grid gap-1 font-mono text-[11px] text-[#D5DEE7] sm:grid-cols-2">
+                                    <span>Kalshi {exec.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(exec.kalshiOrder.price)} · {exec.shares.toLocaleString()} shares · {fmtUsd(exec.kalshiOrder.size)}</span>
+                                    <span>Polymarket {exec.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(exec.polymarketOrder.price)} · {exec.shares.toLocaleString()} shares · {fmtUsd(exec.polymarketOrder.size)}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mb-3 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-3 py-2.5 text-xs text-[#ef4444]">
+                                  Live executable liquidity is unavailable: one or both selected orderbook levels are stale, empty, or invalid.
+                                </div>
+                              )}
                               <div className="flex items-center gap-6 text-xs mb-2">
                                 <div className="flex items-center gap-2">
                                   <span className="text-[#8A9BA8]">Total Stake:</span>
@@ -958,6 +977,20 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                                 </div>
                               </div>
                               <LegBreakdown breakdown={breakdown} formatCurrency={fmtUsd} />
+                              {exec && supportedStrategy && (
+                                <ProfitDistributionPanel
+                                  strategy={o.strategy as 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi'}
+                                  kalshiPrice={exec.kalshiOrder.price}
+                                  pmPrice={exec.polymarketOrder.price}
+                                  kalshiStake={exec.kalshiOrder.size}
+                                  pmStake={exec.polymarketOrder.size}
+                                  category={(o as { category?: string }).category}
+                                  kalshiWinLabel={`Kalshi ${exec.kalshiOrder.outcome.toUpperCase()}`}
+                                  pmWinLabel={`Polymarket ${exec.polymarketOrder.outcome.toUpperCase()}`}
+                                  formatCurrency={fmtUsd}
+                                  onChange={() => undefined}
+                                />
+                              )}
                             </td>
                           </tr>
                         );
