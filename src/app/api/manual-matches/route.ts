@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getManualMatches, addManualMatch } from '@/lib/manual-matches';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseManualMatchInput } from '@/lib/manual-match-request';
 
 export async function GET() {
   try {
@@ -18,18 +20,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    if (!body.kalshiTicker || !body.pmConditionId) {
-      return NextResponse.json({ error: 'Missing kalshiTicker or pmConditionId' }, { status: 400 });
-    }
-    const match = await addManualMatch({
-      kalshiTicker: body.kalshiTicker,
-      pmConditionId: body.pmConditionId,
-      kalshiTitle: body.kalshiTitle || '',
-      pmTitle: body.pmTitle || '',
-      kalshiUrl: body.kalshiUrl,
-      polymarketUrl: body.polymarketUrl,
-    });
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const input = parseManualMatchInput(parsed.body);
+    if ('error' in input) return NextResponse.json({ error: input.error }, { status: 400 });
+    const match = await addManualMatch(input);
     return NextResponse.json({ match }, { status: 201 });
   } catch (err: any) {
     if (err.message === 'Manual match already exists for this pair') {
