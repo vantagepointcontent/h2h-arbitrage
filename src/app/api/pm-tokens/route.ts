@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
+import { parsePolymarketConditionId } from '@/lib/polymarket-request';
 
 /* EXEC-002: resolve Polymarket YES/NO token IDs for a conditionId so the
  * scan page can build an ExecutableArb for the manual-execute modal.
@@ -12,10 +13,11 @@ import { clientSafeError } from '@/lib/error-handler';
  * (only on manual Execute button click), not in a polling burst. */
 export async function GET(request: NextRequest) {
   try {
-    const conditionId = new URL(request.url).searchParams.get('conditionId');
-    if (!conditionId) {
-      return NextResponse.json({ success: false, error: 'Missing conditionId' }, { status: 400 });
+    const parsed = parsePolymarketConditionId(new URL(request.url).searchParams.get('conditionId'));
+    if ('error' in parsed) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
     }
+    const conditionId = parsed.conditionId;
 
     // Direct CLOB API call — no shared rate limiter, no semaphore
     const controller = new AbortController();
