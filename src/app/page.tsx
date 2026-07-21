@@ -84,6 +84,7 @@ import { saveSpread } from "@/lib/spreadHistory";
 
 
 import { MarketSidebar } from "@/app/components/MarketSidebar";
+import { PlatformLinkInputs, type PlatformLinkInput } from "@/app/components/PlatformLinkInputs";
 // UI-005: code-split heavy view panels
 const OverviewPanel = dynamic(() => import("@/app/components/OverviewPanel").then(m => m.OverviewPanel), { ssr: false });
 const MarketFinderPanel = dynamic(() => import("@/app/components/MarketFinderPanel").then(m => m.MarketFinderPanel), { ssr: false });
@@ -190,6 +191,10 @@ function buildCachedResult(
 export default function Home() {
   const [kalshiUrl, setKalshiUrl] = useState("");
   const [pmUrl, setPmUrl] = useState("");
+  const [platformLinks, setPlatformLinks] = useState<PlatformLinkInput[]>([
+    { id: "kalshi", platform: "kalshi", url: "" },
+    { id: "polymarket", platform: "polymarket", url: "" },
+  ]);
   const [capital, setCapital] = useState(1000);
   // PERF-P2: ref mirror so the 60s auto-refresh interval doesn't tear down
   // and restart on every capital keystroke (capital was in its deps).
@@ -478,7 +483,13 @@ export default function Home() {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kalshiUrl: kUrl, polymarketUrl: pUrl, capital: capital, skipAutoMatch: matchMode === "manual" }),
+        body: JSON.stringify({
+          platformLinks: platformLinks.filter((link) => link.url).map(({ platform, url }) => ({ platform: platform ?? "", url })),
+          kalshiUrl: kUrl,
+          polymarketUrl: pUrl,
+          capital: capital,
+          skipAutoMatch: matchMode === "manual",
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -1493,33 +1504,23 @@ export default function Home() {
                 {!activeMarketId && (
                 <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
                   {/* FEAT-015: category picker — browse matched pairs instead of pasting URLs */}
-                  <ScanCategoryPicker onPick={(k, pm) => { setKalshiUrl(k); setPmUrl(pm); }} />
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
-                        <Link2 className="w-4 h-4" /> Kalshi URL
-                      </label>
-                      <input
-                        type="text"
-                        value={kalshiUrl}
-                        onChange={(e) => setKalshiUrl(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#48555F] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all"
-                        placeholder="https://kalshi.com/markets/..."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium text-[#8A9BA8]">
-                        <Link2 className="w-4 h-4" /> Polymarket URL
-                      </label>
-                      <input
-                        type="text"
-                        value={pmUrl}
-                        onChange={(e) => setPmUrl(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-sm text-[#FFFFFF] placeholder-[#48555F] focus:outline-none focus:border-[#5DBE81] focus:ring-1 focus:ring-[#5DBE81]/30 transition-all"
-                        placeholder="https://polymarket.com/event/..."
-                      />
-                    </div>
-                  </div>
+                  <ScanCategoryPicker onPick={(k, pm) => {
+                    setKalshiUrl(k); setPmUrl(pm);
+                    setPlatformLinks([
+                      { id: "kalshi", platform: "kalshi", url: k },
+                      { id: "polymarket", platform: "polymarket", url: pm },
+                    ]);
+                  }} />
+                  <PlatformLinkInputs
+                    links={platformLinks}
+                    onChange={(links) => {
+                      setPlatformLinks(links);
+                      const kalshi = links.find((link) => link.platform === "kalshi")?.url ?? "";
+                      const polymarket = links.find((link) => link.platform === "polymarket")?.url ?? "";
+                      setKalshiUrl(kalshi);
+                      setPmUrl(polymarket);
+                    }}
+                  />
 
                   {/* Auto/Manual match toggle */}
                   <div className="flex items-center gap-2 mb-4 flex-col sm:flex-row">
