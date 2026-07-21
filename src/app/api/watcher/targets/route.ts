@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshWatchTargets, computeTiers, flagForPromotion, getTierState } from '@/lib/watch-targets';
 import logger from '@/lib/logger';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseWatcherTargetsRequest } from '@/lib/watcher-targets-request';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,11 +37,13 @@ export async function POST(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  let body: { action?: string; pairId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  const parsed = await parseJsonObject(req);
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const body = parseWatcherTargetsRequest(parsed.body);
+  if ('error' in body) {
+    return NextResponse.json({ error: body.error }, { status: 400 });
   }
 
   try {
@@ -48,7 +52,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ...result });
     }
     if (body.action === 'promote') {
-      if (!body.pairId) return NextResponse.json({ error: 'Missing pairId' }, { status: 400 });
       await flagForPromotion(body.pairId);
       return NextResponse.json({ ok: true, pairId: body.pairId });
     }
