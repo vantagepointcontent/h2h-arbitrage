@@ -21,6 +21,7 @@ import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
+import { resolveScanLinks } from '@/lib/scan-links';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -34,7 +35,9 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { kalshiUrl, polymarketUrl, skipAutoMatch, capital = 1000, force = false } = body;
+    const { skipAutoMatch, capital = 1000, force = false } = body;
+    // FEAT-4: canonical platformLinks payload with legacy URL compatibility.
+    const { platformLinks: suppliedLinks, kalshiUrl, polymarketUrl } = resolveScanLinks(body);
 
     const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
     const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
