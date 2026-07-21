@@ -5,7 +5,7 @@
 
 import path from 'path';
 import { createClient } from '@libsql/client';
-import { resolvePair, PairResolveError } from './pair-resolver';
+import { resolvePairFromLinks, PairResolveError } from './pair-resolver';
 import { getSetting } from './settings';
 import logger from './logger';
 
@@ -113,7 +113,10 @@ export async function refreshWatchTargets(): Promise<{ resolved: number; failed:
       if (!m) return;
       const pairId = String(m.id);
       try {
-        const r = await resolvePair(String(m.kalshi_url), String(m.polymarket_url), 100);
+        const r = await resolvePairFromLinks([
+          { platform: 'kalshi', url: String(m.kalshi_url) },
+          { platform: 'polymarket', url: String(m.polymarket_url) },
+        ], 100);
         const now = new Date().toISOString();
         await c.execute(`DELETE FROM watch_targets WHERE pair_id = ?`, [pairId]);
         for (const o of r.matchedOutcomes) {

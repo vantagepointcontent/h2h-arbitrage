@@ -10,7 +10,7 @@ import { orderbookState } from '@/lib/orderbook-state';
 import { computeAllLiveArbitrages, LiveMatchedOutcome } from '@/lib/live-arb-engine';
 import { attachPersistenceScores } from '@/lib/persistence-tracker';
 import { getAvgEpisodeLifespanMin } from '@/lib/arb-lifecycle';
-import { resolvePair, PairResolveError } from '@/lib/pair-resolver';
+import { resolvePairFromLinks, PairResolveError } from '@/lib/pair-resolver';
 import { seedAllBooks } from '@/lib/book-seed';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '@/lib/ws-book-apply';
 import logger from '@/lib/logger';
@@ -50,7 +50,10 @@ export async function GET(req: NextRequest) {
   // ── Resolve the pair (Kalshi tickers + PM token IDs + matched outcomes) ──
   let resolved;
   try {
-    resolved = await resolvePair(kalshiUrl, pmUrl, capital);
+    resolved = await resolvePairFromLinks([
+      { platform: 'kalshi', url: kalshiUrl },
+      { platform: 'polymarket', url: pmUrl },
+    ], capital);
   } catch (err) {
     if (err instanceof PairResolveError) {
       return new Response(err.message, { status: ERROR_STATUS[err.code] ?? 500 });
