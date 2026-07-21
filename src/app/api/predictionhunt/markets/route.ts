@@ -16,6 +16,7 @@ import { upsertSavedMarket } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavePredictionHuntMarketRequest } from '@/lib/predictionhunt-request';
+import { parseBoundedInteger } from '@/lib/request-query';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
@@ -69,8 +70,8 @@ export async function GET(request: NextRequest) {
     const categories = categoryParam
       ? categoryParam.split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
       : CATEGORIES;
-    const maxDays = maxDaysParam ? Math.min(365, Math.max(1, parseInt(maxDaysParam, 10))) : 365;
-    const fetchCount = fetchCountParam ? Math.min(50, Math.max(1, parseInt(fetchCountParam, 10))) : 3;
+    const maxDays = parseBoundedInteger(maxDaysParam, 365, 1, 365);
+    const fetchCount = parseBoundedInteger(fetchCountParam, 3, 1, 50);
 
     // If quota is exhausted, skip fresh calls entirely and return cached data
     if (isPhQuotaExhausted()) {
