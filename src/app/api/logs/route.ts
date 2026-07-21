@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseLogLimit } from '@/lib/logs-request';
 
 /**
  * GET /api/logs
  *
  * Query params:
  *   marketId   — filter by market ID
- *   limit      — max results (default 100, max 200)
+ *   limit      — max results (default 100, max 500)
  *   minRoi     — only return scans with bestRoiPct >= this value
  *   positiveArbOnly=true — only return scans with positive_arb_count > 0
  *   fromDate   — ISO date string, scans at or after
@@ -19,8 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const marketId = searchParams.get('marketId') || undefined;
-    const limitStr = searchParams.get('limit');
-    const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 500) : 100;
+    const limit = parseLogLimit(searchParams.get('limit'));
     const minRoiStr = searchParams.get('minRoi');
     const minRoi = minRoiStr !== null ? parseFloat(minRoiStr) : undefined;
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
