@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllSettings, setSettings, resetSetting } from '@/lib/settings';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
 
 const NO_CACHE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -26,9 +27,11 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const body = parsed.body;
 
-    if (typeof body?.reset === 'string') {
+    if (typeof body.reset === 'string') {
       await resetSetting(body.reset);
       const settings = await getAllSettings();
       return NextResponse.json({ success: true, settings }, { headers: NO_CACHE });
