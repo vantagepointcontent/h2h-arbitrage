@@ -79,6 +79,11 @@ export function ProfitDistributionPanel({
           <div className="flex justify-center text-[10px] text-[#8A9BA8]">
             <span className="font-mono text-[#facc15]">{splitPct}%</span><span className="ml-1">Kalshi payout bias · 50% is balanced</span>
           </div>
+          {splitPct !== 50 && (
+            <p className="rounded-md border border-[#facc15]/25 bg-[#facc15]/10 px-2 py-1.5 text-[10px] text-[#facc15]">
+              Directional split: execute the displayed leg amounts manually. Automatic two-leg execution is available only at the balanced 50% split.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Scenario label={`If ${kalshiWinLabel} wins`} profit={distribution.netProfitIfKalshiWins} stakeLabel="Kalshi stake" stake={distribution.kalshiStake} formatCurrency={formatCurrency} />

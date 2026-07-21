@@ -33,6 +33,7 @@ describe('ProfitDistributionPanel', () => {
     expect(onChange.mock.calls[0][0]).toMatchObject({ splitPct: 100, totalStake: 95 });
     expect(onChange.mock.calls[0][0].kalshiStake).toBeCloseTo(95, 8);
     expect(onChange.mock.calls[0][0].pmStake).toBeCloseTo(0, 8);
+    expect(screen.getByText(/directional split: execute the displayed leg amounts manually/i)).toBeTruthy();
     expect(screen.getByText('Recalculated fees')).toBeTruthy();
   });
 });

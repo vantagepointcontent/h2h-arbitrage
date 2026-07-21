@@ -185,10 +185,14 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
 
           const distributionKey = `${idx}-${o.artist}`;
           const adjusted = distributions[distributionKey];
-          // A zero stake at a directional endpoint is intentionally a one-leg
-          // position, not an executable two-leg arb.
+          // The execution engine only supports equal contract counts across both
+          // legs. A non-centre split intentionally creates directional exposure,
+          // so it must remain manual-only rather than silently clipping the two
+          // orders back to the smaller shared contract count.
+          const isDirectionalSplit = adjusted != null && adjusted.splitPct !== 50;
           const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious
             && o.kalshi?.ticker && o.polymarket?.conditionId
+            && !isDirectionalSplit
             && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0));
           const displayProfit = adjusted?.worstCaseNetProfit ?? o.arbitrage.expectedProfit;
           const displayRoi = adjusted
