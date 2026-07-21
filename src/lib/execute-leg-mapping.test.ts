@@ -11,6 +11,11 @@ const base = {
   kalshiNoAsk: 0.57,
   pmYesAsk: 0.41,
   pmNoAsk: 0.52,
+  kalshiYesAskShares: 100,
+  kalshiNoAskShares: 100,
+  pmYesAskShares: 100,
+  pmNoAskShares: 100,
+  stale: false,
   kalshiTicker: 'KXTEST-26',
   pmYesTokenId: 'tok-yes-1',
   pmNoTokenId: 'tok-no-1',
@@ -50,8 +55,9 @@ describe('buildExecutableArb leg mapping', () => {
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', kalshiStake: 0 }, 'T')).toBeNull();
   });
 
-  it('stakes flow through to order sizes', () => {
+  it('uses the same matched whole-share quantity for both order sizes', () => {
     const arb = buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM' }, 'T');
+    expect(arb!.shares).toBe(100);
     expect(arb!.kalshiOrder.size).toBe(45);
     expect(arb!.polymarketOrder.size).toBe(52);
   });

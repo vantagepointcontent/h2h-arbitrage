@@ -26,6 +26,8 @@ export interface ExecutableArb {
   strategy: string;
   roiPct: number;
   expectedProfit: number;
+  /** Whole matched contracts, capped to the smaller selected live ask level. */
+  shares: number;
   kalshiOrder: ArbLeg;
   polymarketOrder: ArbLeg;
 }
@@ -43,6 +45,13 @@ export function buildExecutableArb(o: {
   kalshiNoAsk: number | null;
   pmYesAsk: number | null;
   pmNoAsk: number | null;
+  /** Contracts available at the exact displayed effective ask level. */
+  kalshiYesAskShares?: number;
+  kalshiNoAskShares?: number;
+  pmYesAskShares?: number;
+  pmNoAskShares?: number;
+  /** Missing or stale books are never safe to execute against. */
+  stale?: boolean;
   kalshiTicker?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
@@ -63,8 +72,22 @@ export function buildExecutableArb(o: {
   } else {
     return null; // cross-outcome / No arb — not executable from this button
   }
-  if (kPrice == null || pmPrice == null || !pmToken) return null;
+  if (kPrice == null || pmPrice == null || !pmToken || o.stale) return null;
   if (kPrice <= 0 || pmPrice <= 0 || o.kalshiStake <= 0 || o.pmStake <= 0) return null;
+
+  const kAvailable = kOutcome === 'yes' ? o.kalshiYesAskShares : o.kalshiNoAskShares;
+  const pmAvailable = pmOutcome === 'yes' ? o.pmYesAskShares : o.pmNoAskShares;
+  if (!Number.isFinite(kAvailable) || !Number.isFinite(pmAvailable) || kAvailable! <= 0 || pmAvailable! <= 0) return null;
+
+  // One arbitrage contract needs one share on each venue. Cap the requested
+  // quantity by the dollar allocation AND the exact selected top ask on both legs.
+  const shares = Math.floor(Math.min(
+    o.kalshiStake / kPrice,
+    o.pmStake / pmPrice,
+    kAvailable!,
+    pmAvailable!,
+  ));
+  if (shares < 1) return null;
 
   return {
     arbId: `${Date.now().toString(36)}-${o.artist.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
@@ -73,13 +96,14 @@ export function buildExecutableArb(o: {
     strategy: o.strategy,
     roiPct: o.roiPct,
     expectedProfit: o.expectedProfit,
+    shares,
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,
-      side: "buy", outcome: kOutcome, size: o.kalshiStake, price: kPrice, orderType: "limit",
+      side: "buy", outcome: kOutcome, size: shares * kPrice, price: kPrice, orderType: "limit",
     },
     polymarketOrder: {
       platform: "polymarket", marketId: pmToken, conditionId: pmToken,
-      side: "buy", outcome: pmOutcome, size: o.pmStake, price: pmPrice, orderType: "limit",
+      side: "buy", outcome: pmOutcome, size: shares * pmPrice, price: pmPrice, orderType: "limit",
     },
   };
 }
@@ -139,7 +163,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
 
   const isReal = gates ? !gates.killSwitch && !gates.dryRun : false;
   const fmt = (n: number) => `$${n.toFixed(2)}`;
-  const formatShares = (size: number) => `${size.toLocaleString(undefined, { maximumFractionDigits: 2 })} shares`;
+  const formatShares = (shares: number) => `${shares.toLocaleString()} shares`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
@@ -166,11 +190,11 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             <div className="px-3 py-2 flex justify-between"><span className="text-[#8A9BA8]">Strategy</span><span className="font-medium">{arb.strategy}</span></div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Kalshi leg</span>
-              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(arb.kalshiOrder.price)} · {formatShares(arb.kalshiOrder.size / arb.kalshiOrder.price)} · {fmt(arb.kalshiOrder.size)}</span>
+              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(arb.kalshiOrder.price)} · {formatShares(arb.shares)} · {fmt(arb.kalshiOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Polymarket leg</span>
-              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {formatShares(arb.polymarketOrder.size / arb.polymarketOrder.price)} · {fmt(arb.polymarketOrder.size)}</span>
+              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {formatShares(arb.shares)} · {fmt(arb.polymarketOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Est. net profit</span>

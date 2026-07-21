@@ -14,6 +14,11 @@ export interface LiveArbResult {
   pmNoAsk: number | null;
   pmYesDepth: number;
   pmNoDepth: number;
+  /** Contracts at the exact displayed effective top ask; used to cap manual execution. */
+  kalshiYesAskShares?: number;
+  kalshiNoAskShares?: number;
+  pmYesAskShares?: number;
+  pmNoAskShares?: number;
   strategy: string;
   roiPct: number;
   expectedProfit: number;
@@ -89,33 +94,35 @@ function computeSingleOutcome(
   // We still pass totalCost (fillable depth) to calculateArbitrageMax for
   // depth-based capital capping.
 
-  // Get the actual top-of-book price directly from the orderbook
-  const getTopAsk = (id: typeof kalshiTicker, side: 'yes' | 'no'): number | null => {
+  // The displayed quote and its depth must come from the exact same level.
+  // Kalshi asks derived from opposite bids below the REST-seeded real floor are
+  // synthetic and cannot be used for either a displayed price or execution.
+  const getEffectiveTopAsk = (id: string, side: 'yes' | 'no', useKalshiFloor: boolean) => {
     const book = orderbookState.getBook(id);
-    const asks = book?.[side].asks;
-    return asks && asks.length > 0 ? asks[0].price : null;
+    const floor = useKalshiFloor ? (side === 'yes' ? book?.realYesAsk : book?.realNoAsk) : undefined;
+    return book?.[side].asks.find((level) => floor == null || level.price >= floor - 1e-9) ?? null;
   };
 
-  const kalshiYesAsk = getTopAsk(kalshiTicker, 'yes') ?? (kYes.avgPrice > 0 ? kYes.avgPrice : null);
-  const kalshiNoAsk = getTopAsk(kalshiTicker, 'no') ?? (kNo.avgPrice > 0 ? kNo.avgPrice : null);
-  const pmYesAsk = getTopAsk(pmYesTokenId, 'yes') ?? (pYes.avgPrice > 0 ? pYes.avgPrice : null);
-  const pmNoAsk = getTopAsk(pmNoTokenId, 'no') ?? (pNo.avgPrice > 0 ? pNo.avgPrice : null);
+  const kalshiYesLevel = getEffectiveTopAsk(kalshiTicker, 'yes', true);
+  const kalshiNoLevel = getEffectiveTopAsk(kalshiTicker, 'no', true);
+  const pmYesLevel = getEffectiveTopAsk(pmYesTokenId, 'yes', false);
+  const pmNoLevel = getEffectiveTopAsk(pmNoTokenId, 'no', false);
+  const kalshiYesAsk = kalshiYesLevel?.price ?? (kYes.avgPrice > 0 ? kYes.avgPrice : null);
+  const kalshiNoAsk = kalshiNoLevel?.price ?? (kNo.avgPrice > 0 ? kNo.avgPrice : null);
+  const pmYesAsk = pmYesLevel?.price ?? (pYes.avgPrice > 0 ? pYes.avgPrice : null);
+  const pmNoAsk = pmNoLevel?.price ?? (pNo.avgPrice > 0 ? pNo.avgPrice : null);
 
-  // Depth = how many dollars of ask liquidity exists at the top of book for display
-  const kYesBook = orderbookState.getBook(kalshiTicker)?.yes.asks;
-  const kNoBook = orderbookState.getBook(kalshiTicker)?.no.asks;
-  const pYesBook = orderbookState.getBook(pmYesTokenId)?.yes.asks;
-  const pNoBook = orderbookState.getBook(pmNoTokenId)?.no.asks;
+  const kalshiYesAskShares = kalshiYesLevel?.quantity ?? 0;
+  const kalshiNoAskShares = kalshiNoLevel?.quantity ?? 0;
+  const pmYesAskShares = pmYesLevel?.quantity ?? 0;
+  const pmNoAskShares = pmNoLevel?.quantity ?? 0;
 
-  const topDepth = (levels?: { price: number; quantity: number }[]) => {
-    if (!levels?.length) return 0;
-    return levels[0].price * levels[0].quantity;
-  };
-
-  const kalshiYesDepth = topDepth(kYesBook);
-  const kalshiNoDepth = topDepth(kNoBook);
-  const pmYesDepth = topDepth(pYesBook);
-  const pmNoDepth = topDepth(pNoBook);
+  // Dollar depth remains for the existing scanner display/capital calculations,
+  // but it is intentionally derived from the same effective quote selected above.
+  const kalshiYesDepth = kalshiYesAsk != null ? kalshiYesAsk * kalshiYesAskShares : 0;
+  const kalshiNoDepth = kalshiNoAsk != null ? kalshiNoAsk * kalshiNoAskShares : 0;
+  const pmYesDepth = pmYesAsk != null ? pmYesAsk * pmYesAskShares : 0;
+  const pmNoDepth = pmNoAsk != null ? pmNoAsk * pmNoAskShares : 0;
 
   let strategy = 'No arb';
   let roiPct = 0;
@@ -167,6 +174,10 @@ function computeSingleOutcome(
     pmNoAsk,
     pmYesDepth,
     pmNoDepth,
+    kalshiYesAskShares,
+    kalshiNoAskShares,
+    pmYesAskShares,
+    pmNoAskShares,
     strategy,
     roiPct,
     expectedProfit,

@@ -21,6 +21,11 @@ interface LiveArbOutcome {
   pmNoAsk: number | null;
   pmYesDepth: number;
   pmNoDepth: number;
+  /** Available contracts at the exact live ask displayed for each side. */
+  kalshiYesAskShares: number;
+  kalshiNoAskShares: number;
+  pmYesAskShares: number;
+  pmNoAskShares: number;
   strategy: string;
   roiPct: number;
   expectedProfit: number;

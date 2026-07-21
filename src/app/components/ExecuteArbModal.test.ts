@@ -12,20 +12,53 @@ const baseArb = {
   kalshiNoAsk: 0.58,
   pmYesAsk: 0.41,
   pmNoAsk: 0.58,
+  kalshiYesAskShares: 100,
+  kalshiNoAskShares: 100,
+  pmYesAskShares: 100,
+  pmNoAskShares: 100,
+  stale: false,
   kalshiTicker: 'KXEXAMPLE',
   pmYesTokenId: 'pm-yes',
   pmNoTokenId: 'pm-no',
 };
 
 describe('buildExecutableArb', () => {
-  it('retains dollar stakes because the execution engine converts them to venue shares', () => {
-    const arb = buildExecutableArb(baseArb, 'Example market');
+  it('caps both legs to the same whole share count from their effective live levels', () => {
+    const arb = buildExecutableArb({
+      ...baseArb,
+      kalshiStake: 50,
+      pmStake: 70,
+      kalshiYesAsk: 0.5,
+      pmNoAsk: 0.7,
+      kalshiYesAskShares: 40,
+      pmNoAskShares: 25,
+    }, 'Example market');
 
-    expect(arb?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.42, size: 42 });
-    expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.58, size: 58 });
+    expect(arb?.shares).toBe(25);
+    expect(arb?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.5, size: 12.5 });
+    expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.7, size: 17.5 });
   });
 
-  it('rejects zero-priced legs instead of producing an infinite share quantity', () => {
+  it('uses the floor-eligible Kalshi quote rather than a lower synthetic ask', () => {
+    const arb = buildExecutableArb({
+      ...baseArb,
+      kalshiYesAsk: 0.43,
+      kalshiYesAskShares: 8,
+      pmNoAsk: 0.56,
+      pmNoAskShares: 8,
+      kalshiStake: 100,
+      pmStake: 100,
+    }, 'Example market');
+
+    expect(arb?.kalshiOrder.price).toBe(0.43);
+    expect(arb?.shares).toBe(8);
+    expect(arb?.kalshiOrder.size).toBeCloseTo(3.44);
+  });
+
+  it('refuses missing, zero, or stale live orderbook data', () => {
+    expect(buildExecutableArb({ ...baseArb, kalshiYesAskShares: 0 }, 'Example market')).toBeNull();
+    expect(buildExecutableArb({ ...baseArb, pmNoAskShares: undefined }, 'Example market')).toBeNull();
+    expect(buildExecutableArb({ ...baseArb, stale: true }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesAsk: 0 }, 'Example market')).toBeNull();
   });
 });
