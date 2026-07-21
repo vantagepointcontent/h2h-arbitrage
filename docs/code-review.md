@@ -14,6 +14,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-006 | Medium | `src/app/api/logs/route.ts` pagination input | Fixed | Non-finite and fractional `limit` parameters could reach the SQLite query. Added tested finite integer parsing with safe default (100) and documented the actual 500-item maximum. |
 | CR-007 | High | `src/app/api/scan-config/route.ts` and persisted scan tiers | Fixed | The persisted config contained an empty tier list, leaving the scheduler unable to qualify markets for scans. Added validated Hot/Warm/Cold tier parsing and automatic fallback to safe defaults. |
 | CR-008 | Medium | `src/app/api/auto-discovery/approve/route.ts` approval input | Fixed | Malformed JSON and arbitrary/oversized pair IDs could reach a state-changing approval operation. Added shared JSON-object parsing and tested trimmed, bounded pair-ID validation. |
+| CR-009 | Medium | `src/app/api/pm-tokens/route.ts` CLOB condition ID | Fixed | The condition ID was interpolated into an external API path without format validation. Added tested validation for Polymarket's canonical 0x-prefixed 32-byte IDs. |
 
 ## Verification
 
