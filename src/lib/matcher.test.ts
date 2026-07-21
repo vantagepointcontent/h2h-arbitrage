@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   calculateArbitrageMax,
   calculateBestArbitrageForOutcome,
@@ -198,6 +198,36 @@ describe('getClobPrices', () => {
       best_bid: 0.59, best_ask: 0.61,
     } as any);
     expect(r?.noPrice).toBeCloseTo(0.41, 2);
+  });
+
+  it('falls back to token orderbooks when a standard market omits aggregate best bid/ask', async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      if (url.includes('token_id=yes-token')) {
+        return { ok: true, json: async () => ({ asks: [{ price: '0.83', size: '5' }], bids: [{ price: '0.29', size: '90' }] }) };
+      }
+      if (url.includes('token_id=no-token')) {
+        return { ok: true, json: async () => ({ asks: [{ price: '0.71', size: '90' }], bids: [{ price: '0.17', size: '5' }] }) };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const r = await getClobPrices({
+        condition_id: 'c-token-fallback',
+        tokens: [
+          { token_id: 'yes-token', outcome: 'Yes' },
+          { token_id: 'no-token', outcome: 'No' },
+        ],
+        best_bid: null,
+        best_ask: null,
+      } as any);
+
+      expect(r).toMatchObject({ yesPrice: 0.83, noPrice: 0.71, bestBid: 0.29, bestAsk: 0.83 });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('returnerar null vid total avsaknad av data', async () => {

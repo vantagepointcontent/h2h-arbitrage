@@ -259,19 +259,50 @@ export async function getClobPrices(clob: ClobMarket): Promise<{
     const hasBid = clob.best_bid !== null && clob.best_bid !== undefined;
     const hasAsk = clob.best_ask !== null && clob.best_ask !== undefined;
 
-    if (!hasBid || !hasAsk) {
-      return null;
+    if (hasBid && hasAsk) {
+      const yesPrice = clamp(clob.best_ask!);
+      const noPrice = clamp(1 - clob.best_bid!);
+
+      if (yesPrice === 0 && noPrice === 0) return null;
+
+      return {
+        yesPrice,
+        noPrice,
+        bestBid: clamp(clob.best_bid!),
+        bestAsk: yesPrice,
+        lastTradePrice: clob.last_trade_price ?? yesPrice,
+      };
     }
 
-    const yesPrice = clamp(clob.best_ask!);
-    const noPrice = clamp(1 - clob.best_bid!);
+    // Some active standard markets omit aggregate best_bid/best_ask even though
+    // their individual YES and NO token books have live liquidity. Treating this
+    // as an empty book suppresses every calculation and leaves the scan UI at 0.
+    // Fall back to those authoritative token books before declaring the market
+    // non-executable.
+    const yesToken = clob.tokens?.find(t => t.outcome === 'Yes');
+    const noToken = clob.tokens?.find(t => t.outcome === 'No');
+    if (!yesToken || !noToken) return null;
 
+    const [yesBook, noBook] = await Promise.all([
+      fetchClobBook(yesToken.token_id),
+      fetchClobBook(noToken.token_id),
+    ]);
+    const yesPrices = getBestPriceFromBook(yesBook);
+    const noPrices = getBestPriceFromBook(noBook);
+    if (!yesPrices) return null;
+
+    const yesPrice = clamp(yesPrices.bestAsk);
+    const noPrice = noPrices?.bestAsk && noPrices.bestAsk > 0
+      ? clamp(noPrices.bestAsk)
+      : yesPrices.bestBid > 0
+        ? clamp(1 - yesPrices.bestBid)
+        : 0;
     if (yesPrice === 0 && noPrice === 0) return null;
 
     return {
       yesPrice,
       noPrice,
-      bestBid: clamp(clob.best_bid!),
+      bestBid: clamp(yesPrices.bestBid),
       bestAsk: yesPrice,
       lastTradePrice: clob.last_trade_price ?? yesPrice,
     };
