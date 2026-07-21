@@ -35,6 +35,7 @@ describe('buildExecutableArb', () => {
     }, 'Example market');
 
     expect(arb?.shares).toBe(25);
+    expect(arb?.limitingConstraint).toBe('Polymarket live depth');
     expect(arb?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.5, size: 12.5 });
     expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.7, size: 17.5 });
     // Full-book scanner profit must never leak into a top-level-depth-capped order.

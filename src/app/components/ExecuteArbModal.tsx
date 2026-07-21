@@ -29,6 +29,8 @@ export interface ExecutableArb {
   expectedProfit: number;
   /** Whole matched contracts, capped to the smaller selected live ask level. */
   shares: number;
+  /** The active constraint on this 1:1 hedge; shown before any confirmation. */
+  limitingConstraint: string;
   kalshiOrder: ArbLeg;
   polymarketOrder: ArbLeg;
 }
@@ -83,12 +85,16 @@ export function buildExecutableArb(o: {
 
   // One arbitrage contract needs one share on each venue. Cap the requested
   // quantity by the dollar allocation AND the exact selected top ask on both legs.
-  const shares = Math.floor(Math.min(
-    o.kalshiStake / kPrice,
-    o.pmStake / pmPrice,
-    kAvailable!,
-    pmAvailable!,
-  ));
+  const constraints = [
+    { label: "Kalshi allocation", value: o.kalshiStake / kPrice },
+    { label: "Polymarket allocation", value: o.pmStake / pmPrice },
+    { label: "Kalshi live depth", value: kAvailable! },
+    { label: "Polymarket live depth", value: pmAvailable! },
+  ];
+  const limitingConstraint = constraints.reduce((lowest, constraint) =>
+    constraint.value < lowest.value ? constraint : lowest,
+  ).label;
+  const shares = Math.floor(Math.min(...constraints.map((constraint) => constraint.value)));
   if (shares < 1) return null;
 
   // The scanner's full-book profit is no longer valid after a top-level depth
@@ -110,6 +116,7 @@ export function buildExecutableArb(o: {
     roiPct,
     expectedProfit,
     shares,
+    limitingConstraint,
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,
       side: "buy", outcome: kOutcome, size: shares * kPrice, price: kPrice, orderType: "limit",
@@ -208,6 +215,10 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Polymarket leg</span>
               <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {formatShares(arb.shares)} · {fmt(arb.polymarketOrder.size)}</span>
+            </div>
+            <div className="px-3 py-2 flex justify-between">
+              <span className="text-[#8A9BA8]">Hedge</span>
+              <span className="font-mono font-medium">1:1 matched · limited by {arb.limitingConstraint}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Est. net profit</span>
