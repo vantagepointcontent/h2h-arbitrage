@@ -13,6 +13,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-005 | Medium | `src/app/api/all-markets/route.ts` upstream price parsing | Fixed | Raw `parseFloat()` could pass `NaN` into market responses when upstream prices were malformed. Added tested finite non-negative price normalization for Kalshi and Polymarket values. |
 | CR-006 | Medium | `src/app/api/logs/route.ts` pagination input | Fixed | Non-finite and fractional `limit` parameters could reach the SQLite query. Added tested finite integer parsing with safe default (100) and documented the actual 500-item maximum. |
 | CR-007 | High | `src/app/api/scan-config/route.ts` and persisted scan tiers | Fixed | The persisted config contained an empty tier list, leaving the scheduler unable to qualify markets for scans. Added validated Hot/Warm/Cold tier parsing and automatic fallback to safe defaults. |
+| CR-008 | Medium | `src/app/api/auto-discovery/approve/route.ts` approval input | Fixed | Malformed JSON and arbitrary/oversized pair IDs could reach a state-changing approval operation. Added shared JSON-object parsing and tested trimmed, bounded pair-ID validation. |
 
 ## Verification
 
