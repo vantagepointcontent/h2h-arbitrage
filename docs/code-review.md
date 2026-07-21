@@ -20,6 +20,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-012 | Medium | `src/app/api/watcher/targets/route.ts` promotion input | Fixed | The authenticated promotion endpoint allowed arbitrary truthy `pairId` values and accepted JSON arrays as request bodies. Added shared JSON-object parsing and tested, bounded non-empty string validation for promotion IDs. |
 | CR-013 | High | `src/app/api/telegram-alerts/route.ts` test-message action | Fixed | A LAN caller could trigger a real configured Telegram test message without the shared API-token guard; malformed request data also became 500s. Added mutating-route authorization plus tested JSON/action validation. No test message was sent during verification. |
 | CR-014 | High | `src/app/api/prune-scans/route.ts` destructive retention action | Fixed | An unauthenticated caller could delete retained scan and lifecycle data; invalid `days` inputs could also reach persistence. Added token authorization, bounded whole-day parsing, and retained the project's standard `x-h2h-token` header for the legitimate poller. No prune action was invoked during verification. |
+| CR-015 | Medium | `src/app/api/scan/route.ts` scan request parsing | Fixed | Valid JSON arrays, scalars, or `null` were not rejected at the request boundary and could fall into generic route handling. Replaced direct parsing with the shared JSON-object guard before link resolution or any upstream fetch. |
 
 ## Verification
 

@@ -23,6 +23,7 @@ import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
+import { parseJsonObject } from '@/lib/request-json';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -30,12 +31,9 @@ const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'tr
 
 export async function POST(request: NextRequest) {
   try {
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const body: Record<string, any> = parsed.body;
     const { skipAutoMatch, force = false } = body;
     const capital = parseScanCapital(body.capital);
     if (capital === null) {
