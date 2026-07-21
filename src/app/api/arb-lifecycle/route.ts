@@ -3,10 +3,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLifecycleStats } from '@/lib/arb-lifecycle';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseBoundedInteger } from '@/lib/request-query';
 
 export async function GET(req: NextRequest) {
   try {
-    const days = Math.min(365, Math.max(1, Number(req.nextUrl.searchParams.get('days') ?? 30)));
+    const days = parseBoundedInteger(req.nextUrl.searchParams.get('days'), 30, 1, 365);
     const stats = await getLifecycleStats(days);
     return NextResponse.json({ days, ...stats });
   } catch (err) {

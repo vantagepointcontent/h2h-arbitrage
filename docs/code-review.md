@@ -24,6 +24,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-016 | Medium | `src/app/api/decoupled-pairs/route.ts` mutation input | Fixed | JSON shape, persisted market identifiers, and delete IDs were accepted without strict validation. Added tested JSON-object parsing, normalized non-empty pair identifiers, and UUID-only delete IDs before any write. |
 | CR-017 | Medium | `src/app/api/predictionhunt/markets/route.ts` save-to-H2H input | Fixed | Valid non-object JSON and arbitrary non-string market fields could reach saved-market persistence. Added tested JSON-object parsing and normalized required URL/title/category/expiry inputs before upsert. |
 | CR-018 | Low | `src/app/api/predictionhunt/markets/route.ts` query-number parsing | Fixed | Non-numeric or unsafe `maxDays`/`fetchCount` query values produced `NaN` and could reach upstream market fetching. Added a shared, tested bounded-integer parser with safe fallbacks. |
+| CR-019 | Low | `src/app/api/arb-lifecycle/route.ts` days query parsing | Fixed | Non-numeric or unsafe `days` values could produce `NaN` and reach lifecycle aggregation. Reused the shared bounded-integer parser with a safe 30-day fallback. |
 
 ## Verification
 
