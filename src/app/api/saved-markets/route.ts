@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult, getMarketUrlsById } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,7 +117,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const body: any = parsed.body;
     if (!body.kalshiUrl || !body.polymarketUrl) {
       return NextResponse.json({ error: 'Missing kalshiUrl or polymarketUrl' }, { status: 400 });
     }
@@ -165,7 +168,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const body: any = parsed.body;
     if (!body.id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 });
     }
