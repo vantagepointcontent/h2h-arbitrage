@@ -134,6 +134,15 @@ interface GateInfo {
   credsReady: boolean;
 }
 
+/** Stable, actionable status text for the manual-execution safety gates. */
+export function getExecutionGateMessage(gates: GateInfo | null): string {
+  if (!gates) return 'Checking execution safety gates — execution remains locked until this completes.';
+  if (gates.killSwitch) return 'Execution is locked by the kill switch. Open Settings → Execution controls to unlock it.';
+  if (gates.dryRun) return 'DRY RUN — orders will be simulated. Disable dry-run in Settings for real execution.';
+  if (!gates.credsReady) return 'Credentials are incomplete. Add all Kalshi and Polymarket credentials in Settings → Trading Credentials.';
+  return 'REAL MODE — this will place REAL limit orders on both platforms with REAL money.';
+}
+
 export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose: () => void }) {
   const [gates, setGates] = useState<GateInfo | null>(null);
   const [busy, setBusy] = useState(false);
@@ -198,11 +207,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
         <div className="px-4 py-3 space-y-3 text-sm">
           <div className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${isReal ? "border-red-800 bg-red-950/40 text-red-400" : "border-amber-500/40 bg-amber-500/10 text-amber-400"}`}>
             <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-            {gates === null ? "Checking safety gates..." : isReal
-              ? "REAL MODE — this will place REAL limit orders on both platforms with REAL money."
-              : gates.killSwitch
-                ? "Kill switch is ON — execution will be refused. Disable it in Settings to proceed."
-                : "DRY RUN — orders will be simulated. Disable dry-run in Settings for real execution."}
+            {getExecutionGateMessage(gates)}
           </div>
 
           <div className="rounded-lg bg-[#0E1621] border border-[#182533] divide-y divide-[#182533] text-xs">
@@ -293,11 +298,11 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           {!result && (
             <button
               onClick={run}
-              disabled={busy || gates?.killSwitch}
+              disabled={busy || !gates || gates.killSwitch}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
             >
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isReal ? "Execute REAL orders" : "Execute (dry run)"}
+              {gates?.killSwitch ? "Execution locked" : isReal ? "Execute REAL orders" : "Execute (dry run)"}
             </button>
           )}
         </div>

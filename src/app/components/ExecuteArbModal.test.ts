@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExecutableArb } from './ExecuteArbModal';
+import { buildExecutableArb, getExecutionGateMessage } from './ExecuteArbModal';
 
 const baseArb = {
   artist: 'Example outcome',
@@ -65,5 +65,12 @@ describe('buildExecutableArb', () => {
     expect(buildExecutableArb({ ...baseArb, pmNoAskShares: undefined }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, stale: true }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesAsk: 0 }, 'Example market')).toBeNull();
+  });
+});
+
+describe('getExecutionGateMessage', () => {
+  it('keeps execution locked until gates load and gives an actionable kill-switch message', () => {
+    expect(getExecutionGateMessage(null)).toContain('remains locked');
+    expect(getExecutionGateMessage({ killSwitch: true, dryRun: true, credsReady: false })).toContain('Settings → Execution controls');
   });
 });
