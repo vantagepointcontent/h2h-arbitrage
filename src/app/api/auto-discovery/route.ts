@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseAutoDiscoveryAction, parseAutoDiscoveryStatePatch } from '@/lib/auto-discovery-route-request';
 import {
   runAutoDiscovery,
   getState,
@@ -30,15 +32,11 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = await req.json();
-    const action = body?.action;
-
-    if (!action || !['run', 'pause', 'resume', 'start_scheduler', 'stop_scheduler'].includes(action)) {
-      return NextResponse.json(
-        { error: 'Invalid action. Use "run", "pause", "resume", "start_scheduler", or "stop_scheduler".' },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseJsonObject(req);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const actionResult = parseAutoDiscoveryAction(parsed.body);
+    if ('error' in actionResult) return NextResponse.json({ error: actionResult.error }, { status: 400 });
+    const { action } = actionResult;
 
     if (action === 'run') {
       const result = await runAutoDiscovery();
@@ -88,12 +86,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  */
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = await req.json();
+    const parsed = await parseJsonObject(req);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const patch = parseAutoDiscoveryStatePatch(parsed.body);
+    if ('error' in patch) return NextResponse.json({ error: patch.error }, { status: 400 });
     const state = getState();
-
-    if (body.paused !== undefined) {
-      state.paused = body.paused;
-    }
+    state.paused = patch.paused;
 
     setState(state);
     return NextResponse.json({ success: true, state });
