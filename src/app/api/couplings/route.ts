@@ -3,6 +3,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { suggestCouplings, CouplingCandidate, CouplingRejection, UnmatchedMarket } from '@/lib/coupling';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseCouplingRequest } from '@/lib/coupling-request';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const REJECTIONS_FILE = path.join(DATA_DIR, 'coupling-rejections.json');
@@ -60,18 +62,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { action, kalshiTicker, pmConditionId, reason } = body;
+  const parsed = await parseJsonObject(request);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  const coupling = parseCouplingRequest(parsed.body);
+  if ('error' in coupling) return NextResponse.json({ error: coupling.error }, { status: 400 });
+
+  try {
     const rejections = await loadRejections();
 
-    if (action === 'reject') {
+    if (coupling.action === 'reject') {
       const rejection: CouplingRejection = {
-        kalshiTicker: kalshiTicker || '',
-        pmConditionId: pmConditionId || '',
+        kalshiTicker: coupling.kalshiTicker,
+        pmConditionId: coupling.pmConditionId,
         rejectedAt: new Date().toISOString(),
-        reason,
+        reason: coupling.reason,
       };
       rejections.push(rejection);
       await saveRejections(rejections);
@@ -79,19 +84,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, rejection });
     }
 
-    if (action === 'accept') {
-      const idx = rejections.findIndex(
-        r => r.kalshiTicker === kalshiTicker && r.pmConditionId === pmConditionId,
-      );
-      if (idx >= 0) {
-        rejections.splice(idx, 1);
-        await saveRejections(rejections);
-      }
-
-      return NextResponse.json({ success: true });
+    const idx = rejections.findIndex(
+      r => r.kalshiTicker === coupling.kalshiTicker && r.pmConditionId === coupling.pmConditionId,
+    );
+    if (idx >= 0) {
+      rejections.splice(idx, 1);
+      await saveRejections(rejections);
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: clientSafeError(error, 'Failed to process coupling action') }, { status: 500 });
   }
