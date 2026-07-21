@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { createClient } from '@libsql/client';
+import type { MarketLink } from './platforms/types';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -89,6 +90,8 @@ async function initDb(): Promise<void> {
     `ALTER TABLE saved_markets ADD COLUMN last_matched_at TEXT`,
     // WS-107: real-time result written by the ws-watcher for HOT pairs
     `ALTER TABLE saved_markets ADD COLUMN live_result TEXT`,
+    // FEAT-3: retain legacy URL columns during the N-platform migration.
+    `ALTER TABLE saved_markets ADD COLUMN platform_links TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -553,6 +556,8 @@ export interface SavedMarket {
   id: string;
   kalshiUrl: string;
   polymarketUrl: string;
+  /** Canonical N-platform representation; legacy URLs remain during migration. */
+  platformLinks?: MarketLink[];
   eventTitle: string;
   category?: string; // e.g. "Politics", "Temperature", "Finances", "Mentions", "Sports"
   createdAt: string;
@@ -580,6 +585,23 @@ async function ensureDir() {
 // written best-effort after each mutation so the poller (read-only) and
 // any legacy tooling keep working, and so a rollback is one file-copy away.
 
+function legacyPlatformLinks(kalshiUrl: string, polymarketUrl: string): MarketLink[] {
+  return [
+    { platform: 'kalshi', url: kalshiUrl },
+    { platform: 'polymarket', url: polymarketUrl },
+  ];
+}
+
+function parsePlatformLinks(value: unknown, kalshiUrl: string, polymarketUrl: string): MarketLink[] {
+  try {
+    const parsed = value ? JSON.parse(String(value)) : null;
+    if (Array.isArray(parsed) && parsed.every(link => typeof link?.url === 'string' && typeof link?.platform === 'string')) {
+      return parsed as MarketLink[];
+    }
+  } catch { /* fall back to legacy URLs */ }
+  return legacyPlatformLinks(kalshiUrl, polymarketUrl);
+}
+
 function rowToMarket(r: any): SavedMarket {
   let lastScanResult: LastScanResult | null = null;
   try { lastScanResult = r.last_scan_result ? JSON.parse(String(r.last_scan_result)) : null; } catch {}
@@ -594,10 +616,13 @@ function rowToMarket(r: any): SavedMarket {
   } else {
     liveResult = null;
   }
+  const kalshiUrl = String(r.kalshi_url);
+  const polymarketUrl = String(r.polymarket_url);
   return {
     id: String(r.id),
-    kalshiUrl: String(r.kalshi_url),
-    polymarketUrl: String(r.polymarket_url),
+    kalshiUrl,
+    polymarketUrl,
+    platformLinks: parsePlatformLinks(r.platform_links, kalshiUrl, polymarketUrl),
     eventTitle: String(r.event_title ?? ''),
     category: r.category != null ? String(r.category) : undefined,
     createdAt: String(r.created_at),
@@ -616,12 +641,13 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
   const c = getClient();
   await c.execute({
     sql: `INSERT INTO saved_markets
-            (id, kalshi_url, polymarket_url, event_title, category, created_at, expiry_date, favorite, last_scan_result,
+            (id, kalshi_url, polymarket_url, platform_links, event_title, category, created_at, expiry_date, favorite, last_scan_result,
              archived, archived_at, archive_reason, last_matched_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             kalshi_url = excluded.kalshi_url,
             polymarket_url = excluded.polymarket_url,
+            platform_links = excluded.platform_links,
             event_title = excluded.event_title,
             category = excluded.category,
             expiry_date = excluded.expiry_date,
@@ -632,7 +658,9 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
             archive_reason = excluded.archive_reason,
             last_matched_at = excluded.last_matched_at`,
     args: [
-      m.id, m.kalshiUrl, m.polymarketUrl, m.eventTitle, m.category ?? null,
+      m.id, m.kalshiUrl, m.polymarketUrl,
+      JSON.stringify(m.platformLinks ?? legacyPlatformLinks(m.kalshiUrl, m.polymarketUrl)),
+      m.eventTitle, m.category ?? null,
       m.createdAt, m.expiryDate ?? null, m.favorite ? 1 : 0,
       m.lastScanResult ? JSON.stringify(m.lastScanResult) : null,
       m.archived ? 1 : 0, m.archivedAt ?? null, m.archiveReason ?? null, m.lastMatchedAt ?? null,
@@ -647,6 +675,16 @@ async function ensureMarketsMigrated(): Promise<void> {
   if (_marketsMigrated) return;
   await ensureDb();
   const c = getClient();
+  // FEAT-3: backfill the canonical N-platform field before any caller reads it.
+  const legacyRows = await c.execute('SELECT id, kalshi_url, polymarket_url FROM saved_markets WHERE platform_links IS NULL OR platform_links = \'\'');
+  for (const row of legacyRows.rows as any[]) {
+    const kalshiUrl = String(row.kalshi_url);
+    const polymarketUrl = String(row.polymarket_url);
+    await c.execute({
+      sql: 'UPDATE saved_markets SET platform_links = ? WHERE id = ?',
+      args: [JSON.stringify(legacyPlatformLinks(kalshiUrl, polymarketUrl)), String(row.id)],
+    });
+  }
   const cnt = await c.execute('SELECT COUNT(*) AS cnt FROM saved_markets');
   const rows = Number((cnt.rows as any[])[0]?.cnt ?? 0);
   if (rows === 0) {

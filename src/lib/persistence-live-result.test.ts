@@ -39,6 +39,20 @@ function makeScan(overrides: Partial<import('./persistence').LastScanResult> = {
 }
 
 describe('WS-107 liveResult persistence', () => {
+  it('migrates legacy two-platform URLs into platformLinks without losing them', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/KXTEST',
+      polymarketUrl: 'https://polymarket.com/event/test-market',
+      eventTitle: 'Platform link migration', category: '', expiryDate: null,
+    });
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect((got as any).platformLinks).toEqual([
+      { platform: 'kalshi', url: 'https://kalshi.com/markets/KXTEST' },
+      { platform: 'polymarket', url: 'https://polymarket.com/event/test-market' },
+    ]);
+  });
+
   it('writes and reads back a fresh liveResult', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/x', polymarketUrl: 'https://polymarket.com/event/x',
