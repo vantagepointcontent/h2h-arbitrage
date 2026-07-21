@@ -8,6 +8,7 @@ import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEve
 import { matchOutcomes, applyManualMatches, UnifiedOutcome } from './matcher';
 import { getManualMatches } from './manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from './decoupled-pairs';
+import type { MarketLink } from './platforms/types';
 import logger from './logger';
 
 interface PmToken {
@@ -38,6 +39,19 @@ export class PairResolveError extends Error {
     super(message);
     this.name = 'PairResolveError';
   }
+}
+
+/**
+ * Canonical platform-link entry point. The live scanner currently has working
+ * adapters only for Kalshi and Polymarket, so extra links are intentionally
+ * preserved for future adapters but not silently treated as executable.
+ */
+export async function resolvePairFromLinks(links: MarketLink[], capital: number): Promise<ResolvedPair> {
+  const kalshiUrl = links.find(link => link.platform === 'kalshi')?.url;
+  const polymarketUrl = links.find(link => link.platform === 'polymarket')?.url;
+  if (!kalshiUrl) throw new PairResolveError('bad_kalshi_url', 'A Kalshi platform link is required for live resolution');
+  if (!polymarketUrl) throw new PairResolveError('bad_pm_url', 'A Polymarket platform link is required for live resolution');
+  return resolvePair(kalshiUrl, polymarketUrl, capital);
 }
 
 /**
