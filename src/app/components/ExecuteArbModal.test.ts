@@ -69,8 +69,9 @@ describe('buildExecutableArb', () => {
 });
 
 describe('getExecutionGateMessage', () => {
-  it('keeps execution locked until gates load and gives an actionable kill-switch message', () => {
+  it('keeps execution locked until gates load, but allows explicit paper bets while real trading remains locked', () => {
     expect(getExecutionGateMessage(null)).toContain('remains locked');
-    expect(getExecutionGateMessage({ killSwitch: true, dryRun: true, credsReady: false })).toContain('Settings → Execution controls');
+    expect(getExecutionGateMessage({ killSwitch: true, dryRun: true, credsReady: false })).toContain('simulated two-leg bet');
+    expect(getExecutionGateMessage({ killSwitch: true, dryRun: false, credsReady: false })).toContain('Real execution is locked');
   });
 });

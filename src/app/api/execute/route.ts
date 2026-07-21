@@ -37,15 +37,17 @@ import logger from '@/lib/logger';
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const [creds, killSwitch] = await Promise.all([
+    const [creds, killSwitch, dryRun] = await Promise.all([
       getCredentialStatus(),
       getSetting<boolean>('execute.killSwitch').catch(() => true),
+      getSetting<boolean>('execute.dryRun').catch(() => true),
     ]);
     return NextResponse.json({
       limits: getSafetyLimitsFromEnv(),
       credentials: creds,
       credentialKeys: CREDENTIAL_KEYS,
       killSwitch,
+      dryRun,
       auditLog: getAuditLog(50),
       policy: 'manual-only',
     });
@@ -91,15 +93,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Missing execution request' }, { status: 400 });
       }
 
-      // ── Kill switch: hard stop for ALL execution, dry-run included ──
-      const killSwitch = await getSetting<boolean>('execute.killSwitch').catch(() => true);
-      if (killSwitch) {
-        return NextResponse.json(
-          { error: 'Kill switch is ON. Disable execute.killSwitch in Settings to allow execution.' },
-          { status: 403 },
-        );
-      }
-
       // Server-side dry-run enforcement: request cannot demand a real order;
       // the effective mode is the OR of request.dryRun, settings, and env.
       const settingDryRun = await getSetting<boolean>('execute.dryRun').catch(() => true);
@@ -107,6 +100,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         ...request,
         dryRun: request.dryRun || settingDryRun,
       };
+
+      // The kill switch protects real trading, not local paper bets. A dry-run
+      // never contacts either venue and is deliberately allowed to persist while
+      // the kill switch remains ON.
+      const killSwitch = await getSetting<boolean>('execute.killSwitch').catch(() => true);
+      if (killSwitch && !effective.dryRun) {
+        return NextResponse.json(
+          { error: 'Kill switch is ON. Real execution is locked; enable Dry run mode to place a simulated test bet.' },
+          { status: 403 },
+        );
+      }
 
       // Real execution additionally requires complete credentials.
       if (!effective.dryRun) {

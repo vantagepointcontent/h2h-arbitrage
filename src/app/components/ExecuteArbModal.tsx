@@ -137,8 +137,8 @@ interface GateInfo {
 /** Stable, actionable status text for the manual-execution safety gates. */
 export function getExecutionGateMessage(gates: GateInfo | null): string {
   if (!gates) return 'Checking execution safety gates — execution remains locked until this completes.';
-  if (gates.killSwitch) return 'Execution is locked by the kill switch. Open Settings → Execution controls to unlock it.';
-  if (gates.dryRun) return 'DRY RUN — orders will be simulated. Disable dry-run in Settings for real execution.';
+  if (gates.dryRun) return 'TEST MODE — this creates a simulated two-leg bet in Trades. The kill switch remains ON and no venue is contacted.';
+  if (gates.killSwitch) return 'Real execution is locked by the kill switch. Keep it ON unless you deliberately intend to trade live.';
   if (!gates.credsReady) return 'Credentials are incomplete. Add all Kalshi and Polymarket credentials in Settings → Trading Credentials.';
   return 'REAL MODE — this will place REAL limit orders on both platforms with REAL money.';
 }
@@ -154,7 +154,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
       .then((r) => r.json())
       .then((d) => setGates({
         killSwitch: Boolean(d.killSwitch),
-        dryRun: Boolean(d.limits?.dryRunMode),
+        dryRun: Boolean(d.dryRun),
         credsReady: Boolean(d.credentials?.allReady),
       }))
       .catch(() => setGates(null));
@@ -298,11 +298,11 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           {!result && (
             <button
               onClick={run}
-              disabled={busy || !gates || gates.killSwitch}
+              disabled={busy || !gates || (!gates.dryRun && gates.killSwitch)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
             >
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {gates?.killSwitch ? "Execution locked" : isReal ? "Execute REAL orders" : "Execute (dry run)"}
+              {gates?.dryRun ? "Place test bet" : gates?.killSwitch ? "Real execution locked" : isReal ? "Execute REAL orders" : "Execute"}
             </button>
           )}
         </div>

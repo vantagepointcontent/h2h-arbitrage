@@ -84,7 +84,7 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'lifecycle.protectFavorites', section: 'lifecycle', label: 'Protect favorites', description: 'Never auto-archive starred markets.', type: 'boolean', default: true },
 
   // ── Auto-Execute ──
-  { key: 'execute.killSwitch', section: 'auto-execute', label: 'Execution kill switch', description: 'Master stop. When ON, /api/execute refuses ALL execution requests (even dry-run). Turn OFF only when you intend to trade.', type: 'boolean', default: true, dangerous: true },
+  { key: 'execute.killSwitch', section: 'auto-execute', label: 'Real-trading kill switch', description: 'Master stop for REAL orders. Keep ON for safe paper/test bets; turn OFF only after deliberately enabling real trading.', type: 'boolean', default: true, dangerous: true },
   { key: 'execute.dryRun', section: 'auto-execute', label: 'Dry run mode', description: 'When ON, executions are simulated. Turning this OFF places REAL orders.', type: 'boolean', env: 'H2H_DRY_RUN', default: true, dangerous: true },
   { key: 'execute.maxStakePerTrade', section: 'auto-execute', label: 'Max stake per trade $', description: 'Hard cap on a single execution stake.', type: 'number', env: 'H2H_MAX_STAKE_USD', default: 100, min: 1, max: 10000 },
   { key: 'execute.maxDailyExposure', section: 'auto-execute', label: 'Max daily exposure $', description: 'Total capital deployable per day across all executions.', type: 'number', env: 'H2H_MAX_DAILY_USD', default: 500, min: 1, max: 100000 },
