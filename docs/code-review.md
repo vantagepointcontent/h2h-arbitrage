@@ -18,6 +18,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-010 | Medium | `src/app/api/lifecycle/route.ts` state-changing request parsing | Fixed | Malformed JSON produced a 500 response, while object-valued IDs were coerced to `"[object Object]"` before persistence. Added shared JSON-object parsing and a tested lifecycle-request parser that permits only known actions and non-empty string IDs. |
 | CR-011 | Medium | `src/app/api/couplings/route.ts` rejection input | Fixed | Malformed payloads produced 500s and missing or non-string market identifiers could create blank or malformed persisted rejection records. Added shared JSON parsing and tested action/identifier validation before any state write. |
 | CR-012 | Medium | `src/app/api/watcher/targets/route.ts` promotion input | Fixed | The authenticated promotion endpoint allowed arbitrary truthy `pairId` values and accepted JSON arrays as request bodies. Added shared JSON-object parsing and tested, bounded non-empty string validation for promotion IDs. |
+| CR-013 | High | `src/app/api/telegram-alerts/route.ts` test-message action | Fixed | A LAN caller could trigger a real configured Telegram test message without the shared API-token guard; malformed request data also became 500s. Added mutating-route authorization plus tested JSON/action validation. No test message was sent during verification. |
 
 ## Verification
 
