@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateArbitrageMax, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import { calculateArbitrageMax, calcKalshiFee, calcPolymarketFee, computeArbitrageFees, getPolymarketTheta } from './matcher';
 
 describe('Kalshi/Polymarket fees', () => {
   it('Kalshi fee rounds up formula 0.07 * C * P * (1-P)', () => {
@@ -110,6 +110,46 @@ describe('Kalshi/Polymarket fees', () => {
     expect(r.strategy).not.toBe('No arb');
     expect(r.expectedProfit).toBeLessThanOrEqual(0);
     expect(r.roiPct).toBeLessThanOrEqual(0);
+  });
+
+  it('charges one Kalshi buy fee for YES Kalshi and one PM fee at a 0.97 total price', () => {
+    const fees = computeArbitrageFees(
+      'Buy YES Kalshi + NO PM',
+      100,
+      50,
+      47,
+      0.50,
+      0.50,
+      0.53,
+      0.47,
+      'Politics',
+    );
+
+    // 100 Kalshi YES contracts at $0.50: ceil($1.75) = $1.75.
+    // The former phantom NO fee made this $3.50 instead.
+    expect(fees.kalshiFee).toBe(1.75);
+    // 100 Polymarket NO contracts at $0.47 with politics theta 0.04.
+    expect(fees.pmFee).toBe(0.9964);
+    // $3.00 gross - $1.75 Kalshi fee - $0.9964 PM fee.
+    expect(fees.worstCaseNetProfit).toBeCloseTo(0.2536, 10);
+  });
+
+  it('charges the symmetric single Kalshi buy fee for NO Kalshi', () => {
+    const fees = computeArbitrageFees(
+      'Buy YES PM + NO Kalshi',
+      100,
+      50,
+      47,
+      0.53,
+      0.50,
+      0.47,
+      0.53,
+      'Politics',
+    );
+
+    expect(fees.kalshiFee).toBe(1.75);
+    expect(fees.pmFee).toBe(0.9964);
+    expect(fees.worstCaseNetProfit).toBeCloseTo(0.2536, 10);
   });
 
   it('tiny spread (0.001) after fees should still be No arb', () => {

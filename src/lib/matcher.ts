@@ -145,7 +145,8 @@ export function getPolymarketTheta(category?: string): number {
 export function calcKalshiFee(contracts: number, price: number, rate = 0.07): number {
   if (contracts <= 0 || price <= 0 || price >= 1) return 0;
   const raw = rate * contracts * price * (1 - price);
-  return Math.ceil(raw * 100) / 100;
+  // Ignore binary floating-point dust only; genuine fractions of a cent still round up.
+  return Math.ceil(raw * 100 - 1e-9) / 100;
 }
 
 /** Polymarket fee: theta * contracts * price * (1 - price). Rounded to 5 decimals. */
@@ -197,16 +198,15 @@ export function computeArbitrageFees(
   let pmFeeDetails = 'Polymarket: no fee (0 contracts or settled)';
 
   if (strategy.includes('YES Kalshi')) {
-    // Buy YES on Kalshi at kalshiBuyPrice, sell NO on Kalshi at 1 - kalshiSellPrice
+    // This strategy places exactly one Kalshi order: buy YES.
     const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
-    const kalshiNoContracts = kalshiStake / (1 - kalshiSellPrice);
-    kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice) + calcKalshiFee(kalshiNoContracts, 1 - kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${fmtProbPrice(kalshiBuyPrice)} + NO sell ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(1 - kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice);
+    kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${fmtProbPrice(kalshiBuyPrice)} = ${formatFee(kalshiFeeAmount)}`;
   } else if (strategy.includes('NO Kalshi')) {
-    // Buy YES on PM, sell NO on Kalshi
+    // This strategy places exactly one Kalshi order: buy NO.
     const kalshiNoContracts = kalshiStake / kalshiSellPrice;
     kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice);
-    kalshiFeeDetails = `Kalshi NO sell ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
+    kalshiFeeDetails = `Kalshi NO buy ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   }
 
   if (strategy.includes('YES PM')) {
