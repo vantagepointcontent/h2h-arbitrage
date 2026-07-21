@@ -6,7 +6,7 @@ import { parseRetentionDays } from '@/lib/retention-request';
 
 function authorized(request: NextRequest): boolean {
   const token = process.env.H2H_API_TOKEN;
-  return !token || request.headers.get('x-api-token') === token;
+  return !token || request.headers.get('x-h2h-token') === token;
 }
 
 /**

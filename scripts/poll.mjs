@@ -567,7 +567,7 @@ async function run() {
       try {
         const res = await fetch(`${BASE_URL}/api/prune-scans?days=30`, {
           method: 'POST',
-          headers: process.env.H2H_API_TOKEN ? { 'x-api-token': process.env.H2H_API_TOKEN } : {},
+          headers: process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {},
         });
         if (res.ok) {
           const result = await res.json();

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 function authorized(req: NextRequest): boolean {
   const token = process.env.H2H_API_TOKEN;
   if (!token) return true; // no token configured — open (matches existing convention)
-  return req.headers.get('x-api-token') === token;
+  return req.headers.get('x-h2h-token') === token;
 }
 
 export async function GET() {
