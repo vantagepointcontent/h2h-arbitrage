@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { approveReviewPair } from '@/lib/auto-discovery';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseReviewPairId } from '@/lib/auto-discovery-request';
 
 /**
  * POST /api/auto-discovery/approve
@@ -11,17 +13,12 @@ import { clientSafeError } from '@/lib/error-handler';
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = await request.json();
-    const { pairId } = body;
+    const parsed = await parseJsonObject(request);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const pair = parseReviewPairId(parsed.body.pairId);
+    if ('error' in pair) return NextResponse.json({ error: pair.error }, { status: 400 });
 
-    if (!pairId || typeof pairId !== 'string') {
-      return NextResponse.json(
-        { error: 'Missing or invalid pairId' },
-        { status: 400 }
-      );
-    }
-
-    const result = await approveReviewPair(pairId);
+    const result = await approveReviewPair(pair.pairId);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 400 });
