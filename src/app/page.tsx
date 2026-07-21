@@ -195,7 +195,7 @@ export default function Home() {
     { id: "kalshi", platform: "kalshi", url: "" },
     { id: "polymarket", platform: "polymarket", url: "" },
   ]);
-  const [capital, setCapital] = useState(1000);
+  const [capital, setCapital] = useState(100);
   // PERF-P2: ref mirror so the 60s auto-refresh interval doesn't tear down
   // and restart on every capital keystroke (capital was in its deps).
   const capitalRef = useRef(capital);
