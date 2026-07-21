@@ -104,8 +104,12 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
         pmStake: adjustedPmStake,
         kalshiYesAsk: o.kalshi.yesAsk ?? null,
         kalshiNoAsk: o.kalshi.noAsk ?? null,
+        kalshiYesAskShares: Number(o.kalshi.yesAskDepth),
+        kalshiNoAskShares: Number(o.kalshi.noAskDepth),
         pmYesAsk: o.polymarket.yesPrice ?? null,
         pmNoAsk: o.polymarket.noPrice ?? null,
+        pmYesAskShares: o.polymarket.askDepth,
+        pmNoAskShares: o.polymarket.noAskDepth,
         kalshiTicker: o.kalshi.ticker,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
@@ -127,8 +131,10 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
           reason = `Missing prices: Kalshi YES ask=${kYesAsk}, PM NO price=${pmNo}`;
         } else if (o.arbitrage.strategy === 'Buy YES PM + NO Kalshi' && (kNoAsk == null || pmYes == null)) {
           reason = `Missing prices: Kalshi NO ask=${kNoAsk}, PM YES price=${pmYes}`;
+        } else {
+          reason = 'Live ask-depth is unavailable or stale for one of the two legs. Refresh the market and try again.';
         }
-        throw new Error(`${o.artist}: ${reason}`);
+        throw new Error(reason);
       }
       setExecutingArb(exec);
     } catch (e: any) {
