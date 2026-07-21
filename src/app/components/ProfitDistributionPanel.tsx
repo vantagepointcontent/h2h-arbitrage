@@ -86,14 +86,25 @@ export function ProfitDistributionPanel({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <OrderLeg platform="Kalshi" outcome={kalshiWinLabel.replace('Kalshi ', '')} shares={distribution.kalshiShares} price={kalshiPrice} cost={distribution.kalshiOrderCost} formatCurrency={formatCurrency} />
+            <OrderLeg platform="Polymarket" outcome={pmWinLabel.replace('Polymarket ', '')} shares={distribution.pmShares} price={pmPrice} cost={distribution.pmOrderCost} formatCurrency={formatCurrency} />
+          </div>
+          <div className="rounded-md border border-[#5DBE81]/30 bg-[#5DBE81]/10 px-2.5 py-2 text-center">
+            <span className="text-[9px] uppercase tracking-wide text-[#8A9BA8]">Lowest split</span>
+            <span className="ml-2 font-mono text-xs font-bold text-[#5DBE81]">
+              {distribution.pmToKalshiRatio ? `PM:Kalshi ${distribution.pmToKalshiRatio.label}` : 'PM:Kalshi —'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Scenario label={`If ${kalshiWinLabel} wins`} profit={distribution.netProfitIfKalshiWins} stakeLabel="Kalshi stake" stake={distribution.kalshiStake} formatCurrency={formatCurrency} />
             <Scenario label={`If ${pmWinLabel} wins`} profit={distribution.netProfitIfPmWins} stakeLabel="Polymarket stake" stake={distribution.pmStake} formatCurrency={formatCurrency} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
-            <Metric label="Kalshi stake" value={formatCurrency(distribution.kalshiStake)} />
-            <Metric label="PM stake" value={formatCurrency(distribution.pmStake)} />
-            <Metric label="Total cost" value={formatCurrency(distribution.totalStake)} strong />
+            <Metric label="Kalshi budget" value={formatCurrency(distribution.kalshiStake)} />
+            <Metric label="PM budget" value={formatCurrency(distribution.pmStake)} />
+            <Metric label="Allocated cost" value={formatCurrency(distribution.totalStake)} strong />
             <Metric label="Recalculated fees" value={`-${formatCurrency(distribution.totalFees)}`} tone="text-[#ef4444]" />
           </div>
         </div>
@@ -108,6 +119,14 @@ function Scenario({ label, profit, stakeLabel, stake, formatCurrency }: { label:
     <div className="text-[10px] text-[#8A9BA8]">{label}</div>
     <div className={`mt-1 font-mono text-sm font-bold ${positive ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{positive ? '+' : ''}{formatCurrency(profit)}</div>
     <div className="mt-1 text-[10px] text-[#8A9BA8]">{stakeLabel}: <span className="font-mono text-[#FFFFFF]">{formatCurrency(stake)}</span></div>
+  </div>;
+}
+
+function OrderLeg({ platform, outcome, shares, price, cost, formatCurrency }: { platform: string; outcome: string; shares: number; price: number; cost: number; formatCurrency: (value: number) => string }) {
+  return <div className="rounded-md border border-[#5DBE81]/30 bg-[#0E1621] p-2.5">
+    <div className="text-[10px] text-[#8A9BA8]">Buy {platform} {outcome}</div>
+    <div className="mt-1 font-mono text-sm font-bold text-[#FFFFFF]">{shares.toLocaleString()} shares <span className="text-[11px] font-normal text-[#8A9BA8]">@ ${price.toFixed(2)}</span></div>
+    <div className="mt-1 text-[10px] text-[#8A9BA8]">Order cost: <span className="font-mono text-[#FFFFFF]">{formatCurrency(cost)}</span></div>
   </div>;
 }
 

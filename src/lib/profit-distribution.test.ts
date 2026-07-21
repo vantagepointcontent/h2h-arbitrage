@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateProfitDistribution } from './profit-distribution';
+import { calculateProfitDistribution, simplifyContractRatio } from './profit-distribution';
 
 describe('calculateProfitDistribution', () => {
   const input = {
@@ -45,5 +45,27 @@ describe('calculateProfitDistribution', () => {
 
   it('rejects invalid prices rather than producing fabricated payout figures', () => {
     expect(() => calculateProfitDistribution({ ...input, kalshiPrice: 0, splitPct: 50 })).toThrow('valid prices');
+  });
+
+  it('reports whole buyable shares and the lowest PM:Kalshi contract split', () => {
+    const result = calculateProfitDistribution({
+      ...input,
+      kalshiPrice: 0.55,
+      pmPrice: 0.42,
+      kalshiStake: 4.95,
+      pmStake: 19.74,
+      splitPct: 50,
+    });
+
+    expect(result.kalshiShares).toBe(9);
+    expect(result.pmShares).toBe(47);
+    expect(result.pmToKalshiRatio).toEqual({ pm: 47, kalshi: 9, label: '47:9' });
+    expect(result.kalshiOrderCost).toBeCloseTo(4.95, 8);
+    expect(result.pmOrderCost).toBeCloseTo(19.74, 8);
+  });
+
+  it('reduces a contract ratio by its greatest common divisor', () => {
+    expect(simplifyContractRatio(45, 15)).toEqual({ pm: 3, kalshi: 1, label: '3:1' });
+    expect(simplifyContractRatio(0, 15)).toBeNull();
   });
 });

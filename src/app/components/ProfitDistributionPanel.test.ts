@@ -27,6 +27,8 @@ describe('ProfitDistributionPanel', () => {
     fireEvent.click(toggle);
     const slider = screen.getByLabelText('Profit distribution') as HTMLInputElement;
     expect(slider.value).toBe('50');
+    expect(screen.getAllByText('100 shares', { exact: false })).toHaveLength(2);
+    expect(screen.getByText('PM:Kalshi 1:1')).toBeTruthy();
     fireEvent.change(slider, { target: { value: '100' } });
 
     expect(onChange).toHaveBeenCalledTimes(1);

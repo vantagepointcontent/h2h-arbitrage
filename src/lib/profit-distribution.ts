@@ -21,6 +21,13 @@ export interface ProfitDistribution {
   pmStake: number;
   kalshiContracts: number;
   pmContracts: number;
+  /** Whole contracts that can actually be entered as manual orders. */
+  kalshiShares: number;
+  pmShares: number;
+  /** Dollar cost of those whole-share orders; budget dust is intentionally excluded. */
+  kalshiOrderCost: number;
+  pmOrderCost: number;
+  pmToKalshiRatio: ContractRatio | null;
   kalshiFee: number;
   pmFee: number;
   totalFees: number;
@@ -28,6 +35,28 @@ export interface ProfitDistribution {
   netProfitIfPmWins: number;
   worstCaseNetProfit: number;
   bestCaseNetProfit: number;
+}
+
+export interface ContractRatio {
+  pm: number;
+  kalshi: number;
+  label: string;
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y !== 0) [x, y] = [y, x % y];
+  return x;
+}
+
+/** Convert whole contract counts into the lowest exact PM:Kalshi split. */
+export function simplifyContractRatio(pmShares: number, kalshiShares: number): ContractRatio | null {
+  const pm = Math.max(0, Math.floor(pmShares));
+  const kalshi = Math.max(0, Math.floor(kalshiShares));
+  if (pm < 1 || kalshi < 1) return null;
+  const divisor = greatestCommonDivisor(pm, kalshi);
+  return { pm: pm / divisor, kalshi: kalshi / divisor, label: `${pm / divisor}:${kalshi / divisor}` };
 }
 
 /**
@@ -56,6 +85,12 @@ export function calculateProfitDistribution(input: ProfitDistributionInput): Pro
   const pmStake = totalStake - kalshiStake;
   const kalshiContracts = kalshiStake / kalshiPrice;
   const pmContracts = pmStake / pmPrice;
+  // Exchanges accept whole contracts only. Keep the allocation math for the
+  // slider's scenario model, but expose the orderable quantities and cash cost.
+  const kalshiShares = Math.floor(kalshiContracts);
+  const pmShares = Math.floor(pmContracts);
+  const kalshiOrderCost = kalshiShares * kalshiPrice;
+  const pmOrderCost = pmShares * pmPrice;
   const kalshiFee = calcKalshiFee(kalshiContracts, kalshiPrice);
   const pmFee = calcPolymarketFee(pmContracts, pmPrice, getPolymarketTheta(input.category));
   const totalFees = kalshiFee + pmFee;
@@ -72,6 +107,11 @@ export function calculateProfitDistribution(input: ProfitDistributionInput): Pro
     pmStake,
     kalshiContracts,
     pmContracts,
+    kalshiShares,
+    pmShares,
+    kalshiOrderCost,
+    pmOrderCost,
+    pmToKalshiRatio: simplifyContractRatio(pmShares, kalshiShares),
     kalshiFee,
     pmFee,
     totalFees,
