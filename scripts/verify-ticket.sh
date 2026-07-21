@@ -69,9 +69,11 @@ if [[ "$SKIP_TESTS" == "true" ]]; then
 else
   echo -e "${YELLOW}Running vitest...${NC}"
   TEST_OUTPUT=$(npx vitest run --reporter=verbose 2>&1) || true
-  TEST_FAILS=$(echo "$TEST_OUTPUT" | grep -E '^\s+×' | wc -l)
-  TEST_PASSES=$(echo "$TEST_OUTPUT" | grep -E '^\s+✓' | wc -l)
-  TEST_SKIPS=$(echo "$TEST_OUTPUT" | grep -E '^\s+↓' | wc -l)
+  # grep exits 1 when there are no matches; with pipefail that must mean
+  # "zero", not abort the verifier before it can report its result.
+  TEST_FAILS=$({ echo "$TEST_OUTPUT" | grep -E '^\s+×' || true; } | wc -l)
+  TEST_PASSES=$({ echo "$TEST_OUTPUT" | grep -E '^\s+✓' || true; } | wc -l)
+  TEST_SKIPS=$({ echo "$TEST_OUTPUT" | grep -E '^\s+↓' || true; } | wc -l)
 
   if [[ "$TEST_FAILS" -eq 0 && "$TEST_SKIPS" -eq 0 ]]; then
     check "Vitest test suite" "PASS" "($TEST_PASSES tests passed, 0 failed, 0 skipped)"
@@ -88,8 +90,11 @@ fi
 # 2. BUILD SUCCEEDS
 # ────────────────────────────────────────────────────────────────
 echo -e "${YELLOW}Running npm run build...${NC}"
-BUILD_OUTPUT=$(npm run build 2>&1) || true
-BUILD_EXIT=$?
+if BUILD_OUTPUT=$(npm run build 2>&1); then
+  BUILD_EXIT=0
+else
+  BUILD_EXIT=$?
+fi
 
 if [[ $BUILD_EXIT -eq 0 ]]; then
   BUILD_ID=$(cat .next/BUILD_ID 2>/dev/null || echo "unknown")
