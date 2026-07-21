@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pruneOldScans, getScanCount } from '@/lib/persistence';
 import { pruneOldEpisodes } from '@/lib/arb-lifecycle';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseRetentionDays } from '@/lib/retention-request';
+
+function authorized(request: NextRequest): boolean {
+  const token = process.env.H2H_API_TOKEN;
+  return !token || request.headers.get('x-api-token') === token;
+}
 
 /**
  * POST /api/prune-scans
@@ -14,9 +20,17 @@ import { clientSafeError } from '@/lib/error-handler';
  *   { deleted: number, remaining: number }
  */
 export async function POST(request: NextRequest) {
+  if (!authorized(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const days = parseRetentionDays(searchParams.get('days'));
+  if (typeof days !== 'number') {
+    return NextResponse.json({ error: days.error }, { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const days = Math.max(1, parseInt(searchParams.get('days') || '30', 10));
 
     const deleted = await pruneOldScans(days);
     const remaining = await getScanCount();
