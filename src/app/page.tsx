@@ -1380,7 +1380,7 @@ export default function Home() {
           onCloseMobileMenu={() => setMobileMenuOpen(false)}
         />
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-2 sm:p-4 md:p-6">
+          <div className="w-full p-2 sm:p-4 md:p-6 2xl:p-8">
             {viewMode === "overview" ? (
               <OverviewPanel
                 markets={savedMarkets}
