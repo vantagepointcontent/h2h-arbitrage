@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
 import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets, fetchKalshiMultiSeriesMarkets, extractKalshiSeriesFromUrl } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
+import { finiteMarketPrice } from '@/lib/market-price';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/all-markets?kalshiUrl=...&pmUrl=...
@@ -79,8 +80,8 @@ async function fetchKalshiEventScoped(kalshiUrl: string): Promise<KalshiMarketLi
   return markets.map(m => ({
     ticker: m.ticker,
     title: m.title || m.yes_sub_title || m.ticker,
-    yesAsk: m.yes_ask_dollars ? parseFloat(m.yes_ask_dollars) : 0,
-    noAsk: m.no_ask_dollars ? parseFloat(m.no_ask_dollars) : 0,
+    yesAsk: finiteMarketPrice(m.yes_ask_dollars),
+    noAsk: finiteMarketPrice(m.no_ask_dollars),
     eventTicker: m.event_ticker || eventTicker,
     closeTime: m.close_time || null,
   }));
@@ -109,8 +110,8 @@ async function fetchPolymarketEventScoped(pmUrl: string): Promise<PolymarketLite
         ? JSON.parse(m.outcomePrices) as string[]
         : m.outcomePrices;
       if (Array.isArray(prices) && prices.length >= 2) {
-        yesPrice = parseFloat(prices[0]) || 0;
-        noPrice = parseFloat(prices[1]) || 0;
+        yesPrice = finiteMarketPrice(prices[0]);
+        noPrice = finiteMarketPrice(prices[1]);
       }
     } catch { /* ignore parse errors */ }
 
