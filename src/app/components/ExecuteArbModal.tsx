@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { Zap, ShieldAlert, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { formatPrice } from "@/app/lib/page-shared";
+import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from "@/lib/matcher";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -55,6 +56,7 @@ export function buildExecutableArb(o: {
   kalshiTicker?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
+  category?: string;
 }, marketTitle: string): ExecutableArb | null {
   if (!o.kalshiTicker) return null;
   let kOutcome: "yes" | "no";
@@ -89,13 +91,24 @@ export function buildExecutableArb(o: {
   ));
   if (shares < 1) return null;
 
+  // The scanner's full-book profit is no longer valid after a top-level depth
+  // cap. Reprice the exact whole-share order shown in this modal, net of venue
+  // fees, so the confirmation and submitted request describe the same trade.
+  const kalshiCost = shares * kPrice;
+  const pmCost = shares * pmPrice;
+  const totalCost = kalshiCost + pmCost;
+  const fees = calcKalshiFee(shares, kPrice)
+    + calcPolymarketFee(shares, pmPrice, getPolymarketTheta(o.category));
+  const expectedProfit = shares - totalCost - fees;
+  const roiPct = totalCost > 0 ? (expectedProfit / totalCost) * 100 : 0;
+
   return {
     arbId: `${Date.now().toString(36)}-${o.artist.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
     marketTitle,
     outcome: o.artist,
     strategy: o.strategy,
-    roiPct: o.roiPct,
-    expectedProfit: o.expectedProfit,
+    roiPct,
+    expectedProfit,
     shares,
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,

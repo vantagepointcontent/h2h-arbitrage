@@ -37,6 +37,10 @@ describe('buildExecutableArb', () => {
     expect(arb?.shares).toBe(25);
     expect(arb?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.5, size: 12.5 });
     expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.7, size: 17.5 });
+    // Full-book scanner profit must never leak into a top-level-depth-capped order.
+    expect(arb?.expectedProfit).toBeLessThan(0);
+    expect(arb?.expectedProfit).not.toBe(4.8);
+    expect(arb?.roiPct).toBeLessThan(0);
   });
 
   it('uses the floor-eligible Kalshi quote rather than a lower synthetic ask', () => {
