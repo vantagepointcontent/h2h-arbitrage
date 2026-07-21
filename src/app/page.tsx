@@ -487,9 +487,11 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          platformLinks: platformLinks.filter((link) => link.url).map(({ platform, url }) => ({ platform: platform ?? "", url })),
-          kalshiUrl: kUrl,
-          polymarketUrl: pUrl,
+          // Manual input uses canonical, per-link platform metadata. Legacy
+          // fields are only for programmatic scans of existing saved markets.
+          ...(platformLinks.some((link) => link.url)
+            ? { platformLinks: platformLinks.filter((link) => link.url).map(({ platform, url }) => ({ platform: platform ?? "", url })) }
+            : { kalshiUrl: kUrl, polymarketUrl: pUrl }),
           capital: capital,
           skipAutoMatch: matchMode === "manual",
         }),

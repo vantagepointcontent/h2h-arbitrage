@@ -21,7 +21,7 @@ import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
-import { resolveScanLinks } from '@/lib/scan-links';
+import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
 
@@ -44,19 +44,27 @@ export async function POST(request: NextRequest) {
     }
     // FEAT-4: canonical platformLinks payload with legacy URL compatibility.
     const { platformLinks: suppliedLinks, kalshiUrl, polymarketUrl } = resolveScanLinks(body);
+    const unavailablePlatforms = getUnavailableScanPlatforms(suppliedLinks);
+    if (unavailablePlatforms.length > 0) {
+      const names = unavailablePlatforms.map(platform => platform.name).join(', ');
+      return NextResponse.json(
+        { error: `${names} adapter not yet available. This link was recognized, but EdgeFinder cannot scan it yet.` },
+        { status: 400 },
+      );
+    }
 
     const kalshiTicker = kalshiUrl ? extractKalshiEventTicker(kalshiUrl) : null;
     const pmSlug = polymarketUrl ? extractPolymarketSlug(polymarketUrl) : null;
 
     if (!kalshiTicker) {
       return NextResponse.json(
-        { error: 'Invalid Kalshi URL. Expected format: https://kalshi.com/markets/{series}/.../{ticker}' },
+        { error: 'A valid Kalshi market link is required. Expected format: https://kalshi.com/markets/{series}/.../{ticker}' },
         { status: 400 }
       );
     }
     if (!pmSlug) {
       return NextResponse.json(
-        { error: 'Invalid Polymarket URL. Expected format: https://polymarket.com/event/{slug} or /sports/{path}' },
+        { error: 'A valid Polymarket market link is required. Expected format: https://polymarket.com/event/{slug} or /sports/{path}' },
         { status: 400 }
       );
     }

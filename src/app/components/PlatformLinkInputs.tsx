@@ -48,7 +48,12 @@ export function PlatformLinkInputs({ links, onChange }: { links: PlatformLinkInp
         </label>
         <label className="space-y-1.5 text-sm font-medium text-[#8A9BA8]">
           <span className="flex items-center gap-2">{platform ? <PlatformIcon platform={platform} /> : null}{platform ? getPlatformName(platform) : "Market URL"}</span>
-          <input ref={(element) => { inputRefs.current[link.id] = element; }} type="url" value={link.url} onChange={e => update(link.id, { url: e.target.value })} placeholder="https://platform.example/market/..." className="w-full rounded-lg border border-[#232E3C] bg-[#182533] px-3 py-2.5 text-sm text-[#FFFFFF] placeholder-[#48555F] focus:border-[#5DBE81] focus:outline-none focus:ring-1 focus:ring-[#5DBE81]/30" />
+          <input ref={(element) => { inputRefs.current[link.id] = element; }} type="url" value={link.url} onChange={e => {
+            const url = e.target.value;
+            // Persist what the URL identifies as, rather than the input row's
+            // former default. Link rows are interchangeable.
+            update(link.id, { url, platform: detectPlatformFromUrl(url) ?? link.platform });
+          }} placeholder="https://platform.example/market/..." className="w-full rounded-lg border border-[#232E3C] bg-[#182533] px-3 py-2.5 text-sm text-[#FFFFFF] placeholder-[#48555F] focus:border-[#5DBE81] focus:outline-none focus:ring-1 focus:ring-[#5DBE81]/30" />
         </label>
         <button type="button" onClick={() => remove(link.id)} disabled={links.length <= 2} title="Remove link" className="mb-0.5 rounded-lg border border-[#232E3C] p-2.5 text-[#8A9BA8] hover:border-red-400/50 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>
       </div>;
