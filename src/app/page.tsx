@@ -317,7 +317,10 @@ export default function Home() {
       const initialMarkets = await loadSavedMarkets();
       savedMarketsRef.current = initialMarkets;
 
-      if (view === "scan" && marketId) {
+      if (view === "scan" && !marketId) {
+        // A direct /?view=scan link is the empty manual-link form, not the dashboard.
+        setViewMode("scan");
+      } else if (view === "scan" && marketId) {
         const m = (initialMarkets as SavedMarket[]).find((m) => m.id === marketId);
         if (m) {
           setKalshiUrl(m.kalshiUrl);
