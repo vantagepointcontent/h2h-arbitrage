@@ -26,6 +26,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-018 | Low | `src/app/api/predictionhunt/markets/route.ts` query-number parsing | Fixed | Non-numeric or unsafe `maxDays`/`fetchCount` query values produced `NaN` and could reach upstream market fetching. Added a shared, tested bounded-integer parser with safe fallbacks. |
 | CR-019 | Low | `src/app/api/arb-lifecycle/route.ts` days query parsing | Fixed | Non-numeric or unsafe `days` values could produce `NaN` and reach lifecycle aggregation. Reused the shared bounded-integer parser with a safe 30-day fallback. |
 | CR-020 | Medium | `src/app/api/auto-discovery/route.ts` scheduler/state mutations | Fixed | Direct JSON parsing and weak patch validation allowed malformed payloads or non-boolean pause state to reach scheduler control and persisted discovery state. Added strict JSON-object, action, and exact boolean-patch validation. |
+| CR-021 | Medium | `src/app/api/saved-markets` update/delete mutations | Fixed | Update handlers accepted arbitrary fields and types; delete paths accepted whitespace or unbounded IDs. Added tested allowlisted update parsing and shared bounded non-empty ID validation to both delete routes. |
 
 ## Verification
 

@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult, getMarketUrlsById } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
+import { parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
 
 export async function GET(request: NextRequest) {
   try {
@@ -170,14 +171,13 @@ export async function PUT(request: NextRequest) {
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
-    const body: any = parsed.body;
-    if (!body.id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-    }
-    const ok = await updateSavedMarket(body.id, {
-      eventTitle: body.eventTitle,
-      expiryDate: body.expiryDate,
-      category: body.category,
+    const update = parseSavedMarketPatch(parsed.body);
+    if ('error' in update) return NextResponse.json({ error: update.error }, { status: 400 });
+    const { id, ...changes } = update;
+    const ok = await updateSavedMarket(id, {
+      eventTitle: changes.eventTitle,
+      expiryDate: changes.expiryDate,
+      category: changes.category,
     });
     if (!ok) return NextResponse.json({ error: 'Market not found' }, { status: 404 });
     return NextResponse.json({ success: true });
@@ -189,9 +189,9 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const id = parseSavedMarketId(searchParams.get('id'));
     if (!id) {
-      return NextResponse.json({ error: 'Missing id query parameter' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing or invalid id query parameter' }, { status: 400 });
     }
     const ok = await deleteSavedMarket(id);
     return NextResponse.json({ success: ok });
