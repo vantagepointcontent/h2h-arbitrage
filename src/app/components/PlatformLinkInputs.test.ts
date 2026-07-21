@@ -26,4 +26,14 @@ describe('PlatformLinkInputs', () => {
     expect(urls).toHaveLength(3);
     expect(document.activeElement).toBe(urls[2]);
   });
+
+  it('stores the detected platform with the URL instead of retaining the row default', () => {
+    render(createElement(Harness));
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: 'https://www.interactivebrokers.com/predictionmarkets/app/market/123' },
+    });
+
+    expect((screen.getAllByRole('combobox')[0] as HTMLSelectElement).value).toBe('ibkr');
+  });
 });
