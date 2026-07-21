@@ -1,5 +1,5 @@
 // WS-103: Watch-target management endpoint.
-// GET  /api/watcher/targets            — current tier assignment + stats
+// GET  /api/watcher/targets            — current persisted tier assignment + stats (read-only)
 // POST /api/watcher/targets            — { action: 'refresh' } re-resolve stale pairs
 //                                        { action: 'promote', pairId } flag a pair HOT (poller hook)
 // Mutations require the shared API token (same scheme as other mutating routes).
@@ -20,11 +20,11 @@ function authorized(req: NextRequest): boolean {
 
 export async function GET() {
   try {
-    const tiers = await computeTiers();
     const state = await getTierState();
+    const hotPairIds = state.filter((entry) => entry.tier === 'hot').map((entry) => entry.pairId);
     return NextResponse.json({
-      stats: tiers.stats,
-      hotPairIds: tiers.hotPairIds,
+      stats: { pairs: state.length, hotPairs: hotPairIds.length, kalshiTickers: 0, pmTokens: 0 },
+      hotPairIds,
       tierState: state,
     });
   } catch (err) {
@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
   try {
     if (body.action === 'refresh') {
       const result = await refreshWatchTargets();
-      return NextResponse.json({ ok: true, ...result });
+      const tiers = await computeTiers();
+      return NextResponse.json({ ok: true, ...result, stats: tiers.stats, hotPairIds: tiers.hotPairIds });
     }
     if (body.action === 'promote') {
       await flagForPromotion(body.pairId);
