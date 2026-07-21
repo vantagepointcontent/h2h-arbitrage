@@ -31,6 +31,27 @@ export const DEFAULT_TIERS: ScanTier[] = [
   { label: "Cold", maxDays: 365, intervalMs: 60 * 60 * 1000 },   // 1 hour
 ];
 
+export function isValidScanTiers(value: unknown): value is ScanTier[] {
+  if (!Array.isArray(value) || value.length !== DEFAULT_TIERS.length) return false;
+  return value.every((tier, index) => {
+    if (!tier || typeof tier !== 'object') return false;
+    const candidate = tier as Partial<ScanTier>;
+    const expected = DEFAULT_TIERS[index];
+    return candidate.label === expected.label
+      && Number.isFinite(candidate.maxDays) && candidate.maxDays! > 0
+      && Number.isFinite(candidate.intervalMs) && candidate.intervalMs! >= 60_000
+      && candidate.intervalMs! <= 86_400_000
+      && (index === 0 || candidate.maxDays! > (value[index - 1] as ScanTier).maxDays);
+  });
+}
+
+export function parseScanConfigTiers(value: unknown): { tiers: ScanTier[] } | { error: string } {
+  if (!isValidScanTiers(value)) {
+    return { error: 'tiers must contain ordered Hot, Warm, and Cold entries with positive maxDays and intervals from 1 minute to 24 hours' };
+  }
+  return { tiers: value };
+}
+
 export function getDefaultConfig(): ScanConfig {
   return {
     tiers: DEFAULT_TIERS,
@@ -41,7 +62,9 @@ export function getDefaultConfig(): ScanConfig {
 export function loadScanConfig(): ScanConfig {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as ScanConfig;
+    const config = JSON.parse(raw) as ScanConfig;
+    if (!isValidScanTiers(config.tiers)) throw new Error('Invalid scan tier config');
+    return config;
   } catch {
     const cfg = getDefaultConfig();
     saveScanConfig(cfg);
