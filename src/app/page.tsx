@@ -1969,6 +1969,7 @@ export default function Home() {
                         outcomes={result.outcomes}
                         formatCurrency={formatCurrency}
                         marketExpiryDate={result.expiryDate}
+                        category={savedMarkets.find((market) => market.id === activeMarketId)?.category}
                         marketTitle={result.eventTitle}
                       />
                     )}

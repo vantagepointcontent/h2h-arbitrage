@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { TrendingUp, Zap } from "lucide-react";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
+import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import { computeApy } from "@/lib/matcher";
+import type { ProfitDistribution } from "@/lib/profit-distribution";
 
 interface Outcome {
   artist: string;
@@ -36,6 +38,7 @@ interface Props {
   outcomes: Outcome[];
   formatCurrency: (n: number) => string;
   marketExpiryDate?: string | null;
+  category?: string;
   /** Market title — when provided, Execute buttons render for simple 2-leg arbs */
   marketTitle?: string;
 }
@@ -48,10 +51,11 @@ interface Props {
  * Execute button renders when marketTitle + ticker + conditionId are available.
  * Distinct from the outcomes table which shows ALL outcomes (including non-arb).
  */
-export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDate, marketTitle }: Props) {
+export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDate, category, marketTitle }: Props) {
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
+  const [distributions, setDistributions] = useState<Record<string, ProfitDistribution>>({});
 
   const arbOpps = useMemo(() => {
     return outcomes
@@ -59,7 +63,13 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
       .sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct);
   }, [outcomes]);
 
-  const startExecute = async (o: Outcome) => {
+  const startExecute = async (o: Outcome, distribution?: ProfitDistribution) => {
+    const adjustedKalshiStake = distribution?.kalshiStake ?? o.arbitrage.kalshiStake ?? 0;
+    const adjustedPmStake = distribution?.pmStake ?? o.arbitrage.pmStake ?? 0;
+    const adjustedProfit = distribution?.worstCaseNetProfit ?? o.arbitrage.expectedProfit;
+    const adjustedRoi = adjustedKalshiStake + adjustedPmStake > 0
+      ? (adjustedProfit / (adjustedKalshiStake + adjustedPmStake)) * 100
+      : o.arbitrage.roiPct;
     // Show clear error instead of silent return
     if (!marketTitle) {
       setExecError('Cannot execute: market title missing. Wait for scan to complete.');
@@ -88,10 +98,10 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
       const exec = buildExecutableArb({
         artist: o.artist,
         strategy: o.arbitrage.strategy,
-        roiPct: o.arbitrage.roiPct,
-        expectedProfit: o.arbitrage.expectedProfit,
-        kalshiStake: o.arbitrage.kalshiStake ?? 0,
-        pmStake: o.arbitrage.pmStake ?? 0,
+        roiPct: adjustedRoi,
+        expectedProfit: adjustedProfit,
+        kalshiStake: adjustedKalshiStake,
+        pmStake: adjustedPmStake,
         kalshiYesAsk: o.kalshi.yesAsk ?? null,
         kalshiNoAsk: o.kalshi.noAsk ?? null,
         pmYesAsk: o.polymarket.yesPrice ?? null,
@@ -102,8 +112,8 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
       }, marketTitle);
       if (!exec) {
         // Provide specific reason why it's not executable
-        const kStake = o.arbitrage.kalshiStake ?? 0;
-        const pmStake = o.arbitrage.pmStake ?? 0;
+        const kStake = adjustedKalshiStake;
+        const pmStake = adjustedPmStake;
         const kYesAsk = o.kalshi?.yesAsk ?? null;
         const kNoAsk = o.kalshi?.noAsk ?? null;
         const pmYes = o.polymarket?.yesPrice ?? null;
@@ -173,7 +183,26 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
           );
           const apy = o.arbitrage.apyPct ?? computeApy(o.arbitrage.roiPct, marketExpiryDate);
 
-          const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId;
+          const distributionKey = `${idx}-${o.artist}`;
+          const adjusted = distributions[distributionKey];
+          // A zero stake at a directional endpoint is intentionally a one-leg
+          // position, not an executable two-leg arb.
+          const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious
+            && o.kalshi?.ticker && o.polymarket?.conditionId
+            && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0));
+          const displayProfit = adjusted?.worstCaseNetProfit ?? o.arbitrage.expectedProfit;
+          const displayRoi = adjusted
+            ? (displayProfit / adjusted.totalStake) * 100
+            : o.arbitrage.roiPct;
+          const kalshiPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
+            ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
+          const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
+            ? o.polymarket?.noPrice : o.polymarket?.yesPrice;
+          const supportsDistribution = !breakdown.isCross
+            && (o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
+            && kalshiPrice != null && kalshiPrice > 0 && kalshiPrice < 1
+            && pmPrice != null && pmPrice > 0 && pmPrice < 1
+            && (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0) > 0;
 
           return (
             <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
@@ -182,10 +211,10 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                 <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
                 <div className="flex-1" />
                 <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
-                  {o.arbitrage.roiPct.toFixed(2)}%
+                  {displayRoi.toFixed(2)}%
                 </span>
                 <span className="text-xs text-[#5DBE81]" title="Expected profit (net of fees)">
-                  {formatCurrency(o.arbitrage.expectedProfit)}
+                  {formatCurrency(displayProfit)}
                 </span>
                 {apy > 0 && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
@@ -196,7 +225,7 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                   <span className="flex flex-col items-center">
                     <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
                     <button
-                      onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                      onClick={(e) => { e.stopPropagation(); startExecute(o, adjusted); }}
                       disabled={resolvingArtist === o.artist}
                       className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                       title="Manually execute this arb (opens confirmation)"
@@ -212,6 +241,20 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
                 <div className="mt-2">
                   <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
                 </div>
+              )}
+              {supportsDistribution && (
+                <ProfitDistributionPanel
+                  strategy={o.arbitrage.strategy as 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi'}
+                  kalshiPrice={kalshiPrice}
+                  pmPrice={pmPrice}
+                  kalshiStake={o.arbitrage.kalshiStake ?? 0}
+                  pmStake={o.arbitrage.pmStake ?? 0}
+                  category={category}
+                  kalshiWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO'}
+                  pmWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES'}
+                  formatCurrency={formatCurrency}
+                  onChange={(distribution) => setDistributions(previous => ({ ...previous, [distributionKey]: distribution }))}
+                />
               )}
             </div>
           );
