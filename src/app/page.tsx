@@ -601,11 +601,10 @@ export default function Home() {
       const ids = marketsToScan && marketsToScan.length > 0
         ? marketsToScan.map((m) => m.id).join(',')
         : undefined;
-      const startUrl = ids
-        ? `/api/saved-markets/refresh?start=true&ids=${encodeURIComponent(ids)}&_=${Date.now()}`
-        : `/api/saved-markets/refresh?start=true&_=${Date.now()}`;
-      const startRes = await fetch(startUrl, {
-        headers: { 'Cache-Control': 'no-store' },
+      const startRes = await fetch('/api/saved-markets/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        body: JSON.stringify({ ids: ids ? ids.split(',') : undefined }),
       });
       if (!startRes.ok) {
         const err = await startRes.text();
