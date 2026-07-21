@@ -11,7 +11,27 @@ import {
   buildPmArbShape,
   calcKalshiFee,
   calcPolymarketFee,
+  normalizeOutcomePlatforms,
 } from './matcher';
+
+describe('platform-neutral outcome model', () => {
+  it('emits canonical platform data while preserving legacy fields during migration', () => {
+    const normalized = normalizeOutcomePlatforms({
+      artist: 'Example',
+      kalshi: { ticker: 'KX-EXAMPLE', yesBid: 0.4, yesAsk: 0.42, noBid: 0.58, noAsk: 0.6, lastPrice: 0.41 },
+      polymarket: { marketId: 'pm-example', conditionId: 'condition-example', yesPrice: 0.43, noPrice: 0.57, bestBid: 0.42, bestAsk: 0.43, lastTradePrice: 0.43 },
+      arbitrage: { strategy: 'No arb', arbType: 'direct', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+      source: 'auto',
+    });
+
+    expect(normalized.kalshi?.ticker).toBe('KX-EXAMPLE');
+    expect(normalized.polymarket?.conditionId).toBe('condition-example');
+    expect(normalized.platforms).toEqual([
+      expect.objectContaining({ platformId: 'kalshi', marketId: 'KX-EXAMPLE', outcomeId: 'KX-EXAMPLE', yesPrice: 0.42 }),
+      expect.objectContaining({ platformId: 'polymarket', marketId: 'pm-example', outcomeId: 'condition-example', yesPrice: 0.43 }),
+    ]);
+  });
+});
 import { getClobPrices } from './polymarket-clob';
 
 describe('calculateArbitrageMax', () => {

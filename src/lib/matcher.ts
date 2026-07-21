@@ -74,6 +74,55 @@ export interface UnifiedOutcome {
   negRisk?: boolean;
   /** True when this outcome is a virtual cross-outcome arbitrage row */
   isCrossOutcome?: boolean;
+  /**
+   * Canonical platform-neutral representation. The legacy `kalshi` and
+   * `polymarket` fields remain during the FEAT-3/4 migration so current
+   * consumers continue to work without a flag-day cutover.
+   */
+  platforms?: MatchedPlatformData[];
+}
+
+/** Normalized per-platform data for one matched outcome. */
+export interface MatchedPlatformData {
+  platformId: 'kalshi' | 'polymarket';
+  marketId: string;
+  outcomeId: string;
+  yesPrice: number;
+  noPrice: number;
+  bestBid: number;
+  bestAsk: number;
+  lastPrice: number;
+  askDepth?: number;
+  bidDepth?: number;
+  raw: NonNullable<UnifiedOutcome['kalshi']> | NonNullable<UnifiedOutcome['polymarket']>;
+}
+
+/**
+ * Populate the canonical N-platform field from legacy data. This is the
+ * compatibility boundary for the phased migration: new callers consume
+ * `platforms`, while FEAT-4/5 move existing callers off the legacy fields.
+ */
+export function normalizeOutcomePlatforms(outcome: UnifiedOutcome): UnifiedOutcome {
+  const platforms: MatchedPlatformData[] = [];
+  if (outcome.kalshi) {
+    const k = outcome.kalshi;
+    platforms.push({
+      platformId: 'kalshi', marketId: k.ticker, outcomeId: k.ticker,
+      yesPrice: k.yesAsk, noPrice: k.noAsk, bestBid: k.yesBid,
+      bestAsk: k.yesAsk, lastPrice: k.lastPrice,
+      askDepth: parseDepth(k.yesAskDepth), bidDepth: parseDepth(k.yesBidDepth), raw: k,
+    });
+  }
+  if (outcome.polymarket) {
+    const p = outcome.polymarket;
+    platforms.push({
+      platformId: 'polymarket', marketId: p.marketId, outcomeId: p.conditionId,
+      yesPrice: p.yesPrice, noPrice: p.noPrice, bestBid: p.bestBid,
+      bestAsk: p.bestAsk, lastPrice: p.lastTradePrice,
+      askDepth: p.askDepth, bidDepth: p.noAskDepth, raw: p,
+    });
+  }
+  return { ...outcome, platforms };
 }
 
 /** Default fee parameters per platform. Polymarket theta varies by category. */
@@ -1206,7 +1255,7 @@ export function matchOutcomes(
     }
   }
 
-  return matched;
+  return matched.map(normalizeOutcomePlatforms);
 }
 
 /**
@@ -1280,5 +1329,5 @@ export function applyManualMatches(
   }
 
   // Remove PM-only entries that got merged
-  return merged.filter((_, i) => !indicesToRemove.has(i));
+  return merged.filter((_, i) => !indicesToRemove.has(i)).map(normalizeOutcomePlatforms);
 }
