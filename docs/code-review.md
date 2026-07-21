@@ -22,6 +22,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-014 | High | `src/app/api/prune-scans/route.ts` destructive retention action | Fixed | An unauthenticated caller could delete retained scan and lifecycle data; invalid `days` inputs could also reach persistence. Added token authorization, bounded whole-day parsing, and retained the project's standard `x-h2h-token` header for the legitimate poller. No prune action was invoked during verification. |
 | CR-015 | Medium | `src/app/api/scan/route.ts` scan request parsing | Fixed | Valid JSON arrays, scalars, or `null` were not rejected at the request boundary and could fall into generic route handling. Replaced direct parsing with the shared JSON-object guard before link resolution or any upstream fetch. |
 | CR-016 | Medium | `src/app/api/decoupled-pairs/route.ts` mutation input | Fixed | JSON shape, persisted market identifiers, and delete IDs were accepted without strict validation. Added tested JSON-object parsing, normalized non-empty pair identifiers, and UUID-only delete IDs before any write. |
+| CR-017 | Medium | `src/app/api/predictionhunt/markets/route.ts` save-to-H2H input | Fixed | Valid non-object JSON and arbitrary non-string market fields could reach saved-market persistence. Added tested JSON-object parsing and normalized required URL/title/category/expiry inputs before upsert. |
 
 ## Verification
 

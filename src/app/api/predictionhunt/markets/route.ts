@@ -14,6 +14,8 @@ import {
 } from '@/lib/predictionhunt';
 import { upsertSavedMarket } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseJsonObject } from '@/lib/request-json';
+import { parseSavePredictionHuntMarketRequest } from '@/lib/predictionhunt-request';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
@@ -201,20 +203,17 @@ export async function POST(request: NextRequest) {
      * Uses upsert: updates in-place if already saved (preserving favorite),
      * creates new if not yet saved. */
     if (action === 'save-to-h2h') {
-      const body = await request.json();
-      if (!body.polymarketUrl || !body.kalshiUrl) {
-        return NextResponse.json(
-          { success: false, error: 'Missing polymarketUrl or kalshiUrl' },
-          { status: 400 }
-        );
-      }
+      const parsed = await parseJsonObject(request);
+      if ('error' in parsed) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+      const body = parseSavePredictionHuntMarketRequest(parsed.body);
+      if ('error' in body) return NextResponse.json({ success: false, error: body.error }, { status: 400 });
 
       const market = await upsertSavedMarket({
         kalshiUrl: body.kalshiUrl,
         polymarketUrl: body.polymarketUrl,
-        eventTitle: body.title || 'Untitled',
-        category: body.category || '',
-        expiryDate: body.expiryDate || null,
+        eventTitle: body.title,
+        category: body.category,
+        expiryDate: body.expiryDate,
       });
 
       return NextResponse.json({ success: true, market }, { status: 200 });
