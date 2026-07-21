@@ -22,6 +22,7 @@ import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { resolveScanLinks } from '@/lib/scan-links';
+import { parseScanCapital } from '@/lib/scan-request';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -35,7 +36,14 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { skipAutoMatch, capital = 1000, force = false } = body;
+    const { skipAutoMatch, force = false } = body;
+    const capital = parseScanCapital(body.capital);
+    if (capital === null) {
+      return NextResponse.json(
+        { error: 'Invalid capital. Expected a finite number from $1 to $1,000,000.' },
+        { status: 400 },
+      );
+    }
     // FEAT-4: canonical platformLinks payload with legacy URL compatibility.
     const { platformLinks: suppliedLinks, kalshiUrl, polymarketUrl } = resolveScanLinks(body);
 
