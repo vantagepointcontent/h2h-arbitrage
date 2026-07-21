@@ -20,17 +20,17 @@ export class OpinionAdapter implements PlatformAdapter {
 
   extractEventId(url: string): string | null {
     // Opinion URL format TBD — placeholder pattern
-    const match = url.match(/opinion\.(?:com|finance)\/(?:event|market)\/([^/?#]+)/i);
+    const match = url.match(/opinion\.(?:trade|com|finance)\/(?:event|market)\/([^/?#]+)/i);
     return match ? match[1] : null;
   }
 
   extractMarketId(url: string): string | null {
-    const match = url.match(/opinion\.(?:com|finance)\/market\/([^/?#]+)/i);
+    const match = url.match(/opinion\.(?:trade|com|finance)\/market\/([^/?#]+)/i);
     return match ? match[1] : null;
   }
 
   isPlatformUrl(url: string): boolean {
-    return /opinion\.(?:com|finance)/i.test(url);
+    return /opinion\.(?:trade|com|finance)/i.test(url);
   }
 
   // ── Market Data Fetching (stubs) ──
