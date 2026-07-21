@@ -64,7 +64,7 @@ export function buildExecutableArb(o: {
     return null; // cross-outcome / No arb — not executable from this button
   }
   if (kPrice == null || pmPrice == null || !pmToken) return null;
-  if (o.kalshiStake <= 0 || o.pmStake <= 0) return null;
+  if (kPrice <= 0 || pmPrice <= 0 || o.kalshiStake <= 0 || o.pmStake <= 0) return null;
 
   return {
     arbId: `${Date.now().toString(36)}-${o.artist.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
@@ -139,6 +139,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
 
   const isReal = gates ? !gates.killSwitch && !gates.dryRun : false;
   const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const formatShares = (size: number) => `${size.toLocaleString(undefined, { maximumFractionDigits: 2 })} shares`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
@@ -165,11 +166,11 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             <div className="px-3 py-2 flex justify-between"><span className="text-[#8A9BA8]">Strategy</span><span className="font-medium">{arb.strategy}</span></div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Kalshi leg</span>
-              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(arb.kalshiOrder.price)} · {fmt(arb.kalshiOrder.size)}</span>
+              <span className="font-mono">{arb.kalshiOrder.outcome.toUpperCase()} @ {formatPrice(arb.kalshiOrder.price)} · {formatShares(arb.kalshiOrder.size / arb.kalshiOrder.price)} · {fmt(arb.kalshiOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Polymarket leg</span>
-              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {fmt(arb.polymarketOrder.size)}</span>
+              <span className="font-mono">{arb.polymarketOrder.outcome.toUpperCase()} @ {formatPrice(arb.polymarketOrder.price)} · {formatShares(arb.polymarketOrder.size / arb.polymarketOrder.price)} · {fmt(arb.polymarketOrder.size)}</span>
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Est. net profit</span>
