@@ -4,9 +4,8 @@ Research date: 2026-07-20. This is an architecture input, not authorization to p
 
 ## Recommendation
 
-1. **Opinion.trade — first additional data integration.** Documented REST market/orderbook API, WebSocket, API-key authentication, and CLOB SDK for trading. Medium implementation effort.
-2. **Predict.fun — second.** Broad documented beta API (markets, orderbooks, orders, JWT auth and WebSocket). Medium effort, but beta/API stability risk.
-3. **IBKR Prediction Markets — last.** Powerful general Client Portal API, but account, IBKR Pro, funded-account, 2FA and market-entitlement constraints make it high-friction. Validate prediction-market contract access before implementation.
+1. **IBKR Prediction Markets — investigate first.** Validate contract access, market-data entitlements, and the supported API surface before implementation.
+2. **Predict.fun — deferred.** Broad documented beta API (markets, orderbooks, orders, JWT auth and WebSocket), but beta/API stability risk.
 
 ## Interactive Brokers Prediction Markets
 
@@ -18,22 +17,6 @@ Research date: 2026-07-20. This is an architecture input, not authorization to p
 - **Next proof:** create a read-only adapter spike after an IBKR Pro account and prediction-market market-data entitlement are confirmed.
 - **Source:** https://www.interactivebrokers.com/campus/ibkr-api-page/cpapi-v1/
 
-## Opinion.trade
-
-- **Read API:** REST OpenAPI exposes market metadata, prices, orderbooks, volumes, history and pagination.
-- **Realtime:** authenticated WebSocket supports market, price, orderbook and event updates.
-- **Auth/rate limit:** API key, 15 requests/sec per key. Access is requested through Opinion's application process.
-- **Trading:** the OpenAPI is read-only; place/cancel orders and positions use the Opinion CLOB SDK.
-- **Chain:** BNB Chain mainnet (chain ID 56).
-- **Difficulty:** Medium — clean documented read path; trading requires SDK/wallet work.
-- **Example market list:**
-  ```bash
-  curl 'https://proxy.opinion.trade:8443/openapi/market?status=activated&sortBy=5&limit=20' \
-    -H 'apikey: YOUR_API_KEY'
-  ```
-- **Sources:**
-  - https://docs.opinion.trade/developer-guide/opinion-open-api/overview
-  - https://docs.opinion.trade/developer-guide/opinion-websocket/overview
 
 ## Predict.fun
 
@@ -54,5 +37,5 @@ Research date: 2026-07-20. This is an architecture input, not authorization to p
 
 - Registry/adapters are justified, but **do not** refactor all existing PM/Kalshi code in one untested sweep.
 - Finish FEAT-1 registry and FEAT-2 adapter contracts first.
-- Keep Opinion, Predict.fun and IBKR adapters read-only/stubbed until their credential and entitlement proof is complete.
+- Keep Predict.fun and IBKR adapters read-only/stubbed until their credential and entitlement proof is complete.
 - Any execution adapter remains manual-only, dry-run by default, and behind the existing kill switch.

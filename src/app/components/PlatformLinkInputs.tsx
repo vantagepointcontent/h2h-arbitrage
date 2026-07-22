@@ -18,7 +18,7 @@ export function PlatformLinkInputs({ links, onChange }: { links: PlatformLinkInp
     window.addEventListener("h2h-platforms-changed", load);
     return () => window.removeEventListener("h2h-platforms-changed", load);
   }, []);
-  const selectablePlatforms = ['kalshi', 'polymarket', 'opinion', 'ibkr'].filter(id => overrides[id] !== false);
+  const selectablePlatforms = ['kalshi', 'polymarket', 'ibkr'].filter(id => overrides[id] !== false);
   const update = (id: string, patch: Partial<PlatformLinkInput>) => onChange(links.map(link => link.id === id ? { ...link, ...patch } : link));
   const remove = (id: string) => onChange(links.filter(link => link.id !== id));
   useEffect(() => {

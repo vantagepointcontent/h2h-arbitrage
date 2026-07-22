@@ -12,7 +12,7 @@
 
 // ── Core Types ────────────────────────────────────────────────────────
 
-export type PlatformId = string; // 'polymarket' | 'kalshi' | 'opinion' | 'ibkr' | ...
+export type PlatformId = string; // 'polymarket' | 'kalshi' | 'ibkr' | ...
 
 export interface PlatformConfig {
   /** Unique identifier used throughout the codebase */
@@ -36,9 +36,9 @@ export interface PlatformConfig {
   /** Whether the adapter implementation exists (vs stub) */
   adapterReady: boolean;
   /** Market data format — how outcomes/prices are structured */
-  dataFormat: 'kalshi-native' | 'polymarket-gamma' | 'opinion-native' | 'ibkr-native' | 'generic';
+  dataFormat: 'kalshi-native' | 'polymarket-gamma' | 'ibkr-native' | 'generic';
   /** Fee model identifier used by the fee calculation system */
-  feeModel: 'kalshi' | 'polymarket' | 'opinion' | 'ibkr' | 'generic';
+  feeModel: 'kalshi' | 'polymarket' | 'ibkr' | 'generic';
   /** WS support for live orderbook streaming */
   supportsWebSocket: boolean;
   /** Sort order for UI display (lower = first) */
@@ -88,22 +88,6 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     supportsWebSocket: true,
     sortOrder: 2,
   },
-  opinion: {
-    id: 'opinion',
-    name: 'Opinion',
-    shortName: 'OP',
-    iconPath: '/opinion-icon.png',
-    color: '#6366f1',
-    apiBaseUrl: '', // TBD when API integration ticket is done
-    urlPatterns: [/opinion\.trade/i, /opinion\.com/i, /opinion\.finance/i],
-    credentialKeys: [],
-    enabled: false,
-    adapterReady: false,
-    dataFormat: 'opinion-native',
-    feeModel: 'opinion',
-    supportsWebSocket: false,
-    sortOrder: 3,
-  },
   ibkr: {
     id: 'ibkr',
     name: 'Interactive Brokers',
@@ -118,7 +102,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     dataFormat: 'ibkr-native',
     feeModel: 'ibkr',
     supportsWebSocket: false,
-    sortOrder: 4,
+    sortOrder: 3,
   },
 };
 

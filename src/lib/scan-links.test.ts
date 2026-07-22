@@ -15,17 +15,17 @@ describe('resolveScanLinks', () => {
     expect(links.platformLinks).toHaveLength(2);
   });
 
-  it('preserves a third platform link while retaining the Kalshi and Polymarket scan pair', () => {
+  it('preserves an IBKR link while retaining the Kalshi and Polymarket scan pair', () => {
     const links = resolveScanLinks({
       platformLinks: [
         { platform: 'kalshi', url: 'https://kalshi.com/markets/KXTEST' },
         { platform: 'polymarket', url: 'https://polymarket.com/event/test-market' },
-        { platform: 'opinion', url: 'https://opinion.com/market/test-market' },
+        { platform: 'ibkr', url: 'https://www.interactivebrokers.com/predictionmarkets/app/market/123' },
       ],
     });
 
     expect(links.platformLinks).toHaveLength(3);
-    expect(links.platformLinks[2]).toEqual({ platform: 'opinion', url: 'https://opinion.com/market/test-market' });
+    expect(links.platformLinks[2]).toEqual({ platform: 'ibkr', url: 'https://www.interactivebrokers.com/predictionmarkets/app/market/123' });
     expect(links.kalshiUrl).toContain('KXTEST');
     expect(links.polymarketUrl).toContain('test-market');
   });

@@ -10,7 +10,7 @@
  *   import { PlatformIcon, getPlatformName, detectPlatformFromUrl } from '@/lib/platforms/client';
  */
 
-export type PlatformId = 'polymarket' | 'kalshi' | 'opinion' | 'ibkr' | string;
+export type PlatformId = 'polymarket' | 'kalshi' | 'ibkr' | string;
 
 export interface ClientPlatformConfig {
   id: PlatformId;
@@ -46,16 +46,6 @@ export const CLIENT_PLATFORMS: Record<PlatformId, ClientPlatformConfig> = {
     adapterReady: true,
     sortOrder: 2,
   },
-  opinion: {
-    id: 'opinion',
-    name: 'Opinion',
-    shortName: 'OP',
-    iconPath: '/opinion-icon.png',
-    color: '#6366f1',
-    enabled: false,
-    adapterReady: false,
-    sortOrder: 3,
-  },
   ibkr: {
     id: 'ibkr',
     name: 'Interactive Brokers',
@@ -64,7 +54,7 @@ export const CLIENT_PLATFORMS: Record<PlatformId, ClientPlatformConfig> = {
     color: '#d4261e',
     enabled: false,
     adapterReady: false,
-    sortOrder: 4,
+    sortOrder: 3,
   },
 };
 
@@ -73,7 +63,7 @@ export const CLIENT_PLATFORMS: Record<PlatformId, ClientPlatformConfig> = {
 const URL_PATTERNS: Record<PlatformId, RegExp[]> = {
   polymarket: [/polymarket\.com/i],
   kalshi: [/kalshi\.com/i],
-  opinion: [/opinion\.com/i, /opinion\.finance/i],
+
   ibkr: [/interactivebrokers\.com/i, /ibkr\.com/i],
 };
 

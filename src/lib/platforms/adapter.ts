@@ -12,7 +12,7 @@
  * delegate to the existing implementation files (polymarket.ts, kalshi.ts,
  * polymarket-clob.ts, kalshi-orders.ts, etc.) — no behavior changes.
  *
- * New platforms (Opinion, IBKR) implement this interface directly with
+ * New platforms (such as IBKR) implement this interface directly with
  * stub implementations for now; actual API calls come in follow-up tickets.
  */
 
@@ -138,9 +138,6 @@ export async function getAdapter(platformId: PlatformId): Promise<PlatformAdapte
       _kalshiAdapter = new KalshiAdapter();
     }
     adapter = _kalshiAdapter;
-  } else if (platformId === 'opinion') {
-    const { OpinionAdapter } = await import('./adapters/opinion-adapter');
-    adapter = new OpinionAdapter();
   } else if (platformId === 'ibkr') {
     const { IbkrAdapter } = await import('./adapters/ibkr-adapter');
     adapter = new IbkrAdapter();
