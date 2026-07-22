@@ -58,7 +58,7 @@ type SortDir = "asc" | "desc";
 
 export default function LogsPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [savedMarkets, setSavedMarkets] = useState<Map<string, string>>(new Map());
+  const [savedMarkets, setSavedMarkets] = useState<Map<string, { title: string; expiryDate?: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -149,13 +149,13 @@ export default function LogsPanel() {
 
   // Fetch saved markets for market name lookup — use ultra-light names endpoint (~20KB vs 277KB)
   useEffect(() => {
-    fetch("/api/saved-markets?fields=names")
+    fetch("/api/saved-markets?fields=basic")
       .then((res) => res.json())
       .then((data) => {
-        const m = new Map<string, string>();
+        const m = new Map<string, { title: string; expiryDate?: string | null }>();
         const list = Array.isArray(data) ? data : (data?.markets ?? []);
         for (const mk of list) {
-          if (mk.eventTitle) m.set(mk.id, mk.eventTitle);
+          if (mk.eventTitle) m.set(mk.id, { title: mk.eventTitle, expiryDate: mk.expiryDate });
         }
         setSavedMarkets(m);
       })
@@ -185,7 +185,7 @@ export default function LogsPanel() {
     const q = searchQuery.toLowerCase();
     return result.filter(
       (l) => {
-        const marketName = l.market_name ?? l.market_title ?? savedMarkets.get(l.market_id);
+        const marketName = l.market_name ?? l.market_title ?? savedMarkets.get(l.market_id)?.title;
         return (
           l.market_id?.toLowerCase().includes(q) ||
           marketName?.toLowerCase().includes(q) ||
@@ -532,6 +532,9 @@ export default function LogsPanel() {
                   >
                     Profit <SortIcon col="best_profit" />
                   </th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    TTE
+                  </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("matched_count")}
@@ -610,14 +613,18 @@ function LogRow({
   fmtPct: (n: number) => string;
   fmtUsd: (n: number) => string;
   fmtTime: (s: string) => string;
-  savedMarkets: Map<string, string>;
+  savedMarkets: Map<string, { title: string; expiryDate?: string | null }>;
 }) {
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbTypeMeta = getArbTypeMeta(log.strategy);
   const apy = logApyPct(log);
 
-  const marketName = log.market_name ?? log.market_title ?? savedMarkets.get(log.market_id);
+  const savedMarket = savedMarkets.get(log.market_id);
+  const marketName = log.market_name ?? log.market_title ?? savedMarket?.title;
+  const expiry = savedMarket?.expiryDate ? new Date(savedMarket.expiryDate) : null;
+  const minutesToExpiry = expiry ? Math.floor((expiry.getTime() - new Date(log.scanned_at).getTime()) / 60_000) : null;
+  const tte = minutesToExpiry == null ? '—' : minutesToExpiry <= 0 ? 'Expired' : minutesToExpiry >= 1440 ? `${Math.floor(minutesToExpiry / 1440)}d ${Math.floor(minutesToExpiry % 1440 / 60)}h` : minutesToExpiry >= 60 ? `${Math.floor(minutesToExpiry / 60)}h ${minutesToExpiry % 60}m` : `${minutesToExpiry}m`;
   const hasMarketName = !!marketName;
 
   const handleNavigate = (e: React.MouseEvent) => {
@@ -668,6 +675,7 @@ function LogRow({
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${apy ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>{apy ? fmtPct(apy) : "—"}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
+        <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
