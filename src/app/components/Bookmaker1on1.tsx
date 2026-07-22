@@ -54,30 +54,21 @@ interface Bookmaker1on1Props {
 }
 
 /** Determine spread color class based on thresholds */
-function spreadColorClass(spread: number | null, thresholds: SpreadThresholds): string {
-  if (spread == null) return "text-[#8A9BA8]";
-  const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "text-[#5DBE81]";
-  if (abs >= thresholds.yellow) return "text-[#facc15]";
-  return "text-[#ef4444]";
+function spreadColorClass(spread: number | null, _thresholds: SpreadThresholds): string {
+  if (spread == null || spread === 0) return "text-[#8A9BA8]";
+  return spread > 0 ? "text-[#5DBE81]" : "text-[#ef4444]";
 }
 
 /** Background tint for spread badge */
-function spreadBgClass(spread: number | null, thresholds: SpreadThresholds): string {
-  if (spread == null) return "bg-[#8A9BA8]/15 ring-[#8A9BA8]/30";
-  const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "bg-[#5DBE81]/15 ring-[#5DBE81]/30";
-  if (abs >= thresholds.yellow) return "bg-[#facc15]/15 ring-[#facc15]/30";
-  return "bg-[#ef4444]/15 ring-[#ef4444]/30";
+function spreadBgClass(spread: number | null, _thresholds: SpreadThresholds): string {
+  if (spread == null || spread === 0) return "bg-[#8A9BA8]/15 ring-[#8A9BA8]/30";
+  return spread > 0 ? "bg-[#5DBE81]/15 ring-[#5DBE81]/30" : "bg-[#ef4444]/15 ring-[#ef4444]/30";
 }
 
 /** Bar fill color */
-function spreadBarClass(spread: number | null, thresholds: SpreadThresholds): string {
-  if (spread == null) return "bg-[#8A9BA8]";
-  const abs = Math.abs(spread);
-  if (abs >= thresholds.green) return "bg-[#5DBE81]";
-  if (abs >= thresholds.yellow) return "bg-[#facc15]";
-  return "bg-red-400";
+function spreadBarClass(spread: number | null, _thresholds: SpreadThresholds): string {
+  if (spread == null || spread === 0) return "bg-[#8A9BA8]";
+  return spread > 0 ? "bg-[#5DBE81]" : "bg-[#ef4444]";
 }
 
 /** Format a price as cents display (e.g. 42.00) — null-safe, shows "—" for missing data */
