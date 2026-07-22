@@ -150,14 +150,16 @@ function Panel({
   icon,
   children,
   rightElement,
+  className,
 }: {
   title: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
   rightElement?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4">
+    <div className={`rounded-xl border border-[#182533] bg-[#17212B] p-4 ${className ?? ''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
           {icon}
@@ -256,7 +258,7 @@ export default function DashboardPanel() {
   const hasData = kpis.totalScans > 0;
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
@@ -446,7 +448,7 @@ export default function DashboardPanel() {
           </div>
 
           {/* ── Row 2: ROI Histogram + Market Coverage ──────── */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="order-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
             {/* ROI Distribution */}
             <Panel
               title="ROI Distribution"
@@ -575,6 +577,7 @@ export default function DashboardPanel() {
           {/* ── Row 3: Profit Timeline (area chart) ──────────── */}
           <Panel
             title="Arb Profit Timeline"
+            className="order-5"
             icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
             rightElement={
               <span className="text-xs text-[#A8B8C4]">
@@ -759,6 +762,7 @@ export default function DashboardPanel() {
           {/* ── Row 3: Top Active Arbs Table ───────────────── */}
           <Panel
             title="Top Active Arbs"
+            className="order-3"
             icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
             rightElement={
               <span className="text-xs text-[#A8B8C4]">
