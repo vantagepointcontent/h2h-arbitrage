@@ -74,7 +74,6 @@ const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
 const ExecutionModeBadge = dynamic(() => import("@/app/components/ExecutionModeBadge"), { ssr: false });
-const DualBrowserPanels = dynamic(() => import("@/components/EmbeddedBrowserPanel").then(m => m.DualBrowserPanels), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { ArbOpportunitiesPanel } from "@/app/components/ArbOpportunitiesPanel";
@@ -226,8 +225,6 @@ export default function Home() {
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
 
-    // Dual panel layout + auto-refresh
-  const [panelLayout, setPanelLayout] = useState<"sidebyside" | "stacked">("stacked");
   // Outcome table filter
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
 
@@ -2101,13 +2098,6 @@ export default function Home() {
                       );
                     })()}
 
-                    {/* Embedded platform browsers */}
-                    <DualBrowserPanels
-                      kalshiUrl={kalshiUrl}
-                      pmUrl={pmUrl}
-                      layout={panelLayout}
-                      onLayoutChange={setPanelLayout}
-                    />
                   </div>
                 )}
               </>

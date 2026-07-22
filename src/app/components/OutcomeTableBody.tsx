@@ -11,6 +11,7 @@ import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
 import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
 import { formatPrice } from "@/app/lib/page-shared";
+import { MarketDepthCharts } from './MarketDepthCharts';
 
 interface Outcome {
   artist: string;
@@ -440,6 +441,11 @@ function OutcomeTableBodyInner({
                     polymarket={o.polymarket}
                     arbitrage={o.arbitrage}
                     formatCurrency={formatCurrency}
+                  />
+
+                  <MarketDepthCharts
+                    kalshiTicker={o.kalshi?.ticker}
+                    pmConditionId={o.polymarket?.conditionId}
                   />
 
                   {/* Sparkline expand: full ROI history chart with axes */}
