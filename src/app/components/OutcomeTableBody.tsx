@@ -13,6 +13,8 @@ import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyToolt
 import { formatPrice } from "@/app/lib/page-shared";
 import { MarketDepthCharts } from './MarketDepthCharts';
 import { calculateShareRatio } from '@/lib/share-ratio';
+import { ProfitDistributionPanel } from './ProfitDistributionPanel';
+import type { ProfitDistribution } from '@/lib/profit-distribution';
 
 interface Outcome {
   artist: string;
@@ -94,7 +96,10 @@ function OutcomeTableBodyInner({
   // Sparkline expand state — which artist's chart is expanded (independent of row expand)
   const [expandedChartArtist, setExpandedChartArtist] = useState<string | null>(null);
 
-  const startExecute = async (o: Outcome) => {
+  // Slider-adjusted stakes are scoped to an outcome and are passed to manual execution.
+  const [profitDistributions, setProfitDistributions] = useState<Record<string, ProfitDistribution>>({});
+
+  const startExecute = async (o: Outcome, distribution?: ProfitDistribution) => {
     // Show clear error instead of silent return
     if (!marketTitle) {
       setExecError('Cannot execute: market title missing. Wait for scan to complete.');
@@ -108,6 +113,9 @@ function OutcomeTableBodyInner({
       setExecError(`Cannot execute ${o.artist}: Polymarket conditionId missing. Wait for live scan to complete.`);
       return;
     }
+    const executionArb = distribution
+      ? { ...o.arbitrage, kalshiStake: distribution.kalshiStake, pmStake: distribution.pmStake }
+      : o.arbitrage;
     setResolvingArtist(o.artist);
     setExecError(null);
     try {
@@ -123,10 +131,10 @@ function OutcomeTableBodyInner({
       const exec = buildExecutableArb({
         artist: o.artist,
         strategy: o.arbitrage.strategy,
-        roiPct: o.arbitrage.roiPct,
-        expectedProfit: o.arbitrage.expectedProfit,
-        kalshiStake: o.arbitrage.kalshiStake ?? 0,
-        pmStake: o.arbitrage.pmStake ?? 0,
+        roiPct: executionArb.roiPct,
+        expectedProfit: executionArb.expectedProfit,
+        kalshiStake: executionArb.kalshiStake ?? 0,
+        pmStake: executionArb.pmStake ?? 0,
         kalshiYesAsk: o.kalshi.yesAsk ?? null,
         kalshiNoAsk: o.kalshi.noAsk ?? null,
         kalshiYesAskShares: Number(o.kalshi.yesAskDepth),
@@ -343,7 +351,7 @@ function OutcomeTableBodyInner({
                         <span className="flex flex-col items-center">
                           <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
                           <button
-                            onClick={(e) => { e.stopPropagation(); startExecute(o); }}
+                            onClick={(e) => { e.stopPropagation(); startExecute(o, profitDistributions[o.artist]); }}
                             disabled={resolvingArtist === o.artist}
                             className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                             title="Manually execute this arb (opens confirmation)"
@@ -442,8 +450,22 @@ function OutcomeTableBodyInner({
                       polymarketLeg?.stake,
                       polymarketLeg?.price,
                     );
+                    const supportsDistribution = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi';
+                    const kalshiPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
+                    const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.polymarket?.noPrice : o.polymarket?.yesPrice;
                     return <>
                       <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
+                      {supportsDistribution && kalshiPrice && pmPrice && <ProfitDistributionPanel
+                        strategy={(o.arbitrage.strategy as 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi')}
+                        kalshiPrice={kalshiPrice}
+                        pmPrice={pmPrice}
+                        kalshiStake={o.arbitrage.kalshiStake ?? 0}
+                        pmStake={o.arbitrage.pmStake ?? 0}
+                        kalshiWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO'}
+                        pmWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES'}
+                        formatCurrency={formatCurrency}
+                        onChange={(distribution) => setProfitDistributions(previous => ({ ...previous, [o.artist]: distribution }))}
+                      />}
                       {ratio && <div className="mt-2 flex items-center justify-between rounded-lg border border-[#232E3C] bg-[#0E1621] px-3 py-2 text-xs">
                         <span className="uppercase tracking-wider text-[#8A9BA8]">Hedge share ratio</span>
                         <span className="font-mono font-bold text-[#FFFFFF]">PM {ratio.display.split(':')[0]} : {ratio.display.split(':')[1]} Kalshi</span>
