@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { makeKalshiAuthHeaders } from '@/lib/kalshi-auth';
 import { fetchClobBook, fetchClobMarket } from '@/lib/polymarket-clob';
-import { buildDepthBook, cumulativeLevels, type RawDepthLevel } from '@/lib/market-depth';
+import { buildDepthBook, buildKalshiYesBook, cumulativeLevels, type RawDepthLevel } from '@/lib/market-depth';
 
 export const dynamic = 'force-dynamic';
 
 type KalshiOrderbook = {
+  orderbook_fp?: {
+    yes_dollars?: [string, string][];
+    no_dollars?: [string, string][];
+  };
+  // Legacy payload shape retained as a fallback for backwards compatibility.
   orderbook?: {
     yes_dollars_fp?: [string, string][];
     no_dollars_fp?: [string, string][];
@@ -52,12 +57,11 @@ export async function GET(request: NextRequest) {
     ]);
     if (!pmBook) return jsonError('Polymarket YES orderbook unavailable', 502);
 
-    // Kalshi REST returns bid ladders for YES and NO. A NO bid is an executable
-    // YES ask at (1 - NO bid), preserving the correct side of the binary book.
-    const kalshiYesBids = toRawLevels(kalshiData.orderbook?.yes_dollars_fp);
-    const kalshiYesAsks = toRawLevels(kalshiData.orderbook?.no_dollars_fp)
-      .map(level => ({ price: 1 - Number(level.price), size: level.size }));
-    const kalshi = buildDepthBook(kalshiYesBids, kalshiYesAsks);
+    // Kalshi REST publishes YES and NO bid ladders under `orderbook_fp`.
+    // A NO bid is an executable YES ask at 1 - NO bid.
+    const kalshiYesBids = toRawLevels(kalshiData.orderbook_fp?.yes_dollars ?? kalshiData.orderbook?.yes_dollars_fp);
+    const kalshiNoBids = toRawLevels(kalshiData.orderbook_fp?.no_dollars ?? kalshiData.orderbook?.no_dollars_fp);
+    const kalshi = buildKalshiYesBook(kalshiYesBids, kalshiNoBids);
     const polymarket = buildDepthBook(pmBook.bids, pmBook.asks);
 
     return NextResponse.json({

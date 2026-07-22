@@ -37,6 +37,14 @@ export function buildDepthBook(bids: RawDepthLevel[] = [], asks: RawDepthLevel[]
   return { bids: normalize(bids, 'bids'), asks: normalize(asks, 'asks') };
 }
 
+/** Kalshi publishes YES and NO bid ladders. NO bids are executable YES asks at 1 - price. */
+export function buildKalshiYesBook(yesBids: RawDepthLevel[] = [], noBids: RawDepthLevel[] = []): DepthBook {
+  return buildDepthBook(
+    yesBids,
+    noBids.map(level => ({ price: 1 - Number(level.price), size: level.size })),
+  );
+}
+
 export function cumulativeLevels(levels: DepthLevel[], limit = 12): CumulativeDepthLevel[] {
   let cumulativeSize = 0;
   return levels.slice(0, limit).map(level => {
