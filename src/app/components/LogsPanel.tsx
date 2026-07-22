@@ -523,6 +523,9 @@ export default function LogsPanel() {
                   >
                     ROI % <SortIcon col="best_roi_pct" />
                   </th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    APY
+                  </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("best_profit")}
@@ -581,6 +584,17 @@ export default function LogsPanel() {
   );
 }
 
+function logApyPct(log: LogEntry): number | null {
+  if (!log.raw_result) return null;
+  try {
+    const arbs = JSON.parse(log.raw_result)?.allArbs ?? [];
+    const values = arbs.map((arb: any) => Number(arb?.apyPct)).filter((value: number) => Number.isFinite(value) && value > 0);
+    return values.length ? Math.max(...values) : null;
+  } catch {
+    return null;
+  }
+}
+
 function LogRow({
   log,
   expanded,
@@ -601,6 +615,7 @@ function LogRow({
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbTypeMeta = getArbTypeMeta(log.strategy);
+  const apy = logApyPct(log);
 
   const marketName = log.market_name ?? log.market_title ?? savedMarkets.get(log.market_id);
   const hasMarketName = !!marketName;
@@ -651,6 +666,7 @@ function LogRow({
           )}
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
+        <td className={`px-3 py-2 text-right text-xs font-mono ${apy ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>{apy ? fmtPct(apy) : "—"}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
