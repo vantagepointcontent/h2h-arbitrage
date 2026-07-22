@@ -225,8 +225,8 @@ export default function Home() {
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
 
-  // Outcome table filter
-  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
+  // Outcome table filter — show only pairable platform outcomes by default.
+  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("matched");
 
   // Match mode: auto (default) or manual
   const [matchMode, setMatchMode] = useState<"auto" | "manual">("auto");
