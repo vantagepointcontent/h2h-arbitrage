@@ -225,8 +225,8 @@ export default function Home() {
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
 
-  // Outcome table filter — show only pairable platform outcomes by default.
-  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("matched");
+  // Outcome table filter; entering a saved market resets this to matched.
+  const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
 
   // Match mode: auto (default) or manual
   const [matchMode, setMatchMode] = useState<"auto" | "manual">("auto");
@@ -261,6 +261,7 @@ export default function Home() {
             setKalshiUrl(m.kalshiUrl);
             setPmUrl(m.polymarketUrl);
             setActiveMarketId(m.id);
+            setOutcomeFilter("matched");
             kalshiUrlRef.current = m.kalshiUrl;
             pmUrlRef.current = m.polymarketUrl;
             activeMarketIdRef.current = m.id;
@@ -323,6 +324,7 @@ export default function Home() {
           setKalshiUrl(m.kalshiUrl);
           setPmUrl(m.polymarketUrl);
           setActiveMarketId(m.id);
+          setOutcomeFilter("matched");
           kalshiUrlRef.current = m.kalshiUrl;
           pmUrlRef.current = m.polymarketUrl;
           activeMarketIdRef.current = m.id;
@@ -727,6 +729,8 @@ export default function Home() {
     setKalshiUrl(m.kalshiUrl);
     setPmUrl(m.polymarketUrl);
     setActiveMarketId(m.id);
+    // UI-10: every newly opened saved market starts in the matched-only view.
+    setOutcomeFilter("matched");
     kalshiUrlRef.current = m.kalshiUrl;
     pmUrlRef.current = m.polymarketUrl;
     activeMarketIdRef.current = m.id;
