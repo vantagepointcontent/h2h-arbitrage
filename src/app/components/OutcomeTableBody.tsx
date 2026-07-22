@@ -12,6 +12,7 @@ import { parseArbLegs, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
 import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
 import { formatPrice } from "@/app/lib/page-shared";
 import { MarketDepthCharts } from './MarketDepthCharts';
+import { calculateShareRatio } from '@/lib/share-ratio';
 
 interface Outcome {
   artist: string;
@@ -433,7 +434,21 @@ function OutcomeTableBodyInner({
                       o.arbitrage.fees,
                       o.arbitrage.expectedProfit,
                     );
-                    return <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />;
+                    const kalshiLeg = breakdown.legs.find(leg => leg.platform === 'Kalshi');
+                    const polymarketLeg = breakdown.legs.find(leg => leg.platform === 'Polymarket');
+                    const ratio = calculateShareRatio(
+                      kalshiLeg?.stake,
+                      kalshiLeg?.price,
+                      polymarketLeg?.stake,
+                      polymarketLeg?.price,
+                    );
+                    return <>
+                      <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
+                      {ratio && <div className="mt-2 flex items-center justify-between rounded-lg border border-[#232E3C] bg-[#0E1621] px-3 py-2 text-xs">
+                        <span className="uppercase tracking-wider text-[#8A9BA8]">Hedge share ratio</span>
+                        <span className="font-mono font-bold text-[#FFFFFF]">PM {ratio.display.split(':')[0]} : {ratio.display.split(':')[1]} Kalshi</span>
+                      </div>}
+                    </>;
                   })()}
 
                   <ExecutionReadiness
