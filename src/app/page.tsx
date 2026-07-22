@@ -981,8 +981,8 @@ export default function Home() {
   const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy" | "scanned">("apy");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("desc");
 
-  // Outcome table sort — default APY desc (highest first)
-  const [outcomeSort, setOutcomeSort] = useState<"roi" | "apy" | "profit">("apy");
+  // Outcome table sort — default largest quoted cross-platform spread first
+  const [outcomeSort, setOutcomeSort] = useState<"roi" | "apy" | "profit" | "spread">("spread");
   const [outcomeSortDir, setOutcomeSortDir] = useState<"asc" | "desc">("desc");
 
   // Load saved markets on mount
@@ -1273,7 +1273,7 @@ export default function Home() {
   };
 
   // Toggle outcome table sort
-  const toggleOutcomeSort = (field: "roi" | "apy" | "profit") => {
+  const toggleOutcomeSort = (field: "roi" | "apy" | "profit" | "spread") => {
     if (outcomeSort === field) {
       setOutcomeSortDir(d => (d === "asc" ? "desc" : "asc"));
     } else {

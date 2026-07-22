@@ -51,8 +51,8 @@ interface OutcomeTableBodyProps {
   marketTitle?: string;
   /** UI-05: market id for arbitrage history sparkline */
   marketId?: string;
-  /** UI-06: sort field for the outcome table */
-  sortField?: "roi" | "apy" | "profit";
+  /** UI-06/UI-08: sort field for the outcome table */
+  sortField?: "roi" | "apy" | "profit" | "spread";
   /** UI-06: sort direction for the outcome table */
   sortDir?: "asc" | "desc";
   /** UI-15: market expiry date for APY tooltip breakdown */
@@ -193,8 +193,11 @@ function OutcomeTableBodyInner({
     if (sortField) {
       const mul = sortDir === "asc" ? 1 : -1;
       arr = [...arr].sort((a, b) => {
-        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? (a.arbitrage.apyPct ?? 0) : a.arbitrage.expectedProfit;
-        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? (b.arbitrage.apyPct ?? 0) : b.arbitrage.expectedProfit;
+        // UI-08: quoted cross-platform price difference, signed PM YES − Kalshi YES.
+        // Positive values rank first; fee-aware ROI remains the profitability signal.
+        const spread = (outcome: Outcome) => ((outcome.polymarket?.yesPrice ?? 0) - (outcome.kalshi?.yesAsk ?? 0)) * 100;
+        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? (a.arbitrage.apyPct ?? 0) : sortField === "profit" ? a.arbitrage.expectedProfit : spread(a);
+        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? (b.arbitrage.apyPct ?? 0) : sortField === "profit" ? b.arbitrage.expectedProfit : spread(b);
         return mul * (va - vb);
       });
     }
