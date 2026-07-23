@@ -28,29 +28,30 @@ function DepthChart({ platform, book }: { platform: 'Kalshi' | 'Polymarket'; boo
         <div className="px-3 py-8 text-center text-xs text-[#8A9BA8]">No live orderbook levels available.</div>
       ) : (
         <div className="p-3">
-          <div className="mb-2 grid grid-cols-[1fr_58px_1fr] gap-2 text-[9px] uppercase tracking-wide text-[#5E6875]">
-            <span>Bid depth</span><span className="text-center">Price</span><span className="text-right">Ask depth</span>
+          <div className="mb-2 grid grid-cols-[1fr_52px_52px_1fr] gap-2 text-[9px] uppercase tracking-wide text-[#5E6875]">
+            <span>Bid shares</span><span className="text-right">Bid price</span><span>Ask price</span><span className="text-right">Ask shares</span>
           </div>
           <div className="space-y-1">
             {Array.from({ length: rows }, (_, index) => {
               const bid = book.bids[index];
               const ask = book.asks[index];
               return (
-                <div key={`${bid?.price ?? 'b'}-${ask?.price ?? 'a'}-${index}`} className="grid grid-cols-[1fr_58px_1fr] items-center gap-2 text-[11px] font-mono">
+                <div key={`${bid?.price ?? 'b'}-${ask?.price ?? 'a'}-${index}`} className="grid grid-cols-[1fr_52px_52px_1fr] items-center gap-2 text-[11px] font-mono">
                   <div className="relative h-5 overflow-hidden rounded-sm bg-[#5DBE81]/5 text-left">
                     {bid && <div className="absolute inset-y-0 right-0 bg-[#5DBE81]/20" style={{ width: `${(bid.cumulativeSize / maxSize) * 100}%` }} />}
-                    <span className="relative z-10 flex h-full items-center px-1.5 text-[#A9DDB9]">{bid ? formatContracts(bid.cumulativeSize) : ''}</span>
+                    <span className="relative z-10 flex h-full items-center px-1.5 text-[#A9DDB9]" title={bid ? `${formatContracts(bid.size)} shares at ${(bid.price * 100).toFixed(2)}¢ · ${formatContracts(bid.cumulativeSize)} cumulative` : undefined}>{bid ? formatContracts(bid.size) : ''}</span>
                   </div>
-                  <span className="text-center text-[#FFFFFF]">{bid ? `${(bid.price * 100).toFixed(0)}¢` : ask ? `${(ask.price * 100).toFixed(0)}¢` : ''}</span>
+                  <span className="text-right text-[#A9DDB9]">{bid ? `${(bid.price * 100).toFixed(2)}¢` : ''}</span>
+                  <span className="text-[#F4B0B0]">{ask ? `${(ask.price * 100).toFixed(2)}¢` : ''}</span>
                   <div className="relative h-5 overflow-hidden rounded-sm bg-[#ef4444]/5 text-right">
                     {ask && <div className="absolute inset-y-0 left-0 bg-[#ef4444]/20" style={{ width: `${(ask.cumulativeSize / maxSize) * 100}%` }} />}
-                    <span className="relative z-10 flex h-full items-center justify-end px-1.5 text-[#F4B0B0]">{ask ? formatContracts(ask.cumulativeSize) : ''}</span>
+                    <span className="relative z-10 flex h-full items-center justify-end px-1.5 text-[#F4B0B0]" title={ask ? `${formatContracts(ask.size)} shares at ${(ask.price * 100).toFixed(2)}¢ · ${formatContracts(ask.cumulativeSize)} cumulative` : undefined}>{ask ? formatContracts(ask.size) : ''}</span>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-2 flex justify-between text-[9px] text-[#5E6875]"><span className="text-[#5DBE81]">Bids</span><span>cumulative contracts</span><span className="text-[#ef4444]">Asks</span></div>
+          <div className="mt-2 flex justify-between text-[9px] text-[#5E6875]"><span className="text-[#5DBE81]">Bids: shares at each price</span><span>Hover a row for cumulative shares</span><span className="text-[#ef4444]">Asks: shares at each price</span></div>
         </div>
       )}
     </section>
