@@ -27,6 +27,8 @@ interface Outcome {
     kalshiStake?: number;
     pmStake?: number;
     strategy: string;
+    /** True only when every leg has a verified positive ask depth. */
+    depthVerified?: boolean;
     fees?: {
       kalshiFee: number;
       pmFee: number;
@@ -307,6 +309,9 @@ function OutcomeTableBodyInner({
                   if (!hasPrices || !k || !p) return <span className="text-[#8A9BA8]">—</span>;
                   // UI-10: Hide stake/depth for negative-arb rows — no point showing
                   // deployable capital when there's no profitable arb.
+                  if (o.arbitrage.depthVerified === false) {
+                    return <span className="text-[#facc15] text-xs" title="Live ask depth is missing for one or more required legs. This quote is not executable.">Depth unknown</span>;
+                  }
                   if (o.arbitrage.roiPct <= 0) return <span className="text-[#8A9BA8]">—</span>;
                   const liq = computeLiquidityFromOutcome(k, p, o.arbitrage);
                   if (!liq) return <span className="text-[#8A9BA8]">—</span>;
@@ -350,7 +355,7 @@ function OutcomeTableBodyInner({
                     <span className="inline-flex items-center gap-1.5">
                       <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} onClick={() => setExpandedArtist(expandedArtist === o.artist ? null : o.artist)} />
                       {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
-                      {marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
+                      {marketTitle && o.arbitrage.roiPct > 0 && o.arbitrage.depthVerified !== false && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
                         <span className="flex flex-col items-center">
                           <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
                           <button

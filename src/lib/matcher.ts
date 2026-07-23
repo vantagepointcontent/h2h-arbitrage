@@ -53,6 +53,8 @@ export interface UnifiedOutcome {
      *  unknown/assumed-infinite — almost certainly a phantom quote on an
      *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
     suspicious?: boolean;
+    /** True only when every required orderbook leg has known positive ask depth. */
+    depthVerified?: boolean;
     /** ARB-01a: classification of the arb strategy.
      *  - "direct": regular YES/NO across platforms (within-outcome)
      *  - "cross": cross-outcome YES+YES across platforms
@@ -467,10 +469,10 @@ export function calculateArbitrageMax(
   // negative-spread pairs, showing 0.0% instead of the real number.
   {
     // Strategy 1: Buy YES Kalshi + NO PM
-    const capK = depthKYes > 0 ? depthKYes / kYes : Infinity;
-    const capP = depthPNo > 0 ? depthPNo / pNo : Infinity;
+    const capK = depthKYes > 0 ? depthKYes / kYes : 0;
+    const capP = depthPNo > 0 ? depthPNo / pNo : 0;
     const capital = Math.min(capK, capP, maxCapital);
-    const effectiveCapital = isFinite(capital) ? capital : maxCapital;
+    const effectiveCapital = capital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
         'Buy YES Kalshi + NO PM',
@@ -510,10 +512,10 @@ export function calculateArbitrageMax(
 
   {
     // Strategy 2: Buy YES PM + NO Kalshi
-    const capP = depthPYes > 0 ? depthPYes / pYes : Infinity;
-    const capK = depthKNo > 0 ? depthKNo / kNo : Infinity;
+    const capP = depthPYes > 0 ? depthPYes / pYes : 0;
+    const capK = depthKNo > 0 ? depthKNo / kNo : 0;
     const capital = Math.min(capP, capK, maxCapital);
-    const effectiveCapital = isFinite(capital) ? capital : maxCapital;
+    const effectiveCapital = capital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
         'Buy YES PM + NO Kalshi',
@@ -568,6 +570,7 @@ export function calculateArbitrageMax(
       sellPrice: 0,
       fees: undefined,
       arbType: 'direct',
+      depthVerified: false,
     };
   }
 
@@ -584,6 +587,7 @@ export function calculateArbitrageMax(
     sellPrice,
     fees: feeInfo,
     arbType: 'direct',
+    depthVerified: true,
   };
 }
 
@@ -610,9 +614,9 @@ export function calculateBestArbitrageForOutcome(
   }
 
   const depthKYes = parseDepth(current.kalshi.yesAskDepth);
-  const depthKNo = parseDepth(current.kalshi.noAskDepth) || parseDepth(current.kalshi.yesAskDepth);
-  const depthPYes = current.polymarket.askDepth != null && current.polymarket.askDepth > 0 ? current.polymarket.askDepth : Infinity;
-  const depthPNo = current.polymarket.noAskDepth != null && current.polymarket.noAskDepth > 0 ? current.polymarket.noAskDepth : Infinity;
+  const depthKNo = parseDepth(current.kalshi.noAskDepth);
+  const depthPYes = current.polymarket.askDepth ?? 0;
+  const depthPNo = current.polymarket.noAskDepth ?? 0;
 
   // Base: within-outcome arbitrages (existing yellow methods)
   let best = calculateArbitrageMax(
@@ -632,14 +636,14 @@ export function calculateBestArbitrageForOutcome(
     const pYesB = complement.polymarket.bestAsk;
     if (kYesA + pYesB < 1) {
       const compAskDepth = complement.polymarket.askDepth ?? 0;
-      const capKA = depthKYes > 0 ? depthKYes / kYesA : Infinity;
-      const capPB = parseDepth(compAskDepth) > 0 ? compAskDepth / pYesB : Infinity;
+      const capKA = depthKYes > 0 ? depthKYes / kYesA : 0;
+      const capPB = parseDepth(compAskDepth) > 0 ? compAskDepth / pYesB : 0;
       const compKalshiYesDepth = parseDepth(complement.kalshi.yesAskDepth ?? 0);
-      const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : Infinity;
-      const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : Infinity;
+      const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : 0;
+      const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : 0;
       // Capital limited by all four legs because we buy YES on both platforms across both outcomes
       const capital = Math.min(capKA, capPB, capKB, capPA, maxCapital);
-      const effectiveCapital = isFinite(capital) ? capital : maxCapital;
+      const effectiveCapital = capital;
       if (effectiveCapital > 0) {
         const grossRoi = 1 - (kYesA + pYesB);
         const grossProfit = effectiveCapital * grossRoi;
@@ -679,6 +683,7 @@ export function calculateBestArbitrageForOutcome(
               netProfitIfPmWins: fees.netProfitIfPmWins,
               worstCaseNetProfit: fees.worstCaseNetProfit,
             },
+            depthVerified: true,
           };
         }
       }
@@ -697,10 +702,10 @@ export function calculateBestArbitrageForOutcome(
     if (kYesA > 0 && kYesB > 0 && kYesA + kYesB < 1) {
       const depthKA = depthKYes;
       const depthKB = parseDepth(complement.kalshi.yesAskDepth);
-      const capKA = depthKA > 0 ? depthKA / kYesA : Infinity;
-      const capKB = depthKB > 0 ? depthKB / kYesB : Infinity;
+      const capKA = depthKA > 0 ? depthKA / kYesA : 0;
+      const capKB = depthKB > 0 ? depthKB / kYesB : 0;
       const capital = Math.min(capKA, capKB, maxCapital);
-      const effectiveCapital = isFinite(capital) ? capital : maxCapital;
+      const effectiveCapital = capital;
       if (effectiveCapital > 0) {
         const kalshiStakeA = effectiveCapital * kYesA;
         const kalshiStakeB = effectiveCapital * kYesB;
@@ -735,6 +740,7 @@ export function calculateBestArbitrageForOutcome(
               netProfitIfPmWins: netProfit,
               worstCaseNetProfit: netProfit,
             },
+            depthVerified: true,
           };
         }
       }
@@ -746,11 +752,11 @@ export function calculateBestArbitrageForOutcome(
     if (pYesA > 0 && pYesB > 0 && pYesA + pYesB < 1) {
       const depthPA = depthPYes;
       const depthPB = complement.polymarket.askDepth != null && complement.polymarket.askDepth > 0
-        ? complement.polymarket.askDepth : Infinity;
-      const capPA = depthPA > 0 ? depthPA / pYesA : Infinity;
-      const capPB = isFinite(depthPB) && depthPB > 0 ? depthPB / pYesB : Infinity;
+        ? complement.polymarket.askDepth : 0;
+      const capPA = depthPA > 0 ? depthPA / pYesA : 0;
+      const capPB = depthPB > 0 ? depthPB / pYesB : 0;
       const capital = Math.min(capPA, capPB, maxCapital);
-      const effectiveCapital = isFinite(capital) ? capital : maxCapital;
+      const effectiveCapital = capital;
       if (effectiveCapital > 0) {
         const pmStakeA = effectiveCapital * pYesA;
         const pmStakeB = effectiveCapital * pYesB;
@@ -786,6 +792,7 @@ export function calculateBestArbitrageForOutcome(
               netProfitIfPmWins: netProfit,
               worstCaseNetProfit: netProfit,
             },
+            depthVerified: true,
           };
         }
       }
@@ -794,7 +801,7 @@ export function calculateBestArbitrageForOutcome(
 
   // Sanity guard: flag phantom arbs (huge ROI on legs with unknown depth).
   const depthUnknown =
-    !isFinite(depthPYes) || !isFinite(depthPNo) || depthKYes <= 0 || depthKNo <= 0;
+    depthPYes <= 0 || depthPNo <= 0 || depthKYes <= 0 || depthKNo <= 0;
 
   // BUG-08: Filter false-positive arbs on near-resolved markets.
   // When prices are at extremes (e.g. 0.01/0.99), the market is essentially

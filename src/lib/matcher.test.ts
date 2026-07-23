@@ -50,33 +50,36 @@ describe('calculateArbitrageMax', () => {
     volume: '', liquidity: '', askDepth: 5000,
   };
 
-  it('beaktar Kalshi depth för kapital', () => {
-    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 0);
+  it('caps executable capital by known Kalshi and PM ask depth', () => {
+    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 5000);
     expect(r.maxCapital).toBeGreaterThan(0);
-    expect(r.strategy).not.toBe('No arb');
+    expect(r.maxCapital).toBeLessThanOrEqual(1000);
+    expect(r.depthVerified).toBe(true);
   });
 
-  it('beaktar PM depth för kapital', () => {
+  it('does not turn missing depth into an executable max-capital stake', () => {
     const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 0);
-    expect(r.pmStake).toBeGreaterThan(0);
-    expect(r.kalshiStake).toBeGreaterThan(0);
+    expect(r.strategy).toBe('No arb');
+    expect(r.maxCapital).toBe(0);
+    expect(r.kalshiStake).toBe(0);
+    expect(r.pmStake).toBe(0);
+    expect(r.depthVerified).toBe(false);
   });
 
-  it('ger No arb om priserna inte ger någon edge', () => {
+  it('returns no executable arb when all required depth is missing', () => {
     const r = calculateArbitrageMax(
       { ...kalshi, yesAsk: 0.60, noAsk: 0.45, yesAskDepth: '0', noAskDepth: '0' },
       { ...pm, bestAsk: 0.60, noPrice: 0.45, askDepth: 0 },
       0, 0, 0, 0
     );
-    // UI-03: Returns strategy with negative ROI instead of 'No arb'
-    expect(r.strategy).not.toBe('No arb');
-    expect(r.roiPct).toBeLessThanOrEqual(0);
+    expect(r.strategy).toBe('No arb');
+    expect(r.depthVerified).toBe(false);
   });
 
   it('depth begränsar maxCapital', () => {
     // Låg depth = låg capital
-    const low = calculateArbitrageMax(kalshi, pm, 100, 0, 100, 0);
-    const high = calculateArbitrageMax(kalshi, pm, 100_000, 0, 100_000, 0);
+    const low = calculateArbitrageMax(kalshi, pm, 100, 0, 100, 100);
+    const high = calculateArbitrageMax(kalshi, pm, 100_000, 0, 100_000, 100_000);
     expect(high.maxCapital).toBeGreaterThan(low.maxCapital);
   });
 });
@@ -566,6 +569,23 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
     const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
     expect(r.strategy).toContain('both sides');
     expect(r.expectedProfit).toBeGreaterThan(0);
+  });
+
+  it('does not mark cross or same-platform opportunities executable with unknown depth', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.72, yesAskDepth: '0', noAskDepth: '0' },
+      polymarket: { ...base.polymarket, bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, askDepth: 0, noAskDepth: 0 },
+    });
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.30, noAsk: 0.72, yesAskDepth: '0', noAskDepth: '0' },
+      polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, askDepth: 0, noAskDepth: 0 },
+    });
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    expect(r.strategy).toBe('No arb');
+    expect(r.maxCapital).toBe(0);
+    expect(r.depthVerified).toBe(false);
   });
 
   it('cross-outcome not considered without complement', () => {
