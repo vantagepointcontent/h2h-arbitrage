@@ -55,15 +55,18 @@ export async function GET(request: NextRequest) {
 
     // UI-015: resolve human-readable market names for the CSV
     let nameMap = new Map<string, string>();
+    let categoryMap = new Map<string, string>();
     try {
       const saved = await getSavedMarkets();
       nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
+      categoryMap = new Map(saved.map((m) => [m.id, m.category ?? '']));
     } catch { /* best-effort */ }
 
     // Build CSV
     const headers = [
       'Scan Time',
       'Market Name',
+      'Category',
       'Market ID',
       'Strategy',
       'Arb Type',
@@ -96,6 +99,7 @@ export async function GET(request: NextRequest) {
       [
         r.scanned_at,
         r.market_title ?? nameMap.get(r.market_id) ?? '',
+        categoryMap.get(r.market_id) ?? '',
         r.market_id,
         r.strategy,
         classifyArbType(r.strategy) ?? '',
