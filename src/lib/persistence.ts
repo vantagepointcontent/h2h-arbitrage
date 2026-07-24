@@ -1059,6 +1059,8 @@ async function ensureExecutionsTable(): Promise<void> {
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
+  // Migration: add steps column if missing (existing DBs)
+  try { await c.execute(`ALTER TABLE executions ADD COLUMN steps TEXT`); } catch { /* column already exists */ }
   _executionsReady = true;
 }
 

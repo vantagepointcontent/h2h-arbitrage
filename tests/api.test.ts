@@ -157,6 +157,7 @@ vi.mock("@/lib/manual-matches", () => ({
 
 vi.mock("@/lib/persistence", () => ({
   getSavedMarkets: vi.fn(async () => []),
+  getSavedMarketById: vi.fn(async () => null),
   addSavedMarket: vi.fn(async (m) => ({
     id: "market-1",
     kalshiUrl: m.kalshiUrl,
@@ -228,6 +229,7 @@ import {
 import { getManualMatches } from "@/lib/manual-matches";
 import {
   getSavedMarkets,
+  getSavedMarketById,
   addSavedMarket,
   deleteSavedMarket,
   updateSavedMarket,
@@ -249,6 +251,7 @@ import {
   POST as savedPost,
   DELETE as savedDelete,
 } from "../src/app/api/saved-markets/route";
+import { PATCH as savedPatch } from "../src/app/api/saved-markets/[id]/route";
 import {
   GET as configGet,
   POST as configPost,
@@ -669,6 +672,134 @@ describe("/api/saved-markets", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(false);
+    });
+  });
+
+  describe("PATCH — update saved market", () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    function makePatchRequest(id: string, body: unknown): any {
+      return new Request(`http://localhost:3000/api/saved-markets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    it("returns 400 for invalid id", async () => {
+      const req = makePatchRequest("   ", { eventTitle: "X" });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "   " }) });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain("Missing or invalid id");
+    });
+
+    it("returns 400 when no update fields provided", async () => {
+      const req = makePatchRequest("m1", {});
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain("Provide at least one update field");
+    });
+
+    it("returns 400 for invalid kalshiUrl", async () => {
+      const req = makePatchRequest("m1", { kalshiUrl: "not-a-url" });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain("kalshiUrl must be a valid Kalshi URL");
+    });
+
+    it("returns 400 for invalid polymarketUrl", async () => {
+      const req = makePatchRequest("m1", { polymarketUrl: "not-a-url" });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain("polymarketUrl must be a valid Polymarket URL");
+    });
+
+    it("returns 400 for invalid platformLinks", async () => {
+      const req = makePatchRequest("m1", { platformLinks: "not-an-array" });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain("platformLinks must be an array");
+    });
+
+    it("returns 404 when market not found", async () => {
+      (updateSavedMarket as any).mockResolvedValue(false);
+
+      const req = makePatchRequest("m1", { eventTitle: "Updated Title" });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.error).toContain("Market not found");
+    });
+
+    it("updates and returns the market", async () => {
+      const mockMarket = {
+        id: "m1",
+        kalshiUrl: "https://kalshi.com/markets/A/a/b",
+        polymarketUrl: "https://polymarket.com/event/x",
+        eventTitle: "Updated Title",
+        category: "Sports",
+        expiryDate: "2025-12-31T23:59:59Z",
+        createdAt: "2025-01-01T00:00:00Z",
+        lastScanResult: null,
+      };
+      (updateSavedMarket as any).mockResolvedValue(true);
+      (getSavedMarketById as any).mockResolvedValue(mockMarket);
+
+      const req = makePatchRequest("m1", {
+        eventTitle: "Updated Title",
+        category: "Sports",
+        expiryDate: "2025-12-31T23:59:59Z",
+        kalshiUrl: "https://kalshi.com/markets/A/a/b",
+        polymarketUrl: "https://polymarket.com/event/x",
+      });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.market.id).toBe("m1");
+      expect(body.market.eventTitle).toBe("Updated Title");
+      expect(body.market.category).toBe("Sports");
+      expect(body.market.kalshiUrl).toBe("https://kalshi.com/markets/A/a/b");
+      expect(body.market.polymarketUrl).toBe("https://polymarket.com/event/x");
+    });
+
+    it("accepts platformLinks array", async () => {
+      const mockMarket = {
+        id: "m1",
+        kalshiUrl: "https://kalshi.com/markets/A/a/b",
+        polymarketUrl: "https://polymarket.com/event/x",
+        eventTitle: "Title",
+        platformLinks: [
+          { platform: "kalshi", url: "https://kalshi.com/markets/A/a/b" },
+          { platform: "polymarket", url: "https://polymarket.com/event/x" },
+        ],
+        createdAt: "2025-01-01T00:00:00Z",
+        lastScanResult: null,
+      };
+      (updateSavedMarket as any).mockResolvedValue(true);
+      (getSavedMarketById as any).mockResolvedValue(mockMarket);
+
+      const req = makePatchRequest("m1", {
+        platformLinks: [
+          { platform: "kalshi", url: "https://kalshi.com/markets/A/a/b" },
+          { platform: "polymarket", url: "https://polymarket.com/event/x" },
+        ],
+      });
+      const res = await savedPatch(req, { params: Promise.resolve({ id: "m1" }) });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.market.platformLinks).toHaveLength(2);
     });
   });
 });
