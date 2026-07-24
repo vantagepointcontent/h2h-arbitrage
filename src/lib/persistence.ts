@@ -513,6 +513,7 @@ export interface LastScanResult {
   kalshiCount: number;
   pmCount: number;
   scannedAt: string;        // ISO timestamp
+  category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
@@ -939,7 +940,21 @@ export async function clearSavedMarketLiveResult(id: string): Promise<void> {
   await c.execute({ sql: 'UPDATE saved_markets SET live_result = NULL WHERE id = ?', args: [id] });
 }
 
-export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate' | 'category'>>): Promise<boolean> {
+export async function getSavedMarketById(id: string): Promise<SavedMarket | null> {
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'SELECT * FROM saved_markets WHERE id = ? AND archived = 0 LIMIT 1',
+    args: [id],
+  });
+  const rows = res.rows as any[];
+  return rows.length > 0 ? rowToMarket(rows[0]) : null;
+}
+
+export async function updateSavedMarket(
+  id: string,
+  updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate' | 'category' | 'kalshiUrl' | 'polymarketUrl' | 'platformLinks'>>,
+): Promise<boolean> {
   await ensureMarketsMigrated();
   const c = getClient();
   const sets: string[] = [];
@@ -947,6 +962,9 @@ export async function updateSavedMarket(id: string, updates: Partial<Pick<SavedM
   if (updates.eventTitle !== undefined) { sets.push('event_title = ?'); args.push(updates.eventTitle); }
   if (updates.expiryDate !== undefined) { sets.push('expiry_date = ?'); args.push(updates.expiryDate || null); }
   if (updates.category !== undefined) { sets.push('category = ?'); args.push(updates.category); }
+  if (updates.kalshiUrl !== undefined) { sets.push('kalshi_url = ?'); args.push(updates.kalshiUrl); }
+  if (updates.polymarketUrl !== undefined) { sets.push('polymarket_url = ?'); args.push(updates.polymarketUrl); }
+  if (updates.platformLinks !== undefined) { sets.push('platform_links = ?'); args.push(JSON.stringify(updates.platformLinks)); }
   if (sets.length === 0) return false;
   args.push(id);
   const res = await c.execute({ sql: `UPDATE saved_markets SET ${sets.join(', ')} WHERE id = ?`, args });
@@ -1036,9 +1054,11 @@ async function ensureExecutionsTable(): Promise<void> {
       kalshi_order     TEXT,
       polymarket_order TEXT,
       result           TEXT,
-      estimated_profit REAL    NOT NULL DEFAULT 0
+      estimated_profit REAL    NOT NULL DEFAULT 0,
+      steps            TEXT
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
   _executionsReady = true;
 }
 
@@ -1054,14 +1074,15 @@ export interface ExecutionRecord {
   polymarketOrder?: unknown;
   result?: unknown;
   estimatedProfit: number;
+  steps?: unknown;
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<void> {
   await ensureExecutionsTable();
   const c = getClient();
   await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
       e.strategy ?? null,
@@ -1069,6 +1090,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<void> {
       e.polymarketOrder != null ? JSON.stringify(e.polymarketOrder) : null,
       e.result != null ? JSON.stringify(e.result) : null,
       e.estimatedProfit ?? 0,
+      e.steps != null ? JSON.stringify(e.steps) : null,
     ],
   });
 }
@@ -1092,7 +1114,35 @@ export async function getExecutions(limit = 200): Promise<ExecutionRecord[]> {
     polymarketOrder: r.polymarket_order ? JSON.parse(String(r.polymarket_order)) : null,
     result: r.result ? JSON.parse(String(r.result)) : null,
     estimatedProfit: Number(r.estimated_profit ?? 0),
+    steps: r.steps ? JSON.parse(String(r.steps)) : null,
   }));
+}
+
+/** Get a single execution by arb_id (the most recent if multiple). */
+export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecord | null> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT * FROM executions WHERE arb_id = ? ORDER BY timestamp DESC LIMIT 1`,
+    args: [arbId],
+  });
+  const rows = res.rows as any[];
+  if (!rows || rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    id: Number(r.id),
+    timestamp: String(r.timestamp),
+    arbId: String(r.arb_id),
+    marketTitle: String(r.market_title),
+    dryRun: Boolean(Number(r.dry_run)),
+    success: Boolean(Number(r.success)),
+    strategy: r.strategy != null ? String(r.strategy) : null,
+    kalshiOrder: r.kalshi_order ? JSON.parse(String(r.kalshi_order)) : null,
+    polymarketOrder: r.polymarket_order ? JSON.parse(String(r.polymarket_order)) : null,
+    result: r.result ? JSON.parse(String(r.result)) : null,
+    estimatedProfit: Number(r.estimated_profit ?? 0),
+    steps: r.steps ? JSON.parse(String(r.steps)) : null,
+  };
 }
 
 // ─── Closed positions (trade history with full P&L) ───────────────

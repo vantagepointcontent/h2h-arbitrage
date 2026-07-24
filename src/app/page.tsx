@@ -352,6 +352,7 @@ export default function Home() {
           if (cached && !isExpired) {
             const cachedResult: ScanResult = {
               eventTitle: m.eventTitle,
+              category: m.category,
               kalshiCount: cached.kalshiCount ?? 0,
               pmCount: cached.pmCount ?? 0,
               matchedCount: cached.matchedCount ?? 0,
@@ -679,6 +680,7 @@ export default function Home() {
           kalshiUrl: kalshiUrlRef.current,
           polymarketUrl: pmUrlRef.current,
           eventTitle: result.eventTitle,
+          category: result.category,
         }),
       });
       if (res.status === 409 || res.status === 400 || !res.ok) {
@@ -757,6 +759,7 @@ export default function Home() {
     if (cached && !isExpired) {
       const cachedResult: ScanResult = {
         eventTitle: m.eventTitle,
+        category: m.category,
         kalshiCount: cached.kalshiCount ?? 0,
         pmCount: cached.pmCount ?? 0,
         matchedCount: cached.matchedCount ?? 0,
@@ -802,6 +805,7 @@ export default function Home() {
       // Expired market: show empty result with clear state
       setResult({
         eventTitle: m.eventTitle,
+        category: m.category,
         kalshiCount: cached?.kalshiCount ?? 0,
         pmCount: cached?.pmCount ?? 0,
         matchedCount: 0,

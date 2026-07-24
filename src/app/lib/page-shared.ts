@@ -210,6 +210,7 @@ export interface ScanResult {
   pmCount: number;
   matchedCount: number;
   expiryDate?: string;
+  category?: string;
   kalshiRawCount?: number;
   pmRawCount?: number;
   pmFilteredCount?: number;

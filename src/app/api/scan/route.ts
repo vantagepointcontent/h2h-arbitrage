@@ -24,6 +24,7 @@ import { computePriceResolved } from '@/app/lib/page-shared';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
+import { classifyMarket } from '@/lib/market-classification';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -156,6 +157,11 @@ export async function POST(request: NextRequest) {
     }
 
     const expiryDate = pmEvent.endDate;
+
+    // ── Determine category from PM event (groupItemTitle) or classify from title ──
+    const rawGroupTitle = pmEvent.markets?.[0]?.groupItemTitle;
+    const eventCategory = (rawGroupTitle && rawGroupTitle !== 'N/A') ? rawGroupTitle : '';
+    const scanCategory = eventCategory || classifyMarket(pmEvent.title).domain;
 
     // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
     const pmRawCount = (pmEvent.markets || []).length;
@@ -376,6 +382,7 @@ export async function POST(request: NextRequest) {
           kalshiCount,
           pmCount,
           scannedAt: new Date().toISOString(),
+          category: scanCategory,
           // UI-013: PM often keeps endDate far in the future even after a market
           // resolves. Persist PM's own closed signal so the UI can treat
           // closed-but-not-yet-past-endDate markets as expired.
@@ -487,6 +494,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       eventTitle: pmEvent.title,
+      category: scanCategory,
       kalshiEventTicker: kalshiTicker,
       pmEventSlug: pmSlug,
       pmEventId: pmEvent.id,
