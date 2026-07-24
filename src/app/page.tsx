@@ -75,6 +75,7 @@ const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPi
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
 const ExecutionModeBadge = dynamic(() => import("@/app/components/ExecutionModeBadge"), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
+const MarketEditPanel = dynamic(() => import("@/app/components/MarketEditPanel"), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
 import { ArbOpportunitiesPanel } from "@/app/components/ArbOpportunitiesPanel";
 import { ApyHeaderInfo, HeaderInfo } from "@/app/components/ApyTooltip";
@@ -223,6 +224,7 @@ export default function Home() {
   // Persist sidebar toggle
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
+  const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
@@ -665,6 +667,15 @@ export default function Home() {
         }
       }
     } catch { /* ignore */ }
+  };
+
+  // Update a saved market in local state after PATCH returns the updated market
+  const updateMarketInState = (updated: SavedMarket) => {
+    setSavedMarkets(prev => prev.map(m => m.id === updated.id ? updated : m));
+    // If currently viewing this market, also update the displayed result title/category/expiry
+    if (activeMarketId === updated.id && result) {
+      setResult(prev => prev ? { ...prev, eventTitle: updated.eventTitle, category: updated.category, expiryDate: updated.expiryDate ?? prev.expiryDate } : prev);
+    }
   };
 
   // Save market from scan result
@@ -1706,6 +1717,20 @@ export default function Home() {
                             <Trash2 className="w-3.5 h-3.5 text-[#8A9BA8] hover:text-[#ef4444]" />
                           </button>
 
+                          {/* Edit chip */}
+                          <button
+                            onClick={() => setEditingMarketId(activeMarketId)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                              editingMarketId === activeMarketId
+                                ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
+                                : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                            }`}
+                            title="Edit market metadata"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span className="text-[10px]">Edit</span>
+                          </button>
+
                           {/* Coupling panel toggle */}
                           <button
                             onClick={() => setCouplingPanelOpen(v => !v)}
@@ -1721,6 +1746,18 @@ export default function Home() {
                           </button>
                         </div>
                       </>
+                    )}
+
+                    {/* Inline edit panel */}
+                    {editingMarketId && activeMarketId === editingMarketId && (
+                      <MarketEditPanel
+                        market={savedMarkets.find(m => m.id === editingMarketId)!}
+                        onSave={(updated) => {
+                          updateMarketInState(updated);
+                          setEditingMarketId(null);
+                        }}
+                        onCancel={() => setEditingMarketId(null)}
+                      />
                     )}
 
                     {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices) && (
