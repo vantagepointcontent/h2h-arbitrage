@@ -33,6 +33,7 @@ interface LogEntry {
   raw_result: string | null;
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
+  category?: string | null;      // resolved from saved_markets (UI-015)
 }
 
 type ArbTypeFilter = "all" | ArbType;
@@ -502,6 +503,9 @@ export default function LogsPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    Category
+                  </th>
                   <th
                     className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("scanned_at")}
@@ -649,6 +653,9 @@ function LogRow({
         className={`border-b border-[#182533] hover:bg-[#0E1621]/50 cursor-pointer transition-colors ${expanded ? "bg-[#0E1621]/50" : ""}`}
         onClick={onToggle}
       >
+        <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap truncate max-w-[120px]" title={log.category || undefined}>
+          {log.category || "\u2014"}
+        </td>
         <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap font-mono">{fmtTime(log.scanned_at)}</td>
         <td className="px-3 py-2 text-xs truncate max-w-[180px]" title={log.market_id}>
           <span
@@ -692,7 +699,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={11} className="px-4 py-3">
+          <td colSpan={12} className="px-4 py-3">
             {rawArbs.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
