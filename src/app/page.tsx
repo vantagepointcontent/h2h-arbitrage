@@ -205,6 +205,7 @@ export default function Home() {
   const [bgRefreshing, setBgRefreshing] = useState(false); // BUG-032
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [lastScanTimestamp, setLastScanTimestamp] = useState<string | null>(null);
   const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
   const [manualMatches, setManualMatches] = useState<ManualMatch[]>([]);
   const [couplingPanelOpen, setCouplingPanelOpen] = useState(false);
@@ -396,6 +397,7 @@ export default function Home() {
             };
             setResult(cachedResult);
             setLastUpdated(new Date(cached.scannedAt));
+            setLastScanTimestamp(cached.scannedAt ?? null);
           }
           // Background refresh (silent) — skip for expired markets
           if (!isExpired) {
@@ -502,6 +504,7 @@ export default function Home() {
       if (res.ok) {
         setResult(data);
         setLastUpdated(new Date());
+        setLastScanTimestamp(new Date().toISOString());
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
         data.outcomes.forEach((o: UnifiedOutcome) => {
@@ -812,6 +815,7 @@ export default function Home() {
       };
       setResult(cachedResult);
       setLastUpdated(new Date(cached.scannedAt));
+      setLastScanTimestamp(cached.scannedAt ?? null);
     } else {
       // Expired market: show empty result with clear state
       setResult({
@@ -827,6 +831,7 @@ export default function Home() {
         expired: true,
       } as ScanResult);
       setLastUpdated(null);
+      setLastScanTimestamp(null);
     }
 
     // Background refresh (silent) — skip for expired markets (BUG-033)
@@ -1056,6 +1061,7 @@ export default function Home() {
         setPriceChanges(changes);
         setResult(data);
         setLastUpdated(new Date());
+        setLastScanTimestamp(new Date().toISOString());
 
         // Auto-clear blink after 3 seconds
         setTimeout(() => setPriceChanges(new Map()), 3000);
@@ -2000,6 +2006,7 @@ export default function Home() {
                             marketExpiryDate={result.expiryDate}
                             sortField={outcomeSort}
                             sortDir={outcomeSortDir}
+                            scanTime={lastScanTimestamp ?? undefined}
                           />
                         </table>
                       </div>

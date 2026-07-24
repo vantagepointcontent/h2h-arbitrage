@@ -59,6 +59,8 @@ interface OutcomeTableBodyProps {
   sortDir?: "asc" | "desc";
   /** UI-15: market expiry date for APY tooltip breakdown */
   marketExpiryDate?: string | null;
+  /** UI-11: ISO timestamp of the last scan, passed to execution for timeline */
+  scanTime?: string;
 }
 
 /** Format days-to-expiry as human-readable string:
@@ -87,6 +89,7 @@ function OutcomeTableBodyInner({
   sortField,
   sortDir,
   marketExpiryDate,
+  scanTime: scanTimeProp,
 }: OutcomeTableBodyProps) {
   const safeOutcomes = outcomes ?? [];
 
@@ -148,6 +151,8 @@ function OutcomeTableBodyInner({
         kalshiTicker: o.kalshi.ticker,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
+        scanTime: scanTimeProp,
+        depthVerified: o.arbitrage.depthVerified,
       }, marketTitle);
       if (!exec) {
         // Provide specific reason why it's not executable

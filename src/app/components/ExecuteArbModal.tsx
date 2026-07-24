@@ -33,6 +33,10 @@ export interface ExecutableArb {
   limitingConstraint: string;
   kalshiOrder: ArbLeg;
   polymarketOrder: ArbLeg;
+  /** ISO timestamp when the opportunity was last scanned/detected. */
+  scanTime?: string;
+  /** Whether at least one share was available at the best ask on both legs. */
+  bestPriceFound?: boolean;
 }
 
 /** Build an executable request from a live arb row, or null when the
@@ -59,6 +63,10 @@ export function buildExecutableArb(o: {
   pmYesTokenId?: string;
   pmNoTokenId?: string;
   category?: string;
+  /** ISO timestamp when the opportunity was last scanned/detected. */
+  scanTime?: string;
+  /** True only when every leg has a verified positive ask depth. */
+  depthVerified?: boolean;
 }, marketTitle: string): ExecutableArb | null {
   if (!o.kalshiTicker) return null;
   let kOutcome: "yes" | "no";
@@ -125,6 +133,8 @@ export function buildExecutableArb(o: {
       platform: "polymarket", marketId: pmToken, conditionId: pmToken,
       side: "buy", outcome: pmOutcome, size: shares * pmPrice, price: pmPrice, orderType: "limit",
     },
+    scanTime: o.scanTime,
+    bestPriceFound: o.depthVerified === true,
   };
 }
 
@@ -177,6 +187,8 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             maxSlippagePct: 1,
             timeoutMs: 10000,
             dryRun: false, // server ORs with settings — settings dryRun still wins
+            scanTime: arb.scanTime,
+            bestPriceFound: arb.bestPriceFound,
           },
         }),
       });

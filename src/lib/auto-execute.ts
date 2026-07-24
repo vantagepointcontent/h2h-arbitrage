@@ -57,9 +57,14 @@ export interface ExecutionRequest {
   maxSlippagePct: number;   // abort if price moves more than this
   timeoutMs: number;         // cancel both if not filled within this
   dryRun: boolean;           // if true, simulate without placing real orders
+  /** ISO timestamp when the opportunity was last scanned/detected. */
+  scanTime?: string;
+  /** Whether at least one share was available at the best ask price when the
+   *  opportunity was detected.  When false, the best-price step shows a warning. */
+  bestPriceFound?: boolean;
 }
 
-export type StepStatus = 'success' | 'pending' | 'failed';
+export type StepStatus = 'success' | 'pending' | 'failed' | 'partial' | 'skipped';
 
 export interface ExecutionStep {
   timestamp: string;
@@ -476,6 +481,23 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     steps.push({ timestamp: new Date().toISOString(), status, description, metadata });
   }
 
+  // ── Pre-execution context steps (from scan data) ──
+  if (req.scanTime) {
+    addStep('success', `Last scan time: ${new Date(req.scanTime).toLocaleString('en-US', { hour12: false })}`, { scanTime: req.scanTime });
+  } else {
+    addStep('skipped', 'Last scan time not recorded (legacy trade)');
+  }
+
+  if (req.bestPriceFound != null) {
+    if (req.bestPriceFound) {
+      addStep('success', 'Best price found — at least one share available at the best ask on both legs');
+    } else {
+      addStep('failed', 'Best price NOT found — no shares available at the best ask when scanned');
+    }
+  } else {
+    addStep('skipped', 'Best price availability not recorded (legacy trade)');
+  }
+
   addStep('success', 'Validation passed — trade request accepted');
   addStep('success', `Execution mode: ${effectiveDryRun ? 'DRY RUN (simulated)' : 'LIVE'}`);
 
@@ -497,8 +519,12 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
   const legStatus = (r: OrderResult) =>
     `${r.platform}: ${r.status}` + (r.filledSize ? ` ($${r.filledSize.toFixed(2)} @ ${r.filledPrice?.toFixed(3)})` : '');
+  const bothLegsStatus: StepStatus =
+    (kalshiResult.status === 'rejected' || polymarketResult.status === 'rejected') ? 'failed'
+    : (kalshiResult.status === 'partial' || polymarketResult.status === 'partial') ? 'partial'
+    : 'success';
   addStep(
-    (kalshiResult.status === 'rejected' || polymarketResult.status === 'rejected') ? 'failed' : 'success',
+    bothLegsStatus,
     `Both legs placed — ${legStatus(kalshiResult)}; ${legStatus(polymarketResult)}`,
     { kalshiOrderId: kalshiResult.orderId, polymarketOrderId: polymarketResult.orderId },
   );
@@ -689,7 +715,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       }
       rollbackExecuted = true;
     } else {
-      addStep('success', `Both legs filled and matched — Kalshi $${kFill.toFixed(2)}, Polymarket $${pFill.toFixed(2)}`);
+      // Both legs have fills and are matched. If either leg is still 'partial'
+      // (not fully filled), surface that as a partial step.
+      const anyPartial = kalshiResult.status === 'partial' || polymarketResult.status === 'partial';
+      addStep(
+        anyPartial ? 'partial' : 'success',
+        `Both legs filled and matched — Kalshi $${kFill.toFixed(2)}, Polymarket $${pFill.toFixed(2)}` +
+          (anyPartial ? ' (partial fills)' : ''),
+      );
     }
     // If matched fills, no rollback needed — both sides hedged
   } else if (!kFilled && !pFilled) {
@@ -781,7 +814,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     polymarketResult.status !== 'rejected' &&
     !unhedged;
 
-  addStep(success ? 'success' : 'failed', `Execution ${success ? 'completed successfully' : 'completed with issues'} — profit $${(actualProfit ?? 0).toFixed(2)}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);
+  const finalStatus: StepStatus = success ? 'success' : (unhedged ? 'failed' : 'partial');
+  addStep(finalStatus, `Execution ${success ? 'completed successfully' : 'completed with issues'} — profit $${(actualProfit ?? 0).toFixed(2)}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);
 
   return {
     success,

@@ -4,6 +4,13 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, Zap } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
+
+/** Augment a LiveArbOutcome with scanTime + depthVerified for buildExecutableArb. */
+function withScanContext(o: LiveArbOutcome) {
+  const kShares = o.strategy === "Buy YES Kalshi + NO PM" ? o.kalshiYesAskShares : o.kalshiNoAskShares;
+  const pmShares = o.strategy === "Buy YES Kalshi + NO PM" ? o.pmNoAskShares : o.pmYesAskShares;
+  return { ...o, scanTime: o.lastUpdate, depthVerified: kShares > 0 && pmShares > 0 };
+}
 import { DepthHeatmap } from "@/app/components/DepthHeatmap";
 import { ArbDecayCurve } from "@/app/components/ArbDecayCurve";
 import { analyzeLiquidity } from "@/lib/liquidity-sizing";
@@ -908,7 +915,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                                 <ArbTypeBadge strategy={o.strategy} arbType={(o as any).arbType} onClick={() => toggleExpandedArtist(o.artist)} />
                                 {(() => {
                                   if (o.stale || o.roiPct <= 0) return null;
-                                  const exec = buildExecutableArb(o, activeTab.marketTitle);
+                                  const exec = buildExecutableArb(withScanContext(o), activeTab.marketTitle);
                                   if (!exec) return null;
                                   return (
                                     <span className="flex flex-col items-center">
@@ -942,7 +949,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           o.fees,
                           o.expectedProfit,
                         );
-                        const exec = buildExecutableArb(o, activeTab.marketTitle);
+                        const exec = buildExecutableArb(withScanContext(o), activeTab.marketTitle);
                         const supportedStrategy = o.strategy === 'Buy YES Kalshi + NO PM' || o.strategy === 'Buy YES PM + NO Kalshi';
                         return (
                           <tr className="bg-[#17212B]/50">
@@ -1103,7 +1110,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                                 {fmtUsd(o.expectedProfit)}
                               </span>
                               {(() => {
-                                const exec = buildExecutableArb(o, activeTab.marketTitle);
+                                const exec = buildExecutableArb(withScanContext(o), activeTab.marketTitle);
                                 if (!exec) return null;
                                 return (
                                   <span className="flex flex-col items-center">
