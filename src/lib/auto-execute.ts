@@ -59,6 +59,15 @@ export interface ExecutionRequest {
   dryRun: boolean;           // if true, simulate without placing real orders
 }
 
+export type StepStatus = 'success' | 'pending' | 'failed';
+
+export interface ExecutionStep {
+  timestamp: string;
+  status: StepStatus;
+  description: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ExecutionResult {
   success: boolean;
   kalshiResult: OrderResult;
@@ -71,6 +80,7 @@ export interface ExecutionResult {
   error?: string;
   tickCheck?: TickCheckResult;  // result of tick check after first leg fill
   alerts?: ExecutionAlert[];    // alerts generated during execution
+  steps: ExecutionStep[];       // chronological step-by-step execution timeline
 }
 
 export interface TickCheckResult {
@@ -451,8 +461,23 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       executionTimeMs: Date.now() - startTime,
       error: validation.errors.join('; '),
       alerts,
+      steps: [
+        {
+          timestamp: new Date().toISOString(),
+          status: 'failed',
+          description: `Validation failed: ${validation.errors.join('; ')}`,
+        },
+      ],
     };
   }
+
+  const steps: ExecutionStep[] = [];
+  function addStep(status: StepStatus, description: string, metadata?: Record<string, unknown>) {
+    steps.push({ timestamp: new Date().toISOString(), status, description, metadata });
+  }
+
+  addStep('success', 'Validation passed — trade request accepted');
+  addStep('success', `Execution mode: ${effectiveDryRun ? 'DRY RUN (simulated)' : 'LIVE'}`);
 
   // ── Phase 1: Fire both legs simultaneously ──
   let kalshiResult: OrderResult;
@@ -469,6 +494,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       placeRealPmLeg(req.polymarketOrder),
     ]);
   }
+
+  const legStatus = (r: OrderResult) =>
+    `${r.platform}: ${r.status}` + (r.filledSize ? ` ($${r.filledSize.toFixed(2)} @ ${r.filledPrice?.toFixed(3)})` : '');
+  addStep(
+    (kalshiResult.status === 'rejected' || polymarketResult.status === 'rejected') ? 'failed' : 'success',
+    `Both legs placed — ${legStatus(kalshiResult)}; ${legStatus(polymarketResult)}`,
+    { kalshiOrderId: kalshiResult.orderId, polymarketOrderId: polymarketResult.orderId },
+  );
 
   // ── Phase 2: Poll loop with tick check ──
   const timeoutMs = req.timeoutMs || limits.orderTimeoutMs || DEFAULT_TIMEOUT_MS;
@@ -502,6 +535,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         // Kalshi filled, Polymarket still pending → tick check Polymarket
         tickCheckResult = await tickCheckLeg('kalshi', req.polymarketOrder, req.maxSlippagePct, effectiveDryRun);
         tickCheckDone = true;
+        addStep(
+          tickCheckResult.action === 'cancel' ? 'failed' : 'success',
+          `Tick check on Kalshi fill — Polymarket expected ${tickCheckResult.expectedPrice.toFixed(3)}${tickCheckResult.actualPrice ? `, actual ${tickCheckResult.actualPrice.toFixed(3)}` : ''} → ${tickCheckResult.action}`,
+          { legChecked: tickCheckResult.legChecked, priceMoved: tickCheckResult.priceMoved },
+        );
         if (tickCheckResult.action === 'cancel') {
           // Price moved → cancel Polymarket, auto-close Kalshi
           alerts.push({
@@ -524,6 +562,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         // Polymarket filled, Kalshi still pending → tick check Kalshi
         tickCheckResult = await tickCheckLeg('polymarket', req.kalshiOrder, req.maxSlippagePct, effectiveDryRun);
         tickCheckDone = true;
+        addStep(
+          tickCheckResult.action === 'cancel' ? 'failed' : 'success',
+          `Tick check on Polymarket fill — Kalshi expected ${tickCheckResult.expectedPrice.toFixed(3)}${tickCheckResult.actualPrice ? `, actual ${tickCheckResult.actualPrice.toFixed(3)}` : ''} → ${tickCheckResult.action}`,
+          { legChecked: tickCheckResult.legChecked, priceMoved: tickCheckResult.priceMoved },
+        );
         if (tickCheckResult.action === 'cancel') {
           alerts.push({
             level: 'warning',
@@ -556,12 +599,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
   if (kFailed && pFailed) {
     // Both failed — clean failure, no exposure
+    addStep('failed', `Both legs failed — Kalshi: ${kalshiResult.status}, Polymarket: ${polymarketResult.status}`);
     if (kFilled || pFilled) {
       // Edge case: both "failed" but one has a residual fill (shouldn't happen but guard)
       alerts.push({ level: 'error', message: 'Both legs failed but residual fill detected — check positions manually' });
     }
   } else if (kFailed && pFilled) {
     // Kalshi failed, Polymarket filled — auto-close Polymarket
+    addStep('failed', `Kalshi leg failed (${kalshiResult.status}) — auto-closing Polymarket`);
     alerts.push({
       level: 'warning',
       message: 'Kalshi leg failed — auto-closing Polymarket position to eliminate exposure',
@@ -584,6 +629,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     rollbackExecuted = true;
   } else if (pFailed && kFilled) {
     // Polymarket failed, Kalshi filled — auto-close Kalshi
+    addStep('failed', `Polymarket leg failed (${polymarketResult.status}) — auto-closing Kalshi`);
     alerts.push({
       level: 'warning',
       message: 'Polymarket leg failed — auto-closing Kalshi position to eliminate exposure',
@@ -613,6 +659,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
     if (minFill < maxFill) {
       // Mismatched fills — cancel both and close the excess
+      addStep('failed', `Mismatched fills — Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing $${(maxFill - minFill).toFixed(2)} excess`);
       alerts.push({
         level: 'warning',
         message: `Mismatched fills: Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing excess`,
@@ -641,10 +688,13 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         });
       }
       rollbackExecuted = true;
+    } else {
+      addStep('success', `Both legs filled and matched — Kalshi $${kFill.toFixed(2)}, Polymarket $${pFill.toFixed(2)}`);
     }
     // If matched fills, no rollback needed — both sides hedged
   } else if (!kFilled && !pFilled) {
     // Both pending at timeout — cancel both, no exposure
+    addStep('failed', 'Both legs timed out without fills — cancelling both, no exposure');
     alerts.push({
       level: 'info',
       message: 'Both legs timed out without fills — cancelling both, no exposure',
@@ -659,6 +709,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     rollbackExecuted = true;
   } else if (kFilled && !pFilled && !pFailed) {
     // Kalshi filled, Polymarket still pending — cancel PM, auto-close Kalshi
+    addStep('failed', `Kalshi filled but Polymarket timed out — auto-closing Kalshi ($${(kalshiResult.filledSize ?? 0).toFixed(2)})`);
     alerts.push({
       level: 'warning',
       message: 'Kalshi filled but Polymarket timed out — auto-closing Kalshi',
@@ -682,6 +733,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     rollbackExecuted = true;
   } else if (pFilled && !kFilled && !kFailed) {
     // Polymarket filled, Kalshi still pending — cancel Kalshi, auto-close Polymarket
+    addStep('failed', `Polymarket filled but Kalshi timed out — auto-closing Polymarket ($${(polymarketResult.filledSize ?? 0).toFixed(2)})`);
     alerts.push({
       level: 'warning',
       message: 'Polymarket filled but Kalshi timed out — auto-closing Polymarket',
@@ -729,6 +781,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     polymarketResult.status !== 'rejected' &&
     !unhedged;
 
+  addStep(success ? 'success' : 'failed', `Execution ${success ? 'completed successfully' : 'completed with issues'} — profit $${(actualProfit ?? 0).toFixed(2)}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);
+
   return {
     success,
     kalshiResult,
@@ -740,6 +794,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     executionTimeMs: Date.now() - startTime,
     tickCheck: tickCheckResult,
     alerts: alerts.length > 0 ? alerts : undefined,
+    steps,
   };
 }
 

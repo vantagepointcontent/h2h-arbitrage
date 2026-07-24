@@ -153,6 +153,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         polymarketOrder: effective.polymarketOrder,
         result,
         estimatedProfit: effective.estimatedProfit,
+        steps: result.steps,
       }).catch((e) => logger.warn('[execute] persistExecution failed', { error: String(e) }));
 
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun });
