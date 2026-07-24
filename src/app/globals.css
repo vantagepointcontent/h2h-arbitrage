@@ -449,3 +449,13 @@ input[type="range"].settings-slider::-moz-range-track {
   border-radius: 9999px;
   background: #232E3C;
 }
+
+/* TIMELINE-001: execution timeline expand animation */
+@keyframes timeline-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.timeline-expand {
+  animation: timeline-fade-in 0.2s ease-out;
+}
