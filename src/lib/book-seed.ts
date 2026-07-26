@@ -89,13 +89,15 @@ export async function seedKalshiBook(ticker: string): Promise<void> {
         // Remove any derived ask levels at a lower price (they're synthetic
         // and cheaper than the real ask — would give false ROI)
         yesAsks = yesAsks.filter((a) => a.price >= realYesAsk - 1e-9);
-        // Prepend the real best ask with its actual size
-        yesAsks.unshift({ price: realYesAsk, quantity: realYesAskSize > 0 ? realYesAskSize : Infinity });
+        // Preserve a quote with an unknown size for display, but never invent
+        // executable liquidity. A zero-sized level makes every execution cap
+        // fail closed until a live orderbook update supplies real shares.
+        yesAsks.unshift({ price: realYesAsk, quantity: realYesAskSize > 0 ? realYesAskSize : 0 });
         yesAsks.sort((a, b) => a.price - b.price);
       }
       if (realNoAsk > 0 && realNoAsk < 1) {
         noAsks = noAsks.filter((a) => a.price >= realNoAsk - 1e-9);
-        noAsks.unshift({ price: realNoAsk, quantity: realNoAskSize > 0 ? realNoAskSize : Infinity });
+        noAsks.unshift({ price: realNoAsk, quantity: realNoAskSize > 0 ? realNoAskSize : 0 });
         noAsks.sort((a, b) => a.price - b.price);
       }
     }

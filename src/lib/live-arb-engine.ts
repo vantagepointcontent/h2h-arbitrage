@@ -100,7 +100,11 @@ function computeSingleOutcome(
   const getEffectiveTopAsk = (id: string, side: 'yes' | 'no', useKalshiFloor: boolean) => {
     const book = orderbookState.getBook(id);
     const floor = useKalshiFloor ? (side === 'yes' ? book?.realYesAsk : book?.realNoAsk) : undefined;
-    return book?.[side].asks.find((level) => floor == null || level.price >= floor - 1e-9) ?? null;
+    const level = book?.[side].asks.find((level) => floor == null || level.price >= floor - 1e-9);
+    // Kalshi's REST market quote can be present while its ask size is unknown.
+    // Retain that quote for display, but attach zero shares so no execution path
+    // can turn it into imaginary liquidity.
+    return level ?? (floor != null ? { price: floor, quantity: 0 } : null);
   };
 
   const kalshiYesLevel = getEffectiveTopAsk(kalshiTicker, 'yes', true);
@@ -215,10 +219,12 @@ export function computeAllLiveArbitrages(
       if (kYesA + pYesB >= 1) continue;
 
       // Capital limited by ask depth on both legs (mirrors manual scan's leg caps)
-      const capK = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : Infinity;
-      const capP = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : Infinity;
+      // An absent/zero level means the displayed quote has no verified fillable
+      // size. It must block execution rather than silently becoming max capital.
+      const capK = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : 0;
+      const capP = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : 0;
       const capped = Math.min(capK, capP, capital);
-      const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+      const effectiveCapital = capped;
       const kalshiStake = effectiveCapital * kYesA;
       const pmStake = effectiveCapital * pYesB;
       const fees = computeArbitrageFees(
@@ -260,10 +266,10 @@ export function computeAllLiveArbitrages(
         const kYesA = cur.kalshiYesAsk;
         const kYesB = comp.kalshiYesAsk;
         if (kYesA != null && kYesB != null && kYesA > 0 && kYesB > 0 && kYesA + kYesB < 1) {
-          const capKA = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : Infinity;
-          const capKB = comp.kalshiYesDepth > 0 ? comp.kalshiYesDepth / kYesB : Infinity;
+          const capKA = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : 0;
+          const capKB = comp.kalshiYesDepth > 0 ? comp.kalshiYesDepth / kYesB : 0;
           const capped = Math.min(capKA, capKB, capital);
-          const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+          const effectiveCapital = capped;
           if (effectiveCapital > 0) {
             const stakeA = effectiveCapital * kYesA;
             const stakeB = effectiveCapital * kYesB;
@@ -291,10 +297,10 @@ export function computeAllLiveArbitrages(
         const pYesA = cur.pmYesAsk;
         const pYesB = comp.pmYesAsk;
         if (pYesA != null && pYesB != null && pYesA > 0 && pYesB > 0 && pYesA + pYesB < 1) {
-          const capPA = cur.pmYesDepth > 0 ? cur.pmYesDepth / pYesA : Infinity;
-          const capPB = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : Infinity;
+          const capPA = cur.pmYesDepth > 0 ? cur.pmYesDepth / pYesA : 0;
+          const capPB = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : 0;
           const capped = Math.min(capPA, capPB, capital);
-          const effectiveCapital = isFinite(capped) && capped > 0 ? capped : capital;
+          const effectiveCapital = capped;
           if (effectiveCapital > 0) {
             const stakeA = effectiveCapital * pYesA;
             const stakeB = effectiveCapital * pYesB;
