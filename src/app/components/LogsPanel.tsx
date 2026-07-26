@@ -54,7 +54,7 @@ const EVENT_TYPE_OPTIONS: { key: EventType; label: string }[] = [
   { key: "system", label: "System" },
 ];
 
-type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "positive_arb_count" | "matched_count";
+type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "apy" | "positive_arb_count" | "matched_count";
 type SortDir = "asc" | "desc";
 
 export default function LogsPanel() {
@@ -215,6 +215,10 @@ export default function LogsPanel() {
           aVal = a.best_profit;
           bVal = b.best_profit;
           break;
+        case "apy":
+          aVal = logApyPct(a) ?? 0;
+          bVal = logApyPct(b) ?? 0;
+          break;
         case "positive_arb_count":
           aVal = a.positive_arb_count;
           bVal = b.positive_arb_count;
@@ -224,12 +228,7 @@ export default function LogsPanel() {
           bVal = b.matched_count;
           break;
       }
-      const sa = String(aVal);
-      const sb = String(bVal);
-      if (sortKey === "scanned_at") {
-        return sortDir === "asc" ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
-      }
-      return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
+      return sortDir === "asc" ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
     return arr;
   }, [filtered, sortKey, sortDir]);
@@ -527,14 +526,17 @@ export default function LogsPanel() {
                   >
                     ROI % <SortIcon col="best_roi_pct" />
                   </th>
-                  <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
-                    APY
-                  </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("best_profit")}
                   >
                     Profit <SortIcon col="best_profit" />
+                  </th>
+                  <th
+                    className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
+                    onClick={() => toggleSort("apy")}
+                  >
+                    APY <SortIcon col="apy" />
                   </th>
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     TTE
@@ -680,8 +682,8 @@ function LogRow({
           )}
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
-        <td className={`px-3 py-2 text-right text-xs font-mono ${apy ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>{apy ? fmtPct(apy) : "—"}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
+        <td className={`px-3 py-2 text-right text-xs font-mono ${apy ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>{apy ? fmtPct(apy) : "—"}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>

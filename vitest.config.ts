@@ -6,7 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     // Unit tests only — integration tests in tests/ require a live dev server
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['node_modules', '.next', 'tests/**'],
     testTimeout: 10000,
   },
