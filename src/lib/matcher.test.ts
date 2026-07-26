@@ -57,12 +57,27 @@ describe('calculateArbitrageMax', () => {
     expect(r.depthVerified).toBe(true);
   });
 
-  it('does not turn missing depth into an executable max-capital stake', () => {
+  it('shows a profitable quote but keeps it unexecutable when required depth is missing', () => {
     const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 0);
-    expect(r.strategy).toBe('No arb');
+    expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
+    expect(r.roiPct).toBeGreaterThan(0);
     expect(r.maxCapital).toBe(0);
     expect(r.kalshiStake).toBe(0);
     expect(r.pmStake).toBe(0);
+    expect(r.depthVerified).toBe(false);
+  });
+
+  it('shows a profitable PM YES + Kalshi NO quote when its Kalshi NO depth is unavailable', () => {
+    const r = calculateArbitrageMax(
+      { ...kalshi, yesAsk: 0.65, noAsk: 0.40 },
+      { ...pm, yesPrice: 0.56, bestAsk: 0.56, noPrice: 0.46 },
+      80, 0, 5000, 5000,
+      'Tech',
+    );
+    expect(r.strategy).toBe('Buy YES PM + NO Kalshi');
+    expect(r.roiPct).toBeCloseTo(1.3344, 3);
+    expect(r.expectedProfit).toBe(0);
+    expect(r.kalshiStake + r.pmStake).toBe(0);
     expect(r.depthVerified).toBe(false);
   });
 

@@ -462,6 +462,38 @@ export function calculateArbitrageMax(
   let sellPrice = 0;
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
   let hasCandidate = false;
+  let bestUnexecutableQuote: {
+    strategy: string;
+    roiPct: number;
+    buyPlatform: 'kalshi' | 'polymarket';
+    buyPrice: number;
+    sellPlatform: 'kalshi' | 'polymarket';
+    sellPrice: number;
+  } | null = null;
+
+  const considerUnexecutableQuote = (
+    quoteStrategy: string,
+    kalshiPrice: number,
+    pmPrice: number,
+    quoteBuyPlatform: 'kalshi' | 'polymarket',
+    quoteSellPlatform: 'kalshi' | 'polymarket',
+  ) => {
+    const quoteCapital = 100;
+    const fees = computeArbitrageFees(
+      quoteStrategy, quoteCapital, quoteCapital * kalshiPrice, quoteCapital * pmPrice,
+      kYes, kNo, pYes, pNo, category,
+    );
+    const roiPct = (fees.worstCaseNetProfit / quoteCapital) * 100;
+    if (roiPct > 0 && (!bestUnexecutableQuote || roiPct > bestUnexecutableQuote.roiPct)) {
+      bestUnexecutableQuote = {
+        strategy: quoteStrategy, roiPct,
+        buyPlatform: quoteBuyPlatform,
+        buyPrice: quoteBuyPlatform === 'kalshi' ? kYes : pYes,
+        sellPlatform: quoteSellPlatform,
+        sellPrice: quoteSellPlatform === 'kalshi' ? kNo : pNo,
+      };
+    }
+  };
 
   // UI-03: Always compute both strategies regardless of spread, so we return
   // the actual (negative) net ROI even when no arb exists. Victor wants to see
@@ -469,6 +501,9 @@ export function calculateArbitrageMax(
   // negative-spread pairs, showing 0.0% instead of the real number.
   {
     // Strategy 1: Buy YES Kalshi + NO PM
+    if (depthKYes <= 0 || depthPNo <= 0) {
+      considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket');
+    }
     const capK = depthKYes > 0 ? depthKYes / kYes : 0;
     const capP = depthPNo > 0 ? depthPNo / pNo : 0;
     const capital = Math.min(capK, capP, maxCapital);
@@ -512,6 +547,9 @@ export function calculateArbitrageMax(
 
   {
     // Strategy 2: Buy YES PM + NO Kalshi
+    if (depthPYes <= 0 || depthKNo <= 0) {
+      considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi');
+    }
     const capP = depthPYes > 0 ? depthPYes / pYes : 0;
     const capK = depthKNo > 0 ? depthKNo / kNo : 0;
     const capital = Math.min(capP, capK, maxCapital);
@@ -557,6 +595,31 @@ export function calculateArbitrageMax(
   // prices — we always computed at least one strategy. The only way it's false
   // is if effectiveCapital was 0 for both (e.g. zero-depth on all legs).
   if (!hasCandidate) {
+    const quote = bestUnexecutableQuote as {
+      strategy: string;
+      roiPct: number;
+      buyPlatform: 'kalshi' | 'polymarket';
+      buyPrice: number;
+      sellPlatform: 'kalshi' | 'polymarket';
+      sellPrice: number;
+    } | null;
+    if (quote) {
+      return {
+        strategy: quote.strategy,
+        roiPct: quote.roiPct,
+        buyPlatform: quote.buyPlatform,
+        buyPrice: quote.buyPrice,
+        sellPlatform: quote.sellPlatform,
+        sellPrice: quote.sellPrice,
+        kalshiStake: 0,
+        pmStake: 0,
+        expectedProfit: 0,
+        maxCapital: 0,
+        fees: undefined,
+        arbType: 'direct',
+        depthVerified: false,
+      };
+    }
     return {
       strategy: 'No arb',
       kalshiStake: 0,
@@ -568,6 +631,33 @@ export function calculateArbitrageMax(
       buyPrice: 0,
       sellPlatform: null,
       sellPrice: 0,
+      fees: undefined,
+      arbType: 'direct',
+      depthVerified: false,
+    };
+  }
+
+  const quote = bestUnexecutableQuote as {
+    strategy: string;
+    roiPct: number;
+    buyPlatform: 'kalshi' | 'polymarket';
+    buyPrice: number;
+    sellPlatform: 'kalshi' | 'polymarket';
+    sellPrice: number;
+  } | null;
+  const executableRoiPct = bestCapital > 0 ? (maxProfit / bestCapital) * 100 : 0;
+  if (quote && quote.roiPct > executableRoiPct) {
+    return {
+      strategy: quote.strategy,
+      roiPct: quote.roiPct,
+      buyPlatform: quote.buyPlatform,
+      buyPrice: quote.buyPrice,
+      sellPlatform: quote.sellPlatform,
+      sellPrice: quote.sellPrice,
+      kalshiStake: 0,
+      pmStake: 0,
+      expectedProfit: 0,
+      maxCapital: 0,
       fees: undefined,
       arbType: 'direct',
       depthVerified: false,
