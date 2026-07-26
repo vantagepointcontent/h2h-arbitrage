@@ -644,15 +644,15 @@ export default function DashboardPanel() {
               {(() => {
                 const funnel = data!.lifecycleFunnel;
                 const stages = [
-                  { label: "Found", value: funnel.found, color: "#5DBE81" },
-                  { label: "Active", value: funnel.active, color: "#facc15" },
-                  { label: "Recurring", value: funnel.recurring, color: "#a855f7" },
-                  { label: "Vanished", value: funnel.vanished, color: "#ef4444" },
-                  { label: "Expired", value: funnel.expired, color: "#5E6875" },
+                  { label: "Found", value: funnel.found, color: "#5DBE81", tooltip: "Total unique arb opportunities detected across scans in this period. Each market and outcome pair counts once per scan where net ROI is positive." },
+                  { label: "Active", value: funnel.active, color: "#facc15", tooltip: "Arb episodes currently open: the most recent scan still shows positive net ROI. These are live right now." },
+                  { label: "Recurring", value: funnel.recurring, color: "#a855f7", tooltip: "The same arb opportunity appeared, vanished, and then reappeared in separate episodes during this period." },
+                  { label: "Vanished", value: funnel.vanished, color: "#ef4444", tooltip: "Arb episodes that closed because the spread disappeared and net ROI fell to zero or below before market expiry." },
+                  { label: "Expired", value: funnel.expired, color: "#5E6875", tooltip: "Arb episodes that closed because the underlying market expired or settled, rather than because the spread disappeared." },
                 ];
                 const maxVal = Math.max(...stages.map((s) => s.value), 1);
                 return stages.map((stage) => (
-                  <div key={stage.label} className="flex items-center gap-3">
+                  <div key={stage.label} className="flex items-center gap-3 cursor-help" title={stage.tooltip}>
                     <span className="text-xs font-medium w-20 text-[#A8B8C4] text-right shrink-0">
                       {stage.label}
                     </span>
