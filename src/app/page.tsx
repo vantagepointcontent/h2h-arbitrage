@@ -73,6 +73,7 @@ const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { 
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
+const PhantomsPanel = dynamic(() => import("@/app/components/PhantomsPanel"), { ssr: false });
 const ExecutionModeBadge = dynamic(() => import("@/app/components/ExecutionModeBadge"), { ssr: false });
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 const MarketEditPanel = dynamic(() => import("@/app/components/MarketEditPanel"), { ssr: false });
@@ -226,7 +227,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "phantoms">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -457,6 +458,8 @@ export default function Home() {
         setViewMode("settings");
       } else if (view === "trades") {
         setViewMode("trades");
+      } else if (view === "phantoms") {
+        setViewMode("phantoms");
       } else {
         setViewMode("dashboard");
       }
@@ -1524,6 +1527,8 @@ export default function Home() {
               <SettingsPanel />
             ) : viewMode === "trades" ? (
               <TradesPanel />
+            ) : viewMode === "phantoms" ? (
+              <PhantomsPanel />
             ) : (
               <>
                 {/* Scan inputs */}

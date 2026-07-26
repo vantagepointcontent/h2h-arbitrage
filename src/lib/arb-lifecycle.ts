@@ -450,3 +450,20 @@ export async function getActiveEpisodesForMarket(
   }
   return results;
 }
+
+/** Closed opportunities observed for under one minute, for the phantom review view. */
+export async function getPhantomEpisodes(days = 30, category?: string): Promise<any[]> {
+  await ensureDb();
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const filters = ["status = 'closed'", 'duration_sec < 60', 'first_seen_at >= ?'];
+  const args: (string | number)[] = [cutoff];
+  if (category && category !== 'all') {
+    filters.push("COALESCE(category, 'uncategorized') = ?");
+    args.push(category);
+  }
+  const rows = await getClient().execute({
+    sql: `SELECT id, market_id, market_title, COALESCE(category, 'uncategorized') AS category, outcome, strategy, first_seen_at, last_seen_at, closed_at, duration_sec, scan_count, first_roi_pct, last_roi_pct, peak_roi_pct, first_profit, peak_profit, first_stake, peak_stake FROM arb_episodes WHERE ${filters.join(' AND ')} ORDER BY first_seen_at DESC LIMIT 500`,
+    args,
+  });
+  return rows.rows as any[];
+}
