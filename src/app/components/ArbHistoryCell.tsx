@@ -21,7 +21,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
   useEffect(() => {
     let cancelled = false;
     const now = Date.now();
-    const from = now - 24 * 60 * 60 * 1000; // last 24h
+    const from = now - 30 * 60 * 1000;
     getSpreadsForOutcome(marketId, outcomeArtist, from, now)
       .then((pts) => {
         if (!cancelled) setPoints(pts);
@@ -35,7 +35,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
   }, [marketId, outcomeArtist]);
 
   const sparkData = useMemo(() => {
-    if (points.length < 2) return null;
+    if (points.length < 5) return null;
     // Sample to max 30 points for the sparkline
     const maxPoints = 30;
     let sampled = points;
@@ -51,7 +51,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
   }, [points]);
 
   if (!sparkData) {
-    return <span className="text-[#8A9BA8] text-xs">—</span>;
+    return <span className="text-[#8A9BA8] text-xs">Collecting data…</span>;
   }
 
   // Build SVG sparkline path
@@ -77,11 +77,16 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
   return (
     <div
       className={`inline-flex items-center gap-1.5 ${clickable ? "cursor-pointer hover:bg-[#182533]/40 rounded px-1 -mx-1 transition-colors" : ""}`}
-      title={`24h ROI: best ${bestRoi.toFixed(2)}%, avg ${avgRoi.toFixed(2)}%, ${rois.length} samples${clickable ? " — click to expand" : ""}`}
+      title={`30m ROI: best ${bestRoi.toFixed(2)}%, avg ${avgRoi.toFixed(2)}%, ${rois.length} samples${clickable ? " — click to expand" : ""}`}
       onClick={clickable ? (e) => { e.stopPropagation(); onExpand!(); } : undefined}
     >
       <svg width={width} height={height} className={`inline-block ${isExpanded ? "opacity-60" : ""}`}>
         <path d={path} fill="none" stroke={strokeColor} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
+        {points.map((point, i) => {
+          const x = Math.min(i, rois.length - 1) * stepX;
+          const y = height - ((point.roiPct - min) / range) * height;
+          return <circle key={point.ts} cx={x} cy={y} r={3} fill="transparent"><title>{`${new Date(point.ts).toLocaleString()}: ${point.roiPct.toFixed(2)}%`}</title></circle>;
+        })}
       </svg>
       <span className={`text-[10px] font-mono ${lastRoi > 0 ? "text-[#5DBE81]" : lastRoi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
         {lastRoi > 0 ? "+" : ""}{lastRoi.toFixed(1)}%
