@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import type { LastScanResult } from '@/lib/persistence';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -54,6 +55,33 @@ describe('scan save category flow', () => {
     expect(m.category).toBe('');
   });
 
+  it('updateSavedMarket persists validated platform URLs and links', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/KXOLD',
+      polymarketUrl: 'https://polymarket.com/event/old-market',
+      eventTitle: 'Platform link update test',
+      category: '',
+      expiryDate: null,
+    });
+    const platformLinks = [
+      { platform: 'kalshi', url: 'https://kalshi.com/markets/KXNEW' },
+      { platform: 'polymarket', url: 'https://polymarket.com/event/new-market' },
+    ];
+
+    expect(await persistence.updateSavedMarket(m.id, {
+      kalshiUrl: platformLinks[0].url,
+      polymarketUrl: platformLinks[1].url,
+      platformLinks,
+    })).toBe(true);
+
+    const updated = await persistence.getSavedMarketById(m.id);
+    expect(updated).toEqual(expect.objectContaining({
+      kalshiUrl: platformLinks[0].url,
+      polymarketUrl: platformLinks[1].url,
+      platformLinks,
+    }));
+  });
+
   it('updateSavedMarketScanResult stores category inside last_scan_result JSON', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/KXCAT2',
@@ -63,7 +91,7 @@ describe('scan save category flow', () => {
       expiryDate: null,
     });
 
-    const scanResult: persistence.LastScanResult = {
+    const scanResult: LastScanResult = {
       bestRoiPct: 3.3,
       bestProfit: 33,
       strategy: 'Buy YES Kalshi + NO PM',

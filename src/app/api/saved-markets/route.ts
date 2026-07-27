@@ -173,6 +173,9 @@ export async function PUT(request: NextRequest) {
       eventTitle: changes.eventTitle,
       expiryDate: changes.expiryDate,
       category: changes.category,
+      kalshiUrl: changes.kalshiUrl,
+      polymarketUrl: changes.polymarketUrl,
+      platformLinks: changes.platformLinks,
     });
     if (!ok) return NextResponse.json({ error: 'Market not found' }, { status: 404 });
     return NextResponse.json({ success: true });
