@@ -35,6 +35,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-027 | Medium | `src/app/api/pm-tokens/route.ts` upstream response validation | Fixed | A successful but malformed CLOB payload with a non-array `tokens` field threw on `.find()` and returned an internal 500. The route now fails safely with a clear 502 response; regression coverage verifies the behavior. |
 | CR-028 | Medium | `src/lib/platforms/registry.ts` platform URL detection | Fixed | Loose substring patterns accepted lookalike hosts such as `kalshi.com.evil.example` and `evilpolymarket.com`, which could incorrectly label an untrusted link as a supported platform. Detection now parses the URL and matches only exact approved hostnames (including `www`); regression coverage rejects lookalikes and malformed URLs. |
 | CR-029 | Medium | `src/app/api/market-depth/route.ts` query validation | Fixed | Unvalidated external identifiers reached Kalshi and CLOB upstream paths. Added a tested request parser that trims valid IDs, rejects malformed/tampered tickers and non-canonical Polymarket condition IDs before any upstream request, and returns a clear 400 response. |
+| CR-030 | Low | `src/app/api/arb-episodes/active/route.ts` query validation | Fixed | The read endpoint accepted whitespace-only and arbitrarily long `marketId` / `outcome` values directly into lifecycle persistence queries. Added a tested parser that normalizes valid values, requires a market ID, and rejects blank or >200-character identifiers with a 400 response before querying. |
 
 ## Verification
 

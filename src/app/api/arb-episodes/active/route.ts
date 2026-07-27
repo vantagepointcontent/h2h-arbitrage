@@ -4,16 +4,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveEpisodeDecay, getActiveEpisodesForMarket } from '@/lib/arb-lifecycle';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseActiveEpisodeRequest } from '@/lib/active-episode-request';
 
 export async function GET(req: NextRequest) {
   try {
-    const marketId = req.nextUrl.searchParams.get('marketId');
-    if (!marketId) {
-      return NextResponse.json({ error: 'marketId is required' }, { status: 400 });
+    const parsed = parseActiveEpisodeRequest({
+      marketId: req.nextUrl.searchParams.get('marketId'),
+      outcome: req.nextUrl.searchParams.get('outcome'),
+    });
+    if ('error' in parsed) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const outcome = req.nextUrl.searchParams.get('outcome');
-
+    const { marketId, outcome } = parsed;
     if (outcome) {
       // Single outcome
       const decay = await getActiveEpisodeDecay(marketId, outcome);
