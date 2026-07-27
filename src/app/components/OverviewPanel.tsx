@@ -131,8 +131,25 @@ function OverviewPanelInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [markets, sort, sortDir]);
 
-  // Apply expiry filter
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  // Categories are derived from the saved market data so the control stays current
+  // without maintaining a second taxonomy in the UI.
+  const categories = useMemo(() => [...new Set(
+    markets
+      .map((market) => market.category?.trim())
+      .filter((category): category is string => Boolean(category)),
+  )].sort((a, b) => a.localeCompare(b)), [markets]);
+
+  // Apply category, expiry, and arb filters as one memoized pipeline.
   const filteredByExpiry = useMemo(() => [...markets].filter(m => {
+    if (categoryFilter !== "all") {
+      const category = m.category?.trim().toLocaleLowerCase() || "uncategorized";
+      if (category !== categoryFilter) return false;
+    }
+    if (categoryFilter === "uncategorized" && m.category?.trim()) return false;
+    return true;
+  }).filter(m => {
     if (!showExpired) {
       // BUG-05b2: use smart expiry — in-play markets (trading prices) are NOT expired
       const isExpired = isMarketExpired(m);
@@ -151,7 +168,7 @@ function OverviewPanelInner({
     return roi > 0;
   }).sort(sortFn),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [markets, showExpired, expiryFilter, showArbOnly, sort, sortDir]);
+    [markets, categoryFilter, showExpired, expiryFilter, showArbOnly, sort, sortDir]);
 
   // Aggregate stats (respect current filter)
   const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
@@ -189,6 +206,23 @@ function OverviewPanelInner({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Markets</h2>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-[#182533] rounded-lg px-1.5 py-0.5">
+            <label htmlFor="market-category-filter" className="sr-only">Category</label>
+            <select
+              id="market-category-filter"
+              aria-label="Category"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="max-w-32 bg-transparent px-1 py-1 text-[10px] font-medium text-[#8A9BA8] outline-none hover:text-[#FFFFFF]"
+            >
+              <option value="all">All categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category.toLocaleLowerCase()}>{category}</option>
+              ))}
+              <option value="uncategorized">Uncategorized</option>
+            </select>
+          </div>
+          <div className="w-px h-4 bg-[#232E3C]" />
           <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
             <button
               onClick={() => onToggleShowArbOnly()}
