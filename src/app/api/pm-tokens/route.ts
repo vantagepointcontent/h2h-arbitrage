@@ -39,7 +39,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: `CLOB API HTTP ${res.status}` }, { status: 502 });
       }
       const data = await res.json();
-      const tokens = data?.tokens ?? [];
+      const tokens = data?.tokens;
+      if (!Array.isArray(tokens)) {
+        return NextResponse.json({ success: false, error: 'Invalid CLOB token response' }, { status: 502 });
+      }
       const yes = tokens.find((t: { outcome?: string }) => t.outcome === 'Yes')?.token_id ?? null;
       const no = tokens.find((t: { outcome?: string }) => t.outcome === 'No')?.token_id ?? null;
       if (!yes || !no) {
