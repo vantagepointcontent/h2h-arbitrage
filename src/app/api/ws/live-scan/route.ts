@@ -13,6 +13,7 @@ import { getAvgEpisodeLifespanMin } from '@/lib/arb-lifecycle';
 import { resolvePairFromLinks, PairResolveError } from '@/lib/pair-resolver';
 import { seedAllBooks } from '@/lib/book-seed';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '@/lib/ws-book-apply';
+import { parseLiveScanCapital } from '@/lib/live-scan-request';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +42,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const kalshiUrl = searchParams.get('kalshiUrl') || '';
   const pmUrl = searchParams.get('pmUrl') || '';
-  const capital = Number(searchParams.get('capital') || '10');
+  const capital = parseLiveScanCapital(searchParams.get('capital'));
+
+  if (capital === null) {
+    return new Response('Invalid capital. Expected a finite number from $1 to $1,000,000.', { status: 400 });
+  }
 
   if (!kalshiUrl || !pmUrl) {
     return new Response('Missing kalshiUrl or pmUrl', { status: 400 });
