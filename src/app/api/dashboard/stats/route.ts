@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDashboardAggregates, getSavedMarkets } from '@/lib/persistence';
 import { classifyMarket } from '@/lib/market-classification';
 import { clientSafeError } from '@/lib/error-handler';
+import { parseDashboardRange } from '@/lib/dashboard-request';
 
 /**
  * GET /api/dashboard/stats
@@ -17,7 +18,7 @@ import { clientSafeError } from '@/lib/error-handler';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const range = searchParams.get('range') || '30d';
+    const range = parseDashboardRange(searchParams.get('range'));
 
     // Compute cutoff date
     let since: string | undefined;
