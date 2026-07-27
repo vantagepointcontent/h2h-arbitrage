@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
-import { parseLogLimit } from '@/lib/logs-request';
+import { parseLogLimit, parseOptionalFiniteNumber } from '@/lib/logs-request';
 
 /**
  * GET /api/logs
@@ -21,8 +21,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const marketId = searchParams.get('marketId') || undefined;
     const limit = parseLogLimit(searchParams.get('limit'));
-    const minRoiStr = searchParams.get('minRoi');
-    const minRoi = minRoiStr !== null ? parseFloat(minRoiStr) : undefined;
+    const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
     const fromDate = searchParams.get('fromDate') || undefined;
     const toDate = searchParams.get('toDate') || undefined;
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const { rows: results, total } = await queryScanHistory({
       marketId,
-      minRoi: minRoi !== undefined && !isNaN(minRoi) ? minRoi : undefined,
+      minRoi,
       positiveArbOnly,
       fromDate,
       toDate,

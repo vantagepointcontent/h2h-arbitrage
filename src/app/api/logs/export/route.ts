@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { classifyArbType } from '@/lib/arb-types';
+import { parseOptionalFiniteNumber } from '@/lib/logs-request';
 
 /**
  * GET /api/logs/export
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const marketId = searchParams.get('marketId') || undefined;
-    const minRoi = searchParams.get('minRoi');
+    const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
     const fromDate = searchParams.get('fromDate');
     const toDate = searchParams.get('toDate');
@@ -22,11 +23,8 @@ export async function GET(request: NextRequest) {
 
     let filtered = pool;
 
-    if (minRoi !== null && minRoi !== undefined) {
-      const min = parseFloat(minRoi);
-      if (!isNaN(min)) {
-        filtered = filtered.filter((r: any) => (r.best_roi_pct ?? 0) >= min);
-      }
+    if (minRoi !== undefined) {
+      filtered = filtered.filter((r: any) => (r.best_roi_pct ?? 0) >= minRoi);
     }
 
     if (positiveArbOnly) {

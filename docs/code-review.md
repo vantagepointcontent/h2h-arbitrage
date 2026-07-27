@@ -39,6 +39,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-031 | Low | `src/app/api/dashboard/stats/route.ts` range normalization | Fixed | Unsupported `range` values used the 30-day query cutoff but were echoed back unchanged, making the API response inconsistent with the data returned. Added a tested allowlist parser that normalizes unsupported values to the documented `30d` default. |
 | CR-032 | Medium | `POST /api/scan` request-rate guard | Fixed | A single client could enqueue unlimited expensive scans before upstream per-platform limiters ran. Added a tested process-local 30-request/minute client guard that returns `429`, `Retry-After`, and no upstream work when exhausted. |
 | CR-033 | Medium | `GET /api/ws/live-scan` capital query parsing | Fixed | Blank, non-finite, zero, negative, or excessive capital query values could enter live-arbitrage sizing as `NaN`/unsafe stakes. Added a tested bounded parser with the existing `$10` default and an explicit 400 response before any market resolution or exchange connection. |
+| CR-034 | Low | `/api/logs` and `/api/logs/export` ROI filter parsing | Fixed | `parseFloat()` accepted `Infinity`, which could be sent into the SQLite filter path or produce inconsistent export filtering. Both routes now share a tested finite-number parser; invalid values act as an absent filter, preserving the read API's existing forgiving behavior. |
 
 ## Verification
 
