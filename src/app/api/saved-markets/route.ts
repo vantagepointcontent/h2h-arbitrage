@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult, getMarketUrlsById } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
-import { parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
+import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,15 +121,10 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
     const body: any = parsed.body;
-    if (!body.kalshiUrl || !body.polymarketUrl) {
-      return NextResponse.json({ error: 'Missing kalshiUrl or polymarketUrl' }, { status: 400 });
-    }
+    const create = parseSavedMarketCreate(body);
+    if ('error' in create) return NextResponse.json({ error: create.error }, { status: 400 });
     const market = await addSavedMarket({
-      kalshiUrl: body.kalshiUrl,
-      polymarketUrl: body.polymarketUrl,
-      eventTitle: body.eventTitle || 'Untitled',
-      category: body.category || '',
-      expiryDate: body.expiryDate || null,
+      ...create,
     });
 
     // If the request also carried a scan result, persist it to SQLite

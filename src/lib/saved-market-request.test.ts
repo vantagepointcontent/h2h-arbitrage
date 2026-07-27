@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSavedMarketId, parseSavedMarketPatch } from './saved-market-request';
+import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from './saved-market-request';
 
 describe('saved market request parsing', () => {
   it('accepts a safe patch', () => {
@@ -27,6 +27,28 @@ describe('saved market request parsing', () => {
     }));
   });
 
+  it('rejects lookalike hosts when creating a saved market', () => {
+    expect(parseSavedMarketCreate({
+      kalshiUrl: 'https://kalshi.com.evil.example/markets/KX-DEMO',
+      polymarketUrl: 'https://polymarket.com/event/demo',
+    })).toEqual({ error: 'kalshiUrl must be a valid Kalshi URL.' });
+  });
+
+  it('normalizes a valid saved-market creation payload', () => {
+    expect(parseSavedMarketCreate({
+      kalshiUrl: ' https://www.kalshi.com/markets/KX-DEMO ',
+      polymarketUrl: 'https://www.polymarket.com/event/demo',
+      eventTitle: ' Demo ',
+      category: ' Politics ',
+    })).toEqual({
+      kalshiUrl: 'https://www.kalshi.com/markets/KX-DEMO',
+      polymarketUrl: 'https://www.polymarket.com/event/demo',
+      eventTitle: 'Demo',
+      category: 'Politics',
+      expiryDate: null,
+    });
+  });
+
   it('accepts platformLinks array', () => {
     const patch = parseSavedMarketPatch({
       id: 'market-1',
@@ -51,6 +73,16 @@ describe('saved market request parsing', () => {
 
   it('rejects invalid polymarketUrl', () => {
     const patch = parseSavedMarketPatch({ id: 'market-1', polymarketUrl: 'not-a-url' });
+    expect(patch).toEqual(expect.objectContaining({ error: expect.any(String) }));
+  });
+
+  it.each([
+    ['kalshiUrl', 'https://kalshi.com.evil.example/markets/KX-DEMO'],
+    ['kalshiUrl', 'https://evilkalshi.com/markets/KX-DEMO'],
+    ['polymarketUrl', 'https://polymarket.com.evil.example/event/demo'],
+    ['polymarketUrl', 'https://evilpolymarket.com/event/demo'],
+  ])('rejects lookalike platform hosts (%s)', (field, value) => {
+    const patch = parseSavedMarketPatch({ id: 'market-1', [field]: value });
     expect(patch).toEqual(expect.objectContaining({ error: expect.any(String) }));
   });
 

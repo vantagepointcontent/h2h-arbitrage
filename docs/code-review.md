@@ -40,6 +40,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-032 | Medium | `POST /api/scan` request-rate guard | Fixed | A single client could enqueue unlimited expensive scans before upstream per-platform limiters ran. Added a tested process-local 30-request/minute client guard that returns `429`, `Retry-After`, and no upstream work when exhausted. |
 | CR-033 | Medium | `GET /api/ws/live-scan` capital query parsing | Fixed | Blank, non-finite, zero, negative, or excessive capital query values could enter live-arbitrage sizing as `NaN`/unsafe stakes. Added a tested bounded parser with the existing `$10` default and an explicit 400 response before any market resolution or exchange connection. |
 | CR-034 | Low | `/api/logs` and `/api/logs/export` ROI filter parsing | Fixed | `parseFloat()` accepted `Infinity`, which could be sent into the SQLite filter path or produce inconsistent export filtering. Both routes now share a tested finite-number parser; invalid values act as an absent filter, preserving the read API's existing forgiving behavior. |
+| CR-035 | Medium | `src/lib/saved-market-request.ts` platform URL validation | Fixed | Saved-market updates recognized platform URLs through loose substrings, accepting lookalike hosts such as `kalshi.com.evil.example`. Validation now matches only exact approved Kalshi/Polymarket hostnames (including `www`); regression coverage rejects lookalikes. |
 
 ## Verification
 

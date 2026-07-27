@@ -10,6 +10,14 @@ type SavedMarketPatch = {
   platformLinks?: MarketLink[];
 };
 
+export type SavedMarketCreate = {
+  kalshiUrl: string;
+  polymarketUrl: string;
+  eventTitle: string;
+  category: string;
+  expiryDate: string | null;
+};
+
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
@@ -24,11 +32,21 @@ function looksLikeUrl(value: string): boolean {
 }
 
 function looksLikeKalshiUrl(value: string): boolean {
-  return looksLikeUrl(value) && /kalshi\.com/.test(value);
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return (hostname === 'kalshi.com' || hostname === 'www.kalshi.com') && looksLikeUrl(value);
+  } catch {
+    return false;
+  }
 }
 
 function looksLikePolymarketUrl(value: string): boolean {
-  return looksLikeUrl(value) && /polymarket\.com/.test(value);
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return (hostname === 'polymarket.com' || hostname === 'www.polymarket.com') && looksLikeUrl(value);
+  } catch {
+    return false;
+  }
 }
 
 function validPlatformLinks(value: unknown): MarketLink[] | null {
@@ -48,6 +66,27 @@ function validPlatformLinks(value: unknown): MarketLink[] | null {
 export function parseSavedMarketId(value: unknown): string | null {
   const id = nonEmptyString(value);
   return id && id.length <= 200 ? id : null;
+}
+
+/** Validate the public saved-market creation payload before it reaches persistence. */
+export function parseSavedMarketCreate(body: Record<string, unknown>): SavedMarketCreate | { error: string } {
+  const kalshiUrl = nonEmptyString(body.kalshiUrl);
+  if (!kalshiUrl || !looksLikeKalshiUrl(kalshiUrl)) return { error: 'kalshiUrl must be a valid Kalshi URL.' };
+
+  const polymarketUrl = nonEmptyString(body.polymarketUrl);
+  if (!polymarketUrl || !looksLikePolymarketUrl(polymarketUrl)) return { error: 'polymarketUrl must be a valid Polymarket URL.' };
+
+  if (body.eventTitle !== undefined && (typeof body.eventTitle !== 'string' || body.eventTitle.trim().length > 500)) return { error: 'eventTitle must be a string up to 500 characters.' };
+  if (body.category !== undefined && (typeof body.category !== 'string' || body.category.trim().length > 200)) return { error: 'category must be a string up to 200 characters.' };
+  if (body.expiryDate !== undefined && body.expiryDate !== null && typeof body.expiryDate !== 'string') return { error: 'expiryDate must be a string or null.' };
+
+  return {
+    kalshiUrl,
+    polymarketUrl,
+    eventTitle: typeof body.eventTitle === 'string' && body.eventTitle.trim() ? body.eventTitle.trim() : 'Untitled',
+    category: typeof body.category === 'string' ? body.category.trim() : '',
+    expiryDate: typeof body.expiryDate === 'string' ? body.expiryDate : null,
+  };
 }
 
 export function parseSavedMarketPatch(body: Record<string, unknown>): SavedMarketPatch | { error: string } {
