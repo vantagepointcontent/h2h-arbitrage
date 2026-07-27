@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { makeKalshiAuthHeaders } from '@/lib/kalshi-auth';
 import { fetchClobBook, fetchClobMarket } from '@/lib/polymarket-clob';
 import { buildDepthBook, buildKalshiYesBook, cumulativeLevels, type RawDepthLevel } from '@/lib/market-depth';
+import { parseMarketDepthRequest } from '@/lib/market-depth-request';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,12 +28,14 @@ function jsonError(error: string, status: number) {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const kalshiTicker = searchParams.get('kalshiTicker');
-  const pmConditionId = searchParams.get('pmConditionId');
-
-  if (!kalshiTicker || !pmConditionId) {
-    return jsonError('kalshiTicker and pmConditionId are required', 400);
+  const parsedRequest = parseMarketDepthRequest(
+    searchParams.get('kalshiTicker'),
+    searchParams.get('pmConditionId'),
+  );
+  if ('error' in parsedRequest) {
+    return jsonError(parsedRequest.error, 400);
   }
+  const { kalshiTicker, pmConditionId } = parsedRequest;
 
   try {
     const kalshiPath = `/trade-api/v2/markets/${encodeURIComponent(kalshiTicker)}/orderbook`;
