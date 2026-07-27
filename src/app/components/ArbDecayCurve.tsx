@@ -119,6 +119,12 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
     trend === "rising" ? "#5DBE81" :
     trend === "declining" ? "#ef4444" : "#facc15";
 
+  const momentumWindow = pts.slice(-5);
+  const momentumStart = momentumWindow[0];
+  const momentumEnd = momentumWindow[momentumWindow.length - 1];
+  const momentumDelta = momentumEnd.roiPct - momentumStart.roiPct;
+  const momentumSeconds = Math.max(1, Math.round((new Date(momentumEnd.seenAt).getTime() - new Date(momentumStart.seenAt).getTime()) / 1000));
+
   // Direction arrow
   const arrow =
     trend === "rising" ? "↗" :
@@ -143,7 +149,8 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
     `Current ROI: ${episode.lastRoiPct.toFixed(2)}%\n` +
     `First ROI: ${episode.firstRoiPct.toFixed(2)}%\n` +
     `Scans: ${episode.scanCount}\n` +
-    `Trend: ${trend}`;
+    `Trend: ${trend}\n` +
+    `Momentum: ${momentumDelta >= 0 ? "+" : ""}${momentumDelta.toFixed(2)}% in ${momentumSeconds}s`;
 
   // Peak marker position
   const peakIdx = rois.indexOf(Math.max(...rois));
