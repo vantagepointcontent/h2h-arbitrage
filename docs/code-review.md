@@ -31,6 +31,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-023 | High | `GET /api/saved-markets/refresh?start=true` | Fixed | A GET request could trigger an unbounded background refresh and upstream scan traffic without mutation-token protection. Moved job start to validated POST, updated the UI caller, and left GET read-only for status polling. |
 | CR-024 | High | `GET /api/watcher/targets` | Fixed | GET invoked `computeTiers()`, which writes tier state and could mutate database state from an unauthenticated read request. GET now reads persisted state only; explicit protected refresh performs re-resolution and recomputation. |
 | CR-025 | Low | `src/lib/liquidity-sizing.ts` | Deferred | The function retains `polymarketAskPrice` and `kalshiNoPrice` parameters although its current single-strategy spread calculation only uses Kalshi YES and Polymarket NO. Removing or redesigning them would be an API change across three UI consumers. No functional change made in this incremental review; revisit only with strategy-aware liquidity sizing and dedicated consumer tests. |
+| CR-026 | Low | `src/app/api/executions/route.ts` query validation | Fixed | `Number(limit)` accepted fractional, negative, non-finite, and arbitrary oversized values at the public route boundary. Reused the tested bounded-integer parser to default invalid input to 200 and clamp valid whole numbers to 1–1,000 before the database query. |
 
 ## Verification
 
