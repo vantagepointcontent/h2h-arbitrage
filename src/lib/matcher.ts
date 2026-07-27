@@ -1141,8 +1141,10 @@ export function buildPmArbShape(market: PMMarket) {
     lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
     volume: market.volume,
     liquidity: market.liquidity,
-    askDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
-    noAskDepth: Number(market.liquidityNum ?? market.liquidity ?? 0),
+    // MF-001: Gamma liquidity is aggregate market metadata, not quantity that
+    // can be filled at the current ask. Missing CLOB depth must fail closed.
+    askDepth: Number.isFinite(market.askDepth) ? market.askDepth : 0,
+    noAskDepth: Number.isFinite(market.noAskDepth) ? market.noAskDepth : 0,
     negRisk: market.neg_risk === true,
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }

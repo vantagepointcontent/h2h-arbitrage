@@ -177,6 +177,42 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
 }
 
 /**
+ * Dollar liquidity available at the best ask only. Depth at worse prices is
+ * excluded: an executable arb must be fillable at the displayed quote.
+ */
+function bestAskDollarDepth(book: ClobBook | null): number {
+  if (!book?.asks?.length) return 0;
+  const validAsks = book.asks
+    .map(({ price, size }) => ({ price: Number(price), size: Number(size) }))
+    .filter(level => Number.isFinite(level.price) && level.price > 0 && Number.isFinite(level.size) && level.size > 0);
+  if (!validAsks.length) return 0;
+
+  const bestAsk = Math.min(...validAsks.map(level => level.price));
+  return validAsks
+    .filter(level => level.price === bestAsk)
+    .reduce((total, level) => total + level.price * level.size, 0);
+}
+
+/**
+ * Fetch executable YES and NO depth from CLOB token books. Unknown, missing,
+ * or empty books fail closed as zero; Gamma liquidity is not fillable depth.
+ */
+export async function getClobAskDepths(clob: ClobMarket): Promise<{ yesAskDepth: number; noAskDepth: number }> {
+  const yesToken = clob.tokens?.find(token => token.outcome === 'Yes');
+  const noToken = clob.tokens?.find(token => token.outcome === 'No');
+  if (!yesToken || !noToken) return { yesAskDepth: 0, noAskDepth: 0 };
+
+  const [yesBook, noBook] = await Promise.all([
+    fetchClobBook(yesToken.token_id),
+    fetchClobBook(noToken.token_id),
+  ]);
+  return {
+    yesAskDepth: bestAskDollarDepth(yesBook),
+    noAskDepth: bestAskDollarDepth(noBook),
+  };
+}
+
+/**
  * Extract best ask/bid from token orderbook.
  * NOTE: CLOB orderbooks are NOT properly sorted — asks are descending (high→low)
  * and bids are ascending (low→high). We must find MIN(ask) and MAX(bid) manually.

@@ -23,6 +23,9 @@ export interface PMMarket {
   neg_risk?: boolean; // true = independent binary outcomes (YES/NO don't sum to 1)
   /** CLOB was reached but had no executable asks. Gamma values must not be used. */
   clobEmpty?: boolean;
+  /** Dollar quantity at the live CLOB YES/NO best ask; zero means unknown or unavailable. */
+  askDepth?: number;
+  noAskDepth?: number;
 }
 
 export interface PMEvent {

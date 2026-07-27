@@ -10,7 +10,7 @@ import {
   fetchKalshiMultiSeriesMarkets,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
-import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
+import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
         const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
         if (!clob) return m;
         try {
-          const live = await getClobPrices(clob);
+          const [live, depth] = await Promise.all([getClobPrices(clob), getClobAskDepths(clob)]);
           if (!live) {
             // The CLOB was reachable but has no executable asks. Keep its token
             // prices for display (the same values shown by Polymarket), but mark
@@ -234,7 +234,10 @@ export async function POST(request: NextRequest) {
             bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
             bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
             lastTradePrice: live.lastTradePrice,
-            noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
+            // MF-001: only CLOB quantity at the displayed ask is executable.
+            // Gamma liquidity is market-wide metadata, not an order-level guarantee.
+            askDepth: depth.yesAskDepth,
+            noAskDepth: depth.noAskDepth,
             neg_risk: clob.neg_risk,
           };
         } catch {

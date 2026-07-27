@@ -32,7 +32,7 @@ describe('platform-neutral outcome model', () => {
     ]);
   });
 });
-import { getClobPrices } from './polymarket-clob';
+import { getClobAskDepths, getClobPrices } from './polymarket-clob';
 
 describe('calculateArbitrageMax', () => {
   const kalshi = {
@@ -257,6 +257,37 @@ describe('getClobPrices', () => {
   });
 });
 
+describe('getClobAskDepths', () => {
+  it('uses only quantity at each token best ask and returns dollar depth', async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      if (url.includes('token_id=yes-depth')) {
+        return { ok: true, json: async () => ({ asks: [{ price: '0.42', size: '10' }, { price: '0.42', size: '5' }, { price: '0.43', size: '100' }], bids: [] }) };
+      }
+      if (url.includes('token_id=no-depth')) {
+        return { ok: true, json: async () => ({ asks: [{ price: '0.57', size: '8' }, { price: '0.61', size: '500' }], bids: [] }) };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', mockFetch);
+    try {
+      const depth = await getClobAskDepths({
+        condition_id: 'c-depth',
+        tokens: [{ token_id: 'yes-depth', outcome: 'Yes' }, { token_id: 'no-depth', outcome: 'No' }],
+      } as any);
+      expect(depth.yesAskDepth).toBeCloseTo(6.3, 8);
+      expect(depth.noAskDepth).toBeCloseTo(4.56, 8);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails closed when a token is unavailable', async () => {
+    const depth = await getClobAskDepths({ condition_id: 'c-missing', tokens: [] } as any);
+    expect(depth).toEqual({ yesAskDepth: 0, noAskDepth: 0 });
+  });
+});
+
 describe('matchOutcomes', () => {
   it('matchar exakt identiska namn', () => {
     const km = [{ ticker: 'KXTRUMP', event_ticker: 'KXTRUMP', title: 'Will Trump win?', yes_bid_dollars: '0.40', yes_ask_dollars: '0.45', no_bid_dollars: '0.55', no_ask_dollars: '0.60' }];
@@ -310,6 +341,24 @@ describe('buildPmArbShape — CLOB-empty regression guard (BUG-086b)', () => {
     expect(shape.bestAsk).toBe(0);
     expect(shape.askDepth).toBe(0);
     expect(shape.isExecutable).toBe(false);
+  });
+
+  it('uses CLOB ask depth and never substitutes Gamma liquidity', () => {
+    const shape = buildPmArbShape(makePmMarket({
+      bestBid: 0.49,
+      bestAsk: 0.51,
+      liquidityNum: 999_999,
+      askDepth: 12.75,
+      noAskDepth: 8.5,
+    }));
+    expect(shape.askDepth).toBe(12.75);
+    expect(shape.noAskDepth).toBe(8.5);
+  });
+
+  it('fails closed when CLOB depth is unavailable despite Gamma liquidity', () => {
+    const shape = buildPmArbShape(makePmMarket({ liquidityNum: 999_999 }));
+    expect(shape.askDepth).toBe(0);
+    expect(shape.noAskDepth).toBe(0);
   });
 });
 

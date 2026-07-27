@@ -8,7 +8,7 @@ import {
   extractKalshiSeriesFromUrl,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
-import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
+import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
@@ -165,7 +165,11 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       const clob = clobMap.get(m.conditionId);
       if (!clob) return m;
       try {
-        const live = await withTimeout(getClobPrices(clob), CLOB_TIMEOUT_MS, 'CLOB prices');
+        const [live, depth] = await withTimeout(
+          Promise.all([getClobPrices(clob), getClobAskDepths(clob)]),
+          CLOB_TIMEOUT_MS,
+          'CLOB prices and depth',
+        );
         if (!live) {
           // CLOB token prices remain useful for display, but without asks they
           // are non-executable and must not feed arbitrage calculation.
@@ -185,7 +189,9 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
           bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
           bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
           lastTradePrice: live.lastTradePrice,
-          noAskDepth: Number(m.liquidityNum ?? m.liquidity ?? 0),
+          // MF-001: use real CLOB ask-level quantity, never Gamma liquidity.
+          askDepth: depth.yesAskDepth,
+          noAskDepth: depth.noAskDepth,
         };
       } catch (e: any) {
         console.warn(`[refresh-single] CLOB timeout for ${market.eventTitle}: ${e.message}`);
