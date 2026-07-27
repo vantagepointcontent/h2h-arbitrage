@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { calculateArbMomentum } from "@/lib/arb-momentum";
 
 interface Props {
   marketId: string;
   outcome: string;
+  /** Compact card variant: directional signal and tooltip without the chart. */
+  compact?: boolean;
 }
 
 interface DecayPoint {
@@ -43,9 +46,16 @@ interface EpisodeData {
  * Direction arrow: ↗ widening / ↘ vanishing / ─ stable.
  * Tooltip: episode duration, peak ROI, current ROI, scan count.
  */
-export function ArbDecayCurve({ marketId, outcome }: Props) {
+export function ArbDecayCurve({ marketId, outcome, compact = false }: Props) {
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Keep the indicator aligned with the app's gentle 60-second scan cadence.
+  useEffect(() => {
+    const interval = window.setInterval(() => setRefreshTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +80,7 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [marketId, outcome]);
+  }, [marketId, outcome, refreshTick]);
 
   const chartData = useMemo(() => {
     if (!episode || episode.points.length < 1) return null;
@@ -119,20 +129,16 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
     trend === "rising" ? "#5DBE81" :
     trend === "declining" ? "#ef4444" : "#facc15";
 
-  const momentumWindow = pts.slice(-5);
-  const momentumStart = momentumWindow[0];
-  const momentumEnd = momentumWindow[momentumWindow.length - 1];
-  const momentumDelta = momentumEnd.roiPct - momentumStart.roiPct;
-  const momentumSeconds = Math.max(1, Math.round((new Date(momentumEnd.seenAt).getTime() - new Date(momentumStart.seenAt).getTime()) / 1000));
+  const momentum = calculateArbMomentum(pts);
 
   // Direction arrow
   const arrow =
-    trend === "rising" ? "↗" :
-    trend === "declining" ? "↘" : "─";
+    momentum.direction === "widening" ? "↑" :
+    momentum.direction === "narrowing" ? "↓" : "—";
 
   const arrowColor =
-    trend === "rising" ? "text-[#5DBE81]" :
-    trend === "declining" ? "text-[#ef4444]" : "text-[#facc15]";
+    momentum.direction === "widening" ? "text-[#5DBE81]" :
+    momentum.direction === "narrowing" ? "text-[#ef4444]" : "text-[#8A9BA8]";
 
   // "Act speed" — minutes the arb has been continuously profitable
   const actSpeedMin = Math.round(episode.durationSec / 60);
@@ -150,7 +156,15 @@ export function ArbDecayCurve({ marketId, outcome }: Props) {
     `First ROI: ${episode.firstRoiPct.toFixed(2)}%\n` +
     `Scans: ${episode.scanCount}\n` +
     `Trend: ${trend}\n` +
-    `Momentum: ${momentumDelta >= 0 ? "+" : ""}${momentumDelta.toFixed(2)}% in ${momentumSeconds}s`;
+    `Momentum: ${momentum.deltaPct >= 0 ? "+" : ""}${momentum.deltaPct.toFixed(2)}% in ${momentum.windowSeconds}s (${momentum.sampleCount} scans)`;
+
+  if (compact) {
+    return (
+      <span className={`text-sm font-bold leading-none ${arrowColor}`} title={tooltip} aria-label={`Momentum ${momentum.direction}`}>
+        {arrow}
+      </span>
+    );
+  }
 
   // Peak marker position
   const peakIdx = rois.indexOf(Math.max(...rois));

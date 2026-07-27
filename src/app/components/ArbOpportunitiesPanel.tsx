@@ -7,6 +7,7 @@ import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./Execu
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import { computeApy } from "@/lib/matcher";
 import type { ProfitDistribution } from "@/lib/profit-distribution";
+import { ArbDecayCurve } from "./ArbDecayCurve";
 
 interface Outcome {
   artist: string;
@@ -36,6 +37,7 @@ interface Outcome {
 
 interface Props {
   outcomes: Outcome[];
+  marketId?: string;
   formatCurrency: (n: number) => string;
   marketExpiryDate?: string | null;
   category?: string;
@@ -51,7 +53,7 @@ interface Props {
  * Execute button renders when marketTitle + ticker + conditionId are available.
  * Distinct from the outcomes table which shows ALL outcomes (including non-arb).
  */
-export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDate, category, marketTitle }: Props) {
+export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, marketExpiryDate, category, marketTitle }: Props) {
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
@@ -219,6 +221,7 @@ export function ArbOpportunitiesPanel({ outcomes, formatCurrency, marketExpiryDa
               {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
               <div className="flex items-center gap-3 flex-wrap">
                 <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
+                {marketId && <ArbDecayCurve marketId={marketId} outcome={o.artist} compact />}
                 <div className="flex-1" />
                 <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
                   {displayRoi.toFixed(2)}%

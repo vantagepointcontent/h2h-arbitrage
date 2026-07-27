@@ -2021,6 +2021,7 @@ export default function Home() {
                     {result && !result.expired && (
                       <ArbOpportunitiesPanel
                         outcomes={result.outcomes}
+                        marketId={activeMarketId ?? undefined}
                         formatCurrency={formatCurrency}
                         marketExpiryDate={result.expiryDate}
                         category={savedMarkets.find((market) => market.id === activeMarketId)?.category}
