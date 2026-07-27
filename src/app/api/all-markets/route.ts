@@ -3,6 +3,7 @@ import { clientSafeError } from '@/lib/error-handler';
 import { extractKalshiEventTicker, extractKalshiMatchKey, filterKalshiMarketsToMatch, fetchKalshiEventMarkets, fetchKalshiSeriesMarkets, fetchKalshiMultiSeriesMarkets, extractKalshiSeriesFromUrl } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { finiteMarketPrice } from '@/lib/market-price';
+import { parseAllMarketsRequest } from '@/lib/all-markets-request';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/all-markets?kalshiUrl=...&pmUrl=...
@@ -129,8 +130,14 @@ async function fetchPolymarketEventScoped(pmUrl: string): Promise<PolymarketLite
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const kalshiUrl = searchParams.get('kalshiUrl');
-    const pmUrl = searchParams.get('pmUrl');
+    const parsedRequest = parseAllMarketsRequest(
+      searchParams.get('kalshiUrl'),
+      searchParams.get('pmUrl'),
+    );
+    if ('error' in parsedRequest) {
+      return NextResponse.json({ error: parsedRequest.error }, { status: 400 });
+    }
+    const { kalshiUrl, pmUrl } = parsedRequest;
 
     // If no URLs provided, return empty (don't fetch global market lists)
     if (!kalshiUrl && !pmUrl) {
