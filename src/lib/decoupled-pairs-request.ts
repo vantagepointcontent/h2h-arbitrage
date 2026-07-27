@@ -5,21 +5,35 @@ export type DecoupledPairCreateRequest = {
   pmTitle: string;
 };
 
+const MAX_IDENTIFIER_LENGTH = 200;
+const MAX_TITLE_LENGTH = 500;
+
+function parseBoundedText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text && text.length <= maxLength ? text : null;
+}
+
 export function parseDecoupledPairCreateRequest(
   body: Record<string, unknown>,
 ): DecoupledPairCreateRequest | { error: string } {
-  const kalshiTicker = typeof body.kalshiTicker === 'string' ? body.kalshiTicker.trim() : '';
-  const pmConditionId = typeof body.pmConditionId === 'string' ? body.pmConditionId.trim() : '';
+  const kalshiTicker = parseBoundedText(body.kalshiTicker, MAX_IDENTIFIER_LENGTH);
+  const pmConditionId = parseBoundedText(body.pmConditionId, MAX_IDENTIFIER_LENGTH);
   if (!kalshiTicker || !pmConditionId) {
     return { error: 'Missing or invalid kalshiTicker or pmConditionId' };
   }
 
-  return {
-    kalshiTicker,
-    pmConditionId,
-    kalshiTitle: typeof body.kalshiTitle === 'string' ? body.kalshiTitle.trim() : '',
-    pmTitle: typeof body.pmTitle === 'string' ? body.pmTitle.trim() : '',
-  };
+  const kalshiTitle = body.kalshiTitle === undefined
+    ? ''
+    : parseBoundedText(body.kalshiTitle, MAX_TITLE_LENGTH);
+  const pmTitle = body.pmTitle === undefined
+    ? ''
+    : parseBoundedText(body.pmTitle, MAX_TITLE_LENGTH);
+  if (kalshiTitle === null || pmTitle === null) {
+    return { error: 'Invalid or oversized market title' };
+  }
+
+  return { kalshiTicker, pmConditionId, kalshiTitle, pmTitle };
 }
 
 export function parseDecoupledPairId(value: string | null): string | { error: string } {

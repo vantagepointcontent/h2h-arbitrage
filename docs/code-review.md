@@ -44,6 +44,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-036 | Medium | `src/app/api/scan/route.ts` manual-match Polymarket prices | Fixed | The manual-match branch parsed Gamma's `outcomePrices` inline. Malformed JSON caused a 500 and malformed values could leak `NaN` into the response. Added a tested shared parser that defaults malformed/non-finite YES/NO values to safe non-executable prices (`0`/`1`) while preserving finite upstream values for the existing matcher validation. |
 | CR-037 | Medium | `src/app/api/all-markets/route.ts` URL validation | Fixed | Optional upstream platform URLs were accepted without host/path validation. Added a tested parser that permits only bounded HTTP(S) Kalshi `/markets/` and Polymarket `/event/`, `/market/`, or `/sports/` URLs on exact approved hosts, rejecting lookalikes and malformed paths with 400 before any upstream request. |
 | CR-038 | Low | `src/app/api/phantoms/route.ts` category filter | Fixed | Whitespace and arbitrarily long category query values were passed directly into the persistence filter. Added a tested shared bounded-text normalizer; empty/oversized values now behave as no filter while valid values are trimmed. |
+| CR-039 | Medium | `src/app/api/decoupled-pairs/route.ts` persisted create fields | Fixed | The state-changing route accepted unbounded ticker, condition-ID, and title strings before writing its JSON store. Added tested 200-character identifier and 500-character title limits; missing optional titles remain supported. |
 
 ## Verification
 
