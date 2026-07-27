@@ -8,6 +8,7 @@ import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import { computeApy } from "@/lib/matcher";
 import type { ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
+import { ShareStakeCalculator } from "./ShareStakeCalculator";
 
 interface Outcome {
   artist: string;
@@ -254,6 +255,20 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                 <div className="mt-2">
                   <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
                 </div>
+              )}
+              {(o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
+                && kalshiPrice != null && pmPrice != null && (
+                <ShareStakeCalculator
+                  strategy={o.arbitrage.strategy}
+                  kalshiYesAsk={o.kalshi?.yesAsk ?? 0}
+                  kalshiNoAsk={o.kalshi?.noAsk ?? 0}
+                  pmYesAsk={o.polymarket?.yesPrice ?? 0}
+                  pmNoAsk={o.polymarket?.noPrice ?? 0}
+                  kalshiAskDepth={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.kalshi?.yesAskDepth : o.kalshi?.noAskDepth}
+                  pmAskDepth={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.polymarket?.noAskDepth : o.polymarket?.askDepth}
+                  category={category}
+                  formatCurrency={formatCurrency}
+                />
               )}
               {supportsDistribution && (
                 <ProfitDistributionPanel
