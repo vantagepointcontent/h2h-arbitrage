@@ -25,12 +25,27 @@ import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links'
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
 import { classifyMarket } from '@/lib/market-classification';
+import { getScanClientKey, scanRateLimiter } from '@/lib/scan-rate-limit';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 export async function POST(request: NextRequest) {
+  const rateLimit = scanRateLimiter.consume(getScanClientKey(request.headers));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many scan requests. Please retry shortly.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+          'X-RateLimit-Remaining': '0',
+        },
+      },
+    );
+  }
+
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });

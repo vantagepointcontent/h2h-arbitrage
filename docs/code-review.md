@@ -37,6 +37,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-029 | Medium | `src/app/api/market-depth/route.ts` query validation | Fixed | Unvalidated external identifiers reached Kalshi and CLOB upstream paths. Added a tested request parser that trims valid IDs, rejects malformed/tampered tickers and non-canonical Polymarket condition IDs before any upstream request, and returns a clear 400 response. |
 | CR-030 | Low | `src/app/api/arb-episodes/active/route.ts` query validation | Fixed | The read endpoint accepted whitespace-only and arbitrarily long `marketId` / `outcome` values directly into lifecycle persistence queries. Added a tested parser that normalizes valid values, requires a market ID, and rejects blank or >200-character identifiers with a 400 response before querying. |
 | CR-031 | Low | `src/app/api/dashboard/stats/route.ts` range normalization | Fixed | Unsupported `range` values used the 30-day query cutoff but were echoed back unchanged, making the API response inconsistent with the data returned. Added a tested allowlist parser that normalizes unsupported values to the documented `30d` default. |
+| CR-032 | Medium | `POST /api/scan` request-rate guard | Fixed | A single client could enqueue unlimited expensive scans before upstream per-platform limiters ran. Added a tested process-local 30-request/minute client guard that returns `429`, `Retry-After`, and no upstream work when exhausted. |
 
 ## Verification
 
