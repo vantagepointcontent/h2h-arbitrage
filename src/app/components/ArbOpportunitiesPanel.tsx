@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { TrendingUp, Zap } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bell, TrendingUp, Zap } from "lucide-react";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
@@ -9,6 +9,14 @@ import { computeApy } from "@/lib/matcher";
 import type { ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
+import {
+  ARB_ALERTS_STORAGE_KEY,
+  type ArbAlert,
+  isAlertThresholdHit,
+  makeArbAlertKey,
+  parseArbAlerts,
+  serializeArbAlerts,
+} from "@/lib/arb-alerts";
 
 interface Outcome {
   artist: string;
@@ -59,12 +67,79 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
   const [distributions, setDistributions] = useState<Record<string, ProfitDistribution>>({});
+  const [alerts, setAlerts] = useState<Record<string, ArbAlert>>(() =>
+    typeof window === "undefined" ? {} : parseArbAlerts(localStorage.getItem(ARB_ALERTS_STORAGE_KEY)),
+  );
+  const [alertDrafts, setAlertDrafts] = useState<Record<string, string>>({});
+  const [flashingAlerts, setFlashingAlerts] = useState<Set<string>>(new Set());
+  const previouslyHitAlerts = useRef(new Set<string>());
+
+  useEffect(() => {
+    localStorage.setItem(ARB_ALERTS_STORAGE_KEY, serializeArbAlerts(alerts));
+  }, [alerts]);
+
+  const saveAlert = (key: string) => {
+    const targetRoiPct = Number(alertDrafts[key]);
+    if (!Number.isFinite(targetRoiPct) || targetRoiPct <= 0) return;
+    setAlerts(current => ({ ...current, [key]: { key, targetRoiPct } }));
+    if ("Notification" in window && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  };
+
+  const clearAlert = (key: string) => {
+    setAlerts(current => {
+      const { [key]: _removed, ...remaining } = current;
+      return remaining;
+    });
+    previouslyHitAlerts.current.delete(key);
+    setFlashingAlerts(current => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  };
 
   const arbOpps = useMemo(() => {
     return outcomes
       .filter(o => o.arbitrage.expectedProfit > 0 && o.arbitrage.roiPct > 0)
       .sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct);
   }, [outcomes]);
+
+  useEffect(() => {
+    const activeKeys = new Set<string>();
+    for (const opportunity of arbOpps) {
+      const key = makeArbAlertKey({
+        artist: opportunity.artist,
+        strategy: opportunity.arbitrage.strategy,
+        kalshiTicker: opportunity.kalshi?.ticker,
+        pmConditionId: opportunity.polymarket?.conditionId,
+      });
+      const hit = isAlertThresholdHit(opportunity.arbitrage.roiPct, alerts[key]);
+      if (!hit) {
+        previouslyHitAlerts.current.delete(key);
+        continue;
+      }
+      activeKeys.add(key);
+      if (previouslyHitAlerts.current.has(key)) continue;
+
+      previouslyHitAlerts.current.add(key);
+      setFlashingAlerts(current => new Set(current).add(key));
+      window.setTimeout(() => setFlashingAlerts(current => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      }), 1600);
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("EdgeFinder target reached", {
+          body: `${opportunity.artist}: ${opportunity.arbitrage.roiPct.toFixed(2)}% net ROI reached your ${alerts[key].targetRoiPct.toFixed(2)}% target.`,
+        });
+      }
+    }
+    for (const key of previouslyHitAlerts.current) {
+      if (!activeKeys.has(key)) previouslyHitAlerts.current.delete(key);
+    }
+  }, [alerts, arbOpps]);
 
   const startExecute = async (o: Outcome, distribution?: ProfitDistribution) => {
     const adjustedKalshiStake = distribution?.kalshiStake ?? o.arbitrage.kalshiStake ?? 0;
@@ -207,6 +282,14 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
           const displayRoi = adjusted
             ? (displayProfit / adjusted.totalStake) * 100
             : o.arbitrage.roiPct;
+          const alertKey = makeArbAlertKey({
+            artist: o.artist,
+            strategy: o.arbitrage.strategy,
+            kalshiTicker: o.kalshi?.ticker,
+            pmConditionId: o.polymarket?.conditionId,
+          });
+          const activeAlert = alerts[alertKey];
+          const alertHit = isAlertThresholdHit(displayRoi, activeAlert);
           const kalshiPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
             ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
           const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
@@ -218,7 +301,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
             && (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0) > 0;
 
           return (
-            <div key={`${idx}-${o.artist}`} className="px-4 py-3 hover:bg-[#0E1621] transition-colors">
+            <div key={`${idx}-${o.artist}`} className={`px-4 py-3 hover:bg-[#0E1621] transition-colors ${flashingAlerts.has(alertKey) ? "bg-[#5DBE81]/20 animate-pulse" : alertHit ? "bg-[#5DBE81]/10" : ""}`}>
               {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
               <div className="flex items-center gap-3 flex-wrap">
                 <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
@@ -233,6 +316,11 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                 {apy > 0 && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
                     APY {apy.toFixed(0)}%
+                  </span>
+                )}
+                {activeAlert && (
+                  <span className={`inline-flex items-center gap-1 text-[10px] ${alertHit ? "text-[#5DBE81]" : "text-[#facc15]"}`} title={`Alert at ${activeAlert.targetRoiPct.toFixed(2)}% net ROI`}>
+                    <Bell className="w-3 h-3" /> {activeAlert.targetRoiPct.toFixed(2)}%
                   </span>
                 )}
                 {canExecute && (
@@ -256,6 +344,40 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                   <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
                 </div>
               )}
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                {activeAlert ? (
+                  <button
+                    onClick={() => clearAlert(alertKey)}
+                    className="px-2 py-1 rounded text-[10px] font-medium border border-[#facc15]/30 text-[#facc15] hover:bg-[#facc15]/10 transition-colors"
+                    title="Clear this in-app alert"
+                  >
+                    Clear alert
+                  </button>
+                ) : (
+                  <>
+                    <label className="text-[10px] text-[#8A9BA8]" htmlFor={`alert-${idx}`}>Target net ROI %</label>
+                    <input
+                      id={`alert-${idx}`}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={alertDrafts[alertKey] ?? ""}
+                      onChange={(event) => setAlertDrafts(current => ({ ...current, [alertKey]: event.target.value }))}
+                      placeholder="3.00"
+                      className="w-20 rounded border border-[#232E3C] bg-[#0E1621] px-2 py-1 text-[10px] text-[#FFFFFF] placeholder:text-[#48555F] focus:border-[#5DBE81]/50 outline-none"
+                    />
+                    <button
+                      onClick={() => saveAlert(alertKey)}
+                      disabled={!Number.isFinite(Number(alertDrafts[alertKey])) || Number(alertDrafts[alertKey]) <= 0}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border border-[#5DBE81]/30 text-[#5DBE81] hover:bg-[#5DBE81]/10 transition-colors disabled:opacity-40"
+                      title="Set an in-app alert for this net ROI threshold"
+                    >
+                      <Bell className="w-3 h-3" /> Set Alert
+                    </button>
+                  </>
+                )}
+              </div>
               {(o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
                 && kalshiPrice != null && pmPrice != null && (
                 <ShareStakeCalculator
