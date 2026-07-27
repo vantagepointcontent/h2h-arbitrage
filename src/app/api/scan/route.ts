@@ -9,7 +9,7 @@ import {
   fetchKalshiSeriesMarkets,
   fetchKalshiMultiSeriesMarkets,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
 import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
 import { getSetting } from '@/lib/settings';
@@ -284,22 +284,25 @@ export async function POST(request: NextRequest) {
           platformA: 'kalshi' as const,
           platformB: null,
         })),
-        ...pmMarkets.map(pm => ({
-          artist: pm.groupItemTitle || pm.question || 'Unknown',
-          kalshi: null,
-          polymarket: {
-            conditionId: pm.conditionId,
-            marketId: pm.id,
-            yesPrice: parseFloat(JSON.parse(pm.outcomePrices || '["0","1"]')[0] || '0'),
-            noPrice: parseFloat(JSON.parse(pm.outcomePrices || '["0","1"]')[1] || '1'),
-            bestBid: pm.bestBid ?? 0,
-            bestAsk: pm.bestAsk ?? 0,
-            lastTradePrice: pm.lastTradePrice ?? 0,
-          },
-          arbitrage: { roiPct: 0, expectedProfit: 0, strategy: 'No arb', kalshiStake: 0, pmStake: 0, fees: null, apyPct: 0 },
-          platformA: null,
-          platformB: 'polymarket' as const,
-        })),
+        ...pmMarkets.map(pm => {
+          const [yesPrice, noPrice] = parseOutcomePrices(pm.outcomePrices);
+          return {
+            artist: pm.groupItemTitle || pm.question || 'Unknown',
+            kalshi: null,
+            polymarket: {
+              conditionId: pm.conditionId,
+              marketId: pm.id,
+              yesPrice,
+              noPrice,
+              bestBid: pm.bestBid ?? 0,
+              bestAsk: pm.bestAsk ?? 0,
+              lastTradePrice: pm.lastTradePrice ?? 0,
+            },
+            arbitrage: { roiPct: 0, expectedProfit: 0, strategy: 'No arb', kalshiStake: 0, pmStake: 0, fees: null, apyPct: 0 },
+            platformA: null,
+            platformB: 'polymarket' as const,
+          };
+        }),
       ];
     } else {
       const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, capital, pmEvent.endDate);

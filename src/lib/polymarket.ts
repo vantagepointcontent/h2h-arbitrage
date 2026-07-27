@@ -152,13 +152,36 @@ export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEven
   });
 }
 
+/**
+ * Parse Gamma's serialized binary prices without allowing malformed upstream
+ * values to leak NaN into scan responses or stake calculations.
+ */
+export function parseOutcomePrices(serialized: string | undefined): [number, number] {
+  try {
+    const values: unknown = JSON.parse(serialized || '[]');
+    if (!Array.isArray(values)) return [0, 1];
+
+    const normalized = (value: unknown, fallback: number): number => {
+      const parsed = typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim() !== ''
+          ? Number(value)
+          : NaN;
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    return [normalized(values[0], 0), normalized(values[1], 1)];
+  } catch {
+    return [0, 1];
+  }
+}
+
 export function parseOutcomes(market: PMMarket): { outcomes: string[]; prices: number[] } {
   try {
     const outcomes = JSON.parse(market.outcomes) as string[];
-    const prices = JSON.parse(market.outcomePrices) as string[];
     return {
       outcomes,
-      prices: prices.map(p => parseFloat(p)),
+      prices: parseOutcomePrices(market.outcomePrices),
     };
   } catch {
     return { outcomes: [], prices: [] };
