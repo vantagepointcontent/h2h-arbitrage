@@ -55,7 +55,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     iconPath: '/polymarket-icon.png',
     color: '#1652f0',
     apiBaseUrl: 'https://gamma-api.polymarket.com',
-    urlPatterns: [/polymarket\.com/i],
+    urlPatterns: [/^(?:www\.)?polymarket\.com$/i],
     credentialKeys: [
       'POLYMARKET_PRIVATE_KEY',
       'POLYMARKET_API_KEY',
@@ -76,7 +76,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     iconPath: '/kalshi-icon.png',
     color: '#1a1a1a',
     apiBaseUrl: 'https://external-api.kalshi.com/trade-api/v2',
-    urlPatterns: [/kalshi\.com/i],
+    urlPatterns: [/^(?:www\.)?kalshi\.com$/i],
     credentialKeys: [
       'KALSHI_API_KEY_ID',
       'KALSHI_API_PRIVATE_KEY',
@@ -95,7 +95,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     iconPath: '/ibkr-icon.png',
     color: '#d4261e',
     apiBaseUrl: '',
-    urlPatterns: [/interactivebrokers\.com/i, /ibkr\.com/i],
+    urlPatterns: [/^(?:www\.)?interactivebrokers\.com$/i, /^(?:www\.)?ibkr\.com$/i],
     credentialKeys: [],
     enabled: false,
     adapterReady: false,
@@ -141,9 +141,15 @@ export function getAdapterReadyPlatforms(): PlatformConfig[] {
  */
 export function detectPlatformFromUrl(url: string): PlatformId | null {
   if (!url) return null;
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null;
+  }
   for (const platform of getAllPlatforms()) {
     for (const pattern of platform.urlPatterns) {
-      if (pattern.test(url)) {
+      if (pattern.test(hostname)) {
         return platform.id;
       }
     }

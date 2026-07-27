@@ -19,4 +19,10 @@ describe('platform registry', () => {
     expect(detectPlatformFromUrl('https://www.interactivebrokers.com/predictionmarkets/app/market/1')).toBe('ibkr');
     expect(detectPlatformFromUrl('not-a-market-link')).toBeNull();
   });
+
+  it('does not identify lookalike or malformed URLs as trading platforms', () => {
+    expect(detectPlatformFromUrl('https://kalshi.com.evil.example/markets/KXTEST')).toBeNull();
+    expect(detectPlatformFromUrl('https://evilpolymarket.com/event/example')).toBeNull();
+    expect(detectPlatformFromUrl('kalshi.com/markets/KXTEST')).toBeNull();
+  });
 });
