@@ -44,9 +44,9 @@ function ExecutionReadinessInner({ kalshi, polymarket, arbitrage, formatCurrency
   if (!kalshi || !polymarket || arbitrage.strategy === 'No arb') return null;
 
   const kalshiDepth = parseDepth(kalshi.yesAskDepth);
-  // PM depth: use real value when present; Infinity per project rule otherwise
+  // MF-001: unknown CLOB depth is non-executable, not infinite liquidity.
   const pmDepthRaw = polymarket.askDepth;
-  const pmDepth = pmDepthRaw != null && Number.isFinite(pmDepthRaw) && pmDepthRaw > 0 ? pmDepthRaw : Infinity;
+  const pmDepth = pmDepthRaw != null && Number.isFinite(pmDepthRaw) && pmDepthRaw > 0 ? pmDepthRaw : 0;
 
   const totalStake = (arbitrage.kalshiStake ?? 0) + (arbitrage.pmStake ?? 0);
   const feeRates = {
@@ -65,7 +65,7 @@ function ExecutionReadinessInner({ kalshi, polymarket, arbitrage, formatCurrency
   );
 
   const warn = WARNING_STYLES[liq.warningLevel] ?? WARNING_STYLES.critical;
-  const bindingSide = kalshiDepth <= (Number.isFinite(pmDepth) ? pmDepth : Infinity) ? 'Kalshi' : 'Polymarket';
+  const bindingSide = kalshiDepth <= pmDepth ? 'Kalshi' : 'Polymarket';
   const captureRatio = Math.round(liq.realToTheoreticalRatio * 100);
 
   return (

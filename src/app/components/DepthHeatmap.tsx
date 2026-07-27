@@ -155,7 +155,8 @@ export function computeLiquidityFromOutcome(
 
   const kalshiDepth = parseDepth(kalshi.yesAskDepth);
   const pmDepthRaw = polymarket.askDepth;
-  const pmDepth = pmDepthRaw != null && Number.isFinite(pmDepthRaw) && pmDepthRaw > 0 ? pmDepthRaw : Infinity;
+  // MF-001: missing CLOB depth is non-executable, never assumed infinite.
+  const pmDepth = pmDepthRaw != null && Number.isFinite(pmDepthRaw) && pmDepthRaw > 0 ? pmDepthRaw : 0;
 
   const totalStake = (arbitrage?.kalshiStake ?? 0) + (arbitrage?.pmStake ?? 0);
   const feeRates = {

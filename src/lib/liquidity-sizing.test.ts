@@ -180,4 +180,22 @@ describe('analyzeLiquidity', () => {
     expect(result.kalshiDepth).toBe(20_000);
     expect(result.warningLevel).toBe('low');
   });
+
+  it('unknown Polymarket depth fails closed instead of assuming Infinity', () => {
+    const result = analyzeLiquidity(
+      0.40,
+      20_000,
+      0.60,
+      0,
+      0.55,
+      0.50,
+      FEES,
+    );
+
+    expect(result.maxFillableStake).toBe(0);
+    expect(result.isLiquid).toBe(false);
+    expect(result.warningLevel).toBe('critical');
+    expect(result.theoreticalProfit).toBe(0);
+    expect(result.realisticProfit).toBe(0);
+  });
 });

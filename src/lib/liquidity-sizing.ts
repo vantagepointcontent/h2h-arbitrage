@@ -11,7 +11,7 @@ export interface LiquidityAnalysis {
   maxFillableStake: number;
   /** Available liquidity on Kalshi side (dollar depth) */
   kalshiDepth: number;
-  /** Available liquidity on Polymarket side (dollar depth, Infinity per project rule) */
+  /** Available executable liquidity on Polymarket side (dollar depth) */
   polymarketDepth: number;
   /** True if maxFillableStake >= $100 */
   isLiquid: boolean;
@@ -33,7 +33,7 @@ export interface LiquidityAnalysis {
  * @param kalshiAskPrice - Yes-side ask price on Kalshi (0–1)
  * @param kalshiAskDepth - Dollar depth available at the Kalshi ask
  * @param polymarketAskPrice - Ask price on Polymarket (0–1)
- * @param polymarketDepth - Dollar depth on Polymarket (Infinity per project rule)
+ * @param polymarketDepth - Executable dollar depth at the Polymarket best ask
  * @param kalshiNoPrice - No-side price on Kalshi (0–1)
  * @param polymarketNoPrice - No-side price on Polymarket (0–1)
  * @param fees - Fee rates for each platform
@@ -49,8 +49,8 @@ export function analyzeLiquidity(
 ): LiquidityAnalysis {
   // --- max fillable stake ---
   // Binding constraint: min(dollar depth on each side)
-  // Guard: if both depths are Infinity (PM defaults to Infinity per project
-  // rule), fall back to a finite cap to avoid Infinity/Infinity = NaN below.
+  // Unknown/missing depth is non-executable. Infinity is retained only as an
+  // explicit caller override for legacy/manual analysis, never inferred here.
   const rawFillable = Math.min(kalshiAskDepth, polymarketDepth);
   const maxFillableStake = Number.isFinite(rawFillable) ? rawFillable : 10_000;
 
