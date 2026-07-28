@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseOutcomePrices, parseOutcomes, type PMMarket } from './polymarket';
+import {
+  extractParentEventSlug,
+  parseOutcomePrices,
+  parseOutcomes,
+  type PMMarket,
+} from './polymarket';
 
 describe('parseOutcomePrices', () => {
   it('preserves valid binary Gamma prices', () => {
@@ -20,5 +25,15 @@ describe('parseOutcomePrices', () => {
     } as PMMarket;
 
     expect(parseOutcomes(market)).toEqual({ outcomes: ['Yes', 'No'], prices: [0, 1] });
+  });
+});
+
+describe('extractParentEventSlug', () => {
+  it('returns only a non-empty event slug from a Gamma market payload', () => {
+    expect(extractParentEventSlug({ events: [{ slug: 'us-house-control' }] })).toBe('us-house-control');
+    expect(extractParentEventSlug({ events: [{ slug: '   ' }] })).toBeUndefined();
+    expect(extractParentEventSlug({ events: [{ slug: 42 }] })).toBeUndefined();
+    expect(extractParentEventSlug({ events: [] })).toBeUndefined();
+    expect(extractParentEventSlug(null)).toBeUndefined();
   });
 });

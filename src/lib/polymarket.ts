@@ -49,6 +49,17 @@ export function isPolymarketMarketUrl(url: string): boolean {
   return /polymarket\.com\/market\//.test(url);
 }
 
+/** Extract a usable parent-event slug from Gamma's untyped expanded market payload. */
+export function extractParentEventSlug(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const events = (value as { events?: unknown }).events;
+  if (!Array.isArray(events) || events.length === 0) return undefined;
+  const slug = events[0] && typeof events[0] === 'object'
+    ? (events[0] as { slug?: unknown }).slug
+    : undefined;
+  return typeof slug === 'string' && slug.trim() !== '' ? slug : undefined;
+}
+
 import { rateLimiters } from '@/lib/rate-limiter';
 import { createTtlMemo } from '@/lib/ttl-cache';
 
@@ -109,7 +120,7 @@ export async function fetchPolymarketMarketAsEvent(slug: string): Promise<PMEven
     // Try to resolve the parent event to get all sibling markets.
     // The markets API includes an `events` array on each market when expanded.
     // We also try the `negRiskMarketID` as a fallback lookup.
-    const eventSlug = (m as any).events?.[0]?.slug as string | undefined;
+    const eventSlug = extractParentEventSlug(m);
 
     if (eventSlug) {
       try {
