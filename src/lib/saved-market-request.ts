@@ -22,6 +22,26 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/** Accept the date-only values emitted by MarketEditPanel and canonical ISO UTC timestamps. */
+function validExpiryDate(value: unknown): string | null {
+  const text = nonEmptyString(value);
+  if (!text) return null;
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z)?$/);
+  if (!match) return null;
+
+  const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)));
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() !== Number(month) - 1 ||
+    parsed.getUTCDate() !== Number(day) ||
+    parsed.getUTCHours() !== Number(hour) ||
+    parsed.getUTCMinutes() !== Number(minute) ||
+    parsed.getUTCSeconds() !== Number(second)
+  ) return null;
+  return text;
+}
+
 function looksLikeUrl(value: string): boolean {
   try {
     const u = new URL(value);
@@ -78,14 +98,14 @@ export function parseSavedMarketCreate(body: Record<string, unknown>): SavedMark
 
   if (body.eventTitle !== undefined && (typeof body.eventTitle !== 'string' || body.eventTitle.trim().length > 500)) return { error: 'eventTitle must be a string up to 500 characters.' };
   if (body.category !== undefined && (typeof body.category !== 'string' || body.category.trim().length > 200)) return { error: 'category must be a string up to 200 characters.' };
-  if (body.expiryDate !== undefined && body.expiryDate !== null && typeof body.expiryDate !== 'string') return { error: 'expiryDate must be a string or null.' };
+  if (body.expiryDate !== undefined && body.expiryDate !== null && !validExpiryDate(body.expiryDate)) return { error: 'expiryDate must be a valid ISO date or null.' };
 
   return {
     kalshiUrl,
     polymarketUrl,
     eventTitle: typeof body.eventTitle === 'string' && body.eventTitle.trim() ? body.eventTitle.trim() : 'Untitled',
     category: typeof body.category === 'string' ? body.category.trim() : '',
-    expiryDate: typeof body.expiryDate === 'string' ? body.expiryDate : null,
+    expiryDate: body.expiryDate === null ? null : validExpiryDate(body.expiryDate),
   };
 }
 
@@ -113,8 +133,8 @@ export function parseSavedMarketPatch(body: Record<string, unknown>): SavedMarke
   }
 
   if ('expiryDate' in body) {
-    if (body.expiryDate !== null && typeof body.expiryDate !== 'string') return { error: 'expiryDate must be a string or null.' };
-    patch.expiryDate = body.expiryDate;
+    if (body.expiryDate !== null && !validExpiryDate(body.expiryDate)) return { error: 'expiryDate must be a valid ISO date or null.' };
+    patch.expiryDate = body.expiryDate === null ? null : validExpiryDate(body.expiryDate)!;
   }
 
   if ('kalshiUrl' in body) {

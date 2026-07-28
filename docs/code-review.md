@@ -61,6 +61,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-053 | High | `src/lib/live-arb-engine.ts` CLOB decimal parsing | Fixed | `Number()` accepted non-decimal numeric syntax (for example `"0x4"`) in CLOB WebSocket sizes. That let malformed exchange input become executable depth. Ask-level parsing now requires a full decimal/scientific numeric string, finite positive values, and a price below $1; regression coverage rejects malformed, non-finite, trailing-text, and hexadecimal values. |
 | CR-054 | High | `src/lib/orderbook-state.ts` shared orderbook boundary | Fixed | The shared `setBook()` boundary accepted non-finite quantities/prices and prices at or above $1. Adapter validation could be bypassed by REST seeding or future callers, allowing invalid levels to become live execution depth. The central sorter now admits only finite, positive quantities and finite prices strictly between $0 and $1; regression coverage verifies all invalid levels are excluded. |
 | CR-055 | High | `src/lib/ws-book-apply.ts` Kalshi snapshot ordering | Fixed | A Kalshi orderbook delta can arrive before its initial snapshot. The resulting provisional positive-sequence book was incorrectly treated as a REST seed, so the full snapshot was discarded and one side remained incomplete. Snapshot handling now preserves only sequence-zero REST seeds; a first snapshot replaces an early-delta provisional book. Regression coverage verifies both converted ask sides and quantities. |
+| CR-056 | Medium | `src/lib/saved-market-request.ts` expiry-date validation | Fixed | Create/update accepted arbitrary expiry strings, including impossible calendar dates, which later became `Invalid Date`/`NaN` in sorting, APY, and scheduler calculations. Added strict calendar validation for UI date-only values and canonical ISO UTC timestamps; invalid values now return a clear 400 before persistence. |
 
 ## Verification
 
@@ -74,6 +75,7 @@ This review is intentionally one module and one verified change at a time. Runti
 - Latest full Vitest: 629 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 - CR-050 regression: `src/lib/kalshi-ws.test.ts` verifies non-finite/out-of-range snapshot levels and malformed deltas are never dispatched to live orderbook consumers.
 - Latest full Vitest after CR-050: 633 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
+- CR-056 regression: `src/lib/saved-market-request.test.ts` rejects malformed and impossible expiry dates for create/update while preserving the UI's date-only format. Full Vitest: 645 passed, 0 failed; production build passed; runtime invalid-expiry POST returned HTTP 400 with the expected validation error.
 
 ## Next review module
 

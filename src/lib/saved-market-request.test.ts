@@ -49,6 +49,23 @@ describe('saved market request parsing', () => {
     });
   });
 
+  it.each([
+    ['not-a-date'],
+    ['2026-02-30T12:00:00.000Z'],
+    ['   '],
+  ])('rejects invalid expiry dates when creating a saved market', (expiryDate) => {
+    expect(parseSavedMarketCreate({
+      kalshiUrl: 'https://kalshi.com/markets/KX-DEMO',
+      polymarketUrl: 'https://polymarket.com/event/demo',
+      expiryDate,
+    })).toEqual({ error: 'expiryDate must be a valid ISO date or null.' });
+  });
+
+  it('rejects invalid expiry dates when patching a saved market', () => {
+    expect(parseSavedMarketPatch({ id: 'market-1', expiryDate: 'not-a-date' }))
+      .toEqual({ error: 'expiryDate must be a valid ISO date or null.' });
+  });
+
   it('accepts platformLinks array', () => {
     const patch = parseSavedMarketPatch({
       id: 'market-1',
