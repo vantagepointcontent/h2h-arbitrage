@@ -51,6 +51,17 @@ const HEARTBEAT_INTERVAL_MS = 10_000;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
 
+/** WebSocket payloads are untrusted; invalid quotes must never reach live sizing. */
+function isTradeablePrice(value: unknown): value is number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= 1;
+}
+
+function isFiniteQuantity(value: unknown, allowNegative = false): value is number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && (allowNegative ? parsed !== 0 : parsed > 0);
+}
+
 export class KalshiWsService {
   private ws: WebSocket | null = null;
   private connected = false;
@@ -183,6 +194,7 @@ export class KalshiWsService {
 
       const side = inner.side;
       if (side !== 'yes' && side !== 'no') return;
+      if (!isTradeablePrice(inner.price_dollars) || !isFiniteQuantity(inner.delta_fp, true)) return;
 
       const delta: KalshiOrderbookDelta = {
         type: 'orderbook_delta',
@@ -191,8 +203,8 @@ export class KalshiWsService {
         marketTicker,
         marketId: inner.market_id,
         side,
-        price: parseFloat(inner.price_dollars),
-        delta: parseFloat(inner.delta_fp),
+        price: Number(inner.price_dollars),
+        delta: Number(inner.delta_fp),
         ts: inner.ts_ms ?? Date.now(),
       };
       this.dispatch(marketTicker, delta);
@@ -206,11 +218,11 @@ export class KalshiWsService {
     if (!Array.isArray(levels)) return [];
     return levels
       .filter((lvl) => Array.isArray(lvl) && lvl.length >= 2)
+      .filter((lvl) => isTradeablePrice(lvl[0]) && isFiniteQuantity(lvl[1]))
       .map((lvl) => ({
-        price: parseFloat(lvl[0]),
-        quantity: parseFloat(lvl[1]),
-      }))
-      .filter((lvl) => !isNaN(lvl.price) && !isNaN(lvl.quantity) && lvl.quantity > 0);
+        price: Number(lvl[0]),
+        quantity: Number(lvl[1]),
+      }));
   }
 
   private dispatch(marketTicker: string, msg: KalshiWsMessage): void {
