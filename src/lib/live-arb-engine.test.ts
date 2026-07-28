@@ -78,6 +78,8 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
       { price: 'Infinity', size: '10' },
       { price: '0.35', size: 'Infinity' },
       { price: '0.36junk', size: '5' },
+      { price: '0x0.36', size: '5' },
+      { price: '0.37', size: '0x4' },
       { price: '0.37', size: '4' },
     ]);
 
