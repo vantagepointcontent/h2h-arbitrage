@@ -55,6 +55,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-047 | High | `src/lib/liquidity-sizing.ts` executable depth sizing | Fixed | The legacy liquidity-analysis helper converted non-finite combined depth to a $10,000 fill assumption and allowed an `Infinity` PM depth to make a Kalshi-only quote look executable. It now requires positive finite ask-level depth on both legs; regression coverage verifies all `Infinity` PM-depth cases fail closed. |
 | CR-048 | High | `src/lib/clob-ws.ts` WebSocket quote parsing | Fixed | Untrusted CLOB WebSocket `best_bid_ask`, `price_change`, and `book` payloads used raw parsing, so `NaN`/`Infinity` could enter the price cache or appear as best/executable orderbook depth. Quotes and sizes now require positive finite values; malformed levels are excluded and snapshots derive their best prices only from valid depth. |
 | CR-049 | High | `src/lib/matcher.ts` depth-string parsing | Fixed | The depth parser accepted a valid numeric prefix while silently ignoring trailing text (for example `"500 contracts"`). That could make malformed upstream depth executable. It now requires the full normalized value to be a finite numeric amount with only an optional `K`/`M`/`B` suffix; regression coverage rejects malformed suffix text. |
+| CR-050 | High | `src/lib/kalshi-ws.ts` WebSocket orderbook parsing | Fixed | Snapshot levels and deltas used raw `parseFloat()`, allowing non-finite or out-of-range prices and non-finite quantities into the live orderbook path. The parser now accepts only finite 0–1 prices and finite nonzero deltas / positive snapshot quantities; regression coverage verifies malformed messages are discarded. |
 
 ## Verification
 
@@ -66,6 +67,8 @@ This review is intentionally one module and one verified change at a time. Runti
 - Runtime proof for CR-002: malformed POST `/api/saved-markets` returns HTTP 400 and `{ "error": "Invalid JSON body" }`.
 - CR-048 regression: `src/lib/clob-ws.test.ts` verifies malformed incremental quotes resolve to `null` and malformed/non-finite snapshot levels are excluded from both best price and executable depth.
 - Latest full Vitest: 629 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
+- CR-050 regression: `src/lib/kalshi-ws.test.ts` verifies non-finite/out-of-range snapshot levels and malformed deltas are never dispatched to live orderbook consumers.
+- Latest full Vitest after CR-050: 633 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 
 ## Next review module
 
