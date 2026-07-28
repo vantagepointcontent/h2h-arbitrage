@@ -32,6 +32,12 @@ const SUBSCRIBE_DEBOUNCE_MS = 200;
 // Per-token best bid/ask cache (populated from WS snapshots)
 const priceCache = new Map<string, { bestBid: number; bestAsk: number; ts: number }>();
 
+/** WebSocket payloads are untrusted. Invalid quotes must not become executable. */
+function finitePositiveValue(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 // Bounded-memory guard: evict cache entries older than 30 min, every 5 min.
 // Prevents unbounded growth in long-running processes (audit F4 fix).
 const PRICE_CACHE_TTL_MS = 30 * 60_000;
@@ -157,8 +163,8 @@ export class ClobWsService {
       const bidStr = msg.bid?.price ?? msg.bid_price;
       const askStr = msg.ask?.price ?? msg.ask_price;
 
-      const bestBid = bidStr != null ? parseFloat(String(bidStr)) : null;
-      const bestAsk = askStr != null ? parseFloat(String(askStr)) : null;
+      const bestBid = bidStr != null ? finitePositiveValue(bidStr) : null;
+      const bestAsk = askStr != null ? finitePositiveValue(askStr) : null;
 
       // Update cache
       if (bestBid != null || bestAsk != null) {
@@ -191,8 +197,8 @@ export class ClobWsService {
       //    'book' snapshot or REST reconcile restores truth)
       const lvl = msg.level;
       const side = msg.side;
-      const price = lvl?.price != null ? parseFloat(lvl.price) : null;
-      const size = lvl?.size != null ? parseFloat(lvl.size) : null;
+      const price = lvl?.price != null ? finitePositiveValue(lvl.price) : null;
+      const size = lvl?.size != null ? finitePositiveValue(lvl.size) : null;
       const ts = msg.timestamp ?? Date.now();
 
       const cached = priceCache.get(assetId) ?? { bestBid: 0, bestAsk: 0, ts };
@@ -225,7 +231,7 @@ export class ClobWsService {
       if (!assetId) return;
 
       const lastTradePrice = msg.last_trade_price != null
-        ? parseFloat(String(msg.last_trade_price))
+        ? finitePositiveValue(msg.last_trade_price)
         : null;
 
       updates.push({
@@ -247,21 +253,17 @@ export class ClobWsService {
       let bestBid: number | null = null;
       let bestAsk: number | null = null;
 
-      if (bids?.length) {
-        bestBid = Math.max(...bids.map((b: any) => parseFloat(b.price)));
-      }
-      if (asks?.length) {
-        bestAsk = Math.min(...asks.map((a: any) => parseFloat(a.price)));
-      }
-
       const parsedBids = bids
-        ?.map((b: any) => ({ price: parseFloat(b.price), size: parseFloat(b.size) }))
-        .filter((b) => b.price > 0 && b.size > 0)
+        ?.map((b: any) => ({ price: finitePositiveValue(b.price), size: finitePositiveValue(b.size) }))
+        .filter((b): b is { price: number; size: number } => b.price != null && b.size != null)
         .sort((a, b) => b.price - a.price) ?? [];
       const parsedAsks = asks
-        ?.map((a: any) => ({ price: parseFloat(a.price), size: parseFloat(a.size) }))
-        .filter((a) => a.price > 0 && a.size > 0)
+        ?.map((a: any) => ({ price: finitePositiveValue(a.price), size: finitePositiveValue(a.size) }))
+        .filter((a): a is { price: number; size: number } => a.price != null && a.size != null)
         .sort((a, b) => a.price - b.price) ?? [];
+
+      bestBid = parsedBids[0]?.price ?? null;
+      bestAsk = parsedAsks[0]?.price ?? null;
 
       if (bestBid != null || bestAsk != null || parsedBids.length > 0 || parsedAsks.length > 0) {
         priceCache.set(assetId, {

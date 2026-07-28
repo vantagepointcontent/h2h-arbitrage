@@ -53,6 +53,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-045 | Low | `src/lib/matcher.ts` suspicious-ROI environment setting | Fixed | `Number(H2H_SUSPICIOUS_ROI_PCT)` accepted `Infinity`, zero, and negative values, which could silently disable or invert phantom-arbitrage protection before per-request settings load. Added a tested finite-positive parser with the safe 25% fallback. |
 | CR-046 | High | `src/lib/matcher.ts` executable depth parsing | Fixed | `parseDepth('Infinity')` treated an unknown/unbounded level as fillable capital. It now accepts only finite positive quantities, so missing CLOB ask depth remains non-executable. Regression coverage verifies no stake/profit is emitted for an `Infinity` PM ask depth. |
 | CR-047 | High | `src/lib/liquidity-sizing.ts` executable depth sizing | Fixed | The legacy liquidity-analysis helper converted non-finite combined depth to a $10,000 fill assumption and allowed an `Infinity` PM depth to make a Kalshi-only quote look executable. It now requires positive finite ask-level depth on both legs; regression coverage verifies all `Infinity` PM-depth cases fail closed. |
+| CR-048 | High | `src/lib/clob-ws.ts` WebSocket quote parsing | Fixed | Untrusted CLOB WebSocket `best_bid_ask`, `price_change`, and `book` payloads used raw parsing, so `NaN`/`Infinity` could enter the price cache or appear as best/executable orderbook depth. Quotes and sizes now require positive finite values; malformed levels are excluded and snapshots derive their best prices only from valid depth. |
 
 ## Verification
 
@@ -62,6 +63,8 @@ This review is intentionally one module and one verified change at a time. Runti
 - Runtime: POST `/api/scan` with `capital: "1000"` returned HTTP 400 with `Invalid capital. Expected a finite number from $1 to $1,000,000.`
 - Implementation commits: `f7e00a9` (CR-001), `253c809` (CR-002).
 - Runtime proof for CR-002: malformed POST `/api/saved-markets` returns HTTP 400 and `{ "error": "Invalid JSON body" }`.
+- CR-048 regression: `src/lib/clob-ws.test.ts` verifies malformed incremental quotes resolve to `null` and malformed/non-finite snapshot levels are excluded from both best price and executable depth.
+- Latest full Vitest: 629 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 
 ## Next review module
 
