@@ -43,5 +43,9 @@ describe('LogsPanel', () => {
     const profitIndex = headers.findIndex((label) => label?.startsWith('Profit'));
     expect(headers[profitIndex + 1]).toBe('APY');
     expect(headers[profitIndex + 1]).not.toContain('x');
+    expect(screen.getByTestId('logs-table-scroll').className).toContain('overflow-x-auto');
+    expect(document.querySelector('table')?.className).toContain('min-w-[1050px]');
+    expect(document.querySelector('thead th')?.className).toContain('sticky');
+    expect(document.querySelector('tbody td')?.className).toContain('sticky');
   });
 });

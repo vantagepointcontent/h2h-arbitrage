@@ -498,11 +498,11 @@ export default function LogsPanel() {
             No log entries. Run a scan to generate data.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto" data-testid="logs-table-scroll">
+            <table className="w-full min-w-[1050px] text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
-                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                  <th className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Category
                   </th>
                   <th
@@ -655,7 +655,7 @@ function LogRow({
         className={`border-b border-[#182533] hover:bg-[#0E1621]/50 cursor-pointer transition-colors ${expanded ? "bg-[#0E1621]/50" : ""}`}
         onClick={onToggle}
       >
-        <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap truncate max-w-[120px]" title={log.category || undefined}>
+        <td className="sticky left-0 z-10 bg-[#17212B] px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap truncate max-w-[120px]" title={log.category || undefined}>
           {log.category || "\u2014"}
         </td>
         <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap font-mono">{fmtTime(log.scanned_at)}</td>
