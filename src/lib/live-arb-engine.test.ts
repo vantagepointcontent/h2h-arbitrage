@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { computeAllLiveArbitrages } from './live-arb-engine';
+import { applyPolymarketBook, computeAllLiveArbitrages } from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
 
 const outcome = {
@@ -71,5 +71,18 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(result[0].strategy).toBe('No arb');
     expect(result[0].kalshiStake + result[0].pmStake).toBe(0);
     expect(result[0].expectedProfit).toBe(0);
+  });
+
+  it('drops malformed and non-finite CLOB ask levels before they reach live orderbook state', () => {
+    applyPolymarketBook(outcome.pmYesTokenId, [
+      { price: 'Infinity', size: '10' },
+      { price: '0.35', size: 'Infinity' },
+      { price: '0.36junk', size: '5' },
+      { price: '0.37', size: '4' },
+    ]);
+
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
+      { price: 0.37, quantity: 4 },
+    ]);
   });
 });

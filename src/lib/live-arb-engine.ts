@@ -334,9 +334,12 @@ export function computeAllLiveArbitrages(
 // Each token_id represents a specific outcome (YES or NO). The caller must
 // specify which side this token is so we store it correctly.
 export function applyPolymarketBook(tokenId: string, asks: { price: string; size: string }[], side: 'yes' | 'no' = 'yes'): void {
+  // CLOB WebSocket payloads are untrusted. Require fully numeric, finite,
+  // executable levels so malformed depth cannot create a phantom live arb.
   const levels = asks
-    .map((a) => ({ price: parseFloat(a.price), quantity: parseFloat(a.size) }))
-    .filter((a) => a.price > 0 && a.quantity > 0)
+    .map((a) => ({ price: Number(a.price), quantity: Number(a.size) }))
+    .filter((a) => Number.isFinite(a.price) && Number.isFinite(a.quantity)
+      && a.price > 0 && a.price < 1 && a.quantity > 0)
     .sort((a, b) => a.price - b.price);
 
   const existing = orderbookState.getBook(tokenId);
