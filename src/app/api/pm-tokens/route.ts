@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
           typeof value === 'object' && value !== null && (value as { outcome?: unknown }).outcome === outcome,
         );
         const tokenId = token?.token_id;
-        return typeof tokenId === 'string' && tokenId.trim() ? tokenId : null;
+        if (typeof tokenId !== 'string') return null;
+        const normalized = tokenId.trim();
+        return normalized || null;
       };
       const yes = tokenIdForOutcome('Yes');
       const no = tokenIdForOutcome('No');

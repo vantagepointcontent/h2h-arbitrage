@@ -42,4 +42,25 @@ describe('GET /api/pm-tokens', () => {
       error: 'Could not resolve Yes/No tokens',
     });
   });
+
+  it('normalizes valid token IDs before returning them to execution consumers', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tokens: [
+          { outcome: 'Yes', token_id: '  yes-token  ' },
+          { outcome: 'No', token_id: '\tno-token\n' },
+        ],
+      }),
+    }));
+
+    const response = await GET(new Request(`http://localhost/api/pm-tokens?conditionId=${conditionId}`) as never);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      yesTokenId: 'yes-token',
+      noTokenId: 'no-token',
+    });
+  });
 });
