@@ -950,6 +950,7 @@ export async function clearSavedMarketLiveResult(id: string): Promise<void> {
   await ensureMarketsMigrated();
   const c = getClient();
   await c.execute({ sql: 'UPDATE saved_markets SET live_result = NULL WHERE id = ?', args: [id] });
+  invalidateMarketsCache();
 }
 
 export async function getSavedMarketById(id: string): Promise<SavedMarket | null> {

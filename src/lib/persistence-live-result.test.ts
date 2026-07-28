@@ -113,6 +113,9 @@ describe('WS-107 liveResult persistence', () => {
       eventTitle: 'Test 5', category: '', expiryDate: null,
     });
     await persistence.updateSavedMarketLiveResult(m.id, makeScan());
+    // Seed the in-process saved-markets cache before the clear. The clear
+    // must invalidate it just like every other saved-market write.
+    expect((await persistence.getSavedMarkets()).find((x) => x.id === m.id)!.liveResult).toBeTruthy();
     await persistence.clearSavedMarketLiveResult(m.id);
     const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
     expect(got.liveResult).toBeNull();
