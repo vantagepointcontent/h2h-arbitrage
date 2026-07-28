@@ -47,5 +47,9 @@ describe('LogsPanel', () => {
     expect(document.querySelector('table')?.className).toContain('min-w-[1050px]');
     expect(document.querySelector('thead th')?.className).toContain('sticky');
     expect(document.querySelector('tbody td')?.className).toContain('sticky');
+    expect(screen.getByRole('button', { name: 'Refresh' }).className).toContain('min-h-11');
+    expect(screen.getByRole('link', { name: 'Export CSV' }).className).toContain('min-h-11');
+    expect(screen.getByLabelText('Positive arb only').parentElement?.className).toContain('min-h-11');
+    expect(screen.getAllByRole('button', { name: /^All$/ }).every((button) => button.className.includes('min-h-11'))).toBe(true);
   });
 });

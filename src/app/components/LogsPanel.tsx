@@ -290,15 +290,15 @@ export default function LogsPanel() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="w-5 h-5 text-[#5DBE81]" />
           Logs
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+            className={`flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               autoRefresh
                 ? "bg-[#5DBE81]/10 text-[#5DBE81] border-[#5DBE81]/30"
                 : "bg-[#182533] text-[#8A9BA8] border-[#182533] hover:text-[#FFFFFF]"
@@ -310,14 +310,14 @@ export default function LogsPanel() {
           </button>
           <button
             onClick={fetchLogs}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF] text-xs font-medium transition-colors"
+            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF] text-xs font-medium transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
           <a
             href={exportUrl}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-xs hover:bg-[#4DA66E] transition-colors"
+            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-xs hover:bg-[#4DA66E] transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             Export CSV
@@ -338,7 +338,7 @@ export default function LogsPanel() {
 
       {/* Arb Type Summary */}
       {logs.length > 0 && (
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="text-[#8A9BA8] font-semibold uppercase tracking-wide">Arb Types:</span>
           <span className="flex items-center gap-1.5">
             <span className={`inline-block w-2 h-2 rounded-full ${ARB_TYPES.direct.dotClass}`} />
@@ -421,7 +421,7 @@ export default function LogsPanel() {
 
         {/* Toggle + Event Type Filter */}
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex min-h-11 items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={positiveArbOnly}
@@ -438,7 +438,7 @@ export default function LogsPanel() {
                 <button
                   key={opt.key}
                   onClick={() => setEventType(opt.key)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                  className={`min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                     eventType === opt.key
                       ? "bg-[#5DBE81]/20 text-[#5DBE81]"
                       : "text-[#8A9BA8] hover:text-[#FFFFFF]"
@@ -457,7 +457,7 @@ export default function LogsPanel() {
                 <button
                   key={opt.key}
                   onClick={() => setArbTypeFilter(opt.key)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                  className={`min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                     arbTypeFilter === opt.key
                       ? opt.key === "direct"
                         ? "bg-emerald-500/20 text-emerald-400"
