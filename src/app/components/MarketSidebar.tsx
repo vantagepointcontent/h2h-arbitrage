@@ -22,12 +22,12 @@ function formatTimeAgo(scannedAt: string | null | undefined): string {
 }
 
 /* ── Nav Button (collapsible sidebar icon button) ── */
-function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; collapsed: boolean }) {
+export function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; collapsed: boolean }) {
   if (collapsed) {
     return (
       <button
         onClick={onClick}
-        className={`w-full flex items-center justify-center p-3 rounded-lg transition-colors ${
+        className={`w-full min-h-11 min-w-11 flex items-center justify-center p-3 rounded-lg transition-colors ${
           active
             ? "bg-[#5DBE81]/10 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
             : "text-[#8A9BA8] hover:bg-[#182533] hover:text-[#FFFFFF]"
@@ -41,7 +41,7 @@ function NavButton({ icon, label, active, onClick, collapsed }: { icon: React.Re
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+      className={`w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
         active
           ? "bg-[#5DBE81]/10 text-[#5DBE81]"
           : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"
@@ -223,7 +223,7 @@ function MarketSidebarInner({
           {/* Close button for mobile */}
           <button
             onClick={onCloseMobileMenu}
-            className="absolute top-3 right-3 p-1 rounded-lg hover:bg-[#182533] md:hidden z-10"
+            className="absolute top-2 right-2 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[#182533] md:hidden z-10"
           >
             <X className="w-4 h-4" />
           </button>
