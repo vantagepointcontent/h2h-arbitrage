@@ -736,9 +736,9 @@ export function calculateBestArbitrageForOutcome(
     const kYesA = current.kalshi.yesAsk;
     const pYesB = complement.polymarket.bestAsk;
     if (kYesA + pYesB < 1) {
-      const compAskDepth = complement.polymarket.askDepth ?? 0;
+      const compAskDepth = parseDepth(complement.polymarket.askDepth);
       const capKA = depthKYes > 0 ? depthKYes / kYesA : 0;
-      const capPB = parseDepth(compAskDepth) > 0 ? compAskDepth / pYesB : 0;
+      const capPB = compAskDepth > 0 ? compAskDepth / pYesB : 0;
       const compKalshiYesDepth = parseDepth(complement.kalshi.yesAskDepth ?? 0);
       const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : 0;
       const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : 0;

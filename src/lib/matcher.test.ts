@@ -735,6 +735,26 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
     expect(r.depthVerified).toBe(false);
   });
 
+  it('uses normalized complementary PM ask depth for cross-outcome sizing', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.72, yesAskDepth: '5000' },
+      polymarket: { ...base.polymarket, bestAsk: 0.72, yesPrice: 0.72, noPrice: 0.72, askDepth: 5000, noAskDepth: 5000 },
+    });
+    const complement = makeOutcome({
+      artist: 'Democratic',
+      kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.90, noAsk: 0.72, yesAskDepth: '5000' },
+      // Runtime upstream payloads can still contain a valid compact depth string.
+      polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, askDepth: '5K' as unknown as number, noAskDepth: 5000 },
+    });
+
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+
+    expect(r.strategy).toContain('both sides');
+    expect(r.maxCapital).toBeGreaterThan(0);
+    expect(r.depthVerified).toBe(true);
+  });
+
   it('cross-outcome not considered without complement', () => {
     const current = makeOutcome();
     const r = calculateBestArbitrageForOutcome(current, null, 'politics');
