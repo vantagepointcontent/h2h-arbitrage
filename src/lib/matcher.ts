@@ -2,6 +2,7 @@ import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
 import { classifyArbType, type ArbType } from './arb-types';
+import { finiteMarketPrice } from './market-price';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -1152,11 +1153,14 @@ export function buildPmArbShape(market: PMMarket) {
 export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
   return {
     ticker: km.ticker,
-    yesBid: parseFloat(km.yes_bid_dollars || '0'),
-    yesAsk: parseFloat(km.yes_ask_dollars || '1'),
-    noBid: parseFloat(km.no_bid_dollars || '0'),
-    noAsk: parseFloat(km.no_ask_dollars || '1'),
-    lastPrice: parseFloat(km.last_price_dollars || '0'),
+    // Invalid upstream quotes must fail closed rather than leaking NaN into
+    // matching and stake calculations. Missing asks retain the legacy $1
+    // default, while malformed supplied values become non-executable $0.
+    yesBid: finiteMarketPrice(km.yes_bid_dollars || '0'),
+    yesAsk: finiteMarketPrice(km.yes_ask_dollars || '1'),
+    noBid: finiteMarketPrice(km.no_bid_dollars || '0'),
+    noAsk: finiteMarketPrice(km.no_ask_dollars || '1'),
+    lastPrice: finiteMarketPrice(km.last_price_dollars || '0'),
     volume24h: km.volume_24h_fp,
     yesBidDepth: km.yes_bid_size_fp,
     yesAskDepth: km.yes_ask_size_fp,

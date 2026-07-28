@@ -184,6 +184,26 @@ describe('REGRESSION: buildKalshiArbShape', () => {
     expect(shape.noAsk).toBe(1);
     expect(shape.yesAskDepth).toBeUndefined();
   });
+
+  it('R16b: malformed Kalshi prices become safe non-executable values', () => {
+    const shape = buildKalshiArbShape({
+      ticker: 'KX-MALFORMED',
+      event_ticker: 'KX-TEST',
+      yes_bid_dollars: 'not-a-price',
+      yes_ask_dollars: 'Infinity',
+      no_bid_dollars: '-0.01',
+      no_ask_dollars: 'NaN',
+      last_price_dollars: 'bad-data',
+    });
+
+    expect(shape).toMatchObject({
+      yesBid: 0,
+      yesAsk: 0,
+      noBid: 0,
+      noAsk: 0,
+      lastPrice: 0,
+    });
+  });
 });
 
 // ==================== R17-R19: computeApy ====================
