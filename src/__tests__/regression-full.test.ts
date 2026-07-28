@@ -204,6 +204,22 @@ describe('REGRESSION: buildKalshiArbShape', () => {
       lastPrice: 0,
     });
   });
+
+  it('R16c: normalized Kalshi shape is safe for manual-match response rows', () => {
+    const shape = buildKalshiArbShape({
+      ticker: 'KX-MANUAL-MALFORMED',
+      event_ticker: 'KX-TEST',
+      yes_ask_dollars: 'Infinity',
+      no_ask_dollars: 'not-a-price',
+    });
+
+    // The scan route uses this shape directly for skipAutoMatch rows. No raw
+    // upstream numeric value may enter that client-facing response.
+    expect(Number.isFinite(shape.yesAsk)).toBe(true);
+    expect(Number.isFinite(shape.noAsk)).toBe(true);
+    expect(shape.yesAsk).toBe(0);
+    expect(shape.noAsk).toBe(0);
+  });
 });
 
 // ==================== R17-R19: computeApy ====================

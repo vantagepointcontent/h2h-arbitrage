@@ -11,7 +11,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
+import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
@@ -269,16 +269,10 @@ export async function POST(request: NextRequest) {
       outcomes = [
         ...kalshiMarkets.map(km => ({
           artist: km.yes_sub_title || km.title || km.ticker,
-          kalshi: {
-            ticker: km.ticker,
-            yesBid: parseFloat(km.yes_bid_dollars || '0'),
-            yesAsk: parseFloat(km.yes_ask_dollars || '1'),
-            noBid: parseFloat(km.no_bid_dollars || '0'),
-            noAsk: parseFloat(km.no_ask_dollars || '1'),
-            lastPrice: parseFloat(km.last_price_dollars || '0'),
-            yesAskDepth: km.yes_ask_size_fp,
-            noAskDepth: km.no_ask_size_fp,
-          },
+          // Keep the manual-match response on the same finite-price boundary
+          // as matched outcomes. Raw parseFloat() here previously reintroduced
+          // NaN/Infinity despite buildKalshiArbShape() failing those quotes closed.
+          kalshi: buildKalshiArbShape(km),
           polymarket: null,
           arbitrage: { roiPct: 0, expectedProfit: 0, strategy: 'No arb', kalshiStake: 0, pmStake: 0, fees: null, apyPct: 0 },
           platformA: 'kalshi' as const,
