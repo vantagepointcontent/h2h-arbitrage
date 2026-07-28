@@ -915,7 +915,19 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
 
 // WS-107: watcher-written real-time result ─────────────────────────
 /** How long a liveResult stays valid without a fresh watcher write. */
-export const LIVE_RESULT_TTL_MS = Number(process.env.H2H_LIVE_RESULT_TTL_MS || 10 * 60_000);
+export const DEFAULT_LIVE_RESULT_TTL_MS = 10 * 60_000;
+
+/**
+ * Keep stale watcher output from becoming permanently valid if deployment
+ * configuration contains a malformed TTL (for example `Infinity` or `0`).
+ */
+export function parseLiveResultTtlMs(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_LIVE_RESULT_TTL_MS;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIVE_RESULT_TTL_MS;
+}
+
+export const LIVE_RESULT_TTL_MS = parseLiveResultTtlMs(process.env.H2H_LIVE_RESULT_TTL_MS);
 
 /** WS-107: persist the watcher's real-time computation for a HOT market.
  *  Targeted UPDATE of live_result only — never touches last_scan_result, so

@@ -39,6 +39,13 @@ function makeScan(overrides: Partial<import('./persistence').LastScanResult> = {
 }
 
 describe('WS-107 liveResult persistence', () => {
+  it('uses the safe TTL when the live-result environment value is invalid', () => {
+    expect(persistence.parseLiveResultTtlMs('not-a-duration')).toBe(10 * 60_000);
+    expect(persistence.parseLiveResultTtlMs('0')).toBe(10 * 60_000);
+    expect(persistence.parseLiveResultTtlMs('-1')).toBe(10 * 60_000);
+    expect(persistence.parseLiveResultTtlMs('300000')).toBe(300000);
+  });
+
   it('migrates legacy two-platform URLs into platformLinks without losing them', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/KXTEST',
