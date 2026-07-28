@@ -280,7 +280,7 @@ export default function ManualMatchPanel({
   return (
     <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[#182533]">
         <Link2 className="w-4 h-4 text-[#5DBE81]" />
         <h3 className="text-sm font-semibold text-[#FFFFFF]">Manual Market Matching</h3>
         <span className="text-[10px] text-[#8A9BA8]">
@@ -316,7 +316,7 @@ export default function ManualMatchPanel({
           <div className="text-[10px] text-[#8A9BA8] uppercase tracking-wider mb-2">Matched Pairs ({activeMatches.length})</div>
           <div className="space-y-1.5">
             {activeMatches.map(mm => (
-              <div key={mm.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#17212B] border border-[#5DBE81]/20">
+              <div key={mm.id} className="flex flex-col items-stretch gap-2 px-3 py-2 rounded-lg bg-[#17212B] border border-[#5DBE81]/20 sm:flex-row sm:items-center">
                 <div className="flex-1 grid grid-cols-[1fr_auto_1fr] gap-2 items-center text-xs">
                   <div className="min-w-0 flex items-center gap-1">
                     <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm shrink-0" />
@@ -330,7 +330,7 @@ export default function ManualMatchPanel({
                 </div>
                 <button
                   onClick={() => onUnpair(mm.id)}
-                  className="p-1.5 rounded-md bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] transition-colors shrink-0"
+                  className="min-h-11 min-w-11 p-1.5 rounded-md bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] transition-colors shrink-0"
                   title="Unlink this pair"
                 >
                   <Unlink className="w-3.5 h-3.5" />
@@ -344,7 +344,7 @@ export default function ManualMatchPanel({
       {/* Two-list pairing interface */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-0">
         {/* Kalshi list (left) */}
-        <div className="border-r border-[#182533]">
+        <div className="border-b border-[#182533] md:border-b-0 md:border-r">
           <div className="px-4 py-2.5 border-b border-[#182533]">
             <div className="flex items-center gap-1.5 mb-2">
               <img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" />
@@ -359,7 +359,7 @@ export default function ManualMatchPanel({
                 value={kalshiSearch}
                 onChange={e => setKalshiSearch(e.target.value)}
                 placeholder="Search Kalshi markets…"
-                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
+                className="min-h-11 w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
               />
             </div>
           </div>
@@ -377,7 +377,7 @@ export default function ManualMatchPanel({
                     key={k.ticker}
                     onClick={() => !isMatched && setSelectedKalshi(isSelected ? null : k.ticker)}
                     disabled={isMatched}
-                    className={`w-full text-left px-4 py-2.5 border-b border-[#182533] transition-colors ${
+                    className={`min-h-11 w-full text-left px-4 py-2.5 border-b border-[#182533] transition-colors ${
                       isSelected
                         ? "bg-[#5DBE81]/15 border-l-2 border-l-[#5DBE81]"
                         : isMatched
@@ -409,7 +409,7 @@ export default function ManualMatchPanel({
           <button
             onClick={handlePair}
             disabled={!canPair || pairing}
-            className="flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg bg-[#5DBE81]/10 hover:bg-[#5DBE81]/20 border border-[#5DBE81]/30 text-[#5DBE81] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="min-h-11 min-w-11 flex flex-col items-center justify-center gap-1.5 px-3 py-3 rounded-lg bg-[#5DBE81]/10 hover:bg-[#5DBE81]/20 border border-[#5DBE81]/30 text-[#5DBE81] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             title={canPair ? "Link selected pair" : "Select one from each side"}
           >
             {pairing ? (
@@ -422,7 +422,7 @@ export default function ManualMatchPanel({
         </div>
 
         {/* Polymarket list (right) */}
-        <div className="border-l border-[#182533] border-t md:border-t-0 border-[#182533]">
+        <div className="border-[#182533] md:border-l">
           <div className="px-4 py-2.5 border-b border-[#182533]">
             <div className="flex items-center gap-1.5 mb-2">
               <img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" />
@@ -437,7 +437,7 @@ export default function ManualMatchPanel({
                 value={pmSearch}
                 onChange={e => setPmSearch(e.target.value)}
                 placeholder="Search Polymarket markets…"
-                className="w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#a855f7]"
+                className="min-h-11 w-full pl-7 pr-2 py-1 rounded-md bg-[#0E1621] border border-[#182533] text-[11px] text-[#FFFFFF] placeholder:text-[#8A9BA8] focus:outline-none focus:border-[#a855f7]"
               />
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function ManualMatchPanel({
                     key={p.conditionId}
                     onClick={() => !isMatched && setSelectedPm(isSelected ? null : p.conditionId)}
                     disabled={isMatched}
-                    className={`w-full text-left px-4 py-2.5 border-b border-[#182533] transition-colors ${
+                    className={`min-h-11 w-full text-left px-4 py-2.5 border-b border-[#182533] transition-colors ${
                       isSelected
                         ? "bg-[#a855f7]/15 border-r-2 border-r-[#a855f7]"
                         : isMatched
