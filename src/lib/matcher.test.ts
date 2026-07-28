@@ -303,6 +303,25 @@ describe('matchOutcomes', () => {
     const matched = r.filter(o => o.kalshi && o.polymarket);
     expect(matched.length).toBe(0); // inga matchar
   });
+
+  it('downgrades all PM name-collision diagnostics to debug', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    try {
+      matchOutcomes([], [
+        { id: 'pm-binary-1', conditionId: 'c-binary-1', question: 'Alpha?', outcomes: '["Yes","No"]', outcomePrices: '["0.50","0.50"]', active: true, closed: false, slug: 'alpha-1' },
+        { id: 'pm-binary-2', conditionId: 'c-binary-2', question: 'Alpha!', outcomes: '["Yes","No"]', outcomePrices: '["0.50","0.50"]', active: true, closed: false, slug: 'alpha-2' },
+        { id: 'pm-multi-1', conditionId: 'c-multi-1', question: 'Event One', outcomes: '["Beta"]', outcomePrices: '["0.50"]', active: true, closed: false, slug: 'beta-1' },
+        { id: 'pm-multi-2', conditionId: 'c-multi-2', question: 'Event Two', outcomes: '["Beta!"]', outcomePrices: '["0.50"]', active: true, closed: false, slug: 'beta-2' },
+      ] as any, 'Collision test');
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(debug).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+      debug.mockRestore();
+    }
+  });
 });
 
 // =====================================================================

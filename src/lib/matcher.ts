@@ -1235,7 +1235,7 @@ export function matchOutcomes(
       const norm = normalizeName(title);
       const prev = pmSeenNames.get(norm);
       if (prev && prev !== title) {
-        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+        console.debug(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
       } else if (!prev) {
         pmSeenNames.set(norm, title);
       }
@@ -1253,7 +1253,7 @@ export function matchOutcomes(
       const norm = normalizeName(title);
       const prev = pmSeenNames.get(norm);
       if (prev && prev !== title) {
-        console.warn(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
+        console.debug(`[matcher]: PM name collision on "${norm}" — "${title}" overlaps with "${prev}"`);
       } else if (!prev) {
         pmSeenNames.set(norm, title);
       }
