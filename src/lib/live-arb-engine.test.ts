@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyPolymarketBook, computeAllLiveArbitrages } from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
-import { applyPmWsUpdates } from './ws-book-apply';
+import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
 
 const outcome = {
   artist: 'Example',
@@ -123,5 +123,38 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
       { price: 0.45, quantity: 8 },
     ]);
+  });
+
+  it('applies the first Kalshi snapshot after an early delta seeded an empty opposite side', () => {
+    applyKalshiWsMessage({
+      type: 'orderbook_delta',
+      marketTicker: outcome.kalshiTicker,
+      marketId: 'test-market',
+      sid: 1,
+      side: 'yes',
+      price: 0.55,
+      delta: 4,
+      seq: 1,
+      ts: Date.now(),
+    });
+
+    applyKalshiWsMessage({
+      type: 'orderbook_snapshot',
+      marketTicker: outcome.kalshiTicker,
+      marketId: 'test-market',
+      sid: 1,
+      yes: [{ price: 0.45, quantity: 8 }],
+      no: [{ price: 0.55, quantity: 6 }],
+      seq: 2,
+      ts: Date.now(),
+    });
+
+    const book = orderbookState.getBook(outcome.kalshiTicker);
+    expect(book?.yes.asks).toHaveLength(1);
+    expect(book?.yes.asks[0].price).toBeCloseTo(0.45);
+    expect(book?.yes.asks[0].quantity).toBe(6);
+    expect(book?.no.asks).toHaveLength(1);
+    expect(book?.no.asks[0].price).toBeCloseTo(0.55);
+    expect(book?.no.asks[0].quantity).toBe(8);
   });
 });

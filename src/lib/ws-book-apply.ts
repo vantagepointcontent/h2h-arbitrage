@@ -17,7 +17,12 @@ import { WsPriceUpdate } from './clob-ws';
  */
 export function applyKalshiWsMessage(msg: KalshiWsMessage): boolean {
   if (msg.type === 'orderbook_snapshot') {
-    if (orderbookState.hasBook(msg.marketTicker)) return false;
+    const existing = orderbookState.getBook(msg.marketTicker);
+    // REST seeds use the default sequence (0) and remain authoritative. A WS
+    // delta can arrive before its snapshot, though; that provisional book has
+    // a positive WS sequence and is incomplete, so the first snapshot must
+    // replace it rather than being discarded.
+    if (existing?.seq === 0) return false;
     const yesAsks = msg.no
       .map((b) => ({ price: 1 - b.price, quantity: b.quantity }))
       .filter((a) => a.price > 0 && a.price < 1);
