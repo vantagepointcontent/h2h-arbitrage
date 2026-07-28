@@ -81,6 +81,23 @@ describe('calculateArbitrageMax', () => {
     expect(r.depthVerified).toBe(false);
   });
 
+  it('fails closed when an otherwise deep required ask price is zero', () => {
+    const r = calculateArbitrageMax(
+      { ...kalshi, yesAsk: 0 },
+      pm,
+      5_000,
+      5_000,
+      5_000,
+      5_000,
+    );
+
+    expect(r.strategy).not.toBe('Buy YES Kalshi + NO PM');
+    expect(r.kalshiStake).toBeGreaterThanOrEqual(0);
+    expect(r.pmStake).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(r.roiPct)).toBe(true);
+    expect(Number.isFinite(r.expectedProfit)).toBe(true);
+  });
+
   it('returns no executable arb when all required depth is missing', () => {
     const r = calculateArbitrageMax(
       { ...kalshi, yesAsk: 0.60, noAsk: 0.45, yesAskDepth: '0', noAskDepth: '0' },

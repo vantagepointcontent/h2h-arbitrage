@@ -451,6 +451,9 @@ export function calculateArbitrageMax(
   const kNo = kalshi.noAsk;
   const pYes = pm.bestAsk;
   const pNo = pm.noPrice;
+  // A zero, negative, non-finite, or above-par ask is not a tradeable quote.
+  // Do not turn malformed/missing upstream prices into an apparent arbitrage.
+  const isTradeableAsk = (price: number) => Number.isFinite(price) && price > 0 && price <= 1;
 
   let maxProfit = -Infinity;
   let strategy = 'No arb';
@@ -502,11 +505,11 @@ export function calculateArbitrageMax(
   // negative-spread pairs, showing 0.0% instead of the real number.
   {
     // Strategy 1: Buy YES Kalshi + NO PM
-    if (depthKYes <= 0 || depthPNo <= 0) {
+    if (isTradeableAsk(kYes) && isTradeableAsk(pNo) && (depthKYes <= 0 || depthPNo <= 0)) {
       considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket');
     }
-    const capK = depthKYes > 0 ? depthKYes / kYes : 0;
-    const capP = depthPNo > 0 ? depthPNo / pNo : 0;
+    const capK = depthKYes > 0 && isTradeableAsk(kYes) ? depthKYes / kYes : 0;
+    const capP = depthPNo > 0 && isTradeableAsk(pNo) ? depthPNo / pNo : 0;
     const capital = Math.min(capK, capP, maxCapital);
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {
@@ -548,11 +551,11 @@ export function calculateArbitrageMax(
 
   {
     // Strategy 2: Buy YES PM + NO Kalshi
-    if (depthPYes <= 0 || depthKNo <= 0) {
+    if (isTradeableAsk(pYes) && isTradeableAsk(kNo) && (depthPYes <= 0 || depthKNo <= 0)) {
       considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi');
     }
-    const capP = depthPYes > 0 ? depthPYes / pYes : 0;
-    const capK = depthKNo > 0 ? depthKNo / kNo : 0;
+    const capP = depthPYes > 0 && isTradeableAsk(pYes) ? depthPYes / pYes : 0;
+    const capK = depthKNo > 0 && isTradeableAsk(kNo) ? depthKNo / kNo : 0;
     const capital = Math.min(capP, capK, maxCapital);
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {
