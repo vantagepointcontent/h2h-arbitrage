@@ -428,7 +428,9 @@ export function parseDepth(val: string | number | null | undefined): number {
   if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : 0;
   const s = String(val).trim().replace(/^\$/, '');
   if (s === 'Infinity') return 0;
-  const m = s.match(/^([\d.,]+)\s*([KMB]?)/i);
+  // The complete value must be a numeric depth with at most one known suffix.
+  // Never treat a malformed upstream value such as "500 contracts" as fillable.
+  const m = s.match(/^([\d.,]+)\s*([KMB]?)\s*$/i);
   if (!m) return 0;
   let num = parseFloat(m[1].replace(/,/g, ''));
   const suffix = (m[2] || '').toUpperCase();

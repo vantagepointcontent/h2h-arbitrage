@@ -180,6 +180,12 @@ describe('parseDepth', () => {
     expect(parseDepth(-1)).toBe(0);
   });
 
+  it('fails closed on malformed depth strings with a numeric prefix', () => {
+    expect(parseDepth('500 contracts')).toBe(0);
+    expect(parseDepth('1K stale')).toBe(0);
+    expect(parseDepth('1.5M?')).toBe(0);
+  });
+
   it('hanterar null/undefined', () => {
     expect(parseDepth(null)).toBe(0);
     expect(parseDepth(undefined)).toBe(0);
