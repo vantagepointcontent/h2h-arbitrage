@@ -12,7 +12,19 @@ import {
   calcKalshiFee,
   calcPolymarketFee,
   normalizeOutcomePlatforms,
+  parseSuspiciousRoiPct,
 } from './matcher';
+
+describe('parseSuspiciousRoiPct', () => {
+  it.each([undefined, '', '0', '-1', 'NaN', 'Infinity', '-Infinity', 'invalid'])
+    ('falls back to 25 for unsafe threshold: %s', (value) => {
+      expect(parseSuspiciousRoiPct(value)).toBe(25);
+    });
+
+  it('accepts a finite positive threshold', () => {
+    expect(parseSuspiciousRoiPct('12.5')).toBe(12.5);
+  });
+});
 
 describe('platform-neutral outcome model', () => {
   it('emits canonical platform data while preserving legacy fields during migration', () => {

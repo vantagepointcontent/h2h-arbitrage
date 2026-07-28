@@ -936,7 +936,14 @@ export function calculateBestArbitrageForOutcome(
 /** ROI above this on a leg with unknown/assumed-infinite depth is almost
  *  certainly a phantom quote on a dead/illiquid book, not a fillable arb.
  *  Real cross-platform arbs live in the 1–5% range. Env-tunable. */
-export const SUSPICIOUS_ROI_PCT = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
+/** Parse the suspicious-ROI threshold without allowing a malformed environment
+ * value to silently disable (Infinity) or invert (zero/negative) the guard. */
+export function parseSuspiciousRoiPct(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
+}
+
+export const SUSPICIOUS_ROI_PCT = parseSuspiciousRoiPct(process.env.H2H_SUSPICIOUS_ROI_PCT);
 
 /** SET-003: runtime-tunable suspicious-ROI threshold. Defaults to the env/25
  *  constant; the scan route overwrites it from the settings DB per request. */
