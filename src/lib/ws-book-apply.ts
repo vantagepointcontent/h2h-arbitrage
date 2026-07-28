@@ -49,16 +49,12 @@ export function applyKalshiWsMessage(msg: KalshiWsMessage): boolean {
  * BUG-06: Previously used Infinity as the quantity for top-of-book WS updates.
  * This caused getWeightedAsk to think there was unlimited liquidity at the best
  * ask, producing wrong depth/ROI. Now we preserve the existing top-of-book
- * quantity when the price is the same, or use the REST-seeded depth when
- * the price changes. If no REST seed exists, use a large finite sentinel
- * (1_000_000 contracts) instead of Infinity.
+ * quantity when the price is the same. A price-only update without a REST
+ * depth seed is display-only: it must not be converted into invented,
+ * executable liquidity.
  */
 export function applyPmWsUpdates(updates: WsPriceUpdate[], pmTokenSides: Map<string, 'yes' | 'no'>): boolean {
   let changed = false;
-  // Sentinel for when no REST depth is available — large but finite so
-  // getWeightedAsk can still compute a meaningful weighted price.
-  const PM_FALLBACK_QTY = 1_000_000;
-
   for (const u of updates) {
     const side = pmTokenSides.get(u.tokenId) ?? 'yes';
     if (u.type === 'book' && u.book) {
@@ -69,13 +65,14 @@ export function applyPmWsUpdates(updates: WsPriceUpdate[], pmTokenSides: Map<str
       if (existing) {
         const asks = side === 'yes' ? existing.yes.asks : existing.no.asks;
         // Remove any levels at or below the new best ask (they're stale)
-        const newAsks = asks.filter((a) => a.price < u.bestAsk! - 1e-9);
-        // Preserve existing top-of-book quantity if the price was the same;
-        // otherwise use the fallback sentinel (no depth info from WS top-of-book)
+        const newAsks = asks.filter((a) => a.price > u.bestAsk! + 1e-9);
+        // Preserve existing top-of-book quantity only when the price matches.
+        // A changed price carries no size, so fail closed rather than invent
+        // fillable depth from a price-only stream update.
         const prevTop = asks.length > 0 ? asks[0] : null;
         const qty = prevTop && Math.abs(prevTop.price - u.bestAsk!) < 1e-9
           ? prevTop.quantity
-          : PM_FALLBACK_QTY;
+          : 0;
         newAsks.unshift({ price: u.bestAsk!, quantity: qty });
         newAsks.sort((a, b) => a.price - b.price);
         if (side === 'yes') {
@@ -85,9 +82,9 @@ export function applyPmWsUpdates(updates: WsPriceUpdate[], pmTokenSides: Map<str
         }
       } else {
         if (side === 'yes') {
-          orderbookState.setBook(u.tokenId, [{ price: u.bestAsk, quantity: PM_FALLBACK_QTY }], [], u.ts);
+          orderbookState.setBook(u.tokenId, [], [], u.ts);
         } else {
-          orderbookState.setBook(u.tokenId, [], [{ price: u.bestAsk, quantity: PM_FALLBACK_QTY }], u.ts);
+          orderbookState.setBook(u.tokenId, [], [], u.ts);
         }
       }
       changed = true;

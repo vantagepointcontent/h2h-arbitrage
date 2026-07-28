@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyPolymarketBook, computeAllLiveArbitrages } from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
+import { applyPmWsUpdates } from './ws-book-apply';
 
 const outcome = {
   artist: 'Example',
@@ -98,6 +99,29 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
 
     expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
       { price: 0.35, quantity: 5 },
+    ]);
+  });
+
+  it('does not invent executable PM depth from a top-of-book update without size', () => {
+    applyPmWsUpdates(
+      [{ type: 'best_bid_ask', tokenId: outcome.pmYesTokenId, bestAsk: 0.35, bestBid: null, lastTradePrice: null, ts: Date.now() }],
+      new Map([[outcome.pmYesTokenId, 'yes']]),
+    );
+
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([]);
+    expect(orderbookState.getWeightedAsk(outcome.pmYesTokenId, 'yes', 100).totalCost).toBe(0);
+  });
+
+  it('removes a stale cheaper PM level when a price-only update reports a worse best ask', () => {
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.30, quantity: 10 }, { price: 0.45, quantity: 8 }], []);
+
+    applyPmWsUpdates(
+      [{ type: 'best_bid_ask', tokenId: outcome.pmYesTokenId, bestAsk: 0.40, bestBid: null, lastTradePrice: null, ts: Date.now() }],
+      new Map([[outcome.pmYesTokenId, 'yes']]),
+    );
+
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
+      { price: 0.45, quantity: 8 },
     ]);
   });
 });
