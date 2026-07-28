@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDashboardAggregates, getSavedMarkets } from '@/lib/persistence';
 import { classifyMarket } from '@/lib/market-classification';
 import { clientSafeError } from '@/lib/error-handler';
-import { parseDashboardRange } from '@/lib/dashboard-request';
+import { parseDashboardRange, parseSuspiciousRoiThreshold } from '@/lib/dashboard-request';
 
 /**
  * GET /api/dashboard/stats
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Phantom guard: rows with ROI above the suspicious threshold are
     // one-tick empty-book quotes, not fillable arbs. They stay in scan
     // counts/histograms but are excluded from ROI/profit KPIs and top arbs.
-    const SUSPICIOUS_ROI = Number(process.env.H2H_SUSPICIOUS_ROI_PCT || 25);
+    const SUSPICIOUS_ROI = parseSuspiciousRoiThreshold(process.env.H2H_SUSPICIOUS_ROI_PCT);
 
     const agg = await getDashboardAggregates(since, SUSPICIOUS_ROI);
 
