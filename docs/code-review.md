@@ -52,6 +52,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-044 | Low | `src/lib/matcher.ts` PM collision diagnostics | Fixed | Two remaining PM name-collision messages were emitted at `warn`, creating noisy false alarms for a non-fatal dedupe diagnostic. Downgraded both branches to `debug`; regression coverage exercises binary and multi-outcome collision paths and guards against warning-level output. |
 | CR-045 | Low | `src/lib/matcher.ts` suspicious-ROI environment setting | Fixed | `Number(H2H_SUSPICIOUS_ROI_PCT)` accepted `Infinity`, zero, and negative values, which could silently disable or invert phantom-arbitrage protection before per-request settings load. Added a tested finite-positive parser with the safe 25% fallback. |
 | CR-046 | High | `src/lib/matcher.ts` executable depth parsing | Fixed | `parseDepth('Infinity')` treated an unknown/unbounded level as fillable capital. It now accepts only finite positive quantities, so missing CLOB ask depth remains non-executable. Regression coverage verifies no stake/profit is emitted for an `Infinity` PM ask depth. |
+| CR-047 | High | `src/lib/liquidity-sizing.ts` executable depth sizing | Fixed | The legacy liquidity-analysis helper converted non-finite combined depth to a $10,000 fill assumption and allowed an `Infinity` PM depth to make a Kalshi-only quote look executable. It now requires positive finite ask-level depth on both legs; regression coverage verifies all `Infinity` PM-depth cases fail closed. |
 
 ## Verification
 

@@ -49,10 +49,13 @@ export function analyzeLiquidity(
 ): LiquidityAnalysis {
   // --- max fillable stake ---
   // Binding constraint: min(dollar depth on each side)
-  // Unknown/missing depth is non-executable. Infinity is retained only as an
-  // explicit caller override for legacy/manual analysis, never inferred here.
-  const rawFillable = Math.min(kalshiAskDepth, polymarketDepth);
-  const maxFillableStake = Number.isFinite(rawFillable) ? rawFillable : 10_000;
+  // Every executable leg needs a positive, finite ask-level quantity. Never
+  // turn an unknown/legacy Infinity sentinel into deployable capital.
+  const hasExecutableDepth = Number.isFinite(kalshiAskDepth) && kalshiAskDepth > 0
+    && Number.isFinite(polymarketDepth) && polymarketDepth > 0;
+  const maxFillableStake = hasExecutableDepth
+    ? Math.min(kalshiAskDepth, polymarketDepth)
+    : 0;
 
   // --- slippage tiers ---
   const bindingDepth = maxFillableStake;
@@ -73,8 +76,10 @@ export function analyzeLiquidity(
   const totalFees = fees.kalshiFee + fees.pmFee;
 
   // --- profits ---
-  const theoreticalProfit = maxFillableStake * (spread - totalFees);
-  const realisticProfit = maxFillableStake * (spread - totalFees - slippageEstimate / 100);
+  // Avoid returning JavaScript's `-0` for a non-executable position; UI and
+  // exports should receive a canonical zero rather than a signed zero.
+  const theoreticalProfit = maxFillableStake === 0 ? 0 : maxFillableStake * (spread - totalFees);
+  const realisticProfit = maxFillableStake === 0 ? 0 : maxFillableStake * (spread - totalFees - slippageEstimate / 100);
 
   // --- ratio ---
   let realToTheoreticalRatio: number;
