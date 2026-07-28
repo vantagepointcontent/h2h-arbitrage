@@ -63,4 +63,24 @@ describe('GET /api/pm-tokens', () => {
       noTokenId: 'no-token',
     });
   });
+
+  it('rejects a malformed payload that assigns the same token to Yes and No', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tokens: [
+          { outcome: 'Yes', token_id: 'shared-token' },
+          { outcome: 'No', token_id: 'shared-token' },
+        ],
+      }),
+    }));
+
+    const response = await GET(new Request(`http://localhost/api/pm-tokens?conditionId=${conditionId}`) as never);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Invalid CLOB token response',
+    });
+  });
 });

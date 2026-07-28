@@ -57,6 +57,12 @@ export async function GET(request: NextRequest) {
       if (!yes || !no) {
         return NextResponse.json({ success: false, error: 'Could not resolve Yes/No tokens' }, { status: 404 });
       }
+      // A binary market must expose distinct assets for its complementary
+      // outcomes. Returning one ID for both legs could produce a malformed
+      // manual-execution request that buys the same token twice.
+      if (yes === no) {
+        return NextResponse.json({ success: false, error: 'Invalid CLOB token response' }, { status: 502 });
+      }
       return NextResponse.json({ success: true, yesTokenId: yes, noTokenId: no });
     } finally {
       clearTimeout(timer);
