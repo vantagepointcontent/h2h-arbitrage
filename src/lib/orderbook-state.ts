@@ -174,7 +174,16 @@ class OrderbookState {
 
   private sortAsks(levels: OrderbookLevel[]): OrderbookLevel[] {
     return levels
-      .filter((lvl) => lvl.quantity > 1e-9 && lvl.price > 1e-9)
+      // This is the final boundary before any REST/WS update becomes live
+      // execution depth. Individual adapters validate their payloads too, but
+      // every caller of setBook()/applyAskDelta() must fail closed here.
+      .filter((lvl) =>
+        Number.isFinite(lvl.price) &&
+        Number.isFinite(lvl.quantity) &&
+        lvl.price > 1e-9 &&
+        lvl.price < 1 &&
+        lvl.quantity > 1e-9,
+      )
       .sort((a, b) => a.price - b.price);
   }
 }

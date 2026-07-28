@@ -87,4 +87,17 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
       { price: 0.37, quantity: 4 },
     ]);
   });
+
+  it('rejects non-finite and out-of-range levels at the shared orderbook boundary', () => {
+    orderbookState.setBook(outcome.pmYesTokenId, [
+      { price: Infinity, quantity: 5 },
+      { price: 0.35, quantity: Infinity },
+      { price: 1.01, quantity: 5 },
+      { price: 0.35, quantity: 5 },
+    ], []);
+
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
+      { price: 0.35, quantity: 5 },
+    ]);
+  });
 });
