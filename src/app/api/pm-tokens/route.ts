@@ -43,17 +43,23 @@ export async function GET(request: NextRequest) {
       if (!Array.isArray(tokens)) {
         return NextResponse.json({ success: false, error: 'Invalid CLOB token response' }, { status: 502 });
       }
-      const tokenIdForOutcome = (outcome: 'Yes' | 'No'): string | null => {
-        const token = tokens.find((value: unknown): value is { outcome?: unknown; token_id?: unknown } =>
+      const tokenIdForOutcome = (outcome: 'Yes' | 'No'): string | null | 'ambiguous' => {
+        const matchingTokens = tokens.filter((value: unknown): value is { outcome?: unknown; token_id?: unknown } =>
           typeof value === 'object' && value !== null && (value as { outcome?: unknown }).outcome === outcome,
         );
-        const tokenId = token?.token_id;
+        // A binary market has exactly one asset for each complementary outcome.
+        // Choosing the first duplicate makes the response depend on upstream array order.
+        if (matchingTokens.length > 1) return 'ambiguous';
+        const tokenId = matchingTokens[0]?.token_id;
         if (typeof tokenId !== 'string') return null;
         const normalized = tokenId.trim();
         return normalized || null;
       };
       const yes = tokenIdForOutcome('Yes');
       const no = tokenIdForOutcome('No');
+      if (yes === 'ambiguous' || no === 'ambiguous') {
+        return NextResponse.json({ success: false, error: 'Invalid CLOB token response' }, { status: 502 });
+      }
       if (!yes || !no) {
         return NextResponse.json({ success: false, error: 'Could not resolve Yes/No tokens' }, { status: 404 });
       }

@@ -83,4 +83,25 @@ describe('GET /api/pm-tokens', () => {
       error: 'Invalid CLOB token response',
     });
   });
+
+  it('rejects an ambiguous payload with duplicate Yes token records', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tokens: [
+          { outcome: 'Yes', token_id: 'yes-token-a' },
+          { outcome: 'Yes', token_id: 'yes-token-b' },
+          { outcome: 'No', token_id: 'no-token' },
+        ],
+      }),
+    }));
+
+    const response = await GET(new Request(`http://localhost/api/pm-tokens?conditionId=${conditionId}`) as never);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Invalid CLOB token response',
+    });
+  });
 });
