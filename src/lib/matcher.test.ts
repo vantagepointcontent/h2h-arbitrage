@@ -79,6 +79,15 @@ describe('calculateArbitrageMax', () => {
     expect(r.depthVerified).toBe(false);
   });
 
+  it('fails closed when an unknown PM ask depth is represented as Infinity', () => {
+    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, parseDepth('Infinity'));
+
+    expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
+    expect(r.maxCapital).toBe(0);
+    expect(r.expectedProfit).toBe(0);
+    expect(r.depthVerified).toBe(false);
+  });
+
   it('shows a profitable PM YES + Kalshi NO quote when its Kalshi NO depth is unavailable', () => {
     const r = calculateArbitrageMax(
       { ...kalshi, yesAsk: 0.65, noAsk: 0.40 },
@@ -163,6 +172,12 @@ describe('parseDepth', () => {
   it('hanterar nummer direkt', () => {
     expect(parseDepth(1000)).toBe(1000);
     expect(parseDepth('0')).toBe(0);
+  });
+
+  it('rejects non-finite and non-positive depth as non-executable', () => {
+    expect(parseDepth('Infinity')).toBe(0);
+    expect(parseDepth(Infinity)).toBe(0);
+    expect(parseDepth(-1)).toBe(0);
   });
 
   it('hanterar null/undefined', () => {

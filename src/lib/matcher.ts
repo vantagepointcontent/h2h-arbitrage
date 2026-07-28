@@ -423,9 +423,11 @@ export function similarity(a: string, b: string): number {
 
 export function parseDepth(val: string | number | null | undefined): number {
   if (val === null || val === undefined) return 0;
-  if (typeof val === 'number') return val;
+  // A synthetic/unbounded depth is not an executable order-book level. Every
+  // executable arbitrage needs a finite ask quantity from the actual book.
+  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : 0;
   const s = String(val).trim().replace(/^\$/, '');
-  if (s === 'Infinity') return Infinity;
+  if (s === 'Infinity') return 0;
   const m = s.match(/^([\d.,]+)\s*([KMB]?)/i);
   if (!m) return 0;
   let num = parseFloat(m[1].replace(/,/g, ''));
@@ -433,7 +435,7 @@ export function parseDepth(val: string | number | null | undefined): number {
   if (suffix === 'K') num *= 1000;
   if (suffix === 'M') num *= 1_000_000;
   if (suffix === 'B') num *= 1_000_000_000;
-  return num;
+  return Number.isFinite(num) && num > 0 ? num : 0;
 }
 
 /** Compute the maximum profit possible given available liquidity (depth). */

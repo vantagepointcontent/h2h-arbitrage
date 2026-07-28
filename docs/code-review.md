@@ -51,6 +51,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-043 | Low | `src/app/api/dashboard/stats/route.ts` suspicious-ROI environment setting | Fixed | A malformed, infinite, zero, or negative `H2H_SUSPICIOUS_ROI_PCT` produced an invalid phantom-arb threshold, making dashboard KPI/top-arb filtering inconsistent. Added a tested finite positive parser with the safe 25% default. |
 | CR-044 | Low | `src/lib/matcher.ts` PM collision diagnostics | Fixed | Two remaining PM name-collision messages were emitted at `warn`, creating noisy false alarms for a non-fatal dedupe diagnostic. Downgraded both branches to `debug`; regression coverage exercises binary and multi-outcome collision paths and guards against warning-level output. |
 | CR-045 | Low | `src/lib/matcher.ts` suspicious-ROI environment setting | Fixed | `Number(H2H_SUSPICIOUS_ROI_PCT)` accepted `Infinity`, zero, and negative values, which could silently disable or invert phantom-arbitrage protection before per-request settings load. Added a tested finite-positive parser with the safe 25% fallback. |
+| CR-046 | High | `src/lib/matcher.ts` executable depth parsing | Fixed | `parseDepth('Infinity')` treated an unknown/unbounded level as fillable capital. It now accepts only finite positive quantities, so missing CLOB ask depth remains non-executable. Regression coverage verifies no stake/profit is emitted for an `Infinity` PM ask depth. |
 
 ## Verification
 

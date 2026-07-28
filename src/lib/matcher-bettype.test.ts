@@ -248,8 +248,8 @@ describe('parseDepth', () => {
     expect(parseDepth('abc')).toBe(0);
   });
 
-  it('handles Infinity string', () => {
-    expect(parseDepth('Infinity')).toBe(Infinity);
+  it('rejects Infinity depth as non-executable', () => {
+    expect(parseDepth('Infinity')).toBe(0);
   });
 });
 
