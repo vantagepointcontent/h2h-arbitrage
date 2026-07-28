@@ -22,4 +22,24 @@ describe('GET /api/pm-tokens', () => {
       error: 'Invalid CLOB token response',
     });
   });
+
+  it('rejects a CLOB token payload with non-string token IDs', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tokens: [
+          { outcome: 'Yes', token_id: 123 },
+          { outcome: 'No', token_id: 'no-token' },
+        ],
+      }),
+    }));
+
+    const response = await GET(new Request(`http://localhost/api/pm-tokens?conditionId=${conditionId}`) as never);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Could not resolve Yes/No tokens',
+    });
+  });
 });

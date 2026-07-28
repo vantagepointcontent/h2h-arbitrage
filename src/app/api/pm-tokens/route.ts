@@ -43,8 +43,15 @@ export async function GET(request: NextRequest) {
       if (!Array.isArray(tokens)) {
         return NextResponse.json({ success: false, error: 'Invalid CLOB token response' }, { status: 502 });
       }
-      const yes = tokens.find((t: { outcome?: string }) => t.outcome === 'Yes')?.token_id ?? null;
-      const no = tokens.find((t: { outcome?: string }) => t.outcome === 'No')?.token_id ?? null;
+      const tokenIdForOutcome = (outcome: 'Yes' | 'No'): string | null => {
+        const token = tokens.find((value: unknown): value is { outcome?: unknown; token_id?: unknown } =>
+          typeof value === 'object' && value !== null && (value as { outcome?: unknown }).outcome === outcome,
+        );
+        const tokenId = token?.token_id;
+        return typeof tokenId === 'string' && tokenId.trim() ? tokenId : null;
+      };
+      const yes = tokenIdForOutcome('Yes');
+      const no = tokenIdForOutcome('No');
       if (!yes || !no) {
         return NextResponse.json({ success: false, error: 'Could not resolve Yes/No tokens' }, { status: 404 });
       }
