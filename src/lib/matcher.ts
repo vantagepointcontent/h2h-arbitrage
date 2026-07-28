@@ -713,8 +713,11 @@ export function calculateBestArbitrageForOutcome(
 
   const depthKYes = parseDepth(current.kalshi.yesAskDepth);
   const depthKNo = parseDepth(current.kalshi.noAskDepth);
-  const depthPYes = current.polymarket.askDepth ?? 0;
-  const depthPNo = current.polymarket.noAskDepth ?? 0;
+  // CLOB depth is normally numeric, but it is still upstream data. Normalize
+  // it here as well as at ingestion: Infinity/NaN must never turn into an
+  // executable capital cap through Math.min(..., maxCapital).
+  const depthPYes = parseDepth(current.polymarket.askDepth);
+  const depthPNo = parseDepth(current.polymarket.noAskDepth);
 
   // Base: within-outcome arbitrages (existing yellow methods)
   let best = calculateArbitrageMax(

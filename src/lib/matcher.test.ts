@@ -721,6 +721,20 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
     expect(r.depthVerified).toBe(false);
   });
 
+  it('fails closed when a raw non-finite PM depth reaches the orchestration layer', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.72 },
+      polymarket: { ...base.polymarket, bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, askDepth: Infinity, noAskDepth: Infinity },
+    });
+
+    const r = calculateBestArbitrageForOutcome(current, null, 'politics');
+
+    expect(r.maxCapital).toBe(0);
+    expect(r.expectedProfit).toBe(0);
+    expect(r.depthVerified).toBe(false);
+  });
+
   it('cross-outcome not considered without complement', () => {
     const current = makeOutcome();
     const r = calculateBestArbitrageForOutcome(current, null, 'politics');
