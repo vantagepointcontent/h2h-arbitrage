@@ -256,6 +256,17 @@ describe('getClobPrices', () => {
     expect(r?.noPrice).toBeCloseTo(0.46, 6);   // NO ask derived from 1 - YES best_bid
   });
 
+  it('fails closed instead of clamping malformed aggregate CLOB quotes', async () => {
+    const r = await getClobPrices({
+      condition_id: 'c-malformed',
+      tokens: [],
+      best_bid: Number.NaN,
+      best_ask: Number.POSITIVE_INFINITY,
+    } as any);
+
+    expect(r).toBeNull();
+  });
+
   it('deriverar noPrice från yesPrice (1 - yes)', async () => {
     const r = await getClobPrices({
       condition_id: 'c1',

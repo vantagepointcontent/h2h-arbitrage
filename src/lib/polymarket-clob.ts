@@ -287,13 +287,18 @@ export async function getClobPrices(clob: ClobMarket): Promise<{
 } | null> {
   if (!clob) return null;
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  // The CLOB response is external input despite the TypeScript interface. Do
+  // not turn NaN/Infinity/negative values into executable-looking quotes via
+  // clamp; use token books as the authoritative fallback instead.
+  const isExecutablePrice = (v: unknown): v is number =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1;
 
   const isNegRisk = clob.neg_risk === true;
 
   // Standard binary market: use clob.best_bid / best_ask
   if (!isNegRisk) {
-    const hasBid = clob.best_bid !== null && clob.best_bid !== undefined;
-    const hasAsk = clob.best_ask !== null && clob.best_ask !== undefined;
+    const hasBid = isExecutablePrice(clob.best_bid);
+    const hasAsk = isExecutablePrice(clob.best_ask);
 
     if (hasBid && hasAsk) {
       const yesPrice = clamp(clob.best_ask!);
