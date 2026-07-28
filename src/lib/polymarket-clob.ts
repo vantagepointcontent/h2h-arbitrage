@@ -219,18 +219,29 @@ export async function getClobAskDepths(clob: ClobMarket): Promise<{ yesAskDepth:
  */
 function getBestPriceFromBook(book: ClobBook | null): { bestBid: number; bestAsk: number } | null {
   if (!book) return null;
+
+  // CLOB data is external input. parseFloat("0.25junk") would turn a malformed
+  // level into a plausible executable quote, while Infinity would later clamp
+  // to $1. Reject both rather than manufacturing a price.
+  const parseQuotePrice = (value: unknown): number | null => {
+    if (typeof value !== 'string' || !/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)) return null;
+    const price = Number(value);
+    return Number.isFinite(price) && price > 0 && price <= 1 ? price : null;
+  };
   
   // Find MIN ask (best price to BUY)
   let bestAsk: number | null = null;
   for (const ask of book.asks) {
-    const price = parseFloat(ask.price);
+    const price = parseQuotePrice(ask.price);
+    if (price === null) continue;
     if (bestAsk === null || price < bestAsk) bestAsk = price;
   }
   
   // Find MAX bid (best price to SELL)
   let bestBid: number | null = null;
   for (const bid of book.bids) {
-    const price = parseFloat(bid.price);
+    const price = parseQuotePrice(bid.price);
+    if (price === null) continue;
     if (bestBid === null || price > bestBid) bestBid = price;
   }
   

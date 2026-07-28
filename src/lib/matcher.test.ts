@@ -309,6 +309,32 @@ describe('getClobPrices', () => {
     }
   });
 
+  it('fails closed when token-book prices are malformed rather than parsing prefixes', async () => {
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        asks: [{ price: '0.20junk', size: '5' }, { price: 'Infinity', size: '2' }],
+        bids: [{ price: '0.10junk', size: '5' }],
+      }),
+    }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const r = await getClobPrices({
+        condition_id: 'c-malformed-token-book',
+        tokens: [
+          { token_id: 'yes-malformed', outcome: 'Yes' },
+          { token_id: 'no-malformed', outcome: 'No' },
+        ],
+      } as any);
+
+      expect(r).toBeNull();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('returnerar null vid total avsaknad av data', async () => {
     const r = await getClobPrices({
       condition_id: 'c1',
