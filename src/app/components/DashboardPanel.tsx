@@ -773,11 +773,11 @@ export default function DashboardPanel() {
             {data!.topActiveArbs.length === 0 ? (
               <EmptyState message="No active arbitrage opportunities in this period." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto" data-testid="dashboard-top-arbs-scroll">
+                <table className="w-full min-w-[800px] text-sm">
                   <thead>
                     <tr className="border-b border-[#182533] bg-[#0E1621]">
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th data-testid="dashboard-top-arb-market-header" className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
                         Market
                       </th>
                       <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
@@ -815,7 +815,8 @@ export default function DashboardPanel() {
                           title="Click to open market scan"
                         >
                           <td
-                            className="px-3 py-2 text-xs font-medium text-[#FFFFFF] truncate max-w-[200px]"
+                            data-testid="dashboard-top-arb-market-cell"
+                            className="sticky left-0 z-10 bg-[#17212B] px-3 py-2 text-xs font-medium text-[#FFFFFF] truncate max-w-[200px]"
                             title={arb.market_title || arb.market_id}
                           >
                             {arb.market_title || arb.market_id}
