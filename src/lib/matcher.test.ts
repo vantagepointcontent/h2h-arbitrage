@@ -373,6 +373,30 @@ describe('getClobAskDepths', () => {
     const depth = await getClobAskDepths({ condition_id: 'c-missing', tokens: [] } as any);
     expect(depth).toEqual({ yesAskDepth: 0, noAskDepth: 0 });
   });
+
+  it('rejects malformed, above-par, and non-decimal ask levels', async () => {
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        asks: [
+          { price: '0x0f', size: '2' },
+          { price: '1', size: '4' },
+          { price: '0.42junk', size: '8' },
+        ],
+        bids: [],
+      }),
+    }));
+    vi.stubGlobal('fetch', mockFetch);
+    try {
+      const depth = await getClobAskDepths({
+        condition_id: 'c-invalid-depth',
+        tokens: [{ token_id: 'yes-invalid-depth', outcome: 'Yes' }, { token_id: 'no-invalid-depth', outcome: 'No' }],
+      } as any);
+      expect(depth).toEqual({ yesAskDepth: 0, noAskDepth: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('matchOutcomes', () => {

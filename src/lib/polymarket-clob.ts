@@ -3,6 +3,7 @@
 // Needed because gamma-api caches outcomePrices aggressively
 
 import { rateLimiters } from '@/lib/rate-limiter';
+import { finiteDecimal } from '@/lib/market-price';
 
 export interface ClobMarket {
   condition_id: string;
@@ -183,8 +184,11 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
 function bestAskDollarDepth(book: ClobBook | null): number {
   if (!book?.asks?.length) return 0;
   const validAsks = book.asks
-    .map(({ price, size }) => ({ price: Number(price), size: Number(size) }))
-    .filter(level => Number.isFinite(level.price) && level.price > 0 && Number.isFinite(level.size) && level.size > 0);
+    .map(({ price, size }) => ({ price: finiteDecimal(price), size: finiteDecimal(size) }))
+    .filter((level): level is { price: number; size: number } =>
+      level.price !== null && level.price > 0 && level.price < 1 &&
+      level.size !== null && level.size > 0,
+    );
   if (!validAsks.length) return 0;
 
   const bestAsk = Math.min(...validAsks.map(level => level.price));
