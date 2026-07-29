@@ -771,11 +771,11 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
               <h3 className="text-sm font-bold text-[#FFFFFF] mb-3">
                 Matched Outcomes ({activeTab.result.outcomes.length})
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+              <div data-testid="live-outcomes-table-scroll" className="overflow-x-auto">
+                <table className="w-full min-w-[1100px] text-xs">
                   <thead>
                     <tr className="border-b border-[#182533]">
-                      <th className="text-left py-2 px-2 text-[#8A9BA8] font-medium">OUTCOME</th>
+                      <th className="sticky left-0 z-10 bg-[#17212B] text-left py-2 px-2 text-[#8A9BA8] font-medium">OUTCOME</th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm" />Yes</span></th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm" />No</span></th>
                       <th className="text-right py-2 px-2 text-[#8A9BA8] font-medium"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm" />Yes</span></th>
@@ -806,7 +806,7 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                         title={o.stale ? "Stale: orderbook data older than 30s — prices may be wrong" : undefined}
                         onClick={() => toggleExpandedArtist(o.artist)}
                       >
-                        <td className="py-2 px-2 text-[#FFFFFF] font-medium">
+                        <td className="sticky left-0 z-10 bg-[#17212B] py-2 px-2 text-[#FFFFFF] font-medium">
                           <span className="inline-flex items-center gap-1.5">
                             <span className={`transition-transform text-[#8A9BA8] text-[10px] ${isRowExpanded ? "rotate-90" : ""}`}>▶</span>
                             {o.artist}
