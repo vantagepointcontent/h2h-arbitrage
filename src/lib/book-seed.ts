@@ -7,6 +7,31 @@ import { applyPolymarketBook } from './live-arb-engine';
 import { makeKalshiAuthHeaders } from './kalshi-auth';
 import { fetchKalshiMarket } from './kalshi';
 import logger from './logger';
+import { finiteMarketPrice } from './market-price';
+
+const DECIMAL_QUANTITY = /^[+]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:e[+]?\d+)?$/i;
+
+/**
+ * Normalize untrusted Kalshi REST orderbook levels before they reach the
+ * shared live-book state. `parseFloat` would accept values such as
+ * `"0.42junk"`; unknown or malformed depth must never become executable.
+ */
+export function parseKalshiSeedLevels(raw: unknown): { price: number; quantity: number }[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.flatMap((level): { price: number; quantity: number }[] => {
+    if (!Array.isArray(level) || level.length < 2) return [];
+    const [rawPrice, rawQuantity] = level;
+    const price = finiteMarketPrice(rawPrice);
+    const quantityText = typeof rawQuantity === 'string' ? rawQuantity.trim() : null;
+    const quantity = typeof rawQuantity === 'number'
+      ? rawQuantity
+      : quantityText && DECIMAL_QUANTITY.test(quantityText) ? Number(quantityText) : NaN;
+    return price > 0 && price < 1 && Number.isFinite(quantity) && quantity > 0
+      ? [{ price, quantity }]
+      : [];
+  });
+}
 
 export async function seedAllBooks(tickers: string[], tokenIds: string[], tokenSides: Map<string, 'yes' | 'no'>): Promise<void> {
   await Promise.all([
@@ -52,13 +77,8 @@ export async function seedKalshiBook(ticker: string): Promise<void> {
       const yesBidLevels = data.orderbook?.yes_dollars_fp ?? data.orderbook?.yes ?? data.orderbook_fp?.yes_dollars ?? [];
       const noBidLevels  = data.orderbook?.no_dollars_fp  ?? data.orderbook?.no  ?? data.orderbook_fp?.no_dollars  ?? [];
 
-      const parseLevels = (raw: [string, string][]) =>
-        raw
-          .map(([p, q]) => ({ price: parseFloat(p), quantity: parseFloat(q) }))
-          .filter((lvl) => !isNaN(lvl.price) && !isNaN(lvl.quantity) && lvl.quantity > 0 && lvl.price > 0 && lvl.price < 1);
-
-      const yesBids = parseLevels(yesBidLevels);
-      const noBids  = parseLevels(noBidLevels);
+      const yesBids = parseKalshiSeedLevels(yesBidLevels);
+      const noBids  = parseKalshiSeedLevels(noBidLevels);
 
       // Derive YES asks from NO bids: YES ask price = 1 - NO bid price
       yesAsks = noBids
@@ -80,10 +100,10 @@ export async function seedKalshiBook(ticker: string): Promise<void> {
     // levels (fallback when the real ask size is exhausted).
     if (marketResult.status === 'fulfilled' && marketResult.value) {
       const km = marketResult.value;
-      const realYesAsk = parseFloat(km.yes_ask_dollars || '0');
-      const realNoAsk  = parseFloat(km.no_ask_dollars  || '0');
-      const realYesAskSize = parseFloat(km.yes_ask_size_fp || '0');
-      const realNoAskSize  = parseFloat(km.no_ask_size_fp  || '0');
+      const realYesAsk = finiteMarketPrice(km.yes_ask_dollars);
+      const realNoAsk  = finiteMarketPrice(km.no_ask_dollars);
+      const realYesAskSize = parseKalshiSeedLevels([["0.5", km.yes_ask_size_fp]])[0]?.quantity ?? 0;
+      const realNoAskSize  = parseKalshiSeedLevels([["0.5", km.no_ask_size_fp]])[0]?.quantity ?? 0;
 
       if (realYesAsk > 0 && realYesAsk < 1) {
         // Remove any derived ask levels at a lower price (they're synthetic
@@ -110,8 +130,8 @@ export async function seedKalshiBook(ticker: string): Promise<void> {
     // below the real ask are filtered out in getWeightedAsk.
     if (marketResult.status === 'fulfilled' && marketResult.value) {
       const km = marketResult.value;
-      const realYesAsk = parseFloat(km.yes_ask_dollars || '0');
-      const realNoAsk  = parseFloat(km.no_ask_dollars  || '0');
+      const realYesAsk = finiteMarketPrice(km.yes_ask_dollars);
+      const realNoAsk  = finiteMarketPrice(km.no_ask_dollars);
       if (realYesAsk > 0 || realNoAsk > 0) {
         orderbookState.setRealAskFloor(ticker, realYesAsk > 0 ? realYesAsk : undefined, realNoAsk > 0 ? realNoAsk : undefined);
       }
