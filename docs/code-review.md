@@ -71,6 +71,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-063 | High | `src/lib/market-price.ts` binary quote parsing | Fixed | Permissive `parseFloat()` accepted numeric prefixes such as `"0.42junk"`, and values above the binary-contract maximum reached matching. Quotes now require a complete decimal representation and a finite value in the $0–$1 range; malformed/out-of-range values fail closed at $0. Regression coverage rejects trailing text, hexadecimal syntax, and values above $1. |
 | CR-064 | High | `src/lib/book-seed.ts` Kalshi REST orderbook parsing | Fixed | REST seeding used permissive `parseFloat()` for bid levels and real ask metadata, allowing numeric prefixes and non-decimal quantity syntax to enter the live execution book. Seed levels now require complete finite binary prices plus complete positive finite decimal depth; malformed/unknown depth fails closed. |
 | CR-065 | High | `src/lib/platforms/adapters/kalshi-adapter.ts` generic Kalshi market normalization | Fixed | The adapter's generic market mapper used permissive `parseFloat()` for exchange quotes, volume, and ask/bid depth. Numeric prefixes, non-decimal values, and non-finite depth could therefore enter the platform-neutral model. It now accepts complete finite binary quotes and complete positive finite optional metrics only; malformed values fail closed. |
+| CR-066 | High | `src/lib/polymarket-clob.ts` CLOB ask-depth parsing | Fixed | `bestAskDollarDepth()` used permissive `Number()` and accepted above-par or non-decimal CLOB ask prices as executable liquidity. It now requires complete finite decimal values, a strictly binary ask price, and positive depth before sizing. Regression coverage rejects hexadecimal, above-par, and trailing-text levels. |
 
 ## Verification
 
@@ -85,6 +86,7 @@ This review is intentionally one module and one verified change at a time. Runti
 - CR-050 regression: `src/lib/kalshi-ws.test.ts` verifies non-finite/out-of-range snapshot levels and malformed deltas are never dispatched to live orderbook consumers.
 - Latest full Vitest after CR-050: 633 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 - CR-056 regression: `src/lib/saved-market-request.test.ts` rejects malformed and impossible expiry dates for create/update while preserving the UI's date-only format. Full Vitest: 645 passed, 0 failed; production build passed; runtime invalid-expiry POST returned HTTP 400 with the expected validation error.
+- CR-066 regression: `src/lib/matcher.test.ts` verifies CLOB ask depth ignores hexadecimal, above-par, and trailing-text prices. Full Vitest: 660 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 
 ## Next review module
 
