@@ -30,6 +30,15 @@ describe('market depth normalization', () => {
     expect(book.asks).toEqual([{ price: 0.65, size: 7 }, { price: 0.7, size: 9 }]);
   });
 
+  it('rejects malformed decimal syntax in external orderbook sizes', () => {
+    const book = buildDepthBook(
+      [{ price: '0.64', size: '0x10' }, { price: '0.60', size: '10contracts' }],
+      [{ price: '0.35', size: '0x10' }, { price: '0.30', size: '10contracts' }],
+    );
+
+    expect(book).toEqual({ bids: [], asks: [] });
+  });
+
   it('builds cumulative contract sizes and limits the rendered depth', () => {
     const levels = cumulativeLevels([
       { price: 0.5, size: 20 },

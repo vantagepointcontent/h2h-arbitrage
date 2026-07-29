@@ -1,3 +1,5 @@
+import { finiteDecimal } from './market-price';
+
 export interface RawDepthLevel {
   price: string | number;
   size: string | number;
@@ -18,9 +20,9 @@ export interface DepthBook {
 }
 
 function parseLevel(level: RawDepthLevel): DepthLevel | null {
-  const price = Number(level.price);
-  const size = Number(level.size);
-  if (!Number.isFinite(price) || !Number.isFinite(size) || price <= 0 || price >= 1 || size <= 0) return null;
+  const price = finiteDecimal(level.price);
+  const size = finiteDecimal(level.size);
+  if (price === null || size === null || price <= 0 || price >= 1 || size <= 0) return null;
   return { price, size };
 }
 
@@ -39,10 +41,11 @@ export function buildDepthBook(bids: RawDepthLevel[] = [], asks: RawDepthLevel[]
 
 /** Kalshi publishes YES and NO bid ladders. NO bids are executable YES asks at 1 - price. */
 export function buildKalshiYesBook(yesBids: RawDepthLevel[] = [], noBids: RawDepthLevel[] = []): DepthBook {
-  return buildDepthBook(
-    yesBids,
-    noBids.map(level => ({ price: 1 - Number(level.price), size: level.size })),
-  );
+  const yesAsks = noBids.flatMap(level => {
+    const noBidPrice = finiteDecimal(level.price);
+    return noBidPrice !== null ? [{ price: 1 - noBidPrice, size: level.size }] : [];
+  });
+  return buildDepthBook(yesBids, yesAsks);
 }
 
 export function cumulativeLevels(levels: DepthLevel[], limit = 12): CumulativeDepthLevel[] {
