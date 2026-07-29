@@ -13,6 +13,12 @@ import {
   fetchKalshiEventMarkets,
   type KalshiMarket,
 } from '../../kalshi';
+import { finiteDecimal, finiteMarketPrice } from '../../market-price';
+
+function optionalPositiveDecimal(value: unknown): number | undefined {
+  const parsed = finiteDecimal(value);
+  return parsed !== null && parsed > 0 ? parsed : undefined;
+}
 
 export class KalshiAdapter implements PlatformAdapter {
   readonly platformId = 'kalshi' as const;
@@ -107,11 +113,11 @@ export class KalshiAdapter implements PlatformAdapter {
   // ── Private Mappers ──
 
   private mapMarket(m: KalshiMarket): PlatformMarket {
-    const yesAsk = parseFloat(m.yes_ask_dollars ?? '0');
-    const noAsk = parseFloat(m.no_ask_dollars ?? '0');
-    const yesBid = parseFloat(m.yes_bid_dollars ?? '0');
-    const noBid = parseFloat(m.no_bid_dollars ?? '0');
-    const lastPrice = parseFloat(m.last_price_dollars ?? '0');
+    const yesAsk = finiteMarketPrice(m.yes_ask_dollars);
+    const noAsk = finiteMarketPrice(m.no_ask_dollars);
+    const yesBid = finiteMarketPrice(m.yes_bid_dollars);
+    const noBid = finiteMarketPrice(m.no_bid_dollars);
+    const lastPrice = finiteMarketPrice(m.last_price_dollars);
 
     const outcomes: PlatformOutcome[] = [
       {
@@ -122,9 +128,9 @@ export class KalshiAdapter implements PlatformAdapter {
         bestBid: yesBid,
         bestAsk: yesAsk,
         lastPrice,
-        volume24h: m.volume_24h_fp ? parseFloat(m.volume_24h_fp) : undefined,
-        bidDepth: m.yes_bid_size_fp ? parseFloat(m.yes_bid_size_fp) : undefined,
-        askDepth: m.yes_ask_size_fp ? parseFloat(m.yes_ask_size_fp) : undefined,
+        volume24h: optionalPositiveDecimal(m.volume_24h_fp),
+        bidDepth: optionalPositiveDecimal(m.yes_bid_size_fp),
+        askDepth: optionalPositiveDecimal(m.yes_ask_size_fp),
         raw: m,
       },
     ];
