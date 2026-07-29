@@ -60,6 +60,7 @@ export function extractParentEventSlug(value: unknown): string | undefined {
   return typeof slug === 'string' && slug.trim() !== '' ? slug : undefined;
 }
 
+import { finiteDecimal } from '@/lib/market-price';
 import { rateLimiters } from '@/lib/rate-limiter';
 import { createTtlMemo } from '@/lib/ttl-cache';
 
@@ -173,12 +174,8 @@ export function parseOutcomePrices(serialized: string | undefined): [number, num
     if (!Array.isArray(values)) return [0, 1];
 
     const normalized = (value: unknown, fallback: number): number => {
-      const parsed = typeof value === 'number'
-        ? value
-        : typeof value === 'string' && value.trim() !== ''
-          ? Number(value)
-          : NaN;
-      return Number.isFinite(parsed) ? parsed : fallback;
+      const parsed = finiteDecimal(value);
+      return parsed !== null && parsed >= 0 && parsed <= 1 ? parsed : fallback;
     };
 
     return [normalized(values[0], 0), normalized(values[1], 1)];

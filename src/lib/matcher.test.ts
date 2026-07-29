@@ -638,8 +638,8 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
         bestAsk: null,
         outcomePrices: '[\"1.50\",\"-0.10\"]',
       }));
-      expect(shape.yesPrice).toBe(1.5);
-      expect(shape.noPrice).toBe(-0.1);
+      expect(shape.yesPrice).toBe(0);
+      expect(shape.noPrice).toBe(1);
     });
 
     it('bestAsk only, very small value → noPrice close to 1', () => {

@@ -15,7 +15,9 @@ describe('parseOutcomePrices', () => {
     expect(parseOutcomePrices('not-json')).toEqual([0, 1]);
     expect(parseOutcomePrices('["Infinity", ""]')).toEqual([0, 1]);
     expect(parseOutcomePrices('["0.3oops", "0.7"]')).toEqual([0, 0.7]);
-    expect(parseOutcomePrices('["1.5", "-0.1"]')).toEqual([1.5, -0.1]);
+    expect(parseOutcomePrices('["1.5", "-0.1"]')).toEqual([0, 1]);
+    expect(parseOutcomePrices('["0x0.4", "0.6"]')).toEqual([0, 0.6]);
+    expect(parseOutcomePrices('["0.4", "0.6junk"]')).toEqual([0.4, 1]);
   });
 
   it('keeps parseOutcomes safe when the price payload is malformed', () => {
