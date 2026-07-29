@@ -243,7 +243,7 @@ function OutcomeTableBodyInner({
               className={`hover:bg-[#182533]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#182533]/30" : ""}`}
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
             >
-              <td className="px-4 py-3 font-medium text-[#FFFFFF]">
+              <td data-testid="outcome-name-cell" className="sticky left-0 z-10 bg-[#17212B] px-4 py-3 font-medium text-[#FFFFFF]">
                 <div className="flex items-center gap-1.5" title={buildMarketTooltip({ eventTitle: marketTitle ?? o.artist, expiryDate: marketExpiryDate })}>
                   <span className={`transition-transform text-[#8A9BA8] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                   {o.artist}

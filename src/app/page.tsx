@@ -1900,7 +1900,7 @@ export default function Home() {
 
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
-                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
+                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
                         {/* Filter toggles */}
                         <div className="flex items-center gap-1 p-2 border-b border-[#182533]">
                           {(["all", "matched", "arb"] as const).map(mode => (
@@ -1917,10 +1917,10 @@ export default function Home() {
                             </button>
                           ))}
                         </div>
-                        <table className="w-full text-sm">
+                        <table className="w-full min-w-[1100px] text-sm">
                           <thead className="bg-[#17212B] border-b border-[#182533]">
                             <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
-                              <th className="text-left px-4 py-3.5 font-medium">
+                              <th className="sticky left-0 z-20 bg-[#17212B] text-left px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1">
                                   Outcome <HeaderInfo text="The market question being predicted (e.g. 'Will X win?'). Each outcome is a Yes/No pair you can bet on." />
                                 </span>
