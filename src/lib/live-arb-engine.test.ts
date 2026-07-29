@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyPolymarketBook, computeAllLiveArbitrages } from './live-arb-engine';
+import { applyPolymarketBook, computeAllLiveArbitrages, parseBookStaleMs } from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
 import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
 
@@ -16,6 +16,17 @@ const complement = {
   pmYesTokenId: 'pm-yes-bug-101-comp',
   pmNoTokenId: 'pm-no-bug-101-comp',
 };
+
+describe('parseBookStaleMs', () => {
+  it.each(['', '0', '-1', 'Infinity', '60seconds', '0x100'])(
+    'fails closed to the safe default for invalid value %j',
+    (value) => expect(parseBookStaleMs(value)).toBe(60_000),
+  );
+
+  it('accepts a finite positive decimal duration', () => {
+    expect(parseBookStaleMs('90000')).toBe(90_000);
+  });
+});
 
 afterEach(() => {
   orderbookState.removeBook(outcome.kalshiTicker);

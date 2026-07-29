@@ -3,6 +3,7 @@
 
 import { orderbookState, WeightedAskResult } from './orderbook-state';
 import { calculateArbitrageMax, computeArbitrageFees, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import { finiteDecimal } from './market-price';
 
 export interface LiveArbResult {
   artist: string;
@@ -62,6 +63,11 @@ export interface LiveMatchedOutcome {
   pmNoTokenId: string;
 }
 
+export function parseBookStaleMs(value: unknown): number {
+  const parsed = finiteDecimal(value);
+  return parsed !== null && parsed > 0 ? parsed : 60_000;
+}
+
 /** Compute arbitrage for a single matched outcome. */
 function computeSingleOutcome(
   outcome: LiveMatchedOutcome,
@@ -75,7 +81,7 @@ function computeSingleOutcome(
   // caused "Stale" status after ~1 minute when WS updates paused briefly.
   // WS auto-reconnect takes up to 30s (exponential backoff), so the stale
   // window must be longer than the reconnect window.
-  const STALE_MS = Number(process.env.H2H_BOOK_STALE_MS || 60_000);
+  const STALE_MS = parseBookStaleMs(process.env.H2H_BOOK_STALE_MS);
   const stale =
     orderbookState.isStale(kalshiTicker, STALE_MS) ||
     orderbookState.isStale(pmYesTokenId, STALE_MS) ||
