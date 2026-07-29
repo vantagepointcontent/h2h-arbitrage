@@ -1554,12 +1554,12 @@ export default function Home() {
                   />
 
                   {/* Auto/Manual match toggle */}
-                  <div className="flex items-center gap-2 mb-4 flex-col sm:flex-row">
+                  <div className="flex flex-col items-stretch gap-2 mb-4 sm:flex-row sm:items-center">
                     <span className="text-xs text-[#8A9BA8]">Match Mode:</span>
                     <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
                       <button
                         onClick={() => setMatchMode("auto")}
-                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                        className={`min-h-11 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "auto"
                             ? "bg-[#5DBE81] text-black"
                             : "text-[#8A9BA8] hover:text-[#FFFFFF]"
@@ -1569,7 +1569,7 @@ export default function Home() {
                       </button>
                       <button
                         onClick={() => setMatchMode("manual")}
-                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                        className={`min-h-11 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "manual"
                             ? "bg-[#a855f7] text-white"
                             : "text-[#8A9BA8] hover:text-[#FFFFFF]"
@@ -1583,25 +1583,25 @@ export default function Home() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <button onClick={() => handleScan(false)} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+                    <button onClick={() => handleScan(false)} disabled={loading} className="flex min-h-11 items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
                       {loading ? "Scanning..." : "Scan Markets"}
                     </button>
 
                     {result && (
-                      <button onClick={saveMarket} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
+                      <button onClick={saveMarket} disabled={saving} className="flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving..." : "Save Market"}
                       </button>
                     )}
 
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex min-h-11 items-center gap-2 sm:ml-auto">
                       <label className="text-xs text-[#8A9BA8]">Capital:</label>
-                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
+                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="h-11 w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
                       <button
                         onClick={() => setCouplingPanelOpen(v => !v)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                        className={`flex min-h-11 items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                           couplingPanelOpen
                             ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
                             : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
