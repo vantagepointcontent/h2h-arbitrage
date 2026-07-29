@@ -622,6 +622,21 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
 
   // --- Edge cases ---
   describe('edge cases', () => {
+    it('fails closed for malformed Gamma best quotes instead of treating them as live orderbook data', () => {
+      const shape = buildPmArbShape(makePmMarket({
+        bestBid: '0x0.49',
+        bestAsk: '0.51junk',
+        lastTradePrice: 'Infinity',
+        outcomePrices: '["0.42","0.58"]',
+      }));
+
+      expect(shape.yesPrice).toBe(0.42);
+      expect(shape.noPrice).toBe(0.58);
+      expect(shape.bestAsk).toBe(0.42);
+      expect(shape.bestBid).toBeCloseTo(0.4116, 6);
+      expect(shape.lastTradePrice).toBe(0);
+    });
+
     it('zero gamma prices → safe defaults', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: null,

@@ -73,6 +73,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-065 | High | `src/lib/platforms/adapters/kalshi-adapter.ts` generic Kalshi market normalization | Fixed | The adapter's generic market mapper used permissive `parseFloat()` for exchange quotes, volume, and ask/bid depth. Numeric prefixes, non-decimal values, and non-finite depth could therefore enter the platform-neutral model. It now accepts complete finite binary quotes and complete positive finite optional metrics only; malformed values fail closed. |
 | CR-066 | High | `src/lib/polymarket-clob.ts` CLOB ask-depth parsing | Fixed | `bestAskDollarDepth()` used permissive `Number()` and accepted above-par or non-decimal CLOB ask prices as executable liquidity. It now requires complete finite decimal values, a strictly binary ask price, and positive depth before sizing. Regression coverage rejects hexadecimal, above-par, and trailing-text levels. |
 | CR-067 | High | `src/lib/polymarket.ts` Gamma outcome-price parsing | Fixed | Serialized Gamma outcome prices accepted hexadecimal and out-of-range numeric values, allowing invalid YES/NO quotes into scan matching. Prices now require a complete finite decimal in the binary $0–$1 range; invalid YES/NO values fall back to their respective non-executable defaults. Regression coverage rejects above-par, negative, hexadecimal, and trailing-text values. |
+| CR-068 | High | `src/lib/matcher.ts` Gamma best-quote normalization | Fixed | Untyped Gamma `bestBid`, `bestAsk`, and `lastTradePrice` bypassed serialized outcome-price validation; malformed numeric strings could be returned as quote fields and incorrectly select an orderbook branch. Best quotes now require complete finite binary decimals and malformed values behave as unavailable; last trade price fails closed at zero. Regression coverage verifies hexadecimal, trailing-text, and infinite values. |
 
 ## Verification
 
@@ -89,6 +90,7 @@ This review is intentionally one module and one verified change at a time. Runti
 - CR-056 regression: `src/lib/saved-market-request.test.ts` rejects malformed and impossible expiry dates for create/update while preserving the UI's date-only format. Full Vitest: 645 passed, 0 failed; production build passed; runtime invalid-expiry POST returned HTTP 400 with the expected validation error.
 - CR-066 regression: `src/lib/matcher.test.ts` verifies CLOB ask depth ignores hexadecimal, above-par, and trailing-text prices. Full Vitest: 660 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 - CR-067 regression: `src/lib/polymarket.test.ts` and `src/lib/matcher.test.ts` verify malformed, non-decimal, and out-of-range Gamma outcome prices fail closed. Full Vitest: 660 passed, 0 failed; production build passed.
+- CR-068 regression: `src/lib/matcher.test.ts` verifies malformed Gamma best quotes fall back to validated outcome prices and a malformed last-trade value returns zero. Full Vitest: 661 passed, 0 failed; production build passed.
 
 ## Next review module
 

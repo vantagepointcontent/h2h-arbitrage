@@ -2,7 +2,7 @@ import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
 import { classifyArbType, type ArbType } from './arb-types';
-import { finiteMarketPrice } from './market-price';
+import { finiteDecimal, finiteMarketPrice } from './market-price';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -1088,8 +1088,15 @@ export function buildPmArbShape(market: PMMarket) {
   // correct yesPrice/noPrice in outcomePrices. We should USE THOSE DIRECTLY
   // instead of re-deriving from YES-side bestBid/bestAsk (which is wrong
   // for neg-risk since NO has its own orderbook).
-  const rawBestAsk = market.bestAsk;
-  const rawBestBid = market.bestBid;
+  // Gamma's expanded payload is untyped network input. A malformed best quote
+  // must behave as absent, not as a live orderbook value or an arbitrary value
+  // returned to the client.
+  const binaryQuoteOrNull = (value: unknown): number | null => {
+    const parsed = finiteDecimal(value);
+    return parsed !== null && parsed >= 0 && parsed <= 1 ? parsed : null;
+  };
+  const rawBestAsk = binaryQuoteOrNull(market.bestAsk);
+  const rawBestBid = binaryQuoteOrNull(market.bestBid);
 
   // A successful CLOB lookup with no asks is non-executable. Preserve the
   // CLOB token prices for display, but force the execution fields to zero.
@@ -1156,7 +1163,7 @@ export function buildPmArbShape(market: PMMarket) {
     // arb calculation doesn't zero them out. These are stale but non-zero.
     bestBid: rawBestBid != null ? rawBestBid : (yesPrice > 0 ? yesPrice * 0.98 : 0),
     bestAsk: rawBestAsk != null ? rawBestAsk : yesPrice,
-    lastTradePrice: market.lastTradePrice ?? prices[0] ?? 0,
+    lastTradePrice: finiteMarketPrice(market.lastTradePrice ?? prices[0] ?? 0),
     volume: market.volume,
     liquidity: market.liquidity,
     // MF-001: Gamma liquidity is aggregate market metadata, not quantity that
