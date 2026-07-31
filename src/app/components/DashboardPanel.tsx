@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Eye,
   Clock,
+  DollarSign,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
@@ -111,6 +112,21 @@ interface DashboardData {
   range: string;
 }
 
+interface DailyPnlSummary {
+  date: string;
+  timezone: string;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  totalPnl: number;
+  totalTrades: number;
+  winRatePct: number;
+  totalVolume: number;
+  platforms: {
+    kalshi: { realizedPnl: number; volume: number };
+    polymarket: { realizedPnl: number; volume: number };
+  };
+}
+
 type RangeKey = "today" | "7d" | "30d" | "90d" | "all";
 const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
   { key: "today", label: "Today" },
@@ -200,6 +216,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // ── Main Component ───────────────────────────────────────────────
 export default function DashboardPanel() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [dailyPnl, setDailyPnl] = useState<DailyPnlSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [range, setRange] = useState<RangeKey>("30d");
@@ -207,11 +224,15 @@ export default function DashboardPanel() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/dashboard/stats?range=${range}`,
-        { cache: "no-store" }
-      );
+      const [res, pnlRes] = await Promise.all([
+        fetch(`/api/dashboard/stats?range=${range}`, { cache: "no-store" }),
+        fetch("/api/dashboard/daily-pnl", { cache: "no-store" }).catch(() => null),
+      ]);
       const json = await res.json();
+      if (pnlRes?.ok) {
+        const pnlJson = await pnlRes.json();
+        if (!pnlJson.error) setDailyPnl(pnlJson);
+      }
       if (json.error) {
         setError(json.error);
       } else {
@@ -298,6 +319,46 @@ export default function DashboardPanel() {
           </button>
         </div>
       </div>
+
+      {/* UI-025: at-a-glance live trading performance for the US Eastern day. */}
+      {dailyPnl && (
+        <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <DollarSign className="h-4 w-4 text-[#5DBE81]" /> Today&apos;s P&amp;L
+            </div>
+            <span className="text-[10px] text-[#A8B8C4]">US Eastern · {dailyPnl.date}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            {[
+              ["Total P&L", fmtUsd(dailyPnl.totalPnl), dailyPnl.totalPnl],
+              ["Realized", fmtUsd(dailyPnl.realizedPnl), dailyPnl.realizedPnl],
+              ["Unrealized", fmtUsd(dailyPnl.unrealizedPnl), dailyPnl.unrealizedPnl],
+            ].map(([label, value, amount]) => (
+              <div key={String(label)} className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">{String(label)}</div>
+                <div className={`text-sm font-semibold tabular-nums ${Number(amount) > 0 ? "text-[#5DBE81]" : Number(amount) < 0 ? "text-[#ef4444]" : "text-white"}`}>{String(value)}</div>
+              </div>
+            ))}
+            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Trades</div>
+              <div className="text-sm font-semibold tabular-nums">{dailyPnl.totalTrades}</div>
+            </div>
+            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Win rate</div>
+              <div className="text-sm font-semibold tabular-nums">{dailyPnl.winRatePct.toFixed(1)}%</div>
+            </div>
+            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Volume</div>
+              <div className="text-sm font-semibold tabular-nums">{fmtUsd(dailyPnl.totalVolume)}</div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[#A8B8C4]">
+            <span>Kalshi: <b className="text-white">{fmtUsd(dailyPnl.platforms.kalshi.volume)}</b> volume · <b className={dailyPnl.platforms.kalshi.realizedPnl >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{fmtUsd(dailyPnl.platforms.kalshi.realizedPnl)}</b> realized</span>
+            <span>Polymarket: <b className="text-white">{fmtUsd(dailyPnl.platforms.polymarket.volume)}</b> volume · <b className={dailyPnl.platforms.polymarket.realizedPnl >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{fmtUsd(dailyPnl.platforms.polymarket.realizedPnl)}</b> realized</span>
+          </div>
+        </div>
+      )}
 
       {/* ── 5 KPI Cards ──────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
