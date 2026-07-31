@@ -82,6 +82,7 @@ export interface ArbitrageInfo {
   buyPrice: number;
   sellPlatform: "kalshi" | "polymarket" | null;
   sellPrice: number;
+  suspicious?: boolean;
 }
 
 export interface UnifiedOutcome {
@@ -227,6 +228,25 @@ export interface ScanResult {
 /* ── Utility helpers ── */
 export function formatPercent(n: number): string {
   return Intl.NumberFormat("en-US", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n / 100);
+}
+
+export function summarizeScanForSidebar(outcomes: UnifiedOutcome[]): Pick<LastScanResult, "bestRoiPct" | "bestProfit" | "strategy"> {
+  const candidates = outcomes.filter((outcome) =>
+    outcome.arbitrage
+    && outcome.arbitrage.strategy !== "No arb"
+    && !outcome.arbitrage.suspicious,
+  );
+  if (candidates.length === 0) {
+    return { bestRoiPct: 0, bestProfit: 0, strategy: "No arb" };
+  }
+  const best = candidates.reduce((current, outcome) =>
+    outcome.arbitrage.roiPct > current.arbitrage.roiPct ? outcome : current,
+  );
+  return {
+    bestRoiPct: best.arbitrage.roiPct,
+    bestProfit: best.arbitrage.expectedProfit,
+    strategy: best.arbitrage.strategy,
+  };
 }
 
 export function formatCurrency(dollars: number): string {

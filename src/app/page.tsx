@@ -95,7 +95,7 @@ import {
   getStoredCustomTitles, setCustomTitle,
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
-  formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired,
+  formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -506,8 +506,25 @@ export default function Home() {
       const data = await res.json();
       if (res.ok) {
         setResult(data);
-        setLastUpdated(new Date());
-        setLastScanTimestamp(new Date().toISOString());
+        const scannedAt = new Date().toISOString();
+        setLastUpdated(new Date(scannedAt));
+        setLastScanTimestamp(scannedAt);
+        const scannedMarketId = activeMarketIdRef.current;
+        if (scannedMarketId && Array.isArray(data.outcomes)) {
+          const summary = summarizeScanForSidebar(data.outcomes);
+          setSavedMarkets((previous) => previous.map((market) => market.id === scannedMarketId
+            ? {
+                ...market,
+                liveResult: {
+                  ...summary,
+                  scannedAt,
+                  kalshiCount: data.kalshiCount ?? 0,
+                  pmCount: data.pmCount ?? 0,
+                  matchedCount: data.matchedCount ?? 0,
+                },
+              }
+            : market));
+        }
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
         data.outcomes.forEach((o: UnifiedOutcome) => {
