@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatPercent, summarizeScanForSidebar, type UnifiedOutcome } from "./page-shared";
+import {
+  DEFAULT_MARKET_EXPIRY_FILTER,
+  DEFAULT_SHOW_ARB_ONLY,
+  formatPercent,
+  summarizeScanForSidebar,
+  type UnifiedOutcome,
+} from "./page-shared";
 
 function outcome(roiPct: number, expectedProfit = 0.01, suspicious = false): UnifiedOutcome {
   return {
@@ -38,5 +44,12 @@ describe("BUG-033 sidebar ROI synchronization", () => {
       bestProfit: 0,
       strategy: "No arb",
     });
+  });
+});
+
+describe("saved-market visibility defaults", () => {
+  it("shows all non-expired markets instead of starting behind restrictive filters", () => {
+    expect(DEFAULT_MARKET_EXPIRY_FILTER).toBe("all");
+    expect(DEFAULT_SHOW_ARB_ONLY).toBe(false);
   });
 });

@@ -31,6 +31,8 @@ export const CUSTOM_TITLES_KEY = "h2h-custom-titles";
 export const MAX_CUSTOM_TITLE_LEN = 100;
 export const MF_AUTO_REFRESH_KEY = "h2h-mf-auto-refresh";
 export const SIDEBAR_OPEN_KEY = "h2h-sidebar-open";
+export const DEFAULT_MARKET_EXPIRY_FILTER = "all" as const;
+export const DEFAULT_SHOW_ARB_ONLY = false;
 
 // ─── Typed accessors ───
 export const getStoredMfCategories = (): string[] => getStored<string[]>(MF_CATEGORIES_KEY, []);

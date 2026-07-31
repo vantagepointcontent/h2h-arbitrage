@@ -96,6 +96,7 @@ import {
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
   formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
+  DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -949,9 +950,9 @@ export default function Home() {
       localStorage.setItem("overviewLayout", overviewLayout);
     }
   }, [overviewLayout]);
-  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">("lte30");
+  const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">(DEFAULT_MARKET_EXPIRY_FILTER);
   const [showExpired, setShowExpired] = useState(false);
-  const [showArbOnly, setShowArbOnly] = useState(true);
+  const [showArbOnly, setShowArbOnly] = useState(DEFAULT_SHOW_ARB_ONLY);
   const [scanningAll, setScanningAll] = useState(false);
   const [copiedLinks, setCopiedLinks] = useState(false); // UI-013
   const [scanAllError, setScanAllError] = useState("");
