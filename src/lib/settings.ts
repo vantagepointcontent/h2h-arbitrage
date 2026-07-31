@@ -11,6 +11,7 @@
  */
 import path from 'path';
 import { createClient } from '@libsql/client';
+import { ExecutionMode, migrateLegacyExecutionMode } from './execution-mode';
 
 const SQLITE_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
@@ -51,6 +52,8 @@ export interface SettingDef {
   dangerous?: boolean;
   /** Allowed values for string settings */
   options?: string[];
+  /** Legacy compatibility key: readable during migration but hidden from UI. */
+  hidden?: boolean;
 }
 
 export const SETTINGS_SCHEMA: SettingDef[] = [
@@ -84,8 +87,10 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'lifecycle.protectFavorites', section: 'lifecycle', label: 'Protect favorites', description: 'Never auto-archive starred markets.', type: 'boolean', default: true },
 
   // ── Auto-Execute ──
-  { key: 'execute.killSwitch', section: 'auto-execute', label: 'Real-trading kill switch', description: 'Master stop for REAL orders. Keep ON for safe paper/test bets; turn OFF only after deliberately enabling real trading.', type: 'boolean', default: true, dangerous: true },
-  { key: 'execute.dryRun', section: 'auto-execute', label: 'Dry run mode', description: 'When ON, executions are simulated. Turning this OFF places REAL orders.', type: 'boolean', env: 'H2H_DRY_RUN', default: true, dangerous: true },
+  { key: 'execute.mode', section: 'auto-execute', label: 'Execution mode', description: 'Paper simulates orders, live-gated validates but blocks real orders, and live permits explicit manual execution after confirmation.', type: 'string', default: 'paper', options: ['paper', 'live-gated', 'live'], dangerous: true },
+  // One migration cycle only: readable for compatibility, hidden from UI.
+  { key: 'execute.killSwitch', section: 'auto-execute', label: 'Legacy kill switch', description: 'Deprecated compatibility key.', type: 'boolean', default: true, dangerous: true, hidden: true },
+  { key: 'execute.dryRun', section: 'auto-execute', label: 'Legacy dry run', description: 'Deprecated compatibility key.', type: 'boolean', env: 'H2H_DRY_RUN', default: true, dangerous: true, hidden: true },
   { key: 'execute.maxStakePerTrade', section: 'auto-execute', label: 'Max stake per trade $', description: 'Hard cap on a single execution stake.', type: 'number', env: 'H2H_MAX_STAKE_USD', default: 100, min: 1, max: 10000 },
   { key: 'execute.maxDailyExposure', section: 'auto-execute', label: 'Max daily exposure $', description: 'Total capital deployable per day across all executions.', type: 'number', env: 'H2H_MAX_DAILY_USD', default: 500, min: 1, max: 100000 },
 
@@ -190,6 +195,25 @@ export async function getSetting<T = number | boolean | string>(key: string): Pr
   return def.default as T;
 }
 
+/** Resolve and lazily persist the new three-state execution mode. */
+export async function getExecutionMode(): Promise<ExecutionMode> {
+  try {
+    const db = await loadDbValues();
+    const rawMode = db.get('execute.mode');
+    if (rawMode === 'paper' || rawMode === 'live-gated' || rawMode === 'live') return rawMode;
+  } catch {
+    // Fall through to the safe legacy/default resolution below.
+  }
+
+  const [dryRun, killSwitch] = await Promise.all([
+    getSetting<boolean>('execute.dryRun').catch(() => true),
+    getSetting<boolean>('execute.killSwitch').catch(() => true),
+  ]);
+  const mode = migrateLegacyExecutionMode(dryRun, killSwitch);
+  await setSettings({ 'execute.mode': mode }).catch(() => ({ ok: false, errors: [] }));
+  return mode;
+}
+
 export interface ResolvedSetting extends SettingDef {
   value: number | boolean | string;
   source: 'db' | 'env' | 'default';
@@ -207,7 +231,7 @@ export async function getAllSettings(): Promise<ResolvedSetting[]> {
     for (const row of rs.rows) updatedAt.set(String(row.key), String(row.updated_at));
   } catch { /* env/default only */ }
 
-  return SETTINGS_SCHEMA.map((def) => {
+  return SETTINGS_SCHEMA.filter((def) => !def.hidden).map((def) => {
     const raw = db.get(def.key);
     if (raw !== undefined) {
       return { ...def, value: coerce(def, raw), source: 'db' as const, updatedAt: updatedAt.get(def.key) ?? null };

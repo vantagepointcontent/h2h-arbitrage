@@ -158,7 +158,7 @@ export function ExecutionCredsCard() {
         <span>
           Execution is <b>manual-only</b> — trades fire exclusively from an explicit Execute action, never automatically.
           Values are stored server-side (.env.local, mode 600) and are never displayed after saving.
-          The kill switch above must be OFF and dry-run disabled before any real order is possible.
+          Real orders require the explicit Live execution mode; Live-gated blocks them and Paper simulates them.
         </span>
       </div>
 

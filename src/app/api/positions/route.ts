@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
-import { getSetting } from '@/lib/settings';
+import { getExecutionMode } from '@/lib/settings';
 import logger from '@/lib/logger';
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
 
@@ -159,11 +159,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unknown action. Use "exit".' }, { status: 400 });
     }
 
-    // Kill switch
-    const killSwitch = await getSetting<boolean>('execute.killSwitch').catch(() => true);
-    if (killSwitch) {
+    // Only explicit live mode permits closing real positions.
+    const executionMode = await getExecutionMode().catch(() => 'paper' as const);
+    if (executionMode !== 'live') {
       return NextResponse.json(
-        { error: 'Kill switch is ON. Disable execute.killSwitch in Settings to allow execution.' },
+        { error: `Execution mode is ${executionMode}. Switch explicitly to live before closing positions.` },
         { status: 403 },
       );
     }

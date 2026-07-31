@@ -13,7 +13,8 @@ import {
   removeCredential,
   CREDENTIAL_KEYS,
 } from '@/lib/execution-creds';
-import { getSetting } from '@/lib/settings';
+import { getExecutionMode, setSettings } from '@/lib/settings';
+import { applyEmergencyStop, executionModeToDryRun } from '@/lib/execution-mode';
 import { persistExecution } from '@/lib/persistence';
 import logger from '@/lib/logger';
 
@@ -37,17 +38,15 @@ import logger from '@/lib/logger';
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const [creds, killSwitch, dryRun] = await Promise.all([
+    const [creds, mode] = await Promise.all([
       getCredentialStatus(),
-      getSetting<boolean>('execute.killSwitch').catch(() => true),
-      getSetting<boolean>('execute.dryRun').catch(() => true),
+      getExecutionMode().catch(() => 'paper' as const),
     ]);
     return NextResponse.json({
-      limits: getSafetyLimitsFromEnv(),
+      limits: { ...getSafetyLimitsFromEnv(), dryRunMode: executionModeToDryRun(mode) },
       credentials: creds,
       credentialKeys: CREDENTIAL_KEYS,
-      killSwitch,
-      dryRun,
+      mode,
       auditLog: getAuditLog(50),
       policy: 'manual-only',
     });
@@ -93,24 +92,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Missing execution request' }, { status: 400 });
       }
 
-      // Server-side dry-run enforcement: request cannot demand a real order;
-      // the effective mode is the OR of request.dryRun, settings, and env.
-      const settingDryRun = await getSetting<boolean>('execute.dryRun').catch(() => true);
-      const effective: ExecutionRequest = {
-        ...request,
-        dryRun: request.dryRun || settingDryRun,
-      };
-
-      // The kill switch protects real trading, not local paper bets. A dry-run
-      // never contacts either venue and is deliberately allowed to persist while
-      // the kill switch remains ON.
-      const killSwitch = await getSetting<boolean>('execute.killSwitch').catch(() => true);
-      if (killSwitch && !effective.dryRun) {
+      // The server-side mode is the sole authority. Request/env dry-run flags
+      // cannot bypass or alter it.
+      const mode = await getExecutionMode().catch(() => 'paper' as const);
+      if (mode === 'live-gated') {
         return NextResponse.json(
-          { error: 'Kill switch is ON. Real execution is locked; enable Dry run mode to place a simulated test bet.' },
+          { error: 'Execution is live-gated. Real orders are blocked by the emergency stop.' },
           { status: 403 },
         );
       }
+      const effective: ExecutionRequest = {
+        ...request,
+        dryRun: executionModeToDryRun(mode),
+      };
 
       // Real execution additionally requires complete credentials.
       if (!effective.dryRun) {
@@ -156,7 +150,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         steps: result.steps,
       }).catch((e) => logger.warn('[execute] persistExecution failed', { error: String(e) }));
 
-      return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun });
+      return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun, mode });
+    }
+
+    if (action === 'emergency-stop') {
+      const mode = await getExecutionMode().catch(() => 'paper' as const);
+      const nextMode = applyEmergencyStop(mode);
+      if (nextMode !== mode) await setSettings({ 'execute.mode': nextMode });
+      logger.warn('[execute] emergency stop activated', { previousMode: mode, mode: nextMode });
+      return NextResponse.json({ success: true, mode: nextMode });
     }
 
     if (action === 'test-connection') {
@@ -177,7 +179,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     return NextResponse.json(
-      { error: 'Unknown action. Use "execute", "set-credential", "remove-credential", or "test-connection".' },
+      { error: 'Unknown action. Use "execute", "emergency-stop", "set-credential", "remove-credential", or "test-connection".' },
       { status: 400 },
     );
   } catch (err) {

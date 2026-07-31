@@ -89,6 +89,8 @@ export default function SettingsPanel() {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [confirmDanger, setConfirmDanger] = useState<string | null>(null);
+  const [liveConfirmation, setLiveConfirmation] = useState("");
+  const [liveConfirmed, setLiveConfirmed] = useState(false);
 
   // WS-106: watcher health polling (15s) + msgs/sec derivation
   const [watcherHealth, setWatcherHealth] = useState<WatcherHealthPayload | null>(null);
@@ -156,13 +158,15 @@ export default function SettingsPanel() {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: apiHeaders(),
-        body: JSON.stringify({ values: dirty }),
+        body: JSON.stringify({ values: dirty, confirmation: liveConfirmed ? "LIVE" : undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.details?.join("; ") ?? data.error ?? "Save failed");
       setSettings(data.settings ?? []);
       const changed = Object.keys(dirty).join(", ");
       setDirty({});
+      setLiveConfirmed(false);
+      setLiveConfirmation("");
       setSavedMsg(`Saved: ${changed}. Live within ~10s.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -302,7 +306,16 @@ export default function SettingsPanel() {
                       ) : s.options ? (
                         <select
                           value={String(val)}
-                          onChange={(e) => setValue(s.key, e.target.value)}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (s.key === "execute.mode" && next === "live") {
+                              setLiveConfirmation("");
+                              setConfirmDanger(s.key);
+                              return;
+                            }
+                            if (s.key === "execute.mode") setLiveConfirmed(false);
+                            setValue(s.key, next);
+                          }}
                           className="px-2 py-1 rounded-lg bg-[#0E1621] border border-[#182533] text-sm focus:border-[#5DBE81] outline-none"
                         >
                           {s.options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -460,25 +473,37 @@ export default function SettingsPanel() {
         </div>
       )}
 
-      {/* Dangerous confirm modal */}
-      {confirmDanger && (
+      {/* Live-mode confirm modal */}
+      {confirmDanger === "execute.mode" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmDanger(null)}>
           <div className="max-w-md mx-4 p-5 rounded-xl border border-red-800 bg-[#0E1621]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
-              <AlertTriangle className="w-5 h-5" /> Disable dry-run mode?
+              <AlertTriangle className="w-5 h-5" /> Enter live execution mode?
             </div>
-            <p className="text-sm text-[#8A9BA8] mb-4">
-              Turning OFF dry-run means executions place REAL orders with REAL money on Kalshi and Polymarket. Are you sure?
+            <p className="text-sm text-[#8A9BA8] mb-3">
+              Live mode allows explicit manual actions to place REAL orders with REAL money. Type <b className="text-white">LIVE</b> to continue.
             </p>
+            <input
+              autoFocus
+              value={liveConfirmation}
+              onChange={(e) => setLiveConfirmation(e.target.value)}
+              className="w-full mb-4 px-3 py-2 rounded-lg bg-[#17212B] border border-red-800 text-sm font-mono outline-none focus:border-red-500"
+              placeholder="LIVE"
+            />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmDanger(null)} className="px-4 py-1.5 rounded-lg text-sm bg-[#182533] hover:bg-[#243447]">
+              <button onClick={() => { setConfirmDanger(null); setLiveConfirmation(""); }} className="px-4 py-1.5 rounded-lg text-sm bg-[#182533] hover:bg-[#243447]">
                 Cancel
               </button>
               <button
-                onClick={() => { setValue(confirmDanger, false); setConfirmDanger(null); }}
-                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold"
+                disabled={liveConfirmation !== "LIVE"}
+                onClick={() => {
+                  setValue("execute.mode", "live");
+                  setLiveConfirmed(true);
+                  setConfirmDanger(null);
+                }}
+                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold disabled:opacity-40"
               >
-                Yes, go live
+                Confirm live mode
               </button>
             </div>
           </div>

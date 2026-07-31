@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllSettings, setSettings, resetSetting } from '@/lib/settings';
+import { validateLiveConfirmation } from '@/lib/execution-mode';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 
@@ -41,7 +42,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Body must be { values: { key: value } } or { reset: key }' }, { status: 400 });
     }
 
-    const result = await setSettings(body.values as Record<string, unknown>);
+    const values = body.values as Record<string, unknown>;
+    if (values['execute.mode'] === 'live' && !validateLiveConfirmation(body.confirmation)) {
+      return NextResponse.json(
+        { error: 'Entering live mode requires the exact confirmation text LIVE.' },
+        { status: 400 },
+      );
+    }
+
+    const result = await setSettings(values);
     if (!result.ok) {
       return NextResponse.json({ error: 'Validation failed', details: result.errors }, { status: 400 });
     }
