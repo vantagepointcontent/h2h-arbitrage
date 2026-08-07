@@ -3,6 +3,7 @@ import {
   validateExecution,
   executeArb,
   getSafetyLimitsFromEnv,
+  shouldSimulateExecution,
   type ExecutionRequest,
   type SafetyLimits,
   type OrderRequest,
@@ -47,7 +48,6 @@ function defaultLimits(): SafetyLimits {
     dailyLossLimit: 500,
     maxSlippagePct: 2.0,
     orderTimeoutMs: 10000,
-    dryRunMode: true,
   };
 }
 
@@ -183,6 +183,16 @@ describe('executeArb', () => {
   });
 });
 
+describe('single execution authority', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('paper simulates and live reaches the real-leg branch regardless of H2H_DRY_RUN', () => {
+    vi.stubEnv('H2H_DRY_RUN', 'true');
+    expect(shouldSimulateExecution(makeRequest(0.45, 100, 0.50, 100, true))).toBe(true);
+    expect(shouldSimulateExecution(makeRequest(0.45, 100, 0.50, 100, false))).toBe(false);
+  });
+});
+
 describe('getSafetyLimitsFromEnv', () => {
   it('defaults to reasonable values when env vars unset', () => {
     const limits = getSafetyLimitsFromEnv();
@@ -192,8 +202,10 @@ describe('getSafetyLimitsFromEnv', () => {
     expect(limits.orderTimeoutMs).toBeGreaterThan(0);
   });
 
-  it('dryRunMode defaults to true', () => {
+  it('does not expose legacy H2H_DRY_RUN as an execution authority', () => {
+    vi.stubEnv('H2H_DRY_RUN', 'true');
     const limits = getSafetyLimitsFromEnv();
-    expect(limits.dryRunMode).toBe(true);
+    expect(limits).not.toHaveProperty('dryRunMode');
+    vi.unstubAllEnvs();
   });
 });

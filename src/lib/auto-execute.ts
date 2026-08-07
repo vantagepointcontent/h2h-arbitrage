@@ -1,8 +1,9 @@
 /**
  * Auto-Execute / One-Click Trade — simultaneous API order execution
  *
- * SAFETY: This module defaults to DRY RUN mode. No real orders are placed
- * unless explicitly enabled via environment variable.
+ * SAFETY: The caller must resolve the server-side execution mode before
+ * invoking this engine. `/api/execute` is the sole authority and passes one
+ * final `dryRun` decision; legacy environment flags never override it here.
  *
  * Flow:
  * 1. User clicks "Execute" on an arb opportunity
@@ -111,7 +112,6 @@ export interface SafetyLimits {
   dailyLossLimit: number;        // stop if daily losses exceed this
   maxSlippagePct: number;        // abort if price moves more than this
   orderTimeoutMs: number;        // cancel if not filled within this
-  dryRunMode: boolean;           // if true, never place real orders
 }
 
 export function getSafetyLimitsFromEnv(): SafetyLimits {
@@ -120,7 +120,6 @@ export function getSafetyLimitsFromEnv(): SafetyLimits {
     dailyLossLimit: parseFloat(process.env.H2H_DAILY_LOSS_LIMIT ?? '') || 500,
     maxSlippagePct: parseFloat(process.env.H2H_MAX_SLIPPAGE_PCT ?? '') || 2.0,
     orderTimeoutMs: parseInt(process.env.H2H_ORDER_TIMEOUT_MS ?? '', 10) || 10000,
-    dryRunMode: process.env.H2H_DRY_RUN !== 'false',  // DEFAULT: dry run = true
   };
 }
 
@@ -446,13 +445,19 @@ async function pollOrder(
   }
 }
 
+export function shouldSimulateExecution(req: ExecutionRequest): boolean {
+  return req.dryRun;
+}
+
 export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult> {
   const startTime = Date.now();
   const limits = getSafetyLimitsFromEnv();
   const alerts: ExecutionAlert[] = [];
 
-  // Force dry run if safety limits require it
-  const effectiveDryRun = req.dryRun || limits.dryRunMode;
+  // `/api/execute` resolves execute.mode once and passes the final decision.
+  // Do not re-read H2H_DRY_RUN here: that legacy layer made UI/API mode differ
+  // from actual order behavior and could silently turn live into paper.
+  const effectiveDryRun = shouldSimulateExecution(req);
 
   // Validate
   const validation = validateExecution(req, limits);
