@@ -27,8 +27,8 @@ interface Subscriber {
 // Connection state
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const HEARTBEAT_INTERVAL_MS = 10_000;
-const RECONNECT_BASE_MS = 500;
-const RECONNECT_MAX_MS = 15_000;
+export const CLOB_RECONNECT_BASE_MS = 500;
+export const CLOB_RECONNECT_MAX_MS = 15_000;
 const SUBSCRIBE_DEBOUNCE_MS = 200;
 
 // Per-token best bid/ask cache (populated from WS snapshots)
@@ -332,8 +332,8 @@ export class ClobWsService {
   private scheduleReconnect(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     const delay = Math.min(
-      RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts),
-      RECONNECT_MAX_MS,
+      CLOB_RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts),
+      CLOB_RECONNECT_MAX_MS,
     );
     this.reconnectAttempts++;
     this.emitStatus({ type: 'reconnecting', attempt: this.reconnectAttempts, delayMs: delay });

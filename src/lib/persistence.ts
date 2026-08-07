@@ -1384,34 +1384,10 @@ export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Pro
     : `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`;
   const args = source ? [source, Math.min(1000, Math.max(1, limit))] : [Math.min(1000, Math.max(1, limit))];
   const res = await c.execute({ sql, args });
-  return (res.rows as any[]).map((r) => ({
-    id: Number(r.id),
-    timestamp: String(r.timestamp),
-    arbId: String(r.arb_id),
-    marketTitle: String(r.market_title),
-    dryRun: Boolean(Number(r.dry_run)),
-    success: Boolean(Number(r.success)),
-    strategy: r.strategy != null ? String(r.strategy) : null,
-    kalshiOrder: r.kalshi_order ? JSON.parse(String(r.kalshi_order)) : null,
-    polymarketOrder: r.polymarket_order ? JSON.parse(String(r.polymarket_order)) : null,
-    result: r.result ? JSON.parse(String(r.result)) : null,
-    estimatedProfit: Number(r.estimated_profit ?? 0),
-    steps: r.steps ? JSON.parse(String(r.steps)) : null,
-    source: (r.source ?? 'manual') as 'manual' | 'bot',
-  }));
+  return (res.rows as any[]).map((r) => rowToExecutionRecord(r));
 }
 
-/** Get a single execution by arb_id (the most recent if multiple). */
-export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecord | null> {
-  await ensureExecutionsTable();
-  const c = getClient();
-  const res = await c.execute({
-    sql: `SELECT * FROM executions WHERE arb_id = ? ORDER BY timestamp DESC LIMIT 1`,
-    args: [arbId],
-  });
-  const rows = res.rows as any[];
-  if (!rows || rows.length === 0) return null;
-  const r = rows[0];
+function rowToExecutionRecord(r: any): ExecutionRecord {
   return {
     id: Number(r.id),
     timestamp: String(r.timestamp),
@@ -1426,7 +1402,20 @@ export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecor
     estimatedProfit: Number(r.estimated_profit ?? 0),
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
     source: (r.source ?? 'manual') as 'manual' | 'bot',
+  };
+}
+
+/** Get a single execution by arb_id (the most recent if multiple). */
+export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecord | null> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT * FROM executions WHERE arb_id = ? ORDER BY timestamp DESC LIMIT 1`,
+    args: [arbId],
   });
+  const rows = res.rows as any[];
+  if (!rows || rows.length === 0) return null;
+  return rowToExecutionRecord(rows[0]);
 }
 
 /** FEAT-040: sum of bot trade exposure for today (UTC). */

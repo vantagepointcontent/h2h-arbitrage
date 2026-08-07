@@ -50,8 +50,8 @@ interface Subscriber {
 
 const WS_URL = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
 const HEARTBEAT_INTERVAL_MS = 10_000;
-const RECONNECT_BASE_MS = 500;
-const RECONNECT_MAX_MS = 15_000;
+export const KALSHI_RECONNECT_BASE_MS = 500;
+export const KALSHI_RECONNECT_MAX_MS = 15_000;
 
 /** WebSocket payloads are untrusted; invalid quotes must never reach live sizing. */
 function isTradeablePrice(value: unknown): value is number {
@@ -122,6 +122,7 @@ export class KalshiWsService {
       this.ws = null;
     }
     this.connected = false;
+    this.emitStatus({ type: 'disconnected', attempt: this.reconnectAttempts, delayMs: 0 });
   }
 
   // ── Internal ───────────────────────────────────────────────
@@ -320,7 +321,7 @@ export class KalshiWsService {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts), RECONNECT_MAX_MS);
+    const delay = Math.min(KALSHI_RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts), KALSHI_RECONNECT_MAX_MS);
     this.reconnectAttempts++;
     this.emitStatus({ type: 'reconnecting', attempt: this.reconnectAttempts, delayMs: delay });
     this.reconnectTimer = setTimeout(() => {

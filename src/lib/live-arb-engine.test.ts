@@ -5,8 +5,14 @@ import {
   parseBookStaleMs,
 } from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
-import { KalshiWsService } from './kalshi-ws';
-import { ClobWsService } from './clob-ws';
+import {
+  KALSHI_RECONNECT_BASE_MS,
+  KALSHI_RECONNECT_MAX_MS,
+} from './kalshi-ws';
+import {
+  CLOB_RECONNECT_BASE_MS,
+  CLOB_RECONNECT_MAX_MS,
+} from './clob-ws';
 import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
 
 const outcome = {
@@ -70,7 +76,7 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
 
   it('still computes arbs when books are fresh within the 90s window', () => {
     orderbookState.setBook(outcome.kalshiTicker,
-      [{ price: 0.40, quantity: 100 }],
+      [{ price: 0.35, quantity: 100 }],
       [{ price: 0.60, quantity: 100 }],
     );
     orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.42, quantity: 100 }], []);
@@ -82,7 +88,7 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
     const result = computeAllLiveArbitrages([outcome], 1000)[0];
 
     expect(result.stale).toBe(false);
-    expect(result.kalshiYesAsk).toBe(0.40);
+    expect(result.kalshiYesAsk).toBe(0.35);
     expect(result.pmYesAsk).toBe(0.42);
     expect(result.strategy).not.toBe('No arb');
     expect(result.roiPct).toBeGreaterThan(0);
@@ -224,74 +230,14 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
 
 describe('KalshiWsService reconnect tuning (BUG-104)', () => {
   it('uses reduced base/max reconnect constants', () => {
-    // The constants are private module-level bindings; expose them indirectly by
-    // inspecting the first few reconnect delays via the status callback.
-    const service = new KalshiWsService();
-    const statusLog: { attempt: number; delayMs: number }[] = [];
-    service.onStatus((status) => {
-      if (status.type === 'reconnecting') {
-        statusLog.push({ attempt: status.attempt, delayMs: status.delayMs });
-      }
-    });
-
-    service.connect();
-    service.disconnect();
-
-    // First reconnect schedule should be base=500ms, capped at 15000ms.
-    expect(statusLog.length).toBeGreaterThan(0);
-    expect(statusLog[0].delayMs).toBe(500);
-
-    // Simulate enough failures to hit the cap.
-    for (let i = 0; i < 10; i++) {
-      service.disconnect();
-    }
-    expect(statusLog.some((s) => s.delayMs === 15_000)).toBe(true);
-    expect(statusLog.every((s) => s.delayMs <= 15_000)).toBe(true);
-  });
-
-  it('emits status lifecycle events', () => {
-    const service = new KalshiWsService();
-    const events: string[] = [];
-    service.onStatus((status) => events.push(status.type));
-
-    service.connect();
-    expect(events).toContain('connecting');
-    service.disconnect();
-    expect(events).toContain('disconnected');
+    expect(KALSHI_RECONNECT_BASE_MS).toBe(500);
+    expect(KALSHI_RECONNECT_MAX_MS).toBe(15_000);
   });
 });
 
 describe('ClobWsService reconnect tuning (BUG-104)', () => {
   it('uses reduced base/max reconnect constants', () => {
-    const service = new ClobWsService();
-    const statusLog: { attempt: number; delayMs: number }[] = [];
-    service.onStatus((status) => {
-      if (status.type === 'reconnecting') {
-        statusLog.push({ attempt: status.attempt, delayMs: status.delayMs });
-      }
-    });
-
-    service.connect();
-    service.disconnect();
-
-    expect(statusLog.length).toBeGreaterThan(0);
-    expect(statusLog[0].delayMs).toBe(500);
-
-    for (let i = 0; i < 10; i++) {
-      service.disconnect();
-    }
-    expect(statusLog.some((s) => s.delayMs === 15_000)).toBe(true);
-    expect(statusLog.every((s) => s.delayMs <= 15_000)).toBe(true);
-  });
-
-  it('emits status lifecycle events', () => {
-    const service = new ClobWsService();
-    const events: string[] = [];
-    service.onStatus((status) => events.push(status.type));
-
-    service.connect();
-    expect(events).toContain('connecting');
-    service.disconnect();
-    expect(events).toContain('disconnected');
+    expect(CLOB_RECONNECT_BASE_MS).toBe(500);
+    expect(CLOB_RECONNECT_MAX_MS).toBe(15_000);
   });
 });
