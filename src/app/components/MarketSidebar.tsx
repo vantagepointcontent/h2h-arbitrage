@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
+import { Activity, FileText, Globe, Layers, LayoutDashboard, Link2, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
@@ -82,6 +82,7 @@ function MarketSidebarInner({
   onGoLogs,
   onGoDashboard,
   onGoTrades,
+  onGoCoupleManagement,
   favoriteIds,
   onToggleFavorite,
   sidebarFavoritesOnly,
@@ -116,6 +117,7 @@ function MarketSidebarInner({
   onGoLogs: () => void;
   onGoDashboard: () => void;
   onGoTrades: () => void;
+  onGoCoupleManagement: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   sidebarFavoritesOnly: boolean;
@@ -234,6 +236,7 @@ function MarketSidebarInner({
             <NavButton icon={<Layers className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
             <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />
             <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />
+            <NavButton icon={<Link2 className="w-5 h-5 shrink-0" />} label="Couple Mgmt" active={viewMode === "couple-management"} onClick={onGoCoupleManagement} collapsed={!sidebarOpen} />
             <NavButton icon={<Activity className="w-5 h-5 shrink-0" />} label="Live WS" active={viewMode === "live"} onClick={() => window.location.href = '/?view=live'} collapsed={!sidebarOpen} />
             <NavButton icon={<FileText className="w-5 h-5 shrink-0" />} label="Logs" active={viewMode === "logs"} onClick={onGoLogs} collapsed={!sidebarOpen} />
             <NavButton icon={<Receipt className="w-5 h-5 shrink-0" />} label="Trades" active={viewMode === "trades"} onClick={onGoTrades} collapsed={!sidebarOpen} />

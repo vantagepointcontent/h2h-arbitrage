@@ -140,6 +140,11 @@ export class RateLimiter {
     this._queueWaitTotalMs = 0;
   }
 
+  /** Read-only config access (for snapshots / reporting). */
+  getConfig(): Readonly<RateLimiterConfig> {
+    return this.config;
+  }
+
   /** Shut down the refill interval (cleanup). */
   dispose(): void {
     clearInterval(this.intervalId);
@@ -324,6 +329,25 @@ const clobMarketsInstance = new RateLimiter('clob-markets', CLOB_MARKETS_CFG);
 const clobBookInstance = new RateLimiter('clob-book', CLOB_BOOK_CFG);
 const kalshiInstance = new RateLimiter('kalshi', KALSHI_CFG);
 const phInstance = new RateLimiter('predictionhunt', PH_CFG);
+
+/**
+ * UI-033: capture a full metrics snapshot across all named limiters.
+ * Used by the poller to persist utilization history to SQLite.
+ */
+export function snapshotRateLimiterMetrics(): {
+  label: string;
+  metrics: RateLimiterMetrics;
+  throttle: ThrottleSnapshot;
+  config: RateLimiterConfig;
+}[] {
+  return [
+    { label: 'gamma', metrics: gammaInstance.getMetrics(), throttle: gammaInstance.getThrottleSnapshot(), config: gammaInstance.getConfig() },
+    { label: 'clob-markets', metrics: clobMarketsInstance.getMetrics(), throttle: clobMarketsInstance.getThrottleSnapshot(), config: clobMarketsInstance.getConfig() },
+    { label: 'clob-book', metrics: clobBookInstance.getMetrics(), throttle: clobBookInstance.getThrottleSnapshot(), config: clobBookInstance.getConfig() },
+    { label: 'kalshi', metrics: kalshiInstance.getMetrics(), throttle: kalshiInstance.getThrottleSnapshot(), config: kalshiInstance.getConfig() },
+    { label: 'predictionhunt', metrics: phInstance.getMetrics(), throttle: phInstance.getThrottleSnapshot(), config: phInstance.getConfig() },
+  ];
+}
 
 /**
  * Named rate limiter instances — import and use directly.

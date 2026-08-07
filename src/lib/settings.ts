@@ -94,9 +94,21 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'execute.maxStakePerTrade', section: 'auto-execute', label: 'Max stake per trade $', description: 'Hard cap on a single execution stake.', type: 'number', env: 'H2H_MAX_STAKE_USD', default: 100, min: 1, max: 10000 },
   { key: 'execute.maxDailyExposure', section: 'auto-execute', label: 'Max daily exposure $', description: 'Total capital deployable per day across all executions.', type: 'number', env: 'H2H_MAX_DAILY_USD', default: 500, min: 1, max: 100000 },
 
+  // ── BotTrader (FEAT-040 / FEAT-041) ──
+  { key: 'bot.enabled', section: 'auto-execute', label: 'BotTrader enabled', description: 'Master kill switch for scan-driven auto-execution.', type: 'boolean', default: false, dangerous: true },
+  { key: 'bot.mode', section: 'auto-execute', label: 'BotTrader mode', description: 'Paper simulates trades; production places real orders when execution mode is live.', type: 'string', default: 'paper', options: ['paper', 'production'], dangerous: true },
+  { key: 'bot.minRoiPct', section: 'auto-execute', label: 'BotTrader min ROI %', description: 'Minimum net ROI % (after fees) to trigger an auto-trade.', type: 'number', default: 1.5, min: 0, max: 50, slider: true },
+  { key: 'bot.minApyPct', section: 'auto-execute', label: 'BotTrader min APY %', description: 'Minimum APY % to trigger (0 to disable).', type: 'number', default: 0, min: 0, max: 1000 },
+  { key: 'bot.minDepthUsd', section: 'auto-execute', label: 'BotTrader min depth $', description: 'Minimum dollar depth at best ask on BOTH legs of the trade.', type: 'number', default: 1, min: 0, max: 10000 },
+  { key: 'bot.minSharesPerLeg', section: 'auto-execute', label: 'BotTrader min shares/leg', description: 'Minimum shares available at best ask on BOTH legs.', type: 'number', default: 1, min: 0, max: 10000 },
+  { key: 'bot.maxExpiryDays', section: 'auto-execute', label: 'BotTrader max expiry days', description: "Skip markets expiring sooner than this (don't trade markets about to resolve).", type: 'number', default: 1, min: 0, max: 365 },
+
   // ── Display ──
   { key: 'display.defaultSort', section: 'display', label: 'Default overview sort', description: 'Initial sort order in Overview.', type: 'string', default: 'apy', options: ['apy', 'roi', 'name', 'expiry'] },
   { key: 'display.hideUnmatched', section: 'display', label: 'Hide unmatched by default', description: 'Overview starts with only matched markets visible.', type: 'boolean', default: true },
+
+  // ── Market Catalog (FEAT-101) ──
+  { key: 'catalog.refreshIntervalHours', section: 'auto-discovery', label: 'Catalog refresh interval (h)', description: 'Hours between full refreshes of the Kalshi + Polymarket market catalog.', type: 'number', default: 6, min: 1, max: 24, slider: true },
 ];
 
 const SCHEMA_BY_KEY = new Map(SETTINGS_SCHEMA.map((d) => [d.key, d]));

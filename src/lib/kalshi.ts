@@ -201,8 +201,142 @@ export function extractKalshiTicker(url: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-const kalshiMemo = createTtlMemo<KalshiMarket[]>(10_000);
-const kalshiSingleMemo = createTtlMemo<KalshiMarket | null>(10_000);
+const kalshiMemo = createTtlMemo<KalshiMarket[]>(30_000);
+const kalshiSingleMemo = createTtlMemo<KalshiMarket | null>(30_000);
+const kalshiAllMemo = createTtlMemo<KalshiMarket[]>(30_000);
+
+/** Paginate through all open Kalshi markets.
+ * Uses cursor-based pagination if available; falls back to offset if the API
+ * returns one. Honors the existing kalshi rate limiter. */
+export async function fetchAllKalshiMarkets(options?: {
+  onPage?: (count: number) => void;
+}): Promise<KalshiMarket[]> {
+  return kalshiAllMemo('all-open', async () => {
+    const all: KalshiMarket[] = [];
+    const seen = new Set<string>();
+
+    // Fetch first page to discover cursor/offset and total shape.
+    const firstPage = await fetchKalshiPage(null, 0);
+    if (!firstPage) return all;
+    accumulate(firstPage.markets);
+    options?.onPage?.(all.length);
+
+    let cursor: string | null = firstPage.nextCursor;
+    let offset = firstPage.markets.length;
+    const maxPages = 500;
+    let safety = firstPage.markets.length > 0 ? 1 : 0;
+
+    // Prefetch remaining pages in parallel, bounded by rate limiter queue.
+    const pending: Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null>[] = [];
+    while (safety < maxPages && (cursor || offset > 0)) {
+      const capturedCursor = cursor;
+      const capturedOffset = offset;
+      pending.push(
+        fetchKalshiPage(capturedCursor, capturedOffset).then((page) => {
+          if (page) {
+            accumulate(page.markets);
+            options?.onPage?.(all.length);
+          }
+          return page;
+        }),
+      );
+      if (cursor) {
+        // Cannot guess next cursor without reading response; stop parallel speculation.
+        break;
+      }
+      offset += 1000;
+      safety += 1;
+    }
+
+    // If cursor-based, continue sequentially after first page.
+    if (cursor) {
+      while (safety < maxPages && cursor) {
+        const page = await fetchKalshiPage(cursor, offset);
+        if (!page || page.markets.length === 0) break;
+        accumulate(page.markets);
+        options?.onPage?.(all.length);
+        cursor = page.nextCursor;
+        if (!cursor) break;
+        safety += 1;
+      }
+    } else {
+      // Wait for parallel offset pages and keep fetching if any page returned full 1000.
+      let maxNextOffset = offset;
+      const results = await Promise.all(pending);
+      for (const page of results) {
+        if (page) {
+          maxNextOffset = Math.max(maxNextOffset, page.offset + page.markets.length);
+          if (page.markets.length === 1000) {
+            // Fetch subsequent pages sequentially starting after this page.
+            let subOffset = page.offset + page.markets.length;
+            let safety2 = 0;
+            while (safety2 < maxPages) {
+              const sub = await fetchKalshiPage(null, subOffset);
+              if (!sub || sub.markets.length === 0) break;
+              accumulate(sub.markets);
+              options?.onPage?.(all.length);
+              subOffset += sub.markets.length;
+              if (sub.markets.length < 1000) break;
+              safety2 += 1;
+            }
+            maxNextOffset = Math.max(maxNextOffset, subOffset);
+          }
+        }
+      }
+      offset = maxNextOffset;
+      // Final safety sequential pass: keep going until a page is empty.
+      while (safety < maxPages) {
+        const page = await fetchKalshiPage(null, offset);
+        if (!page || page.markets.length === 0) break;
+        accumulate(page.markets);
+        options?.onPage?.(all.length);
+        offset += page.markets.length;
+        if (page.markets.length < 1000) break;
+        safety += 1;
+      }
+    }
+
+    return all;
+
+    function accumulate(markets: KalshiMarket[]) {
+      for (const m of markets) {
+        if (m.ticker && !seen.has(m.ticker)) {
+          seen.add(m.ticker);
+          all.push(m);
+        }
+      }
+    }
+  });
+}
+
+async function fetchKalshiPage(
+  cursor: string | null,
+  offset: number,
+): Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null> {
+  const params = new URLSearchParams({
+    status: 'open',
+    limit: '1000',
+    depthP: 'Infinity',
+  });
+  if (cursor) {
+    params.set('cursor', cursor);
+  } else {
+    params.set('offset', String(offset));
+  }
+  params.set('_t', String(Date.now()));
+
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets?${params.toString()}`,
+      { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(15000) },
+    ),
+  );
+  if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
+  const data: any = await res.json();
+  const markets: KalshiMarket[] = data.markets || [];
+  const nextCursor = typeof data.cursor === 'string' && data.cursor ? data.cursor : null;
+  return { markets, nextCursor, offset };
+}
 
 export async function fetchKalshiEventMarkets(eventTicker: string): Promise<KalshiMarket[]> {
   return kalshiMemo(`event:${eventTicker}`, async () => {

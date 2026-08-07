@@ -13,6 +13,7 @@ import {
   Eye,
   Clock,
   DollarSign,
+  HardDrive,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
@@ -110,6 +111,26 @@ interface DashboardData {
   lifecycleFunnel: LifecycleFunnel;
   arbTypeBreakdown: ArbTypeItem[];
   range: string;
+  capacity?: CapacityData;
+}
+
+interface CapacityPoint {
+  hour: string;
+  utilizationPct: number;
+  isThrottled: number;
+  avgQueueWaitMs: number;
+  rejectedRequests: number;
+}
+
+interface CapacitySeries {
+  name: string;
+  data: CapacityPoint[];
+}
+
+interface CapacityData {
+  range: string;
+  hours: string[];
+  series: CapacitySeries[];
 }
 
 interface DailyPnlSummary {
@@ -125,6 +146,19 @@ interface DailyPnlSummary {
     kalshi: { realizedPnl: number; volume: number };
     polymarket: { realizedPnl: number; volume: number };
   };
+}
+
+interface StorageSummary {
+  diskTotal: number;
+  diskUsed: number;
+  diskFree: number;
+  diskPercent: number;
+  dbSize: number;
+  walSize: number;
+  dataDirSize: number;
+  scanRowCount: number;
+  oldestScan: string | null;
+  retentionDays: number;
 }
 
 type RangeKey = "today" | "7d" | "30d" | "90d" | "all";
@@ -144,6 +178,17 @@ const fmtUsd = (n: number) =>
     currency: "USD",
     maximumFractionDigits: 2,
   });
+
+const fmtBytes = (n: number) => {
+  if (n <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    Math.floor(Math.log(n) / Math.log(1024)),
+    units.length - 1,
+  );
+  const value = n / Math.pow(1024, i);
+  return `${value.toFixed(i === 0 ? 0 : 1).replace(/\.0$/, "")} ${units[i]}`;
+};
 
 const fmtShortDate = (s: string) => {
   const d = new Date(s);
@@ -217,6 +262,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function DashboardPanel() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [dailyPnl, setDailyPnl] = useState<DailyPnlSummary | null>(null);
+  const [storage, setStorage] = useState<StorageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [range, setRange] = useState<RangeKey>("30d");
@@ -224,14 +270,24 @@ export default function DashboardPanel() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [res, pnlRes] = await Promise.all([
+      const [res, pnlRes, storageRes, capacityRes] = await Promise.all([
         fetch(`/api/dashboard/stats?range=${range}`, { cache: "no-store" }),
         fetch("/api/dashboard/daily-pnl", { cache: "no-store" }).catch(() => null),
+        fetch("/api/dashboard/storage", { cache: "no-store" }).catch(() => null),
+        fetch(`/api/dashboard/capacity?range=${range}`, { cache: "no-store" }).catch(() => null),
       ]);
       const json = await res.json();
+      if (storageRes?.ok) {
+        const storageJson = await storageRes.json();
+        if (!storageJson.error) setStorage(storageJson);
+      }
       if (pnlRes?.ok) {
         const pnlJson = await pnlRes.json();
         if (!pnlJson.error) setDailyPnl(pnlJson);
+      }
+      if (capacityRes?.ok) {
+        const capacityJson = await capacityRes.json();
+        if (!capacityJson.error) json.capacity = capacityJson;
       }
       if (json.error) {
         setError(json.error);
@@ -397,6 +453,161 @@ export default function DashboardPanel() {
           color="#a855f7"
         />
       </div>
+
+      {/* ── API Capacity Utilization (line chart) ───────── */}
+      {data?.capacity && data.capacity.series.length > 0 && (
+        <Panel
+          title="API Capacity Utilization"
+          icon={<Activity className="w-4 h-4 text-[#60a5fa]" />}
+          rightElement={
+            <span className="text-xs text-[#A8B8C4]">
+              {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
+            </span>
+          }
+        >
+          <ResponsiveContainer width="100%" height={280} key={`capacity-${range}`}>
+            <LineChart
+              data={data.capacity.hours.map((hour) => {
+                const point: Record<string, string | number> = { hour };
+                for (const s of data.capacity!.series) {
+                  const p = s.data.find((d) => d.hour === hour);
+                  point[s.name] = p?.utilizationPct ?? 0;
+                }
+                return point;
+              })}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+              <XAxis
+                dataKey="hour"
+                tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                tickFormatter={(val: string) => val.slice(5, 16)}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                domain={[0, 100]}
+                tickFormatter={(v: number) => `${v}%`}
+              />
+              <Tooltip
+                content={({ active, payload, label }: any) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                      <p className="text-xs text-[#A8B8C4] mb-2">{label}</p>
+                      {payload.map((entry: any, i: number) => {
+                        const val = Number(entry.value ?? 0);
+                        const color =
+                          val >= 95
+                            ? "#ef4444"
+                            : val >= 80
+                              ? "#facc15"
+                              : entry.color;
+                        return (
+                          <p key={i} className="text-xs font-mono" style={{ color }}>
+                            {entry.name}: {val.toFixed(1)}%
+                          </p>
+                        );
+                      })}
+                    </div>
+                  );
+                }}
+              />
+              <Legend wrapperStyle={{ color: '#A8B8C4', fontSize: '11px' }} />
+              {data.capacity.series.map((s, i) => {
+                const COLORS = ["#60a5fa", "#5DBE81", "#facc15", "#a855f7"];
+                const baseColor = COLORS[i % COLORS.length];
+                return (
+                  <Line
+                    key={s.name}
+                    type="monotone"
+                    dataKey={s.name}
+                    name={s.name}
+                    stroke={baseColor}
+                    strokeWidth={2}
+                    dot={(props: any) => {
+                      const val = Number(props.value ?? 0);
+                      if (val >= 95) {
+                        return <circle cx={props.cx} cy={props.cy} r={3} fill="#ef4444" />;
+                      }
+                      if (val >= 80) {
+                        return <circle cx={props.cx} cy={props.cy} r={3} fill="#facc15" />;
+                      }
+                      return <circle cx={props.cx} cy={props.cy} r={2} fill={baseColor} />;
+                    }}
+                    connectNulls
+                  />
+                );
+              })}
+            </LineChart>
+          </ResponsiveContainer>
+        </Panel>
+      )}
+
+      {/* ── Storage info box ───────────────────────────────── */}
+      <Panel
+        title="Storage"
+        icon={<HardDrive className="w-4 h-4 text-[#A8B8C4]" />}
+        rightElement={
+          storage ? (
+            <span className="text-[10px] text-[#A8B8C4]">{storage.retentionDays}d retention</span>
+          ) : null
+        }
+      >
+        {storage ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">Disk usage</div>
+              <div className="text-sm font-semibold tabular-nums mb-1.5">
+                {fmtBytes(storage.diskUsed)} / {fmtBytes(storage.diskTotal)} ({storage.diskPercent}%)
+              </div>
+              <div className="h-2 w-full rounded-full bg-[#0E1621] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    storage.diskPercent >= 80 ? "bg-[#ef4444]" : storage.diskPercent >= 60 ? "bg-[#facc15]" : "bg-[#5DBE81]"
+                  }`}
+                  style={{ width: `${Math.min(storage.diskPercent, 100)}%` }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">DB size</div>
+              <div className="text-sm font-semibold tabular-nums text-white">{fmtBytes(storage.dbSize)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">WAL size</div>
+              <div
+                className={`text-sm font-semibold tabular-nums ${
+                  storage.walSize > storage.dbSize * 0.5
+                    ? storage.walSize > storage.dbSize
+                      ? "text-[#ef4444]"
+                      : "text-[#facc15]"
+                    : "text-white"
+                }`}
+              >
+                {fmtBytes(storage.walSize)}
+              </div>
+              {storage.walSize > storage.dbSize * 0.5 && (
+                <div className="text-[10px] text-[#facc15] mt-0.5">
+                  WAL {'>'} 50% of DB — checkpoint problem
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">Scan rows</div>
+              <div className="text-sm font-semibold tabular-nums text-white">
+                {storage.scanRowCount.toLocaleString()} rows
+              </div>
+              <div className="text-[10px] text-[#A8B8C4]">
+                {storage.oldestScan
+                  ? `since ${new Date(storage.oldestScan).toISOString().slice(0, 10)}`
+                  : "no scans yet"}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-[#A8B8C4]">Storage data unavailable.</div>
+        )}
+      </Panel>
 
       {!hasData ? (
         <EmptyState message="No scan data yet. Run a scan to populate the dashboard." />

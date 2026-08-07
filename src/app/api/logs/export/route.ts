@@ -1,57 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanHistory, getSavedMarkets } from '@/lib/persistence';
+import { queryScanHistoryStream, countScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { classifyArbType } from '@/lib/arb-types';
-import { parseOptionalFiniteNumber } from '@/lib/logs-request';
+import { parseExportLimit, parseOptionalFiniteNumber } from '@/lib/logs-request';
+
+const headers = [
+  'Scan Time',
+  'Market Name',
+  'Category',
+  'Market ID',
+  'Strategy',
+  'Arb Type',
+  'ROI %',
+  'Profit ($)',
+  'Matched Count',
+  'Kalshi Count',
+  'PM Count',
+  'Positive Arb Count',
+  'Total Stake ($)',
+  'Outcome Count',
+];
+
+const escapeCsv = (val: unknown): string => {
+  if (val === null || val === undefined) return '';
+  let s = String(val);
+  if (/^[=+\-@\t\r]/.test(s) && Number.isNaN(Number(s))) {
+    s = `'${s}`;
+  }
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+};
+
+function buildFilters(searchParams: URLSearchParams) {
+  const marketId = searchParams.get('marketId') || undefined;
+  const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
+  const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
+  const fromDate = searchParams.get('fromDate') || undefined;
+  const toDate = searchParams.get('toDate') || undefined;
+  const maxRows = parseExportLimit(searchParams.get('limit'));
+  return { marketId, minRoi, positiveArbOnly, fromDate, toDate, maxRows };
+}
 
 /**
  * GET /api/logs/export
  *
- * Returns a CSV file for Excel. Same filters as /api/logs but always
- * returns all matching rows (up to 500).
+ * UI-035: streams a CSV download using slim scan columns (no raw_result blob).
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const marketId = searchParams.get('marketId') || undefined;
-    const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
-    const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
-    const fromDate = searchParams.get('fromDate');
-    const toDate = searchParams.get('toDate');
+    const filters = buildFilters(searchParams);
 
-    const pool = await getScanHistory(marketId, 500);
-
-    let filtered = pool;
-
-    if (minRoi !== undefined) {
-      filtered = filtered.filter((r: any) => (r.best_roi_pct ?? 0) >= minRoi);
-    }
-
-    if (positiveArbOnly) {
-      filtered = filtered.filter((r: any) => (r.positive_arb_count ?? 0) > 0);
-    }
-
-    if (fromDate) {
-      const from = new Date(fromDate).getTime();
-      if (!isNaN(from)) {
-        filtered = filtered.filter((r: any) => {
-          const t = new Date(r.scanned_at).getTime();
-          return !isNaN(t) && t >= from;
-        });
-      }
-    }
-
-    if (toDate) {
-      const to = new Date(toDate).getTime();
-      if (!isNaN(to)) {
-        filtered = filtered.filter((r: any) => {
-          const t = new Date(r.scanned_at).getTime();
-          return !isNaN(t) && t <= to;
-        });
-      }
-    }
-
-    // UI-015: resolve human-readable market names for the CSV
     let nameMap = new Map<string, string>();
     let categoryMap = new Map<string, string>();
     try {
@@ -60,65 +61,41 @@ export async function GET(request: NextRequest) {
       categoryMap = new Map(saved.map((m) => [m.id, m.category ?? '']));
     } catch { /* best-effort */ }
 
-    // Build CSV
-    const headers = [
-      'Scan Time',
-      'Market Name',
-      'Category',
-      'Market ID',
-      'Strategy',
-      'Arb Type',
-      'ROI %',
-      'Profit ($)',
-      'Matched Count',
-      'Kalshi Count',
-      'PM Count',
-      'Positive Arb Count',
-      'Total Stake ($)',
-      'Outcome Count',
-    ];
+    const readable = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(new TextEncoder().encode(headers.map(escapeCsv).join(',') + '\n'));
 
-    const escapeCsv = (val: any): string => {
-      if (val === null || val === undefined) return '';
-      let s = String(val);
-      // CSV formula-injection guard: prefix values Excel would treat as a
-      // formula (=, +, -, @, tab, CR) with a single quote (audit L6 fix).
-      // Legitimate negative/positive NUMBERS are exempt (e.g. ROI -0.5).
-      if (/^[=+\-@\t\r]/.test(s) && Number.isNaN(Number(s))) {
-        s = `'${s}`;
-      }
-      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
+        for await (const batch of queryScanHistoryStream(filters)) {
+          for (const r of batch) {
+            const line = [
+              r.scanned_at,
+              r.market_title ?? nameMap.get(r.market_id) ?? '',
+              categoryMap.get(r.market_id) ?? '',
+              r.market_id,
+              r.strategy,
+              classifyArbType(r.strategy) ?? '',
+              r.best_roi_pct,
+              r.best_profit,
+              r.matched_count,
+              r.kalshi_count,
+              r.pm_count,
+              r.positive_arb_count,
+              r.total_stake,
+              r.outcome_count,
+            ]
+              .map(escapeCsv)
+              .join(',');
+            controller.enqueue(new TextEncoder().encode(line + '\n'));
+          }
+        }
 
-    const rows = filtered.map((r: any) =>
-      [
-        r.scanned_at,
-        r.market_title ?? nameMap.get(r.market_id) ?? '',
-        categoryMap.get(r.market_id) ?? '',
-        r.market_id,
-        r.strategy,
-        classifyArbType(r.strategy) ?? '',
-        r.best_roi_pct,
-        r.best_profit,
-        r.matched_count,
-        r.kalshi_count,
-        r.pm_count,
-        r.positive_arb_count,
-        r.total_stake,
-        r.outcome_count,
-      ]
-        .map(escapeCsv)
-        .join(',')
-    );
-
-    const csv = [headers.join(','), ...rows].join('\n');
+        controller.close();
+      },
+    });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    return new NextResponse(csv, {
+    return new NextResponse(readable, {
       status: 200,
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -126,9 +103,36 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     return NextResponse.json(
       { error: clientSafeError(err, 'Failed to export logs') },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * HEAD /api/logs/export
+ *
+ * UI-035: returns the same filters' matching row count so the UI can show an
+ * estimate before the user downloads a large file.
+ */
+export async function HEAD(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const filters = buildFilters(searchParams);
+    const count = await countScanHistory(filters);
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'X-Export-Row-Count': String(count),
+        'X-Export-Max-Rows': String(filters.maxRows),
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: clientSafeError(err, 'Failed to estimate export size') },
       { status: 500 }
     );
   }

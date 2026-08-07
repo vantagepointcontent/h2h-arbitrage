@@ -765,6 +765,13 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
             </div>
           )}
 
+          {/* BUG-104: banner shows when any outcome is stale but we still render last known prices below. */}
+          {activeTab.result && activeTab.result.outcomes.some((o) => o.stale) && (
+            <div className="mb-3 rounded-lg border border-[#facc15]/30 bg-[#facc15]/10 px-3 py-2 text-xs text-[#facc15]">
+              <span className="font-bold">Stale prices</span> — orderbook data older than 90s. Last known prices are shown greyed out; live execution is paused until fresh data arrives.
+            </div>
+          )}
+
           {/* Outcomes Table */}
           {activeTab.result && activeTab.result.outcomes.length > 0 && (
             <>
@@ -800,10 +807,10 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           isRowExpanded ? "bg-[#182533]/30" : ""
                         } ${
                           o.stale
-                            ? "opacity-40 grayscale hover:opacity-60"
+                            ? "opacity-60 grayscale hover:opacity-80"
                             : "hover:bg-[#182533]"
                         }`}
-                        title={o.stale ? "Stale: orderbook data older than 30s — prices may be wrong" : undefined}
+                        title={o.stale ? "Stale: orderbook data older than 90s — prices shown for reference only" : undefined}
                         onClick={() => toggleExpandedArtist(o.artist)}
                       >
                         <td className="sticky left-0 z-10 bg-[#17212B] py-2 px-2 text-[#FFFFFF] font-medium">
@@ -841,10 +848,18 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
                           })()}
                         </FlashCell>
                         <FlashCell flash={activeTab.flashes[`${idx}-roi`]} className={`py-2 px-2 text-right font-mono font-bold ${roiColor(o.roiPct)}`}>
-                          {o.roiPct > 0 ? `+${o.roiPct.toFixed(2)}%` : `${o.roiPct.toFixed(2)}%`}
+                          {o.stale ? (
+                            <span className="text-[#8A9BA8]" title="ROI hidden while prices are stale">—</span>
+                          ) : (
+                            `${o.roiPct > 0 ? "+" : ""}${o.roiPct.toFixed(2)}%`
+                          )}
                         </FlashCell>
                         <FlashCell flash={activeTab.flashes[`${idx}-profit`]} className={`py-2 px-2 text-right font-mono font-bold ${o.expectedProfit > 0 ? "text-[#5DBE81]" : "text-[#FFFFFF]"}`}>
-                          {fmtUsd(o.expectedProfit)}
+                          {o.stale ? (
+                            <span className="text-[#8A9BA8]" title="Profit hidden while prices are stale">—</span>
+                          ) : (
+                            fmtUsd(o.expectedProfit)
+                          )}
                         </FlashCell>
                         <td className="py-2 px-2 text-right">
                           {(() => {

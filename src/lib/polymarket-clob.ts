@@ -148,10 +148,42 @@ export async function fetchClobMarket(conditionId: string): Promise<ClobMarket |
   }
 }
 
+// PERF-P2: short-lived cache for token orderbooks — auto-refresh + manual
+// refresh hit the same books repeatedly, and each neg-risk market makes 2-4
+// book calls. 15s TTL matches clobCache staleness tolerance.
+const clobBookCache = new Map<string, { data: ClobBook | null; expires: number }>();
+
+function getCachedBook(tokenId: string): ClobBook | null | undefined {
+  const entry = clobBookCache.get(tokenId);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expires) {
+    clobBookCache.delete(tokenId);
+    return undefined;
+  }
+  // undefined vs null: cache hit that resolved to empty book is stored as null
+  return entry.data;
+}
+
+function setCachedBook(tokenId: string, data: ClobBook | null): void {
+  clobBookCache.set(tokenId, { data, expires: Date.now() + CLOB_CACHE_TTL_MS });
+  if (clobBookCache.size > 200) {
+    const now = Date.now();
+    for (const [key, entry] of clobBookCache.entries()) {
+      if (now > entry.expires) clobBookCache.delete(key);
+    }
+  }
+}
+
 /**
  * Fetch orderbook for a specific token (used for neg-risk markets).
  */
 export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
+  const cached = getCachedBook(tokenId);
+  if (cached !== undefined) {
+    debugLog('[CLOB] book cache hit', tokenId.slice(0, 12));
+    return cached;
+  }
+
   await clobSemaphore.acquire();
   try {
     const res = await rateLimiters.clobBook.execute(() =>
@@ -168,9 +200,15 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
         },
       ),
     );
-    if (!res.ok) return null;
-    return await res.json();
+    if (!res.ok) {
+      setCachedBook(tokenId, null);
+      return null;
+    }
+    const data = await res.json();
+    setCachedBook(tokenId, data);
+    return data;
   } catch {
+    setCachedBook(tokenId, null);
     return null;
   } finally {
     clobSemaphore.release();

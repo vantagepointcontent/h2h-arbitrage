@@ -34,6 +34,58 @@ const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathn
 const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
+// FEAT-MarketCatalog: refresh all-platform catalog every 6 hours via the app API
+let lastCatalogSyncAt = 0;
+const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+async function triggerCatalogSync() {
+  try {
+    const res = await fetch(`${BASE_URL}/api/catalog/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+      },
+      signal: AbortSignal.timeout(600000),
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      console.log(`[${new Date().toISOString()}] Catalog sync OK:`, JSON.stringify(json));
+    } else {
+      console.warn(`[${new Date().toISOString()}] Catalog sync failed: HTTP ${res.status}`);
+    }
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] Catalog sync error:`, e.message);
+  }
+}
+
+
+// UI-033: snapshot rate-limiter metrics every ~60s so the dashboard can show
+// historical API capacity utilization. We track the last snapshot time
+// independently of the main poll cycle so market scans don't starve it.
+let lastLimiterSnapshotAt = 0;
+const LIMITER_SNAPSHOT_INTERVAL_MS = 60000;
+
+async function snapshotLimiters() {
+  try {
+    const res = await fetch(`${BASE_URL}/api/snapshot-limiters`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      console.log(`[${new Date().toISOString()}] Limiter snapshot OK: ${json.persisted ?? '?'} limiters`);
+    } else {
+      console.warn(`[${new Date().toISOString()}] Limiter snapshot failed: HTTP ${res.status}`);
+    }
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] Limiter snapshot error:`, e.message);
+  }
+}
 
 // ── Adaptive timeout + circuit breaker (per-market scan stats) ────────────
 // Problem this solves: a fixed 60s timeout for every market means one bad
@@ -402,7 +454,21 @@ function formatInterval(ms) {
 
 async function pollOnce() {
   const startedAt = new Date();
+
+  // FEAT-MarketCatalog: trigger a full catalog refresh every 6 hours
+  if (Date.now() - lastCatalogSyncAt >= CATALOG_SYNC_INTERVAL_MS) {
+    lastCatalogSyncAt = Date.now();
+    await triggerCatalogSync();
+  }
+
   const cycleStart = Date.now();
+
+  // UI-033: snapshot rate-limiter metrics every ~60s. This is independent of
+  // how many markets are due and runs at the start of each poll cycle.
+  if (Date.now() - lastLimiterSnapshotAt >= LIMITER_SNAPSHOT_INTERVAL_MS) {
+    lastLimiterSnapshotAt = Date.now();
+    await snapshotLimiters();
+  }
 
   // Reload adaptive config each cycle (hot-reload friendly)
   const adaptiveConfig = loadAdaptiveConfig();

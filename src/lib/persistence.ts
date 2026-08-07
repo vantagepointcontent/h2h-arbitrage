@@ -65,6 +65,69 @@ async function initDb(): Promise<void> {
   // PERF-P3: partial index for positiveArbOnly logs filter + dashboard top-arbs
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arbs ON scan_results(scanned_at DESC) WHERE positive_arb_count > 0`);
 
+  // Market Catalog (FEAT-101): all open markets from Kalshi + Polymarket
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS market_catalog (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform        TEXT    NOT NULL,        -- 'kalshi' | 'polymarket'
+      market_id       TEXT    NOT NULL,        -- platform-specific ID
+      title           TEXT    NOT NULL,
+      category        TEXT,
+      event_id        TEXT,                  -- platform event ticker/slug
+      event_title     TEXT,
+      expiry_date     TEXT,                  -- close_time / endDate
+      is_binary       INTEGER DEFAULT 1,     -- 1 YES/NO, 0 multi-outcome
+      outcome_count   INTEGER DEFAULT 2,
+      yes_bid         REAL,
+      yes_ask         REAL,
+      no_bid          REAL,
+      no_ask          REAL,
+      volume_24h      REAL,
+      source_url      TEXT,
+      fetched_at      TEXT    NOT NULL,      -- ISO timestamp
+      stale           INTEGER DEFAULT 0,     -- 1 if not seen in latest refresh
+      UNIQUE(platform, market_id)
+    )
+  `);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_market_catalog_platform ON market_catalog(platform, stale, fetched_at DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_market_catalog_expiry ON market_catalog(expiry_date)`);
+  // Migration: add columns that were added after initial launch (legacy DBs)
+  const columnsToAdd = [
+    { name: 'stale', def: 'INTEGER DEFAULT 0' },
+    { name: 'event_id', def: 'TEXT' },
+    { name: 'event_title', def: 'TEXT' },
+    { name: 'is_binary', def: 'INTEGER DEFAULT 1' },
+    { name: 'outcome_count', def: 'INTEGER DEFAULT 2' },
+    { name: 'yes_bid', def: 'REAL' },
+    { name: 'yes_ask', def: 'REAL' },
+    { name: 'no_bid', def: 'REAL' },
+    { name: 'no_ask', def: 'REAL' },
+    { name: 'volume_24h', def: 'REAL' },
+  ];
+  for (const col of columnsToAdd) {
+    try { await c.execute(`ALTER TABLE market_catalog ADD COLUMN ${col.name} ${col.def}`); } catch { /* column already exists */ }
+  }
+
+  // UI-033: per-API capacity utilization history (rate limiter snapshots)
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS rate_limiter_metrics (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      limiter_name      TEXT    NOT NULL,
+      timestamp         TEXT    NOT NULL,
+      total_requests    INTEGER NOT NULL DEFAULT 0,
+      queued_requests   INTEGER NOT NULL DEFAULT 0,
+      rejected_requests INTEGER NOT NULL DEFAULT 0,
+      retry_429_count   INTEGER NOT NULL DEFAULT 0,
+      avg_queue_wait_ms INTEGER NOT NULL DEFAULT 0,
+      tokens_available  INTEGER NOT NULL DEFAULT 0,
+      is_throttled      INTEGER NOT NULL DEFAULT 0,
+      effective_rate    REAL    NOT NULL DEFAULT 0,
+      refill_interval_ms INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_rate_limiter_metrics_name_ts ON rate_limiter_metrics(limiter_name, timestamp DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_rate_limiter_metrics_ts ON rate_limiter_metrics(timestamp DESC)`);
+
   // ── OPS-009: saved markets + scan history live in SQLite ──────────
   // JSON files had multi-process write races (app + poller). SQLite with
   // the app as single writer eliminates them; a JSON mirror is written
@@ -241,6 +304,15 @@ export async function getScanCount(): Promise<number> {
   return (result.rows as any[])?.[0]?.cnt ?? 0;
 }
 
+/** Return the oldest scan timestamp in the DB, or null if no scans exist. */
+export async function getOldestScan(): Promise<string | null> {
+  await ensureDb();
+  const c = getClient();
+  const result = await c.execute('SELECT MIN(scanned_at) AS oldest FROM scan_results');
+  const oldest = (result.rows as any[])?.[0]?.oldest;
+  return oldest != null ? String(oldest) : null;
+}
+
 /** PERF-P1: Look up Kalshi & Polymarket URLs from scan_results by market_id.
  * Uses the idx_scan_results_market_id index — single-column SELECT, no blob.
  * Returns the most recent non-null pair, or null if none found. */
@@ -292,7 +364,7 @@ export async function queryScanHistory(opts: {
   toDate?: string;
   limit?: number;
   before?: string; // MF-014: cursor — scanned_at value for pagination
-}): Promise<{ rows: any[]; total: number }> {
+}): Promise<{ rows: any[]; total: number; uniqueMarkets: number }> {
   await ensureDb();
   const c = getClient();
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
@@ -306,8 +378,13 @@ export async function queryScanHistory(opts: {
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
   if (opts.before) { where += ' AND scanned_at < ?'; args.push(opts.before); }
 
-  const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM scan_results${where}`, args });
-  const total = Number((countRes.rows as any[])[0]?.cnt ?? 0);
+  const countRes = await c.execute({
+    sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets FROM scan_results${where}`,
+    args,
+  });
+  const countRow = (countRes.rows as any[])[0];
+  const total = Number(countRow?.cnt ?? 0);
+  const uniqueMarkets = Number(countRow?.unique_markets ?? 0);
 
   const rows = await c.execute({
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
@@ -317,7 +394,91 @@ export async function queryScanHistory(opts: {
           ORDER BY scanned_at DESC LIMIT ?`,
     args: [...args, limit],
   });
-  return { rows: Array.isArray(rows.rows) ? (rows.rows as any[]) : [], total };
+  return { rows: Array.isArray(rows.rows) ? (rows.rows as any[]) : [], total, uniqueMarkets };
+}
+
+/**
+ * UI-035: chunked, streaming-friendly scan history export.
+ *
+ * Yields batches of 500 slim rows (no raw_result blob) so a route can stream
+ * 50k+ rows to the client without holding them all in memory. Filters run in
+ * SQLite, indexed on scanned_at DESC.
+ */
+export async function* queryScanHistoryStream(opts: {
+  marketId?: string;
+  minRoi?: number;
+  positiveArbOnly?: boolean;
+  fromDate?: string;
+  toDate?: string;
+  maxRows?: number;
+  chunkSize?: number;
+}): AsyncGenerator<any[], void, unknown> {
+  await ensureDb();
+  const c = getClient();
+  const maxRows = Math.min(Math.max(opts.maxRows ?? 50000, 1), 50000);
+  const chunkSize = Math.min(Math.max(opts.chunkSize ?? 500, 1), 2000);
+
+  let where = ' WHERE 1=1';
+  const args: (string | number)[] = [];
+  if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
+  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
+  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
+  if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
+  if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+
+  let emitted = 0;
+  let lastCursor: string | null = null;
+
+  while (emitted < maxRows) {
+    const thisLimit = Math.min(chunkSize, maxRows - emitted);
+    let cursorWhere = where;
+    const cursorArgs = [...args];
+    if (lastCursor) {
+      cursorWhere += ' AND scanned_at < ?';
+      cursorArgs.push(lastCursor);
+    }
+
+    const res = await c.execute({
+      sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
+                   outcome_count, matched_count, kalshi_count, pm_count,
+                   positive_arb_count, total_stake, scanned_at
+            FROM scan_results${cursorWhere}
+            ORDER BY scanned_at DESC LIMIT ?`,
+      args: [...cursorArgs, thisLimit],
+    });
+
+    const batch = Array.isArray(res.rows) ? (res.rows as any[]) : [];
+    if (batch.length === 0) break;
+
+    yield batch;
+    emitted += batch.length;
+    lastCursor = batch[batch.length - 1].scanned_at as string;
+
+    if (batch.length < thisLimit) break;
+  }
+}
+
+/** UI-035: exact match count for the export row estimate (no blob read). */
+export async function countScanHistory(opts: {
+  marketId?: string;
+  minRoi?: number;
+  positiveArbOnly?: boolean;
+  fromDate?: string;
+  toDate?: string;
+}): Promise<number> {
+  await ensureDb();
+  const c = getClient();
+
+  let where = ' WHERE 1=1';
+  const args: (string | number)[] = [];
+  if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
+  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
+  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
+  if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
+  if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+
+  const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM scan_results${where}`, args });
+  return Number((countRes.rows as any[])[0]?.cnt ?? 0);
 }
 
 /**
@@ -502,6 +663,107 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
       avgRoi: +Number(r.avg_roi ?? 0).toFixed(2),
     })),
   };
+}
+
+/* ─────────────────────────── Rate Limiter Metrics (UI-033) ───── */
+
+export interface RateLimiterMetricRecord {
+  id?: number;
+  limiterName: string;
+  timestamp: string;
+  totalRequests: number;
+  queuedRequests: number;
+  rejectedRequests: number;
+  retry429Count: number;
+  avgQueueWaitMs: number;
+  tokensAvailable: number;
+  isThrottled: boolean;
+  effectiveRate: number;
+  refillIntervalMs: number;
+}
+
+/** Persist one snapshot row per limiter. */
+export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord[]): Promise<void> {
+  await ensureDb();
+  const c = getClient();
+  const insert = await c.batch(
+    records.map((r) => ({
+      sql: `INSERT INTO rate_limiter_metrics
+              (limiter_name, timestamp, total_requests, queued_requests, rejected_requests,
+               retry_429_count, avg_queue_wait_ms, tokens_available, is_throttled,
+               effective_rate, refill_interval_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        r.limiterName,
+        r.timestamp,
+        r.totalRequests ?? 0,
+        r.queuedRequests ?? 0,
+        r.rejectedRequests ?? 0,
+        r.retry429Count ?? 0,
+        r.avgQueueWaitMs ?? 0,
+        r.tokensAvailable ?? 0,
+        r.isThrottled ? 1 : 0,
+        r.effectiveRate ?? 0,
+        r.refillIntervalMs ?? 0,
+      ],
+    })),
+    'write',
+  );
+  // Defensive: libsql batch returns an array of results; swallow so callers don't await them
+  void insert;
+}
+
+/**
+ * UI-033: hourly capacity utilization per limiter, SQL-side aggregation.
+ * Returns one row per (hour, limiter) with utilization % = total_requests /
+ * theoretical max for that hour (3600 * 1000 / refill_interval_ms).
+ * Rows are ordered newest first.
+ */
+export async function getCapacityUtilization(since?: string): Promise<{
+  hour: string;
+  limiter: string;
+  utilizationPct: number;
+  totalRequests: number;
+  maxRequests: number;
+  isThrottled: number;
+  avgQueueWaitMs: number;
+  rejectedRequests: number;
+}[]> {
+  await ensureDb();
+  const c = getClient();
+  const where = since ? 'WHERE timestamp >= ?' : 'WHERE 1=1';
+  const args: (string | number)[] = since ? [since] : [];
+  const res = await c.execute({
+    sql: `SELECT
+            substr(timestamp, 1, 13) || ':00:00' AS hour,
+            limiter_name                            AS limiter,
+            refill_interval_ms                      AS refill_interval_ms,
+            SUM(total_requests)                     AS total_requests,
+            MAX(CASE WHEN is_throttled = 1 THEN 1 ELSE 0 END) AS was_throttled,
+            AVG(avg_queue_wait_ms)                  AS avg_queue_wait_ms,
+            SUM(rejected_requests)                  AS rejected_requests
+          FROM rate_limiter_metrics
+          ${where}
+          GROUP BY hour, limiter_name
+          ORDER BY hour DESC, limiter_name`,
+    args,
+  });
+  const rows = Array.isArray(res.rows) ? (res.rows as any[]) : [];
+  return rows.map((r) => {
+    const totalRequests = Number(r.total_requests ?? 0);
+    const refillIntervalMs = Math.max(1, Number(r.refill_interval_ms ?? 1000));
+    const maxRequests = Math.round((3600 * 1000) / refillIntervalMs);
+    return {
+      hour: String(r.hour),
+      limiter: String(r.limiter),
+      utilizationPct: +Math.min(100, (totalRequests / Math.max(1, maxRequests)) * 100).toFixed(2),
+      totalRequests,
+      maxRequests,
+      isThrottled: Number(r.was_throttled ?? 0),
+      avgQueueWaitMs: Math.round(Number(r.avg_queue_wait_ms ?? 0)),
+      rejectedRequests: Number(r.rejected_requests ?? 0),
+    };
+  });
 }
 
 export interface LastScanResult {
@@ -1074,6 +1336,8 @@ async function ensureExecutionsTable(): Promise<void> {
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
   // Migration: add steps column if missing (existing DBs)
   try { await c.execute(`ALTER TABLE executions ADD COLUMN steps TEXT`); } catch { /* column already exists */ }
+  // FEAT-040: add source column for manual vs bot execution tracking
+  try { await c.execute(`ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`); } catch { /* column already exists */ }
   _executionsReady = true;
 }
 
@@ -1090,14 +1354,15 @@ export interface ExecutionRecord {
   result?: unknown;
   estimatedProfit: number;
   steps?: unknown;
+  source?: 'manual' | 'bot';
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<void> {
   await ensureExecutionsTable();
   const c = getClient();
   await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
       e.strategy ?? null,
@@ -1106,17 +1371,19 @@ export async function persistExecution(e: ExecutionRecord): Promise<void> {
       e.result != null ? JSON.stringify(e.result) : null,
       e.estimatedProfit ?? 0,
       e.steps != null ? JSON.stringify(e.steps) : null,
+      e.source ?? 'manual',
     ],
   });
 }
 
-export async function getExecutions(limit = 200): Promise<ExecutionRecord[]> {
+export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Promise<ExecutionRecord[]> {
   await ensureExecutionsTable();
   const c = getClient();
-  const res = await c.execute({
-    sql: `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`,
-    args: [Math.min(1000, Math.max(1, limit))],
-  });
+  const sql = source
+    ? `SELECT * FROM executions WHERE source = ? ORDER BY timestamp DESC LIMIT ?`
+    : `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`;
+  const args = source ? [source, Math.min(1000, Math.max(1, limit))] : [Math.min(1000, Math.max(1, limit))];
+  const res = await c.execute({ sql, args });
   return (res.rows as any[]).map((r) => ({
     id: Number(r.id),
     timestamp: String(r.timestamp),
@@ -1130,6 +1397,7 @@ export async function getExecutions(limit = 200): Promise<ExecutionRecord[]> {
     result: r.result ? JSON.parse(String(r.result)) : null,
     estimatedProfit: Number(r.estimated_profit ?? 0),
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
+    source: (r.source ?? 'manual') as 'manual' | 'bot',
   }));
 }
 
@@ -1157,7 +1425,39 @@ export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecor
     result: r.result ? JSON.parse(String(r.result)) : null,
     estimatedProfit: Number(r.estimated_profit ?? 0),
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
-  };
+    source: (r.source ?? 'manual') as 'manual' | 'bot',
+  });
+}
+
+/** FEAT-040: sum of bot trade exposure for today (UTC). */
+export async function getTodayBotExposure(): Promise<number> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const res = await c.execute({
+    sql: `SELECT COALESCE(SUM(
+      CASE
+        WHEN kalshi_order IS NOT NULL AND polymarket_order IS NOT NULL THEN
+          COALESCE(json_extract(kalshi_order, '$.size'), 0) + COALESCE(json_extract(polymarket_order, '$.size'), 0)
+        WHEN kalshi_order IS NOT NULL THEN COALESCE(json_extract(kalshi_order, '$.size'), 0)
+        WHEN polymarket_order IS NOT NULL THEN COALESCE(json_extract(polymarket_order, '$.size'), 0)
+        ELSE 0
+      END
+    ), 0) AS total FROM executions WHERE source = 'bot' AND timestamp >= ? AND timestamp < ?`,
+    args: [`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
+  });
+  return Number((res.rows as any[])[0]?.total ?? 0);
+}
+
+/** FEAT-040: check whether a bot trade already exists for this market/outcome pair. */
+export async function hasOpenBotPosition(arbId: string): Promise<boolean> {
+  await ensureExecutionsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT COUNT(*) AS cnt FROM executions WHERE arb_id = ? AND source = 'bot' AND success = 1`,
+    args: [arbId],
+  });
+  return Number((res.rows as any[])[0]?.cnt ?? 0) > 0;
 }
 
 // ─── Closed positions (trade history with full P&L) ───────────────
@@ -1259,4 +1559,571 @@ export async function getClosedPositions(limit = 500): Promise<ClosedPosition[]>
     conditionId: r.condition_id ?? null,
     rawData: r.raw_data ? JSON.parse(String(r.raw_data)) : undefined,
   }));
+}
+
+// ─── Market Catalog (FEAT-101) ──────────────────────────────────────
+
+export interface MarketCatalogRow {
+  id: number;
+  platform: 'kalshi' | 'polymarket';
+  marketId: string;
+  title: string;
+  category: string | null;
+  eventId: string | null;
+  eventTitle: string | null;
+  expiryDate: string | null;
+  isBinary: boolean;
+  outcomeCount: number;
+  yesBid: number | null;
+  yesAsk: number | null;
+  noBid: number | null;
+  noAsk: number | null;
+  volume24h: number | null;
+  sourceUrl: string | null;
+  fetchedAt: string;
+  stale: boolean;
+}
+
+function rowToMarketCatalogRow(r: any): MarketCatalogRow {
+  return {
+    id: Number(r.id),
+    platform: String(r.platform) as 'kalshi' | 'polymarket',
+    marketId: String(r.market_id),
+    title: String(r.title),
+    category: r.category != null ? String(r.category) : null,
+    eventId: r.event_id != null ? String(r.event_id) : null,
+    eventTitle: r.event_title != null ? String(r.event_title) : null,
+    expiryDate: r.expiry_date != null ? String(r.expiry_date) : null,
+    isBinary: Boolean(Number(r.is_binary ?? 1)),
+    outcomeCount: Number(r.outcome_count ?? 2),
+    yesBid: r.yes_bid != null ? Number(r.yes_bid) : null,
+    yesAsk: r.yes_ask != null ? Number(r.yes_ask) : null,
+    noBid: r.no_bid != null ? Number(r.no_bid) : null,
+    noAsk: r.no_ask != null ? Number(r.no_ask) : null,
+    volume24h: r.volume_24h != null ? Number(r.volume_24h) : null,
+    sourceUrl: r.source_url != null ? String(r.source_url) : null,
+    fetchedAt: String(r.fetched_at),
+    stale: Boolean(Number(r.stale ?? 0)),
+  };
+}
+
+/** Ensure the market_catalog table is ready. */
+async function ensureMarketCatalogTable(): Promise<void> {
+  // initDb already creates the table; ensureDb guarantees initDb ran.
+  await ensureDb();
+}
+
+/** Upsert a single market into the catalog. */
+export async function upsertMarketCatalog(row: Omit<MarketCatalogRow, 'id' | 'stale'>): Promise<void> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  await c.execute({
+    sql: `INSERT INTO market_catalog
+            (platform, market_id, title, category, event_id, event_title, expiry_date,
+             is_binary, outcome_count, yes_bid, yes_ask, no_bid, no_ask, volume_24h, source_url, fetched_at, stale)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(platform, market_id) DO UPDATE SET
+            title = excluded.title,
+            category = excluded.category,
+            event_id = excluded.event_id,
+            event_title = excluded.event_title,
+            expiry_date = excluded.expiry_date,
+            is_binary = excluded.is_binary,
+            outcome_count = excluded.outcome_count,
+            yes_bid = excluded.yes_bid,
+            yes_ask = excluded.yes_ask,
+            no_bid = excluded.no_bid,
+            no_ask = excluded.no_ask,
+            volume_24h = excluded.volume_24h,
+            source_url = excluded.source_url,
+            fetched_at = excluded.fetched_at,
+            stale = 0`,
+    args: [
+      row.platform, row.marketId, row.title, row.category ?? null, row.eventId ?? null, row.eventTitle ?? null,
+      row.expiryDate ?? null, row.isBinary ? 1 : 0, row.outcomeCount,
+      row.yesBid ?? null, row.yesAsk ?? null, row.noBid ?? null, row.noAsk ?? null,
+      row.volume24h ?? null, row.sourceUrl ?? null, row.fetchedAt, 0,
+    ],
+  });
+}
+
+/** Mark all rows for a platform fetched before `before` as stale. Returns rows changed. */
+export async function markStaleMarketCatalog(platform: 'kalshi' | 'polymarket', before: string): Promise<number> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  const result = await c.execute({
+    sql: `UPDATE market_catalog SET stale = 1 WHERE platform = ? AND fetched_at < ? AND stale = 0`,
+    args: [platform, before],
+  });
+  return Number((result as any).rowsAffected ?? 0);
+}
+
+/** Query the catalog with optional platform filter, stale filter, and pagination. */
+export async function queryMarketCatalog(opts: {
+  platform?: 'kalshi' | 'polymarket';
+  includeStale?: boolean;
+  limit?: number;
+  cursor?: number;
+  sortBy?: 'fetched_at' | 'expiry_date' | 'title';
+  sortDir?: 'asc' | 'desc';
+}): Promise<{ rows: MarketCatalogRow[]; total: number; nextCursor: number | null }> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 1000);
+  const cursor = Math.max(opts.cursor ?? 0, 0);
+  const sortBy = ['fetched_at', 'expiry_date', 'title'].includes(opts.sortBy ?? '') ? opts.sortBy! : 'fetched_at';
+  const sortDir = opts.sortDir === 'asc' ? 'ASC' : 'DESC';
+
+  let where = ' WHERE 1=1';
+  const args: (string | number)[] = [];
+  if (opts.platform) { where += ' AND platform = ?'; args.push(opts.platform); }
+  if (!opts.includeStale) { where += ' AND stale = 0'; }
+
+  const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM market_catalog${where}`, args });
+  const total = Number((countRes.rows as any[])[0]?.cnt ?? 0);
+
+  const offsetSql = cursor > 0 ? ' OFFSET ?' : '';
+  const rowsRes = await c.execute({
+    sql: `SELECT * FROM market_catalog${where} ORDER BY ${sortBy} ${sortDir} LIMIT ?${offsetSql}`,
+    args: cursor > 0 ? [...args, limit, cursor] : [...args, limit],
+  });
+
+  const rows = (rowsRes.rows as any[]).map(rowToMarketCatalogRow);
+  const nextCursor = cursor + rows.length < total ? cursor + rows.length : null;
+  return { rows, total, nextCursor };
+}
+
+/** Aggregated stats for the catalog endpoint. */
+
+/** Alias for queryMarketCatalog for callers that expect the old name. */
+export async function getMarketCatalog(opts: Parameters<typeof queryMarketCatalog>[0]): ReturnType<typeof queryMarketCatalog> {
+  return queryMarketCatalog(opts);
+}
+
+/** Alias for markStaleMarketCatalog for callers that expect the old name. */
+export async function pruneMarketCatalog(platform: 'kalshi' | 'polymarket', before: string): Promise<number> {
+  return markStaleMarketCatalog(platform, before);
+}
+
+/** UI-038: group uncoupled markets by event title and cross-check against manual matches + matched_pairs. */
+export async function getUncoupledEvents(opts?: {
+  search?: string;
+  sortBy?: 'title' | 'expiry' | 'confidence';
+  platform?: 'both' | 'kalshi' | 'polymarket';
+  minConfidence?: number;
+}): Promise<{
+  events: {
+    id: string;
+    title: string;
+    category: string | null;
+    expiryDate: string | null;
+    confidence: number;
+    kalshiMarkets: { ticker: string; title: string; url: string | null }[];
+    polymarketMarkets: { conditionId: string; title: string; url: string | null }[];
+    coupledCount: number;
+    totalPossible: number;
+  }[];
+  total: number;
+}> {
+  const { calculateConfidence } = await import('./auto-discovery');
+  const { getManualMatches } = await import('./manual-matches');
+  const search = opts?.search?.toLowerCase().trim();
+  const platform = opts?.platform ?? 'both';
+  const minConfidence = opts?.minConfidence ?? 0;
+  const sortBy = opts?.sortBy ?? 'title';
+
+  const [kalshiRes, pmRes, manualMatches, dbPairs] = await Promise.all([
+    queryMarketCatalog({ platform: 'kalshi', includeStale: false, limit: 10000 }),
+    queryMarketCatalog({ platform: 'polymarket', includeStale: false, limit: 10000 }),
+    getManualMatches(),
+    getMatchedPairs(undefined, 5000),
+  ]);
+
+  const coupledKalshi = new Set<string>();
+  const coupledPm = new Set<string>();
+  for (const m of manualMatches) {
+    coupledKalshi.add(m.kalshiTicker);
+    coupledPm.add(m.pmConditionId);
+  }
+  for (const p of dbPairs) {
+    coupledKalshi.add(p.kalshiMarketId);
+    coupledPm.add(p.polymarketMarketId);
+  }
+
+  // Normalize event title: strip trailing outcome suffixes like " - YES" / " - NO"
+  function eventTitleOf(row: MarketCatalogRow): string {
+    const raw = row.eventTitle || row.title || '';
+    return raw.replace(/\s*-\s*(YES|NO)$/i, '').trim();
+  }
+
+  function normalizeEventId(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  }
+
+  const groups = new Map<string, {
+    title: string;
+    category: string | null;
+    expiry: string | null;
+    kalshiRows: MarketCatalogRow[];
+    pmRows: MarketCatalogRow[];
+  }>();
+
+  function addRow(row: MarketCatalogRow) {
+    const title = eventTitleOf(row);
+    const id = normalizeEventId(title);
+    const g = groups.get(id) || { title, category: row.category, expiry: row.expiryDate, kalshiRows: [], pmRows: [] };
+    if (row.platform === 'kalshi') g.kalshiRows.push(row);
+    else g.pmRows.push(row);
+    if (row.expiryDate && (!g.expiry || row.expiryDate < g.expiry)) g.expiry = row.expiryDate;
+    if (row.category && !g.category) g.category = row.category;
+    groups.set(id, g);
+  }
+
+  kalshiRes.rows.forEach(addRow);
+  pmRes.rows.forEach(addRow);
+
+  const events: ReturnType<typeof getUncoupledEvents> extends Promise<{ events: infer E }> ? E : never = [];
+
+  for (const [id, g] of groups.entries()) {
+    if (g.kalshiRows.length === 0 || g.pmRows.length === 0) continue;
+
+    const kalshiMarkets = g.kalshiRows
+      .filter((r) => !coupledKalshi.has(r.marketId))
+      .map((r) => ({ ticker: r.marketId, title: r.title, url: r.sourceUrl }));
+    const polymarketMarkets = g.pmRows
+      .filter((r) => !coupledPm.has(r.marketId))
+      .map((r) => ({ conditionId: r.marketId, title: r.title, url: r.sourceUrl }));
+
+    const totalPossible = g.kalshiRows.length + g.pmRows.length;
+    const coupledCount = totalPossible - kalshiMarkets.length - polymarketMarkets.length;
+
+    // Skip groups that are fully coupled
+    if (kalshiMarkets.length === 0 && polymarketMarkets.length === 0) continue;
+
+    if (platform === 'kalshi' && kalshiMarkets.length === 0) continue;
+    if (platform === 'polymarket' && polymarketMarkets.length === 0) continue;
+
+    // Confidence: prefer existing matched_pairs score, otherwise compute best pairwise.
+    let confidence = 0;
+    const existing = dbPairs.find(
+      (p) =>
+        g.kalshiRows.some((r) => r.marketId === p.kalshiMarketId) &&
+        g.pmRows.some((r) => r.marketId === p.polymarketMarketId),
+    );
+    if (existing) {
+      confidence = existing.confidence;
+    } else {
+      for (const k of g.kalshiRows) {
+        for (const p of g.pmRows) {
+          const { confidence: c } = calculateConfidence(
+            k.title,
+            p.title,
+            k.category || '',
+            p.category || '',
+            k.expiryDate,
+            p.expiryDate,
+          );
+          if (c > confidence) confidence = c;
+        }
+      }
+    }
+
+    if (confidence < minConfidence) continue;
+    if (search && !g.title.toLowerCase().includes(search)) continue;
+
+    events.push({
+      id,
+      title: g.title,
+      category: g.category,
+      expiryDate: g.expiry,
+      confidence,
+      kalshiMarkets,
+      polymarketMarkets,
+      coupledCount,
+      totalPossible,
+    });
+  }
+
+  events.sort((a, b) => {
+    if (sortBy === 'expiry') {
+      const ea = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+      const eb = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+      return ea - eb;
+    }
+    if (sortBy === 'confidence') return b.confidence - a.confidence;
+    return a.title.localeCompare(b.title);
+  });
+
+  return { events, total: events.length };
+}
+
+export async function getMarketCatalogStats(): Promise<{
+  total: number;
+  perPlatform: { platform: string; total: number; stale: number; lastFetchedAt: string | null }[];
+}> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  const [totalRes, perPlatformRes] = await Promise.all([
+    c.execute('SELECT COUNT(*) AS cnt FROM market_catalog'),
+    c.execute(`
+      SELECT platform,
+             COUNT(*) AS total,
+             SUM(CASE WHEN stale = 1 THEN 1 ELSE 0 END) AS stale,
+             MAX(fetched_at) AS last_fetched_at
+      FROM market_catalog
+      GROUP BY platform
+      ORDER BY platform
+    `),
+  ]);
+  const total = Number((totalRes.rows as any[])[0]?.cnt ?? 0);
+  const perPlatform = (perPlatformRes.rows as any[]).map((r) => ({
+    platform: String(r.platform),
+    total: Number(r.total ?? 0),
+    stale: Number(r.stale ?? 0),
+    lastFetchedAt: r.last_fetched_at ? String(r.last_fetched_at) : null,
+  }));
+  return { total, perPlatform };
+}
+
+/** Bulk insert/upsert market catalog rows in a transaction for speed. */
+export async function bulkUpsertMarketCatalog(rows: Omit<MarketCatalogRow, 'id' | 'stale'>[]): Promise<number> {
+  await ensureMarketCatalogTable();
+  if (rows.length === 0) return 0;
+  const c = getClient();
+  const tx = await c.transaction('write');
+  try {
+    for (const row of rows) {
+      await tx.execute({
+        sql: `INSERT INTO market_catalog
+                (platform, market_id, title, category, event_id, event_title, expiry_date,
+                 is_binary, outcome_count, yes_bid, yes_ask, no_bid, no_ask, volume_24h, source_url, fetched_at, stale)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(platform, market_id) DO UPDATE SET
+                title = excluded.title,
+                category = excluded.category,
+                event_id = excluded.event_id,
+                event_title = excluded.event_title,
+                expiry_date = excluded.expiry_date,
+                is_binary = excluded.is_binary,
+                outcome_count = excluded.outcome_count,
+                yes_bid = excluded.yes_bid,
+                yes_ask = excluded.yes_ask,
+                no_bid = excluded.no_bid,
+                no_ask = excluded.no_ask,
+                volume_24h = excluded.volume_24h,
+                source_url = excluded.source_url,
+                fetched_at = excluded.fetched_at,
+                stale = 0`,
+        args: [
+          row.platform, row.marketId, row.title, row.category ?? null, row.eventId ?? null, row.eventTitle ?? null,
+          row.expiryDate ?? null, row.isBinary ? 1 : 0, row.outcomeCount,
+          row.yesBid ?? null, row.yesAsk ?? null, row.noBid ?? null, row.noAsk ?? null,
+          row.volume24h ?? null, row.sourceUrl ?? null, row.fetchedAt, 0,
+        ],
+      });
+    }
+    await tx.commit();
+    return rows.length;
+  } catch (err) {
+    await tx.rollback().catch(() => {});
+    throw err;
+  }
+}
+
+/** Clear stale flag from the most recently refreshed rows — used after a refresh completes. */
+export async function touchMarketCatalog(platform: 'kalshi' | 'polymarket', fetchedAt: string): Promise<void> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  await c.execute({
+    sql: `UPDATE market_catalog SET fetched_at = ? WHERE platform = ? AND stale = 1`,
+    args: [fetchedAt, platform],
+  });
+}
+
+/** Reset all stale flags (useful after schema migrations or manual repairs). */
+export async function resetMarketCatalogStale(platform?: 'kalshi' | 'polymarket'): Promise<number> {
+  await ensureMarketCatalogTable();
+  const c = getClient();
+  const result = platform
+    ? await c.execute({ sql: `UPDATE market_catalog SET stale = 0 WHERE platform = ?`, args: [platform] })
+    : await c.execute('UPDATE market_catalog SET stale = 0');
+  return Number((result as any).rowsAffected ?? 0);
+}
+
+
+
+// ── FEAT: cross-platform matched pairs persistence ─────────────────
+
+export interface MatchedPair {
+  id: number;
+  kalshiMarketId: string;
+  polymarketMarketId: string;
+  kalshiTitle: string | null;
+  polymarketTitle: string | null;
+  kalshiUrl: string | null;
+  polymarketUrl: string | null;
+  confidence: number;
+  confidenceBreakdown: {
+    nameSimilarity: number;
+    entityMatch: number;
+    categoryMatch: number;
+    expiryProximity: number;
+  };
+  status: 'auto_queued' | 'pending_review' | 'approved' | 'rejected';
+  matchedAt: string;
+  verifiedAt: string | null;
+}
+
+function rowToMatchedPair(r: any): MatchedPair {
+  let breakdown = { nameSimilarity: 0, entityMatch: 0, categoryMatch: 0, expiryProximity: 0 };
+  try { breakdown = r.confidence_breakdown ? JSON.parse(String(r.confidence_breakdown)) : breakdown; } catch {}
+  return {
+    id: Number(r.id),
+    kalshiMarketId: String(r.kalshi_market_id),
+    polymarketMarketId: String(r.polymarket_market_id),
+    kalshiTitle: r.kalshi_title ?? null,
+    polymarketTitle: r.polymarket_title ?? null,
+    kalshiUrl: r.kalshi_url ?? null,
+    polymarketUrl: r.polymarket_url ?? null,
+    confidence: Number(r.confidence ?? 0),
+    confidenceBreakdown: breakdown,
+    status: String(r.status ?? 'pending') as MatchedPair['status'],
+    matchedAt: String(r.matched_at),
+    verifiedAt: r.verified_at ?? null,
+  };
+}
+
+async function ensureMatchedPairsTable(): Promise<void> {
+  await ensureDb();
+  const c = getClient();
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS matched_pairs (
+      id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+      kalshi_market_id       TEXT    NOT NULL,
+      polymarket_market_id   TEXT    NOT NULL,
+      kalshi_title           TEXT,
+      polymarket_title       TEXT,
+      kalshi_url             TEXT,
+      polymarket_url         TEXT,
+      confidence             INTEGER NOT NULL,
+      confidence_breakdown   TEXT,
+      status                 TEXT    DEFAULT 'pending',
+      matched_at             TEXT    NOT NULL,
+      verified_at            TEXT,
+      UNIQUE(kalshi_market_id, polymarket_market_id)
+    )
+  `);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_matched_pairs_status ON matched_pairs(status, matched_at DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_matched_pairs_kalshi ON matched_pairs(kalshi_market_id)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_matched_pairs_pm ON matched_pairs(polymarket_market_id)`);
+}
+
+export async function upsertMatchedPair(pair: Omit<MatchedPair, 'id'> & { id?: number }): Promise<number> {
+  await ensureMatchedPairsTable();
+  const c = getClient();
+  const now = new Date().toISOString();
+  const row = await c.execute({
+    sql: `INSERT INTO matched_pairs
+            (kalshi_market_id, polymarket_market_id, kalshi_title, polymarket_title, kalshi_url, polymarket_url,
+             confidence, confidence_breakdown, status, matched_at, verified_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(kalshi_market_id, polymarket_market_id) DO UPDATE SET
+            kalshi_title = excluded.kalshi_title,
+            polymarket_title = excluded.polymarket_title,
+            kalshi_url = excluded.kalshi_url,
+            polymarket_url = excluded.polymarket_url,
+            confidence = excluded.confidence,
+            confidence_breakdown = excluded.confidence_breakdown,
+            status = CASE WHEN matched_pairs.status = 'approved' OR matched_pairs.status = 'rejected'
+                          THEN matched_pairs.status
+                          ELSE excluded.status END,
+            verified_at = excluded.verified_at
+          RETURNING id`,
+    args: [
+      pair.kalshiMarketId,
+      pair.polymarketMarketId,
+      pair.kalshiTitle ?? null,
+      pair.polymarketTitle ?? null,
+      pair.kalshiUrl ?? null,
+      pair.polymarketUrl ?? null,
+      pair.confidence,
+      JSON.stringify(pair.confidenceBreakdown),
+      pair.status,
+      pair.matchedAt ?? now,
+      pair.verifiedAt ?? now,
+    ],
+  });
+  return Number((row.rows as any[])[0]?.id ?? 0);
+}
+
+export async function getMatchedPairs(status?: MatchedPair['status'] | MatchedPair['status'][], limit = 500): Promise<MatchedPair[]> {
+  await ensureMatchedPairsTable();
+  const c = getClient();
+  let sql = 'SELECT * FROM matched_pairs';
+  const args: string[] = [];
+  if (status) {
+    const statuses = Array.isArray(status) ? status : [status];
+    sql += ` WHERE status IN (${statuses.map(() => '?').join(',')})`;
+    args.push(...statuses);
+  }
+  sql += ' ORDER BY matched_at DESC LIMIT ?';
+  args.push(String(Math.min(Math.max(limit, 1), 5000)));
+  const res = await c.execute({ sql, args });
+  return (res.rows as any[]).map(rowToMatchedPair);
+}
+
+export async function getMatchedPairById(id: number): Promise<MatchedPair | null> {
+  await ensureMatchedPairsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'SELECT * FROM matched_pairs WHERE id = ? LIMIT 1',
+    args: [id],
+  });
+  const rows = res.rows as any[];
+  return rows.length > 0 ? rowToMatchedPair(rows[0]) : null;
+}
+
+export async function updateMatchedPairStatus(id: number, status: MatchedPair['status'], verifiedAt?: string): Promise<boolean> {
+  await ensureMatchedPairsTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: 'UPDATE matched_pairs SET status = ?, verified_at = COALESCE(?, verified_at) WHERE id = ?',
+    args: [status, verifiedAt ?? null, id],
+  });
+  return Number((res as any).rowsAffected ?? 0) > 0;
+}
+
+export async function approveMatchedPair(id: number): Promise<{ approved: boolean; market?: SavedMarket; error?: string }> {
+  const pair = await getMatchedPairById(id);
+  if (!pair) return { approved: false, error: 'Matched pair not found' };
+  if (!pair.kalshiUrl || !pair.polymarketUrl) {
+    return { approved: false, error: 'Pair is missing platform URLs' };
+  }
+  const title = pair.kalshiTitle || pair.polymarketTitle || 'Matched cross-platform pair';
+  try {
+    const existing = await findSavedMarketByUrls(pair.kalshiUrl, pair.polymarketUrl);
+    if (existing) {
+      await updateMatchedPairStatus(id, 'approved');
+      return { approved: true, market: existing };
+    }
+    const market = await addSavedMarket({
+      kalshiUrl: pair.kalshiUrl,
+      polymarketUrl: pair.polymarketUrl,
+      eventTitle: title,
+      category: undefined,
+      expiryDate: null,
+    });
+    await updateMatchedPairStatus(id, 'approved');
+    return { approved: true, market };
+  } catch (e: any) {
+    return { approved: false, error: e.message };
+  }
+}
+
+export async function rejectMatchedPair(id: number): Promise<boolean> {
+  return updateMatchedPairStatus(id, 'rejected');
 }

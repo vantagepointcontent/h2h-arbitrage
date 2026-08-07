@@ -65,7 +65,7 @@ export interface LiveMatchedOutcome {
 
 export function parseBookStaleMs(value: unknown): number {
   const parsed = finiteDecimal(value);
-  return parsed !== null && parsed > 0 ? parsed : 60_000;
+  return parsed !== null && parsed > 0 ? parsed : 90_000;
 }
 
 /** Compute arbitrage for a single matched outcome. */
@@ -79,9 +79,14 @@ function computeSingleOutcome(
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
   // caused "Stale" status after ~1 minute when WS updates paused briefly.
-  // WS auto-reconnect takes up to 30s (exponential backoff), so the stale
-  // window must be longer than the reconnect window.
+  // WS auto-reconnect takes up to 15s with the reduced backoff (BUG-104), so
+  // the stale window must be longer than the reconnect window.
+  // BUG-104: default raised from 60s to 90s to give 3 full reconnect cycles
+  // before stale kicks in.
   const STALE_MS = parseBookStaleMs(process.env.H2H_BOOK_STALE_MS);
+
+  // Staleness only blocks live execution math; we still surface the last known
+  // quotes so users can see the market rather than seeing $0 profit/ROI.
   const stale =
     orderbookState.isStale(kalshiTicker, STALE_MS) ||
     orderbookState.isStale(pmYesTokenId, STALE_MS) ||
@@ -143,33 +148,39 @@ function computeSingleOutcome(
 
   const allAvailable = kalshiYesAsk != null && kalshiNoAsk != null && pmYesAsk != null && pmNoAsk != null;
 
-  if (allAvailable && !stale) {
+  // BUG-104: even when stale we keep the last known prices visible in the UI.
+  // Live execution math is only skipped when prices are missing, so stale rows
+  // show greyed-out data instead of zeroed ROI/profit.
+  if (allAvailable) {
     // Depth args must be in DOLLARS (calculateArbitrageMax does depth/price
     // to derive contract capital) — use totalCost (fillable dollars up to
     // `capital`), NOT maxQuantity (contracts). Also forward the user's
     // capital as maxCapital instead of the silent 1000 default, so live WS
     // matches the manual scan path (BUG-031b).
+    //
+    // When stale, we cap deployed capital to 0 because we don't know if the
+    // book is still fillable; the displayed quote remains for reference.
     const candidate = calculateArbitrageMax(
       { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
       { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
-      kYes.totalCost,
-      kNo.totalCost,
-      pYes.totalCost,
-      pNo.totalCost,
+      stale ? 0 : kYes.totalCost,
+      stale ? 0 : kNo.totalCost,
+      stale ? 0 : pYes.totalCost,
+      stale ? 0 : pNo.totalCost,
       category,
       capital,
     );
 
     strategy = candidate.strategy;
-    roiPct = candidate.roiPct;
-    expectedProfit = candidate.expectedProfit;
-    kalshiStake = candidate.kalshiStake;
-    pmStake = candidate.pmStake;
+    roiPct = stale ? 0 : candidate.roiPct;
+    expectedProfit = stale ? 0 : candidate.expectedProfit;
+    kalshiStake = stale ? 0 : candidate.kalshiStake;
+    pmStake = stale ? 0 : candidate.pmStake;
     if (candidate.fees) {
       fees = {
-        kalshiFee: candidate.fees.kalshiFee,
-        pmFee: candidate.fees.pmFee,
-        worstCaseNetProfit: candidate.fees.worstCaseNetProfit,
+        kalshiFee: stale ? 0 : candidate.fees.kalshiFee,
+        pmFee: stale ? 0 : candidate.fees.pmFee,
+        worstCaseNetProfit: stale ? 0 : candidate.fees.worstCaseNetProfit,
       };
     }
   }

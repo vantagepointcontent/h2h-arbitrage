@@ -2,31 +2,6 @@
   "paused": false,
   "scanRecords": [
     {
-      "category": "politics",
-      "lastScannedAt": "2026-07-12T04:46:25.880Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-12T07:56:25.626Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-12T11:06:28.591Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "sports",
-      "lastScannedAt": "2026-07-12T14:14:43.893Z",
-      "marketsAdded": 0
-    },
-    {
-      "category": "politics",
-      "lastScannedAt": "2026-07-12T17:24:42.964Z",
-      "marketsAdded": 0
-    },
-    {
       "category": "sports",
       "lastScannedAt": "2026-07-12T20:34:48.765Z",
       "marketsAdded": 0
@@ -250,9 +225,34 @@
       "category": "politics",
       "lastScannedAt": "2026-07-24T16:47:00.048Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-08-07T10:55:52.934Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "sports",
+      "lastScannedAt": "2026-08-07T14:05:55.279Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-08-07T17:15:54.997Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "technology",
+      "lastScannedAt": "2026-08-07T20:22:51.733Z",
+      "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-08-07T23:32:53.777Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-07-24T16:47:00.048Z",
+  "lastScanAt": "2026-08-07T23:32:53.777Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }

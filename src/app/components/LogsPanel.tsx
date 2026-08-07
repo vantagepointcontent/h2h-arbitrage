@@ -83,6 +83,10 @@ export default function LogsPanel() {
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // UI-035: export row count estimate
+  const [exportCount, setExportCount] = useState<number | null>(null);
+  const [exportCountLoading, setExportCountLoading] = useState(false);
+
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -138,7 +142,8 @@ export default function LogsPanel() {
   }, [nextCursor, loadingMore, minRoi, positiveArbOnly, fromDate, toDate]);
 
   useEffect(() => {
-    fetchLogs();
+    const run = async () => { await fetchLogs(); };
+    void run();
   }, [fetchLogs]);
 
   // Auto-refresh: poll every 15s for real-time log streaming
@@ -251,6 +256,56 @@ export default function LogsPanel() {
     if (toDate) params.set("toDate", toDate);
     return `/api/logs/export?${params.toString()}`;
   }, [minRoi, positiveArbOnly, fromDate, toDate]);
+  // UI-035: estimate export row count from HEAD /api/logs/export
+  useEffect(() => {
+    let cancelled = false;
+    const update = async () => {
+      setExportCountLoading(true);
+      try {
+        const res = await fetch(exportUrl, { method: "HEAD", cache: "no-store" });
+        const count = res.headers.get("X-Export-Row-Count");
+        if (!cancelled) setExportCount(count ? Number(count) : null);
+      } catch {
+        if (!cancelled) setExportCount(null);
+      } finally {
+        if (!cancelled) setExportCountLoading(false);
+      }
+    };
+    void update();
+    return () => { cancelled = true; };
+  }, [exportUrl]);
+
+  // UI-035: date-range presets
+  const setDateRange = useCallback((preset: "today" | "7d" | "30d" | "month") => {
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().split("T")[0];
+    let from: Date;
+    let to: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    switch (preset) {
+      case "today":
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case "7d":
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+        break;
+      case "30d":
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+        break;
+      case "month":
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+    }
+    setFromDate(iso(from));
+    setToDate(iso(to));
+  }, []);
+
+
+  const exportEstimateText = useMemo(() => {
+    if (exportCountLoading) return "Estimating export size...";
+    if (exportCount === null) return "";
+    return `This will export ${exportCount.toLocaleString()} row${exportCount === 1 ? "" : "s"}`;
+  }, [exportCount, exportCountLoading]);
 
   // Arb type summary counts (from all logs, not filtered)
   const arbTypeCounts = useMemo(() => {
@@ -281,11 +336,6 @@ export default function LogsPanel() {
     const d = new Date(s);
     return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
-
-  const SortIcon = ({ col }: { col: SortKey }) =>
-    sortKey === col ? (
-      sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />
-    ) : null;
 
   return (
     <div className="space-y-4">
@@ -324,6 +374,14 @@ export default function LogsPanel() {
           </a>
         </div>
       </div>
+
+      {/* Export estimate */}
+      {exportEstimateText && (
+        <div className="text-xs text-[#8A9BA8] flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5 text-[#5DBE81]" />
+          {exportEstimateText}
+        </div>
+      )}
 
       {/* Stats Summary */}
       {stats && (
@@ -419,6 +477,27 @@ export default function LogsPanel() {
           </div>
         </div>
 
+        {/* Date-range presets */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Preset:</span>
+          <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
+            {[
+              { key: "today", label: "Today" },
+              { key: "7d", label: "Last 7 days" },
+              { key: "30d", label: "Last 30 days" },
+              { key: "month", label: "Full month" },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setDateRange(opt.key as any)}
+                className="min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors text-[#8A9BA8] hover:text-[#FFFFFF]"
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Toggle + Event Type Filter */}
         <div className="flex items-center gap-3 flex-wrap">
           <label className="flex min-h-11 items-center gap-2 cursor-pointer">
@@ -509,7 +588,7 @@ export default function LogsPanel() {
                     className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("scanned_at")}
                   >
-                    Scan Time <SortIcon col="scanned_at" />
+                    Scan Time {sortKey === "scanned_at" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Market Name
@@ -524,19 +603,19 @@ export default function LogsPanel() {
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("best_roi_pct")}
                   >
-                    ROI % <SortIcon col="best_roi_pct" />
+                    ROI % {sortKey === "best_roi_pct" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("best_profit")}
                   >
-                    Profit <SortIcon col="best_profit" />
+                    Profit {sortKey === "best_profit" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("apy")}
                   >
-                    APY <SortIcon col="apy" />
+                    APY {sortKey === "apy" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     TTE
@@ -545,7 +624,7 @@ export default function LogsPanel() {
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("matched_count")}
                   >
-                    Matched <SortIcon col="matched_count" />
+                    Matched {sortKey === "matched_count" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     K / PM
@@ -554,7 +633,7 @@ export default function LogsPanel() {
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("positive_arb_count")}
                   >
-                    Arbs <SortIcon col="positive_arb_count" />
+                    Arbs {sortKey === "positive_arb_count" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
                   </th>
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Stake

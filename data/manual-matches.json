@@ -560,5 +560,117 @@
     "pmTitle": "Anthony Albanese",
     "id": "1784284266773-tq04eo1",
     "createdAt": "2026-07-17T10:31:06.773Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-SA",
+    "pmConditionId": "0xa8da044bb908d46d98bfda6f2dbe2ca94007efe851e80dc4467e8856082a2a70",
+    "kalshiTitle": "Saudi Arabia (SA, Jan 2027)",
+    "pmTitle": "Saudi Arabia",
+    "id": "1786125546065-bl56950",
+    "createdAt": "2026-08-07T17:59:06.065Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-NK",
+    "pmConditionId": "0x035b7cc0833f825c4476352a1d5edeb870fc8250776803352177d44d34b03c6e",
+    "kalshiTitle": "North Korea (NK, Jan 2027)",
+    "pmTitle": "North Korea",
+    "id": "1786125548482-s2w0ag1",
+    "createdAt": "2026-08-07T17:59:08.482Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-PAKI",
+    "pmConditionId": "0xc1c987ae6cf96c0c676527c8dfaee295eb7aff785a00d91ca6de37e87738b72c",
+    "kalshiTitle": "Pakistan (PAKI, Jan 2027)",
+    "pmTitle": "Pakistan",
+    "id": "1786125549333-t1s0pqy",
+    "createdAt": "2026-08-07T17:59:09.333Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-VEN",
+    "pmConditionId": "0x5c92a73f97cd55da73b95d1c05d78c6b1065eeed9dcc889f23d5537441c04ac6",
+    "kalshiTitle": "Venezuela (VEN, Jan 2027)",
+    "pmTitle": "Venezuela",
+    "id": "1786125550512-43kh4d0",
+    "createdAt": "2026-08-07T17:59:10.512Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-UKR",
+    "pmConditionId": "0x89522d57b6a2cca2f737872db3ca4adcbaf0252fda9a265d90d549e7aee7bd43",
+    "kalshiTitle": "Ukraine (UKR, Jan 2027)",
+    "pmTitle": "Ukraine",
+    "id": "1786125552608-agcxusr",
+    "createdAt": "2026-08-07T17:59:12.608Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-TAI",
+    "pmConditionId": "0x4eea504d6a9a609f2e6fe6b88de6327755282192ebbae4b3b170eac91b611214",
+    "kalshiTitle": "Taiwan (>AI°F, Jan 2027)",
+    "pmTitle": "Taiwan",
+    "id": "1786125571569-g4oxn75",
+    "createdAt": "2026-08-07T17:59:31.570Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-RUS",
+    "pmConditionId": "0x40c2dd3dc9e6fb511e58e2a67141b66a97aa569e6b59c9b1f14f65e734c173d1",
+    "kalshiTitle": "Russia (RUS, Jan 2027)",
+    "pmTitle": "Russia",
+    "id": "1786125573167-tsxkpwt",
+    "createdAt": "2026-08-07T17:59:33.167Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-MEX",
+    "pmConditionId": "0x4f95cd46bd8135256e761691edad83c8e648b86cafa2e772d3084d3e35153efa",
+    "kalshiTitle": "Mexico (MEX, Jan 2027)",
+    "pmTitle": "Mexico",
+    "id": "1786125574650-kq2s01m",
+    "createdAt": "2026-08-07T17:59:34.650Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-JAP",
+    "pmConditionId": "0xbff26f3f5b87131b491a07d8f493d76a1319e8a03d6f526a55b466aa57328df0",
+    "kalshiTitle": "Japan (JAP, Jan 2027)",
+    "pmTitle": "Japan",
+    "id": "1786125576432-aw6m2rk",
+    "createdAt": "2026-08-07T17:59:36.432Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-ITA",
+    "pmConditionId": "0xec25fff9ebd7b4ef5fecde23efcc876ed6b75c4870e2d0f0c03fdbe5f56364ab",
+    "kalshiTitle": "Italy (ITA, Jan 2027)",
+    "pmTitle": "Italy",
+    "id": "1786125577708-mwg4m77",
+    "createdAt": "2026-08-07T17:59:37.708Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-ISR",
+    "pmConditionId": "0x572971eede0909d69662fe3e09d7c6ada9065ee792b6fa14548e85d6af90ee0b",
+    "kalshiTitle": "Israel (ISR, Jan 2027)",
+    "pmTitle": "Israel",
+    "id": "1786125648107-tw34yti",
+    "createdAt": "2026-08-07T18:00:48.107Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-IND",
+    "pmConditionId": "0x64de3843f040e3b4ea1f205c98ecd6bfc38f293d1c53790f5e1c74c8d2140615",
+    "kalshiTitle": "India (IND, Jan 2027)",
+    "pmTitle": "India",
+    "id": "1786125648874-12no1y9",
+    "createdAt": "2026-08-07T18:00:48.874Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-GER",
+    "pmConditionId": "0x77abd7f7b1d92d7273479a8e12aa200641a82fc73053dd73502091ac14cce524",
+    "kalshiTitle": "Germany (GER, Jan 2027)",
+    "pmTitle": "Germany",
+    "id": "1786125650127-gs4p7bg",
+    "createdAt": "2026-08-07T18:00:50.127Z"
+  },
+  {
+    "kalshiTicker": "KXTRUMPCOUNTRIES-27JAN01-CAN",
+    "pmConditionId": "0xf6279279a7d6a8f5b3389ffea499313812180672d2d13ed32a8524ebd18e3b36",
+    "kalshiTitle": "Canada (CAN, Jan 2027)",
+    "pmTitle": "Canada",
+    "id": "1786125651869-98jl4le",
+    "createdAt": "2026-08-07T18:00:51.869Z"
   }
 ]

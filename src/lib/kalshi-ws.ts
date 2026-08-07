@@ -41,6 +41,8 @@ export type KalshiWsMessage = KalshiOrderbookSnapshot | KalshiOrderbookDelta;
 
 export type KalshiWsCallback = (msg: KalshiWsMessage) => void;
 
+export type KalshiWsStatusCallback = (status: { type: 'connecting' | 'connected' | 'disconnected' | 'reconnecting'; attempt: number; delayMs: number }) => void;
+
 interface Subscriber {
   marketTicker: string;
   cb: KalshiWsCallback;
@@ -48,8 +50,8 @@ interface Subscriber {
 
 const WS_URL = 'wss://api.elections.kalshi.com/trade-api/ws/v2';
 const HEARTBEAT_INTERVAL_MS = 10_000;
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30_000;
+const RECONNECT_BASE_MS = 500;
+const RECONNECT_MAX_MS = 15_000;
 
 /** WebSocket payloads are untrusted; invalid quotes must never reach live sizing. */
 function isTradeablePrice(value: unknown): value is number {
@@ -70,6 +72,7 @@ export class KalshiWsService {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingTickers = new Set<string>();
+  private statusCb: KalshiWsStatusCallback | null = null;
 
   connect(): void {
     // Idempotent: if a socket is already open or connecting, do nothing.
@@ -106,6 +109,10 @@ export class KalshiWsService {
     return this.subscribers.size;
   }
 
+  onStatus(cb: KalshiWsStatusCallback | null): void {
+    this.statusCb = cb;
+  }
+
   disconnect(): void {
     this.stopHeartbeat();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -120,6 +127,7 @@ export class KalshiWsService {
   // ── Internal ───────────────────────────────────────────────
 
   private doConnect(): void {
+    this.emitStatus({ type: 'connecting', attempt: this.reconnectAttempts, delayMs: 0 });
     try {
       // Auth via signed headers on the upgrade request (RSA-PSS).
       // Query-param auth with PKCS#1 v1.5 signatures fails the handshake.
@@ -133,6 +141,7 @@ export class KalshiWsService {
     this.ws.onopen = () => {
       this.connected = true;
       this.reconnectAttempts = 0;
+      this.emitStatus({ type: 'connected', attempt: 0, delayMs: 0 });
       this.startHeartbeat();
       this.flushPendingSubscriptions();
     };
@@ -150,6 +159,7 @@ export class KalshiWsService {
     this.ws.onclose = () => {
       this.connected = false;
       this.stopHeartbeat();
+      this.emitStatus({ type: 'disconnected', attempt: this.reconnectAttempts, delayMs: 0 });
       this.scheduleReconnect();
     };
   }
@@ -312,9 +322,20 @@ export class KalshiWsService {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts), RECONNECT_MAX_MS);
     this.reconnectAttempts++;
+    this.emitStatus({ type: 'reconnecting', attempt: this.reconnectAttempts, delayMs: delay });
     this.reconnectTimer = setTimeout(() => {
       this.doConnect();
     }, delay);
+  }
+
+  private emitStatus(status: { type: 'connecting' | 'connected' | 'disconnected' | 'reconnecting'; attempt: number; delayMs: number }): void {
+    if (this.statusCb) {
+      try {
+        this.statusCb(status);
+      } catch (err) {
+        console.error('[kalshi-ws] status callback error:', err);
+      }
+    }
   }
 }
 

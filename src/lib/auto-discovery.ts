@@ -159,7 +159,7 @@ function weightedPick(candidates: string[], yieldCounts?: Map<string, number>, y
 }
 
 /** Normalize market title for matching (same as predictionhunt.ts) */
-function normalizeTitle(t: string): string {
+export function normalizeTitle(t: string): string {
   return t.toLowerCase()
     .replace(/[.,/#!$%\\^&\\*;:{}=_`~()-]/g, '')
     .replace(/\\s+/g, ' ')
@@ -484,11 +484,43 @@ function addToReviewQueue(pair: PendingReviewPair): void {
 let schedulerTimer: ReturnType<typeof setInterval> | null = null;
 let schedulerRunning = false;
 let lastLifecycleSweepAt = 0; // AUTO-002
+let lastCatalogRefreshAt = 0; // FEAT-101
 const LIFECYCLE_SWEEP_MS = 60 * 60 * 1000; // hourly
+const DEFAULT_CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+/** Resolve the configured market-catalog refresh interval from settings. */
+async function resolveCatalogRefreshIntervalMs(): Promise<number> {
+  try {
+    const { getSetting } = await import('./settings');
+    const hours = await getSetting<number>('catalog.refreshIntervalHours');
+    if (Number.isFinite(hours) && hours >= 1 && hours <= 24) return hours * 60 * 60 * 1000;
+  } catch { /* fall back to default */ }
+  return DEFAULT_CATALOG_REFRESH_MS;
+}
+
+/** Run a catalog refresh if the configured interval has elapsed. */
+async function maybeRefreshCatalog(): Promise<void> {
+  const intervalMs = await resolveCatalogRefreshIntervalMs();
+  if (Date.now() - lastCatalogRefreshAt < intervalMs) return;
+  try {
+    const { refreshMarketCatalog } = await import('./market-catalog');
+    const result = await refreshMarketCatalog();
+    lastCatalogRefreshAt = Date.now();
+    const total = result.kalshi.upserted + result.polymarket.upserted;
+    if (total > 0) {
+      console.log(
+        `[market-catalog] Refreshed: ${result.kalshi.upserted} Kalshi, ${result.polymarket.upserted} Polymarket markets (stale: ${result.kalshi.stale}/${result.polymarket.stale})`
+      );
+    }
+  } catch (err: any) {
+    console.error('[market-catalog] Refresh failed:', err.message);
+  }
+}
 
 /** Start the background scheduler. Idempotent — safe to call multiple times.
  * AUTO-001: ticks every 10 min and fires when discovery.scanIntervalHours
- * (Settings, default 3h) has elapsed since lastScanAt — interval is hot-tunable. */
+ * (Settings, default 3h) has elapsed since lastScanAt — interval is hot-tunable.
+ * FEAT-101: also refreshes market catalog every 6 hours (configurable). */
 export function startScheduler(): void {
   if (schedulerRunning) return;
   schedulerRunning = true;
@@ -504,6 +536,12 @@ export function startScheduler(): void {
       }
     } catch (err: any) {
       console.error('[lifecycle] Sweep failed:', err.message);
+    }
+    // FEAT-101: refresh market catalog on its own interval
+    try {
+      await maybeRefreshCatalog();
+    } catch (err: any) {
+      console.error('[market-catalog] Scheduled refresh failed:', err.message);
     }
     try {
       const state = loadState();
@@ -537,6 +575,19 @@ export function startScheduler(): void {
   }, TICK_MS);
 
   console.log(`[auto-discovery] Scheduler started (tick: 10min, interval from settings, default ${SCAN_INTERVAL_MS / 3600000}h)`);
+}
+
+/** Trigger one market-catalog refresh from outside the scheduler tick. */
+export async function runCatalogRefreshNow(): Promise<{ kalshi: number; polymarket: number; durationMs: number }> {
+  const start = Date.now();
+  const { refreshMarketCatalog } = await import('./market-catalog');
+  const result = await refreshMarketCatalog();
+  lastCatalogRefreshAt = Date.now();
+  return {
+    kalshi: result.kalshi.upserted,
+    polymarket: result.polymarket.upserted,
+    durationMs: Date.now() - start,
+  };
 }
 
 /** Stop the background scheduler. */

@@ -195,3 +195,102 @@ export function parseOutcomes(market: PMMarket): { outcomes: string[]; prices: n
     return { outcomes: [], prices: [] };
   }
 }
+
+const gammaAllMemo = createTtlMemo<PMMarket[]>(30_000);
+
+/**
+ * Fetch all active (open) Polymarket markets via Gamma API.
+ * Paginates through `/markets?limit=500&active=true&closed=false`.
+ * Uses the existing gamma rate limiter. No PredictionHunt dependency.
+ */
+export async function fetchAllPolymarketMarkets(options?: {
+  onPage?: (count: number) => void;
+}): Promise<PMMarket[]> {
+  return gammaAllMemo('all-active', async () => {
+    const all: PMMarket[] = [];
+    const seen = new Set<string>();
+
+    // First page gives us nextCursor; fetch in parallel with bounded speculation.
+    const firstPage = await fetchPMPage(null);
+    if (!firstPage) return all;
+    accumulate(firstPage.markets);
+    options?.onPage?.(all.length);
+
+    let cursor = firstPage.nextCursor;
+    const maxPages = 100;
+    let safety = firstPage.markets.length > 0 ? 1 : 0;
+
+    // Gamma uses cursor-based pagination. Prefetch a window of pages in parallel
+    // by resolving each cursor sequentially but issuing fetches as soon as we know
+    // the next cursor. This saturates the 30 req/s limiter while respecting cursors.
+    while (safety < maxPages && cursor) {
+      // Issue up to 10 parallel cursor-resolved fetches in a sliding window.
+      const window: Promise<{ markets: PMMarket[]; nextCursor: string | null } | null>[] = [];
+      let windowCursor: string | null = cursor;
+      for (let i = 0; i < 10 && windowCursor; i++) {
+        const captured = windowCursor;
+        window.push(
+          fetchPMPage(captured).then((page) => {
+            if (page) {
+              accumulate(page.markets);
+              options?.onPage?.(all.length);
+            }
+            return page;
+          }),
+        );
+        // We don't know the next cursor until the page returns, so we issue only
+        // the first page of the window and will discover the rest via awaits.
+        break;
+      }
+
+      const page = await Promise.race(window);
+      if (!page || !page.nextCursor) {
+        cursor = null;
+        break;
+      }
+      cursor = page.nextCursor;
+      safety += 1;
+    }
+
+    return all;
+
+    function accumulate(markets: PMMarket[]) {
+      for (const m of markets) {
+        if (m.conditionId && !seen.has(m.conditionId)) {
+          seen.add(m.conditionId);
+          all.push(m);
+        }
+      }
+    }
+  });
+}
+
+async function fetchPMPage(
+  cursor: string | null,
+): Promise<{ markets: PMMarket[]; nextCursor: string | null } | null> {
+  const params = new URLSearchParams({
+    limit: '500',
+    active: 'true',
+    closed: 'false',
+  });
+  if (cursor) params.set('cursor', cursor);
+  params.set('_t', String(Date.now()));
+
+  const res = await rateLimiters.gamma.execute(() =>
+    fetch(
+      `https://gamma-api.polymarket.com/markets?${params.toString()}`,
+      {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15000),
+      },
+    ),
+  );
+  if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
+  const data: any = await res.json();
+  const markets: PMMarket[] = Array.isArray(data) ? data : (data.markets || []);
+  const nextCursor = typeof data.nextCursor === 'string' && data.nextCursor ? data.nextCursor
+    : typeof data.cursor === 'string' && data.cursor ? data.cursor
+    : null;
+  return { markets, nextCursor };
+}

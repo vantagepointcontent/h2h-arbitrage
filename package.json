@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && npm run build:watcher",
+    "build": "next build && npm run build:watcher && npm run build:maintenance",
     "build:watcher": "esbuild scripts/ws-watcher.ts --bundle --platform=node --format=esm --outfile=dist/ws-watcher.mjs --external:@libsql/client --external:ws --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "build:maintenance": "cp scripts/db-maintenance.mjs dist/db-maintenance.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

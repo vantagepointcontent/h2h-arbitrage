@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server';
 import { clobWs } from '@/lib/clob-ws';
 import { kalshiWs, KalshiWsMessage } from '@/lib/kalshi-ws';
 import { orderbookState } from '@/lib/orderbook-state';
-import { computeAllLiveArbitrages, LiveMatchedOutcome } from '@/lib/live-arb-engine';
+import { computeAllLiveArbitrages, LiveMatchedOutcome, parseBookStaleMs } from '@/lib/live-arb-engine';
 import { attachPersistenceScores } from '@/lib/persistence-tracker';
 import { getAvgEpisodeLifespanMin } from '@/lib/arb-lifecycle';
 import { resolvePairFromLinks, PairResolveError } from '@/lib/pair-resolver';
@@ -91,10 +91,17 @@ export async function GET(req: NextRequest) {
 
       send({ type: 'status', message: 'Connecting to exchanges...' });
 
-      // Seed ALL books from REST so UI shows prices immediately
+      // Seed ALL books from REST so UI shows prices immediately.
+      // BUG-104: propagate seed errors to the client instead of swallowing them.
       seedAllBooks(session.kalshiTickers, session.pmTokenIds, pmTokenSides)
         .then(() => maybeSendResults())
-        .catch(() => {});
+        .catch((err) => {
+          logger.error('[live-scan] initial seed failed', { err, kalshiUrl, pmUrl });
+          send({
+            type: 'error',
+            error: `Failed to connect to exchanges. ${err instanceof Error ? err.message : 'Unknown error'}`,
+          });
+        });
 
       // ── Kalshi WS: subscribe to ALL tickers ──
       // B2 fix: record the exact subKeys used at subscribe time so cleanup
@@ -156,13 +163,76 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // BUG-104: status updates when WS singletons reconnect so the frontend
+      // shows per-exchange progress instead of a frozen "Connecting to exchanges...".
+      const kalshiStatusKey = `live-scan-kalshi-status-${Date.now()}`;
+      kalshiWs.onStatus((status) => {
+        if (session.closed) return;
+        if (status.type === 'connecting') {
+          send({ type: 'status', message: 'Connecting to Kalshi...' });
+        } else if (status.type === 'connected') {
+          send({ type: 'status', message: 'Connected to Kalshi' });
+        } else if (status.type === 'reconnecting') {
+          send({ type: 'status', message: `Reconnecting to Kalshi... (attempt ${status.attempt})` });
+        } else if (status.type === 'disconnected') {
+          send({ type: 'status', message: 'Kalshi disconnected' });
+        }
+      });
+      // Give the status callback a stable identity so it is not double-registered
+      // if the route is ever refactored; the singleton keeps only one callback anyway.
+      (kalshiWs as unknown as { _liveScanStatusKey?: string })._liveScanStatusKey = kalshiStatusKey;
+
+      const clobStatusKey = `live-scan-clob-status-${Date.now()}`;
+      clobWs.onStatus((status) => {
+        if (session.closed) return;
+        if (status.type === 'connecting') {
+          send({ type: 'status', message: 'Connecting to Polymarket...' });
+        } else if (status.type === 'connected') {
+          send({ type: 'status', message: 'Connected to Polymarket' });
+        } else if (status.type === 'reconnecting') {
+          send({ type: 'status', message: `Reconnecting to Polymarket... (attempt ${status.attempt})` });
+        } else if (status.type === 'disconnected') {
+          send({ type: 'status', message: 'Polymarket disconnected' });
+        }
+      });
+      (clobWs as unknown as { _liveScanStatusKey?: string })._liveScanStatusKey = clobStatusKey;
+
       // Periodic heartbeat — sends results every 1s even if no WS updates.
       // Also sends SSE comment lines (: heartbeat) to keep proxies alive.
+      const staleMs = parseBookStaleMs(process.env.H2H_BOOK_STALE_MS);
+      let reseedInFlight = false;
       const heartbeat = setInterval(() => {
         if (session.closed) return;
         // SSE comment line — keeps connection alive through proxies
         controller.enqueue(encoder.encode(`: heartbeat\n\n`));
         maybeSendResults();
+
+        // BUG-104: auto-recovery. If every outcome is stale, re-seed books from
+        // REST. This recovers when WS updates stop but the REST path is still live.
+        if (session.matchedOutcomes.length === 0 || reseedInFlight) return;
+        const allStale = session.matchedOutcomes.every((o) =>
+          orderbookState.isStale(o.kalshiTicker, staleMs) &&
+          orderbookState.isStale(o.pmYesTokenId, staleMs) &&
+          orderbookState.isStale(o.pmNoTokenId, staleMs),
+        );
+        if (!allStale) return;
+
+        reseedInFlight = true;
+        send({ type: 'status', message: 'Reconnecting to exchanges...' });
+        seedAllBooks(session.kalshiTickers, session.pmTokenIds, pmTokenSides)
+          .then(() => {
+            reseedInFlight = false;
+            maybeSendResults();
+          })
+          .catch((err) => {
+            reseedInFlight = false;
+            logger.error('[live-scan] re-seed failed', { err, kalshiUrl, pmUrl });
+            send({ type: 'status', message: 'Reconnecting to exchanges...' });
+            send({
+              type: 'error',
+              error: `Failed to reconnect to exchanges. ${err instanceof Error ? err.message : 'Unknown error'}`,
+            });
+          });
       }, 1000);
 
       // Cleanup when client disconnects
@@ -178,6 +248,10 @@ export async function GET(req: NextRequest) {
 
         // Unsubscribe Polymarket
         clobWs.unsubscribe(pmSubKey);
+
+        // Remove status callbacks so they don't leak to other SSE sessions.
+        kalshiWs.onStatus(null);
+        clobWs.onStatus(null);
 
         // Clean up orderbook state
         for (const t of session.kalshiTickers) orderbookState.removeBook(t);

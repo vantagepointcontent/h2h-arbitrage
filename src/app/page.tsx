@@ -48,6 +48,7 @@ import {
   FileText,
   PanelLeft,
   Radar,
+  GitMerge,
   Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -65,6 +66,7 @@ const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSugge
   loading: () => <div className="p-4 text-sm text-[#8A9BA8]">Loading...</div>,
   ssr: false,
 });
+const CoupleManagementPanel = dynamic(() => import("@/app/components/CoupleManagementPanel"), { ssr: false });
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
@@ -228,7 +230,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "phantoms">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "phantoms" | "couple-management">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -300,6 +302,9 @@ export default function Home() {
         } else {
           setViewMode("scan");
         }
+      } else if (state?.view === "couple-management") {
+        setViewMode("couple-management");
+        setActiveMarketId(null);
       } else {
         setViewMode("overview");
         setActiveMarketId(null);
@@ -403,7 +408,7 @@ export default function Home() {
           }
           // Background refresh (silent) — skip for expired markets
           if (!isExpired) {
-            handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
+            handleQuickPricesRefresh(marketId, true);
           }
         } else {
           // Market not in saved_markets (archived/never saved).
@@ -431,6 +436,7 @@ export default function Home() {
         setViewMode("overview");
       } else if (view === "marketfinder") {
         setViewMode("marketfinder");
+        window.history.replaceState({ view: "marketfinder" }, "", "/?view=marketfinder");
         // Read multi-select categories from URL (?cats=a,b,c), fallback to legacy ?category=X
         const catsParam = params.get("cats");
         const legacyCat = params.get("category");
@@ -461,12 +467,77 @@ export default function Home() {
         setViewMode("trades");
       } else if (view === "phantoms") {
         setViewMode("phantoms");
+      } else if (view === "couple-management") {
+        setViewMode("couple-management");
+        window.history.replaceState({ view: "couple-management" }, "", "/?view=couple-management");
       } else {
         setViewMode("dashboard");
       }
     };
     syncFromUrl();
   }, []);
+
+  const handleQuickPricesRefresh = async (marketId: string, silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setBgRefreshing(true);
+    }
+    setError("");
+
+    try {
+      const res = await fetch("/api/quick-prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marketId,
+          capital: capitalRef.current,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult((prev) => {
+          if (!prev) return data as ScanResult;
+          // Merge quick-prices outcome updates into the existing result so
+          // UI state (expanded rows, sorting) is not lost.
+          const next = { ...data } as ScanResult;
+          if (prev.outcomes && data.outcomes) {
+            const prevByArtist = new Map(prev.outcomes.map((o: UnifiedOutcome) => [o.artist, o]));
+            next.outcomes = (data.outcomes as UnifiedOutcome[]).map((o: UnifiedOutcome) => {
+              const old = prevByArtist.get(o.artist);
+              if (!old) return o;
+              return {
+                ...old,
+                kalshi: o.kalshi,
+                polymarket: o.polymarket,
+                arbitrage: o.arbitrage,
+              };
+            });
+          }
+          return next;
+        });
+        const scannedAt = new Date().toISOString();
+        setLastUpdated(new Date(scannedAt));
+        setLastScanTimestamp(scannedAt);
+        if (Array.isArray(data.outcomes)) {
+          const prices = new Map<string, { kYes: number; pYes: number }>();
+          (data.outcomes as UnifiedOutcome[]).forEach((o: UnifiedOutcome) => {
+            if (o.kalshi && o.polymarket) {
+              prices.set(o.artist, { kYes: o.kalshi.yesAsk, pYes: o.polymarket.yesPrice });
+            }
+          });
+          previousPricesRef.current = prices;
+        }
+      } else {
+        setError(data.error || "Quick refresh failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "Network error");
+    } finally {
+      if (!silent) setLoading(false);
+      else setBgRefreshing(false);
+    }
+  };
 
   // Scan handler
   const handleScan = async (useDefaults: boolean) => {
@@ -479,7 +550,7 @@ export default function Home() {
     await handleScanWithUrls(kUrl, pUrl);
   };
 
-  const handleScanWithUrls = async (kUrl: string, pUrl: string, silent = false) => {
+  const handleScanWithUrls = async (kUrl: string, pUrl: string, silent = false, forceFull = false) => {
     if (!silent) {
       setLoading(true);
       setResult(null);
@@ -502,6 +573,7 @@ export default function Home() {
             : { kalshiUrl: kUrl, polymarketUrl: pUrl }),
           capital: capital,
           skipAutoMatch: matchMode === "manual",
+          force: forceFull,
         }),
       });
       const data = await res.json();
@@ -762,7 +834,8 @@ export default function Home() {
   };
 
   // Navigate to market detail
-  const loadMarket = async (m: SavedMarket) => {
+  const loadMarket = async (m: SavedMarket, options?: { forceFull?: boolean }) => {
+    const forceFull = options?.forceFull ?? false;
     setKalshiUrl(m.kalshiUrl);
     setPmUrl(m.polymarketUrl);
     setActiveMarketId(m.id);
@@ -857,7 +930,11 @@ export default function Home() {
 
     // Background refresh (silent) — skip for expired markets (BUG-033)
     if (!isExpired) {
-      handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true);
+      if (forceFull) {
+        handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true, true);
+      } else {
+        handleQuickPricesRefresh(m.id, true);
+      }
     }
   };
 
@@ -918,6 +995,12 @@ export default function Home() {
     setCouplingPanelOpen(false);
     setViewMode("trades");
     window.history.replaceState({ view: "trades" }, "", "/?view=trades");
+  };
+
+  const goToCoupleManagement = () => {
+    setCouplingPanelOpen(false);
+    setViewMode("couple-management");
+    window.history.replaceState({ view: "couple-management" }, "", "/?view=couple-management");
   };
 
   const goToScan = () => {
@@ -1044,50 +1127,8 @@ export default function Home() {
   useEffect(() => {
     if (!activeMarketId || viewMode !== "scan") return;
 
-    const market = savedMarketsRef.current.find(m => m.id === activeMarketId);
-    if (!market) return;
-
     const iv = setInterval(() => {
-      // Compare prices AFTER scan completes
-      fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kalshiUrl: market.kalshiUrl, polymarketUrl: market.polymarketUrl, capital: capitalRef.current }),
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.outcomes) return;
-
-        // Compare with previous prices
-        const oldPrices = previousPricesRef.current;
-        const changes = new Map<string, "up" | "down" | null>();
-        const newPrices = new Map<string, { kYes: number; pYes: number }>();
-
-        data.outcomes.forEach((o: UnifiedOutcome) => {
-          if (o.kalshi && o.polymarket) {
-            newPrices.set(o.artist, { kYes: o.kalshi.yesAsk, pYes: o.polymarket.yesPrice });
-
-            const old = oldPrices.get(o.artist);
-            if (old) {
-              const kDiff = o.kalshi.yesAsk - old.kYes;
-              const pDiff = o.polymarket.yesPrice - old.pYes;
-              if (kDiff !== 0 || pDiff !== 0) {
-                changes.set(o.artist, (kDiff + pDiff) > 0 ? "up" : "down");
-              }
-            }
-          }
-        });
-
-        previousPricesRef.current = newPrices;
-        setPriceChanges(changes);
-        setResult(data);
-        setLastUpdated(new Date());
-        setLastScanTimestamp(new Date().toISOString());
-
-        // Auto-clear blink after 3 seconds
-        setTimeout(() => setPriceChanges(new Map()), 3000);
-      })
-      .catch(err => console.error("Auto-refresh failed:", err));
+      handleQuickPricesRefresh(activeMarketId, true);
     }, 60000);
 
     return () => clearInterval(iv);
@@ -1370,6 +1411,9 @@ export default function Home() {
           <ExecutionModeBadge />
 
           <div className="ml-auto flex items-center gap-2">
+            <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "couple-management" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Couple Management">
+              <GitMerge className="w-4 h-4" />
+            </button>
             <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "live" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Live WebSocket scan">
               <Activity className="w-4 h-4" />
             </button>
@@ -1415,6 +1459,7 @@ export default function Home() {
           onGoLogs={goToLogs}
           onGoDashboard={goToDashboard}
           onGoTrades={goToTrades}
+          onGoCoupleManagement={goToCoupleManagement}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
@@ -1547,6 +1592,8 @@ export default function Home() {
               <TradesPanel />
             ) : viewMode === "phantoms" ? (
               <PhantomsPanel />
+            ) : viewMode === "couple-management" ? (
+              <CoupleManagementPanel />
             ) : (
               <>
                 {/* Scan inputs */}
@@ -1712,14 +1759,28 @@ export default function Home() {
                           <button
                             onClick={() => {
                               const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                              if (market) handleQuickPricesRefresh(activeMarketId, false);
                             }}
                             disabled={loading}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
-                            title="Refresh"
+                            title="Refresh prices"
                           >
                             {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#8A9BA8]" />}
-                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? (scanningAll && scanProgress.total > 0 ? `Refreshing ${scanProgress.current}/${scanProgress.total}…` : "Refreshing prices…") : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                          </button>
+
+                          {/* Full Re-scan chip */}
+                          <button
+                            onClick={() => {
+                              const market = savedMarkets.find(m => m.id === activeMarketId);
+                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl, false, true);
+                            }}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
+                            title="Full re-scan (discover sibling series + depth)"
+                          >
+                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <Scan className="w-3 h-3 text-[#8A9BA8]" />}
+                            <span className="text-[10px] text-[#FFFFFF]">Full Re-scan</span>
                           </button>
 
                           {/* Data chips (config-driven) */}
@@ -1807,7 +1868,7 @@ export default function Home() {
                               <button
                                 onClick={() => {
                                   const market = savedMarkets.find(m => m.id === activeMarketId);
-                                  if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl);
+                                  if (market) handleQuickPricesRefresh(activeMarketId, false);
                                 }}
                                 disabled={loading}
                                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors disabled:opacity-50"

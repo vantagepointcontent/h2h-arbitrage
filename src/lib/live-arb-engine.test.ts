@@ -1,6 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { applyPolymarketBook, computeAllLiveArbitrages, parseBookStaleMs } from './live-arb-engine';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  applyPolymarketBook,
+  computeAllLiveArbitrages,
+  parseBookStaleMs,
+} from './live-arb-engine';
 import { orderbookState } from './orderbook-state';
+import { KalshiWsService } from './kalshi-ws';
+import { ClobWsService } from './clob-ws';
 import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
 
 const outcome = {
@@ -20,11 +26,12 @@ const complement = {
 describe('parseBookStaleMs', () => {
   it.each(['', '0', '-1', 'Infinity', '60seconds', '0x100'])(
     'fails closed to the safe default for invalid value %j',
-    (value) => expect(parseBookStaleMs(value)).toBe(60_000),
+    (value) => expect(parseBookStaleMs(value)).toBe(90_000),
   );
 
   it('accepts a finite positive decimal duration', () => {
     expect(parseBookStaleMs('90000')).toBe(90_000);
+    expect(parseBookStaleMs('120000')).toBe(120_000);
   });
 });
 
@@ -35,6 +42,51 @@ afterEach(() => {
   orderbookState.removeBook(complement.kalshiTicker);
   orderbookState.removeBook(complement.pmYesTokenId);
   orderbookState.removeBook(complement.pmNoTokenId);
+  vi.useRealTimers();
+});
+
+describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
+  it('keeps last known prices visible but zeroes execution math when stale', () => {
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.42, quantity: 100 }],
+      [{ price: 0.58, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.40, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.60, quantity: 100 }]);
+
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(91_000);
+
+    const result = computeAllLiveArbitrages([outcome], 1000)[0];
+
+    expect(result.stale).toBe(true);
+    expect(result.kalshiYesAsk).toBe(0.42);
+    expect(result.pmYesAsk).toBe(0.40);
+    expect(result.roiPct).toBe(0);
+    expect(result.expectedProfit).toBe(0);
+    expect(result.kalshiStake).toBe(0);
+    expect(result.pmStake).toBe(0);
+  });
+
+  it('still computes arbs when books are fresh within the 90s window', () => {
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.40, quantity: 100 }],
+      [{ price: 0.60, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.42, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.58, quantity: 100 }]);
+
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(30_000);
+
+    const result = computeAllLiveArbitrages([outcome], 1000)[0];
+
+    expect(result.stale).toBe(false);
+    expect(result.kalshiYesAsk).toBe(0.40);
+    expect(result.pmYesAsk).toBe(0.42);
+    expect(result.strategy).not.toBe('No arb');
+    expect(result.roiPct).toBeGreaterThan(0);
+  });
 });
 
 describe('computeAllLiveArbitrages effective execution quotes', () => {
@@ -167,5 +219,79 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(book?.no.asks).toHaveLength(1);
     expect(book?.no.asks[0].price).toBeCloseTo(0.55);
     expect(book?.no.asks[0].quantity).toBe(8);
+  });
+});
+
+describe('KalshiWsService reconnect tuning (BUG-104)', () => {
+  it('uses reduced base/max reconnect constants', () => {
+    // The constants are private module-level bindings; expose them indirectly by
+    // inspecting the first few reconnect delays via the status callback.
+    const service = new KalshiWsService();
+    const statusLog: { attempt: number; delayMs: number }[] = [];
+    service.onStatus((status) => {
+      if (status.type === 'reconnecting') {
+        statusLog.push({ attempt: status.attempt, delayMs: status.delayMs });
+      }
+    });
+
+    service.connect();
+    service.disconnect();
+
+    // First reconnect schedule should be base=500ms, capped at 15000ms.
+    expect(statusLog.length).toBeGreaterThan(0);
+    expect(statusLog[0].delayMs).toBe(500);
+
+    // Simulate enough failures to hit the cap.
+    for (let i = 0; i < 10; i++) {
+      service.disconnect();
+    }
+    expect(statusLog.some((s) => s.delayMs === 15_000)).toBe(true);
+    expect(statusLog.every((s) => s.delayMs <= 15_000)).toBe(true);
+  });
+
+  it('emits status lifecycle events', () => {
+    const service = new KalshiWsService();
+    const events: string[] = [];
+    service.onStatus((status) => events.push(status.type));
+
+    service.connect();
+    expect(events).toContain('connecting');
+    service.disconnect();
+    expect(events).toContain('disconnected');
+  });
+});
+
+describe('ClobWsService reconnect tuning (BUG-104)', () => {
+  it('uses reduced base/max reconnect constants', () => {
+    const service = new ClobWsService();
+    const statusLog: { attempt: number; delayMs: number }[] = [];
+    service.onStatus((status) => {
+      if (status.type === 'reconnecting') {
+        statusLog.push({ attempt: status.attempt, delayMs: status.delayMs });
+      }
+    });
+
+    service.connect();
+    service.disconnect();
+
+    expect(statusLog.length).toBeGreaterThan(0);
+    expect(statusLog[0].delayMs).toBe(500);
+
+    for (let i = 0; i < 10; i++) {
+      service.disconnect();
+    }
+    expect(statusLog.some((s) => s.delayMs === 15_000)).toBe(true);
+    expect(statusLog.every((s) => s.delayMs <= 15_000)).toBe(true);
+  });
+
+  it('emits status lifecycle events', () => {
+    const service = new ClobWsService();
+    const events: string[] = [];
+    service.onStatus((status) => events.push(status.type));
+
+    service.connect();
+    expect(events).toContain('connecting');
+    service.disconnect();
+    expect(events).toContain('disconnected');
   });
 });

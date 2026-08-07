@@ -17,6 +17,8 @@ export interface WsPriceUpdate {
 
 export type WsCallback = (updates: WsPriceUpdate[]) => void;
 
+export type ClobWsStatusCallback = (status: { type: 'connecting' | 'connected' | 'disconnected' | 'reconnecting'; attempt: number; delayMs: number }) => void;
+
 interface Subscriber {
   tokenIds: Set<string>;
   cb: WsCallback;
@@ -25,8 +27,8 @@ interface Subscriber {
 // Connection state
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const HEARTBEAT_INTERVAL_MS = 10_000;
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30_000;
+const RECONNECT_BASE_MS = 500;
+const RECONNECT_MAX_MS = 15_000;
 const SUBSCRIBE_DEBOUNCE_MS = 200;
 
 // Per-token best bid/ask cache (populated from WS snapshots)
@@ -57,6 +59,7 @@ export class ClobWsService {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private subscribeTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingTokenIds = new Set<string>();
+  private statusCb: ClobWsStatusCallback | null = null;
 
   // ── Public API ────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ export class ClobWsService {
     }
     this.resetReconnect();
     try {
+      this.emitStatus({ type: 'connecting', attempt: this.reconnectAttempts, delayMs: 0 });
       this.ws = new WebSocket(WS_URL);
     } catch {
       this.scheduleReconnect();
@@ -78,6 +82,7 @@ export class ClobWsService {
     this.ws.onopen = () => {
       this.connected = true;
       this.reconnectAttempts = 0;
+      this.emitStatus({ type: 'connected', attempt: 0, delayMs: 0 });
       this.flushSubscribe();
       this.startHeartbeat();
     };
@@ -95,6 +100,7 @@ export class ClobWsService {
     this.ws.onclose = (_ev) => {
       this.connected = false;
       this.stopHeartbeat();
+      this.emitStatus({ type: 'disconnected', attempt: this.reconnectAttempts, delayMs: 0 });
       this.scheduleReconnect();
     };
   }
@@ -138,6 +144,10 @@ export class ClobWsService {
   /** Get the current subscriber count (for diagnostics). */
   getSubscriberCount(): number {
     return this.subscribers.size;
+  }
+
+  onStatus(cb: ClobWsStatusCallback | null): void {
+    this.statusCb = cb;
   }
 
   // ── Internal ─────────────────────────────────────────────
@@ -326,9 +336,20 @@ export class ClobWsService {
       RECONNECT_MAX_MS,
     );
     this.reconnectAttempts++;
+    this.emitStatus({ type: 'reconnecting', attempt: this.reconnectAttempts, delayMs: delay });
     this.reconnectTimer = setTimeout(() => {
       this.connect();
     }, delay);
+  }
+
+  private emitStatus(status: { type: 'connecting' | 'connected' | 'disconnected' | 'reconnecting'; attempt: number; delayMs: number }): void {
+    if (this.statusCb) {
+      try {
+        this.statusCb(status);
+      } catch (err) {
+        console.error('[clob-ws] status callback error:', err);
+      }
+    }
   }
 
   private flushSubscribe(): void {
