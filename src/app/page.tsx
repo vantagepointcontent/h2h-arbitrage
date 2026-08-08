@@ -1300,18 +1300,24 @@ export default function Home() {
     const cats = mfCategories.join(",");
     const url = `/api/predictionhunt/markets?${cats ? `category=${encodeURIComponent(cats)}&` : ""}maxDays=${mfExpiryDays}&fetchCount=${mfFetchCount}`;
     fetch(url, { headers: { "Cache-Control": "no-store" } })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) {
-          const markets = d.markets || [];
-          setMfMarkets(markets);
-          if (d.lastSync) setMfLastSync(d.lastSync);
-          // Update cache
-          mfCacheRef.current = { data: markets, fetchedAt: Date.now() };
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data?.success) {
+          throw new Error(data?.error || `MarketFinder request failed (${r.status})`);
         }
-        setMfError("");
+        return data;
       })
-      .catch(() => setMfError("Failed to load MarketFinder data"))
+      .then((d) => {
+        const markets = d.markets || [];
+        setMfMarkets(markets);
+        if (d.lastSync) setMfLastSync(d.lastSync);
+        // Update cache
+        mfCacheRef.current = { data: markets, fetchedAt: Date.now() };
+      })
+      .catch((err) => {
+        console.error("Failed to load MarketFinder data", err);
+        setMfError(err instanceof Error ? err.message : "Failed to load MarketFinder data");
+      })
       .finally(() => { if (showLoading) setMfLoading(false); });
   }, [mfCategories, mfExpiryDays, mfFetchCount]);
 

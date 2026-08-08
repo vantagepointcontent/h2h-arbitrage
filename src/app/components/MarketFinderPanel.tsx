@@ -300,19 +300,27 @@ export function MarketFinderPanel({
         </div>
       )}
 
-      {error && (
-        <div className="flex items-center gap-2 text-sm text-[#ef4444]">
-          <AlertCircle className="w-4 h-4" /> {error}
-        </div>
-      )}
-
       {bulkMsg && (
         <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${bulkMsg.includes("failed") ? "text-[#facc15] bg-[#facc15]/10" : "text-[#5DBE81] bg-[#5DBE81]/10"}`}>
           <Check className="w-4 h-4" /> {bulkMsg}
         </div>
       )}
 
-      {loading ? (
+      {error ? (
+        <div role="alert" className="rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 p-6 text-center">
+          <AlertCircle className="mx-auto mb-2 h-6 w-6 text-[#ef4444]" />
+          <h3 className="text-sm font-semibold text-[#FFFFFF]">MarketFinder failed to load</h3>
+          <p className="mt-1 text-xs text-[#ef4444]">{error}</p>
+          <button
+            type="button"
+            onClick={onFetch}
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-2 text-sm font-medium text-[#FFFFFF] hover:bg-[#ef4444]/20"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </button>
+        </div>
+      ) : loading ? (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
           {/* Skeleton rows */}
           {[...Array(6)].map((_, i) => (
