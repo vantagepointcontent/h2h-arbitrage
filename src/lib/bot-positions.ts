@@ -191,3 +191,72 @@ export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
     c.close();
   }
 }
+
+export interface BotPositionInput {
+  executionId: number;
+  pairId: string;
+  marketTitle: string;
+  kalshiTicker: string | null;
+  pmConditionId: string | null;
+  strategy: string;
+  kalshiSide: 'yes' | 'no';
+  pmSide: 'yes' | 'no';
+  kalshiPrice: number;
+  pmPrice: number;
+  kalshiStake: number;
+  pmStake: number;
+  expectedProfit: number;
+  expiryDate?: string | null;
+}
+
+export async function recordBotPosition(input: BotPositionInput): Promise<void> {
+  const c = getClient();
+  try {
+    const kalshiPriceCents = Math.round(input.kalshiPrice * 100);
+    const pmPriceCents = Math.round(input.pmPrice * 100);
+    const sharesKalshi = Math.max(1, Math.floor(input.kalshiStake / input.kalshiPrice));
+    const sharesPm = Math.max(1, Math.floor(input.pmStake / input.pmPrice));
+    const totalCostCents = sharesKalshi * kalshiPriceCents + sharesPm * pmPriceCents;
+    const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
+    const expectedProfitCents = expectedPayoutCents - totalCostCents;
+    const unrealizedPnlCents = expectedProfitCents;
+    const unrealizedRoiBps = totalCostCents > 0 ? Math.round((unrealizedPnlCents * 10_000) / totalCostCents) : 0;
+
+    await c.execute({
+      sql: `INSERT INTO bot_positions (
+        execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
+        strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
+        shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
+        fees, status, opened_at, expiry_date, current_value,
+        unrealized_pnl, unrealized_roi_pct, last_valuation_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        input.executionId,
+        input.pairId,
+        input.marketTitle,
+        input.kalshiTicker,
+        input.pmConditionId,
+        input.strategy,
+        input.kalshiSide,
+        input.pmSide,
+        kalshiPriceCents,
+        pmPriceCents,
+        sharesKalshi,
+        sharesPm,
+        totalCostCents,
+        expectedPayoutCents,
+        expectedProfitCents,
+        0,
+        'open',
+        new Date().toISOString(),
+        input.expiryDate ?? null,
+        expectedPayoutCents,
+        unrealizedPnlCents,
+        unrealizedRoiBps,
+        new Date().toISOString(),
+      ],
+    });
+  } finally {
+    c.close();
+  }
+}

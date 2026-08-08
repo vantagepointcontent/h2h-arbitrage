@@ -1357,12 +1357,13 @@ export interface ExecutionRecord {
   source?: 'manual' | 'bot';
 }
 
-export async function persistExecution(e: ExecutionRecord): Promise<void> {
+export async function persistExecution(e: ExecutionRecord): Promise<number> {
   await ensureExecutionsTable();
   const c = getClient();
-  await c.execute({
+  const res = await c.execute({
     sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
       e.strategy ?? null,
@@ -1374,6 +1375,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<void> {
       e.source ?? 'manual',
     ],
   });
+  return Number((res.rows as any[])[0]?.id ?? 0);
 }
 
 export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Promise<ExecutionRecord[]> {
@@ -2123,4 +2125,134 @@ export async function approveMatchedPair(id: number): Promise<{ approved: boolea
 
 export async function rejectMatchedPair(id: number): Promise<boolean> {
   return updateMatchedPairStatus(id, 'rejected');
+}
+
+// ── FEAT-046: Market Catalog fetch job metadata ───────────────────
+
+export interface MarketCatalogMetaRow {
+  id: number;
+  platform: 'kalshi' | 'polymarket';
+  category: string;
+  lastFullFetchAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: 'running' | 'idle' | 'failed' | 'aborted';
+  lastSuccessfulOffset: string | null;
+  marketsFetched: number;
+  rateLimitHits: number;
+  errorMessage: string | null;
+}
+
+function rowToMarketCatalogMeta(r: any): MarketCatalogMetaRow {
+  return {
+    id: Number(r.id),
+    platform: String(r.platform) as 'kalshi' | 'polymarket',
+    category: String(r.category ?? ''),
+    lastFullFetchAt: r.last_full_fetch_at ? String(r.last_full_fetch_at) : null,
+    lastRunAt: r.last_run_at ? String(r.last_run_at) : null,
+    lastRunStatus: String(r.last_run_status ?? 'idle') as MarketCatalogMetaRow['lastRunStatus'],
+    lastSuccessfulOffset: r.last_successful_offset ? String(r.last_successful_offset) : null,
+    marketsFetched: Number(r.markets_fetched ?? 0),
+    rateLimitHits: Number(r.rate_limit_hits ?? 0),
+    errorMessage: r.error_message ? String(r.error_message) : null,
+  };
+}
+
+async function ensureMarketCatalogMetaTable(): Promise<void> {
+  await ensureDb();
+  const c = getClient();
+  await c.execute(`
+    CREATE TABLE IF NOT EXISTS market_catalog_meta (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform            TEXT    NOT NULL,
+      category            TEXT    NOT NULL DEFAULT '',
+      last_full_fetch_at  TEXT,
+      last_run_at         TEXT,
+      last_run_status     TEXT,
+      last_successful_offset TEXT,
+      markets_fetched     INTEGER NOT NULL DEFAULT 0,
+      rate_limit_hits     INTEGER NOT NULL DEFAULT 0,
+      error_message       TEXT,
+      UNIQUE(platform, category)
+    )
+  `);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_market_catalog_meta_run ON market_catalog_meta(platform, category, last_run_at DESC)`);
+}
+
+/** Get one category meta row (or default shell) for a platform/category. */
+export async function getMarketCatalogMeta(platform: 'kalshi' | 'polymarket', category: string): Promise<MarketCatalogMetaRow> {
+  await ensureMarketCatalogMetaTable();
+  const c = getClient();
+  const res = await c.execute({
+    sql: `SELECT * FROM market_catalog_meta WHERE platform = ? AND category = ?`,
+    args: [platform, category],
+  });
+  const rows = res.rows as any[];
+  if (rows.length > 0) return rowToMarketCatalogMeta(rows[0]);
+  return {
+    id: 0,
+    platform,
+    category,
+    lastFullFetchAt: null,
+    lastRunAt: null,
+    lastRunStatus: 'idle',
+    lastSuccessfulOffset: null,
+    marketsFetched: 0,
+    rateLimitHits: 0,
+    errorMessage: null,
+  };
+}
+
+/** Upsert category-level catalog job metadata. */
+export async function setMarketCatalogMeta(
+  platform: 'kalshi' | 'polymarket',
+  category: string,
+  patch: Partial<Omit<MarketCatalogMetaRow, 'id' | 'platform' | 'category'>>,
+): Promise<void> {
+  await ensureMarketCatalogMetaTable();
+  const c = getClient();
+  await c.execute({
+    sql: `INSERT INTO market_catalog_meta
+            (platform, category, last_full_fetch_at, last_run_at, last_run_status,
+             last_successful_offset, markets_fetched, rate_limit_hits, error_message)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(platform, category) DO UPDATE SET
+            last_full_fetch_at = COALESCE(excluded.last_full_fetch_at, last_full_fetch_at),
+            last_run_at = COALESCE(excluded.last_run_at, last_run_at),
+            last_run_status = COALESCE(excluded.last_run_status, last_run_status),
+            last_successful_offset = COALESCE(excluded.last_successful_offset, last_successful_offset),
+            markets_fetched = COALESCE(excluded.markets_fetched, markets_fetched),
+            rate_limit_hits = COALESCE(excluded.rate_limit_hits, rate_limit_hits),
+            error_message = COALESCE(excluded.error_message, error_message)`,
+    args: [
+      platform,
+      category,
+      patch.lastFullFetchAt ?? null,
+      patch.lastRunAt ?? null,
+      patch.lastRunStatus ?? null,
+      patch.lastSuccessfulOffset ?? null,
+      patch.marketsFetched ?? null,
+      patch.rateLimitHits ?? null,
+      patch.errorMessage ?? null,
+    ],
+  });
+}
+
+/** Get status overview for all catalog fetch categories. */
+export async function getMarketCatalogMetaOverview(): Promise<{
+  categories: MarketCatalogMetaRow[];
+  totalMarkets: number;
+  staleMarkets: number;
+}> {
+  await ensureMarketCatalogMetaTable();
+  const c = getClient();
+  const [catRes, countRes, staleRes] = await Promise.all([
+    c.execute(`SELECT * FROM market_catalog_meta ORDER BY platform, category`),
+    c.execute(`SELECT COUNT(*) AS cnt FROM market_catalog`),
+    c.execute(`SELECT COUNT(*) AS cnt FROM market_catalog WHERE stale = 1`),
+  ]);
+  return {
+    categories: (catRes.rows as any[]).map(rowToMarketCatalogMeta),
+    totalMarkets: Number((countRes.rows as any[])[0]?.cnt ?? 0),
+    staleMarkets: Number((staleRes.rows as any[])[0]?.cnt ?? 0),
+  };
 }
