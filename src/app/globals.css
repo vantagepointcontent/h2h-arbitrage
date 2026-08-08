@@ -70,16 +70,40 @@
   --chart-4: #facc15;
   --chart-5: #ef4444;
 
-  /* Semantic tokens for theme-aware surfaces */
-  --surface: #121212;
+  /* Trading design system: semantic tokens, never encode meaning in raw hex utilities. */
+  --surface: #0E1621;
+  --surface-workspace: #0E1621;
+  --surface-panel: #17212B;
+  --surface-raised: #121E2B;
   --surface-elevated: #17212B;
-  --surface-hover: #17212B;
+  --surface-hover: #182533;
+  --surface-selected: rgba(93, 190, 129, 0.12);
   --text: #FFFFFF;
+  --text-primary: #FFFFFF;
+  --text-secondary: #8A9BA8;
   --text-muted: #8A9BA8;
   --text-faint: #5E6875;
-  --divider: #17212B;
-  --header-bg: #121212;
-  --sidebar-bg: #121212;
+  --border-subtle: #182533;
+  --border-strong: #232E3C;
+  --divider: #182533;
+  --focus-ring: #5DBE81;
+  --status-positive: #5DBE81;
+  --status-negative: #ef4444;
+  --status-warning: #facc15;
+  --status-info: #60a5fa;
+  --status-stale: #8A9BA8;
+  --status-blocked: #f97316;
+  --platform-kalshi: #4C8BF5;
+  --platform-polymarket: #7A6FF0;
+  --header-bg: #0E1621;
+  --sidebar-bg: #17212B;
+  --density-row-compact: 2rem;
+  --density-row-standard: 2.5rem;
+  --density-row-interactive: 2.75rem;
+  --space-workspace: 1.5rem;
+  --space-panel: 1rem;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
 }
 
 /* ─── Light theme ─── */
@@ -109,12 +133,29 @@
   --chart-5: #dc2626;
 
   --surface: #faf5ec;
+  --surface-workspace: #faf5ec;
+  --surface-panel: #f0e8dc;
+  --surface-raised: #e8ddd0;
   --surface-elevated: #f0e8dc;
   --surface-hover: #e8ddd0;
+  --surface-selected: rgba(77, 166, 110, 0.12);
   --text: #1a1a2e;
+  --text-primary: #1a1a2e;
+  --text-secondary: #5E6875;
   --text-muted: #5E6875;
-  --text-faint: #8A9BA8;
+  --text-faint: #6b7280;
+  --border-subtle: #d4c8b8;
+  --border-strong: #b9ab98;
   --divider: #d4c8b8;
+  --focus-ring: #327a4f;
+  --status-positive: #327a4f;
+  --status-negative: #b91c1c;
+  --status-warning: #8a5a00;
+  --status-info: #1d4ed8;
+  --status-stale: #5E6875;
+  --status-blocked: #c2410c;
+  --platform-kalshi: #245eb5;
+  --platform-polymarket: #5b4fc4;
   --header-bg: #f0e8dc;
   --sidebar-bg: #faf5ec;
 }

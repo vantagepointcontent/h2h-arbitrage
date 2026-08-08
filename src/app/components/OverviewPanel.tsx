@@ -7,6 +7,7 @@ import { computeApy } from "@/lib/matcher";
 import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
+import { DataTable } from "@/components/ui";
 
 /* ── Overview Panel ── */
 function OverviewPanelInner({
@@ -186,34 +187,34 @@ function OverviewPanelInner({
     <div className="space-y-5">
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-          <TrendingUp className={`w-3 h-3 ${avgRoi > 0 ? "text-[#5DBE81]" : avgRoi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`} />
-          <span className="text-[10px] text-[#8A9BA8]">Avg Yield</span>
-          <span className={`text-xs font-bold ${avgRoi > 0 ? "text-[#5DBE81]" : avgRoi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>{avgRoi > 0 ? "+" : ""}{formatPercent(avgRoi)}</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+          <TrendingUp className={`w-3 h-3 ${avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
+          <span className="text-[10px] text-[var(--text-secondary)]">Avg Yield</span>
+          <span className={`text-xs font-bold ${avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{avgRoi > 0 ? "+" : ""}{formatPercent(avgRoi)}</span>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-          <DollarSign className={`w-3 h-3 ${totalProfit > 0 ? "text-[#5DBE81]" : totalProfit < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`} />
-          <span className="text-[10px] text-[#8A9BA8]">Total Profit</span>
-          <span className={`text-xs font-bold ${totalProfit > 0 ? "text-[#5DBE81]" : totalProfit < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>{formatCurrency(totalProfit)}</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+          <DollarSign className={`w-3 h-3 ${totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
+          <span className="text-[10px] text-[var(--text-secondary)]">Total Profit</span>
+          <span className={`text-xs font-bold ${totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{formatCurrency(totalProfit)}</span>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B]">
-          <Zap className="w-3 h-3 text-[#facc15]" />
-          <span className="text-[10px] text-[#8A9BA8]">Arbitrages</span>
-          <span className="text-xs font-bold text-[#FFFFFF]">{arbOpportunities} / {totalMarkets}</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+          <Zap className="w-3 h-3 text-[var(--status-warning)]" />
+          <span className="text-[10px] text-[var(--text-secondary)]">Arbitrages</span>
+          <span className="text-xs font-bold text-[var(--text-primary)]">{arbOpportunities} / {totalMarkets}</span>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Markets</h2>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg px-1.5 py-0.5">
+          <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg px-1.5 py-0.5">
             <label htmlFor="market-category-filter" className="sr-only">Category</label>
             <select
               id="market-category-filter"
               aria-label="Category"
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
-              className="max-w-32 bg-transparent px-1 py-1 text-[10px] font-medium text-[#8A9BA8] outline-none hover:text-[#FFFFFF]"
+              className="max-w-32 bg-transparent px-1 py-1 text-[10px] font-medium text-[var(--text-secondary)] outline-none hover:text-[var(--text-primary)]"
             >
               <option value="all">All categories</option>
               {categories.map((category) => (
@@ -222,36 +223,36 @@ function OverviewPanelInner({
               <option value="uncategorized">Uncategorized</option>
             </select>
           </div>
-          <div className="w-px h-4 bg-[#232E3C]" />
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+          <div className="w-px h-4 bg-[var(--border-strong)]" />
+          <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg p-0.5">
             <button
               onClick={() => onToggleShowArbOnly()}
               className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                 showArbOnly
-                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                  : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                  ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
               title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
             >
               {showArbOnly ? "Arb: On" : "Arb: Off"}
             </button>
           </div>
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg p-0.5">
             <button
               onClick={() => onToggleShowExpired()}
               className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                 showExpired
-                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                  : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                  ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
               title={showExpired ? "Click to hide expired markets" : "Expired markets are hidden — click to show them"}
             >
               {showExpired ? "Showing expired" : "Expired hidden"}
             </button>
           </div>
-          <div className="w-px h-4 bg-[#232E3C]" />
+          <div className="w-px h-4 bg-[var(--border-strong)]" />
           {/* Expiry filter buttons */}
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg p-0.5">
             {([
               { key: "all", label: "All" },
               { key: "lte7", label: "≤7d" },
@@ -263,17 +264,17 @@ function OverviewPanelInner({
                 onClick={() => onSetExpiryFilter(key)}
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                   expiryFilter === key
-                    ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                    : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                    ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="w-px h-4 bg-[#232E3C]" />
+          <div className="w-px h-4 bg-[var(--border-strong)]" />
           {/* Sort toggles */}
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg p-0.5">
             {([
               { key: "apy", label: "APY" },
               { key: "roi", label: "ROI" },
@@ -287,28 +288,28 @@ function OverviewPanelInner({
                 onClick={() => onToggleSort(key)}
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                   sort === key
-                    ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                    : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                    ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 {label}{sort === key && (sortDir === "asc" ? " ↑" : " ↓")}
               </button>
             ))}
           </div>
-          <div className="w-px h-4 bg-[#232E3C]" />
-          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[#182533] hover:bg-[#232E3C] text-[#8A9BA8] transition-colors" title="Toggle layout">
+          <div className="w-px h-4 bg-[var(--border-strong)]" />
+          <button onClick={() => onToggleLayout(layout === "grid" ? "table" : "grid")} className="p-2 rounded-lg bg-[var(--surface-hover)] hover:bg-[var(--border-strong)] text-[var(--text-secondary)] transition-colors" title="Toggle layout">
             {layout === "grid" ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-[#8A9BA8]">
+        <div className="py-20 text-center text-sm text-[var(--text-secondary)]">
           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
           Loading markets...
         </div>
       ) : filteredByExpiry.length === 0 ? (
-        <div className="py-20 text-center text-sm text-[#8A9BA8]">
+        <div className="py-20 text-center text-sm text-[var(--text-secondary)]">
           {sorted.length === 0 ? "No saved markets. Go to Scan or MarketFinder to add some." : "No markets match the selected expiry filter."}
         </div>
       ) : layout === "grid" ? (
@@ -325,36 +326,36 @@ function OverviewPanelInner({
               <div
                 key={m.id}
                 onClick={() => onSelectMarket(m)}
-                className="rounded-xl border border-[#182533] bg-[#17212B] p-4 space-y-3 cursor-pointer hover:border-[#5DBE81]/40 transition-colors"
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4 space-y-3 cursor-pointer hover:border-[var(--status-positive)]/40 transition-colors"
               >
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-sm text-[#FFFFFF]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: scannedAt })}>{m.eventTitle}</h3>
+                  <h3 className="font-semibold text-sm text-[var(--text-primary)]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: scannedAt })}>{m.eventTitle}</h3>
                   <div className="flex items-center gap-1.5">
-                    {arbCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#5DBE81]/10 text-[#5DBE81] font-medium">{arbCount} arb{arbCount > 1 ? "s" : ""}</span>}
-                    {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.category}</span>}
+                    {arbCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--status-positive)]/10 text-[var(--status-positive)] font-medium">{arbCount} arb{arbCount > 1 ? "s" : ""}</span>}
+                    {m.category && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--surface-hover)] text-[var(--text-secondary)]">{m.category}</span>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="text-[#8A9BA8]">Expiry</div>
-                  <div className="text-[#FFFFFF] text-right">{formatExpiry(m.expiryDate)}</div>
-                  <div className="text-[#8A9BA8]">Matched</div>
-                  <div className="text-[#8A9BA8] text-right">{matchedCount > 0 ? matchedCount : "—"}</div>
-                  <div className="text-[#8A9BA8]">ROI</div>
-                  <div className={`text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
+                  <div className="text-[var(--text-secondary)]">Expiry</div>
+                  <div className="text-[var(--text-primary)] text-right">{formatExpiry(m.expiryDate)}</div>
+                  <div className="text-[var(--text-secondary)]">Matched</div>
+                  <div className="text-[var(--text-secondary)] text-right">{matchedCount > 0 ? matchedCount : "—"}</div>
+                  <div className="text-[var(--text-secondary)]">ROI</div>
+                  <div className={`text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                   </div>
-                  <div className="text-[#8A9BA8] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
-                  <div className={`text-right font-bold ${apy > 0 ? "text-[#5DBE81]" : apy < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
+                  <div className="text-[var(--text-secondary)] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
+                  <div className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                     {apy !== 0 ? (
                       <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
                         {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
                       </ApyValueTooltip>
                     ) : "—"}
                   </div>
-                  <div className="text-[#8A9BA8]">Est. Profit</div>
-                  <div className="text-[#FFFFFF] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
+                  <div className="text-[var(--text-secondary)]">Est. Profit</div>
+                  <div className="text-[var(--text-primary)] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-[#8A9BA8]">
+                <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {timeUntilExpiry(m.expiryDate)}
@@ -366,10 +367,10 @@ function OverviewPanelInner({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[#17212B] border-b border-[#182533]">
-              <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto">
+          <DataTable aria-label="Saved markets overview">
+            <thead className="bg-[var(--surface-panel)] border-b border-[var(--border-subtle)]">
+              <tr className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">
                 {([
                   { key: "name", label: "Market", align: "left" },
                   { key: "expiry", label: "Expiry", align: "right" },
@@ -384,12 +385,12 @@ function OverviewPanelInner({
                   <th
                     key={key}
                     onClick={() => onToggleSort(key)}
-                    className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+                    className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors ${align === "right" ? "text-right" : "text-left"}`}
                   >
                     <span className={align === "right" ? "inline-flex items-center gap-1 flex-row-reverse" : "inline-flex items-center gap-1"}>
                       {label}
                       {info && <ApyHeaderInfo />}
-                      <span className={`text-[8px] transition-opacity ${sort === key ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                      <span className={`text-[10px] transition-opacity ${sort === key ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
                         {sort === key && sortDir === "asc" ? "▲" : "▼"}
                       </span>
                     </span>
@@ -397,7 +398,7 @@ function OverviewPanelInner({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#182533]">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {filteredByExpiry.map((m) => {
                 const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                 const apy = getMarketApy(m);
@@ -411,30 +412,30 @@ function OverviewPanelInner({
                   <tr
                     key={m.id}
                     onClick={() => onSelectMarket(m)}
-                    className="cursor-pointer hover:bg-[#182533]/50 transition-colors"
+                    className="cursor-pointer hover:bg-[var(--surface-hover)]/50 transition-colors"
                   >
-                    <td className="px-4 py-3 font-medium text-[#FFFFFF]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>{m.eventTitle}</td>
-                    <td className="px-4 py-3 text-right text-[#FFFFFF]">{formatExpiry(m.expiryDate)}</td>
-                    <td className="px-4 py-3 text-right text-[#8A9BA8]">{matchedCount > 0 ? matchedCount : "—"}</td>
-                    <td className="px-4 py-3 text-right font-bold text-[#5DBE81]">{arbCount > 0 ? arbCount : "—"}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[#5DBE81]" : roi < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
+                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>{m.eventTitle}</td>
+                    <td className="px-4 py-3 text-right text-[var(--text-primary)]">{formatExpiry(m.expiryDate)}</td>
+                    <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{matchedCount > 0 ? matchedCount : "—"}</td>
+                    <td className="px-4 py-3 text-right font-bold text-[var(--status-positive)]">{arbCount > 0 ? arbCount : "—"}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
-                    <td className={`px-4 py-3 text-right font-bold ${apy > 0 ? "text-[#5DBE81]" : apy < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]"}`}>
+                    <td className={`px-4 py-3 text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                       {apy !== 0 ? (
                         <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
                           {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
                         </ApyValueTooltip>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right text-[#FFFFFF]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-[var(--text-primary)]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="px-4 py-3 text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
-                    <td className="px-4 py-3 text-right text-xs text-[#8A9BA8]">{formatRelativeTime(scannedAt)}</td>
+                    <td className="px-4 py-3 text-right text-xs text-[var(--text-secondary)]">{formatRelativeTime(scannedAt)}</td>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
     </div>

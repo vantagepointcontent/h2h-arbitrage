@@ -1,0 +1,3 @@
+import type { TableHTMLAttributes } from 'react';
+import { cn } from '@/lib/utils';
+export function DataTable({className,...props}:TableHTMLAttributes<HTMLTableElement>){return <table className={cn('w-full border-separate border-spacing-0 text-[12px] tabular-nums [&_th]:h-[var(--density-row-compact)] [&_th]:border-b [&_th]:border-[var(--border-subtle)] [&_th]:bg-[var(--surface-raised)] [&_th]:px-3 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-semibold [&_th]:text-[var(--text-secondary)] [&_td]:h-[var(--density-row-standard)] [&_td]:border-b [&_td]:border-[var(--border-subtle)] [&_td]:px-3 [&_td]:text-[var(--text-primary)] [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[var(--surface-hover)]',className)} {...props}/>}
