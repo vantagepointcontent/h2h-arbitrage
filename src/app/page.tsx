@@ -76,6 +76,7 @@ const CouplingPanel = dynamic(() => import("@/app/components/CouplingPanel"), { 
 const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel"), { ssr: false });
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
+const BotTraderPanel = dynamic(() => import("@/app/components/BotTraderPanel"), { ssr: false });
 const PhantomsPanel = dynamic(() => import("@/app/components/PhantomsPanel"), { ssr: false });
 import ExecutionModeBadge from "@/app/components/ExecutionModeBadge";
 import { TradingStatusRail } from "@/app/components/shell/TradingStatusRail";
@@ -233,7 +234,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "phantoms" | "couple-management">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms" | "couple-management">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -310,6 +311,9 @@ export default function Home() {
         setActiveMarketId(null);
       } else if (state?.view === "timing") {
         setViewMode("timing");
+        setActiveMarketId(null);
+      } else if (state?.view === "bottrader") {
+        setViewMode("bottrader");
         setActiveMarketId(null);
       } else {
         setViewMode("overview");
@@ -473,6 +477,8 @@ export default function Home() {
         setViewMode("settings");
       } else if (view === "trades") {
         setViewMode("trades");
+      } else if (view === "bottrader") {
+        setViewMode("bottrader");
       } else if (view === "phantoms") {
         setViewMode("phantoms");
       } else if (view === "couple-management") {
@@ -1011,6 +1017,12 @@ export default function Home() {
     window.history.replaceState({ view: "trades" }, "", "/?view=trades");
   };
 
+  const goToBotTrader = () => {
+    window.history.replaceState({ view: "bottrader" }, "", "/?view=bottrader");
+    setCouplingPanelOpen(false);
+    setViewMode("bottrader");
+  };
+
   const goToCoupleManagement = () => {
     setCouplingPanelOpen(false);
     setViewMode("couple-management");
@@ -1476,6 +1488,7 @@ export default function Home() {
           onGoDashboard={goToDashboard}
           onGoTiming={goToTiming}
           onGoTrades={goToTrades}
+          onGoBotTrader={goToBotTrader}
           onGoCoupleManagement={goToCoupleManagement}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
@@ -1609,6 +1622,8 @@ export default function Home() {
               <SettingsPanel />
             ) : viewMode === "trades" ? (
               <TradesPanel />
+            ) : viewMode === "bottrader" ? (
+              <BotTraderPanel />
             ) : viewMode === "phantoms" ? (
               <PhantomsPanel />
             ) : viewMode === "couple-management" ? (

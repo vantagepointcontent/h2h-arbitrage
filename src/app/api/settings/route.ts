@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllSettings, setSettings, resetSetting } from '@/lib/settings';
+import { getAllSettings, getSetting, setSettings, resetSetting } from '@/lib/settings';
 import { validateLiveConfirmation } from '@/lib/execution-mode';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
@@ -48,6 +48,24 @@ export async function POST(request: NextRequest) {
         { error: 'Entering live mode requires the exact confirmation text LIVE.' },
         { status: 400 },
       );
+    }
+
+    // Production is gated server-side as well as by the confirmation UI. This
+    // does not alter the independent AUTO_LIVE_ORDERS_AUTHORIZED fail-closed guard.
+    if (values['bot.mode'] === 'production') {
+      if (body.confirmation !== 'PRODUCTION') {
+        return NextResponse.json(
+          { error: 'Entering BotTrader production mode requires the exact confirmation text PRODUCTION.' },
+          { status: 400 },
+        );
+      }
+      const executeMode = await getSetting<string>('execute.mode').catch(() => 'paper');
+      if (executeMode !== 'live') {
+        return NextResponse.json(
+          { error: 'BotTrader production mode is only allowed when execute.mode is set to live.' },
+          { status: 400 },
+        );
+      }
     }
 
     const result = await setSettings(values);
