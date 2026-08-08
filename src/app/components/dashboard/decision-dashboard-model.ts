@@ -2,11 +2,35 @@ export type AttentionItem = { id: string; severity: 1 | 2 | 3; title: string; de
 
 type Position = { id: string; marketTitle: string; pairedState?: string; attentionReasons?: string[]; breakdown?: { totalNetPnl?: number; totalFees?: number }; totalCost?: number; oneLegExposure?: number };
 type Execution = { id?: number; arbId?: string; marketTitle?: string; timestamp?: string; success?: boolean; result?: { unhedged?: boolean; rollbackExecuted?: boolean; netExposure?: number; kalshiResult?: unknown; polymarketResult?: unknown } | null };
+type AttentionContext = {
+  nowMs?: number;
+  credentialReady?: Partial<Record<string, boolean>>;
+};
 
-export function buildAttentionQueue(positions: Position[], executions: Execution[], errors: Record<string, string | null | undefined>): AttentionItem[] {
+const ACTIVE_EXECUTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function buildAttentionQueue(
+  positions: Position[],
+  executions: Execution[],
+  errors: Record<string, string | null | undefined>,
+  context: AttentionContext = {},
+): AttentionItem[] {
   const items: AttentionItem[] = [];
-  for (const [venue, detail] of Object.entries(errors)) if (detail) items.push({ id: `platform-${venue}`, severity: 2, category: "platform", title: `${venue} position feed unavailable`, detail });
+  const nowMs = context.nowMs ?? Date.now();
+  for (const [venue, detail] of Object.entries(errors)) {
+    if (!detail) continue;
+    const credentialsMissing = context.credentialReady?.[venue] === false;
+    items.push({
+      id: `platform-${venue}`,
+      severity: credentialsMissing ? 1 : 2,
+      category: "platform",
+      title: credentialsMissing ? `${venue} credentials not configured` : `${venue} position feed unavailable`,
+      detail: credentialsMissing ? "Position monitoring is inactive for this platform." : detail,
+    });
+  }
   for (const execution of executions) {
+    const timestampMs = execution.timestamp ? Date.parse(execution.timestamp) : Number.NaN;
+    if (!Number.isFinite(timestampMs) || nowMs - timestampMs > ACTIVE_EXECUTION_WINDOW_MS) continue;
     const result = execution.result ?? {};
     if (result.unhedged) items.push({ id: `execution-${execution.id ?? execution.arbId}-unhedged`, severity: 3, category: "execution", title: "Unhedged execution", detail: execution.marketTitle ?? "Unknown market" });
     else if (execution.success === false) items.push({ id: `execution-${execution.id ?? execution.arbId}-failed`, severity: 3, category: "execution", title: result.rollbackExecuted ? "Execution failed; rollback attempted" : "Execution failed without confirmed rollback", detail: execution.marketTitle ?? "Unknown market" });
