@@ -174,15 +174,29 @@ describe('REGRESSION: buildKalshiArbShape', () => {
     expect(shape.noAskDepth).toBe('$500');
   });
 
-  it('R16: saknade värden → safe defaults', () => {
+  it('R16: missing Kalshi quotes are unavailable, never synthetic $1 asks', () => {
     const km: KalshiMarket = {
       ticker: 'KX-TEST-001',
       event_ticker: 'KX-TEST',
     };
     const shape = buildKalshiArbShape(km);
-    expect(shape.yesAsk).toBe(1);  // default från parseFloat(... || '1')
-    expect(shape.noAsk).toBe(1);
+    expect(shape.yesAsk).toBe(0);
+    expect(shape.noAsk).toBe(0);
     expect(shape.yesAskDepth).toBeUndefined();
+  });
+
+  it('R16a: a Kalshi ask without positive ask size is not executable', () => {
+    const shape = buildKalshiArbShape({
+      ticker: 'KXLIVTOUR-YOR26-CSMI',
+      event_ticker: 'KXLIVTOUR-YOR26',
+      yes_ask_dollars: '0.0100',
+      yes_ask_size_fp: '55200.00',
+      no_ask_dollars: '1.0000',
+      // Kalshi omits no_ask_size_fp when there is no NO offer.
+    });
+
+    expect(shape.yesAsk).toBe(0.01);
+    expect(shape.noAsk).toBe(0);
   });
 
   it('R16b: malformed Kalshi prices become safe non-executable values', () => {
