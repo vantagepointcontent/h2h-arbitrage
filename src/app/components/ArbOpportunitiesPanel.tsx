@@ -7,7 +7,7 @@ import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import { computeApy } from "@/lib/matcher";
-import type { ProfitDistribution } from "@/lib/profit-distribution";
+import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
 import {
@@ -296,11 +296,18 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
             ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
           const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
             ? o.polymarket?.noPrice : o.polymarket?.yesPrice;
+          const distributionStakes = kalshiPrice != null && pmPrice != null
+            ? resolveDistributionStakes({
+                kalshiStake: o.arbitrage.kalshiStake, pmStake: o.arbitrage.pmStake,
+                maxCapital: o.arbitrage.maxCapital, expectedProfit: o.arbitrage.expectedProfit,
+                roiPct: o.arbitrage.roiPct, kalshiPrice, pmPrice,
+              })
+            : null;
           const supportsDistribution = !breakdown.isCross
             && (o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
             && kalshiPrice != null && kalshiPrice > 0 && kalshiPrice < 1
             && pmPrice != null && pmPrice > 0 && pmPrice < 1
-            && (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0) > 0;
+            && distributionStakes != null;
 
           return (
             <div key={`${idx}-${o.artist}`} className={`px-4 py-3 hover:bg-[#0E1621] transition-colors ${flashingAlerts.has(alertKey) ? "bg-[#5DBE81]/20 animate-pulse" : alertHit ? "bg-[#5DBE81]/10" : ""}`}>
@@ -421,8 +428,8 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                   strategy={o.arbitrage.strategy as 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi'}
                   kalshiPrice={kalshiPrice}
                   pmPrice={pmPrice}
-                  kalshiStake={o.arbitrage.kalshiStake ?? 0}
-                  pmStake={o.arbitrage.pmStake ?? 0}
+                  kalshiStake={distributionStakes!.kalshiStake}
+                  pmStake={distributionStakes!.pmStake}
                   category={category}
                   kalshiWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO'}
                   pmWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES'}

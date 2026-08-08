@@ -43,6 +43,24 @@ export interface ContractRatio {
   label: string;
 }
 
+/** Recover a balanced two-leg budget when older/cached arb rows omit per-leg stakes. */
+export function resolveDistributionStakes(input: {
+  kalshiStake?: number; pmStake?: number; maxCapital?: number;
+  expectedProfit: number; roiPct: number; kalshiPrice: number; pmPrice: number;
+}): { kalshiStake: number; pmStake: number } | null {
+  const kalshiStake = Number(input.kalshiStake) || 0;
+  const pmStake = Number(input.pmStake) || 0;
+  if (kalshiStake + pmStake > 0) return { kalshiStake, pmStake };
+  const impliedCapital = input.roiPct > 0 ? input.expectedProfit / (input.roiPct / 100) : 0;
+  const totalCapital = Number(input.maxCapital) > 0 ? Number(input.maxCapital) : impliedCapital;
+  const priceTotal = input.kalshiPrice + input.pmPrice;
+  if (!(totalCapital > 0) || !(priceTotal > 0)) return null;
+  return {
+    kalshiStake: totalCapital * input.kalshiPrice / priceTotal,
+    pmStake: totalCapital * input.pmPrice / priceTotal,
+  };
+}
+
 function greatestCommonDivisor(a: number, b: number): number {
   let x = Math.abs(Math.trunc(a));
   let y = Math.abs(Math.trunc(b));

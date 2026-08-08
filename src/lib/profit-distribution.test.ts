@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { calculateProfitDistribution, simplifyContractRatio } from './profit-distribution';
+import { calculateProfitDistribution, resolveDistributionStakes, simplifyContractRatio } from './profit-distribution';
+
+describe('resolveDistributionStakes', () => {
+  it('recovers balanced stakes for positive cached arbs that omit per-leg stakes', () => {
+    const stakes = resolveDistributionStakes({ expectedProfit: 5, roiPct: 5, kalshiPrice: 0.4, pmPrice: 0.5 });
+    expect(stakes?.kalshiStake).toBeCloseTo(44.4444, 3);
+    expect(stakes?.pmStake).toBeCloseTo(55.5556, 3);
+  });
+
+  it('preserves scanner-provided stakes when available', () => {
+    expect(resolveDistributionStakes({ kalshiStake: 42, pmStake: 53, expectedProfit: 5, roiPct: 5, kalshiPrice: 0.42, pmPrice: 0.53 })).toEqual({ kalshiStake: 42, pmStake: 53 });
+  });
+});
 
 describe('calculateProfitDistribution', () => {
   const input = {
