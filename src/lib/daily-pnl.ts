@@ -8,6 +8,7 @@ interface ExecutionLike {
   success: boolean;
   kalshiOrder?: unknown;
   polymarketOrder?: unknown;
+  result?: unknown;
 }
 
 interface ClosedPositionLike {
@@ -16,6 +17,7 @@ interface ClosedPositionLike {
   realizedPnl: number;
   size: number;
   entryPrice: number;
+  pairId?: string | null;
 }
 
 interface PositionLike {
@@ -35,12 +37,26 @@ function easternDateKey(value: Date | string): string {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+/** Persisted order size is USD stake, not contract count. */
 function orderVolume(order: unknown): number {
   if (!order || typeof order !== 'object') return 0;
   const value = order as Record<string, unknown>;
   const size = Number(value.size ?? 0);
-  const price = Number(value.price ?? 0);
-  return Number.isFinite(size) && Number.isFinite(price) && size > 0 && price > 0 ? size * price : 0;
+  return Number.isFinite(size) && size > 0 ? size : 0;
+}
+
+/** Prefer the actual filled USD stake recorded by the execution engine. */
+function executionLegVolume(entry: ExecutionLike, platform: Platform): number {
+  const result = entry.result && typeof entry.result === 'object'
+    ? entry.result as Record<string, unknown>
+    : null;
+  const resultKey = platform === 'kalshi' ? 'kalshiResult' : 'polymarketResult';
+  const leg = result?.[resultKey];
+  if (leg && typeof leg === 'object') {
+    const filledSize = Number((leg as Record<string, unknown>).filledSize ?? 0);
+    return Number.isFinite(filledSize) && filledSize > 0 ? filledSize : 0;
+  }
+  return orderVolume(platform === 'kalshi' ? entry.kalshiOrder : entry.polymarketOrder);
 }
 
 const finite = (value: unknown): number => {
@@ -70,8 +86,8 @@ export function summarizeDailyPnl({
     polymarket: { realizedPnl: 0, volume: 0 },
   };
   for (const entry of liveExecutions) {
-    platforms.kalshi.volume += orderVolume(entry.kalshiOrder);
-    platforms.polymarket.volume += orderVolume(entry.polymarketOrder);
+    platforms.kalshi.volume += executionLegVolume(entry, 'kalshi');
+    platforms.polymarket.volume += executionLegVolume(entry, 'polymarket');
   }
   for (const entry of closedToday) {
     platforms[entry.platform].realizedPnl += finite(entry.realizedPnl);
@@ -79,7 +95,13 @@ export function summarizeDailyPnl({
 
   const realizedPnl = closedToday.reduce((sum, entry) => sum + finite(entry.realizedPnl), 0);
   const unrealizedPnl = positions.reduce((sum, entry) => sum + finite(entry.breakdown?.totalNetPnl), 0);
-  const wins = closedToday.filter((entry) => finite(entry.realizedPnl) > 0).length;
+  const closedTrades = new Map<string, number>();
+  closedToday.forEach((entry, index) => {
+    // Legs sharing pairId are one trade. Unpaired positions remain individual trades.
+    const key = entry.pairId ? `pair:${entry.pairId}` : `leg:${index}`;
+    closedTrades.set(key, (closedTrades.get(key) ?? 0) + finite(entry.realizedPnl));
+  });
+  const wins = [...closedTrades.values()].filter((netPnl) => netPnl > 0).length;
   const totalVolume = platforms.kalshi.volume + platforms.polymarket.volume;
 
   return {
@@ -89,7 +111,7 @@ export function summarizeDailyPnl({
     unrealizedPnl,
     totalPnl: realizedPnl + unrealizedPnl,
     totalTrades: liveExecutions.length,
-    winRatePct: closedToday.length ? (wins / closedToday.length) * 100 : 0,
+    winRatePct: closedTrades.size ? (wins / closedTrades.size) * 100 : 0,
     totalVolume,
     platforms,
   };
