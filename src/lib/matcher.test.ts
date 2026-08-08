@@ -9,11 +9,49 @@ import {
   similarity,
   matchOutcomes,
   buildPmArbShape,
+  buildKalshiArbShape,
   calcKalshiFee,
   calcPolymarketFee,
   normalizeOutcomePlatforms,
   parseSuspiciousRoiPct,
 } from './matcher';
+
+describe('buildKalshiArbShape', () => {
+  const market = (overrides: Record<string, unknown> = {}) => ({
+    ticker: 'KX-ASK-SIZE',
+    yes_bid_dollars: '0.39',
+    yes_ask_dollars: '0.41',
+    no_bid_dollars: '0.57',
+    no_ask_dollars: '0.59',
+    last_price_dollars: '0.40',
+    volume_24h_fp: '100',
+    yes_bid_size_fp: '10',
+    yes_ask_size_fp: '5',
+    no_bid_size_fp: '10',
+    no_ask_size_fp: '5',
+    ...overrides,
+  }) as unknown as Parameters<typeof buildKalshiArbShape>[0];
+
+  it('preserves quoted ask prices when Kalshi omits ask-size fields', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_ask_size_fp: undefined,
+      no_ask_size_fp: null,
+    }));
+
+    expect(shape.yesAsk).toBe(0.41);
+    expect(shape.noAsk).toBe(0.59);
+  });
+
+  it('keeps explicitly zero-sized asks non-executable', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_ask_size_fp: 0,
+      no_ask_size_fp: '0',
+    }));
+
+    expect(shape.yesAsk).toBe(0);
+    expect(shape.noAsk).toBe(0);
+  });
+});
 
 describe('parseSuspiciousRoiPct', () => {
   it.each([undefined, '', '0', '-1', 'NaN', 'Infinity', '-Infinity', 'invalid'])

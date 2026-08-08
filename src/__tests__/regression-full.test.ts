@@ -185,18 +185,25 @@ describe('REGRESSION: buildKalshiArbShape', () => {
     expect(shape.yesAskDepth).toBeUndefined();
   });
 
-  it('R16a: a Kalshi ask without positive ask size is not executable', () => {
-    const shape = buildKalshiArbShape({
+  it('R16a: a Kalshi ask with unknown size remains visible but explicit zero size is not executable', () => {
+    const missingSize = buildKalshiArbShape({
       ticker: 'KXLIVTOUR-YOR26-CSMI',
       event_ticker: 'KXLIVTOUR-YOR26',
       yes_ask_dollars: '0.0100',
       yes_ask_size_fp: '55200.00',
       no_ask_dollars: '1.0000',
-      // Kalshi omits no_ask_size_fp when there is no NO offer.
+      // Some Kalshi responses omit no_ask_size_fp even when the quote is valid.
+    });
+    const explicitZero = buildKalshiArbShape({
+      ticker: 'KXLIVTOUR-YOR26-ZERO',
+      event_ticker: 'KXLIVTOUR-YOR26',
+      no_ask_dollars: '1.0000',
+      no_ask_size_fp: '0',
     });
 
-    expect(shape.yesAsk).toBe(0.01);
-    expect(shape.noAsk).toBe(0);
+    expect(missingSize.yesAsk).toBe(0.01);
+    expect(missingSize.noAsk).toBe(1);
+    expect(explicitZero.noAsk).toBe(0);
   });
 
   it('R16b: malformed Kalshi prices become safe non-executable values', () => {

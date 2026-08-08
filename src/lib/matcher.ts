@@ -1175,15 +1175,15 @@ export function buildPmArbShape(market: PMMarket) {
 }
 
 export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
-  // Kalshi may publish boundary prices such as NO ask=$1.00 even when that
-  // side has no order. The website correctly shows no offer because the
-  // corresponding *_ask_size_fp field is absent/zero. Price without positive
-  // size is not executable liquidity and must fail closed.
+  // A quoted ask can be valid even when Kalshi omits the corresponding size.
+  // Preserve that price for display/matching, but keep explicit zero-size offers
+  // non-executable. Downstream depth remains zero when size is unknown, so this
+  // does not reintroduce BUG-101's synthetic infinite liquidity.
   const executableAsk = (
     price: string | number | null | undefined,
     size: string | number | null | undefined,
   ): number => {
-    if (parseDepth(size) <= 0) return 0;
+    if (size != null && Number(size) === 0) return 0;
     return finiteMarketPrice(price);
   };
 
