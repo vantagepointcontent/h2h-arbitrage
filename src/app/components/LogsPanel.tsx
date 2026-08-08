@@ -83,6 +83,9 @@ export default function LogsPanel() {
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // UI-034: unique markets count from SQL COUNT(DISTINCT market_id)
+  const [uniqueMarkets, setUniqueMarkets] = useState<number | null>(null);
+
   // UI-035: export row count estimate
   const [exportCount, setExportCount] = useState<number | null>(null);
   const [exportCountLoading, setExportCountLoading] = useState(false);
@@ -106,6 +109,7 @@ export default function LogsPanel() {
       } else {
         setLogs(data.logs || []);
         setNextCursor(data.nextCursor);
+        setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
       }
     } catch (e: any) {
       setError(e.message || "Failed to fetch logs");
@@ -133,6 +137,7 @@ export default function LogsPanel() {
       } else {
         setLogs(prev => [...prev, ...(data.logs || [])]);
         setNextCursor(data.nextCursor);
+        setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
       }
     } catch (e: any) {
       setError(e.message || "Failed to load more logs");
@@ -398,8 +403,9 @@ export default function LogsPanel() {
 
       {/* Stats Summary */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <StatBox label="Total Scans" value={stats.count.toString()} />
+          <StatBox label="Unique Markets" value={uniqueMarkets != null ? uniqueMarkets.toLocaleString() : "—"} color="#5DBE81" />
           <StatBox label="Total Arbs" value={stats.totalArbs.toString()} color="#5DBE81" />
           <StatBox label="Avg ROI" value={fmtPct(stats.avgRoi)} color={stats.avgRoi > 0 ? "#5DBE81" : "#ef4444"} />
           <StatBox label="Best ROI" value={fmtPct(stats.bestRoi)} color="#5DBE81" />

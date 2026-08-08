@@ -291,6 +291,63 @@ function getBestPriceFromBook(book: ClobBook | null): { bestBid: number; bestAsk
   return { bestBid: bestBid ?? 0, bestAsk: bestAsk ?? 0 };
 }
 
+export interface ClobBidPrices {
+  yesBidCents: number | null;
+  noBidCents: number | null;
+  resolved: boolean;
+}
+
+function priceToCents(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null;
+  return Math.round(value * 100);
+}
+
+/**
+ * Extract executable sell prices for both outcome tokens. Token books are the
+ * source of truth and are deliberately scanned for MAX(bid), because CLOB
+ * levels are not reliably sorted. Token metadata `price` is never used.
+ */
+export function extractClobBidPrices(
+  clob: ClobMarket,
+  yesBook: ClobBook | null,
+  noBook: ClobBook | null,
+): ClobBidPrices {
+  const yesToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'yes');
+  const noToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'no');
+
+  if (clob.closed === true && yesToken && noToken && yesToken.winner !== noToken.winner) {
+    if (yesToken.winner === true) return { yesBidCents: 100, noBidCents: 0, resolved: true };
+    if (noToken.winner === true) return { yesBidCents: 0, noBidCents: 100, resolved: true };
+  }
+
+  const yesPrices = getBestPriceFromBook(yesBook);
+  const noPrices = getBestPriceFromBook(noBook);
+  let yesBidCents = yesPrices && yesPrices.bestBid > 0 ? priceToCents(yesPrices.bestBid) : null;
+  let noBidCents = noPrices && noPrices.bestBid > 0 ? priceToCents(noPrices.bestBid) : null;
+
+  // Aggregate complementary quotes are valid only for standard binary markets.
+  // Neg-risk outcomes are independent and must never be inferred as 1-price.
+  if (clob.neg_risk !== true) {
+    if (yesBidCents == null) yesBidCents = priceToCents(clob.best_bid);
+    if (noBidCents == null && typeof clob.best_ask === 'number' && clob.best_ask > 0) {
+      noBidCents = priceToCents(1 - clob.best_ask);
+    }
+  }
+  return { yesBidCents, noBidCents, resolved: false };
+}
+
+/** Fetch executable YES/NO sell bids from the two token orderbooks. */
+export async function getClobBidPrices(clob: ClobMarket): Promise<ClobBidPrices> {
+  const yesToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'yes');
+  const noToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'no');
+  if (!yesToken || !noToken) return extractClobBidPrices(clob, null, null);
+  const [yesBook, noBook] = await Promise.all([
+    fetchClobBook(yesToken.token_id),
+    fetchClobBook(noToken.token_id),
+  ]);
+  return extractClobBidPrices(clob, yesBook, noBook);
+}
+
 export async function fetchClobMarkets(conditionIds: string[]): Promise<Map<string, ClobMarket>> {
   // Deduplicate conditionIds and filter out already-cached ones
   const uniqueIds = [...new Set(conditionIds)];

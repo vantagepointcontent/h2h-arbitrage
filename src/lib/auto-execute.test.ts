@@ -4,6 +4,8 @@ import {
   executeArb,
   getSafetyLimitsFromEnv,
   shouldSimulateExecution,
+  areFilledContractsMatched,
+  isCompleteClose,
   type ExecutionRequest,
   type SafetyLimits,
   type OrderRequest,
@@ -156,6 +158,58 @@ describe('executeArb', () => {
     const limits = getSafetyLimitsFromEnv();
     expect(typeof limits.dailyLossLimit).toBe('number');
     expect(limits.dailyLossLimit).toBeGreaterThan(0);
+  });
+
+  it('matches hedged fills by contract quantity rather than unequal dollar notionals', () => {
+    expect(areFilledContractsMatched(
+      { platform: 'kalshi', status: 'filled', filledSize: 45, filledPrice: 0.45, filledContracts: 100, timestamp: '' },
+      { platform: 'polymarket', status: 'filled', filledSize: 52, filledPrice: 0.52, filledContracts: 100, timestamp: '' },
+    )).toEqual({ matched: true, kalshiContracts: 100, polymarketContracts: 100 });
+  });
+
+  it('fails closed instead of reconstructing missing contract units from rounded notionals', () => {
+    expect(areFilledContractsMatched(
+      { platform: 'kalshi', status: 'filled', filledSize: 45, filledPrice: 0.45, timestamp: '' },
+      { platform: 'polymarket', status: 'filled', filledSize: 52, filledPrice: 0.52, timestamp: '' },
+    ).matched).toBe(false);
+  });
+
+  it('uses authoritative filled contract units instead of reconstructing them from rounded notionals', () => {
+    expect(areFilledContractsMatched(
+      {
+        platform: 'kalshi', status: 'filled', filledSize: 13.94,
+        filledPrice: 0.45, filledContracts: 31, timestamp: '',
+      },
+      {
+        platform: 'polymarket', status: 'filled', filledSize: 16.11,
+        filledPrice: 0.52, filledContracts: 31, timestamp: '',
+      },
+    )).toEqual({ matched: true, kalshiContracts: 31, polymarketContracts: 31 });
+  });
+
+  it('retains the matched residual contracts after successfully closing an unequal-fill excess', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    random
+      .mockReturnValueOnce(0.5) // Kalshi order fills
+      .mockReturnValueOnce(0.5) // Kalshi slippage = 0
+      .mockReturnValueOnce(0.9) // Kalshi gets the larger partial fill
+      .mockReturnValueOnce(0.5) // Kalshi order id
+      .mockReturnValueOnce(0.5) // PM order fills
+      .mockReturnValueOnce(0.5) // PM slippage = 0
+      .mockReturnValueOnce(0.5); // PM gets the smaller partial fill; later calls default to successful 0.5
+
+    const result = await executeArb(makeRequest(0.45, 45, 0.52, 52, true, 2, 1));
+
+    expect(result.rollbackExecuted).toBe(true);
+    expect(result.unhedged).toBe(false);
+    expect(result.kalshiResult.filledContracts).toBe(92);
+    expect(result.polymarketResult.filledContracts).toBe(92);
+  });
+
+  it('requires the venue to confirm the entire requested excess close', () => {
+    expect(isCompleteClose(8, 8)).toBe(true);
+    expect(isCompleteClose(8, 3)).toBe(false);
+    expect(isCompleteClose(8, null)).toBe(false);
   });
 
   it('partial fill handling calculates netExposure', async () => {

@@ -3,6 +3,22 @@ import path from 'path';
 import { getSavedMarkets, SavedMarket, updateSavedMarketScanResult } from '@/lib/persistence';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket } from '@/app/api/saved-markets/refresh/refresh-single';
+import { runBotTraderOnScanOutcomes, type BotTradeInput } from '@/lib/bot-trader';
+
+function parseDepthString(val: number | string | null | undefined): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : 0;
+  const s = String(val).trim().replace(/^\$/, '');
+  if (s === 'Infinity') return 0;
+  const m = s.match(/^(\d[\d,]*(?:\.\d+)?)\s*([KMB]?)\s*$/i);
+  if (!m) return 0;
+  let num = parseFloat(m[1].replace(/,/g, ''));
+  const suffix = (m[2] || '').toUpperCase();
+  if (suffix === 'K') num *= 1000;
+  if (suffix === 'M') num *= 1_000_000;
+  if (suffix === 'B') num *= 1_000_000_000;
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
 
 const REFRESH_STATE_FILE = path.join(process.cwd(), 'data', 'refresh-job-state.json');
 
@@ -95,6 +111,41 @@ async function runRefreshJob(marketIds?: string[]) {
           allArbs: result.allArbs,
         };
         await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
+        // FEAT-040: run BotTrader over the scan's matched outcomes.
+        // Paper-only unless production is separately authorized.
+        try {
+          const inputs: BotTradeInput[] = (result.allArbs || [])
+            .filter((arb) => arb.roiPct > 0)
+            .map((arb: any) => ({
+              pairId: market.id,
+              marketTitle: market.eventTitle,
+              outcome: arb.artist,
+              strategy: arb.strategy,
+              roiPct: arb.roiPct,
+              apyPct: arb.apyPct ?? null,
+              expectedProfit: arb.expectedProfit,
+              kalshiStake: arb.kalshiStake ?? arb.totalStake / 2,
+              pmStake: arb.pmStake ?? arb.totalStake / 2,
+              kalshiTicker: arb.kalshiTicker ?? null,
+              pmConditionId: arb.pmConditionId ?? null,
+              kalshiYesAsk: arb.kalshiYesAsk ?? null,
+              kalshiNoAsk: arb.kalshiNoAsk ?? null,
+              pmYesAsk: arb.pmBestAsk ?? null,
+              pmNoAsk: arb.pmNoPrice ?? null,
+              kalshiYesDepth: parseDepthString(arb.kalshiYesDepth),
+              kalshiNoDepth: parseDepthString(arb.kalshiNoDepth),
+              pmYesDepth: arb.pmYesDepth ?? 0,
+              pmNoDepth: arb.pmNoDepth ?? 0,
+              expiryDate: result.expiryDate ?? undefined,
+            }));
+          const botResults = await runBotTraderOnScanOutcomes(market.id, market.eventTitle, result.expiryDate ?? undefined, inputs);
+          const executed = botResults.filter((b) => b.executed).length;
+          if (executed > 0) {
+            console.log(`[refresh-job] BotTrader executed ${executed} trade(s) for ${market.eventTitle}`);
+          }
+        } catch (e: any) {
+          console.warn(`[refresh-job] BotTrader hook failed for ${market.eventTitle}:`, e.message);
+        }
         newState.succeeded++;
       } catch (e: any) {
         newState.failed++;

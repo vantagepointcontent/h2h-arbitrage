@@ -38,8 +38,132 @@ export interface BotPosition {
   dryRun: boolean;
 }
 
-function getClient(): Client {
-  return createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
+export type CreateBotPosition = Omit<BotPosition,
+  'id' | 'status' | 'settledAt' | 'currentPriceKalshiCents' |
+  'currentPricePmCents' | 'currentValueCents' | 'unrealizedPnlCents' |
+  'unrealizedRoiBps' | 'lastValuationAt' | 'realizedPnlCents' |
+  'settlementSide' | 'dryRun'
+>;
+
+export interface PositionQuote {
+  kalshiYesBidCents: number | null;
+  kalshiNoBidCents: number | null;
+  pmYesBidCents: number | null;
+  pmNoBidCents: number | null;
+  observedAt: string;
+  expiryDate: string | null;
+  kalshiResolved?: boolean;
+  pmResolved?: boolean;
+}
+
+export interface PositionValuation {
+  status: 'open' | 'settled';
+  currentPriceKalshiCents: number;
+  currentPricePmCents: number;
+  currentValueCents: number;
+  unrealizedPnlCents: number;
+  unrealizedRoiBps: number;
+  lastValuationAt: string;
+  settledAt: string | null;
+  realizedPnlCents: number | null;
+  settlementSide: SettlementSide;
+}
+
+interface KalshiSettlementMarket {
+  status?: string;
+  settlement_value_dollars?: string;
+  yes_bid_dollars?: string;
+  no_bid_dollars?: string;
+}
+
+/** Return authoritative binary settlement prices, independent of empty books. */
+export function getKalshiResolvedPrices(market: KalshiSettlementMarket): {
+  yesBidCents: number | null;
+  noBidCents: number | null;
+  resolved: boolean;
+} {
+  const resolved = ['settled', 'finalized', 'resolved'].includes((market.status ?? '').toLowerCase());
+  if (!resolved) return { yesBidCents: null, noBidCents: null, resolved: false };
+  const settlement = market.settlement_value_dollars ?? '';
+  if (settlement === '1' || /^1\.0+$/.test(settlement)) {
+    return { yesBidCents: 100, noBidCents: 0, resolved: true };
+  }
+  if (settlement === '0' || /^0\.0+$/.test(settlement)) {
+    return { yesBidCents: 0, noBidCents: 100, resolved: true };
+  }
+  return { yesBidCents: null, noBidCents: null, resolved: false };
+}
+
+function isPriceCents(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100;
+}
+
+function assertMoneyCents(name: string, value: number): void {
+  if (!Number.isSafeInteger(value)) throw new Error(`${name} must be integer cents`);
+}
+
+function assertShares(name: string, value: number): void {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer contract count`);
+}
+
+function roiBps(pnlCents: number, costCents: number): number {
+  if (costCents <= 0) return 0;
+  return Math.round((pnlCents * 10_000) / costCents);
+}
+
+export function calculatePositionValuation(
+  position: BotPosition,
+  quote: PositionQuote,
+): PositionValuation {
+  const kalshiPrice = position.kalshiSide === 'yes'
+    ? quote.kalshiYesBidCents
+    : quote.kalshiNoBidCents;
+  const pmPrice = position.pmSide === 'yes'
+    ? quote.pmYesBidCents
+    : quote.pmNoBidCents;
+
+  if (!isPriceCents(kalshiPrice) || !isPriceCents(pmPrice)) {
+    throw new Error(`Missing executable bid for bot position ${position.id}`);
+  }
+
+  const currentValueCents =
+    kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm;
+  const unrealizedPnlCents = currentValueCents - position.totalCostCents;
+  const base: PositionValuation = {
+    status: 'open',
+    currentPriceKalshiCents: kalshiPrice,
+    currentPricePmCents: pmPrice,
+    currentValueCents,
+    unrealizedPnlCents,
+    unrealizedRoiBps: roiBps(unrealizedPnlCents, position.totalCostCents),
+    lastValuationAt: quote.observedAt,
+    settledAt: null,
+    realizedPnlCents: null,
+    settlementSide: null,
+  };
+
+  const expiryMs = quote.expiryDate ? Date.parse(quote.expiryDate) : Number.NaN;
+  const observedMs = Date.parse(quote.observedAt);
+  const expired = Number.isFinite(expiryMs) && Number.isFinite(observedMs) && expiryMs < observedMs;
+  const resolvedComplement =
+    (kalshiPrice === 100 && pmPrice === 0) ||
+    (kalshiPrice === 0 && pmPrice === 100);
+
+  if (!expired || !quote.kalshiResolved || !quote.pmResolved || !resolvedComplement) return base;
+
+  const payoutCents = kalshiPrice === 100
+    ? position.sharesKalshi * 100
+    : position.sharesPm * 100;
+  return {
+    ...base,
+    status: 'settled',
+    currentValueCents: payoutCents,
+    unrealizedPnlCents: payoutCents - position.totalCostCents,
+    unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
+    settledAt: quote.observedAt,
+    realizedPnlCents: payoutCents - position.totalCostCents - position.feesCents,
+    settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
+  };
 }
 
 function rowToPosition(row: Record<string, unknown>): BotPosition {
@@ -77,29 +201,370 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
   };
 }
 
-export async function getBotPositions(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
-  const c = getClient();
-  try {
-    const status = options.status ?? 'all';
-    if (status !== 'all' && status !== 'open' && status !== 'settled') {
-      throw new Error(`Invalid status: ${status}`);
+export class BotPositionStore {
+  private readonly client: Client;
+  private schemaReady: Promise<void> | null = null;
+
+  constructor(dbUrl = `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}`) {
+    this.client = createClient({ url: dbUrl });
+  }
+
+  private ensureSchema(): Promise<void> {
+    if (!this.schemaReady) this.schemaReady = this.createSchema();
+    return this.schemaReady;
+  }
+
+  private async createSchema(): Promise<void> {
+    await this.client.execute('PRAGMA busy_timeout = 5000');
+    await this.client.execute('PRAGMA foreign_keys = ON');
+    await this.client.execute(`
+      CREATE TABLE IF NOT EXISTS bot_positions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id INTEGER NOT NULL REFERENCES executions(id),
+        market_id TEXT,
+        market_title TEXT NOT NULL,
+        kalshi_ticker TEXT,
+        pm_condition_id TEXT,
+        strategy TEXT,
+        kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
+        pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
+        buy_price_kalshi INTEGER NOT NULL,
+        buy_price_pm INTEGER NOT NULL,
+        shares_kalshi INTEGER NOT NULL,
+        shares_pm INTEGER NOT NULL,
+        total_cost INTEGER NOT NULL,
+        expected_payout INTEGER NOT NULL,
+        expected_profit INTEGER NOT NULL,
+        fees INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
+        opened_at TEXT NOT NULL,
+        expiry_date TEXT,
+        settled_at TEXT,
+        current_price_kalshi INTEGER,
+        current_price_pm INTEGER,
+        current_value INTEGER,
+        unrealized_pnl INTEGER,
+        unrealized_roi_pct INTEGER,
+        last_valuation_at TEXT,
+        realized_pnl INTEGER,
+        settlement_side TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL)
+      )
+    `);
+    // Idempotent migration for installations that created the table from an
+    // earlier FEAT-043 draft. SQLite ignores no columns implicitly, so add each
+    // missing column explicitly before creating indexes.
+    const info = await this.client.execute('PRAGMA table_info(bot_positions)');
+    const existing = new Set(info.rows.map((row) => String(row.name)));
+    const migrations: Record<string, string> = {
+      execution_id: 'INTEGER REFERENCES executions(id)',
+      market_id: 'TEXT',
+      market_title: "TEXT NOT NULL DEFAULT ''",
+      kalshi_ticker: 'TEXT',
+      pm_condition_id: 'TEXT',
+      strategy: 'TEXT',
+      kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
+      pm_side: "TEXT NOT NULL DEFAULT 'no'",
+      buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
+      buy_price_pm: 'INTEGER NOT NULL DEFAULT 0',
+      shares_kalshi: 'INTEGER NOT NULL DEFAULT 0',
+      shares_pm: 'INTEGER NOT NULL DEFAULT 0',
+      total_cost: 'INTEGER NOT NULL DEFAULT 0',
+      expected_payout: 'INTEGER NOT NULL DEFAULT 0',
+      expected_profit: 'INTEGER NOT NULL DEFAULT 0',
+      fees: 'INTEGER NOT NULL DEFAULT 0',
+      status: "TEXT NOT NULL DEFAULT 'open'",
+      opened_at: "TEXT NOT NULL DEFAULT ''",
+      expiry_date: 'TEXT',
+      settled_at: 'TEXT',
+      current_price_kalshi: 'INTEGER',
+      current_price_pm: 'INTEGER',
+      current_value: 'INTEGER',
+      unrealized_pnl: 'INTEGER',
+      unrealized_roi_pct: 'INTEGER',
+      last_valuation_at: 'TEXT',
+      realized_pnl: 'INTEGER',
+      settlement_side: 'TEXT',
+    };
+    for (const [name, definition] of Object.entries(migrations)) {
+      if (!existing.has(name)) {
+        await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
+      }
     }
-    const limit = Math.min(1000, Math.max(1, options.limit ?? 100));
-    const where = status === 'all' ? '' : "WHERE bp.status = ?";
-    const args = status === 'all' ? [limit] : [status, limit];
-    const res = await c.execute({
-      sql: `SELECT bp.*, COALESCE(e.dry_run, 1) AS dry_run
-            FROM bot_positions bp
-            LEFT JOIN executions e ON e.id = bp.execution_id
-            ${where}
-            ORDER BY bp.opened_at DESC
-            LIMIT ?`,
+    await this.client.execute(`
+      CREATE TABLE IF NOT EXISTS bot_position_reservations (
+        pair_key TEXT PRIMARY KEY,
+        reserved_at TEXT NOT NULL,
+        exposure_at_risk INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    const reservationInfo = await this.client.execute('PRAGMA table_info(bot_position_reservations)');
+    if (!reservationInfo.rows.some((row) => String(row.name) === 'exposure_at_risk')) {
+      await this.client.execute(`ALTER TABLE bot_position_reservations ADD COLUMN exposure_at_risk INTEGER NOT NULL DEFAULT 0`);
+    }
+    await this.client.execute(`CREATE INDEX IF NOT EXISTS idx_bot_positions_status ON bot_positions(status, opened_at DESC)`);
+    await this.client.execute(`DROP INDEX IF EXISTS idx_bot_positions_open_pair`);
+    await this.client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id)) WHERE status = 'open'`);
+  }
+
+  async create(input: CreateBotPosition): Promise<BotPosition> {
+    await this.ensureSchema();
+    assertShares('sharesKalshi', input.sharesKalshi);
+    assertShares('sharesPm', input.sharesPm);
+    for (const [name, value] of Object.entries({
+      buyPriceKalshiCents: input.buyPriceKalshiCents,
+      buyPricePmCents: input.buyPricePmCents,
+      totalCostCents: input.totalCostCents,
+      expectedPayoutCents: input.expectedPayoutCents,
+      expectedProfitCents: input.expectedProfitCents,
+      feesCents: input.feesCents,
+    })) assertMoneyCents(name, value);
+    if (!isPriceCents(input.buyPriceKalshiCents) || !isPriceCents(input.buyPricePmCents)) {
+      throw new Error('Buy prices must be integer cents from 0 through 100');
+    }
+    if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId)) {
+      throw new Error('An open bot position already exists for this market pair');
+    }
+
+    const initialRoiBps = roiBps(input.expectedProfitCents, input.totalCostCents);
+    let result;
+    try {
+      result = await this.client.execute({
+        sql: `INSERT INTO bot_positions (
+          execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
+          strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
+          shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
+          fees, status, opened_at, expiry_date, current_price_kalshi,
+          current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
+          last_valuation_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
+          input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
+          input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
+          input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
+          input.expectedProfitCents, input.feesCents, input.openedAt,
+          input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
+          input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
+          input.openedAt,
+        ],
+      });
+    } catch (error) {
+      if (String(error).includes('UNIQUE constraint failed')) {
+        throw new Error('An open bot position already exists for this market pair');
+      }
+      throw error;
+    }
+    const id = Number(result.lastInsertRowid ?? 0);
+    const created = await this.getById(id);
+    if (!created) throw new Error('Created bot position could not be read back');
+    return created;
+  }
+
+  async getById(id: number): Promise<BotPosition | null> {
+    await this.ensureSchema();
+    const result = await this.client.execute({
+      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id WHERE bp.id = ?`,
+      args: [id],
+    });
+    return result.rows[0] ? rowToPosition(result.rows[0] as Record<string, unknown>) : null;
+  }
+
+  async hasOpenPair(kalshiTicker: string | null, pmConditionId: string | null): Promise<boolean> {
+    await this.ensureSchema();
+    if (!kalshiTicker || !pmConditionId) return false;
+    const result = await this.client.execute({
+      sql: `SELECT 1 FROM bot_positions WHERE status = 'open' AND lower(kalshi_ticker) = lower(?) AND lower(pm_condition_id) = lower(?) LIMIT 1`,
+      args: [kalshiTicker, pmConditionId],
+    });
+    return result.rows.length > 0;
+  }
+
+  private pairKey(kalshiTicker: string, pmConditionId: string): string {
+    return `${kalshiTicker.trim().toLowerCase()}\u0000${pmConditionId.trim().toLowerCase()}`;
+  }
+
+  async reservePair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
+    await this.ensureSchema();
+    // Automatic live orders are hard-disabled; a 10-minute lease recovers paper
+    // reservations after process crashes while remaining far longer than the
+    // 15-second execution timeout.
+    const staleBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+    await this.client.execute({
+      sql: `DELETE FROM bot_position_reservations WHERE reserved_at < ? AND exposure_at_risk = 0`,
+      args: [staleBefore],
+    });
+    if (await this.hasOpenPair(kalshiTicker, pmConditionId)) return false;
+    try {
+      await this.client.execute({
+        sql: `INSERT INTO bot_position_reservations (pair_key, reserved_at) VALUES (?, ?)`,
+        args: [this.pairKey(kalshiTicker, pmConditionId), new Date().toISOString()],
+      });
+      // Close the narrow gap between the precheck and reservation insert: a
+      // prior reservation may have committed its position and released while
+      // this caller waited on SQLite's writer lock.
+      if (await this.hasOpenPair(kalshiTicker, pmConditionId)) {
+        await this.releasePair(kalshiTicker, pmConditionId);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (String(error).includes('UNIQUE constraint failed')) return false;
+      throw error;
+    }
+  }
+
+  async releasePair(kalshiTicker: string, pmConditionId: string): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `DELETE FROM bot_position_reservations WHERE pair_key = ?`,
+      args: [this.pairKey(kalshiTicker, pmConditionId)],
+    });
+  }
+
+  async retainPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_position_reservations SET exposure_at_risk = 1 WHERE pair_key = ?`,
+      args: [this.pairKey(kalshiTicker, pmConditionId)],
+    });
+  }
+
+  async list(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
+    await this.ensureSchema();
+    const status = options.status ?? 'all';
+    const limit = Math.min(1000, Math.max(1, Math.trunc(options.limit ?? 100)));
+    const where = status === 'all' ? '' : 'WHERE bp.status = ?';
+    const args: Array<string | number> = status === 'all' ? [limit] : [status, limit];
+    const result = await this.client.execute({
+      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id ${where} ORDER BY bp.opened_at DESC LIMIT ?`,
       args,
     });
-    return (res.rows as Array<Record<string, unknown>>).map(rowToPosition);
-  } finally {
-    c.close();
+    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
   }
+
+  async listAllForAnalytics(): Promise<BotPosition[]> {
+    await this.ensureSchema();
+    const result = await this.client.execute(`
+      SELECT bp.*, e.dry_run
+      FROM bot_positions bp
+      LEFT JOIN executions e ON e.id = bp.execution_id
+      ORDER BY bp.opened_at DESC
+    `);
+    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
+  }
+
+  async listAllOpen(): Promise<BotPosition[]> {
+    await this.ensureSchema();
+    const result = await this.client.execute(`
+      SELECT bp.*, e.dry_run
+      FROM bot_positions bp
+      LEFT JOIN executions e ON e.id = bp.execution_id
+      WHERE bp.status = 'open'
+      ORDER BY bp.opened_at ASC
+    `);
+    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
+  }
+
+  async updateValuation(id: number, valuation: PositionValuation): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_positions SET
+        status = ?, current_price_kalshi = ?, current_price_pm = ?,
+        current_value = ?, unrealized_pnl = ?, unrealized_roi_pct = ?,
+        last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?
+        WHERE id = ? AND status = 'open'`,
+      args: [
+        valuation.status, valuation.currentPriceKalshiCents,
+        valuation.currentPricePmCents, valuation.currentValueCents,
+        valuation.unrealizedPnlCents, valuation.unrealizedRoiBps,
+        valuation.lastValuationAt, valuation.settledAt,
+        valuation.realizedPnlCents, valuation.settlementSide, id,
+      ],
+    });
+  }
+
+  close(): void {
+    this.client.close();
+  }
+}
+
+let defaultStore: BotPositionStore | null = null;
+function store(): BotPositionStore {
+  if (!defaultStore) defaultStore = new BotPositionStore();
+  return defaultStore;
+}
+
+export async function createBotPosition(input: CreateBotPosition): Promise<BotPosition> {
+  return store().create(input);
+}
+
+/** Compatibility adapter used by BotTrader after a successful paper execution. */
+export interface BotPositionInput {
+  executionId: number;
+  pairId: string;
+  marketTitle: string;
+  kalshiTicker: string | null;
+  pmConditionId: string | null;
+  strategy: string;
+  kalshiSide: BotPositionSide;
+  pmSide: BotPositionSide;
+  kalshiPrice: number;
+  pmPrice: number;
+  kalshiStake: number;
+  pmStake: number;
+  expectedProfit: number;
+  expiryDate?: string | null;
+}
+
+export async function recordBotPosition(input: BotPositionInput): Promise<void> {
+  const buyPriceKalshiCents = Math.round(input.kalshiPrice * 100);
+  const buyPricePmCents = Math.round(input.pmPrice * 100);
+  const sharesKalshi = Math.max(1, Math.floor(input.kalshiStake / input.kalshiPrice + 1e-9));
+  const sharesPm = Math.max(1, Math.floor(input.pmStake / input.pmPrice + 1e-9));
+  const totalCostCents = sharesKalshi * buyPriceKalshiCents + sharesPm * buyPricePmCents;
+  const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
+  const expectedProfitCents = Math.round(input.expectedProfit * 100);
+
+  await createBotPosition({
+    executionId: input.executionId,
+    marketId: input.pairId,
+    marketTitle: input.marketTitle,
+    kalshiTicker: input.kalshiTicker,
+    pmConditionId: input.pmConditionId,
+    strategy: input.strategy,
+    kalshiSide: input.kalshiSide,
+    pmSide: input.pmSide,
+    buyPriceKalshiCents,
+    buyPricePmCents,
+    sharesKalshi,
+    sharesPm,
+    totalCostCents,
+    expectedPayoutCents,
+    expectedProfitCents,
+    feesCents: Math.max(0, expectedPayoutCents - totalCostCents - expectedProfitCents),
+    openedAt: new Date().toISOString(),
+    expiryDate: input.expiryDate ?? null,
+  });
+}
+
+export async function hasOpenBotMarketPair(kalshiTicker: string | null, pmConditionId: string | null): Promise<boolean> {
+  return store().hasOpenPair(kalshiTicker, pmConditionId);
+}
+
+export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
+  return store().reservePair(kalshiTicker, pmConditionId);
+}
+
+export async function retainBotMarketPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {
+  return store().retainPairForExposure(kalshiTicker, pmConditionId);
+}
+
+export async function releaseBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<void> {
+  return store().releasePair(kalshiTicker, pmConditionId);
+}
+
+export async function getBotPositions(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
+  return store().list(options);
 }
 
 export interface BotPositionAnalytics {
@@ -113,150 +578,113 @@ export interface BotPositionAnalytics {
   timeStats: { tradesPerDayBps: number; averageHoldSeconds: number };
 }
 
-function roiBps(pnlCents: number, costCents: number): number {
-  if (costCents <= 0) return 0;
-  return Math.round((pnlCents * 10_000) / costCents);
-}
-
 export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
-  const c = getClient();
-  try {
-    const res = await c.execute({
-      sql: `SELECT bp.*, COALESCE(e.dry_run, 1) AS dry_run
-            FROM bot_positions bp
-            LEFT JOIN executions e ON e.id = bp.execution_id
-            ORDER BY bp.opened_at DESC`,
-    });
-    const positions = (res.rows as Array<Record<string, unknown>>).map(rowToPosition);
+  const positions = await store().listAllForAnalytics();
+  const paper = positions.filter((position) => position.dryRun).length;
+  const production = positions.length - paper;
+  const open = positions.filter((position) => position.status === 'open');
+  const settled = positions.filter((position) => position.status === 'settled');
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+  const score = (position: BotPosition) => position.realizedPnlCents ?? position.unrealizedPnlCents ?? 0;
+  const ranked = [...positions].sort((a, b) => score(b) - score(a));
+  const dates = new Map<string, { realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>();
+  for (const position of positions) {
+    const date = position.openedAt.slice(0, 10);
+    const row = dates.get(date) ?? { realizedPnlCents: 0, unrealizedPnlCents: 0, trades: 0 };
+    row.trades += 1;
+    row.realizedPnlCents += position.realizedPnlCents ?? 0;
+    row.unrealizedPnlCents += position.status === 'open' ? position.unrealizedPnlCents ?? 0 : 0;
+    dates.set(date, row);
+  }
+  const distinctDays = Math.max(1, dates.size);
+  const holdSeconds = settled.map((position) => {
+    const start = Date.parse(position.openedAt);
+    const end = position.settledAt ? Date.parse(position.settledAt) : start;
+    return Math.max(0, Math.round((end - start) / 1000));
+  });
+  return {
+    totalBotTrades: { paper, production, total: positions.length },
+    openPositions: {
+      count: open.length,
+      unrealizedPnlCents: sum(open.map((position) => position.unrealizedPnlCents ?? 0)),
+    },
+    settledPositions: {
+      count: settled.length,
+      realizedPnlCents: sum(settled.map((position) => position.realizedPnlCents ?? 0)),
+      winRateBps: settled.length === 0 ? 0 : Math.round(settled.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000 / settled.length),
+    },
+    averageRoi: {
+      atTradeBps: positions.length === 0 ? 0 : Math.round(sum(positions.map((position) => roiBps(position.expectedProfitCents, position.totalCostCents))) / positions.length),
+      currentBps: positions.length === 0 ? 0 : Math.round(sum(positions.map((position) => position.unrealizedRoiBps ?? 0)) / positions.length),
+    },
+    bestTrade: ranked[0] ?? null,
+    worstTrade: ranked.at(-1) ?? null,
+    dailyPnl: [...dates.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, values]) => ({ date, ...values })),
+    timeStats: {
+      tradesPerDayBps: Math.round(positions.length * 10_000 / distinctDays),
+      averageHoldSeconds: holdSeconds.length === 0 ? 0 : Math.round(sum(holdSeconds) / holdSeconds.length),
+    },
+  };
+}
 
-    const paper = positions.filter((p) => p.dryRun).length;
-    const production = positions.length - paper;
-    const open = positions.filter((p) => p.status === 'open');
-    const settled = positions.filter((p) => p.status === 'settled');
+export async function pollOpenBotPositions(dependencies?: {
+  fetchKalshi?: (ticker: string) => Promise<{
+    yes_bid_dollars?: string;
+    no_bid_dollars?: string;
+    close_time?: string;
+    status?: string;
+    settlement_value_dollars?: string;
+  } | null>;
+  fetchPmBids?: (conditionId: string) => Promise<{ yesBidCents: number | null; noBidCents: number | null; resolved: boolean } | null>;
+  observedAt?: string;
+}): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
+  const [{ fetchKalshiMarket }, { fetchClobMarket, getClobBidPrices }] = await Promise.all([
+    import('./kalshi'),
+    import('./polymarket-clob'),
+  ]);
+  const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarket;
+  const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
+    const market = await fetchClobMarket(conditionId);
+    return market ? getClobBidPrices(market) : null;
+  });
+  const observedAt = dependencies?.observedAt ?? new Date().toISOString();
+  const open = await store().listAllOpen();
+  let updated = 0;
+  let settled = 0;
+  const errors: Array<{ id: number; error: string }> = [];
 
-    const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
-
-    const score = (p: BotPosition) => p.realizedPnlCents ?? p.unrealizedPnlCents ?? 0;
-    const ranked = [...positions].sort((a, b) => score(b) - score(a));
-
-    const dates = new Map<string, { realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>();
-    for (const p of positions) {
-      const date = p.openedAt.slice(0, 10);
-      const row = dates.get(date) ?? { realizedPnlCents: 0, unrealizedPnlCents: 0, trades: 0 };
-      row.trades += 1;
-      row.realizedPnlCents += p.realizedPnlCents ?? 0;
-      row.unrealizedPnlCents += p.status === 'open' ? (p.unrealizedPnlCents ?? 0) : 0;
-      dates.set(date, row);
+  await Promise.all(open.map(async (position) => {
+    try {
+      if (!position.kalshiTicker || !position.pmConditionId) {
+        throw new Error('Position is missing venue market identifiers');
+      }
+      const [kalshi, pmBids] = await Promise.all([
+        fetchKalshi(position.kalshiTicker),
+        fetchPmBids(position.pmConditionId),
+      ]);
+      if (!kalshi || !pmBids) throw new Error('Venue quote unavailable');
+      const parseCents = (value: string | undefined): number | null => {
+        if (value == null || !/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)) return null;
+        const cents = Math.round(Number(value) * 100);
+        return isPriceCents(cents) ? cents : null;
+      };
+      const kalshiResolution = getKalshiResolvedPrices(kalshi);
+      const valuation = calculatePositionValuation(position, {
+        kalshiYesBidCents: kalshiResolution.yesBidCents ?? parseCents(kalshi.yes_bid_dollars),
+        kalshiNoBidCents: kalshiResolution.noBidCents ?? parseCents(kalshi.no_bid_dollars),
+        pmYesBidCents: pmBids.yesBidCents,
+        pmNoBidCents: pmBids.noBidCents,
+        observedAt,
+        expiryDate: kalshi.close_time ?? position.expiryDate,
+        kalshiResolved: kalshiResolution.resolved,
+        pmResolved: pmBids.resolved,
+      });
+      await store().updateValuation(position.id, valuation);
+      updated += 1;
+      if (valuation.status === 'settled') settled += 1;
+    } catch (error) {
+      errors.push({ id: position.id, error: error instanceof Error ? error.message : String(error) });
     }
-    const distinctDays = Math.max(1, dates.size);
-
-    const holdSeconds = settled.map((p) => {
-      const start = Date.parse(p.openedAt);
-      const end = p.settledAt ? Date.parse(p.settledAt) : start;
-      return Math.max(0, Math.round((end - start) / 1000));
-    });
-
-    return {
-      totalBotTrades: { paper, production, total: positions.length },
-      openPositions: {
-        count: open.length,
-        unrealizedPnlCents: sum(open.map((p) => p.unrealizedPnlCents ?? 0)),
-      },
-      settledPositions: {
-        count: settled.length,
-        realizedPnlCents: sum(settled.map((p) => p.realizedPnlCents ?? 0)),
-        winRateBps: settled.length === 0
-          ? 0
-          : Math.round(settled.filter((p) => (p.realizedPnlCents ?? 0) > 0).length * 10_000 / settled.length),
-      },
-      averageRoi: {
-        atTradeBps: positions.length === 0
-          ? 0
-          : Math.round(sum(positions.map((p) => roiBps(p.expectedProfitCents, p.totalCostCents))) / positions.length),
-        currentBps: positions.length === 0
-          ? 0
-          : Math.round(sum(positions.map((p) => p.unrealizedRoiBps ?? 0)) / positions.length),
-      },
-      bestTrade: ranked[0] ?? null,
-      worstTrade: ranked.at(-1) ?? null,
-      dailyPnl: [...dates.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, values]) => ({ date, ...values })),
-      timeStats: {
-        tradesPerDayBps: Math.round(positions.length * 10_000 / distinctDays),
-        averageHoldSeconds: holdSeconds.length === 0 ? 0 : Math.round(sum(holdSeconds) / holdSeconds.length),
-      },
-    };
-  } finally {
-    c.close();
-  }
-}
-
-export interface BotPositionInput {
-  executionId: number;
-  pairId: string;
-  marketTitle: string;
-  kalshiTicker: string | null;
-  pmConditionId: string | null;
-  strategy: string;
-  kalshiSide: 'yes' | 'no';
-  pmSide: 'yes' | 'no';
-  kalshiPrice: number;
-  pmPrice: number;
-  kalshiStake: number;
-  pmStake: number;
-  expectedProfit: number;
-  expiryDate?: string | null;
-}
-
-export async function recordBotPosition(input: BotPositionInput): Promise<void> {
-  const c = getClient();
-  try {
-    const kalshiPriceCents = Math.round(input.kalshiPrice * 100);
-    const pmPriceCents = Math.round(input.pmPrice * 100);
-    const sharesKalshi = Math.max(1, Math.floor(input.kalshiStake / input.kalshiPrice));
-    const sharesPm = Math.max(1, Math.floor(input.pmStake / input.pmPrice));
-    const totalCostCents = sharesKalshi * kalshiPriceCents + sharesPm * pmPriceCents;
-    const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
-    const expectedProfitCents = expectedPayoutCents - totalCostCents;
-    const unrealizedPnlCents = expectedProfitCents;
-    const unrealizedRoiBps = totalCostCents > 0 ? Math.round((unrealizedPnlCents * 10_000) / totalCostCents) : 0;
-
-    await c.execute({
-      sql: `INSERT INTO bot_positions (
-        execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
-        strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
-        shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
-        fees, status, opened_at, expiry_date, current_value,
-        unrealized_pnl, unrealized_roi_pct, last_valuation_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        input.executionId,
-        input.pairId,
-        input.marketTitle,
-        input.kalshiTicker,
-        input.pmConditionId,
-        input.strategy,
-        input.kalshiSide,
-        input.pmSide,
-        kalshiPriceCents,
-        pmPriceCents,
-        sharesKalshi,
-        sharesPm,
-        totalCostCents,
-        expectedPayoutCents,
-        expectedProfitCents,
-        0,
-        'open',
-        new Date().toISOString(),
-        input.expiryDate ?? null,
-        expectedPayoutCents,
-        unrealizedPnlCents,
-        unrealizedRoiBps,
-        new Date().toISOString(),
-      ],
-    });
-  } finally {
-    c.close();
-  }
+  }));
+  return { updated, settled, errors };
 }

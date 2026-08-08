@@ -25,7 +25,16 @@ export interface PmOrderResponse {
   orderId: string;
   status: string;         // matched | live | delayed | unmatched
   success: boolean;
+  filledContracts: number | null;
   raw: unknown;
+}
+
+export function parsePmFilledContracts(raw: unknown): number | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const order = raw as Record<string, unknown>;
+  const value = order.size_matched ?? order.sizeMatched;
+  const parsed = typeof value === 'number' || typeof value === 'string' ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 let _client: any = null;
@@ -93,6 +102,7 @@ export async function placePmOrder(p: PmOrderParams): Promise<PmOrderResponse> {
     orderId: resp?.orderID ?? resp?.orderId ?? '',
     status: resp?.status ?? 'unknown',
     success,
+    filledContracts: parsePmFilledContracts(resp),
     raw: resp,
   };
 }
@@ -119,6 +129,7 @@ export async function getPmOrder(orderId: string): Promise<PmOrderResponse | nul
       orderId: String(order.id ?? order.order_id ?? orderId),
       status,
       success: true,
+      filledContracts: parsePmFilledContracts(order),
       raw: order,
     };
   } catch (err) {
@@ -157,6 +168,7 @@ export async function placePmSellOrder(p: PmOrderParams): Promise<PmOrderRespons
     orderId: resp?.orderID ?? resp?.orderId ?? '',
     status: resp?.status ?? 'unknown',
     success,
+    filledContracts: parsePmFilledContracts(resp),
     raw: resp,
   };
 }

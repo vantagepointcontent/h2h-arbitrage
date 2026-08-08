@@ -10,4 +10,11 @@ describe('OpenPositionsPanel trading design system migration', () => {
     expect(source).toContain('tabular-nums');
     expect(source).not.toContain('text-[9px]');
   });
+
+  it('wires every required sortable column', () => {
+    const source = readFileSync(`${process.cwd()}/src/app/components/OpenPositionsPanel.tsx`, 'utf8');
+    expect(source).toContain("toggleSort('market')");
+    expect(source).toContain("toggleSort('roi')");
+    expect(source).toContain("toggleSort('size')");
+  });
 });

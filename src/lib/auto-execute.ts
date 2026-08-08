@@ -35,6 +35,8 @@ export interface OrderRequest {
   side: OrderSide;
   outcome: 'yes' | 'no';
   size: number;         // dollar amount
+  /** Exact requested contract/share units when known by the caller. */
+  contracts?: number;
   price: number;        // limit price (0-1)
   orderType: OrderType;
 }
@@ -43,6 +45,8 @@ export interface OrderResult {
   platform: 'kalshi' | 'polymarket';
   status: OrderStatus;
   filledSize?: number;
+  /** Authoritative venue-reported contracts/shares. */
+  filledContracts?: number;
   filledPrice?: number;
   orderId?: string;
   error?: string;
@@ -161,6 +165,7 @@ function simulateOrder(req: OrderRequest): OrderResult {
       platform: req.platform,
       status: 'pending',
       filledSize: 0,
+      filledContracts: 0,
       filledPrice: req.price,
       orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
@@ -170,10 +175,13 @@ function simulateOrder(req: OrderRequest): OrderResult {
   const slippage = (Math.random() - 0.5) * 0.005;
   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
   const fillRatio = 0.85 + Math.random() * 0.15; // 85-100% fill
+  const requestedContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
+  const filledContracts = Math.floor(requestedContracts * fillRatio);
   return {
     platform: req.platform,
     status: fillRatio >= 0.99 ? 'filled' : 'partial',
-    filledSize: req.size * fillRatio,
+    filledSize: filledContracts * filledPrice,
+    filledContracts,
     filledPrice,
     orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     timestamp: new Date().toISOString(),
@@ -184,10 +192,12 @@ function simulateOrder(req: OrderRequest): OrderResult {
 function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
   const slippage = (Math.random() - 0.5) * 0.005;
   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
+  const filledContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
   return {
     platform: req.platform,
     status: 'filled',
-    filledSize: req.size,
+    filledSize: filledContracts * filledPrice,
+    filledContracts,
     filledPrice,
     orderId,
     timestamp: new Date().toISOString(),
@@ -212,7 +222,7 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const priceCents = Math.round(req.price * 100);
-      const count = Math.max(1, Math.floor(req.size / req.price)); // $size → contracts
+      const count = Math.max(1, Math.floor(req.contracts ?? (req.size / req.price))); // $size → contracts
       const r = await placeKalshiOrder({
         ticker: req.ticker,
         side: req.outcome,
@@ -225,6 +235,7 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
         platform: 'kalshi',
         status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
         filledSize: filledContracts * req.price,
+        filledContracts,
         filledPrice: req.price,
         orderId: r.orderId,
         timestamp: new Date().toISOString(),
@@ -249,12 +260,14 @@ async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
   let lastErr: any;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const size = req.size / req.price; // $size → shares
+      const size = req.contracts ?? (req.size / req.price); // $size → shares
       const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
+      const filledContracts = r.filledContracts;
       return {
         platform: 'polymarket',
-        status: r.status === 'matched' ? 'filled' : 'pending',
-        filledSize: r.status === 'matched' ? req.size : 0,
+        status: r.status === 'matched' && filledContracts != null ? 'filled' : 'pending',
+        filledSize: filledContracts != null ? filledContracts * req.price : 0,
+        filledContracts: filledContracts ?? undefined,
         filledPrice: req.price,
         orderId: r.orderId,
         timestamp: new Date().toISOString(),
@@ -352,11 +365,34 @@ function isSettled(status: OrderStatus): boolean {
 
 /** Determine if an order has any fill (partial or full). */
 function hasFill(r: OrderResult): boolean {
-  return (r.filledSize ?? 0) > 0;
+  return (r.filledContracts ?? 0) > 0 || (r.filledSize ?? 0) > 0;
+}
+
+/** Compare hedge coverage in contracts; filledSize is dollar notional. */
+export function areFilledContractsMatched(
+  kalshiResult: OrderResult,
+  polymarketResult: OrderResult,
+): { matched: boolean; kalshiContracts: number; polymarketContracts: number } {
+  const kalshiContracts = kalshiResult.filledContracts ?? 0;
+  const polymarketContracts = polymarketResult.filledContracts ?? 0;
+  const authoritative =
+    Number.isFinite(kalshiResult.filledContracts) &&
+    Number.isFinite(polymarketResult.filledContracts);
+  return {
+    matched: authoritative && Math.abs(kalshiContracts - polymarketContracts) < 1e-6,
+    kalshiContracts,
+    polymarketContracts,
+  };
 }
 
 /** Close a filled position by placing a sell order at the fill price.
  *  Returns true if the close succeeded, false if it failed (exposure remains). */
+export function isCompleteClose(requestedContracts: number, filledContracts: number | null): boolean {
+  return Number.isFinite(requestedContracts) && requestedContracts > 0 &&
+    filledContracts != null && Number.isFinite(filledContracts) &&
+    filledContracts + 1e-9 >= requestedContracts;
+}
+
 async function autoCloseLeg(
   leg: OrderResult,
   req: OrderRequest,
@@ -364,6 +400,8 @@ async function autoCloseLeg(
   dryRun: boolean,
 ): Promise<boolean> {
   if (!hasFill(leg) || !leg.orderId) return true; // nothing to close
+  const contracts = leg.filledContracts;
+  if (contracts == null || !Number.isFinite(contracts) || contracts <= 0) return false;
 
   if (dryRun) {
     // Simulate: 90% success rate for close
@@ -374,7 +412,7 @@ async function autoCloseLeg(
     if (leg.platform === 'kalshi') {
       const { placeKalshiSellOrder } = await import('./kalshi-orders');
       const priceCents = Math.round((leg.filledPrice ?? req.price) * 100);
-      const count = Math.max(1, Math.floor((leg.filledSize ?? 0) / (leg.filledPrice ?? req.price)));
+      const count = Math.max(1, Math.floor(contracts));
       const r = await placeKalshiSellOrder({
         ticker: req.ticker!,
         side: req.outcome,
@@ -382,16 +420,15 @@ async function autoCloseLeg(
         priceCents,
         clientOrderId: `h2h-close-${arbId}-k`.slice(0, 64),
       });
-      return r.status === 'executed' || r.filledCount > 0;
+      return isCompleteClose(contracts, r.filledCount);
     } else {
       const { placePmSellOrder } = await import('./polymarket-orders');
-      const size = (leg.filledSize ?? 0) / (leg.filledPrice ?? req.price);
       const r = await placePmSellOrder({
         tokenId: req.conditionId!,
         price: leg.filledPrice ?? req.price,
-        size,
+        size: contracts,
       });
-      return r.status === 'matched' || r.success;
+      return isCompleteClose(contracts, r.filledContracts);
     }
   } catch {
     return false; // close failed — exposure remains
@@ -423,6 +460,7 @@ async function pollOrder(
         platform: 'kalshi',
         status: updated.status === 'executed' ? 'filled' : (updated.status as OrderStatus),
         filledSize: updated.filledCount * (leg.filledPrice ?? req.price),
+        filledContracts: updated.filledCount,
         filledPrice: leg.filledPrice ?? req.price,
         orderId: leg.orderId,
         timestamp: new Date().toISOString(),
@@ -431,10 +469,18 @@ async function pollOrder(
       const { getPmOrder } = await import('./polymarket-orders');
       const updated = await getPmOrder(leg.orderId);
       if (!updated) return leg;
+      const filledContracts = updated.filledContracts ?? leg.filledContracts;
       return {
         platform: 'polymarket',
-        status: updated.status === 'matched' ? 'filled' : (updated.status as OrderStatus),
-        filledSize: updated.status === 'matched' ? req.size : leg.filledSize,
+        status: updated.status === 'matched' && updated.filledContracts != null
+          ? 'filled'
+          : updated.filledContracts != null && updated.filledContracts > 0
+            ? 'partial'
+            : 'pending',
+        filledSize: filledContracts != null
+          ? filledContracts * (leg.filledPrice ?? req.price)
+          : leg.filledSize,
+        filledContracts,
         filledPrice: leg.filledPrice ?? req.price,
         orderId: leg.orderId,
         timestamp: new Date().toISOString(),
@@ -682,30 +728,28 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     }
     rollbackExecuted = true;
   } else if (kFilled && pFilled) {
-    // Both have fills — check if matched
-    const kFill = kalshiResult.filledSize ?? 0;
-    const pFill = polymarketResult.filledSize ?? 0;
-    const minFill = Math.min(kFill, pFill);
-    const maxFill = Math.max(kFill, pFill);
+    // Both have fills — compare hedge coverage in contracts, not dollars.
+    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
+    const { kalshiContracts: kFill, polymarketContracts: pFill } = match;
 
-    if (minFill < maxFill) {
-      // Mismatched fills — cancel both and close the excess
-      addStep('failed', `Mismatched fills — Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing $${(maxFill - minFill).toFixed(2)} excess`);
+    if (!match.matched) {
+      // Mismatched contracts — cancel both and close the excess contracts.
+      addStep('failed', `Mismatched fills — Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`);
       alerts.push({
         level: 'warning',
-        message: `Mismatched fills: Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing excess`,
+        message: `Mismatched fills: Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`,
         action: 'close excess',
       });
       if (!effectiveDryRun) {
         await cancelLeg(kalshiResult);
         await cancelLeg(polymarketResult);
       }
-      // Close the excess from the larger leg
-      const excess = maxFill - minFill;
+      const excessContracts = Math.abs(kFill - pFill);
       const largerLeg = kFill > pFill ? kalshiResult : polymarketResult;
       const largerReq = kFill > pFill ? req.kalshiOrder : req.polymarketOrder;
+      const excessNotional = excessContracts * (largerLeg.filledPrice ?? largerReq.price);
       const closed = await autoCloseLeg(
-        { ...largerLeg, filledSize: excess },
+        { ...largerLeg, filledSize: excessNotional, filledContracts: excessContracts },
         largerReq,
         req.arbId,
         effectiveDryRun,
@@ -714,9 +758,24 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         unhedged = true;
         alerts.push({
           level: 'error',
-          message: `Failed to close $${excess.toFixed(2)} excess — unhedged exposure remains`,
+          message: `Failed to close ${excessContracts.toFixed(4)} excess contracts — unhedged exposure remains`,
           action: 'manual close required',
         });
+      } else {
+        const matchedContracts = Math.min(kFill, pFill);
+        if (kFill > pFill) {
+          kalshiResult = {
+            ...kalshiResult,
+            filledContracts: matchedContracts,
+            filledSize: matchedContracts * (kalshiResult.filledPrice ?? req.kalshiOrder.price),
+          };
+        } else {
+          polymarketResult = {
+            ...polymarketResult,
+            filledContracts: matchedContracts,
+            filledSize: matchedContracts * (polymarketResult.filledPrice ?? req.polymarketOrder.price),
+          };
+        }
       }
       rollbackExecuted = true;
     } else {
@@ -725,7 +784,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       const anyPartial = kalshiResult.status === 'partial' || polymarketResult.status === 'partial';
       addStep(
         anyPartial ? 'partial' : 'success',
-        `Both legs filled and matched — Kalshi $${kFill.toFixed(2)}, Polymarket $${pFill.toFixed(2)}` +
+        `Both legs filled and matched — ${kFill.toFixed(4)} contracts per leg` +
           (anyPartial ? ' (partial fills)' : ''),
       );
     }
@@ -800,15 +859,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   let netExposure: number | undefined;
 
   if (kalshiResult.filledSize && polymarketResult.filledSize && kalshiResult.filledPrice && polymarketResult.filledPrice) {
-    const kalshiFilled = kalshiResult.filledSize;
-    const pmFilled = polymarketResult.filledSize;
-    const minFill = Math.min(kalshiFilled, pmFilled);
-    const maxFill = Math.max(kalshiFilled, pmFilled);
-    netExposure = unhedged ? (maxFill - minFill) : 0;
+    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
+    const minContracts = Math.min(match.kalshiContracts, match.polymarketContracts);
+    const kalshiNotional = kalshiResult.filledSize;
+    const pmNotional = polymarketResult.filledSize;
+    netExposure = unhedged ? Math.abs(kalshiNotional - pmNotional) : 0;
 
-    // Profit = minFill * (1 - buyYesPrice - buyNoPrice) — simplified
     const spread = 1 - kalshiResult.filledPrice - polymarketResult.filledPrice;
-    actualProfit = minFill * spread;
+    actualProfit = minContracts * spread;
   } else if (unhedged) {
     // One leg filled, other didn't — all of the filled amount is exposure
     netExposure = (kalshiResult.filledSize ?? 0) + (polymarketResult.filledSize ?? 0);

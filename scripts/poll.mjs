@@ -34,29 +34,43 @@ const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathn
 const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
-// FEAT-MarketCatalog: refresh all-platform catalog every 6 hours via the app API
-let lastCatalogSyncAt = 0;
-const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// FEAT-046: refresh all-platform catalog once daily at 04:00 UTC via PM2 cron.
+// The previous 6-hour interval is replaced by a single off-peak daily run so
+// the catalog job never interferes with normal user-triggered scans.
+const CATALOG_CRON = '0 4 * * *';
+let lastCatalogRunAt = 0;
+let catalogJobRunning = false;
 
-async function triggerCatalogSync() {
+async function runDailyCatalogRefresh() {
+  if (catalogJobRunning) return;
+  catalogJobRunning = true;
   try {
-    const res = await fetch(`${BASE_URL}/api/catalog/sync`, {
+    console.log(`[${new Date().toISOString()}] Starting daily catalog refresh`);
+    const res = await fetch(`${BASE_URL}/api/catalog/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
       },
-      signal: AbortSignal.timeout(600000),
+      signal: AbortSignal.timeout(3_600_000), // 1 hour max for full refresh
     });
     if (res.ok) {
       const json = await res.json().catch(() => ({}));
-      console.log(`[${new Date().toISOString()}] Catalog sync OK:`, JSON.stringify(json));
+      console.log(`[${new Date().toISOString()}] Daily catalog refresh OK:`, JSON.stringify(json));
     } else {
-      console.warn(`[${new Date().toISOString()}] Catalog sync failed: HTTP ${res.status}`);
+      console.warn(`[${new Date().toISOString()}] Daily catalog refresh failed: HTTP ${res.status}`);
     }
   } catch (e) {
-    console.warn(`[${new Date().toISOString()}] Catalog sync error:`, e.message);
+    console.warn(`[${new Date().toISOString()}] Daily catalog refresh error:`, e.message);
+  } finally {
+    catalogJobRunning = false;
+    lastCatalogRunAt = Date.now();
   }
+}
+
+// Legacy helper kept for backwards compatibility; now only called manually or by cron.
+async function triggerCatalogSync() {
+  return runDailyCatalogRefresh();
 }
 
 
@@ -455,10 +469,13 @@ function formatInterval(ms) {
 async function pollOnce() {
   const startedAt = new Date();
 
-  // FEAT-MarketCatalog: trigger a full catalog refresh every 6 hours
-  if (Date.now() - lastCatalogSyncAt >= CATALOG_SYNC_INTERVAL_MS) {
-    lastCatalogSyncAt = Date.now();
-    await triggerCatalogSync();
+  // FEAT-046: trigger the daily catalog refresh at 04:00 UTC. We keep a local
+  // guard so we don't re-run if the process restarts later the same day.
+  const nowUtc = new Date();
+  const currentDay = nowUtc.toISOString().slice(0, 10);
+  const currentHourMinute = `${String(nowUtc.getUTCHours()).padStart(2, '0')}:${String(nowUtc.getUTCMinutes()).padStart(2, '0')}`;
+  if (currentHourMinute >= '04:00' && lastCatalogRunAt < new Date(`${currentDay}T04:00:00Z`).getTime()) {
+    await runDailyCatalogRefresh();
   }
 
   const cycleStart = Date.now();
@@ -569,6 +586,19 @@ async function pollOnce() {
           ...(process.env.H2H_API_TOKEN ? { 'x-api-token': process.env.H2H_API_TOKEN } : {}),
         },
         body: JSON.stringify({ action: 'promote', pairId: market.id }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+      // FEAT-040: BotTrader hook for poller path.  We only have aggregate scan
+      // results here (no full UnifiedOutcome array).  The in-app refresh job path
+      // does the real outcome-level evaluation.  This hook logs when the market is
+      // positive so the operator sees BotTrader is active.
+      fetch(`${BASE_URL}/api/bot-trader/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+        },
+        body: JSON.stringify({ pairId: market.id, marketTitle: market.eventTitle }),
         signal: AbortSignal.timeout(5000),
       }).catch(() => {});
     } else {

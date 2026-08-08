@@ -388,7 +388,9 @@ export default function OpenPositionsPanel() {
                 <th className="text-left px-4 py-3 font-medium">Pair state</th>
                 <th className="text-left px-4 py-3 font-medium">Platform</th>
                 <th className="text-left px-4 py-3 font-medium">Side</th>
-                <th className="text-right px-4 py-3 font-medium">Size</th>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('size')}>
+                  Size <SortIcon field="size" />
+                </th>
                 <th className="text-right px-4 py-3 font-medium">Entry</th>
                 <th className="text-right px-4 py-3 font-medium">Current</th>
                 <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>

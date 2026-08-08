@@ -37,7 +37,7 @@ export type SettingType = 'number' | 'boolean' | 'string';
 
 export interface SettingDef {
   key: string;
-  section: 'alerts' | 'scanner' | 'auto-discovery' | 'auto-execute' | 'lifecycle' | 'display';
+  section: 'alerts' | 'scanner' | 'auto-discovery' | 'auto-execute' | 'lifecycle' | 'display' | 'bot';
   label: string;
   description: string;
   type: SettingType;
@@ -94,14 +94,15 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'execute.maxStakePerTrade', section: 'auto-execute', label: 'Max stake per trade $', description: 'Hard cap on a single execution stake.', type: 'number', env: 'H2H_MAX_STAKE_USD', default: 100, min: 1, max: 10000 },
   { key: 'execute.maxDailyExposure', section: 'auto-execute', label: 'Max daily exposure $', description: 'Total capital deployable per day across all executions.', type: 'number', env: 'H2H_MAX_DAILY_USD', default: 500, min: 1, max: 100000 },
 
-  // ── BotTrader (FEAT-040 / FEAT-041) ──
-  { key: 'bot.enabled', section: 'auto-execute', label: 'BotTrader enabled', description: 'Master kill switch for scan-driven auto-execution.', type: 'boolean', default: false, dangerous: true },
-  { key: 'bot.mode', section: 'auto-execute', label: 'BotTrader mode', description: 'Paper simulates trades; production places real orders when execution mode is live.', type: 'string', default: 'paper', options: ['paper', 'production'], dangerous: true },
-  { key: 'bot.minRoiPct', section: 'auto-execute', label: 'BotTrader min ROI %', description: 'Minimum net ROI % (after fees) to trigger an auto-trade.', type: 'number', default: 1.5, min: 0, max: 50, slider: true },
-  { key: 'bot.minApyPct', section: 'auto-execute', label: 'BotTrader min APY %', description: 'Minimum APY % to trigger (0 to disable).', type: 'number', default: 0, min: 0, max: 1000 },
-  { key: 'bot.minDepthUsd', section: 'auto-execute', label: 'BotTrader min depth $', description: 'Minimum dollar depth at best ask on BOTH legs of the trade.', type: 'number', default: 1, min: 0, max: 10000 },
-  { key: 'bot.minSharesPerLeg', section: 'auto-execute', label: 'BotTrader min shares/leg', description: 'Minimum shares available at best ask on BOTH legs.', type: 'number', default: 1, min: 0, max: 10000 },
-  { key: 'bot.maxExpiryDays', section: 'auto-execute', label: 'BotTrader max expiry days', description: "Skip markets expiring sooner than this (don't trade markets about to resolve).", type: 'number', default: 1, min: 0, max: 365 },
+  // ── BotTrader (FEAT-041) ──
+  { key: 'bot.enabled', section: 'bot', label: 'BotTrader enabled', description: 'Master switch. When off, no bot trades are placed.', type: 'boolean', default: false, dangerous: true },
+  { key: 'bot.mode', section: 'bot', label: 'Execution mode', description: 'Paper simulates trades. Production places real orders (requires execute.mode=live).', type: 'string', default: 'paper', options: ['paper', 'production'], dangerous: true },
+  { key: 'bot.minRoiPct', section: 'bot', label: 'Min ROI %', description: 'Minimum net ROI (after fees) for the bot to trigger a trade.', type: 'number', default: 2.0, min: 0, max: 50, slider: true },
+  { key: 'bot.minDepthUsd', section: 'bot', label: 'Min depth per leg $', description: 'Minimum dollar depth at best ask on EACH leg (not total). $0.50 here means ~$0.50 on each leg, which is ~$1 total trade at typical $0.50 ask prices.', type: 'number', default: 0.5, min: 0.01, max: 1000, slider: true },
+  { key: 'bot.minApyPct', section: 'bot', label: 'Min APY %', description: 'Minimum annualized yield. Set to 0 to disable APY filter.', type: 'number', default: 0, min: 0, max: 500, slider: true },
+  { key: 'bot.minSharesPerLeg', section: 'bot', label: 'Min shares per leg', description: 'Minimum shares available at best ask on EACH leg. The total trade size is roughly shares × (ask prices on both legs); default 1 share ≈ $0.45–$0.55 per leg, ~$1 total.', type: 'number', default: 1, min: 1, max: 100, slider: true },
+  { key: 'bot.maxExpiryDays', section: 'bot', label: 'Max expiry (days)', description: 'Skip markets expiring sooner than this.', type: 'number', default: 1, min: 0, max: 365, slider: true },
+  { key: 'bot.maxTradesPerDay', section: 'bot', label: 'Max trades per day', description: 'Hard cap on bot trades per UTC day.', type: 'number', default: 10, min: 1, max: 100, slider: true },
 
   // ── Display ──
   { key: 'display.defaultSort', section: 'display', label: 'Default overview sort', description: 'Initial sort order in Overview.', type: 'string', default: 'apy', options: ['apy', 'roi', 'name', 'expiry'] },

@@ -24,6 +24,7 @@ import {
   Radar,
   Search,
   Zap,
+  Bot,
   Monitor,
   Activity,
   RotateCcw,
@@ -59,6 +60,7 @@ const SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: "scanner", label: "Scanner", icon: <Radar className="w-4 h-4" /> },
   { id: "auto-discovery", label: "Auto-Discovery", icon: <Search className="w-4 h-4" /> },
   { id: "auto-execute", label: "Auto-Execute", icon: <Zap className="w-4 h-4" /> },
+  { id: "bot", label: "BotTrader", icon: <Bot className="w-4 h-4" /> },
   { id: "lifecycle", label: "Lifecycle", icon: <Radar className="w-4 h-4" /> },
   { id: "display", label: "Display", icon: <Monitor className="w-4 h-4" /> },
 ];
@@ -69,6 +71,17 @@ function apiHeaders(): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (TOKEN) h["x-h2h-token"] = TOKEN;
   return h;
+}
+
+interface BotStatus {
+  enabled: boolean;
+  mode: 'paper' | 'production';
+  todayCount: number;
+  todayStakeUsd: number;
+  lastTradeAt: string | null;
+  lastTradeMarket: string | null;
+  lastTradeRoiPct: number | null;
+  error: string | null;
 }
 
 export default function SettingsPanel() {
@@ -91,6 +104,8 @@ export default function SettingsPanel() {
   const [confirmDanger, setConfirmDanger] = useState<string | null>(null);
   const [liveConfirmation, setLiveConfirmation] = useState("");
   const [liveConfirmed, setLiveConfirmed] = useState(false);
+  const [botConfirmation, setBotConfirmation] = useState("");
+  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
 
   // WS-106: watcher health polling (15s) + msgs/sec derivation
   const [watcherHealth, setWatcherHealth] = useState<WatcherHealthPayload | null>(null);
@@ -123,14 +138,10 @@ export default function SettingsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const [sRes, hRes] = await Promise.all([
-        fetch("/api/settings", { cache: "no-store" }),
-        fetch("/api/health", { cache: "no-store" }).catch(() => null),
-      ]);
+      const sRes = await fetch("/api/settings", { cache: "no-store" });
       if (!sRes.ok) throw new Error(`Settings load failed (${sRes.status})`);
       const data = await sRes.json();
       setSettings(data.settings ?? []);
-      if (hRes?.ok) setHealth(await hRes.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -138,7 +149,81 @@ export default function SettingsPanel() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const reloadStatus = useCallback(async () => {
+    try {
+      const [hRes, bRes] = await Promise.all([
+        fetch("/api/health", { cache: "no-store" }).catch(() => null),
+        fetch("/api/bot-trader/status", { cache: "no-store" }).catch(() => null),
+      ]);
+      if (hRes?.ok) setHealth(await hRes.json());
+      if (bRes?.ok) setBotStatus(await bRes.json());
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  // Keep names referenced for future manual refresh use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _load = load;
+
+  // Trigger initial data load on mount (eslint rule dislikes direct async setState in effect bodies)
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const sRes = await fetch("/api/settings", { cache: "no-store" });
+        if (!sRes.ok) throw new Error(`Settings load failed (${sRes.status})`);
+        const data = await sRes.json();
+        if (cancelled) return;
+        setSettings(data.settings ?? []);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load status endpoints once on mount and refresh after saves
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const [hRes, bRes] = await Promise.all([
+          fetch("/api/health", { cache: "no-store" }).catch(() => null),
+          fetch("/api/bot-trader/status", { cache: "no-store" }).catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (hRes?.ok) setHealth(await hRes.json());
+        if (bRes?.ok) setBotStatus(await bRes.json());
+      } catch {
+        if (!cancelled) setBotStatus(null);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  // FEAT-041: poll bot-trader status every 30s
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/bot-trader/status", { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        if (cancelled) return;
+        setBotStatus(await res.json());
+      } catch {
+        if (!cancelled) setBotStatus(null);
+      }
+    };
+    const id = setInterval(poll, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const effectiveValue = (s: ResolvedSetting) =>
     s.key in dirty ? dirty[s.key] : s.value;
@@ -167,7 +252,9 @@ export default function SettingsPanel() {
       setDirty({});
       setLiveConfirmed(false);
       setLiveConfirmation("");
+      setBotConfirmation("");
       setSavedMsg(`Saved: ${changed}. Live within ~10s.`);
+      void reloadStatus();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -290,9 +377,12 @@ export default function SettingsPanel() {
                             step={(() => { const r = (s.max ?? 100) - (s.min ?? 0); return r <= 50 ? 0.5 : r <= 200 ? 1 : r <= 5000 ? 10 : 1000; })()}
                             value={Number(val)}
                             onChange={(e) => setValue(s.key, Number(e.target.value))}
-                            className="settings-slider flex-1"
+                            className="settings-slider flex-1 accent-[#5DBE81]"
                           />
-                          <span className="text-sm w-16 text-right tabular-nums">{val}</span>
+                          <span className="text-sm w-20 text-right tabular-nums">
+                            {s.key === "bot.minRoiPct" || s.key === "bot.minApyPct" ? `${val}%` : val}
+                            {s.key === "bot.minApyPct" && val === 0 ? " (disabled)" : ""}
+                          </span>
                         </div>
                       ) : s.type === "number" ? (
                         <input
@@ -314,11 +404,17 @@ export default function SettingsPanel() {
                               return;
                             }
                             if (s.key === "execute.mode") setLiveConfirmed(false);
+                            if (s.key === "bot.mode" && next === "production") {
+                              setBotConfirmation("");
+                              setConfirmDanger(s.key);
+                              return;
+                            }
+                            if (s.key === "bot.mode") setBotConfirmation("");
                             setValue(s.key, next);
                           }}
-                          className="px-2 py-1 rounded-lg bg-[#0E1621] border border-[#182533] text-sm focus:border-[#5DBE81] outline-none"
+                          className={`px-2 py-1 rounded-lg bg-[#0E1621] border border-[#182533] text-sm focus:border-[#5DBE81] outline-none ${s.key === "bot.mode" && val === "production" ? "text-red-400 border-red-800" : ""}`}
                         >
-                          {s.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                          {s.options.map((o) => <option key={o} value={o} className={s.key === "bot.mode" && o === "production" ? "text-red-400" : ""}>{o}</option>)}
                         </select>
                       ) : (
                         <input
@@ -341,6 +437,58 @@ export default function SettingsPanel() {
           </div>
         );
       })}
+
+      {/* FEAT-041: BotTrader status card */}
+      <div className="mb-6 rounded-xl border border-[#182533] bg-[#17212B]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533] text-[#8A9BA8] font-semibold text-sm uppercase tracking-wide">
+          <Bot className="w-4 h-4" /> BotTrader Status
+        </div>
+        <div className="px-4 py-3 text-sm">
+          {botStatus ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Bot</div>
+                  <div className={`text-sm font-medium ${botStatus.enabled ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
+                    {botStatus.enabled ? "ENABLED" : "OFF"}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Mode</div>
+                  <div className={`text-sm font-medium ${botStatus.mode === "production" ? "text-red-400" : "text-[#5DBE81]"}`}>
+                    {botStatus.mode === "production" ? "PRODUCTION" : "Paper"}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Today&#39;s trades</div>
+                  <div className="text-sm font-medium">
+                    {botStatus.todayCount} · ${botStatus.todayStakeUsd.toFixed(2)} staked
+                  </div>
+                </div>
+                <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Last trade</div>
+                  <div className="text-sm font-medium truncate" title={botStatus.lastTradeMarket ?? undefined}>
+                    {botStatus.lastTradeAt ? new Date(botStatus.lastTradeAt).toLocaleString() : "—"}
+                  </div>
+                </div>
+              </div>
+              {botStatus.lastTradeMarket && (
+                <div className="text-xs text-[#8A9BA8] mb-2">
+                  Last: {botStatus.lastTradeMarket}
+                  {typeof botStatus.lastTradeRoiPct === "number" && (
+                    <span className={botStatus.lastTradeRoiPct >= 0 ? "text-[#5DBE81]" : "text-red-400"}>
+                      {" "}· {botStatus.lastTradeRoiPct.toFixed(2)}% ROI
+                    </span>
+                  )}
+                </div>
+              )}
+              {botStatus.error && <div className="text-xs text-red-400">{botStatus.error}</div>}
+            </>
+          ) : (
+            <span className="text-[#8A9BA8]">BotTrader status endpoint unavailable.</span>
+          )}
+        </div>
+      </div>
 
       {/* HOOKUP-04: trading credentials (manual execution only) */}
       <ExecutionCredsCard />
@@ -504,6 +652,45 @@ export default function SettingsPanel() {
                 className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold disabled:opacity-40"
               >
                 Confirm live mode
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FEAT-041: BotTrader production confirm modal */}
+      {confirmDanger === "bot.mode" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmDanger(null)}>
+          <div className="max-w-md mx-4 p-5 rounded-xl border border-red-800 bg-[#0E1621]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
+              <AlertTriangle className="w-5 h-5" /> Switch to production mode?
+            </div>
+            <p className="text-sm text-red-300 mb-3">
+              ⚠️ PRODUCTION MODE: Real orders will be placed. Ensure credentials are configured and tested.
+            </p>
+            <p className="text-sm text-[#8A9BA8] mb-3">
+              This requires <b className="text-white">execute.mode = live</b>. Type <b className="text-white">PRODUCTION</b> to confirm you understand this will place real orders with real money.
+            </p>
+            <input
+              autoFocus
+              value={botConfirmation}
+              onChange={(e) => setBotConfirmation(e.target.value)}
+              className="w-full mb-4 px-3 py-2 rounded-lg bg-[#17212B] border border-red-800 text-sm font-mono outline-none focus:border-red-500"
+              placeholder="PRODUCTION"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setConfirmDanger(null); setBotConfirmation(""); }} className="px-4 py-1.5 rounded-lg text-sm bg-[#182533] hover:bg-[#243447]">
+                Cancel
+              </button>
+              <button
+                disabled={botConfirmation !== "PRODUCTION"}
+                onClick={() => {
+                  setValue("bot.mode", "production");
+                  setConfirmDanger(null);
+                }}
+                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold disabled:opacity-40"
+              >
+                Confirm production mode
               </button>
             </div>
           </div>

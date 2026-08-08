@@ -29,9 +29,16 @@ export interface KalshiOrderParams {
 export interface KalshiOrderResponse {
   orderId: string;
   status: string;          // resting | executed | canceled | pending
-  filledCount: number;
-  remainingCount: number;
+  /** Undefined means Kalshi omitted the authoritative cumulative fill count. */
+  filledCount: number | undefined;
+  remainingCount: number | undefined;
   raw: unknown;
+}
+
+export function parseKalshiCount(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrderResponse> {
@@ -67,8 +74,8 @@ export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrde
   return {
     orderId: order?.order_id ?? '',
     status: order?.status ?? 'unknown',
-    filledCount: Number(order?.taker_fill_count ?? order?.fill_count ?? 0),
-    remainingCount: Number(order?.remaining_count ?? 0),
+    filledCount: parseKalshiCount(order?.taker_fill_count ?? order?.fill_count),
+    remainingCount: parseKalshiCount(order?.remaining_count),
     raw: data,
   };
 }
@@ -121,8 +128,8 @@ export async function placeKalshiSellOrder(p: KalshiOrderParams): Promise<Kalshi
   return {
     orderId: order?.order_id ?? '',
     status: order?.status ?? 'unknown',
-    filledCount: Number(order?.taker_fill_count ?? order?.fill_count ?? 0),
-    remainingCount: Number(order?.remaining_count ?? 0),
+    filledCount: parseKalshiCount(order?.taker_fill_count ?? order?.fill_count),
+    remainingCount: parseKalshiCount(order?.remaining_count),
     raw: data,
   };
 }
@@ -142,8 +149,8 @@ export async function getKalshiOrder(orderId: string): Promise<KalshiOrderRespon
   return {
     orderId: order.order_id,
     status: order.status,
-    filledCount: Number(order.taker_fill_count ?? order.fill_count ?? 0),
-    remainingCount: Number(order.remaining_count ?? 0),
+    filledCount: parseKalshiCount(order.taker_fill_count ?? order.fill_count),
+    remainingCount: parseKalshiCount(order.remaining_count),
     raw: data,
   };
 }

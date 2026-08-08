@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const toDate = searchParams.get('toDate') || undefined;
     const before = searchParams.get('before') || undefined; // MF-014: cursor
 
-    const { rows: results, total } = await queryScanHistory({
+    const { rows: results, total, uniqueMarkets } = await queryScanHistory({
       marketId,
       minRoi,
       positiveArbOnly,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json(
-      { logs: enriched, count: enriched.length, total, nextCursor },
+      { logs: enriched, count: enriched.length, total, uniqueMarkets, nextCursor },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

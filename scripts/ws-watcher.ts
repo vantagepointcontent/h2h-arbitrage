@@ -21,10 +21,11 @@ import { recordArbObservations } from '../src/lib/arb-lifecycle';
 import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
 import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
-import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '../src/lib/persistence';
-import { computePriceResolved } from '../src/app/lib/page-shared';
-import { SUSPICIOUS_ROI_PCT } from '../src/lib/matcher';
-import logger from '../src/lib/logger';
+import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '@/lib/persistence';
+import { computePriceResolved } from '@/app/lib/page-shared';
+import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
+import { runBotTraderOnLiveArbs } from '@/lib/bot-trader';
+import logger from '@/lib/logger';
 
 // ── Config ──────────────────────────────────────────────────────
 const TIER_REFRESH_MS = 60_000;          // re-read tiers (picks up poller promotions fast)
@@ -311,6 +312,19 @@ async function computePair(pairId: string): Promise<void> {
       pmYesPrice: r.pmYesAsk ?? undefined,
       pmNoPrice: r.pmNoAsk ?? undefined,
     });
+  }
+
+  // FEAT-040: BotTrader hook — evaluate criteria and simulate/execute (paper-only
+  // unless explicitly authorized).  Run after lifecycle/alerts so the episode has
+  // already been recorded and persistence is warmed up.
+  try {
+    const botResults = await runBotTraderOnLiveArbs(pairId, pair.title, undefined, positive);
+    const executed = botResults.filter((b) => b.executed).length;
+    if (executed > 0) {
+      logger.info('[watcher] BotTrader executed', { pairId, executed, total: botResults.length });
+    }
+  } catch (err) {
+    logger.warn('[watcher] BotTrader hook failed', { pairId, err });
   }
 }
 
