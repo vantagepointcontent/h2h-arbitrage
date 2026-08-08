@@ -245,11 +245,11 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
   return (
     <div className="mt-4 rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4 border-b border-[#182533]">
         <TrendingUp className="w-4 h-4 text-[#facc15]" />
         <h3 className="text-sm font-semibold text-[#FFFFFF]">Arb Opportunities</h3>
         <span className="text-[10px] text-[#8A9BA8]">({arbOpps.length})</span>
-        <span className="text-[10px] text-[#5E6875] ml-auto">Sorted by ROI ↓</span>
+        <span className="w-full text-[10px] text-[#5E6875] sm:ml-auto sm:w-auto">Sorted by ROI ↓</span>
       </div>
 
       {/* Arb rows */}
@@ -310,9 +310,9 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
             && distributionStakes != null;
 
           return (
-            <div key={`${idx}-${o.artist}`} className={`px-4 py-3 hover:bg-[#0E1621] transition-colors ${flashingAlerts.has(alertKey) ? "bg-[#5DBE81]/20 animate-pulse" : alertHit ? "bg-[#5DBE81]/10" : ""}`}>
+            <div key={`${idx}-${o.artist}`} className={`px-3 py-3 sm:px-4 hover:bg-[#0E1621] transition-colors ${flashingAlerts.has(alertKey) ? "bg-[#5DBE81]/20 animate-pulse" : alertHit ? "bg-[#5DBE81]/10" : ""}`}>
               {/* Row 1: badge + concise strategy + ROI + profit + APY + execute */}
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <ArbTypeBadge strategy={o.arbitrage.strategy} arbType={(o.arbitrage as any).arbType} />
                 {marketId && <ArbDecayCurve marketId={marketId} outcome={o.artist} compact />}
                 <div className="flex-1" />
@@ -348,7 +348,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                         netProfit: displayProfit,
                       }));
                     }}
-                    className="inline-flex items-center gap-1 rounded border border-[#5DBE81]/30 px-2 py-1 text-[10px] font-semibold text-[#5DBE81] hover:bg-[#5DBE81]/10"
+                    className="inline-flex min-h-11 items-center gap-1 rounded border border-[#5DBE81]/30 px-3 py-2 text-[10px] font-semibold text-[#5DBE81] hover:bg-[#5DBE81]/10"
                     title="Open a read-only trade plan"
                   >
                     <ClipboardList className="h-3 w-3" /> Plan
@@ -360,7 +360,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                     <button
                       onClick={(e) => { e.stopPropagation(); startExecute(o, adjusted); }}
                       disabled={resolvingArtist === o.artist}
-                      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                      className="min-h-11 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                       title="Manually execute this arb (opens confirmation)"
                     >
                       <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
@@ -375,18 +375,18 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                   <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
                 </div>
               )}
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <div className="mt-2 flex items-stretch gap-2 flex-wrap sm:items-center">
                 {activeAlert ? (
                   <button
                     onClick={() => clearAlert(alertKey)}
-                    className="px-2 py-1 rounded text-[10px] font-medium border border-[#facc15]/30 text-[#facc15] hover:bg-[#facc15]/10 transition-colors"
+                    className="min-h-11 px-3 py-2 rounded text-[10px] font-medium border border-[#facc15]/30 text-[#facc15] hover:bg-[#facc15]/10 transition-colors"
                     title="Clear this in-app alert"
                   >
                     Clear alert
                   </button>
                 ) : (
                   <>
-                    <label className="text-[10px] text-[#8A9BA8]" htmlFor={`alert-${idx}`}>Target net ROI %</label>
+                    <label className="flex min-h-11 items-center text-[10px] text-[#8A9BA8]" htmlFor={`alert-${idx}`}>Target net ROI %</label>
                     <input
                       id={`alert-${idx}`}
                       type="number"
@@ -396,12 +396,12 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                       value={alertDrafts[alertKey] ?? ""}
                       onChange={(event) => setAlertDrafts(current => ({ ...current, [alertKey]: event.target.value }))}
                       placeholder="3.00"
-                      className="w-20 rounded border border-[#232E3C] bg-[#0E1621] px-2 py-1 text-[10px] text-[#FFFFFF] placeholder:text-[#48555F] focus:border-[#5DBE81]/50 outline-none"
+                      className="min-h-11 w-20 rounded border border-[#232E3C] bg-[#0E1621] px-2 py-2 text-xs text-[#FFFFFF] placeholder:text-[#48555F] focus:border-[#5DBE81]/50 outline-none"
                     />
                     <button
                       onClick={() => saveAlert(alertKey)}
                       disabled={!Number.isFinite(Number(alertDrafts[alertKey])) || Number(alertDrafts[alertKey]) <= 0}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border border-[#5DBE81]/30 text-[#5DBE81] hover:bg-[#5DBE81]/10 transition-colors disabled:opacity-40"
+                      className="inline-flex min-h-11 items-center gap-1 px-3 py-2 rounded text-[10px] font-medium border border-[#5DBE81]/30 text-[#5DBE81] hover:bg-[#5DBE81]/10 transition-colors disabled:opacity-40"
                       title="Set an in-app alert for this net ROI threshold"
                     >
                       <Bell className="w-3 h-3" /> Set Alert
@@ -447,7 +447,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
         <div className="mx-4 my-2 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-2.5 text-xs text-[#ef4444] flex items-center gap-2">
           <span className="text-sm">⚠️</span>
           <span>{execError}</span>
-          <button onClick={() => setExecError(null)} className="ml-auto text-[#ef4444]/60 hover:text-[#ef4444] text-xs">✕</button>
+          <button aria-label="Dismiss execution error" onClick={() => setExecError(null)} className="ml-auto min-h-11 min-w-11 text-[#ef4444]/60 hover:text-[#ef4444] text-xs">✕</button>
         </div>
       )}
 
@@ -457,11 +457,11 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
       )}
       {tradePlan && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60" role="dialog" aria-modal="true" aria-label="Trade plan">
-          <button className="flex-1 cursor-default" aria-label="Close trade plan" onClick={() => setTradePlan(null)} />
+          <button className="hidden flex-1 cursor-default sm:block" aria-label="Close trade plan" onClick={() => setTradePlan(null)} />
           <aside className="h-full w-full max-w-md overflow-y-auto border-l border-[#232E3C] bg-[#0E1621] p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div><p className="text-[10px] font-bold uppercase tracking-widest text-[#facc15]">Plan only · No orders placed</p><h2 className="mt-1 text-lg font-semibold text-white">Trade plan</h2><p className="mt-1 text-sm text-[#8A9BA8]">{tradePlan.outcome}</p></div>
-              <button onClick={() => setTradePlan(null)} className="rounded p-2 text-[#8A9BA8] hover:bg-white/5 hover:text-white" aria-label="Close trade plan"><X className="h-4 w-4" /></button>
+              <button onClick={() => setTradePlan(null)} className="min-h-11 min-w-11 rounded p-2 text-[#8A9BA8] hover:bg-white/5 hover:text-white" aria-label="Close trade plan"><X className="h-4 w-4" /></button>
             </div>
             <div className="mt-6 space-y-3">
               {[["Kalshi", tradePlan.kalshiSide, tradePlan.kalshiPrice, tradePlan.kalshiStake], ["Polymarket", tradePlan.polymarketSide, tradePlan.polymarketPrice, tradePlan.polymarketStake]].map(([venue, side, price, stake]) => (
