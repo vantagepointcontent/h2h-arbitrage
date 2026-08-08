@@ -30,6 +30,13 @@ describe('scan save category flow', () => {
     expect(classify.classifyMarket('Will BTC hit $100k by year end?').domain).toBe('crypto');
   });
 
+  it('only accepts canonical platform categories and rejects outcome labels', () => {
+    expect(classify.resolveMarketDomain('Who will win the US election?', 'Trump')).toBe('politics');
+    expect(classify.resolveMarketDomain('Will Arsenal win the Premier League?', 'Yes')).toBe('sports');
+    expect(classify.resolveMarketDomain('Ambiguous title', 'Crypto')).toBe('crypto');
+    expect(classify.parseMarketDomain('N/A')).toBeNull();
+  });
+
   it('addSavedMarket persists category when provided', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/KXSPORT',

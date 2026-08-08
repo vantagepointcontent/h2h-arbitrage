@@ -33,7 +33,7 @@ import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarketById } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
-import { classifyMarket } from '@/lib/market-classification';
+import { resolveMarketDomain } from './market-classification';
 
 const QUICK_KALSHI_TIMEOUT_MS = 5000;
 const QUICK_PM_TIMEOUT_MS = 5000;
@@ -105,8 +105,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const expiryDate = pmEvent.endDate;
 
   const rawGroupTitle = pmEvent.markets?.[0]?.groupItemTitle;
-  const eventCategory = rawGroupTitle && rawGroupTitle !== 'N/A' ? rawGroupTitle : '';
-  const scanCategory = eventCategory || classifyMarket(pmEvent.title).domain;
+  const scanCategory = resolveMarketDomain(pmEvent.title, rawGroupTitle);
 
   const pmRawCount = (pmEvent.markets || []).length;
   const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);

@@ -13,7 +13,17 @@
 
 export type BetType = 'moneyline' | 'spread' | 'total' | 'advance' | 'exact-score' | 'draw' | 'top-n' | 'special';
 type MarketType = 'binary' | 'multi-outcome' | 'bracket';
-type Domain = 'politics' | 'sports' | 'finance' | 'crypto' | 'entertainment' | 'world' | 'science' | 'weather';
+export type Domain = 'politics' | 'sports' | 'finance' | 'crypto' | 'entertainment' | 'world' | 'science' | 'weather';
+
+export const MARKET_DOMAINS: readonly Domain[] = [
+  'politics', 'sports', 'finance', 'crypto', 'entertainment', 'world', 'science', 'weather',
+];
+
+export function parseMarketDomain(value: unknown): Domain | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return MARKET_DOMAINS.includes(normalized as Domain) ? normalized as Domain : null;
+}
 
 interface MarketClassification {
   marketType: MarketType;
@@ -96,5 +106,14 @@ export function classifyMarket(
     domain,
     confidence: Math.min(btConf, domConf),
   };
+}
+
+/** Prefer explicit platform categories only when they map to our canonical domains. */
+export function resolveMarketDomain(title: string, ...platformCategories: unknown[]): Domain {
+  for (const category of platformCategories) {
+    const parsed = parseMarketDomain(category);
+    if (parsed) return parsed;
+  }
+  return classifyMarket(title).domain;
 }
 

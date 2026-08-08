@@ -24,7 +24,7 @@ import { computePriceResolved } from '@/app/lib/page-shared';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
-import { classifyMarket } from '@/lib/market-classification';
+import { resolveMarketDomain } from '@/lib/market-classification';
 import { getScanClientKey, scanRateLimiter } from '@/lib/scan-rate-limit';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
@@ -173,10 +173,10 @@ export async function POST(request: NextRequest) {
 
     const expiryDate = pmEvent.endDate;
 
-    // ── Determine category from PM event (groupItemTitle) or classify from title ──
+    // groupItemTitle is often an outcome label ("Yes", a candidate name, etc.).
+    // Only accept it when it is one of EdgeFinder's canonical domains.
     const rawGroupTitle = pmEvent.markets?.[0]?.groupItemTitle;
-    const eventCategory = (rawGroupTitle && rawGroupTitle !== 'N/A') ? rawGroupTitle : '';
-    const scanCategory = eventCategory || classifyMarket(pmEvent.title).domain;
+    const scanCategory = resolveMarketDomain(pmEvent.title, rawGroupTitle);
 
     // ---- LIVE CLOB ENRICHMENT: replace cached gamma prices with real orderbook prices ----
     const pmRawCount = (pmEvent.markets || []).length;
