@@ -76,7 +76,8 @@ module.exports = {
       time: true,
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
-      max_memory_restart: '256M'
+      max_memory_restart: '256M',
+      cron_restart: '0 4 * * *',
     },
     {
       name: 'h2h-watcher',
@@ -106,6 +107,33 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
       max_memory_restart: '1G'
+    },
+    {
+      name: 'h2h-valuer',
+      script: './dist/position-valuer.mjs',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+
+      restart_delay: 5000,
+      max_restarts: Infinity,
+      min_uptime: 15000,
+
+      kill_timeout: 15000,
+      shutdown_listener: true,
+
+      env: {
+        NODE_ENV: 'production',
+      },
+
+      log_file: '/home/scott/.pm2/logs/h2h-valuer.log',
+      error_file: '/home/scott/.pm2/logs/h2h-valuer-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-valuer-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+
+      max_memory_restart: '256M'
     },
   ]
 };
