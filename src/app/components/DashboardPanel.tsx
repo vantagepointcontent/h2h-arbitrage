@@ -220,7 +220,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-[#182533] bg-[#17212B] p-4 ${className ?? ''}`}>
+    <div className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4 ${className ?? ''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
           {icon}
@@ -236,7 +236,7 @@ function Panel({
 // ── Empty state ──────────────────────────────────────────────────
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-16 text-center text-sm text-[#A8B8C4]">
+    <div className="py-16 text-center text-sm text-[var(--text-secondary)]">
       <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
       {message}
     </div>
@@ -247,8 +247,8 @@ function EmptyState({ message }: { message: string }) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-      <p className="text-xs text-[#A8B8C4] mb-1">{label}</p>
+    <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
+      <p className="text-xs text-[var(--text-secondary)] mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-xs font-mono" style={{ color: entry.color }}>
           {entry.name}: {entry.value}
@@ -315,7 +315,7 @@ export default function DashboardPanel() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-[#A8B8C4]">
+      <div className="py-20 text-center text-sm text-[var(--text-secondary)]">
         <Activity className="w-6 h-6 animate-spin mx-auto mb-3" />
         Loading dashboard…
       </div>
@@ -324,7 +324,7 @@ export default function DashboardPanel() {
 
   if (!data && error) {
     return (
-      <div className="py-20 text-center text-sm text-[#ef4444]">
+      <div className="py-20 text-center text-sm text-[var(--status-negative)]">
         <AlertTriangle className="w-6 h-6 mx-auto mb-3" />
         {error}
       </div>
@@ -335,24 +335,24 @@ export default function DashboardPanel() {
   const hasData = kpis.totalScans > 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 tabular-nums">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-          <Activity className="w-5 h-5 text-[#5DBE81]" />
+          <Activity className="w-5 h-5 text-[var(--status-positive)]" />
           Dashboard
         </h2>
         <div className="flex items-center gap-3">
           {/* Date range selector */}
-          <div className="flex items-center gap-1 bg-[#182533] rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-[var(--border-subtle)] rounded-lg p-0.5">
             {RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
                 onClick={() => setRange(opt.key)}
                 className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                   range === opt.key
-                    ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                    : "text-[#A8B8C4] hover:text-[#FFFFFF]"
+                    ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 {opt.label}
@@ -365,8 +365,8 @@ export default function DashboardPanel() {
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               autoRefresh
-                ? "bg-[#5DBE81]/10 text-[#5DBE81] border-[#5DBE81]/30"
-                : "bg-[#182533] text-[#A8B8C4] border-[#182533] hover:text-[#FFFFFF]"
+                ? "bg-[var(--status-positive)]/10 text-[var(--status-positive)] border-[var(--status-positive)]/30"
+                : "bg-[var(--border-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
             }`}
             title="Auto-refresh every 60s"
           >
@@ -378,12 +378,12 @@ export default function DashboardPanel() {
 
       {/* UI-025: at-a-glance live trading performance for the US Eastern day. */}
       {dailyPnl && (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <DollarSign className="h-4 w-4 text-[#5DBE81]" /> Today&apos;s P&amp;L
+              <DollarSign className="h-4 w-4 text-[var(--status-positive)]" /> Today&apos;s P&amp;L
             </div>
-            <span className="text-[10px] text-[#A8B8C4]">US Eastern · {dailyPnl.date}</span>
+            <span className="text-[10px] text-[var(--text-secondary)]">US Eastern · {dailyPnl.date}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             {[
@@ -391,27 +391,27 @@ export default function DashboardPanel() {
               ["Realized", fmtUsd(dailyPnl.realizedPnl), dailyPnl.realizedPnl],
               ["Unrealized", fmtUsd(dailyPnl.unrealizedPnl), dailyPnl.unrealizedPnl],
             ].map(([label, value, amount]) => (
-              <div key={String(label)} className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">{String(label)}</div>
-                <div className={`text-sm font-semibold tabular-nums ${Number(amount) > 0 ? "text-[#5DBE81]" : Number(amount) < 0 ? "text-[#ef4444]" : "text-white"}`}>{String(value)}</div>
+              <div key={String(label)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">{String(label)}</div>
+                <div className={`text-sm font-semibold tabular-nums ${Number(amount) > 0 ? "text-[var(--status-positive)]" : Number(amount) < 0 ? "text-[var(--status-negative)]" : "text-white"}`}>{String(value)}</div>
               </div>
             ))}
-            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Trades</div>
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Trades</div>
               <div className="text-sm font-semibold tabular-nums">{dailyPnl.totalTrades}</div>
             </div>
-            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Win rate</div>
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Win rate</div>
               <div className="text-sm font-semibold tabular-nums">{dailyPnl.winRatePct.toFixed(1)}%</div>
             </div>
-            <div className="rounded-lg border border-[#182533] bg-[#0E1621] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4]">Volume</div>
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Volume</div>
               <div className="text-sm font-semibold tabular-nums">{fmtUsd(dailyPnl.totalVolume)}</div>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[#A8B8C4]">
-            <span>Kalshi: <b className="text-white">{fmtUsd(dailyPnl.platforms.kalshi.volume)}</b> volume · <b className={dailyPnl.platforms.kalshi.realizedPnl >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{fmtUsd(dailyPnl.platforms.kalshi.realizedPnl)}</b> realized</span>
-            <span>Polymarket: <b className="text-white">{fmtUsd(dailyPnl.platforms.polymarket.volume)}</b> volume · <b className={dailyPnl.platforms.polymarket.realizedPnl >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{fmtUsd(dailyPnl.platforms.polymarket.realizedPnl)}</b> realized</span>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--text-secondary)]">
+            <span>Kalshi: <b className="text-white">{fmtUsd(dailyPnl.platforms.kalshi.volume)}</b> volume · <b className={dailyPnl.platforms.kalshi.realizedPnl >= 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}>{fmtUsd(dailyPnl.platforms.kalshi.realizedPnl)}</b> realized</span>
+            <span>Polymarket: <b className="text-white">{fmtUsd(dailyPnl.platforms.polymarket.volume)}</b> volume · <b className={dailyPnl.platforms.polymarket.realizedPnl >= 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}>{fmtUsd(dailyPnl.platforms.polymarket.realizedPnl)}</b> realized</span>
           </div>
         </div>
       )}
@@ -422,7 +422,7 @@ export default function DashboardPanel() {
           icon={<Zap className="w-4 h-4" />}
           label="Total Arbs Found"
           value={kpis.totalArbsFound.toLocaleString()}
-          color="#5DBE81"
+          color="var(--status-positive)"
         />
         {/* BUG-01: "Active Arbs Now" = count of markets where the latest scan
             (liveResult ?? lastScanResult) has bestRoiPct > 0. Computed in the
@@ -432,25 +432,25 @@ export default function DashboardPanel() {
           icon={<Eye className="w-4 h-4" />}
           label="Active Arbs Now"
           value={kpis.activeArbs.toLocaleString()}
-          color="#facc15"
+          color="var(--status-warning)"
         />
         <KPICard
           icon={<BarChart3 className="w-4 h-4" />}
           label="Total Scans"
           value={kpis.totalScans.toLocaleString()}
-          color="#FFFFFF"
+          color="var(--text-primary)"
         />
         <KPICard
           icon={<TrendingUp className="w-4 h-4" />}
           label="Avg ROI"
           value={fmtPct(kpis.avgRoi)}
-          color={kpis.avgRoi > 0 ? "#5DBE81" : "#ef4444"}
+          color={kpis.avgRoi > 0 ? "var(--status-positive)" : "var(--status-negative)"}
         />
         <KPICard
           icon={<Globe className="w-4 h-4" />}
           label="Markets Tracked"
           value={kpis.marketsTracked.toString()}
-          color="#a855f7"
+          color="var(--platform-polymarket)"
         />
       </div>
 
@@ -458,9 +458,9 @@ export default function DashboardPanel() {
       {data?.capacity && data.capacity.series.length > 0 && (
         <Panel
           title="API Capacity Utilization"
-          icon={<Activity className="w-4 h-4 text-[#60a5fa]" />}
+          icon={<Activity className="w-4 h-4 text-[var(--status-info)]" />}
           rightElement={
-            <span className="text-xs text-[#A8B8C4]">
+            <span className="text-xs text-[var(--text-secondary)]">
               {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
             </span>
           }
@@ -476,15 +476,15 @@ export default function DashboardPanel() {
                 return point;
               })}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
               <XAxis
                 dataKey="hour"
-                tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
                 tickFormatter={(val: string) => val.slice(5, 16)}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
                 domain={[0, 100]}
                 tickFormatter={(v: number) => `${v}%`}
               />
@@ -492,15 +492,15 @@ export default function DashboardPanel() {
                 content={({ active, payload, label }: any) => {
                   if (!active || !payload?.length) return null;
                   return (
-                    <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                      <p className="text-xs text-[#A8B8C4] mb-2">{label}</p>
+                    <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
+                      <p className="text-xs text-[var(--text-secondary)] mb-2">{label}</p>
                       {payload.map((entry: any, i: number) => {
                         const val = Number(entry.value ?? 0);
                         const color =
                           val >= 95
-                            ? "#ef4444"
+                            ? "var(--status-negative)"
                             : val >= 80
-                              ? "#facc15"
+                              ? "var(--status-warning)"
                               : entry.color;
                         return (
                           <p key={i} className="text-xs font-mono" style={{ color }}>
@@ -512,9 +512,9 @@ export default function DashboardPanel() {
                   );
                 }}
               />
-              <Legend wrapperStyle={{ color: '#A8B8C4', fontSize: '11px' }} />
+              <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: '11px' }} />
               {data.capacity.series.map((s, i) => {
-                const COLORS = ["#60a5fa", "#5DBE81", "#facc15", "#a855f7"];
+                const COLORS = ["var(--status-info)", "var(--status-positive)", "var(--status-warning)", "var(--platform-polymarket)"];
                 const baseColor = COLORS[i % COLORS.length];
                 return (
                   <Line
@@ -527,10 +527,10 @@ export default function DashboardPanel() {
                     dot={(props: any) => {
                       const val = Number(props.value ?? 0);
                       if (val >= 95) {
-                        return <circle cx={props.cx} cy={props.cy} r={3} fill="#ef4444" />;
+                        return <circle cx={props.cx} cy={props.cy} r={3} fill="var(--status-negative)" />;
                       }
                       if (val >= 80) {
-                        return <circle cx={props.cx} cy={props.cy} r={3} fill="#facc15" />;
+                        return <circle cx={props.cx} cy={props.cy} r={3} fill="var(--status-warning)" />;
                       }
                       return <circle cx={props.cx} cy={props.cy} r={2} fill={baseColor} />;
                     }}
@@ -546,58 +546,58 @@ export default function DashboardPanel() {
       {/* ── Storage info box ───────────────────────────────── */}
       <Panel
         title="Storage"
-        icon={<HardDrive className="w-4 h-4 text-[#A8B8C4]" />}
+        icon={<HardDrive className="w-4 h-4 text-[var(--text-secondary)]" />}
         rightElement={
           storage ? (
-            <span className="text-[10px] text-[#A8B8C4]">{storage.retentionDays}d retention</span>
+            <span className="text-[10px] text-[var(--text-secondary)]">{storage.retentionDays}d retention</span>
           ) : null
         }
       >
         {storage ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">Disk usage</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">Disk usage</div>
               <div className="text-sm font-semibold tabular-nums mb-1.5">
                 {fmtBytes(storage.diskUsed)} / {fmtBytes(storage.diskTotal)} ({storage.diskPercent}%)
               </div>
-              <div className="h-2 w-full rounded-full bg-[#0E1621] overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-[var(--surface-workspace)] overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
-                    storage.diskPercent >= 80 ? "bg-[#ef4444]" : storage.diskPercent >= 60 ? "bg-[#facc15]" : "bg-[#5DBE81]"
+                    storage.diskPercent >= 80 ? "bg-[var(--status-negative)]" : storage.diskPercent >= 60 ? "bg-[var(--status-warning)]" : "bg-[var(--status-positive)]"
                   }`}
                   style={{ width: `${Math.min(storage.diskPercent, 100)}%` }}
                 />
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">DB size</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">DB size</div>
               <div className="text-sm font-semibold tabular-nums text-white">{fmtBytes(storage.dbSize)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">WAL size</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">WAL size</div>
               <div
                 className={`text-sm font-semibold tabular-nums ${
                   storage.walSize > storage.dbSize * 0.5
                     ? storage.walSize > storage.dbSize
-                      ? "text-[#ef4444]"
-                      : "text-[#facc15]"
+                      ? "text-[var(--status-negative)]"
+                      : "text-[var(--status-warning)]"
                     : "text-white"
                 }`}
               >
                 {fmtBytes(storage.walSize)}
               </div>
               {storage.walSize > storage.dbSize * 0.5 && (
-                <div className="text-[10px] text-[#facc15] mt-0.5">
+                <div className="text-[10px] text-[var(--status-warning)] mt-0.5">
                   WAL {'>'} 50% of DB — checkpoint problem
                 </div>
               )}
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[#A8B8C4] mb-1">Scan rows</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">Scan rows</div>
               <div className="text-sm font-semibold tabular-nums text-white">
                 {storage.scanRowCount.toLocaleString()} rows
               </div>
-              <div className="text-[10px] text-[#A8B8C4]">
+              <div className="text-[10px] text-[var(--text-secondary)]">
                 {storage.oldestScan
                   ? `since ${new Date(storage.oldestScan).toISOString().slice(0, 10)}`
                   : "no scans yet"}
@@ -605,7 +605,7 @@ export default function DashboardPanel() {
             </div>
           </div>
         ) : (
-          <div className="text-sm text-[#A8B8C4]">Storage data unavailable.</div>
+          <div className="text-sm text-[var(--text-secondary)]">Storage data unavailable.</div>
         )}
       </Panel>
 
@@ -618,40 +618,40 @@ export default function DashboardPanel() {
             {/* Arb Discovery Timeline (line chart) */}
             <Panel
               title="Arb Discovery Timeline"
-              icon={<Activity className="w-4 h-4 text-[#5DBE81]" />}
+              icon={<Activity className="w-4 h-4 text-[var(--status-positive)]" />}
               rightElement={
-                <span className="text-xs text-[#A8B8C4]">
+                <span className="text-xs text-[var(--text-secondary)]">
                   {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
             >
               <ResponsiveContainer width="100%" height={260} key={`timeline-${range}`}>
                 <LineChart data={data!.timeline}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                   <XAxis
                     dataKey="time"
-                    tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                    tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
                     tickFormatter={(val: string) => val.slice(5)}
                     interval="preserveStartEnd"
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 10, fill: "#5DBE81" }}
+                    tick={{ fontSize: 10, fill: "var(--status-positive)" }}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 10, fill: "#facc15" }}
+                    tick={{ fontSize: 10, fill: "var(--status-warning)" }}
                     domain={[0, "dataMax"]}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ color: '#A8B8C4', fontSize: '11px' }} />
+                  <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: '11px' }} />
                   <Line
                     yAxisId="left"
                     type="monotone"
                     dataKey="scans"
                     name="Scans"
-                    stroke="#5DBE81"
+                    stroke="var(--status-positive)"
                     strokeWidth={2}
                     dot={false}
                     connectNulls
@@ -661,7 +661,7 @@ export default function DashboardPanel() {
                     type="monotone"
                     dataKey="avgRoi"
                     name="Avg ROI %"
-                    stroke="#facc15"
+                    stroke="var(--status-warning)"
                     strokeWidth={2}
                     dot={false}
                     connectNulls
@@ -673,29 +673,29 @@ export default function DashboardPanel() {
             {/* Scans Per Day (bar chart) */}
             <Panel
               title="Scans Per Day"
-              icon={<BarChart3 className="w-4 h-4 text-[#5DBE81]" />}
+              icon={<BarChart3 className="w-4 h-4 text-[var(--status-positive)]" />}
               rightElement={
-                <span className="text-xs text-[#A8B8C4]">
+                <span className="text-xs text-[var(--text-secondary)]">
                   {range === "all" ? "Last 365 days" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
                 </span>
               }
             >
               <ResponsiveContainer width="100%" height={260} key={`scans-${range}`}>
                 <BarChart data={data!.scansPerDay}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                    tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
                     interval="preserveStartEnd"
                   />
-                  <YAxis tick={{ fontSize: 10, fill: "#A8B8C4" }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--text-secondary)" }} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload, label }: any) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                          <p className="text-xs text-[#A8B8C4]">{fmtShortDate(label)}</p>
-                          <p className="text-xs font-mono text-[#5DBE81]">
+                        <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
+                          <p className="text-xs text-[var(--text-secondary)]">{fmtShortDate(label)}</p>
+                          <p className="text-xs font-mono text-[var(--status-positive)]">
                             {payload[0].value} scans
                           </p>
                         </div>
@@ -708,8 +708,8 @@ export default function DashboardPanel() {
                         key={i}
                         fill={
                           data!.scansPerDay[i].count > 0
-                            ? "#5DBE81"
-                            : "#182533"
+                            ? "var(--status-positive)"
+                            : "var(--border-subtle)"
                         }
                       />
                     ))}
@@ -724,9 +724,9 @@ export default function DashboardPanel() {
             {/* ROI Distribution */}
             <Panel
               title="ROI Distribution"
-              icon={<Target className="w-4 h-4 text-[#5DBE81]" />}
+              icon={<Target className="w-4 h-4 text-[var(--status-positive)]" />}
               rightElement={
-                <span className="text-xs text-[#A8B8C4]">
+                <span className="text-xs text-[var(--text-secondary)]">
                   Net of fees
                 </span>
               }
@@ -737,29 +737,29 @@ export default function DashboardPanel() {
                     ...b,
                     color:
                       b.low >= 10
-                        ? "#5DBE81"
+                        ? "var(--status-positive)"
                         : b.low >= 5
-                          ? "#facc15"
+                          ? "var(--status-warning)"
                           : b.low >= 2
-                            ? "#5DBE81"
-                            : "#5E6875",
+                            ? "var(--status-positive)"
+                            : "var(--text-faint)",
                   }))}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: "#A8B8C4" }}
+                    tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
                   />
-                  <YAxis tick={{ fontSize: 10, fill: "#A8B8C4" }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--text-secondary)" }} allowDecimals={false} />
                   <Tooltip
                     content={({ active, payload }: any) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                          <p className="text-xs text-[#A8B8C4]">
+                        <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
+                          <p className="text-xs text-[var(--text-secondary)]">
                             ROI {payload[0]?.payload?.label}
                           </p>
-                          <p className="text-xs font-mono text-[#5DBE81]">
+                          <p className="text-xs font-mono text-[var(--status-positive)]">
                             {payload[0].value} scans
                           </p>
                         </div>
@@ -770,12 +770,12 @@ export default function DashboardPanel() {
                     {data!.roiDistribution.map((b, i) => {
                       const c =
                         b.low >= 10
-                          ? "#5DBE81"
+                          ? "var(--status-positive)"
                           : b.low >= 5
-                            ? "#facc15"
+                            ? "var(--status-warning)"
                             : b.low >= 2
-                              ? "#5DBE81"
-                              : "#5E6875";
+                              ? "var(--status-positive)"
+                              : "var(--text-faint)";
                       return <Cell key={i} fill={c} opacity={b.count > 0 ? 1 : 0.15} />;
                     })}
                   </Bar>
@@ -786,9 +786,9 @@ export default function DashboardPanel() {
             {/* Market Coverage (donut chart) */}
             <Panel
               title="Market Coverage"
-              icon={<Globe className="w-4 h-4 text-[#a855f7]" />}
+              icon={<Globe className="w-4 h-4 text-[var(--platform-polymarket)]" />}
               rightElement={
-                <span className="text-xs text-[#A8B8C4]">
+                <span className="text-xs text-[var(--text-secondary)]">
                   By domain
                 </span>
               }
@@ -810,17 +810,17 @@ export default function DashboardPanel() {
                   >
                     {data!.marketCoverage.map((_: any, i: number) => {
                       const COLORS: Record<string, string> = {
-                        Politics: "#5DBE81",
-                        Sports: "#facc15",
-                        Crypto: "#a855f7",
-                        Economics: "#60a5fa",
-                        Entertainment: "#ef4444",
-                        Other: "#5E6875",
+                        Politics: "var(--status-positive)",
+                        Sports: "var(--status-warning)",
+                        Crypto: "var(--platform-polymarket)",
+                        Economics: "var(--status-info)",
+                        Entertainment: "var(--status-negative)",
+                        Other: "var(--text-faint)",
                       };
                       return (
                         <Cell
                           key={i}
-                          fill={COLORS[data!.marketCoverage[i].name] || "#5E6875"}
+                          fill={COLORS[data!.marketCoverage[i].name] || "var(--text-faint)"}
                           stroke="transparent"
                         />
                       );
@@ -830,11 +830,11 @@ export default function DashboardPanel() {
                     content={({ active, payload }: any) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
+                        <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
                           <p className="text-xs font-semibold" style={{ color: payload[0].color }}>
                             {payload[0].name}
                           </p>
-                          <p className="text-xs font-mono text-[#A8B8C4]">
+                          <p className="text-xs font-mono text-[var(--text-secondary)]">
                             {payload[0].value} markets
                           </p>
                         </div>
@@ -850,9 +850,9 @@ export default function DashboardPanel() {
           <Panel
             title="Arb Profit Timeline"
             className="order-5"
-            icon={<TrendingUp className="w-4 h-4 text-[#5DBE81]" />}
+            icon={<TrendingUp className="w-4 h-4 text-[var(--status-positive)]" />}
             rightElement={
-              <span className="text-xs text-[#A8B8C4]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 {range === "all" ? "All time" : range === "today" ? "Today" : `Last ${RANGE_OPTIONS.find(o => o.key === range)?.label ?? "30 days"}`}
               </span>
             }
@@ -861,28 +861,28 @@ export default function DashboardPanel() {
               <AreaChart data={data!.profitTimeline}>
                 <defs>
                   <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#5DBE81" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="#5DBE81" stopOpacity={0.05} />
+                    <stop offset="5%" stopColor="var(--status-positive)" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="var(--status-positive)" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#182533" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                 <XAxis
                   dataKey="time"
-                  tick={{ fontSize: 10, fill: "#A8B8C4" }}
+                  tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
                   tickFormatter={(val: string) => val.slice(5)}
                   interval="preserveStartEnd"
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "#5DBE81" }}
+                  tick={{ fontSize: 10, fill: "var(--status-positive)" }}
                   tickFormatter={(v: number) => `$${v}`}
                 />
                 <Tooltip
                   content={({ active, payload }: any) => {
                     if (!active || !payload?.length) return null;
                     return (
-                      <div className="bg-[#0E1621] border border-[#182533] rounded-lg p-3 shadow-lg">
-                        <p className="text-xs text-[#A8B8C4]">{payload[0]?.payload?.time}</p>
-                        <p className="text-xs font-mono text-[#5DBE81]">
+                      <div className="bg-[var(--surface-workspace)] border border-[var(--border-subtle)] rounded-lg p-3 shadow-lg">
+                        <p className="text-xs text-[var(--text-secondary)]">{payload[0]?.payload?.time}</p>
+                        <p className="text-xs font-mono text-[var(--status-positive)]">
                           {fmtUsd(payload[0].value)}
                         </p>
                       </div>
@@ -893,7 +893,7 @@ export default function DashboardPanel() {
                   type="monotone"
                   dataKey="profit"
                   name="Profit"
-                  stroke="#5DBE81"
+                  stroke="var(--status-positive)"
                   strokeWidth={2}
                   fill="url(#profitGrad)"
                   connectNulls
@@ -905,9 +905,9 @@ export default function DashboardPanel() {
           {/* ── Row 4: Lifecycle Funnel ─────────────────────── */}
           <Panel
             title="Arb Lifecycle Funnel"
-            icon={<Layers className="w-4 h-4 text-[#facc15]" />}
+            icon={<Layers className="w-4 h-4 text-[var(--status-warning)]" />}
             rightElement={
-              <span className="text-xs text-[#A8B8C4]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Found → Active → Recurring → Vanished → Expired
               </span>
             }
@@ -916,19 +916,19 @@ export default function DashboardPanel() {
               {(() => {
                 const funnel = data!.lifecycleFunnel;
                 const stages = [
-                  { label: "Found", value: funnel.found, color: "#5DBE81", tooltip: "Total unique arb opportunities detected across scans in this period. Each market and outcome pair counts once per scan where net ROI is positive." },
-                  { label: "Active", value: funnel.active, color: "#facc15", tooltip: "Arb episodes currently open: the most recent scan still shows positive net ROI. These are live right now." },
-                  { label: "Recurring", value: funnel.recurring, color: "#a855f7", tooltip: "The same arb opportunity appeared, vanished, and then reappeared in separate episodes during this period." },
-                  { label: "Vanished", value: funnel.vanished, color: "#ef4444", tooltip: "Arb episodes that closed because the spread disappeared and net ROI fell to zero or below before market expiry." },
-                  { label: "Expired", value: funnel.expired, color: "#5E6875", tooltip: "Arb episodes that closed because the underlying market expired or settled, rather than because the spread disappeared." },
+                  { label: "Found", value: funnel.found, color: "var(--status-positive)", tooltip: "Total unique arb opportunities detected across scans in this period. Each market and outcome pair counts once per scan where net ROI is positive." },
+                  { label: "Active", value: funnel.active, color: "var(--status-warning)", tooltip: "Arb episodes currently open: the most recent scan still shows positive net ROI. These are live right now." },
+                  { label: "Recurring", value: funnel.recurring, color: "var(--platform-polymarket)", tooltip: "The same arb opportunity appeared, vanished, and then reappeared in separate episodes during this period." },
+                  { label: "Vanished", value: funnel.vanished, color: "var(--status-negative)", tooltip: "Arb episodes that closed because the spread disappeared and net ROI fell to zero or below before market expiry." },
+                  { label: "Expired", value: funnel.expired, color: "var(--text-faint)", tooltip: "Arb episodes that closed because the underlying market expired or settled, rather than because the spread disappeared." },
                 ];
                 const maxVal = Math.max(...stages.map((s) => s.value), 1);
                 return stages.map((stage) => (
                   <div key={stage.label} className="flex items-center gap-3 cursor-help" title={stage.tooltip}>
-                    <span className="text-xs font-medium w-20 text-[#A8B8C4] text-right shrink-0">
+                    <span className="text-xs font-medium w-20 text-[var(--text-secondary)] text-right shrink-0">
                       {stage.label}
                     </span>
-                    <div className="flex-1 bg-[#0E1621] rounded-full overflow-hidden" style={{ height: 24 }}>
+                    <div className="flex-1 bg-[var(--surface-workspace)] rounded-full overflow-hidden" style={{ height: 24 }}>
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -949,9 +949,9 @@ export default function DashboardPanel() {
           {/* ── Row 4b: Arb Episode Lifecycle (durable vs phantom) ── */}
           <Panel
             title="Arb Episode Stats"
-            icon={<Clock className="w-4 h-4 text-[#5DBE81]" />}
+            icon={<Clock className="w-4 h-4 text-[var(--status-positive)]" />}
             rightElement={
-              <span className="text-xs text-[#A8B8C4]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Durable (≥5m) vs phantom (&lt;1m) episodes
               </span>
             }
@@ -964,9 +964,9 @@ export default function DashboardPanel() {
           {/* ── Row 4c: Arb Type Breakdown ─────────────────── */}
           <Panel
             title="Arb Type Breakdown"
-            icon={<Layers className="w-4 h-4 text-[#60a5fa]" />}
+            icon={<Layers className="w-4 h-4 text-[var(--status-info)]" />}
             rightElement={
-              <span className="text-xs text-[#A8B8C4]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Count & profit by type · Net of fees
               </span>
             }
@@ -977,10 +977,10 @@ export default function DashboardPanel() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {(() => {
                   const TYPE_META: Record<string, { label: string; color: string; desc: string }> = {
-                    cross: { label: 'Cross Arb', color: '#60a5fa', desc: 'YES+YES across platforms' },
-                    direct: { label: 'Direct Arb', color: '#5DBE81', desc: 'YES+NO same outcome' },
-                    internal: { label: 'Internal Arb', color: '#a855f7', desc: 'YES+YES same platform' },
-                    unknown: { label: 'Unknown', color: '#5E6875', desc: 'Unclassified' },
+                    cross: { label: 'Cross Arb', color: 'var(--status-info)', desc: 'YES+YES across platforms' },
+                    direct: { label: 'Direct Arb', color: 'var(--status-positive)', desc: 'YES+NO same outcome' },
+                    internal: { label: 'Internal Arb', color: 'var(--platform-polymarket)', desc: 'YES+YES same platform' },
+                    unknown: { label: 'Unknown', color: 'var(--text-faint)', desc: 'Unclassified' },
                   };
                   const types = ['cross', 'direct', 'internal'];
                   return types.map((t) => {
@@ -992,7 +992,7 @@ export default function DashboardPanel() {
                     return (
                       <div
                         key={t}
-                        className="rounded-lg border border-[#182533] bg-[#0E1621] p-3 space-y-2"
+                        className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3 space-y-2"
                       >
                         <div className="flex items-center gap-2">
                           <span
@@ -1006,19 +1006,19 @@ export default function DashboardPanel() {
                             {meta.label}
                           </span>
                         </div>
-                        <div className="text-xs text-[#5E6875]">{meta.desc}</div>
+                        <div className="text-xs text-[var(--text-faint)]">{meta.desc}</div>
                         <div className="flex items-baseline justify-between pt-1">
                           <div>
                             <div className="text-lg font-bold" style={{ color: meta.color }}>
                               {count.toLocaleString()}
                             </div>
-                            <div className="text-[10px] text-[#5E6875]">scans</div>
+                            <div className="text-[10px] text-[var(--text-faint)]">scans</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm font-mono font-semibold" style={{ color: count > 0 ? '#facc15' : '#5E6875' }}>
+                            <div className="text-sm font-mono font-semibold" style={{ color: count > 0 ? 'var(--status-warning)' : 'var(--text-faint)' }}>
                               {count > 0 ? fmtUsd(profit) : '—'}
                             </div>
-                            <div className="text-[10px] text-[#5E6875]">
+                            <div className="text-[10px] text-[var(--text-faint)]">
                               {count > 0 ? `avg ${fmtPct(avgRoi)}` : 'no data'}
                             </div>
                           </div>
@@ -1035,9 +1035,9 @@ export default function DashboardPanel() {
           <Panel
             title="Top Active Arbs"
             className="order-3"
-            icon={<TrendingUp className="w-4 h-4 text-[#facc15]" />}
+            icon={<TrendingUp className="w-4 h-4 text-[var(--status-warning)]" />}
             rightElement={
-              <span className="text-xs text-[#A8B8C4]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Live · Sorted by ROI ↓ · Click to open scan
               </span>
             }
@@ -1048,23 +1048,23 @@ export default function DashboardPanel() {
               <div className="overflow-x-auto" data-testid="dashboard-top-arbs-scroll">
                 <table className="w-full min-w-[800px] text-sm">
                   <thead>
-                    <tr className="border-b border-[#182533] bg-[#0E1621]">
-                      <th data-testid="dashboard-top-arb-market-header" className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                    <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-workspace)]">
+                      <th data-testid="dashboard-top-arb-market-header" className="sticky left-0 z-20 bg-[var(--surface-workspace)] px-3 py-2 text-left text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         Market
                       </th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         Strategy
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         ROI
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         Profit
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         Arbs
                       </th>
-                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[#A8B8C4] uppercase tracking-wide">
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                         Scanned
                       </th>
                     </tr>
@@ -1073,14 +1073,14 @@ export default function DashboardPanel() {
                     {data!.topActiveArbs.map((arb) => {
                       const roiColor =
                         arb.best_roi_pct >= 5
-                          ? "text-[#5DBE81]"
+                          ? "text-[var(--status-positive)]"
                           : arb.best_roi_pct >= 0
-                            ? "text-[#facc15]"
-                            : "text-[#ef4444]";
+                            ? "text-[var(--status-warning)]"
+                            : "text-[var(--status-negative)]";
                       return (
                         <tr
                           key={arb.id}
-                          className="border-b border-[#182533] hover:bg-[#0E1621]/50 transition-colors cursor-pointer"
+                          className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-workspace)]/50 transition-colors cursor-pointer"
                           onClick={() =>
                             (window.location.href = `/?view=scan&id=${encodeURIComponent(arb.market_id)}`)
                           }
@@ -1088,7 +1088,7 @@ export default function DashboardPanel() {
                         >
                           <td
                             data-testid="dashboard-top-arb-market-cell"
-                            className="sticky left-0 z-10 bg-[#17212B] px-3 py-2 text-xs font-medium text-[#FFFFFF] truncate max-w-[200px]"
+                            className="sticky left-0 z-10 bg-[var(--surface-panel)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] truncate max-w-[200px]"
                             title={arb.market_title || arb.market_id}
                           >
                             {arb.market_title || arb.market_id}
@@ -1099,13 +1099,13 @@ export default function DashboardPanel() {
                           <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>
                             {fmtPct(arb.best_roi_pct)}
                           </td>
-                          <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">
+                          <td className="px-3 py-2 text-right text-xs font-mono text-[var(--status-warning)]">
                             {fmtUsd(arb.best_profit)}
                           </td>
-                          <td className="px-3 py-2 text-right text-xs font-mono text-[#5DBE81]">
+                          <td className="px-3 py-2 text-right text-xs font-mono text-[var(--status-positive)]">
                             {arb.positive_arb_count}
                           </td>
-                          <td className="px-3 py-2 text-right text-xs text-[#A8B8C4] font-mono whitespace-nowrap">
+                          <td className="px-3 py-2 text-right text-xs text-[var(--text-secondary)] font-mono whitespace-nowrap">
                             {fmtTime(arb.scanned_at)}
                           </td>
                         </tr>
@@ -1121,7 +1121,7 @@ export default function DashboardPanel() {
 
       {/* Footer note */}
       {hasData && (
-        <div className="flex items-center justify-between text-xs text-[#A8B8C4]">
+        <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
           <span>All values net of fees</span>
           <span>
             Data range: {RANGE_OPTIONS.find((r) => r.key === range)?.label}
@@ -1145,10 +1145,10 @@ function KPICard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 space-y-2">
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         {icon}
-        <span className="text-[10px] text-[#A8B8C4]">{label}</span>
+        <span className="text-[10px] text-[var(--text-secondary)]">{label}</span>
       </div>
       <div className="text-lg font-bold" style={{ color }}>
         {value}
