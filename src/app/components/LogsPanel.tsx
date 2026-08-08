@@ -256,6 +256,12 @@ export default function LogsPanel() {
     if (toDate) params.set("toDate", toDate);
     return `/api/logs/export?${params.toString()}`;
   }, [minRoi, positiveArbOnly, fromDate, toDate]);
+  const tradeExportUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
+    return `/api/logs/trades/export?${params.toString()}`;
+  }, [fromDate, toDate]);
   // UI-035: estimate export row count from HEAD /api/logs/export
   useEffect(() => {
     let cancelled = false;
@@ -367,10 +373,17 @@ export default function LogsPanel() {
           </button>
           <a
             href={exportUrl}
+            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#182533] text-[#8A9BA8] border border-[#182533] font-semibold text-xs hover:text-white transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export Scan CSV
+          </a>
+          <a
+            href={tradeExportUrl}
             className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-xs hover:bg-[#4DA66E] transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
-            Export CSV
+            Export Trades CSV
           </a>
         </div>
       </div>

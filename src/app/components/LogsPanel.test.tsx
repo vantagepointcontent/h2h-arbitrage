@@ -48,7 +48,8 @@ describe('LogsPanel', () => {
     expect(document.querySelector('thead th')?.className).toContain('sticky');
     expect(document.querySelector('tbody td')?.className).toContain('sticky');
     expect(screen.getByRole('button', { name: 'Refresh' }).className).toContain('min-h-11');
-    expect(screen.getByRole('link', { name: 'Export CSV' }).className).toContain('min-h-11');
+    expect(screen.getByRole('link', { name: 'Export Scan CSV' }).className).toContain('min-h-11');
+    expect(screen.getByRole('link', { name: 'Export Trades CSV' }).getAttribute('href')).toBe('/api/logs/trades/export?');
     expect(screen.getByLabelText('Positive arb only').parentElement?.className).toContain('min-h-11');
     expect(screen.getAllByRole('button', { name: /^All$/ }).every((button) => button.className.includes('min-h-11'))).toBe(true);
   });

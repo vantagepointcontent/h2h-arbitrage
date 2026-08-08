@@ -1382,7 +1382,7 @@ export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Pro
   const sql = source
     ? `SELECT * FROM executions WHERE source = ? ORDER BY timestamp DESC LIMIT ?`
     : `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`;
-  const args = source ? [source, Math.min(1000, Math.max(1, limit))] : [Math.min(1000, Math.max(1, limit))];
+  const args = source ? [source, Math.min(10_000, Math.max(1, limit))] : [Math.min(10_000, Math.max(1, limit))];
   const res = await c.execute({ sql, args });
   return (res.rows as any[]).map((r) => rowToExecutionRecord(r));
 }
