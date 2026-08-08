@@ -210,6 +210,10 @@ export default function Home() {
   useEffect(() => { capitalRef.current = capital; }, [capital]);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // BUG-108: URL routing and saved-market cache hydration are asynchronous.
+  // Keep the workspace in an explicit startup state until both have resolved,
+  // instead of briefly rendering the default/empty view.
+  const [routeInitializing, setRouteInitializing] = useState(true);
   const [bgRefreshing, setBgRefreshing] = useState(false); // BUG-032
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -488,7 +492,12 @@ export default function Home() {
         setViewMode("dashboard");
       }
     };
-    syncFromUrl();
+    void syncFromUrl()
+      .catch((err) => {
+        console.error("Failed to initialize view from URL", err);
+        setError("Failed to load the requested market.");
+      })
+      .finally(() => setRouteInitializing(false));
   }, []);
 
   const handleQuickPricesRefresh = async (marketId: string, silent = false) => {
@@ -1499,7 +1508,16 @@ export default function Home() {
         />
         <div className="flex-1 overflow-y-auto">
           <div className="w-full p-2 sm:p-4 md:p-6 2xl:p-8">
-            {viewMode === "overview" ? (
+            {routeInitializing ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex min-h-[40vh] items-center justify-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] text-sm text-[var(--text-secondary)]"
+              >
+                <Loader2 className="h-5 w-5 animate-spin text-[var(--status-positive)]" />
+                Loading workspace...
+              </div>
+            ) : viewMode === "overview" ? (
               <OverviewPanel
                 markets={savedMarkets}
                 loading={overviewLoading}
