@@ -3,6 +3,7 @@ import { clientSafeError } from '@/lib/error-handler';
 import { getExecutionMode } from '@/lib/settings';
 import logger from '@/lib/logger';
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
+import { derivePositionRisk } from '@/lib/position-risk';
 
 /**
  * Open Positions API.
@@ -134,12 +135,27 @@ export async function GET(): Promise<NextResponse> {
     // Pair positions by title similarity (arb legs = same market on both platforms)
     const paired = pairPositions(kalshi, pm);
 
-    // Sort by market name by default (acceptance criteria)
-    paired.sort((a, b) => a.marketTitle.localeCompare(b.marketTitle));
+    // Account feeds do not expose orderbook-depth timestamps. Publish the fetch
+    // timestamp and explicitly mark liquidity as unverified instead of implying it.
+    const quoteTimestamp = new Date().toISOString();
+    const enriched = paired.map((position) => ({
+      ...position,
+      ...derivePositionRisk(position),
+      quoteTimestamps: {
+        kalshi: position.kalshi ? quoteTimestamp : null,
+        polymarket: position.polymarket ? quoteTimestamp : null,
+      },
+    }));
+
+    // Needs-attention positions first, then stable alphabetical ordering.
+    enriched.sort((a, b) => {
+      const riskDelta = b.attentionReasons.length - a.attentionReasons.length;
+      return riskDelta || a.marketTitle.localeCompare(b.marketTitle);
+    });
 
     return NextResponse.json({
       success: true,
-      positions: paired,
+      positions: enriched,
       raw: { kalshi, polymarket: pm },
       errors: { kalshi: kalshiError, polymarket: pmError },
     });

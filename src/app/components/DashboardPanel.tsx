@@ -18,6 +18,7 @@ import {
 import { useEffect, useState, useCallback } from "react";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
+import { DecisionCommandCenter } from "./dashboard/DecisionCommandCenter";
 import {
   ResponsiveContainer,
   LineChart,
@@ -375,6 +376,9 @@ export default function DashboardPanel() {
           </button>
         </div>
       </div>
+
+      {/* DES-005: financial risk and actionability outrank historical analytics. */}
+      <DecisionCommandCenter />
 
       {/* UI-025: at-a-glance live trading performance for the US Eastern day. */}
       {dailyPnl && (

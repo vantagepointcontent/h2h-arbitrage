@@ -130,6 +130,13 @@ interface PairedPosition {
   totalUnrealizedPnl: number;
   totalRoiPct: number;
   breakdown: RoiBreakdown;
+  pairedState: 'paired' | 'unpaired';
+  expiry: string | null;
+  netExitValue: number;
+  oneLegExposure: number;
+  exitLiquidityRisk: 'unverified';
+  attentionReasons: string[];
+  quoteTimestamps: { kalshi: string | null; polymarket: string | null };
 }
 
 interface PositionsResponse {
@@ -141,6 +148,14 @@ interface PositionsResponse {
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
 const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 const fmtPrice = (n: number) => `${(n * 100).toFixed(1)}¢`;
+const fmtExpiry = (value: string | null) => {
+  if (!value) return 'Unknown';
+  const ms = new Date(value).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const hours = Math.floor(ms / 3_600_000);
+  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+};
+const fmtAge = (value: string | null) => value ? `${Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000))}s` : '—';
 
 type SortField = 'market' | 'roi' | 'value' | 'size';
 type SortDir = 'asc' | 'desc';
@@ -304,6 +319,25 @@ export default function OpenPositionsPanel() {
         </div>
       )}
 
+      {!loading && (
+        <section aria-label="Position attention queue" className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold"><AlertTriangle className="h-4 w-4 text-[var(--status-warning)]" /> Position attention</h3>
+            <span className="text-xs text-[var(--text-secondary)]">{positions.filter(position => position.attentionReasons.some(reason => reason !== 'Exit depth unverified')).length} requiring action</span>
+          </div>
+          {positions.some(position => position.attentionReasons.some(reason => reason !== 'Exit depth unverified')) ? (
+            <div className="space-y-2">
+              {positions.filter(position => position.attentionReasons.some(reason => reason !== 'Exit depth unverified')).map(position => (
+                <div key={position.id} className="flex flex-col gap-1 rounded-lg border border-[var(--status-warning)]/25 bg-[var(--status-warning)]/5 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="truncate text-xs font-medium text-[var(--text-primary)]">{position.marketTitle}</span>
+                  <span className="text-xs text-[var(--status-warning)]">{position.attentionReasons.filter(reason => reason !== 'Exit depth unverified').join(' · ')}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-xs text-[var(--text-secondary)]">No position risk requires action. Exit depth remains explicitly unverified until venue depth is available.</p>}
+        </section>
+      )}
+
       {/* Exit result toast */}
       {exitResult && (
         <div className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
@@ -351,6 +385,7 @@ export default function OpenPositionsPanel() {
                 <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('market')}>
                   Market <SortIcon field="market" />
                 </th>
+                <th className="text-left px-4 py-3 font-medium">Pair state</th>
                 <th className="text-left px-4 py-3 font-medium">Platform</th>
                 <th className="text-left px-4 py-3 font-medium">Side</th>
                 <th className="text-right px-4 py-3 font-medium">Size</th>
@@ -360,8 +395,12 @@ export default function OpenPositionsPanel() {
                   Value <SortIcon field="value" />
                 </th>
                 <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
-                  ROI <SortIcon field="roi" />
+                  Net P&amp;L <SortIcon field="roi" />
                 </th>
+                <th className="text-right px-4 py-3 font-medium">Expiry</th>
+                <th className="text-right px-4 py-3 font-medium">Quote age</th>
+                <th className="text-right px-4 py-3 font-medium">1-leg exposure</th>
+                <th className="text-left px-4 py-3 font-medium">Exit depth</th>
                 <th className="text-center px-4 py-3 font-medium">Action</th>
               </tr>
             </thead>
@@ -387,6 +426,7 @@ export default function OpenPositionsPanel() {
                         {pair.marketTitle}
                       </td>
                     )}
+                    {i === 0 && <td rowSpan={rowSpan} className="px-4 py-3 align-top"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${pair.pairedState === 'paired' ? 'bg-[var(--status-positive)]/10 text-[var(--status-positive)]' : 'bg-[var(--status-negative)]/10 text-[var(--status-negative)]'}`}>{pair.pairedState}</span></td>}
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
                         <PlatformIcon platform={leg.platform} size="sm" />
@@ -487,6 +527,10 @@ export default function OpenPositionsPanel() {
                             </div>
                           </div>
                         </td>
+                        <td rowSpan={rowSpan} className="px-4 py-3 text-right align-top text-xs text-[var(--text-secondary)]" title={pair.expiry ?? 'Expiry unavailable'}>{fmtExpiry(pair.expiry)}</td>
+                        <td rowSpan={rowSpan} className="px-4 py-3 text-right align-top text-xs text-[var(--text-secondary)]">K {fmtAge(pair.quoteTimestamps.kalshi)} · PM {fmtAge(pair.quoteTimestamps.polymarket)}</td>
+                        <td rowSpan={rowSpan} className="px-4 py-3 text-right align-top text-xs font-semibold text-[var(--status-warning)] tabular-nums">{fmtUsd(pair.oneLegExposure)}</td>
+                        <td rowSpan={rowSpan} className="px-4 py-3 align-top text-xs text-[var(--status-warning)]">Unverified<div className="mt-1 text-[10px] font-normal text-[var(--text-faint)]">Partial exit possible</div></td>
                         <td rowSpan={rowSpan} className="px-4 py-3 text-center align-top">
                           <button
                             onClick={() => setConfirmExit(pair)}
