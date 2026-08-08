@@ -8,6 +8,8 @@ import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitD
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
+import { OpportunityQueue } from "./opportunities/OpportunityQueue";
+import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 
 /* ── Overview Panel ── */
 function OverviewPanelInner({
@@ -183,8 +185,66 @@ function OverviewPanelInner({
     return { totalMarkets, totalProfit, avgRoi, arbOpportunities };
   }, [filteredByExpiry]);
 
+  const opportunityModels = useMemo(() => rankOpportunities(markets.flatMap((market) => {
+    const scan = market.liveResult ?? market.lastScanResult;
+    const historicalArbs = market.lastScanResult?.allArbs ?? [];
+    const liveArbs = market.liveResult?.allArbs ?? [];
+    const opportunityKey = (arb: { artist: string; strategy: string }) => `${arb.artist}::${arb.strategy}`;
+    const liveKeys = new Set(liveArbs.map(opportunityKey));
+    const historicalKeys = new Set(historicalArbs.map(opportunityKey));
+    const arbs = [
+      ...historicalArbs.filter((arb) => liveKeys.has(opportunityKey(arb))),
+      ...liveArbs.filter((arb) => !historicalKeys.has(opportunityKey(arb))),
+      ...historicalArbs.filter((arb) => !liveKeys.has(opportunityKey(arb))),
+    ];
+    return arbs
+      .filter((arb) => arb.expectedProfit > 0 && arb.roiPct > 0)
+      .map((arb) => buildOpportunityViewModel({
+        artist: arb.artist,
+        kalshi: {
+          ticker: "kalshiTicker" in arb && typeof arb.kalshiTicker === "string" ? arb.kalshiTicker : undefined,
+          yesAsk: "kalshiYesAsk" in arb && typeof arb.kalshiYesAsk === "number" ? arb.kalshiYesAsk : 0,
+          noAsk: "kalshiNoAsk" in arb && typeof arb.kalshiNoAsk === "number" ? arb.kalshiNoAsk : 0,
+        },
+        polymarket: {
+          conditionId: "pmConditionId" in arb && typeof arb.pmConditionId === "string" ? arb.pmConditionId : undefined,
+          yesPrice: "pmYesPrice" in arb && typeof arb.pmYesPrice === "number" ? arb.pmYesPrice : 0,
+          noPrice: "pmNoPrice" in arb && typeof arb.pmNoPrice === "number" ? arb.pmNoPrice : 0,
+        },
+        arbitrage: {
+          strategy: arb.strategy,
+          expectedProfit: arb.expectedProfit,
+          roiPct: arb.roiPct,
+          kalshiStake: "kalshiStake" in arb && typeof arb.kalshiStake === "number" ? arb.kalshiStake : undefined,
+          pmStake: "pmStake" in arb && typeof arb.pmStake === "number" ? arb.pmStake : undefined,
+          maxCapital: arb.totalStake,
+        },
+        persistence: liveKeys.has(opportunityKey(arb)) && historicalKeys.has(opportunityKey(arb))
+          ? "durable"
+          : liveKeys.has(opportunityKey(arb))
+            ? "new"
+            : "fading",
+      }, {
+        marketId: market.id,
+        marketTitle: market.eventTitle,
+        scannedAt: scan?.scannedAt,
+      }));
+  })), [markets]);
+
   return (
     <div className="space-y-5">
+      {opportunityModels.length > 0 && (
+        <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)]">
+          <OpportunityQueue
+            opportunities={opportunityModels}
+            onPrepare={(opportunity) => {
+              const market = markets.find((item) => item.id === opportunity.marketId);
+              if (market) onSelectMarket(market);
+            }}
+          />
+        </div>
+      )}
+
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">

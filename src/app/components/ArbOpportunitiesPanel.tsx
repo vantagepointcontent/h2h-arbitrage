@@ -9,6 +9,8 @@ import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import { computeApy } from "@/lib/matcher";
 import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
+import { OpportunityQueue } from "./opportunities/OpportunityQueue";
+import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
 import {
   ARB_ALERTS_STORAGE_KEY,
@@ -53,6 +55,7 @@ interface Props {
   category?: string;
   /** Market title — when provided, Execute buttons render for simple 2-leg arbs */
   marketTitle?: string;
+  scannedAt?: string | null;
 }
 
 /**
@@ -63,7 +66,7 @@ interface Props {
  * Execute button renders when marketTitle + ticker + conditionId are available.
  * Distinct from the outcomes table which shows ALL outcomes (including non-arb).
  */
-export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, marketExpiryDate, category, marketTitle }: Props) {
+export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, marketExpiryDate, category, marketTitle, scannedAt }: Props) {
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
@@ -107,6 +110,14 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
       .filter(o => o.arbitrage.expectedProfit > 0 && o.arbitrage.roiPct > 0)
       .sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct);
   }, [outcomes]);
+
+  const opportunityModels = useMemo(() => rankOpportunities(
+    arbOpps.map((outcome) => buildOpportunityViewModel(outcome, {
+      marketId,
+      marketTitle,
+      scannedAt,
+    })),
+  ), [arbOpps, marketId, marketTitle, scannedAt]);
 
   useEffect(() => {
     const activeKeys = new Set<string>();
@@ -252,7 +263,12 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
         <span className="w-full text-[10px] text-[#5E6875] sm:ml-auto sm:w-auto">Sorted by ROI ↓</span>
       </div>
 
-      {/* Arb rows */}
+      <OpportunityQueue
+        opportunities={opportunityModels}
+        onPrepare={(opportunity) => void startExecute(opportunity.source as Outcome)}
+      />
+
+      {/* Detailed arb rows */}
       <div className="divide-y divide-[#182533]">
         {arbOpps.map((o, idx) => {
           const breakdown = parseArbLegs(

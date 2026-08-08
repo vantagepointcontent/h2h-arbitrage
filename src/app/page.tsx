@@ -2120,6 +2120,7 @@ export default function Home() {
                         marketExpiryDate={result.expiryDate}
                         category={savedMarkets.find((market) => market.id === activeMarketId)?.category}
                         marketTitle={result.eventTitle}
+                        scannedAt={lastScanTimestamp ?? null}
                       />
                     )}
 
