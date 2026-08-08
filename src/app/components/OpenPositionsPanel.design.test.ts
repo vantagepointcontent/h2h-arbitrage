@@ -17,4 +17,12 @@ describe('OpenPositionsPanel trading design system migration', () => {
     expect(source).toContain("toggleSort('roi')");
     expect(source).toContain("toggleSort('size')");
   });
+
+  it('renders loading and retryable fetch errors before any zero-valued metrics or empty state', () => {
+    const source = readFileSync(`${process.cwd()}/src/app/components/OpenPositionsPanel.tsx`, 'utf8');
+    expect(source).toContain('if (loading)');
+    expect(source).toContain('Failed to load positions');
+    expect(source).toContain('onClick={() => void load()}');
+    expect(source.indexOf('if (error)')).toBeLessThan(source.indexOf('return (\n    <div className="space-y-4">'));
+  });
 });

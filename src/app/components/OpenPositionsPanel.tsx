@@ -173,13 +173,22 @@ export default function OpenPositionsPanel() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/positions', { cache: 'no-store' });
       const data: PositionsResponse = await res.json();
       if (!data.success) throw new Error('Failed to load positions');
-      setPositions(data.positions || []);
-      setPlatformErrors(data.errors || {});
+      const nextPositions = data.positions || [];
+      const fetchErrors = Object.values(data.errors || {}).filter(Boolean);
+      if (nextPositions.length === 0 && fetchErrors.length > 0) {
+        throw new Error(fetchErrors.join('; '));
+      }
+      setPositions(nextPositions);
+      setPlatformErrors({
+        kalshi: data.errors?.kalshi || undefined,
+        polymarket: data.errors?.polymarket || undefined,
+      });
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -304,6 +313,14 @@ export default function OpenPositionsPanel() {
   const totalPnl = positions.reduce((s, p) => s + p.totalUnrealizedPnl, 0);
   const totalRoi = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const pairedCount = positions.filter(p => p.kalshi && p.polymarket).length;
+
+  if (loading) {
+    return <div role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-secondary)]"><Loader2 className="h-4 w-4 animate-spin" /> Loading positions…</div>;
+  }
+
+  if (error) {
+    return <div role="alert" className="rounded-xl border border-[var(--status-negative)]/30 bg-[var(--status-negative)]/5 p-6 text-center"><AlertTriangle className="mx-auto h-5 w-5 text-[var(--status-negative)]" /><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Failed to load positions</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{error}</p><button type="button" onClick={() => void load()} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-muted)]"><RefreshCw className="h-3.5 w-3.5" /> Retry</button></div>;
+  }
 
   return (
     <div className="space-y-4">
