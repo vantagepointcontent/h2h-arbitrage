@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, TrendingUp, Zap } from "lucide-react";
+import { Bell, ClipboardList, TrendingUp, X, Zap } from "lucide-react";
+import { buildTradePlan, type TradePlan } from "@/lib/trade-plan";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
@@ -66,6 +67,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
+  const [tradePlan, setTradePlan] = useState<TradePlan | null>(null);
   const [distributions, setDistributions] = useState<Record<string, ProfitDistribution>>({});
   const [alerts, setAlerts] = useState<Record<string, ArbAlert>>(() =>
     typeof window === "undefined" ? {} : parseArbAlerts(localStorage.getItem(ARB_ALERTS_STORAGE_KEY)),
@@ -323,6 +325,28 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                     <Bell className="w-3 h-3" /> {activeAlert.targetRoiPct.toFixed(2)}%
                   </span>
                 )}
+                {supportsDistribution && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setTradePlan(buildTradePlan({
+                        outcome: o.artist,
+                        strategy: o.arbitrage.strategy,
+                        kalshiPrice: kalshiPrice!,
+                        polymarketPrice: pmPrice!,
+                        kalshiStake: adjusted?.kalshiStake ?? o.arbitrage.kalshiStake ?? 0,
+                        polymarketStake: adjusted?.pmStake ?? o.arbitrage.pmStake ?? 0,
+                        kalshiFee: o.arbitrage.fees?.kalshiFee,
+                        polymarketFee: o.arbitrage.fees?.pmFee,
+                        netProfit: displayProfit,
+                      }));
+                    }}
+                    className="inline-flex items-center gap-1 rounded border border-[#5DBE81]/30 px-2 py-1 text-[10px] font-semibold text-[#5DBE81] hover:bg-[#5DBE81]/10"
+                    title="Open a read-only trade plan"
+                  >
+                    <ClipboardList className="h-3 w-3" /> Plan
+                  </button>
+                )}
                 {canExecute && (
                   <span className="flex flex-col items-center">
                     <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
@@ -423,6 +447,28 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
       {/* Execute confirmation modal */}
       {executingArb && (
         <ExecuteArbModal arb={executingArb} onClose={() => setExecutingArb(null)} />
+      )}
+      {tradePlan && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60" role="dialog" aria-modal="true" aria-label="Trade plan">
+          <button className="flex-1 cursor-default" aria-label="Close trade plan" onClick={() => setTradePlan(null)} />
+          <aside className="h-full w-full max-w-md overflow-y-auto border-l border-[#232E3C] bg-[#0E1621] p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><p className="text-[10px] font-bold uppercase tracking-widest text-[#facc15]">Plan only · No orders placed</p><h2 className="mt-1 text-lg font-semibold text-white">Trade plan</h2><p className="mt-1 text-sm text-[#8A9BA8]">{tradePlan.outcome}</p></div>
+              <button onClick={() => setTradePlan(null)} className="rounded p-2 text-[#8A9BA8] hover:bg-white/5 hover:text-white" aria-label="Close trade plan"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-6 space-y-3">
+              {[["Kalshi", tradePlan.kalshiSide, tradePlan.kalshiPrice, tradePlan.kalshiStake], ["Polymarket", tradePlan.polymarketSide, tradePlan.polymarketPrice, tradePlan.polymarketStake]].map(([venue, side, price, stake]) => (
+                <div key={String(venue)} className="rounded-lg border border-[#232E3C] bg-[#17212B] p-4"><div className="flex justify-between text-sm"><span className="font-semibold text-white">{venue} {side}</span><span className="text-[#5DBE81]">{(Number(price) * 100).toFixed(1)}¢ ask</span></div><p className="mt-2 text-xs text-[#8A9BA8]">Stake <span className="float-right text-white">{formatCurrency(Number(stake))}</span></p></div>
+              ))}
+            </div>
+            <dl className="mt-5 space-y-2 rounded-lg border border-[#232E3C] p-4 text-sm">
+              <div className="flex justify-between"><dt className="text-[#8A9BA8]">Total capital</dt><dd className="text-white">{formatCurrency(tradePlan.totalCapital)}</dd></div>
+              <div className="flex justify-between"><dt className="text-[#8A9BA8]">Estimated fees</dt><dd className="text-white">{formatCurrency(tradePlan.totalFees)}</dd></div>
+              <div className="flex justify-between border-t border-[#232E3C] pt-2 font-semibold"><dt className="text-[#8A9BA8]">Expected net profit</dt><dd className="text-[#5DBE81]">{formatCurrency(tradePlan.netProfit)} ({tradePlan.netRoiPct.toFixed(2)}%)</dd></div>
+            </dl>
+            <p className="mt-5 rounded-lg bg-[#facc15]/10 p-3 text-xs text-[#facc15]">This is a read-only preparation aid. Review live prices and liquidity before using the separate manual execution flow.</p>
+          </aside>
+        </div>
       )}
     </div>
   );
