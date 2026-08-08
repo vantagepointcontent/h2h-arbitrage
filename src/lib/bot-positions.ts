@@ -81,6 +81,9 @@ export async function getBotPositions(options: { status?: BotPositionStatus | 'a
   const c = getClient();
   try {
     const status = options.status ?? 'all';
+    if (status !== 'all' && status !== 'open' && status !== 'settled') {
+      throw new Error(`Invalid status: ${status}`);
+    }
     const limit = Math.min(1000, Math.max(1, options.limit ?? 100));
     const where = status === 'all' ? '' : "WHERE bp.status = ?";
     const args = status === 'all' ? [limit] : [status, limit];

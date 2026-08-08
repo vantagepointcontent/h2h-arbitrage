@@ -14,8 +14,24 @@ describe('GET /api/bot-trader/positions', () => {
     await expect(response.json()).resolves.toEqual({ success: true, count: 0, positions: [] });
   });
 
+  it('uses defaults when no query params provided', async () => {
+    const response = await GET(new Request('http://localhost/api/bot-trader/positions') as never);
+    expect(response.status).toBe(200);
+    expect(getBotPositions).toHaveBeenCalledWith({ status: 'all', limit: 100 });
+    await expect(response.json()).resolves.toEqual({ success: true, count: 0, positions: [] });
+  });
+
+  it('accepts status=settled', async () => {
+    const response = await GET(new Request('http://localhost/api/bot-trader/positions?status=settled') as never);
+    expect(response.status).toBe(200);
+    expect(getBotPositions).toHaveBeenCalledWith({ status: 'settled', limit: 100 });
+  });
+
   it('rejects invalid status and malformed limits', async () => {
     expect((await GET(new Request('http://localhost/api/bot-trader/positions?status=closed') as never)).status).toBe(400);
     expect((await GET(new Request('http://localhost/api/bot-trader/positions?limit=1.5') as never)).status).toBe(400);
+    expect((await GET(new Request('http://localhost/api/bot-trader/positions?limit=0') as never)).status).toBe(400);
+    expect((await GET(new Request('http://localhost/api/bot-trader/positions?limit=1001') as never)).status).toBe(400);
+    expect((await GET(new Request('http://localhost/api/bot-trader/positions?limit=-1') as never)).status).toBe(400);
   });
 });
