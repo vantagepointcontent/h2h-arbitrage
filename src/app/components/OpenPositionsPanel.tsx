@@ -275,19 +275,19 @@ export default function OpenPositionsPanel() {
         };
       }
 
-      const res = await fetch('/api/positions', {
+      const res = await fetch(`/api/positions/${encodeURIComponent(pair.id)}/exit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!data.success && !data.partialFill) {
-        throw new Error(data.error || 'Exit failed');
+        throw new Error(data.error || (data.errors ? Object.values(data.errors).filter(Boolean).join('; ') : 'Exit failed'));
       }
       setExitResult({
         id: pair.id,
         success: data.success,
-        pnl: pair.totalUnrealizedPnl,
+        pnl: data.realizedPnl,
         error: data.errors ? Object.values(data.errors).filter(Boolean).join('; ') : undefined,
       });
       // Refresh positions after exit
