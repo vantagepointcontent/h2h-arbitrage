@@ -108,6 +108,7 @@ export interface ArbLegBreakdown {
   totalCost: number | null;
   grossProfit: number | null;
   fees: number | null;
+  feeBreakdown: { kalshiFee: number; pmFee: number } | null;
   netProfit: number | null;
 }
 
@@ -130,7 +131,7 @@ export function parseArbLegs(
   expectedProfit?: number | null,
 ): ArbLegBreakdown {
   if (!strategy || strategy === 'No arb') {
-    return { isCross: false, legs: [], totalCost: null, grossProfit: null, fees: null, netProfit: null };
+    return { isCross: false, legs: [], totalCost: null, grossProfit: null, fees: null, feeBreakdown: null, netProfit: null };
   }
 
   // Cross-outcome: "Buy YES both sides: Kalshi <A> + Polymarket <B>" (matcher.ts)
@@ -148,7 +149,7 @@ export function parseArbLegs(
     const grossProfit = totalCost != null ? 1 - totalCost : null;
     const totalFees = fees ? fees.kalshiFee + fees.pmFee : null;
     const netProfit = expectedProfit ?? fees?.worstCaseNetProfit ?? null;
-    return { isCross: true, legs, totalCost, grossProfit, fees: totalFees, netProfit };
+    return { isCross: true, legs, totalCost, grossProfit, fees: totalFees, feeBreakdown: fees ?? null, netProfit };
   }
 
   // Regular: "Buy YES Kalshi + NO PM"
@@ -163,7 +164,7 @@ export function parseArbLegs(
     const grossProfit = totalCost != null ? 1 - totalCost : null;
     const totalFees = fees ? fees.kalshiFee + fees.pmFee : null;
     const netProfit = expectedProfit ?? fees?.worstCaseNetProfit ?? null;
-    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, netProfit };
+    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, feeBreakdown: fees ?? null, netProfit };
   }
 
   // Regular: "Buy YES PM + NO Kalshi"
@@ -178,7 +179,7 @@ export function parseArbLegs(
     const grossProfit = totalCost != null ? 1 - totalCost : null;
     const totalFees = fees ? fees.kalshiFee + fees.pmFee : null;
     const netProfit = expectedProfit ?? fees?.worstCaseNetProfit ?? null;
-    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, netProfit };
+    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, feeBreakdown: fees ?? null, netProfit };
   }
 
   // Same-platform YES+YES: "Same-platform YES+YES Kalshi: <A> + <B>"
@@ -199,11 +200,11 @@ export function parseArbLegs(
     const grossProfit = totalCost != null ? 1 - totalCost : null;
     const totalFees = fees ? fees.kalshiFee + fees.pmFee : null;
     const netProfit = expectedProfit ?? fees?.worstCaseNetProfit ?? null;
-    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, netProfit };
+    return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, feeBreakdown: fees ?? null, netProfit };
   }
 
   // Unknown strategy format
-  return { isCross: false, legs: [], totalCost: null, grossProfit: null, fees: null, netProfit: null };
+  return { isCross: false, legs: [], totalCost: null, grossProfit: null, fees: null, feeBreakdown: null, netProfit: null };
 }
 
 /**
@@ -291,7 +292,7 @@ function PlatformIcon({ platform }: { platform: 'Kalshi' | 'Polymarket' }) {
 export function LegBreakdown({ breakdown, formatCurrency }: LegBreakdownProps) {
   if (breakdown.legs.length === 0) return null;
 
-  const { isCross, legs, totalCost, grossProfit, fees, netProfit } = breakdown;
+  const { isCross, legs, totalCost, grossProfit, fees, feeBreakdown, netProfit } = breakdown;
 
   return (
     <div className={`mt-3 rounded-lg border p-3 ${isCross ? 'border-[#ef4444]/30 bg-[#ef4444]/5' : 'border-[#facc15]/20 bg-[#facc15]/5'}`}>
@@ -306,8 +307,15 @@ export function LegBreakdown({ breakdown, formatCurrency }: LegBreakdownProps) {
 
       {/* Legs */}
       <div className="space-y-1.5">
-        {legs.map((leg, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
+        {legs.map((leg, i) => {
+          const venueLegs = legs.filter(candidate => candidate.platform === leg.platform);
+          const venueFee = leg.platform === 'Kalshi' ? feeBreakdown?.kalshiFee : feeBreakdown?.pmFee;
+          const knownStake = venueLegs.reduce((sum, candidate) => sum + Math.max(0, candidate.stake ?? 0), 0);
+          const share = knownStake > 0 && leg.stake != null ? leg.stake / knownStake : 1 / venueLegs.length;
+          const legFee = venueFee == null ? null : venueFee * share;
+          const feePct = legFee != null && leg.stake != null && leg.stake > 0 ? (legFee / leg.stake) * 100 : null;
+          return (
+          <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-[#8A9BA8] font-medium w-10">Leg {i + 1}</span>
             <PlatformIcon platform={leg.platform} />
             <span className="text-[#FFFFFF] font-medium">Buy {leg.side}</span>
@@ -315,11 +323,13 @@ export function LegBreakdown({ breakdown, formatCurrency }: LegBreakdownProps) {
             <span className="text-[#FFFFFF]">— &ldquo;{leg.outcome}&rdquo;</span>
             <span className="text-[#8A9BA8]">@</span>
             <span className="text-[#FFFFFF] font-mono font-bold">{leg.price != null ? formatPrice(leg.price) : '—'}</span>
-            {leg.stake != null && leg.stake > 0 && (
-              <span className="text-[#8A9BA8] text-[10px] ml-auto">stake: {formatCurrency(leg.stake)}</span>
-            )}
+            <span className="ml-auto flex items-center gap-3 text-[10px] text-[#8A9BA8]">
+              {leg.stake != null && leg.stake > 0 && <span>stake: {formatCurrency(leg.stake)}</span>}
+              {legFee != null && <span className="text-[#ef4444]">fee: {feePct != null ? `${feePct.toFixed(2)}% · ` : ''}{formatCurrency(legFee)}</span>}
+            </span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Summary */}
