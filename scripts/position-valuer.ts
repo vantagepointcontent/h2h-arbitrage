@@ -9,7 +9,7 @@
 
 import path from 'path';
 import { createClient } from '@libsql/client';
-import { fetchKalshiMarket } from '../src/lib/kalshi';
+import { fetchKalshiMarket, fetchKalshiMarketFast } from '../src/lib/kalshi';
 import { fetchClobMarket } from '../src/lib/polymarket-clob';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
@@ -204,11 +204,11 @@ async function valuateOnce() {
         continue;
       }
 
-      // Fetch both markets concurrently. fetchKalshiMarket has 30s TTL memo;
+      // Fetch both markets concurrently. fetchKalshiMarketFast has 10s TTL memo;
       // fetchClobMarket has 15s clobCache.  These satisfy the requested
       // 10s / 15s cache semantics under normal load.
       const [kalshi, pm] = await Promise.all([
-        fetchKalshiMarket(kTicker),
+        fetchKalshiMarketFast(kTicker),
         fetchClobMarket(pmCid),
       ]);
 

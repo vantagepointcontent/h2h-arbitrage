@@ -203,93 +203,110 @@ export function extractKalshiTicker(url: string): string | null {
 
 const kalshiMemo = createTtlMemo<KalshiMarket[]>(30_000);
 const kalshiSingleMemo = createTtlMemo<KalshiMarket | null>(30_000);
-const kalshiAllMemo = createTtlMemo<KalshiMarket[]>(30_000);
+const kalshiFastMemo   = createTtlMemo<KalshiMarket | null>(10_000);
+const kalshiAllMemo    = createTtlMemo<KalshiMarket[]>(30_000);
 
 /** Paginate through all open Kalshi markets.
  * Uses cursor-based pagination if available; falls back to offset if the API
- * returns one. Honors the existing kalshi rate limiter. */
+ * returns one. Honors the existing kalshi rate limiter.
+ *
+ * FEAT-046: supports category filtering, incremental `since`, resume cursor,
+ * and explicit per-page delay. */
 export async function fetchAllKalshiMarkets(options?: {
-  onPage?: (count: number) => void;
+  onPage?: (count: number, cursor?: string | null, page429s?: number) => void;
+  maxPages?: number;
+  category?: string;
+  since?: string | null;
+  resumeCursor?: string | null;
+  minPageDelayMs?: number;
 }): Promise<KalshiMarket[]> {
-  return kalshiAllMemo('all-open', async () => {
+  const maxPages = Math.min(Math.max(options?.maxPages ?? 500, 1), 500);
+  const minPageDelayMs = Math.max(0, options?.minPageDelayMs ?? 0);
+  const category = options?.category;
+  const resumeCursor = options?.resumeCursor ?? null;
+  const since = options?.since ?? null;
+
+  // Cache only unfiltered, non-incremental, non-resuming fetches.
+  const cacheKey = category ? `category:${category}` : 'all-open';
+  const canMemo = !since && !resumeCursor;
+
+  const doFetch = async (): Promise<KalshiMarket[]> => {
     const all: KalshiMarket[] = [];
     const seen = new Set<string>();
 
-    // Fetch first page to discover cursor/offset and total shape.
-    const firstPage = await fetchKalshiPage(null, 0);
+    const firstPage = await fetchKalshiPage(null, 0, { category, since });
     if (!firstPage) return all;
     accumulate(firstPage.markets);
-    options?.onPage?.(all.length);
+    options?.onPage?.(all.length, firstPage.nextCursor ?? null, 0);
 
-    let cursor: string | null = firstPage.nextCursor;
+    let cursor: string | null = resumeCursor || firstPage.nextCursor;
     let offset = firstPage.markets.length;
-    const maxPages = 500;
     let safety = firstPage.markets.length > 0 ? 1 : 0;
 
-    // Prefetch remaining pages in parallel, bounded by rate limiter queue.
-    const pending: Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null>[] = [];
-    while (safety < maxPages && (cursor || offset > 0)) {
-      const capturedCursor = cursor;
-      const capturedOffset = offset;
-      pending.push(
-        fetchKalshiPage(capturedCursor, capturedOffset).then((page) => {
-          if (page) {
-            accumulate(page.markets);
-            options?.onPage?.(all.length);
-          }
-          return page;
-        }),
-      );
-      if (cursor) {
-        // Cannot guess next cursor without reading response; stop parallel speculation.
-        break;
-      }
-      offset += 1000;
-      safety += 1;
-    }
-
-    // If cursor-based, continue sequentially after first page.
     if (cursor) {
       while (safety < maxPages && cursor) {
-        const page = await fetchKalshiPage(cursor, offset);
+        if (minPageDelayMs > 0) await sleep(minPageDelayMs);
+        const page = await fetchKalshiPage(cursor, 0, { category, since });
         if (!page || page.markets.length === 0) break;
         accumulate(page.markets);
-        options?.onPage?.(all.length);
+        options?.onPage?.(all.length, page.nextCursor ?? null, 0);
         cursor = page.nextCursor;
-        if (!cursor) break;
         safety += 1;
       }
     } else {
-      // Wait for parallel offset pages and keep fetching if any page returned full 1000.
+      const pending: Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null>[] = [];
+      while (safety < maxPages) {
+        if (minPageDelayMs > 0 && pending.length > 0) await sleep(minPageDelayMs);
+        pending.push(
+          fetchKalshiPage(null, offset, { category, since }).then((page) => {
+            if (page) {
+              accumulate(page.markets);
+              options?.onPage?.(all.length, page.nextCursor ?? null, 0);
+            }
+            return page;
+          }),
+        );
+        offset += 1000;
+        safety += 1;
+      }
+
       let maxNextOffset = offset;
       const results = await Promise.all(pending);
+      const fullPages: { offset: number; markets: KalshiMarket[] }[] = [];
       for (const page of results) {
-        if (page) {
-          maxNextOffset = Math.max(maxNextOffset, page.offset + page.markets.length);
-          if (page.markets.length === 1000) {
-            // Fetch subsequent pages sequentially starting after this page.
-            let subOffset = page.offset + page.markets.length;
-            let safety2 = 0;
-            while (safety2 < maxPages) {
-              const sub = await fetchKalshiPage(null, subOffset);
-              if (!sub || sub.markets.length === 0) break;
-              accumulate(sub.markets);
-              options?.onPage?.(all.length);
-              subOffset += sub.markets.length;
-              if (sub.markets.length < 1000) break;
-              safety2 += 1;
-            }
-            maxNextOffset = Math.max(maxNextOffset, subOffset);
-          }
-        }
+        if (!page) continue;
+        maxNextOffset = Math.max(maxNextOffset, page.offset + page.markets.length);
+        if (page.markets.length === 1000) fullPages.push(page);
       }
+
+      const continuationResults = await Promise.all(
+        fullPages.map(async (page) => {
+          const cont: KalshiMarket[] = [];
+          let subOffset = page.offset + page.markets.length;
+          let subSafety = 0;
+          while (subSafety < maxPages) {
+            if (minPageDelayMs > 0) await sleep(minPageDelayMs);
+            const sub = await fetchKalshiPage(null, subOffset, { category, since });
+            if (!sub || sub.markets.length === 0) break;
+            cont.push(...sub.markets);
+            subOffset += sub.markets.length;
+            if (sub.markets.length < 1000) break;
+            subSafety += 1;
+          }
+          return cont;
+        }),
+      );
+      for (const markets of continuationResults) accumulate(markets);
+      maxNextOffset = Math.max(maxNextOffset, ...fullPages.map((p) => p.offset + 1000));
+
       offset = maxNextOffset;
-      // Final safety sequential pass: keep going until a page is empty.
+      safety = 0;
       while (safety < maxPages) {
-        const page = await fetchKalshiPage(null, offset);
+        if (minPageDelayMs > 0) await sleep(minPageDelayMs);
+        const page = await fetchKalshiPage(null, offset, { category, since });
         if (!page || page.markets.length === 0) break;
         accumulate(page.markets);
-        options?.onPage?.(all.length);
+        options?.onPage?.(all.length, page.nextCursor ?? null, 0);
         offset += page.markets.length;
         if (page.markets.length < 1000) break;
         safety += 1;
@@ -306,12 +323,27 @@ export async function fetchAllKalshiMarkets(options?: {
         }
       }
     }
-  });
+  };
+
+  if (canMemo) {
+    return kalshiAllMemo(cacheKey, doFetch);
+  }
+  return doFetch();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+interface FetchKalshiPageOptions {
+  category?: string;
+  since?: string | null;
 }
 
 async function fetchKalshiPage(
   cursor: string | null,
   offset: number,
+  opts: FetchKalshiPageOptions,
 ): Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null> {
   const params = new URLSearchParams({
     status: 'open',
@@ -322,6 +354,12 @@ async function fetchKalshiPage(
     params.set('cursor', cursor);
   } else {
     params.set('offset', String(offset));
+  }
+  if (opts.category) {
+    params.set('event_category', opts.category);
+  }
+  if (opts.since) {
+    params.set('created_after', opts.since);
   }
   params.set('_t', String(Date.now()));
 
@@ -497,6 +535,21 @@ export async function fetchKalshiMultiSeriesMarkets(
 
 export async function fetchKalshiMarket(ticker: string): Promise<KalshiMarket | null> {
   return kalshiSingleMemo(`market:${ticker}`, async () => {
+  const res = await rateLimiters.kalshi.execute(() =>
+    fetch(
+      `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
+      { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(5000) },
+    ),
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.market || null;
+  });
+}
+
+/** Same as {@link fetchKalshiMarket} but with a 10-second TTL for valuer polling. */
+export async function fetchKalshiMarketFast(ticker: string): Promise<KalshiMarket | null> {
+  return kalshiFastMemo(`market:${ticker}`, async () => {
   const res = await rateLimiters.kalshi.execute(() =>
     fetch(
       `https://external-api.kalshi.com/trade-api/v2/markets/${ticker}?depthP=Infinity`,
