@@ -1064,7 +1064,7 @@ export default function Home() {
   const [showArbOnly, setShowArbOnly] = useState(DEFAULT_SHOW_ARB_ONLY);
   const [scanningAll, setScanningAll] = useState(false);
   const [copiedLinks, setCopiedLinks] = useState(false); // UI-013
-  const [marketWorkspaceTab, setMarketWorkspaceTab] = useState<MarketWorkspaceTab>("opportunities");
+  const [marketWorkspaceTab, setMarketWorkspaceTab] = useState<MarketWorkspaceTab>("prices");
   const [scanAllError, setScanAllError] = useState("");
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
@@ -1841,6 +1841,11 @@ export default function Home() {
                         defaultCapital={capital}
                         onCapitalChange={setCapital}
                       />
+                    )}
+                    {marketWorkspaceTab === "opportunities" && !result.expired && !result.noPrices && (!result.outcomes || result.outcomes.filter(o => o.arbitrage && o.arbitrage.expectedProfit > 0).length === 0) && (
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-6 text-center text-sm text-[var(--text-secondary)]">
+                        {result.matchedCount} matched outcomes but 0 positive arbs at current executable prices.
+                      </div>
                     )}
 
                     {/* Bookmaker 1on1 view */}
