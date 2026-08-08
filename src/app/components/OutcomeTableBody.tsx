@@ -221,15 +221,15 @@ function OutcomeTableBodyInner({
 
   return (
     <>
-    <tbody className="divide-y divide-[#182533]">
+    <tbody className="divide-y divide-[var(--border-subtle)] tabular-nums">
       {displayOutcomes.map((o, idx) => {
         const k = o.kalshi;
         const p = o.polymarket;
         const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
-        const roiColor = !hasPrices ? "text-[#8A9BA8]" : o.arbitrage.roiPct > 0 ? "text-[#5DBE81]" : o.arbitrage.roiPct < 0 ? "text-[#ef4444]" : "text-[#8A9BA8]";
+        const roiColor = !hasPrices ? "text-[var(--text-secondary)]" : o.arbitrage.roiPct > 0 ? "text-[var(--status-positive)]" : o.arbitrage.roiPct < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]";
         // APY color: gray for non-actionable (no prices, ROI <= 0, or APY <= 0); green only when ROI is positive and APY is positive
-        const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || (o.arbitrage.apyPct ?? 0) <= 0 ? "text-[#8A9BA8]" : "text-[#5DBE81]";
+        const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || (o.arbitrage.apyPct ?? 0) <= 0 ? "text-[var(--text-secondary)]" : "text-[var(--status-positive)]";
         const isExpanded = expandedArtist === o.artist;
         const totalStake = (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0);
         const stakeRatio = totalStake > 0
@@ -240,27 +240,27 @@ function OutcomeTableBodyInner({
         return (
           <React.Fragment key={`${idx}-${o.artist}`}>
             <tr
-              className={`hover:bg-[#182533]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[#182533]/30" : ""}`}
+              className={`hover:bg-[var(--surface-hover)]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[var(--surface-hover)]/30" : ""}`}
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
             >
-              <td data-testid="outcome-name-cell" className="sticky left-0 z-10 bg-[#17212B] px-4 py-3 font-medium text-[#FFFFFF]">
+              <td data-testid="outcome-name-cell" className="sticky left-0 z-10 bg-[var(--surface-panel)] px-4 py-3 font-medium text-[var(--text-primary)]">
                 <div className="flex items-center gap-1.5" title={buildMarketTooltip({ eventTitle: marketTitle ?? o.artist, expiryDate: marketExpiryDate })}>
-                  <span className={`transition-transform text-[#8A9BA8] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
+                  <span className={`transition-transform text-[var(--text-secondary)] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                   {o.artist}
                 </div>
               </td>
-              <td className="px-4 py-3 text-right text-[#FFFFFF]">
+              <td className="px-4 py-3 text-right text-[var(--text-primary)]">
                 {formatPrice(o.kalshi?.yesAsk)}
-                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
-                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
+                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[var(--status-positive)]">▲</span>}
+                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[var(--status-negative)]">▼</span>}
               </td>
-              <td className="px-4 py-3 text-right text-[#8A9BA8]">{formatPrice(o.kalshi?.noAsk)}</td>
-              <td className="px-4 py-3 text-right text-[#FFFFFF]">
+              <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{formatPrice(o.kalshi?.noAsk)}</td>
+              <td className="px-4 py-3 text-right text-[var(--text-primary)]">
                 {formatPrice(o.polymarket?.yesPrice)}
-                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[#5DBE81]">▲</span>}
-                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[#ef4444]">▼</span>}
+                {priceChanges?.get(o.artist) === "up" && <span className="ml-1 animate-pulse text-[var(--status-positive)]">▲</span>}
+                {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[var(--status-negative)]">▼</span>}
               </td>
-              <td className="px-4 py-3 text-right text-[#8A9BA8]">{formatPrice(o.polymarket?.noPrice)}</td>
+              <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{formatPrice(o.polymarket?.noPrice)}</td>
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (
@@ -271,37 +271,37 @@ function OutcomeTableBodyInner({
               </td>
               <td className="relative px-4 py-3 text-right group">
                 {!hasPrices || profit <= 0 ? (
-                  <span className="text-[#8A9BA8]">—</span>
+                  <span className="text-[var(--text-secondary)]">—</span>
                 ) : profit > 0 ? (
                   <div className="group inline-block">
-                    <span className="text-[#FFFFFF] cursor-help">{formatCurrency(profit)}</span>
+                    <span className="text-[var(--text-primary)] cursor-help">{formatCurrency(profit)}</span>
                     {o.arbitrage.fees && (
-                      <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                        <div className="font-bold text-[#FFFFFF] mb-2">Fee Breakdown</div>
+                      <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[var(--surface-panel)] border border-[var(--border-strong)] rounded-lg shadow-xl p-3 text-xs">
+                        <div className="font-bold text-[var(--text-primary)] mb-2">Fee Breakdown</div>
                         <div className="space-y-1 mb-2">
-                          <div className="flex justify-between text-[#8A9BA8]">
+                          <div className="flex justify-between text-[var(--text-secondary)]">
                             <span>Gross profit</span>
-                            <span className="text-[#FFFFFF]">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
+                            <span className="text-[var(--text-primary)]">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
                           </div>
-                          <div className="flex justify-between text-[#8A9BA8]">
+                          <div className="flex justify-between text-[var(--text-secondary)]">
                             <span>Kalshi fee</span>
-                            <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
+                            <span className="text-[var(--status-negative)]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
                           </div>
-                          <div className="flex justify-between text-[#8A9BA8]">
+                          <div className="flex justify-between text-[var(--text-secondary)]">
                             <span>Polymarket fee</span>
-                            <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
+                            <span className="text-[var(--status-negative)]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
                           </div>
                         </div>
-                        <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-2">
+                        <div className="flex justify-between text-[var(--text-primary)] font-medium border-t border-[var(--border-subtle)] pt-2">
                           <span>Net profit (after fees)</span>
-                          <span className="text-[#5DBE81] font-bold">{formatCurrency(profit)}</span>
+                          <span className="text-[var(--status-positive)] font-bold">{formatCurrency(profit)}</span>
                         </div>
-                        <div className="border-t border-[#182533] pt-2 mt-2 space-y-1">
-                          <div className="text-[#8A9BA8] text-[10px]">{o.arbitrage.fees.kalshiFeeDetails}</div>
-                          <div className="text-[#8A9BA8] text-[10px]">{o.arbitrage.fees.pmFeeDetails}</div>
-                          <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-1">
+                        <div className="border-t border-[var(--border-subtle)] pt-2 mt-2 space-y-1">
+                          <div className="text-[var(--text-secondary)] text-[10px]">{o.arbitrage.fees.kalshiFeeDetails}</div>
+                          <div className="text-[var(--text-secondary)] text-[10px]">{o.arbitrage.fees.pmFeeDetails}</div>
+                          <div className="flex justify-between text-[var(--text-primary)] font-medium border-t border-[var(--border-subtle)] pt-1">
                             <span>Worst-case net</span>
-                            <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
+                            <span className={o.arbitrage.fees.worstCaseNetProfit >= 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}>{formatCurrency(o.arbitrage.fees.worstCaseNetProfit)}</span>
                           </div>
                         </div>
                       </div>
@@ -311,15 +311,15 @@ function OutcomeTableBodyInner({
               </td>
               <td className="px-4 py-3 text-right">
                 {(() => {
-                  if (!hasPrices || !k || !p) return <span className="text-[#8A9BA8]">—</span>;
+                  if (!hasPrices || !k || !p) return <span className="text-[var(--text-secondary)]">—</span>;
                   // UI-10: Hide stake/depth for negative-arb rows — no point showing
                   // deployable capital when there's no profitable arb.
                   if (o.arbitrage.depthVerified === false) {
-                    return <span className="text-[#facc15] text-xs" title="Live ask depth is missing for one or more required legs. This quote is not executable.">Depth unknown</span>;
+                    return <span className="text-[var(--status-warning)] text-xs" title="Live ask depth is missing for one or more required legs. This quote is not executable.">Depth unknown</span>;
                   }
-                  if (o.arbitrage.roiPct <= 0) return <span className="text-[#8A9BA8]">—</span>;
+                  if (o.arbitrage.roiPct <= 0) return <span className="text-[var(--text-secondary)]">—</span>;
                   const liq = computeLiquidityFromOutcome(k, p, o.arbitrage);
-                  if (!liq) return <span className="text-[#8A9BA8]">—</span>;
+                  if (!liq) return <span className="text-[var(--text-secondary)]">—</span>;
                   return (
                     <div className="flex flex-col items-end gap-0.5">
                       <DepthHeatmap
@@ -331,8 +331,8 @@ function OutcomeTableBodyInner({
                         compact
                       />
                       {totalStake > 0 && (
-                        <span className={`text-[10px] font-medium ${isBalanced ? "text-[#5DBE81]" : "text-[#ef4444]"}`} title="Total stake (Kalshi + Polymarket)">
-                          <span className="text-[#8A9BA8]">Stake:</span> {formatCurrency(totalStake)}
+                        <span className={`text-[10px] font-medium ${isBalanced ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}`} title="Total stake (Kalshi + Polymarket)">
+                          <span className="text-[var(--text-secondary)]">Stake:</span> {formatCurrency(totalStake)}
                         </span>
                       )}
                     </div>
@@ -344,17 +344,17 @@ function OutcomeTableBodyInner({
                   // Toggle chart expansion; also expand the row if not already
                   setExpandedChartArtist(prev => prev === o.artist ? null : o.artist);
                   if (expandedArtist !== o.artist) setExpandedArtist(o.artist);
-                }} isExpanded={expandedChartArtist === o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
+                }} isExpanded={expandedChartArtist === o.artist} /> : <span className="text-[var(--text-secondary)] text-xs">—</span>}
               </td>
               <td className="px-4 py-3 text-right">
-                {marketId && o.arbitrage.roiPct > 0 ? <ArbDecayCurve marketId={marketId} outcome={o.artist} /> : <span className="text-[#8A9BA8] text-xs">—</span>}
+                {marketId && o.arbitrage.roiPct > 0 ? <ArbDecayCurve marketId={marketId} outcome={o.artist} /> : <span className="text-[var(--text-secondary)] text-xs">—</span>}
               </td>
               <td className="px-4 py-3 text-xs">
                 {!hasPrices ? (
-                  <span className="text-[#8A9BA8]">—</span>
+                  <span className="text-[var(--text-secondary)]">—</span>
                 ) : (() => {
                   if (o.arbitrage.strategy === 'No arb') {
-                    return <span className="text-[#8A9BA8]">No arb</span>;
+                    return <span className="text-[var(--text-secondary)]">No arb</span>;
                   }
                   return (
                     <span className="inline-flex items-center gap-1.5">
@@ -362,11 +362,11 @@ function OutcomeTableBodyInner({
                       {/* EXEC-002: manual execute — only for simple 2-leg positive arbs */}
                       {marketTitle && o.arbitrage.roiPct > 0 && o.arbitrage.depthVerified !== false && !(o.arbitrage as any).suspicious && o.kalshi?.ticker && o.polymarket?.conditionId && (
                         <span className="flex flex-col items-center">
-                          <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>
+                          <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">Action</span>
                           <button
                             onClick={(e) => { e.stopPropagation(); startExecute(o, profitDistributions[o.artist]); }}
                             disabled={resolvingArtist === o.artist}
-                            className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#facc15]/20 text-[#facc15] hover:bg-[#facc15]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                            className="px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-[var(--status-warning)]/20 text-[var(--status-warning)] hover:bg-[var(--status-warning)]/40 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                             title="Manually execute this arb (opens confirmation)"
                           >
                             <Zap className="w-2.5 h-2.5" /> {resolvingArtist === o.artist ? "..." : "Execute"}
@@ -379,62 +379,62 @@ function OutcomeTableBodyInner({
               </td>
             </tr>
             {isExpanded && (
-              <tr className="bg-[#17212B]/50">
+              <tr className="bg-[var(--surface-panel)]/50">
                 <td colSpan={12} className="px-4 py-3">
                   <div className="flex items-center gap-6 text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="text-[#8A9BA8]">Total Stake:</span>
-                      <span className="font-bold text-[#FFFFFF]">{formatCurrency(totalStake)}</span>
+                      <span className="text-[var(--text-secondary)]">Total Stake:</span>
+                      <span className="font-bold text-[var(--text-primary)]">{formatCurrency(totalStake)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[#8A9BA8]">Breakdown:</span>
-                      <span className="text-[#5DBE81]">Kalshi: {formatCurrency(o.arbitrage.kalshiStake ?? 0)}</span>
-                      <span className="text-[#8A9BA8]">|</span>
-                      <span className="text-[#ef4444]">Polymarket: {formatCurrency(o.arbitrage.pmStake ?? 0)}</span>
+                      <span className="text-[var(--text-secondary)]">Breakdown:</span>
+                      <span className="text-[var(--status-positive)]">Kalshi: {formatCurrency(o.arbitrage.kalshiStake ?? 0)}</span>
+                      <span className="text-[var(--text-secondary)]">|</span>
+                      <span className="text-[var(--status-negative)]">Polymarket: {formatCurrency(o.arbitrage.pmStake ?? 0)}</span>
                     </div>
-                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "bg-[#ef4444]/10 text-[#ef4444]"}`}>
+                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isBalanced ? "bg-[var(--status-positive)]/10 text-[var(--status-positive)]" : "bg-[var(--status-negative)]/10 text-[var(--status-negative)]"}`}>
                       {isBalanced ? "● Balanced" : "● Imbalanced"}
                     </div>
                     {/* APY in expanded detail — same value as scan table column */}
                     {hasPrices && o.arbitrage.apyPct != null && o.arbitrage.apyPct > 0 && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[#8A9BA8]">APY:</span>
+                        <span className="text-[var(--text-secondary)]">APY:</span>
                         <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
-                          <span className="font-bold text-[#5DBE81]">{formatPercent(o.arbitrage.apyPct)}</span>
+                          <span className="font-bold text-[var(--status-positive)]">{formatPercent(o.arbitrage.apyPct)}</span>
                         </ApyValueTooltip>
                       </div>
                     )}
                     {/* Days to expiry in expanded detail */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[#8A9BA8]">Days to expiry:</span>
-                      <span className={`font-medium ${formatTimeToExpiry(marketExpiryDate) === "Expired" ? "text-[#ef4444]" : "text-[#FFFFFF]"}`}>
+                      <span className="text-[var(--text-secondary)]">Days to expiry:</span>
+                      <span className={`font-medium ${formatTimeToExpiry(marketExpiryDate) === "Expired" ? "text-[var(--status-negative)]" : "text-[var(--text-primary)]"}`}>
                         {formatTimeToExpiry(marketExpiryDate)}
                       </span>
                     </div>
                   </div>
                   {/* UI-13: Fee breakdown in expanded row */}
                   {o.arbitrage.fees && (
-                    <div className="mt-3 pt-3 border-t border-[#182533]">
-                      <div className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium mb-2">Fee Breakdown</div>
+                    <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-medium mb-2">Fee Breakdown</div>
                       <div className="flex items-center gap-6 text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9BA8]">Gross:</span>
-                          <span className="text-[#FFFFFF] font-medium">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
+                          <span className="text-[var(--text-secondary)]">Gross:</span>
+                          <span className="text-[var(--text-primary)] font-medium">{formatCurrency(profit + o.arbitrage.fees.kalshiFee + o.arbitrage.fees.pmFee)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9BA8]">Kalshi fee:</span>
-                          <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
+                          <span className="text-[var(--text-secondary)]">Kalshi fee:</span>
+                          <span className="text-[var(--status-negative)]">-{formatCurrency(o.arbitrage.fees.kalshiFee)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9BA8]">PM fee:</span>
-                          <span className="text-[#ef4444]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
+                          <span className="text-[var(--text-secondary)]">PM fee:</span>
+                          <span className="text-[var(--status-negative)]">-{formatCurrency(o.arbitrage.fees.pmFee)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9BA8]">Net:</span>
-                          <span className="text-[#5DBE81] font-bold">{formatCurrency(profit)}</span>
+                          <span className="text-[var(--text-secondary)]">Net:</span>
+                          <span className="text-[var(--status-positive)] font-bold">{formatCurrency(profit)}</span>
                         </div>
                       </div>
-                      <div className="mt-1.5 text-[10px] text-[#8A9BA8] space-y-0.5">
+                      <div className="mt-1.5 text-[10px] text-[var(--text-secondary)] space-y-0.5">
                         <div>{o.arbitrage.fees.kalshiFeeDetails}</div>
                         <div>{o.arbitrage.fees.pmFeeDetails}</div>
                       </div>
@@ -479,9 +479,9 @@ function OutcomeTableBodyInner({
                         formatCurrency={formatCurrency}
                         onChange={(distribution) => setProfitDistributions(previous => ({ ...previous, [o.artist]: distribution }))}
                       />}
-                      {ratio && <div className="mt-2 flex items-center justify-between rounded-lg border border-[#232E3C] bg-[#0E1621] px-3 py-2 text-xs">
-                        <span className="uppercase tracking-wider text-[#8A9BA8]">Hedge share ratio</span>
-                        <span className="font-mono font-bold text-[#FFFFFF]">PM {ratio.display.split(':')[0]} : {ratio.display.split(':')[1]} Kalshi</span>
+                      {ratio && <div className="mt-2 flex items-center justify-between rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-3 py-2 text-xs">
+                        <span className="uppercase tracking-wider text-[var(--text-secondary)]">Hedge share ratio</span>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">PM {ratio.display.split(':')[0]} : {ratio.display.split(':')[1]} Kalshi</span>
                       </div>}
                     </>;
                   })()}
@@ -515,10 +515,10 @@ function OutcomeTableBodyInner({
       {/* EXEC-002: token-resolution error + confirmation modal */}
       {execError && (
         <tr><td colSpan={12} className="px-4 py-0">
-          <div className="my-2 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-2.5 text-xs text-[#ef4444] flex items-center gap-2">
+          <div className="my-2 rounded-lg border border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 px-4 py-2.5 text-xs text-[var(--status-negative)] flex items-center gap-2">
             <span className="text-sm">⚠️</span>
             <span>{execError}</span>
-            <button onClick={() => setExecError(null)} className="ml-auto text-[#ef4444]/60 hover:text-[#ef4444] text-xs">✕</button>
+            <button onClick={() => setExecError(null)} className="ml-auto text-[var(--status-negative)]/60 hover:text-[var(--status-negative)] text-xs">✕</button>
           </div>
         </td></tr>
       )}
@@ -529,42 +529,42 @@ function OutcomeTableBodyInner({
       )}
     </tbody>
     {profitableOutcomes.length > 0 && (
-      <tfoot className="bg-[#17212B] border-t-2 border-[#5DBE81]/30">
+      <tfoot className="bg-[var(--surface-panel)] border-t-2 border-[var(--status-positive)]/30">
         <tr>
           <td colSpan={7} className="px-4 py-3">
-            <span className="text-[10px] uppercase tracking-wider text-[#8A9BA8] font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-medium">
               Accumulated Arb Profit
             </span>
-            <span className="ml-2 text-[10px] text-[#8A9BA8]">
+            <span className="ml-2 text-[10px] text-[var(--text-secondary)]">
               ({profitableOutcomes.length} opportun{profitableOutcomes.length > 1 ? "ities" : "y"})
             </span>
           </td>
           <td colSpan={5} className="px-4 py-3 text-right">
             <div className="group inline-block">
-              <span className="text-lg font-bold text-[#5DBE81]">
+              <span className="text-lg font-bold text-[var(--status-positive)]">
                 {formatCurrency(accumulatedProfit)}
               </span>
-              <span className="ml-2 text-[10px] text-[#8A9BA8]">after fees</span>
+              <span className="ml-2 text-[10px] text-[var(--text-secondary)]">after fees</span>
               {hasFeeBreakdown && (accumulatedKalshiFees > 0 || accumulatedPmFees > 0) && (
-                <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[#17212B] border border-[#232E3C] rounded-lg shadow-xl p-3 text-xs">
-                  <div className="font-bold text-[#FFFFFF] mb-2">Accumulated Fee Breakdown</div>
+                <div className="invisible group-hover:visible absolute bottom-full right-0 z-50 mb-2 w-72 bg-[var(--surface-panel)] border border-[var(--border-strong)] rounded-lg shadow-xl p-3 text-xs">
+                  <div className="font-bold text-[var(--text-primary)] mb-2">Accumulated Fee Breakdown</div>
                   <div className="space-y-1 mb-2">
-                    <div className="flex justify-between text-[#8A9BA8]">
+                    <div className="flex justify-between text-[var(--text-secondary)]">
                       <span>Gross profit (before fees)</span>
-                      <span className="text-[#FFFFFF]">{formatCurrency(accumulatedGrossProfit)}</span>
+                      <span className="text-[var(--text-primary)]">{formatCurrency(accumulatedGrossProfit)}</span>
                     </div>
-                    <div className="flex justify-between text-[#8A9BA8]">
+                    <div className="flex justify-between text-[var(--text-secondary)]">
                       <span>Kalshi fees total</span>
-                      <span className="text-[#ef4444]">-{formatCurrency(accumulatedKalshiFees)}</span>
+                      <span className="text-[var(--status-negative)]">-{formatCurrency(accumulatedKalshiFees)}</span>
                     </div>
-                    <div className="flex justify-between text-[#8A9BA8]">
+                    <div className="flex justify-between text-[var(--text-secondary)]">
                       <span>Polymarket fees total</span>
-                      <span className="text-[#ef4444]">-{formatCurrency(accumulatedPmFees)}</span>
+                      <span className="text-[var(--status-negative)]">-{formatCurrency(accumulatedPmFees)}</span>
                     </div>
                   </div>
-                  <div className="flex justify-between text-[#FFFFFF] font-medium border-t border-[#182533] pt-2">
+                  <div className="flex justify-between text-[var(--text-primary)] font-medium border-t border-[var(--border-subtle)] pt-2">
                     <span>Net profit (after fees)</span>
-                    <span className="text-[#5DBE81] font-bold">{formatCurrency(accumulatedProfit)}</span>
+                    <span className="text-[var(--status-positive)] font-bold">{formatCurrency(accumulatedProfit)}</span>
                   </div>
                 </div>
               )}
