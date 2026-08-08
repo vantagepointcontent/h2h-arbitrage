@@ -1473,8 +1473,13 @@ async function ensureClosedPositionsTable(): Promise<void> {
       fees_paid        REAL    NOT NULL DEFAULT 0,
       ticker           TEXT,
       condition_id     TEXT,
+      execution_mode   TEXT    NOT NULL DEFAULT 'live',
       raw_data         TEXT
     )`);
+  const columns = await c.execute(`PRAGMA table_info(closed_positions)`);
+  if (!(columns.rows as any[]).some((row) => String(row.name) === 'execution_mode')) {
+    await c.execute(`ALTER TABLE closed_positions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'live'`);
+  }
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_closed_at ON closed_positions(closed_at DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_pair_id ON closed_positions(pair_id)`);
   _closedPositionsReady = true;
@@ -1497,6 +1502,7 @@ export interface ClosedPosition {
   feesPaid?: number;
   ticker?: string | null;
   conditionId?: string | null;
+  executionMode?: 'live' | 'paper';
   rawData?: unknown;
 }
 
@@ -1506,8 +1512,8 @@ export async function persistClosedPosition(cp: ClosedPosition): Promise<void> {
   await c.execute({
     sql: `INSERT INTO closed_positions
       (market_title, platform, side, size, entry_price, exit_price, realized_pnl, roi_pct,
-       opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, raw_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, execution_mode, raw_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       cp.marketTitle, cp.platform, cp.side, cp.size,
       cp.entryPrice, cp.exitPrice, cp.realizedPnl, cp.roiPct,
@@ -1517,6 +1523,7 @@ export async function persistClosedPosition(cp: ClosedPosition): Promise<void> {
       cp.feesPaid ?? 0,
       cp.ticker ?? null,
       cp.conditionId ?? null,
+      cp.executionMode ?? 'live',
       cp.rawData != null ? JSON.stringify(cp.rawData) : null,
     ],
   });
@@ -1546,6 +1553,7 @@ export async function getClosedPositions(limit = 500): Promise<ClosedPosition[]>
     feesPaid: Number(r.fees_paid ?? 0),
     ticker: r.ticker ?? null,
     conditionId: r.condition_id ?? null,
+    executionMode: String(r.execution_mode ?? 'live') as 'live' | 'paper',
     rawData: r.raw_data ? JSON.parse(String(r.raw_data)) : undefined,
   }));
 }

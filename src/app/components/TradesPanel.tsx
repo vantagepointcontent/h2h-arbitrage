@@ -63,6 +63,23 @@ interface ExecutionRecord {
   estimatedProfit: number;
 }
 
+interface ClosedPositionRecord {
+  id: number;
+  marketTitle: string;
+  platform: 'kalshi' | 'polymarket';
+  side: 'YES' | 'NO';
+  size: number;
+  entryPrice: number;
+  exitPrice: number;
+  realizedPnl: number;
+  roiPct: number;
+  openedAt?: string | null;
+  closedAt: string;
+  durationSecs?: number | null;
+  feesPaid: number;
+  executionMode?: 'live' | 'paper';
+}
+
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
 
 /** Derive a human-readable trade status from the execution record. */
@@ -276,6 +293,7 @@ function ExecutionTimeline({
 
 export default function TradesPanel() {
   const [trades, setTrades] = useState<ExecutionRecord[]>([]);
+  const [closedPositions, setClosedPositions] = useState<ClosedPositionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'real' | 'dry' | 'pending'>('all');
@@ -292,10 +310,15 @@ export default function TradesPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/executions?limit=500', { cache: 'no-store' });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to load trades');
-      setTrades(data.executions || []);
+      const [executionRes, closedRes] = await Promise.all([
+        fetch('/api/executions?limit=500', { cache: 'no-store' }),
+        fetch('/api/closed-positions?limit=500', { cache: 'no-store' }),
+      ]);
+      const [executionData, closedData] = await Promise.all([executionRes.json(), closedRes.json()]);
+      if (!executionData.success) throw new Error(executionData.error || 'Failed to load trades');
+      if (!closedData.success) throw new Error(closedData.error || 'Failed to load closed positions');
+      setTrades(executionData.executions || []);
+      setClosedPositions(closedData.positions || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -460,6 +483,31 @@ export default function TradesPanel() {
       {/* Trade History sub-tab */}
       {subTab === 'history' && (
         <>
+          <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-x-auto mb-4">
+            <div className="px-4 py-3 border-b border-[#182533] flex items-center justify-between">
+              <div><div className="text-sm font-semibold text-[#FFFFFF]">Closed positions</div><div className="text-[10px] text-[#8A9BA8]">Realized P&amp;L after entry and exit fees</div></div>
+              <span className="text-xs text-[#8A9BA8]">{closedPositions.length}</span>
+            </div>
+            {closedPositions.length === 0 ? <div className="text-sm text-[#8A9BA8] py-6 text-center">No positions have been closed yet.</div> : (
+              <table className="w-full text-sm">
+                <thead><tr className="text-[10px] uppercase text-[#8A9BA8] border-b border-[#182533]">
+                  <th className="text-left px-4 py-3 font-medium">Closed</th><th className="text-left px-4 py-3 font-medium">Market</th><th className="text-left px-4 py-3 font-medium">Platform / Side</th>
+                  <th className="text-right px-4 py-3 font-medium">Size</th><th className="text-right px-4 py-3 font-medium">Entry</th><th className="text-right px-4 py-3 font-medium">Exit</th>
+                  <th className="text-right px-4 py-3 font-medium">Fees</th><th className="text-right px-4 py-3 font-medium">Net P&amp;L</th><th className="text-right px-4 py-3 font-medium">ROI</th>
+                  <th className="text-right px-4 py-3 font-medium">Duration</th><th className="text-center px-4 py-3 font-medium">Mode</th>
+                </tr></thead>
+                <tbody className="divide-y divide-[#182533]">{closedPositions.map((position) => <tr key={position.id} className="hover:bg-[#182533]/50">
+                  <td className="px-4 py-3 text-xs text-[#8A9BA8] whitespace-nowrap">{new Date(position.closedAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-xs text-[#FFFFFF] max-w-[220px] truncate" title={position.marketTitle}>{position.marketTitle}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap"><span className={position.platform === 'kalshi' ? 'text-[#5DBE81]' : 'text-[#a78bfa]'}>{position.platform === 'kalshi' ? 'Kalshi' : 'Polymarket'}</span><span className="text-[#8A9BA8]"> · {position.side}</span></td>
+                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.size.toFixed(2)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.entryPrice.toFixed(3)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.exitPrice.toFixed(3)}</td>
+                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{fmtUsd(position.feesPaid)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.realizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtUsd(position.realizedPnl)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.roiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{position.roiPct.toFixed(2)}%</td>
+                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap">{position.durationSecs == null ? 'Unknown' : position.durationSecs < 3600 ? `${Math.round(position.durationSecs / 60)}m` : `${(position.durationSecs / 3600).toFixed(1)}h`}</td><td className="px-4 py-3 text-center"><span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#facc15]/20 text-[#facc15]">{position.executionMode ?? 'live'}</span></td>
+                </tr>)}</tbody>
+              </table>
+            )}
+          </div>
+
           {/* Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">

@@ -232,13 +232,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const success = !errors.kalshi && !errors.polymarket;
     const partialFill = (errors.kalshi && !errors.polymarket) || (!errors.kalshi && errors.polymarket);
 
-    // Persist to executions table for trade history
+    // Persist both the execution audit record and one immutable closed-position
+    // record per successfully submitted leg. The latter powers full realized-P&L
+    // history rather than trying to reconstruct entry data from a sell order.
     if (success || partialFill) {
       try {
-        const { persistExecution } = await import('@/lib/persistence');
-        const totalRealizedPnl = (kalshi?.unrealizedPnl ?? 0) + (polymarket?.cashPnl ?? 0);
+        const { persistExecution, persistClosedPosition } = await import('@/lib/persistence');
+        const closedAt = new Date().toISOString();
+        const netLegPnl = (leg: any, grossPnl: number) => grossPnl - Number(leg?.exitFees ?? 0);
+        const totalRealizedPnl =
+          (kalshi && !errors.kalshi ? netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)) : 0)
+          + (polymarket && !errors.polymarket ? netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)) : 0);
+
+        const closedRecords = [
+          kalshi && !errors.kalshi ? {
+            marketTitle: kalshi.title ?? 'Unknown', platform: 'kalshi' as const, side: kalshi.side,
+            size: Number(kalshi.size), entryPrice: Number(kalshi.entryPrice ?? 0),
+            exitPrice: Number(kalshi.exitPrice ?? kalshi.priceCents / 100),
+            realizedPnl: netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)),
+            roiPct: Number(kalshi.totalCost ?? 0) > 0
+              ? netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)) / Number(kalshi.totalCost) * 100 : 0,
+            openedAt: kalshi.openedAt ?? null, closedAt,
+            durationSecs: kalshi.openedAt ? Math.max(0, Math.floor((Date.parse(closedAt) - Date.parse(kalshi.openedAt)) / 1000)) : null,
+            pairId: body.pairId ?? null, feesPaid: Number(kalshi.feesPaid ?? 0) + Number(kalshi.exitFees ?? 0),
+            ticker: kalshi.ticker, executionMode: 'live' as const,
+          } : null,
+          polymarket && !errors.polymarket ? {
+            marketTitle: polymarket.title ?? 'Unknown', platform: 'polymarket' as const, side: polymarket.side,
+            size: Number(polymarket.size), entryPrice: Number(polymarket.entryPrice ?? 0),
+            exitPrice: Number(polymarket.exitPrice ?? polymarket.price),
+            realizedPnl: netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)),
+            roiPct: Number(polymarket.totalCost ?? 0) > 0
+              ? netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)) / Number(polymarket.totalCost) * 100 : 0,
+            openedAt: polymarket.openedAt ?? null, closedAt,
+            durationSecs: polymarket.openedAt ? Math.max(0, Math.floor((Date.parse(closedAt) - Date.parse(polymarket.openedAt)) / 1000)) : null,
+            pairId: body.pairId ?? null, feesPaid: Number(polymarket.feesPaid ?? 0) + Number(polymarket.exitFees ?? 0),
+            conditionId: polymarket.conditionId, executionMode: 'live' as const,
+          } : null,
+        ].filter(Boolean);
+        await Promise.all(closedRecords.map((record) => persistClosedPosition(record!)));
         await persistExecution({
-          timestamp: new Date().toISOString(),
+          timestamp: closedAt,
           arbId: `exit-${Date.now()}`,
           marketTitle: kalshi?.title ?? polymarket?.title ?? 'Unknown',
           dryRun: false,
