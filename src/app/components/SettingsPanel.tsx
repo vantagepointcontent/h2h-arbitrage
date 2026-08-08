@@ -298,7 +298,7 @@ export default function SettingsPanel() {
         <h2 className="text-xl font-bold">Settings</h2>
       </div>
       <p className="text-sm text-[#8A9BA8] mb-6">
-        DB-backed overrides — changes apply live within ~10 seconds, no restart. Source shows where each value comes from (db → env → default).
+        Edit values below, then click Save Changes to apply them within ~10 seconds without a restart. Source shows where each value comes from (db → env → default).
       </p>
 
       {error && (
@@ -616,7 +616,7 @@ export default function SettingsPanel() {
             disabled={saving}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#5DBE81] text-black text-sm font-semibold hover:bg-[#4faf73] disabled:opacity-50"
           >
-            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
+            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       )}
