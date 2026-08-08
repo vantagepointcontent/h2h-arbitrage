@@ -29,8 +29,8 @@ export function NavButton({ icon, label, active, onClick, collapsed }: { icon: R
         onClick={onClick}
         className={`w-full min-h-11 min-w-11 flex items-center justify-center p-3 rounded-lg transition-colors ${
           active
-            ? "bg-[#5DBE81]/10 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-            : "text-[#8A9BA8] hover:bg-[#182533] hover:text-[#FFFFFF]"
+            ? "bg-[var(--status-positive)]/10 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30"
+            : "text-[var(--text-secondary)] hover:bg-[var(--border-subtle)] hover:text-[var(--text-primary)]"
         }`}
         title={label}
       >
@@ -43,8 +43,8 @@ export function NavButton({ icon, label, active, onClick, collapsed }: { icon: R
       onClick={onClick}
       className={`w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
         active
-          ? "bg-[#5DBE81]/10 text-[#5DBE81]"
-          : "bg-[#182533] text-[#8A9BA8] hover:bg-[#232E3C] hover:text-[#FFFFFF]"
+          ? "bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
+          : "bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--border-strong)] hover:text-[var(--text-primary)]"
       }`}
     >
       {icon}
@@ -217,7 +217,7 @@ function MarketSidebarInner({
           sidebarOpen
             ? "w-[380px]"
             : "w-[64px]"
-        } shrink-0 border-r border-[#182533] bg-[#17212B] transition-all duration-200 md:block ${
+        } shrink-0 border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] transition-all duration-200 md:block ${
           mobileMenuOpen
             ? "fixed inset-y-0 left-0 z-50 w-[380px] max-w-[85vw] md:relative md:w-auto md:z-auto md:inset-auto"
             : "hidden md:block md:!w-auto"
@@ -227,13 +227,13 @@ function MarketSidebarInner({
           {/* Close button for mobile */}
           <button
             onClick={onCloseMobileMenu}
-            className="absolute top-2 right-2 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[#182533] md:hidden z-10"
+            className="absolute top-2 right-2 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--border-subtle)] md:hidden z-10"
           >
             <X className="w-4 h-4" />
           </button>
 
           {/* ── Navigation ── */}
-          <div className="space-y-1 sticky top-0 z-10 bg-[#17212B] pb-2">
+          <div className="space-y-1 sticky top-0 z-10 bg-[var(--surface-panel)] pb-2">
             <NavButton icon={<LayoutDashboard className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
             <NavButton icon={<Clock3 className="w-5 h-5 shrink-0" />} label="Arb Timing" active={viewMode === "timing"} onClick={onGoTiming} collapsed={!sidebarOpen} />
             <NavButton icon={<Layers className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
@@ -249,11 +249,11 @@ function MarketSidebarInner({
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <h2 className="text-xs font-semibold text-[#8A9BA8] tracking-wide uppercase">Saved Markets ({filtered.length}{filtered.length !== markets.length ? `/${markets.length}` : ""})</h2>
+                  <h2 className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide uppercase">Saved Markets ({filtered.length}{filtered.length !== markets.length ? `/${markets.length}` : ""})</h2>
                   <button
                     onClick={onToggleSidebarFavorites}
                     className={`p-0.5 rounded transition-colors ${
-                      sidebarFavoritesOnly ? "text-[#facc15]" : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                      sidebarFavoritesOnly ? "text-[var(--status-warning)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                     title={sidebarFavoritesOnly ? "Show all markets" : "Show favorites only"}
                   >
@@ -264,7 +264,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("apy")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "apy" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "apy" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
                     title="Sort by APY — Annualized ROI = ROI × (365 ÷ days to expiry)"
                   >
@@ -273,7 +273,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("roi")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "roi" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "roi" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
                     title="Sort by ROI"
                   >
@@ -282,7 +282,7 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("name")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "name" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "name" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
                     title="Sort by Name"
                   >
@@ -291,26 +291,26 @@ function MarketSidebarInner({
                   <button
                     onClick={() => onToggleSort("scanned")}
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
-                      sort === "scanned" ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30" : "text-[#8A9BA8] hover:text-[#FFFFFF] hover:bg-[#182533]"
+                      sort === "scanned" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
                     title="Sort by last scan time (click to toggle asc/desc)"
                   >
                     Scanned{sort === "scanned" && (sortDir === "asc" ? " ↑" : " ↓")}
                   </button>
-                  <div className="w-px h-4 bg-[#232E3C] mx-0.5" />
-                  <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[#182533] text-[#8A9BA8] hover:text-[#5DBE81] transition-colors disabled:opacity-50" title="Scan filtered markets">
+                  <div className="w-px h-4 bg-[var(--border-strong)] mx-0.5" />
+                  <button onClick={() => onScanAll(filtered)} disabled={scanningAll} className="p-1.5 rounded-md hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--status-positive)] transition-colors disabled:opacity-50" title="Scan filtered markets">
                     {scanningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               {scanningAll && scanProgress.total > 0 && (
-                <div className="flex items-center gap-2 text-[10px] text-[#8A9BA8]">
+                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Scanning {scanProgress.current}/{scanProgress.total}...
                 </div>
               )}
-              {scanAllError && <div className="text-xs text-[#ef4444]">{scanAllError}</div>}
+              {scanAllError && <div className="text-xs text-[var(--status-negative)]">{scanAllError}</div>}
 
               {/* Filters */}
               <div className="space-y-2">
@@ -319,13 +319,13 @@ function MarketSidebarInner({
                   value={sidebarSearch}
                   onChange={(e) => setSidebarSearch(e.target.value)}
                   placeholder="Filter by name..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] border border-[#232E3C] text-xs text-[#FFFFFF] placeholder-[#232E3C] focus:outline-none focus:border-[#5DBE81]"
+                  className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] border border-[var(--border-strong)] text-xs text-[var(--text-primary)] placeholder-[var(--border-strong)] focus:outline-none focus:border-[var(--status-positive)]"
                 />
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <select
                     value={expiryFilter}
                     onChange={(e) => onSetExpiryFilter(e.target.value as any)}
-                    className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
+                    className="px-2.5 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[11px] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--status-positive)]/50 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                   >
                     <option value="all">All expiries</option>
                     <option value="lte7">≤ 7 days</option>
@@ -335,7 +335,7 @@ function MarketSidebarInner({
                   <select
                     value={sidebarCategory}
                     onChange={(e) => setSidebarCategory(e.target.value)}
-                    className="px-2.5 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-[11px] text-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]/50 cursor-pointer hover:text-[#FFFFFF] transition-colors"
+                    className="px-2.5 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[11px] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--status-positive)]/50 cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                   >
                     <option value="all">All categories</option>
                     {availableCategories.map((c) => (
@@ -346,8 +346,8 @@ function MarketSidebarInner({
                     onClick={onToggleShowExpired}
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                       showExpired
-                        ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                        : "bg-[#0E1621] text-[#8A9BA8] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                        ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] border-[var(--status-positive)]/30"
+                        : "bg-[var(--surface-workspace)] text-[var(--text-secondary)] border-[var(--border-strong)] hover:text-[var(--text-primary)] hover:border-[var(--text-faint)]"
                     }`}
                     title={showExpired ? "Hide expired markets" : "Show expired markets"}
                   >
@@ -357,8 +357,8 @@ function MarketSidebarInner({
                     onClick={onToggleShowArbOnly}
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
                       showArbOnly
-                        ? "bg-[#5DBE81]/15 text-[#5DBE81] border-[#5DBE81]/30"
-                        : "bg-[#0E1621] text-[#8A9BA8] border-[#232E3C] hover:text-[#FFFFFF] hover:border-[#3A4858]"
+                        ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] border-[var(--status-positive)]/30"
+                        : "bg-[var(--surface-workspace)] text-[var(--text-secondary)] border-[var(--border-strong)] hover:text-[var(--text-primary)] hover:border-[var(--text-faint)]"
                     }`}
                     title={showArbOnly ? "Show all markets" : "Show only arbitrage opportunities"}
                   >
@@ -381,7 +381,7 @@ function MarketSidebarInner({
                       // are skipped during layout/paint (470+ markets).
                       style={{ contentVisibility: "auto", containIntrinsicSize: "auto 40px" }}
                       className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
-                        isActive ? "bg-[#5DBE81]/10 ring-1 ring-[#5DBE81]/30" : "hover:bg-[#182533]"
+                        isActive ? "bg-[var(--status-positive)]/10 ring-1 ring-[var(--status-positive)]/30" : "hover:bg-[var(--border-subtle)]"
                       }`}
                       title={`Latest scanned: ${formatTimeAgo(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt)}`}
                     >
@@ -392,8 +392,8 @@ function MarketSidebarInner({
                         }}
                         className={`shrink-0 p-0.5 rounded transition-colors ${
                           favoriteIds.has(m.id)
-                            ? "text-[#facc15]"
-                            : "text-[#8A9BA8] group-hover:text-[#FFFFFF]"
+                            ? "text-[var(--status-warning)]"
+                            : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
                         }`}
                         title={favoriteIds.has(m.id) ? "Remove favorite" : "Add favorite"}
                       >
@@ -401,10 +401,10 @@ function MarketSidebarInner({
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 min-w-0">
-                          <div className="text-xs font-medium text-[#FFFFFF] truncate" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt })}>{m.eventTitle}</div>
+                          <div className="text-xs font-medium text-[var(--text-primary)] truncate" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt })}>{m.eventTitle}</div>
                           {hotIds.has(m.id) && (
                             <span
-                              className="shrink-0 inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-px rounded-full bg-[#f97316]/15 text-[#f97316] ring-1 ring-[#f97316]/30 uppercase"
+                              className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded-full bg-[var(--status-blocked)]/15 text-[var(--status-blocked)] ring-1 ring-[var(--status-blocked)]/30 uppercase"
                               title="HOT tier — live WebSocket-watched"
                             >
                               <Zap className="w-2 h-2" fill="currentColor" />HOT
@@ -413,16 +413,16 @@ function MarketSidebarInner({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {m.category && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.category}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--border-subtle)] text-[var(--text-secondary)]">{m.category}</span>
                           )}
-                          <span className="text-[9px] text-[#8A9BA8]">{timeUntilExpiry(m.expiryDate)}</span>
+                          <span className="text-[9px] text-[var(--text-secondary)]">{timeUntilExpiry(m.expiryDate)}</span>
                           {(() => {
                             // WS-106: last-tick freshness — prefer live WS result, fall back to poller scan
                             const f = tickFreshness(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt ?? null);
                             if (f.level === 'never') return null;
                             return (
                               <span className={`text-[9px] inline-flex items-center gap-0.5 ${freshnessColor(f.level)}`} title={`Last price update: ${f.label}`}>
-                                <span className={`w-1 h-1 rounded-full ${f.level === 'live' ? 'bg-[#5DBE81] animate-pulse' : f.level === 'recent' ? 'bg-[#8A9BA8]' : f.level === 'stale' ? 'bg-[#facc15]' : 'bg-[#ef4444]'}`} />
+                                <span className={`w-1 h-1 rounded-full ${f.level === 'live' ? 'bg-[var(--status-positive)] animate-pulse' : f.level === 'recent' ? 'bg-[var(--text-secondary)]' : f.level === 'stale' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
                                 {f.label}
                               </span>
                             );
@@ -431,12 +431,12 @@ function MarketSidebarInner({
                       </div>
                       <div className="flex items-center shrink-0">
                         {roi !== 0 && (
-                          <span className={`text-xs font-bold ${roi > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                          <span className={`text-xs font-bold ${roi > 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}`}>
                             {roi > 0 ? "+" : ""}{formatPercent(roi)}
                           </span>
                         )}
                         {apy > 0 && (
-                          <span className="text-[10px] text-[#8A9BA8] ml-1">
+                          <span className="text-[10px] text-[var(--text-secondary)] ml-1">
                             (<ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
                               {formatPercent(apy)}
                             </ApyValueTooltip>)
@@ -447,10 +447,10 @@ function MarketSidebarInner({
                   );
                 })}
                 {filtered.length === 0 && markets.length > 0 && (
-                  <div className="text-xs text-[#8A9BA8] text-center py-4">No markets match filters.</div>
+                  <div className="text-xs text-[var(--text-secondary)] text-center py-4">No markets match filters.</div>
                 )}
                 {markets.length === 0 && (
-                  <div className="text-xs text-[#8A9BA8] text-center py-4">No saved markets yet.</div>
+                  <div className="text-xs text-[var(--text-secondary)] text-center py-4">No saved markets yet.</div>
                 )}
               </div>
             </>

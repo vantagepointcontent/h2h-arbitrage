@@ -59,11 +59,11 @@ import { CATEGORIES } from "@/lib/categories";
 import dynamic from "next/dynamic";
 // PERF-P1: lazy-load heavy conditionally-rendered components into separate chunks
 const Bookmaker1on1 = dynamic(() => import("@/app/components/Bookmaker1on1").then(m => m.Bookmaker1on1), {
-  loading: () => <div className="p-4 text-sm text-[#8A9BA8]">Loading...</div>,
+  loading: () => <div className="p-4 text-sm text-[var(--text-secondary)]">Loading...</div>,
   ssr: false,
 });
 const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSuggestions").then(m => m.CouplingSuggestions), {
-  loading: () => <div className="p-4 text-sm text-[#8A9BA8]">Loading...</div>,
+  loading: () => <div className="p-4 text-sm text-[var(--text-secondary)]">Loading...</div>,
   ssr: false,
 });
 const CoupleManagementPanel = dynamic(() => import("@/app/components/CoupleManagementPanel"), { ssr: false });
@@ -1402,40 +1402,40 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="h-screen bg-[#0E1621] text-[#FFFFFF] flex flex-col overflow-hidden">
+    <div className="h-screen bg-[var(--surface-workspace)] text-[var(--text-primary)] flex flex-col overflow-hidden">
       {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} />}
 
       {/* Top nav bar */}
-      <header className="sticky top-0 z-50 border-b border-[#182533] bg-[#0E1621]/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[var(--surface-workspace)]/90 backdrop-blur">
         <div className="flex items-center h-14 px-4 gap-3">
-          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[#182533]">
+          <button onClick={() => setMobileMenuOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-[var(--border-subtle)]">
             <Rows3 className="w-5 h-5" />
           </button>
-          <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+          <button onClick={() => setSidebarOpen(v => !v)} className="hidden lg:flex p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
             <PanelLeft className={`w-5 h-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#5DBE81]/15 border border-[#5DBE81]/30">
-              <Radar className="w-4 h-4 text-[#5DBE81]" />
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--status-positive)]/15 border border-[var(--status-positive)]/30">
+              <Radar className="w-4 h-4 text-[var(--status-positive)]" />
             </div>
             <h1 className="text-base font-bold tracking-tight">EdgeFinder</h1>
           </div>
           <ExecutionModeBadge />
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "couple-management" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Couple Management">
+            <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "couple-management" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Couple Management">
               <GitMerge className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "live" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="Live WebSocket scan">
+            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "live" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Live WebSocket scan">
               <Activity className="w-4 h-4" />
             </button>
-            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]" title="Alert settings">
+            <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
-            <button onClick={goToSettings} className={`p-2 rounded-lg hover:bg-[#182533] transition-colors ${viewMode === "settings" ? "text-[#5DBE81] bg-[#5DBE81]/10" : "text-[#8A9BA8] hover:text-[#FFFFFF]"}`} title="App settings">
+            <button onClick={goToSettings} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "settings" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="App settings">
               <SettingsIconLucide className="w-4 h-4" />
             </button>
-            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]" title="Toggle theme">
+            <button onClick={() => theme.toggleTheme()} className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Toggle theme">
               {theme.theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
@@ -1613,7 +1613,7 @@ export default function Home() {
               <>
                 {/* Scan inputs */}
                 {!activeMarketId && (
-                <div className="rounded-xl border border-[#182533] bg-[#17212B] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
                   {/* FEAT-015: category picker — browse matched pairs instead of pasting URLs */}
                   <ScanCategoryPicker onPick={(k, pm) => {
                     setKalshiUrl(k); setPmUrl(pm);
@@ -1635,14 +1635,14 @@ export default function Home() {
 
                   {/* Auto/Manual match toggle */}
                   <div className="flex flex-col items-stretch gap-2 mb-4 sm:flex-row sm:items-center">
-                    <span className="text-xs text-[#8A9BA8]">Match Mode:</span>
-                    <div className="flex rounded-lg bg-[#0E1621] border border-[#182533] p-0.5">
+                    <span className="text-xs text-[var(--text-secondary)]">Match Mode:</span>
+                    <div className="flex rounded-lg bg-[var(--surface-workspace)] border border-[var(--border-subtle)] p-0.5">
                       <button
                         onClick={() => setMatchMode("auto")}
                         className={`min-h-11 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "auto"
-                            ? "bg-[#5DBE81] text-black"
-                            : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                            ? "bg-[var(--status-positive)] text-black"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                       >
                         Auto Match
@@ -1651,40 +1651,40 @@ export default function Home() {
                         onClick={() => setMatchMode("manual")}
                         className={`min-h-11 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "manual"
-                            ? "bg-[#a855f7] text-white"
-                            : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                            ? "bg-[var(--platform-polymarket)] text-white"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                       >
                         Manual Match
                       </button>
                     </div>
                     {matchMode === "manual" && (
-                      <span className="text-[10px] text-[#a855f7]/70">Link markets manually after scan</span>
+                      <span className="text-[10px] text-[var(--platform-polymarket)]/70">Link markets manually after scan</span>
                     )}
                   </div>
 
                   <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:flex-wrap">
-                    <button onClick={() => handleScan(false)} disabled={loading} className="flex min-h-11 items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#5DBE81] text-black font-semibold text-sm hover:bg-[#4DA66E] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={() => handleScan(false)} disabled={loading} className="flex min-h-11 items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--status-positive)] text-black font-semibold text-sm hover:brightness-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
                       {loading ? "Scanning..." : "Scan Markets"}
                     </button>
 
                     {result && (
-                      <button onClick={saveMarket} disabled={saving} className="flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#182533] border border-[#232E3C] text-[#FFFFFF] text-sm hover:bg-[#232E3C] transition-all disabled:opacity-50">
+                      <button onClick={saveMarket} disabled={saving} className="flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--border-subtle)] border border-[var(--border-strong)] text-[var(--text-primary)] text-sm hover:bg-[var(--border-strong)] transition-all disabled:opacity-50">
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving..." : "Save Market"}
                       </button>
                     )}
 
                     <div className="flex min-h-11 items-center gap-2 sm:ml-auto">
-                      <label className="text-xs text-[#8A9BA8]">Capital:</label>
-                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="h-11 w-24 px-2 py-1.5 rounded-lg border border-[#232E3C] bg-[#0E1621] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]" />
+                      <label className="text-xs text-[var(--text-secondary)]">Capital:</label>
+                      <input type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value))} className="h-11 w-24 px-2 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--status-positive)]" />
                       <button
                         onClick={() => setCouplingPanelOpen(v => !v)}
                         className={`flex min-h-11 items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                           couplingPanelOpen
-                            ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
-                            : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                            ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                         title="Toggle coupling panel"
                       >
@@ -1695,7 +1695,7 @@ export default function Home() {
                   </div>
 
                   {error && (
-                    <div className="mt-3 flex items-center gap-2 text-sm text-[#ef4444]">
+                    <div className="mt-3 flex items-center gap-2 text-sm text-[var(--status-negative)]">
                       <AlertCircle className="w-4 h-4" /> {error}
                     </div>
                   )}
@@ -1704,7 +1704,7 @@ export default function Home() {
 
                 {/* Loading state */}
                 {loading && (
-                  <div className="py-20 text-center text-sm text-[#8A9BA8]">
+                  <div className="py-20 text-center text-sm text-[var(--text-secondary)]">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
                     Scanning markets...
                   </div>
@@ -1718,9 +1718,9 @@ export default function Home() {
                       <>
                         {/* Title row */}
                         <div className="flex items-center gap-2 mb-3">
-                          <h2 className="text-sm font-bold text-[#FFFFFF] truncate">{result.eventTitle}</h2>
+                          <h2 className="text-sm font-bold text-[var(--text-primary)] truncate">{result.eventTitle}</h2>
                           {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[#182533] text-[#8A9BA8]">
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[var(--border-subtle)] text-[var(--text-secondary)]">
                               {savedMarkets.find(m => m.id === activeMarketId)?.category}
                             </span>
                           )}
@@ -1733,11 +1733,11 @@ export default function Home() {
                             href={savedMarkets.find(m => m.id === activeMarketId)?.kalshiUrl || "#"}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] hover:border-[#5DBE81]/50 transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] hover:border-[var(--status-positive)]/50 transition-colors"
                             title="Open Kalshi market"
                           >
                             <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />
-                            <span className="text-[10px] text-[#8A9BA8]">Kalshi</span>
+                            <span className="text-[10px] text-[var(--text-secondary)]">Kalshi</span>
                           </a>
 
                           {/* Polymarket link chip */}
@@ -1745,11 +1745,11 @@ export default function Home() {
                             href={savedMarkets.find(m => m.id === activeMarketId)?.polymarketUrl || "#"}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] hover:border-[#a855f7]/50 transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] hover:border-[var(--platform-polymarket)]/50 transition-colors"
                             title="Open Polymarket"
                           >
                             <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />
-                            <span className="text-[10px] text-[#8A9BA8]">Polymarket</span>
+                            <span className="text-[10px] text-[var(--text-secondary)]">Polymarket</span>
                           </a>
 
                           {/* UI-013: Links button — copy URLs to clipboard */}
@@ -1763,11 +1763,11 @@ export default function Home() {
                                 setTimeout(() => setCopiedLinks(false), 2000);
                               });
                             }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors"
                             title="Copy Kalshi + Polymarket URLs"
                           >
-                            {copiedLinks ? <Check className="w-3 h-3 text-[#5DBE81]" /> : <Link2 className="w-3 h-3 text-[#8A9BA8]" />}
-                            <span className="text-[10px] text-[#8A9BA8]">{copiedLinks ? "Copied!" : "Copy URLs"}</span>
+                            {copiedLinks ? <Check className="w-3 h-3 text-[var(--status-positive)]" /> : <Link2 className="w-3 h-3 text-[var(--text-secondary)]" />}
+                            <span className="text-[10px] text-[var(--text-secondary)]">{copiedLinks ? "Copied!" : "Copy URLs"}</span>
                           </button>
 
                           {/* Refresh chip */}
@@ -1777,11 +1777,11 @@ export default function Home() {
                               if (market) handleQuickPricesRefresh(activeMarketId, false);
                             }}
                             disabled={loading}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors disabled:opacity-50"
                             title="Refresh prices"
                           >
-                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <RefreshCw className="w-3 h-3 text-[#8A9BA8]" />}
-                            <span className="text-[10px] text-[#FFFFFF]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
+                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[var(--status-positive)]" /> : <RefreshCw className="w-3 h-3 text-[var(--text-secondary)]" />}
+                            <span className="text-[10px] text-[var(--text-primary)]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
                           </button>
 
                           {/* Full Re-scan chip */}
@@ -1791,24 +1791,24 @@ export default function Home() {
                               if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl, false, true);
                             }}
                             disabled={loading}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#182533] transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors disabled:opacity-50"
                             title="Full re-scan (discover sibling series + depth)"
                           >
-                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[#5DBE81]" /> : <Scan className="w-3 h-3 text-[#8A9BA8]" />}
-                            <span className="text-[10px] text-[#FFFFFF]">Full Re-scan</span>
+                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[var(--status-positive)]" /> : <Scan className="w-3 h-3 text-[var(--text-secondary)]" />}
+                            <span className="text-[10px] text-[var(--text-primary)]">Full Re-scan</span>
                           </button>
 
                           {/* Data chips (config-driven) */}
                           {([
-                            { label: "Kalshi", icon: <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />, value: String(result.kalshiCount), valueClass: "text-[#FFFFFF]", dim: false },
-                            { label: "Polymarket", icon: <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />, value: String(result.pmCount), valueClass: "text-[#FFFFFF]", dim: false },
-                            { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[#5DBE81]"><Check className="w-2.5 h-2.5 text-[#FFFFFF]" /></div>, value: String(result.matchedCount), valueClass: "text-[#FFFFFF]", dim: false },
-                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[#5DBE81]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit > 0 ? o.arbitrage.expectedProfit : 0), 0)), valueClass: "text-[#5DBE81]", dim: !!result.expired },
-                            { label: "Expiry", icon: <Clock className="w-3 h-3 text-[#facc15]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[#FFFFFF]", dim: false },
+                            { label: "Kalshi", icon: <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />, value: String(result.kalshiCount), valueClass: "text-[var(--text-primary)]", dim: false },
+                            { label: "Polymarket", icon: <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />, value: String(result.pmCount), valueClass: "text-[var(--text-primary)]", dim: false },
+                            { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--status-positive)]"><Check className="w-2.5 h-2.5 text-[var(--text-primary)]" /></div>, value: String(result.matchedCount), valueClass: "text-[var(--text-primary)]", dim: false },
+                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[var(--status-positive)]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit > 0 ? o.arbitrage.expectedProfit : 0), 0)), valueClass: "text-[var(--status-positive)]", dim: !!result.expired },
+                            { label: "Expiry", icon: <Clock className="w-3 h-3 text-[var(--status-warning)]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[var(--text-primary)]", dim: false },
                           ] as const).map((chip) => (
-                            <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] ${chip.dim ? "opacity-50" : ""}`}>
+                            <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] ${chip.dim ? "opacity-50" : ""}`}>
                               {chip.icon}
-                              <span className="text-[10px] text-[#8A9BA8]">{chip.label}</span>
+                              <span className="text-[10px] text-[var(--text-secondary)]">{chip.label}</span>
                               <span className={`text-xs font-bold ${chip.valueClass}`}>{chip.value}</span>
                             </div>
                           ))}
@@ -1816,10 +1816,10 @@ export default function Home() {
                           {/* Delete chip */}
                           <button
                             onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
-                            className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-[#182533] bg-[#121E2B] hover:bg-[#ef4444]/10 transition-colors"
+                            className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--status-negative)]/10 transition-colors"
                             title="Delete market"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-[#8A9BA8] hover:text-[#ef4444]" />
+                            <Trash2 className="w-3.5 h-3.5 text-[var(--text-secondary)] hover:text-[var(--status-negative)]" />
                           </button>
 
                           {/* Edit chip */}
@@ -1827,8 +1827,8 @@ export default function Home() {
                             onClick={() => setEditingMarketId(activeMarketId)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                               editingMarketId === activeMarketId
-                                ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
-                                : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                                ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
+                                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                             title="Edit market metadata"
                           >
@@ -1841,8 +1841,8 @@ export default function Home() {
                             onClick={() => setCouplingPanelOpen(v => !v)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
                               couplingPanelOpen
-                                ? "border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]"
-                                : "border-[#182533] bg-[#121E2B] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                                ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
+                                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                             title="Toggle coupling panel"
                           >
@@ -1866,11 +1866,11 @@ export default function Home() {
                     )}
 
                     {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices) && (
-                      <div className={`rounded-xl border p-3 flex items-start gap-3 text-sm ${result.expired ? 'border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444]' : 'border-[#facc15]/30 bg-[#facc15]/10 text-[#facc15]'}`}>
+                      <div className={`rounded-xl border p-3 flex items-start gap-3 text-sm ${result.expired ? 'border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)]' : 'border-[var(--status-warning)]/30 bg-[var(--status-warning)]/10 text-[var(--status-warning)]'}`}>
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <div className="space-y-1 flex-1">
                           <div className="font-semibold">{result.expired ? 'Market expired' : result.noPrices ? 'No live prices' : 'Market data warning'}</div>
-                          <div className="text-xs text-[#8A9BA8]">
+                          <div className="text-xs text-[var(--text-secondary)]">
                             {result.expired && <span className="mr-3">This market has expired. Data is no longer being captured or updated — prices and arbitrage calculations are frozen and no longer valid.</span>}
                             {result.noPrices && <span className="mr-3">No live prices available. Refresh or check the market URLs.</span>}
                             {!result.expired && !result.noPrices && result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
@@ -1886,7 +1886,7 @@ export default function Home() {
                                   if (market) handleQuickPricesRefresh(activeMarketId, false);
                                 }}
                                 disabled={loading}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)] text-[11px] font-medium hover:bg-[var(--status-negative)]/20 transition-colors disabled:opacity-50"
                                 title="Re-scan this expired market"
                               >
                                 <RefreshCw className="w-3 h-3" />
@@ -1894,7 +1894,7 @@ export default function Home() {
                               </button>
                               <button
                                 onClick={() => setMatchMode("manual")}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)] text-[11px] font-medium hover:bg-[var(--status-negative)]/20 transition-colors"
                                 title="Switch to manual matching mode"
                               >
                                 <Link2 className="w-3 h-3" />
@@ -1902,7 +1902,7 @@ export default function Home() {
                               </button>
                               <button
                                 onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444] text-[11px] font-medium hover:bg-[#ef4444]/20 transition-colors"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)] text-[11px] font-medium hover:bg-[var(--status-negative)]/20 transition-colors"
                                 title="Delete this market"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -1942,8 +1942,8 @@ export default function Home() {
                             onClick={() => setBookmakerView(false)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               !bookmakerView
-                                ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                                : "bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                                ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30"
+                                : "bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                           >
                             <Rows3 className="w-3.5 h-3.5" /> Outcomes Table
@@ -1952,8 +1952,8 @@ export default function Home() {
                             onClick={() => setBookmakerView(true)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                               bookmakerView
-                                ? "bg-[#5DBE81]/15 text-[#5DBE81] ring-1 ring-[#5DBE81]/30"
-                                : "bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]"
+                                ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30"
+                                : "bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                           >
                             <BarChart3 className="w-3.5 h-3.5" /> 1on1 Bookmaker
@@ -1994,17 +1994,17 @@ export default function Home() {
 
                     {/* Outcome table — expanded log/detail area */}
                     {!bookmakerView && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
-                      <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
                         {/* Filter toggles */}
-                        <div className="flex items-center gap-1 p-2 border-b border-[#182533]">
+                        <div className="flex items-center gap-1 p-2 border-b border-[var(--border-subtle)]">
                           {(["all", "matched", "arb"] as const).map(mode => (
                             <button
                               key={mode}
                               onClick={() => setOutcomeFilter(mode)}
                               className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                                 outcomeFilter === mode
-                                  ? "bg-[#5DBE81]/20 text-[#5DBE81]"
-                                  : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                                  ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                               }`}
                             >
                               {mode === "all" ? "Show All" : mode === "matched" ? "Matched Only" : "Arb Only"}
@@ -2012,9 +2012,9 @@ export default function Home() {
                           ))}
                         </div>
                         <table className="w-full min-w-[1100px] text-sm">
-                          <thead className="bg-[#17212B] border-b border-[#182533]">
-                            <tr className="text-[10px] text-[#8A9BA8] uppercase tracking-wider">
-                              <th className="sticky left-0 z-20 bg-[#17212B] text-left px-4 py-3.5 font-medium">
+                          <thead className="bg-[var(--surface-panel)] border-b border-[var(--border-subtle)]">
+                            <tr className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">
+                              <th className="sticky left-0 z-20 bg-[var(--surface-panel)] text-left px-4 py-3.5 font-medium">
                                 <span className="inline-flex items-center gap-1">
                                   Outcome <HeaderInfo text="The market question being predicted (e.g. 'Will X win?'). Each outcome is a Yes/No pair you can bet on." />
                                 </span>
@@ -2043,26 +2043,26 @@ export default function Home() {
                                   No <HeaderInfo text="Polymarket No price — current best ask for a No share on Polymarket. Lower = cheaper to buy No." />
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                              <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   ROI <HeaderInfo text="Return on Investment — net profit as a percentage of total stake, after Kalshi and Polymarket trading fees.\nExample: $2 profit on $100 stake = 2% ROI." />
-                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "roi" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "roi" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
                                     {outcomeSort === "roi" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                              <th onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   APY <ApyHeaderInfo />
-                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "apy" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "apy" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
                                     {outcomeSort === "apy" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[#FFFFFF] transition-colors">
+                              <th onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   Profit <HeaderInfo text="Net profit in dollars for this arbitrage opportunity, after all trading fees on both Kalshi and Polymarket.\nThis is the absolute dollar amount you'd earn from the arb trade at the current prices and stake." />
-                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "profit" ? "opacity-100 text-[#5DBE81]" : "opacity-0"}`}>
+                                  <span className={`text-[8px] transition-opacity ${outcomeSort === "profit" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
                                     {outcomeSort === "profit" && outcomeSortDir === "asc" ? "▲" : "▼"}
                                   </span>
                                 </span>
@@ -2212,23 +2212,23 @@ export default function Home() {
                       });
                       if (marketCouplings.length === 0) return null;
                       return (
-                        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden">
-                          <div className="flex items-center gap-2 px-4 py-3 border-b border-[#182533]">
-                            <Link2 className="w-4 h-4 text-[#5DBE81]" />
-                            <h3 className="text-sm font-semibold text-[#FFFFFF]">Active Couplings</h3>
-                            <span className="text-[10px] text-[#8A9BA8]">({marketCouplings.length})</span>
+                        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden">
+                          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)]">
+                            <Link2 className="w-4 h-4 text-[var(--status-positive)]" />
+                            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Active Couplings</h3>
+                            <span className="text-[10px] text-[var(--text-secondary)]">({marketCouplings.length})</span>
                           </div>
                           <div className="p-3 space-y-2">
                             {marketCouplings.map(mm => (
-                              <div key={mm.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533]">
+                              <div key={mm.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--surface-workspace)] border border-[var(--border-subtle)]">
                                 <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
                                   <div className="flex items-center gap-1 min-w-0">
                                     <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm shrink-0" />
-                                    <span className="text-[#FFFFFF] truncate" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
+                                    <span className="text-[var(--text-primary)] truncate" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
                                   </div>
                                   <div className="flex items-center gap-1 min-w-0">
                                     <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm shrink-0" />
-                                    <span className="text-[#FFFFFF] truncate" title={mm.pmTitle}>{mm.pmTitle}</span>
+                                    <span className="text-[var(--text-primary)] truncate" title={mm.pmTitle}>{mm.pmTitle}</span>
                                   </div>
                                 </div>
                                 <button
@@ -2238,7 +2238,7 @@ export default function Home() {
                                       handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
                                     }
                                   }}
-                                  className="p-1.5 rounded-md bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] transition-colors"
+                                  className="p-1.5 rounded-md bg-[var(--status-negative)]/10 hover:bg-[var(--status-negative)]/20 text-[var(--status-negative)] transition-colors"
                                   title="Unlink this coupling"
                                 >
                                   <Unlink className="w-3.5 h-3.5" />
