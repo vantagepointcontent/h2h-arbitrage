@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, FileText, Globe, Layers, LayoutDashboard, Link2, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
+import { Activity, Clock3, FileText, Globe, Layers, LayoutDashboard, Link2, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { SavedMarket, formatPercent, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
@@ -81,6 +81,7 @@ function MarketSidebarInner({
   onGoMarketFinder,
   onGoLogs,
   onGoDashboard,
+  onGoTiming,
   onGoTrades,
   onGoCoupleManagement,
   favoriteIds,
@@ -116,6 +117,7 @@ function MarketSidebarInner({
   onGoMarketFinder: () => void;
   onGoLogs: () => void;
   onGoDashboard: () => void;
+  onGoTiming: () => void;
   onGoTrades: () => void;
   onGoCoupleManagement: () => void;
   favoriteIds: Set<string>;
@@ -233,6 +235,7 @@ function MarketSidebarInner({
           {/* ── Navigation ── */}
           <div className="space-y-1 sticky top-0 z-10 bg-[#17212B] pb-2">
             <NavButton icon={<LayoutDashboard className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
+            <NavButton icon={<Clock3 className="w-5 h-5 shrink-0" />} label="Arb Timing" active={viewMode === "timing"} onClick={onGoTiming} collapsed={!sidebarOpen} />
             <NavButton icon={<Layers className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
             <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />
             <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />

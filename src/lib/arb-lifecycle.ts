@@ -16,6 +16,7 @@
  */
 import path from 'path';
 import { createClient } from '@libsql/client';
+import { buildArbTimingHeatmap, type TimingZone } from './arb-timing';
 
 const SQLITE_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
@@ -251,6 +252,23 @@ export async function getLifecycleStats(days: number = 30): Promise<{
     topDurable: topDurable.rows as any[],
     recentEpisodes: recentEpisodes.rows as any[],
   };
+}
+
+/** UI-026: trustworthy opportunity episodes grouped by weekday and hour. */
+export async function getArbTimingHeatmap(
+  days: number = 30,
+  category?: string,
+  timeZone: TimingZone = 'America/New_York',
+) {
+  await ensureDb();
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const result = await getClient().execute({
+    sql: `SELECT first_seen_at, category, status, duration_sec, scan_count, peak_roi_pct
+          FROM arb_episodes
+          WHERE first_seen_at >= ? AND peak_roi_pct > 0`,
+    args: [cutoff],
+  });
+  return buildArbTimingHeatmap(result.rows as any[], { category, timeZone });
 }
 
 /** HOOKUP-02 (FEAT-004): average closed-episode lifespan for a market, in
