@@ -77,7 +77,8 @@ const ManualMatchPanel = dynamic(() => import("@/app/components/ManualMatchPanel
 const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPicker"), { ssr: false });
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
 const PhantomsPanel = dynamic(() => import("@/app/components/PhantomsPanel"), { ssr: false });
-const ExecutionModeBadge = dynamic(() => import("@/app/components/ExecutionModeBadge"), { ssr: false });
+import ExecutionModeBadge from "@/app/components/ExecutionModeBadge";
+import { TradingStatusRail } from "@/app/components/shell/TradingStatusRail";
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 const MarketEditPanel = dynamic(() => import("@/app/components/MarketEditPanel"), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -1441,6 +1442,7 @@ export default function Home() {
           </div>
         </div>
       </header>
+      <TradingStatusRail />
 
       <main className="flex flex-1 overflow-hidden">
         <MarketSidebar
