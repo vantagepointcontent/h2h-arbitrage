@@ -444,14 +444,14 @@ export async function getClobPrices(clob: ClobMarket): Promise<{
   // These are INDEPENDENT and can sum to >1 (that's the point of neg-risk)
   const yesPrice = clamp(y.bestAsk);
   
-  // NO price: priority order - NO token bestAsk -> 1 - YES token bestBid -> NO token midpoint
+  // NO price: only an actual NO ask or an executable YES bid can fund the
+  // complementary leg. Token metadata `price` is indicative midpoint/last
+  // data and must never be presented or calculated as available liquidity.
   let noPrice: number;
   if (n.bestAsk != null && n.bestAsk > 0) {
     noPrice = clamp(n.bestAsk);
   } else if (y.bestBid != null && y.bestBid > 0) {
     noPrice = clamp(1 - y.bestBid);
-  } else if (noToken.price != null && noToken.price > 0) {
-    noPrice = clamp(noToken.price);
   } else {
     noPrice = 0;
   }

@@ -335,6 +335,34 @@ describe('getClobPrices', () => {
     }
   });
 
+  it('does not treat a neg-risk token midpoint as an executable NO ask', async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      if (url.includes('token_id=yes-neg-risk')) {
+        return { ok: true, json: async () => ({ asks: [{ price: '0.21', size: '10' }], bids: [] }) };
+      }
+      if (url.includes('token_id=no-neg-risk')) {
+        return { ok: true, json: async () => ({ asks: [], bids: [{ price: '0.79', size: '10' }] }) };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    try {
+      const r = await getClobPrices({
+        condition_id: 'c-neg-risk-no-ask',
+        neg_risk: true,
+        tokens: [
+          { token_id: 'yes-neg-risk', outcome: 'Yes', price: 0.21 },
+          { token_id: 'no-neg-risk', outcome: 'No', price: 0.895 },
+        ],
+      } as any);
+
+      expect(r).toMatchObject({ yesPrice: 0.21, noPrice: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('returnerar null vid total avsaknad av data', async () => {
     const r = await getClobPrices({
       condition_id: 'c1',
