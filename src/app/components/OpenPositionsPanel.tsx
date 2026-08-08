@@ -12,6 +12,7 @@ import {
   LogOut, ArrowUpDown, ArrowUp, ArrowDown, Wallet,
 } from 'lucide-react';
 import { PlatformIcon } from '@/lib/platforms/PlatformIcon';
+import { DataTable, EmptyState, Metric } from '@/components/ui';
 
 // ── Fee helpers (client-safe, mirrors matcher.ts server-side math) ──
 
@@ -307,8 +308,8 @@ export default function OpenPositionsPanel() {
       {exitResult && (
         <div className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
           exitResult.success
-            ? 'border-[#5DBE81]/30 bg-[#5DBE81]/10 text-[#5DBE81]'
-            : 'border-[#ef4444]/30 bg-[#ef4444]/10 text-[#ef4444]'
+            ? 'border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]'
+            : 'border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)]'
         }`}>
           {exitResult.success ? (
             <>
@@ -329,48 +330,25 @@ export default function OpenPositionsPanel() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#8A9BA8]">Open positions</div>
-          <div className="text-lg font-bold text-[#FFFFFF]">{positions.length}</div>
-          {pairedCount > 0 && (
-            <div className="text-[10px] text-[#8A9BA8]">{pairedCount} arb pairs</div>
-          )}
-        </div>
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#8A9BA8]">Total value</div>
-          <div className="text-lg font-bold text-[#FFFFFF]">{fmtUsd(totalValue)}</div>
-        </div>
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#8A9BA8]">Total cost</div>
-          <div className="text-lg font-bold text-[#8A9BA8]">{fmtUsd(totalCost)}</div>
-        </div>
-        <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-          <div className="text-[10px] uppercase text-[#8A9BA8]">Unrealized P&L</div>
-          <div className={`text-lg font-bold ${totalPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
-            {fmtUsd(totalPnl)}
-          </div>
-          <div className={`text-[10px] ${totalRoi >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
-            {fmtPct(totalRoi)}
-          </div>
-        </div>
+        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Open positions" value={positions.length} hint={pairedCount > 0 ? `${pairedCount} arb pairs` : undefined} />
+        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Total value" value={fmtUsd(totalValue)} />
+        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Total cost" value={fmtUsd(totalCost)} />
+        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Unrealized P&L" value={fmtUsd(totalPnl)} hint={fmtPct(totalRoi)} tone={totalPnl >= 0 ? 'positive' : 'negative'} />
       </div>
 
       {/* Positions table */}
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-[#8A9BA8] py-8 justify-center">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] py-8 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading positions…
         </div>
       ) : sorted.length === 0 ? (
-        <div className="text-sm text-[#8A9BA8] py-8 text-center flex flex-col items-center gap-2">
-          <Wallet className="w-8 h-8 opacity-30" />
-          No open positions. Live positions from connected platform accounts will appear here.
-        </div>
+        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No open positions" description="Live positions from connected platform accounts will appear here." />
       ) : (
-        <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-x-auto">
+          <DataTable aria-label="Open positions">
             <thead>
-              <tr className="text-[10px] uppercase text-[#8A9BA8] border-b border-[#182533]">
-                <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[#FFFFFF]" onClick={() => toggleSort('market')}>
+              <tr className="text-[10px] uppercase text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
+                <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('market')}>
                   Market <SortIcon field="market" />
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Platform</th>
@@ -378,16 +356,16 @@ export default function OpenPositionsPanel() {
                 <th className="text-right px-4 py-3 font-medium">Size</th>
                 <th className="text-right px-4 py-3 font-medium">Entry</th>
                 <th className="text-right px-4 py-3 font-medium">Current</th>
-                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[#FFFFFF]" onClick={() => toggleSort('value')}>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>
                   Value <SortIcon field="value" />
                 </th>
-                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[#FFFFFF]" onClick={() => toggleSort('roi')}>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
                   ROI <SortIcon field="roi" />
                 </th>
                 <th className="text-center px-4 py-3 font-medium">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#182533]">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {sorted.map(pair => {
                 const legs = [
                   pair.kalshi ? { platform: 'Kalshi' as const, side: pair.kalshi.side, size: pair.kalshi.size, entry: pair.kalshi.entryPrice, current: pair.kalshi.currentPrice, value: pair.kalshi.currentValue, pnl: pair.kalshi.unrealizedPnl, roi: pair.kalshi.roiPct } : null,
@@ -403,107 +381,107 @@ export default function OpenPositionsPanel() {
                   const legRoiPct = legBreakdown?.roiPct ?? leg.roi;
 
                   return (
-                  <tr key={`${pair.id}-${i}`} className="hover:bg-[#182533]/50 transition-colors">
+                  <tr key={`${pair.id}-${i}`} className="hover:bg-[var(--surface-hover)]/50 transition-colors">
                     {i === 0 && (
-                      <td rowSpan={rowSpan} className="px-4 py-3 text-xs text-[#FFFFFF] max-w-[200px] truncate align-top" title={pair.marketTitle}>
+                      <td rowSpan={rowSpan} className="px-4 py-3 text-xs text-[var(--text-primary)] max-w-[200px] truncate align-top" title={pair.marketTitle}>
                         {pair.marketTitle}
                       </td>
                     )}
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
                         <PlatformIcon platform={leg.platform} size="sm" />
-                        <span className={leg.platform === 'Kalshi' ? 'text-[#5DBE81]' : 'text-[#a78bfa]'}>
+                        <span className={leg.platform === 'Kalshi' ? 'text-[var(--status-positive)]' : 'text-[var(--platform-polymarket)]'}>
                           {leg.platform}
                         </span>
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs uppercase">
-                      <span className={leg.side === 'YES' ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
+                      <span className={leg.side === 'YES' ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>
                         {leg.side}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
+                    <td className="px-4 py-3 text-xs text-right text-[var(--text-secondary)] whitespace-nowrap tabular-nums">
                       {leg.size.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
+                    <td className="px-4 py-3 text-xs text-right text-[var(--text-secondary)] whitespace-nowrap tabular-nums">
                       {fmtPrice(leg.entry)}
                     </td>
                     <td className="px-4 py-3 text-xs text-right whitespace-nowrap tabular-nums">
                       <div className="flex flex-col items-end">
-                        <span className="text-[#FFFFFF]">{fmtPrice(leg.current)}</span>
-                        <span className={`text-[10px] font-normal ${legRoiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+                        <span className="text-[var(--text-primary)]">{fmtPrice(leg.current)}</span>
+                        <span className={`text-[10px] font-normal ${legRoiPct >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}`}>
                           {fmtPct(legRoiPct)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap tabular-nums">
+                    <td className="px-4 py-3 text-xs text-right text-[var(--text-secondary)] whitespace-nowrap tabular-nums">
                       {fmtUsd(leg.value)}
                     </td>
                     {i === 0 && (
                       <>
                         <td rowSpan={rowSpan} className={`px-4 py-3 text-xs text-right font-bold align-top whitespace-nowrap tabular-nums ${
-                          pair.breakdown.totalNetPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'
+                          pair.breakdown.totalNetPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'
                         }`}>
                           <div className="flex flex-col items-end group/roi relative cursor-help">
                             <span>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
                             <span className="text-[10px] font-normal opacity-80">{fmtPct(pair.totalRoiPct)}</span>
                             {/* Tooltip: breakdown on hover */}
-                            <div className="absolute right-full top-0 mr-2 z-20 hidden group-hover/roi:block w-64 rounded-lg border border-[#232E3C] bg-[#0E1621] p-3 shadow-xl text-left whitespace-normal">
-                              <div className="text-[10px] uppercase text-[#8A9BA8] mb-2 font-semibold">ROI Breakdown (net of fees)</div>
+                            <div className="absolute right-full top-0 mr-2 z-20 hidden group-hover/roi:block w-64 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] p-3 shadow-xl text-left whitespace-normal">
+                              <div className="text-[10px] uppercase text-[var(--text-secondary)] mb-2 font-semibold">ROI Breakdown (net of fees)</div>
                               {pair.breakdown.legA && (
                                 <div className="space-y-0.5 mb-2">
-                                  <div className="text-[10px] text-[#5DBE81] font-medium">Leg A — {pair.breakdown.legA.platform} {pair.breakdown.legA.side}</div>
-                                  <div className="flex justify-between text-[10px] text-[#8A9BA8] pl-2">
+                                  <div className="text-[10px] text-[var(--status-positive)] font-medium">Leg A — {pair.breakdown.legA.platform} {pair.breakdown.legA.side}</div>
+                                  <div className="flex justify-between text-[10px] text-[var(--text-secondary)] pl-2">
                                     <span>Gross P&L</span>
-                                    <span className={pair.breakdown.legA.grossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legA.grossPnl)}</span>
+                                    <span className={pair.breakdown.legA.grossPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legA.grossPnl)}</span>
                                   </div>
-                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                  <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Entry fee</span>
                                     <span>−{fmtUsd(pair.breakdown.legA.feesPaid)}</span>
                                   </div>
-                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                  <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Exit fee</span>
                                     <span>−{fmtUsd(pair.breakdown.legA.exitFees)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] pl-2 font-medium">
-                                    <span className="text-[#8A9BA8]">Net P&L</span>
-                                    <span className={pair.breakdown.legA.netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legA.netPnl)}</span>
+                                    <span className="text-[var(--text-secondary)]">Net P&L</span>
+                                    <span className={pair.breakdown.legA.netPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legA.netPnl)}</span>
                                   </div>
                                 </div>
                               )}
                               {pair.breakdown.legB && (
                                 <div className="space-y-0.5 mb-2">
-                                  <div className="text-[10px] text-[#a78bfa] font-medium">Leg B — {pair.breakdown.legB.platform} {pair.breakdown.legB.side}</div>
-                                  <div className="flex justify-between text-[10px] text-[#8A9BA8] pl-2">
+                                  <div className="text-[10px] text-[var(--platform-polymarket)] font-medium">Leg B — {pair.breakdown.legB.platform} {pair.breakdown.legB.side}</div>
+                                  <div className="flex justify-between text-[10px] text-[var(--text-secondary)] pl-2">
                                     <span>Gross P&L</span>
-                                    <span className={pair.breakdown.legB.grossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legB.grossPnl)}</span>
+                                    <span className={pair.breakdown.legB.grossPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legB.grossPnl)}</span>
                                   </div>
-                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                  <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Entry fee</span>
                                     <span>−{fmtUsd(pair.breakdown.legB.feesPaid)}</span>
                                   </div>
-                                  <div className="flex justify-between text-[10px] text-[#5E6875] pl-2">
+                                  <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Exit fee</span>
                                     <span>−{fmtUsd(pair.breakdown.legB.exitFees)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] pl-2 font-medium">
-                                    <span className="text-[#8A9BA8]">Net P&L</span>
-                                    <span className={pair.breakdown.legB.netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.legB.netPnl)}</span>
+                                    <span className="text-[var(--text-secondary)]">Net P&L</span>
+                                    <span className={pair.breakdown.legB.netPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legB.netPnl)}</span>
                                   </div>
                                 </div>
                               )}
-                              <div className="border-t border-[#232E3C] pt-1.5 space-y-0.5">
-                                <div className="flex justify-between text-[10px] text-[#8A9BA8]">
+                              <div className="border-t border-[var(--border-strong)] pt-1.5 space-y-0.5">
+                                <div className="flex justify-between text-[10px] text-[var(--text-secondary)]">
                                   <span>Total gross P&L</span>
-                                  <span className={pair.breakdown.totalGrossPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.totalGrossPnl)}</span>
+                                  <span className={pair.breakdown.totalGrossPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.totalGrossPnl)}</span>
                                 </div>
-                                <div className="flex justify-between text-[10px] text-[#5E6875]">
+                                <div className="flex justify-between text-[10px] text-[var(--text-faint)]">
                                   <span>Total fees</span>
-                                  <span className="text-[#ef4444]">−{fmtUsd(pair.breakdown.totalFees)}</span>
+                                  <span className="text-[var(--status-negative)]">−{fmtUsd(pair.breakdown.totalFees)}</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] font-bold">
-                                  <span className="text-[#FFFFFF]">Total net P&L</span>
-                                  <span className={pair.breakdown.totalNetPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
+                                  <span className="text-[var(--text-primary)]">Total net P&L</span>
+                                  <span className={pair.breakdown.totalNetPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
                                 </div>
                               </div>
                             </div>
@@ -513,7 +491,7 @@ export default function OpenPositionsPanel() {
                           <button
                             onClick={() => setConfirmExit(pair)}
                             disabled={exiting === pair.id}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 text-[#ef4444] text-[10px] font-medium hover:bg-[#ef4444]/20 transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--status-negative)]/10 border border-[var(--status-negative)]/30 text-[var(--status-negative)] text-[10px] font-medium hover:bg-[var(--status-negative)]/20 transition-colors disabled:opacity-50"
                             title="Close both legs"
                           >
                             {exiting === pair.id ? (
@@ -530,7 +508,7 @@ export default function OpenPositionsPanel() {
                 });
               })}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
 
@@ -545,60 +523,60 @@ export default function OpenPositionsPanel() {
         return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmExit(null)}>
           <div
-            className="rounded-xl border border-[#182533] bg-[#17212B] p-6 max-w-md w-full mx-4 space-y-4"
+            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-6 max-w-md w-full mx-4 space-y-4"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-2">
-              <LogOut className="w-5 h-5 text-[#ef4444]" />
-              <h3 className="text-sm font-bold text-[#FFFFFF]">
+              <LogOut className="w-5 h-5 text-[var(--status-negative)]" />
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
                 Close {isPaired ? 'both positions' : legCount === 1 ? 'position' : 'positions'}?
-                <span className={`ml-2 ${confirmExit.totalRoiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+                <span className={`ml-2 ${confirmExit.totalRoiPct >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}`}>
                   Current ROI: {fmtPct(confirmExit.totalRoiPct)}
                 </span>
               </h3>
             </div>
-            <div className="text-xs text-[#8A9BA8] space-y-1">
-              <div>Market: <span className="text-[#FFFFFF]">{confirmExit.marketTitle}</span></div>
+            <div className="text-xs text-[var(--text-secondary)] space-y-1">
+              <div>Market: <span className="text-[var(--text-primary)]">{confirmExit.marketTitle}</span></div>
               {confirmExit.kalshi && (
                 <div>
                   Kalshi: Sell {confirmExit.kalshi.size} {confirmExit.kalshi.side} @ {fmtPrice(confirmExit.kalshi.currentPrice)}
-                  <span className="text-[#5E6875]"> — fee: {fmtUsd(fees.kalshiFee)}</span>
+                  <span className="text-[var(--text-faint)]"> — fee: {fmtUsd(fees.kalshiFee)}</span>
                 </div>
               )}
               {confirmExit.polymarket && (
                 <div>
                   Polymarket: Sell {confirmExit.polymarket.size} {confirmExit.polymarket.outcome} @ {fmtPrice(confirmExit.polymarket.currentPrice)}
-                  <span className="text-[#5E6875]"> — fee: {fmtUsd(fees.pmFee)}</span>
+                  <span className="text-[var(--text-faint)]"> — fee: {fmtUsd(fees.pmFee)}</span>
                 </div>
               )}
             </div>
             {/* P&L + fees summary */}
-            <div className="rounded-lg border border-[#182533] bg-[#0E1621] p-3 space-y-1.5 text-xs">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3 space-y-1.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-[#8A9BA8]">Unrealized P&L (gross)</span>
-                <span className={confirmExit.totalUnrealizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
+                <span className="text-[var(--text-secondary)]">Unrealized P&L (gross)</span>
+                <span className={confirmExit.totalUnrealizedPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>
                   {fmtUsd(confirmExit.totalUnrealizedPnl)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#8A9BA8]">Exit fees</span>
-                <span className="text-[#ef4444]">−{fmtUsd(fees.totalFees)}</span>
+                <span className="text-[var(--text-secondary)]">Exit fees</span>
+                <span className="text-[var(--status-negative)]">−{fmtUsd(fees.totalFees)}</span>
               </div>
               {fees.kalshiFee > 0 && (
-                <div className="flex justify-between pl-3 text-[10px] text-[#5E6875]">
+                <div className="flex justify-between pl-3 text-[10px] text-[var(--text-faint)]">
                   <span>Kalshi fee (7%)</span>
                   <span>{fmtUsd(fees.kalshiFee)}</span>
                 </div>
               )}
               {fees.pmFee > 0 && (
-                <div className="flex justify-between pl-3 text-[10px] text-[#5E6875]">
+                <div className="flex justify-between pl-3 text-[10px] text-[var(--text-faint)]">
                   <span>Polymarket fee (θ=0.05)</span>
                   <span>{fmtUsd(fees.pmFee)}</span>
                 </div>
               )}
-              <div className="border-t border-[#182533] pt-1.5 flex justify-between font-bold">
-                <span className="text-[#FFFFFF]">Expected net P&L</span>
-                <span className={netPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}>
+              <div className="border-t border-[var(--border-subtle)] pt-1.5 flex justify-between font-bold">
+                <span className="text-[var(--text-primary)]">Expected net P&L</span>
+                <span className={netPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>
                   {fmtUsd(netPnl)}
                   <span className="ml-1 text-[10px] font-normal opacity-80">({fmtPct(netRoi)})</span>
                 </span>
@@ -611,14 +589,14 @@ export default function OpenPositionsPanel() {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmExit(null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-[#8A9BA8] hover:text-[#FFFFFF] border border-[#232E3C]"
+                className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-strong)]"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleExit(confirmExit)}
                 disabled={exiting === confirmExit.id}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#ef4444]/20 border border-[#ef4444]/40 text-[#ef4444] hover:bg-[#ef4444]/30 disabled:opacity-50 flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--status-negative)]/20 border border-[var(--status-negative)]/40 text-[var(--status-negative)] hover:bg-[var(--status-negative)]/30 disabled:opacity-50 flex items-center gap-1.5"
               >
                 {exiting === confirmExit.id && <Loader2 className="w-3 h-3 animate-spin" />}
                 {exiting === confirmExit.id
