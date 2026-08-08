@@ -79,6 +79,7 @@ const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr:
 const PhantomsPanel = dynamic(() => import("@/app/components/PhantomsPanel"), { ssr: false });
 import ExecutionModeBadge from "@/app/components/ExecutionModeBadge";
 import { TradingStatusRail } from "@/app/components/shell/TradingStatusRail";
+import { MarketWorkspaceHeader, type MarketWorkspaceTab } from "@/app/components/market/MarketWorkspaceHeader";
 const StakeCalculator = dynamic(() => import("@/components/StakeCalculator").then(m => m.StakeCalculator), { ssr: false });
 const MarketEditPanel = dynamic(() => import("@/app/components/MarketEditPanel"), { ssr: false });
 import { OutcomeTableBody } from "@/app/components/OutcomeTableBody";
@@ -1051,9 +1052,10 @@ export default function Home() {
   const [showArbOnly, setShowArbOnly] = useState(DEFAULT_SHOW_ARB_ONLY);
   const [scanningAll, setScanningAll] = useState(false);
   const [copiedLinks, setCopiedLinks] = useState(false); // UI-013
+  const [marketWorkspaceTab, setMarketWorkspaceTab] = useState<MarketWorkspaceTab>("opportunities");
   const [scanAllError, setScanAllError] = useState("");
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
-  const [bookmakerView, setBookmakerView] = useState(false);
+
 
   // Favorites state (persisted to localStorage)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(getStoredFavoriteIds);
@@ -1715,145 +1717,35 @@ export default function Home() {
                 {/* Results */}
                 {result && (
                   <div className="space-y-4">
-                    {/* ── Market Header: Title OUTSIDE + Chips in separate box-containers ── */}
-                    {activeMarketId && (
-                      <>
-                        {/* Title row */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <h2 className="text-sm font-bold text-[var(--text-primary)] truncate">{result.eventTitle}</h2>
-                          {savedMarkets.find(m => m.id === activeMarketId)?.category && (
-                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[var(--border-subtle)] text-[var(--text-secondary)]">
-                              {savedMarkets.find(m => m.id === activeMarketId)?.category}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Data chips — separate rounded box-containers */}
-                        <div className="flex items-center gap-2 flex-wrap mb-4">
-                          {/* Kalshi link chip */}
-                          <a
-                            href={savedMarkets.find(m => m.id === activeMarketId)?.kalshiUrl || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] hover:border-[var(--status-positive)]/50 transition-colors"
-                            title="Open Kalshi market"
-                          >
-                            <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />
-                            <span className="text-[10px] text-[var(--text-secondary)]">Kalshi</span>
-                          </a>
-
-                          {/* Polymarket link chip */}
-                          <a
-                            href={savedMarkets.find(m => m.id === activeMarketId)?.polymarketUrl || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] hover:border-[var(--platform-polymarket)]/50 transition-colors"
-                            title="Open Polymarket"
-                          >
-                            <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />
-                            <span className="text-[10px] text-[var(--text-secondary)]">Polymarket</span>
-                          </a>
-
-                          {/* UI-013: Links button — copy URLs to clipboard */}
-                          <button
-                            onClick={() => {
-                              const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (!market) return;
-                              const text = `Kalshi: ${market.kalshiUrl}\nPolymarket: ${market.polymarketUrl}`;
-                              navigator.clipboard.writeText(text).then(() => {
-                                setCopiedLinks(true);
-                                setTimeout(() => setCopiedLinks(false), 2000);
-                              });
-                            }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors"
-                            title="Copy Kalshi + Polymarket URLs"
-                          >
-                            {copiedLinks ? <Check className="w-3 h-3 text-[var(--status-positive)]" /> : <Link2 className="w-3 h-3 text-[var(--text-secondary)]" />}
-                            <span className="text-[10px] text-[var(--text-secondary)]">{copiedLinks ? "Copied!" : "Copy URLs"}</span>
-                          </button>
-
-                          {/* Refresh chip */}
-                          <button
-                            onClick={() => {
-                              const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (market) handleQuickPricesRefresh(activeMarketId, false);
-                            }}
-                            disabled={loading}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors disabled:opacity-50"
-                            title="Refresh prices"
-                          >
-                            {loading || bgRefreshing ? <Loader2 className="w-3 h-3 animate-spin text-[var(--status-positive)]" /> : <RefreshCw className="w-3 h-3 text-[var(--text-secondary)]" />}
-                            <span className="text-[10px] text-[var(--text-primary)]">{bgRefreshing ? "Refreshing prices…" : lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) + "s ago" : "—"}</span>
-                          </button>
-
-                          {/* Full Re-scan chip */}
-                          <button
-                            onClick={() => {
-                              const market = savedMarkets.find(m => m.id === activeMarketId);
-                              if (market) handleScanWithUrls(market.kalshiUrl, market.polymarketUrl, false, true);
-                            }}
-                            disabled={loading}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--border-subtle)] transition-colors disabled:opacity-50"
-                            title="Full re-scan (discover sibling series + depth)"
-                          >
-                            {loading ? <Loader2 className="w-3 h-3 animate-spin text-[var(--status-positive)]" /> : <Scan className="w-3 h-3 text-[var(--text-secondary)]" />}
-                            <span className="text-[10px] text-[var(--text-primary)]">Full Re-scan</span>
-                          </button>
-
-                          {/* Data chips (config-driven) */}
-                          {([
-                            { label: "Kalshi", icon: <img src="/kalshi-icon.png" alt="Kalshi" className="w-4 h-4 rounded-sm" />, value: String(result.kalshiCount), valueClass: "text-[var(--text-primary)]", dim: false },
-                            { label: "Polymarket", icon: <img src="/polymarket-icon.png" alt="Polymarket" className="w-4 h-4 rounded-sm" />, value: String(result.pmCount), valueClass: "text-[var(--text-primary)]", dim: false },
-                            { label: "Matched", icon: <div className="flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--status-positive)]"><Check className="w-2.5 h-2.5 text-[var(--text-primary)]" /></div>, value: String(result.matchedCount), valueClass: "text-[var(--text-primary)]", dim: false },
-                            { label: "Total Profit", icon: <TrendingUp className="w-3 h-3 text-[var(--status-positive)]" />, value: result.expired ? "—" : formatCurrency((result?.outcomes ?? []).reduce((s, o) => s + (o?.arbitrage?.expectedProfit > 0 ? o.arbitrage.expectedProfit : 0), 0)), valueClass: "text-[var(--status-positive)]", dim: !!result.expired },
-                            { label: "Expiry", icon: <Clock className="w-3 h-3 text-[var(--status-warning)]" />, value: formatExpiry(result.expiryDate), valueClass: "text-[var(--text-primary)]", dim: false },
-                          ] as const).map((chip) => (
-                            <div key={chip.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] ${chip.dim ? "opacity-50" : ""}`}>
-                              {chip.icon}
-                              <span className="text-[10px] text-[var(--text-secondary)]">{chip.label}</span>
-                              <span className={`text-xs font-bold ${chip.valueClass}`}>{chip.value}</span>
-                            </div>
-                          ))}
-
-                          {/* Delete chip */}
-                          <button
-                            onClick={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
-                            className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--status-negative)]/10 transition-colors"
-                            title="Delete market"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-[var(--text-secondary)] hover:text-[var(--status-negative)]" />
-                          </button>
-
-                          {/* Edit chip */}
-                          <button
-                            onClick={() => setEditingMarketId(activeMarketId)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              editingMarketId === activeMarketId
-                                ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
-                                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            }`}
-                            title="Edit market metadata"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span className="text-[10px]">Edit</span>
-                          </button>
-
-                          {/* Coupling panel toggle */}
-                          <button
-                            onClick={() => setCouplingPanelOpen(v => !v)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              couplingPanelOpen
-                                ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]"
-                                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            }`}
-                            title="Toggle coupling panel"
-                          >
-                            <PanelRight className="w-3.5 h-3.5" />
-                            <span className="text-[10px]">Couplings</span>
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    {/* DES-003: structured active-market workspace header */}
+                    {activeMarketId && (() => {
+                      const market = savedMarkets.find((item) => item.id === activeMarketId);
+                      if (!market) return null;
+                      return <MarketWorkspaceHeader
+                        market={{ ...market, eventTitle: result.eventTitle }}
+                        outcomes={(result.outcomes ?? []) as Array<Record<string, any>>}
+                        scannedAt={lastScanTimestamp ?? lastUpdated?.toISOString()}
+                        loading={loading}
+                        refreshing={bgRefreshing}
+                        favorite={favoriteIds.has(activeMarketId)}
+                        copied={copiedLinks}
+                        activeTab={marketWorkspaceTab}
+                        onTabChange={setMarketWorkspaceTab}
+                        onFavorite={() => toggleFavorite(activeMarketId)}
+                        onRefresh={() => handleQuickPricesRefresh(activeMarketId, false)}
+                        onInspect={() => setMarketWorkspaceTab("opportunities")}
+                        onRescan={() => handleScanWithUrls(market.kalshiUrl, market.polymarketUrl, false, true)}
+                        onEdit={() => setEditingMarketId(activeMarketId)}
+                        onCopy={() => {
+                          navigator.clipboard.writeText(`Kalshi: ${market.kalshiUrl}\nPolymarket: ${market.polymarketUrl}`).then(() => {
+                            setCopiedLinks(true);
+                            setTimeout(() => setCopiedLinks(false), 2000);
+                          });
+                        }}
+                        onCouplings={() => { setMarketWorkspaceTab("matching"); setCouplingPanelOpen(true); }}
+                        onDelete={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
+                      />;
+                    })()}
 
                     {/* Inline edit panel */}
                     {editingMarketId && activeMarketId === editingMarketId && (
@@ -1917,7 +1809,7 @@ export default function Home() {
                     )}
 
                     {/* Stake Calculator */}
-                    {!result.expired && !result.noPrices && result.matchedCount > 0 && result.outcomes && (
+                    {marketWorkspaceTab === "opportunities" && !result.expired && !result.noPrices && result.matchedCount > 0 && result.outcomes && (
                       <StakeCalculator
                         suggestions={result.outcomes
                           .filter(o => o.arbitrage && o.arbitrage.expectedProfit > 0)
@@ -1936,36 +1828,8 @@ export default function Home() {
                       />
                     )}
 
-                    {/* View toggle: outcome table <-> 1on1 bookmaker view */}
-                    {!result.expired && !result.noPrices && result.matchedCount > 0 && (
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setBookmakerView(false)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              !bookmakerView
-                                ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30"
-                                : "bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            }`}
-                          >
-                            <Rows3 className="w-3.5 h-3.5" /> Outcomes Table
-                          </button>
-                          <button
-                            onClick={() => setBookmakerView(true)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              bookmakerView
-                                ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30"
-                                : "bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            }`}
-                          >
-                            <BarChart3 className="w-3.5 h-3.5" /> 1on1 Bookmaker
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Bookmaker 1on1 view */}
-                    {result?.outcomes && bookmakerView && (
+                    {marketWorkspaceTab === "depth" && result?.outcomes && (
                       <Bookmaker1on1
                         outcomes={result.outcomes.map(o => ({
                           artist: o.artist,
@@ -1990,12 +1854,12 @@ export default function Home() {
                         kalshiUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.kalshiUrl : undefined}
                         pmUrl={activeMarketId ? savedMarkets.find(m => m.id === activeMarketId)?.polymarketUrl : undefined}
                         capital={capital}
-                        liveMode={bookmakerView}
+                        liveMode
                       />
                     )}
 
                     {/* Outcome table — expanded log/detail area */}
-                    {!bookmakerView && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
+                    {marketWorkspaceTab === "prices" && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
                         {/* Filter toggles */}
                         <div className="flex items-center gap-1 p-2 border-b border-[var(--border-subtle)]">
@@ -2114,7 +1978,7 @@ export default function Home() {
                     )}
 
                     {/* UI-16b: Arb Opportunities — always-visible section below outcomes table */}
-                    {result && !result.expired && (
+                    {marketWorkspaceTab === "opportunities" && result && !result.expired && (
                       <ArbOpportunitiesPanel
                         outcomes={result.outcomes}
                         marketId={activeMarketId ?? undefined}
@@ -2127,7 +1991,7 @@ export default function Home() {
                     )}
 
                     {/* HOOKUP-07: historical spread chart for the active saved market */}
-                    {activeMarketId && result && !result.expired && (
+                    {marketWorkspaceTab === "history" && activeMarketId && result && !result.expired && (
                       <HistoricalSpreadChart
                         marketId={activeMarketId}
                         outcomeArtists={(result.outcomes ?? [])
@@ -2149,7 +2013,7 @@ export default function Home() {
                     )}
 
                     {/* Manual matching panel — two-list pairing interface */}
-                    {matchMode === "manual" && result && (() => {
+                    {marketWorkspaceTab === "matching" && matchMode === "manual" && result && (() => {
                       const marketCouplings = manualMatches.filter(mm => {
                         const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
                           o.kalshi && o.kalshi.ticker === mm.kalshiTicker
@@ -2186,7 +2050,7 @@ export default function Home() {
                     })()}
 
                     {/* Auto mode: Coupling suggestions for unmatched markets */}
-                    {matchMode === "auto" && result.unmatchedKalshi.length > 0 && result.unmatchedPolymarket.length > 0 && (
+                    {marketWorkspaceTab === "matching" && matchMode === "auto" && result.unmatchedKalshi.length > 0 && result.unmatchedPolymarket.length > 0 && (
                       <CouplingSuggestions
                         unmatchedKalshi={result.unmatchedKalshi}
                         unmatchedPolymarket={result.unmatchedPolymarket}
@@ -2203,7 +2067,7 @@ export default function Home() {
                     )}
 
                     {/* Auto mode: Active couplings for this market — with unlink capability */}
-                    {matchMode === "auto" && manualMatches.length > 0 && (() => {
+                    {marketWorkspaceTab === "matching" && matchMode === "auto" && manualMatches.length > 0 && (() => {
                       const marketCouplings = manualMatches.filter(mm => {
                         const kMatch = result.outcomes?.some((o: UnifiedOutcome) =>
                           o.kalshi && o.kalshi.ticker === mm.kalshiTicker
