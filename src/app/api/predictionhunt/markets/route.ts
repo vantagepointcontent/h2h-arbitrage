@@ -11,12 +11,18 @@ import {
   CATEGORY_SEARCH_TERMS,
   fetchMatchingMarkets,
   buildMatchedMarketsFromSearch,
+  probePredictionHuntAvailability,
 } from '@/lib/predictionhunt';
 import { upsertSavedMarket } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavePredictionHuntMarketRequest } from '@/lib/predictionhunt-request';
 import { parseBoundedInteger } from '@/lib/request-query';
+import {
+  getPredictionHuntQuotaState,
+  isMonthlyQuotaError,
+  mayCheckQuota,
+} from '@/lib/predictionhunt-quota';
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/predictionhunt/markets
@@ -39,27 +45,6 @@ function applyDateWindow(markets: PredictionHuntMarket[], maxDays: number): Pred
   });
 }
 
-let phQuotaExhausted = false;
-let phQuotaResetAt = 0;
-
-function isPhQuotaExhausted(): boolean {
-  if (!phQuotaExhausted) return false;
-  // Cooldown: 6 hours after first monthly-exceeded hit
-  if (Date.now() > phQuotaResetAt) {
-    phQuotaExhausted = false;
-    return false;
-  }
-  return true;
-}
-
-function markPhQuotaExhausted(e: any) {
-  const msg = e?.message || '';
-  if (msg.includes('rate_limit.exceeded_month')) {
-    phQuotaExhausted = true;
-    phQuotaResetAt = Date.now() + 6 * 60 * 60 * 1000; // 6h cooldown
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -74,7 +59,8 @@ export async function GET(request: NextRequest) {
     const fetchCount = parseBoundedInteger(fetchCountParam, 3, 1, 50);
 
     // If quota is exhausted, skip fresh calls entirely and return cached data
-    if (isPhQuotaExhausted()) {
+    const quotaState = await getPredictionHuntQuotaState();
+    if (!mayCheckQuota(quotaState)) {
       const cachedAll = await getPredictionHuntMarkets();
       const cached = applyDateWindow(cachedAll, maxDays); // BUG-037
       return NextResponse.json({
@@ -84,6 +70,7 @@ export async function GET(request: NextRequest) {
         fresh: false,
         cached: true,
         quotaWarning: 'PredictionHunt monthly quota exceeded. Showing cached markets only.',
+        nextQuotaCheckAt: quotaState.nextCheckAt,
         categories,
         maxDays,
         fetchCount,
@@ -104,19 +91,20 @@ export async function GET(request: NextRequest) {
             allEvents.push(...result.events);
           } catch (e: any) {
             console.warn(`[ph matching-markets] ${cat}/${term} failed: ${e.message}`);
-            markPhQuotaExhausted(e);
-            if (isPhQuotaExhausted()) break;
+            if (isMonthlyQuotaError(e)) break;
           }
           await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
         }
-        if (isPhQuotaExhausted()) break;
+        const currentQuota = await getPredictionHuntQuotaState();
+        if (!mayCheckQuota(currentQuota)) break;
       }
 
       let matches: PredictionHuntMarket[] = [];
       let cachedFallback = false;
       let warning: string | undefined;
 
-      if (!isPhQuotaExhausted()) {
+      const currentQuota = await getPredictionHuntQuotaState();
+      if (currentQuota.status !== 'exhausted') {
         // BUG-037: defensive re-filter — buildMatchedMarketsFromSearch input is
         // pre-filtered per-term, but enforce the window on the final rows too.
         matches = applyDateWindow(buildMatchedMarketsFromSearch(allEvents, fetchCount), maxDays);
@@ -176,6 +164,19 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
+
+    if (action === 'fetch-all' || action === 'sync') {
+      const quotaState = await getPredictionHuntQuotaState();
+      if (!mayCheckQuota(quotaState)) {
+        return NextResponse.json({
+          success: false,
+          skipped: true,
+          error: 'PredictionHunt monthly quota exhausted. Automatic update skipped until the next daily availability check.',
+          nextQuotaCheckAt: quotaState.nextCheckAt,
+        }, { status: 429 });
+      }
+      await probePredictionHuntAvailability();
+    }
 
     /* ── Fetch all markets from both platforms (raw, unmatched) ── */
     if (action === 'fetch-all') {

@@ -1,6 +1,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { rateLimiters } from '@/lib/rate-limiter';
+import {
+  assertPredictionHuntQuotaCheckAllowed,
+  isMonthlyQuotaError,
+  markPredictionHuntAvailable,
+  markPredictionHuntMonthlyExhausted,
+  getPredictionHuntQuotaState,
+} from '@/lib/predictionhunt-quota';
 
 /* ──────────────────────────── Types ──────────────────────────── */
 
@@ -48,6 +55,37 @@ const RATE_LIMIT_MS = 600;
 
 export { RATE_LIMIT_MS };
 
+async function predictionHuntFetch(url: URL): Promise<Response> {
+  await assertPredictionHuntQuotaCheckAllowed();
+  const res = await rateLimiters.predictionhunt.execute(() =>
+    fetch(url.toString(), {
+      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
+    }),
+  );
+
+  if (res.ok) {
+    await markPredictionHuntAvailable();
+    return res;
+  }
+
+  const text = await res.text().catch(() => '');
+  const error = new Error(`PredictionHunt ${res.status}: ${text.slice(0, 200)}`);
+  if (isMonthlyQuotaError(error)) await markPredictionHuntMonthlyExhausted();
+  throw error;
+}
+
+/** Make one cheap request before a bulk update. When monthly quota is gone,
+ * the persistent breaker blocks the update and all retries until next UTC day. */
+export async function probePredictionHuntAvailability(): Promise<void> {
+  const state = await getPredictionHuntQuotaState();
+  if (state.status === 'available') return;
+  const url = new URL(`${BASE_URL}/markets`);
+  url.searchParams.set('platform', 'polymarket');
+  url.searchParams.set('status', 'active');
+  url.searchParams.set('limit', '1');
+  await predictionHuntFetch(url);
+}
+
 export const CATEGORIES = [
   'sports', 'politics', 'election', 'entertainment', 'economics',
   'crypto', 'science', 'technology', 'weather', 'international',
@@ -75,16 +113,7 @@ export async function fetchPlatformMarkets(platform: string, category?: string, 
   url.searchParams.set('limit', String(limit));
   if (category) url.searchParams.set('category', category);
 
-  const res = await rateLimiters.predictionhunt.execute(() =>
-    fetch(url.toString(), {
-      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
-    }),
-  );
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`${platform} ${res.status}: ${text.slice(0,200)}`);
-  }
+  const res = await predictionHuntFetch(url);
 
   const data = await res.json();
   if (!data.markets) return [];
@@ -111,6 +140,7 @@ export async function fetchAllPlatformMarkets(platform: string): Promise<PhV2Mar
       all.push(...ms);
     } catch (e: any) {
       console.warn(`[ph] ${platform}/${cat} failed: ${e.message}`);
+      if (isMonthlyQuotaError(e)) break;
     }
     await new Promise(r => setTimeout(r, RATE_LIMIT_MS));
   }
@@ -270,6 +300,7 @@ export interface SyncLog {
 }
 
 export async function runFullSync(): Promise<SyncLog> {
+  await probePredictionHuntAvailability();
   const log: SyncLog = {
     startedAt: new Date().toISOString(), finishedAt: '',
     categoriesTried: [...CATEGORIES], categoriesSucceeded: [], categoriesFailed: [],
@@ -402,16 +433,7 @@ export async function fetchMatchingMarkets(
   url.searchParams.set('q', query);
   url.searchParams.set('limit', String(limit));
 
-  const res = await rateLimiters.predictionhunt.execute(() =>
-    fetch(url.toString(), {
-      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
-    }),
-  );
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`matching-markets ${res.status}: ${text.slice(0, 200)}`);
-  }
+  const res = await predictionHuntFetch(url);
 
   const data = await res.json();
   const events = (data.events || []).map((e: any) => mapEvent(e, true));
@@ -499,16 +521,7 @@ export async function searchPredictionHunt(
   url.searchParams.set('limit', String(limit));
   if (category && category !== 'all') url.searchParams.set('category', category);
 
-  const res = await rateLimiters.predictionhunt.execute(() =>
-    fetch(url.toString(), {
-      headers: { 'Accept': 'application/json', 'X-API-Key': API_KEY },
-    }),
-  );
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`search ${res.status}: ${text.slice(0, 200)}`);
-  }
+  const res = await predictionHuntFetch(url);
 
   const data = await res.json();
   const events = (data.events || []).map((e: any) => mapEvent(e, false));
