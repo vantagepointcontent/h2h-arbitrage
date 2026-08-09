@@ -75,7 +75,7 @@ export function OpportunityQueue({ opportunities, onPrepare }: Props) {
               <thead className="sticky top-0 bg-[var(--surface-raised)] text-[var(--text-secondary)]">
                 <tr>
                   {['Market / outcome', 'Strategy', 'Net profit', 'Net ROI', 'Capital', 'Max fill', 'Age', 'Persistence', 'Risk', ''].map((label) => (
-                    <th key={label} className="px-3 py-2 font-medium">{label}</th>
+                    <th key={label} title={({ 'Market / outcome':'The market event name and the specific outcome being compared', Strategy:'Which legs to buy across Kalshi and Polymarket', 'Net profit':'Expected profit after deducting trading fees from both platforms', 'Net ROI':'Return on investment as a percentage, net of fees', Capital:'Total dollar amount allocated across both legs', 'Max fill':'Maximum stake fillable at current orderbook depth', Age:'Time since this opportunity was first detected', Persistence:'How long this arb has been continuously observed', Risk:'Execution state: executable, blocked, stale, or thin', '':'Opportunity actions' } as Record<string,string>)[label]} className="px-3 py-2 font-medium">{label}</th>
                   ))}
                 </tr>
               </thead>

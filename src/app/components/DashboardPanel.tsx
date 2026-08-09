@@ -560,7 +560,7 @@ export default function DashboardPanel() {
         {storage ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">Disk usage</div>
+              <div title="Storage used by EdgeFinder database and data files" className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">Disk usage</div>
               <div className="text-sm font-semibold tabular-nums mb-1.5">
                 {fmtBytes(storage.diskUsed)} / {fmtBytes(storage.diskTotal)} ({storage.diskPercent}%)
               </div>
@@ -578,7 +578,7 @@ export default function DashboardPanel() {
               <div className="text-sm font-semibold tabular-nums text-white">{fmtBytes(storage.dbSize)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">WAL size</div>
+              <div title="Write-Ahead Log size — if larger than the main DB, checkpoints are falling behind" className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] mb-1">WAL size</div>
               <div
                 className={`text-sm font-semibold tabular-nums ${
                   storage.walSize > storage.dbSize * 0.5
@@ -1149,7 +1149,7 @@ function KPICard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 space-y-2">
+    <div title={({ 'Total Arbs Found':'All-time count of unique arbitrage opportunities detected', 'Active Arbs Now':'Currently valid arb opportunities across all saved markets', 'Total Scans':'Total number of market scans executed', 'Avg ROI':'Average ROI percentage across all arbs found, net of fees', 'Markets Tracked':'Number of saved markets currently being monitored' } as Record<string,string>)[label]} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         {icon}
         <span className="text-[10px] text-[var(--text-secondary)]">{label}</span>

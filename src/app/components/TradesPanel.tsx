@@ -491,10 +491,10 @@ export default function TradesPanel() {
             {closedPositions.length === 0 ? <div className="text-sm text-[#8A9BA8] py-6 text-center">No positions have been closed yet.</div> : (
               <table className="w-full text-sm">
                 <thead><tr className="text-[10px] uppercase text-[#8A9BA8] border-b border-[#182533]">
-                  <th className="text-left px-4 py-3 font-medium">Closed</th><th className="text-left px-4 py-3 font-medium">Market</th><th className="text-left px-4 py-3 font-medium">Platform / Side</th>
-                  <th className="text-right px-4 py-3 font-medium">Size</th><th className="text-right px-4 py-3 font-medium">Entry</th><th className="text-right px-4 py-3 font-medium">Exit</th>
-                  <th className="text-right px-4 py-3 font-medium">Fees</th><th className="text-right px-4 py-3 font-medium">Net P&amp;L</th><th className="text-right px-4 py-3 font-medium">ROI</th>
-                  <th className="text-right px-4 py-3 font-medium">Duration</th><th className="text-center px-4 py-3 font-medium">Mode</th>
+                  <th title="When the position was closed" className="text-left px-4 py-3 font-medium">Closed</th><th title="Market event name" className="text-left px-4 py-3 font-medium">Market</th><th title="Trading venue and YES or NO side" className="text-left px-4 py-3 font-medium">Platform / Side</th>
+                  <th title="Number of shares or contracts" className="text-right px-4 py-3 font-medium">Size</th><th title="Average price paid when entering" className="text-right px-4 py-3 font-medium">Entry</th><th title="Average price received when exiting" className="text-right px-4 py-3 font-medium">Exit</th>
+                  <th title="Trading fees paid across entry and exit" className="text-right px-4 py-3 font-medium">Fees</th><th title="Realized profit or loss after all trading fees" className="text-right px-4 py-3 font-medium">Net P&amp;L</th><th title="Realized return on invested capital as a percentage" className="text-right px-4 py-3 font-medium">ROI</th>
+                  <th title="Time between opening and closing" className="text-right px-4 py-3 font-medium">Duration</th><th title="Paper simulation or live production trade" className="text-center px-4 py-3 font-medium">Mode</th>
                 </tr></thead>
                 <tbody className="divide-y divide-[#182533]">{closedPositions.map((position) => <tr key={position.id} className="hover:bg-[#182533]/50">
                   <td className="px-4 py-3 text-xs text-[#8A9BA8] whitespace-nowrap">{new Date(position.closedAt).toLocaleString()}</td>
@@ -558,18 +558,18 @@ export default function TradesPanel() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[10px] uppercase text-[#8A9BA8] border-b border-[#182533]">
-                    <th className="text-center px-2 py-3 font-medium w-8">{/* expand toggle */}</th>
-                    <th className="text-left px-4 py-3 font-medium">Time</th>
-                    <th className="text-left px-4 py-3 font-medium">Market</th>
-                    <th className="text-left px-4 py-3 font-medium">Platform</th>
-                    <th className="text-left px-4 py-3 font-medium">Side</th>
-                    <th className="text-right px-4 py-3 font-medium">Size</th>
-                    <th className="text-right px-4 py-3 font-medium">Price</th>
-                    <th className="text-center px-4 py-3 font-medium">Fill</th>
-                    <th className="text-center px-4 py-3 font-medium">Status</th>
-                    <th className="text-right px-4 py-3 font-medium">Est. P&L</th>
-                    <th className="text-center px-4 py-3 font-medium">Mode</th>
-                    <th className="text-center px-4 py-3 font-medium">Action</th>
+                    <th title="Expand the execution timeline" className="text-center px-2 py-3 font-medium w-8">{/* expand toggle */}</th>
+                    <th title="When execution was requested" className="text-left px-4 py-3 font-medium">Time</th>
+                    <th title="Market event name" className="text-left px-4 py-3 font-medium">Market</th>
+                    <th title="Kalshi or Polymarket execution venue" className="text-left px-4 py-3 font-medium">Platform</th>
+                    <th title="YES or NO contract side" className="text-left px-4 py-3 font-medium">Side</th>
+                    <th title="Requested dollar size" className="text-right px-4 py-3 font-medium">Size</th>
+                    <th title="Requested execution price" className="text-right px-4 py-3 font-medium">Price</th>
+                    <th title="Filled amount compared with requested amount" className="text-center px-4 py-3 font-medium">Fill</th>
+                    <th title="Execution state: filled, pending, cancelled, or failed" className="text-center px-4 py-3 font-medium">Status</th>
+                    <th title="Estimated profit after trading fees" className="text-right px-4 py-3 font-medium">Est. P&amp;L</th>
+                    <th title="Paper simulation or live production trade" className="text-center px-4 py-3 font-medium">Mode</th>
+                    <th title="Available trade actions" className="text-center px-4 py-3 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#182533]">

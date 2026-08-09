@@ -399,28 +399,28 @@ export default function OpenPositionsPanel() {
           <DataTable aria-label="Open positions">
             <thead>
               <tr className="text-[10px] uppercase text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
-                <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('market')}>
+                <th title="Market event name; click to sort" className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('market')}>
                   Market <SortIcon field="market" />
                 </th>
-                <th className="text-left px-4 py-3 font-medium">Pair state</th>
-                <th className="text-left px-4 py-3 font-medium">Platform</th>
-                <th className="text-left px-4 py-3 font-medium">Side</th>
-                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('size')}>
+                <th title="Whether both arb legs are paired and hedged" className="text-left px-4 py-3 font-medium">Pair state</th>
+                <th title="Kalshi or Polymarket execution venue" className="text-left px-4 py-3 font-medium">Platform</th>
+                <th title="YES or NO contract side" className="text-left px-4 py-3 font-medium">Side</th>
+                <th title="Number of shares or contracts; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('size')}>
                   Size <SortIcon field="size" />
                 </th>
-                <th className="text-right px-4 py-3 font-medium">Entry</th>
-                <th className="text-right px-4 py-3 font-medium">Current</th>
-                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>
+                <th title="Average price paid when opening the position" className="text-right px-4 py-3 font-medium">Entry</th>
+                <th title="Latest available market price" className="text-right px-4 py-3 font-medium">Current</th>
+                <th title="Current dollar value; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>
                   Value <SortIcon field="value" />
                 </th>
-                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
+                <th title="Unrealized profit or loss after estimated exit fees; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
                   Net P&amp;L <SortIcon field="roi" />
                 </th>
-                <th className="text-right px-4 py-3 font-medium">Expiry</th>
-                <th className="text-right px-4 py-3 font-medium">Quote age</th>
-                <th className="text-right px-4 py-3 font-medium">1-leg exposure</th>
-                <th className="text-left px-4 py-3 font-medium">Exit depth</th>
-                <th className="text-center px-4 py-3 font-medium">Action</th>
+                <th title="Time remaining until the market resolves" className="text-right px-4 py-3 font-medium">Expiry</th>
+                <th title="Age of the latest price used for valuation" className="text-right px-4 py-3 font-medium">Quote age</th>
+                <th title="Unhedged dollar exposure if the matching leg is missing" className="text-right px-4 py-3 font-medium">1-leg exposure</th>
+                <th title="Available orderbook liquidity for closing the position" className="text-left px-4 py-3 font-medium">Exit depth</th>
+                <th title="Available position actions" className="text-center px-4 py-3 font-medium">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">

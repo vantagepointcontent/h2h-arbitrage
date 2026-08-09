@@ -66,7 +66,7 @@ export default function ArbTimingPanel() {
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
-          <label className="grid gap-1 text-xs text-[var(--text-muted)]">
+          <label title="Time period to analyze for arbitrage patterns" className="grid gap-1 text-xs text-[var(--text-muted)]">
             Range
             <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)]">
               <option value={7}>7 days</option>
@@ -75,14 +75,14 @@ export default function ArbTimingPanel() {
               <option value={365}>1 year</option>
             </select>
           </label>
-          <label className="grid gap-1 text-xs text-[var(--text-muted)]">
+          <label title="Filter by market category (politics, sports, etc.)" className="grid gap-1 text-xs text-[var(--text-muted)]">
             Category
             <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-9 max-w-52 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)]">
               <option value="">All categories</option>
               {(data?.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-xs text-[var(--text-muted)]">
+          <label title="Display hours in US Eastern or UTC" className="grid gap-1 text-xs text-[var(--text-muted)]">
             Time zone
             <select value={timeZone} onChange={(event) => setTimeZone(event.target.value as typeof timeZone)} className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)]">
               <option value="America/New_York">US Eastern</option>
@@ -107,7 +107,7 @@ export default function ArbTimingPanel() {
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <span className="font-mono text-2xl font-semibold text-[var(--text-primary)]">{data?.totalEpisodes.toLocaleString() ?? 0}</span>
-              <span className="ml-2 text-sm text-[var(--text-muted)]">qualified episodes</span>
+              <span title="Distinct arb opportunities that lasted more than 30 seconds and appeared in multiple scans" className="ml-2 text-sm text-[var(--text-muted)]">qualified episodes</span>
             </div>
             <div className="text-xs text-[var(--text-muted)]">Hours shown in {zoneLabel}</div>
           </div>
