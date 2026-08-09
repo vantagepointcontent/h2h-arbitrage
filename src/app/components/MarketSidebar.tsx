@@ -222,8 +222,8 @@ function MarketSidebarInner({
         } shrink-0 border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] transition-all duration-200 md:block ${
           mobileMenuOpen
             ? "fixed inset-y-0 left-0 z-50 w-[380px] max-w-[85vw] md:relative md:w-auto md:z-auto md:inset-auto"
-            : "hidden md:block md:!w-auto"
-        } ${!sidebarOpen ? "overflow-visible" : "overflow-hidden"}`}
+            : "hidden md:block"
+        } ${sidebarOpen ? "md:!w-[380px]" : "md:!w-[64px]"} ${!sidebarOpen ? "overflow-visible" : "overflow-hidden"}`}
       >
         <div className="px-3 py-4 space-y-4 h-full flex flex-col">
           {/* Close button for mobile */}

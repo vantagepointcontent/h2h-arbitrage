@@ -64,11 +64,11 @@ export function TradingStatusRail() {
   return (
     <>
       <section aria-label="Trading system status" className="border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-1.5 lg:px-5">
-        <div className="mx-auto flex max-w-[1800px] gap-1.5 overflow-x-auto">
+        <div className="mx-auto flex max-w-[1800px] gap-1.5 overflow-x-auto md:grid md:grid-cols-5 md:overflow-visible">
           {items.map((item) => {
             const Icon = ICONS[item.id as keyof typeof ICONS] ?? AlertTriangle;
             return (
-              <button key={item.id} type="button" onClick={() => setSelected(item)} aria-label={`${item.label}: ${item.value}. Open status details.`} className="flex min-w-max flex-1 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-left hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+              <button key={item.id} type="button" onClick={() => setSelected(item)} aria-label={`${item.label}: ${item.value}. Open status details.`} className="flex min-w-max flex-1 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-left hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] md:min-w-0 md:flex-wrap">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${TONES[item.tone]}`} aria-hidden="true" />
                 <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
                 <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{item.label}</span>

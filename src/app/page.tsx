@@ -1432,7 +1432,7 @@ export default function Home() {
 
   // ── Render ──
   return (
-    <div className="h-screen bg-[var(--surface-workspace)] text-[var(--text-primary)] flex flex-col overflow-hidden">
+    <div className="h-[100dvh] min-h-0 bg-[var(--surface-workspace)] text-[var(--text-primary)] flex flex-col overflow-hidden">
       {alertSettingsOpen && <AlertSettingsPanel onClose={() => setAlertSettingsOpen(false)} />}
 
       {/* Top nav bar */}
@@ -1473,7 +1473,7 @@ export default function Home() {
       </header>
       <TradingStatusRail />
 
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <MarketSidebar
           markets={savedMarkets}
           activeId={activeMarketId}
@@ -1512,8 +1512,8 @@ export default function Home() {
           mobileMenuOpen={mobileMenuOpen}
           onCloseMobileMenu={() => setMobileMenuOpen(false)}
         />
-        <div className="flex-1 overflow-y-auto">
-          <div className="w-full p-2 sm:p-4 md:p-6 2xl:p-8">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="w-full min-w-0 p-2 sm:p-4 md:p-6 2xl:p-8">
             {routeInitializing ? (
               <div
                 role="status"

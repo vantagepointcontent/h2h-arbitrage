@@ -389,7 +389,7 @@ export default function DashboardPanel() {
             </div>
             <span className="text-[10px] text-[var(--text-secondary)]">US Eastern · {dailyPnl.date}</span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
             {[
               ["Total P&L", fmtUsd(dailyPnl.totalPnl), dailyPnl.totalPnl],
               ["Realized", fmtUsd(dailyPnl.realizedPnl), dailyPnl.realizedPnl],
@@ -421,7 +421,7 @@ export default function DashboardPanel() {
       )}
 
       {/* ── 5 KPI Cards ──────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
         <KPICard
           icon={<Zap className="w-4 h-4" />}
           label="Total Arbs Found"
