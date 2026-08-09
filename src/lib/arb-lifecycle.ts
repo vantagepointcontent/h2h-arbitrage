@@ -148,7 +148,18 @@ export async function recordArbObservations(
   await ensureDb();
   const c = getClient();
   const now = new Date().toISOString();
-  const canonicalCategory = resolveLifecycleCategory(marketTitle, category);
+  // The scan payload can still carry provider groupItemTitle/outcome labels.
+  // Resolve against the persisted saved-market category at the final write boundary.
+  const saved = await c.execute({
+    sql: 'SELECT event_title, category FROM saved_markets WHERE id = ? LIMIT 1',
+    args: [marketId],
+  });
+  const savedMarket = (saved.rows as any[])[0];
+  const canonicalCategory = resolveLifecycleCategory(
+    String(savedMarket?.event_title || marketTitle || ''),
+    category,
+    savedMarket?.category,
+  );
   let opened = 0, extended = 0, closed = 0;
 
   // Live episodes for this market

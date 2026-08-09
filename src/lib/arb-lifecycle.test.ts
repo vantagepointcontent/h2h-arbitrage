@@ -19,6 +19,7 @@ afterAll(async () => {
     args: [marketPattern],
   });
   await db.execute({ sql: `DELETE FROM arb_episodes WHERE market_id LIKE ?`, args: [marketPattern] });
+  await db.execute({ sql: `DELETE FROM saved_markets WHERE id LIKE ?`, args: [marketPattern] });
 });
 
 const arb = (outcome: string, roiPct: number, profit = 10, stake = 100) => ({
@@ -60,6 +61,20 @@ describe('recordArbObservations', () => {
     await recordArbObservations(mid, 'MLB: AL Cy Young Winner', 'Tarik Skubal', [arb('Pitcher', 2.5)]);
     const rows = await db.execute({ sql: `SELECT category FROM arb_episodes WHERE market_id = ?`, args: [mid] });
     expect((rows.rows[0] as any).category).toBe('sports');
+  });
+
+  it('uses the saved market category instead of a polluted scan category', async () => {
+    const mid = `${TEST_PREFIX}-saved-category`;
+    await db.execute({
+      sql: `INSERT INTO saved_markets
+            (id, kalshi_url, polymarket_url, event_title, category, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [mid, 'https://kalshi.test/market', 'https://polymarket.test/market',
+        'TIME Person of the Year 2026', 'entertainment', new Date().toISOString()],
+    });
+    await recordArbObservations(mid, 'TIME Person of the Year 2026', 'Jeremy Hansen', [arb('Candidate', 2.5)]);
+    const rows = await db.execute({ sql: `SELECT category FROM arb_episodes WHERE market_id = ?`, args: [mid] });
+    expect((rows.rows[0] as any).category).toBe('entertainment');
   });
 
   it('extends a live episode and tracks peaks', async () => {
