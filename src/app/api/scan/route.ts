@@ -26,6 +26,7 @@ import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
 import { resolveMarketDomain } from '@/lib/market-classification';
 import { getScanClientKey, scanRateLimiter } from '@/lib/scan-rate-limit';
+import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -194,7 +195,21 @@ export async function POST(request: NextRequest) {
       logger.debug('[scan] Filtered PM markets', { count: pmFilteredCount, markets: pmMarketsRaw.map(m => ({ conditionId: m.conditionId?.slice(0, 12), group: m.groupItemTitle, q: m.question?.slice(0, 40) })) });
     }
     
-    const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
+    // First match against Gamma prices, then fetch expensive CLOB metadata only
+    // for actual cross-platform pairs. A large event can have 80+ PM outcomes
+    // but fewer than 10 Kalshi counterparts; fetching every unrelated outcome
+    // made the scan UI appear frozen for 40+ seconds.
+    const preliminaryOutcomes = skipAutoMatch
+      ? []
+      : applyManualMatches(
+          matchOutcomes(kalshiMarkets, pmMarketsRaw, pmEvent.title, capital, pmEvent.endDate),
+          manualMatches,
+          kalshiMarkets,
+          pmMarketsRaw,
+          capital,
+          pmEvent.endDate,
+        );
+    const conditionIds = selectMatchedClobConditionIds(preliminaryOutcomes);
     let clobMap: Map<string, any>;
     try {
       // Allow more time for large multi-outcome events (CLOB has 10-concurrent semaphore)
