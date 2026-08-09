@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
+import BotActionLogs from './BotActionLogs';
 
 type PositionStatus = 'open' | 'settled' | 'closed';
 type PositionFilter = 'all' | 'open' | 'settled';
@@ -138,6 +139,7 @@ function StatusBadge({ status }: { status: PositionStatus }) {
 }
 
 export default function BotTraderPanel() {
+  const [view, setView] = useState<'analytics' | 'logs'>('analytics');
   const [analytics, setAnalytics] = useState<Analytics>(EMPTY_ANALYTICS);
   const [positions, setPositions] = useState<BotPosition[]>([]);
   const [status, setStatus] = useState<BotStatus | null>(null);
@@ -269,6 +271,12 @@ export default function BotTraderPanel() {
 
       {error && <div role="alert" className="rounded-lg border border-[var(--status-negative)]/40 bg-[var(--status-negative)]/10 px-3 py-2 text-xs text-[var(--status-negative)]">{error}</div>}
 
+      <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-1" role="tablist" aria-label="BotTrader views">
+        {(['analytics', 'logs'] as const).map((tab) => <button key={tab} role="tab" aria-selected={view === tab} onClick={() => setView(tab)} className={`min-h-11 rounded-md px-4 text-xs font-semibold capitalize ${view === tab ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{tab}</button>)}
+      </div>
+
+      {view === 'logs' ? <BotActionLogs /> : <div className="space-y-3">
+
       {status && (
         <div className={`rounded-lg border px-3 py-3 ${status.enabled ? 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10' : 'border-[var(--border-subtle)] bg-[var(--surface-panel)]'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -349,6 +357,7 @@ export default function BotTraderPanel() {
           </div>
         </div>
       )}
+      </div>}
     </section>
   );
 }

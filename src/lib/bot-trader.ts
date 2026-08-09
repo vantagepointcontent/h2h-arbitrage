@@ -33,6 +33,7 @@ import {
 } from './persistence';
 import { recordBotPosition } from './bot-positions';
 import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './telegram-alerts';
+import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
 import logger from './logger';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -460,9 +461,36 @@ function proposedStakeUsd(input: BotTradeInput): number {
 export async function maybeExecuteBotTrade(
   input: BotTradeInput,
 ): Promise<BotExecutionResult> {
+  // A pair/outcome may be evaluated repeatedly. Keep each attempt as its own
+  // chain while the execution arbId remains stable for duplicate prevention.
+  const tradeId = `${safeArbId(input.pairId, input.outcome)}:${crypto.randomUUID()}`;
+  const log = async (
+    step: string,
+    action: string,
+    responseStatus: BotActionStatus,
+    details: { requestPayload?: unknown; responsePayload?: unknown; errorReason?: string | null; durationMs?: number | null; alertMetadata?: unknown } = {},
+  ) => appendBotActionLog({
+    tradeId,
+    trigger: 'Scan found qualifying arb',
+    marketId: input.pairId,
+    marketTitle: input.marketTitle,
+    step,
+    action,
+    responseStatus,
+    ...details,
+  }).catch((error) => logger.warn('[bot-trader] action log failed', { tradeId, step, error: String(error) }));
+
+  await log('detection', `Scan found arb: ROI ${input.roiPct.toFixed(2)}%, APY ${(input.apyPct ?? 0).toFixed(2)}%, ${input.marketTitle}`, 'passed', {
+    requestPayload: { pairId: input.pairId, outcome: input.outcome, strategy: input.strategy },
+  });
   const settings = await getBotSettings();
 
   const evaluation = evaluateBotTrade(input, settings);
+  await log('criteria_check', evaluation.reason, evaluation.shouldTrade ? 'passed' : 'failed', {
+    requestPayload: settings,
+    responsePayload: evaluation.criteria,
+    errorReason: evaluation.shouldTrade ? null : evaluation.reason,
+  });
   if (!evaluation.shouldTrade) {
     return { executed: false, dryRun: true, reason: evaluation.reason };
   }
@@ -479,6 +507,7 @@ export async function maybeExecuteBotTrade(
     return true; // fail-safe: skip on error
   });
   if (alreadyOpen) {
+    await log('preflight', 'Duplicate position check', 'failed', { errorReason: `Open bot position already exists for ${arbId}` });
     return { executed: false, dryRun: true, reason: `Open bot position already exists for ${arbId}` };
   }
 
@@ -492,6 +521,7 @@ export async function maybeExecuteBotTrade(
   const proposedStake = proposedStakeUsd(input);
 
   if (todayTrades >= settings.maxTradesPerDay) {
+    await log('preflight', 'Daily trade limit check', 'failed', { responsePayload: { todayTrades, maxTradesPerDay: settings.maxTradesPerDay }, errorReason: 'Daily bot trade limit reached' });
     return {
       executed: false,
       dryRun: true,
@@ -500,6 +530,7 @@ export async function maybeExecuteBotTrade(
   }
 
   if (todayExposure + proposedStake > maxDailyExposure) {
+    await log('preflight', 'Daily exposure limit check', 'failed', { responsePayload: { todayExposure, proposedStake, maxDailyExposure }, errorReason: 'Daily exposure limit reached' });
     return {
       executed: false,
       dryRun: true,
@@ -525,10 +556,15 @@ export async function maybeExecuteBotTrade(
 
   const execReq = buildExecutionRequest(input);
   if (!execReq) {
+    await log('preflight', 'Build two-leg execution request', 'failed', { errorReason: 'Missing leg data' });
     return { executed: false, dryRun: true, reason: 'Unable to build execution request (missing leg data)' };
   }
 
   execReq.dryRun = effectiveDryRun;
+  await log('preflight', 'Execution request and safety gates verified', 'passed', {
+    requestPayload: execReq,
+    responsePayload: { effectiveDryRun, autoLiveOrdersAuthorized: AUTO_LIVE_ORDERS_AUTHORIZED, todayTrades, todayExposure },
+  });
 
   logger.info('[bot-trader] executing trade', {
     arbId,
@@ -539,7 +575,27 @@ export async function maybeExecuteBotTrade(
     globalMode,
   });
 
+  const executionStarted = Date.now();
   const result = await executeArb(execReq);
+  const executionDurationMs = Date.now() - executionStarted;
+  for (const step of result.steps ?? []) {
+    const rawStatus = String(step.status ?? '').toLowerCase();
+    const responseStatus: BotActionStatus = rawStatus === 'failed' || rawStatus === 'timeout' ? 'failed' : rawStatus === 'pending' ? 'pending' : 'passed';
+    await log('execution', step.description || 'Execution step', responseStatus, {
+      responsePayload: step.metadata,
+      errorReason: responseStatus === 'failed' ? step.description : null,
+    });
+  }
+  await log('result', result.success
+    ? `${effectiveDryRun ? 'Paper simulation completed' : 'Trade completed'} for ${input.marketTitle}`
+    : `Trade attempt failed for ${input.marketTitle}`,
+  result.success ? 'passed' : 'failed', {
+    requestPayload: execReq,
+    responsePayload: result,
+    errorReason: result.success ? null : (result.error || 'Execution failed'),
+    durationMs: executionDurationMs,
+    alertMetadata: result.alerts,
+  });
 
   const executionRecord: ExecutionRecord = {
     timestamp: new Date().toISOString(),

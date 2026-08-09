@@ -9,6 +9,10 @@ import {
 } from './bot-trader';
 import type { UnifiedOutcome } from './matcher';
 
+vi.mock('./bot-action-log', () => ({
+  appendBotActionLog: vi.fn(async () => 1),
+}));
+
 function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
   return {
     enabled: true,
