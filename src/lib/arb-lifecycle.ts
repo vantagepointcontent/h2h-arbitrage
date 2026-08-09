@@ -17,6 +17,7 @@
 import path from 'path';
 import { createClient } from '@libsql/client';
 import { buildArbTimingHeatmap, type TimingZone } from './arb-timing';
+import { resolveMarketDomain, type Domain } from './market-classification';
 
 const SQLITE_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
@@ -36,6 +37,41 @@ function getClient() {
 }
 
 let _inited = false;
+
+/** Lifecycle analytics must never persist provider tags, outcome labels or
+ * person/team names as categories. Prefer the saved market's canonical domain,
+ * then a valid incoming domain, and finally classify the market title. */
+export function resolveLifecycleCategory(
+  marketTitle: string | undefined,
+  incomingCategory?: unknown,
+  savedCategory?: unknown,
+): Domain {
+  return resolveMarketDomain(marketTitle ?? '', savedCategory, incomingCategory);
+}
+
+async function canonicalizeEpisodeCategories(c: ReturnType<typeof createClient>): Promise<void> {
+  const rows = await c.execute(`
+    SELECT DISTINCT
+      e.market_id,
+      e.market_title,
+      e.category AS episode_category,
+      s.event_title AS saved_title,
+      s.category AS saved_category
+    FROM arb_episodes e
+    LEFT JOIN saved_markets s ON s.id = e.market_id
+  `);
+
+  for (const row of rows.rows as any[]) {
+    const title = String(row.saved_title || row.market_title || '');
+    const category = resolveLifecycleCategory(title, row.episode_category, row.saved_category);
+    await c.execute({
+      sql: `UPDATE arb_episodes SET category = ?
+            WHERE market_id = ? AND (category IS NULL OR category != ?)`,
+      args: [category, String(row.market_id), category],
+    });
+  }
+}
+
 async function ensureDb(): Promise<void> {
   if (_inited) return;
   const c = getClient();
@@ -83,6 +119,10 @@ async function ensureDb(): Promise<void> {
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episode_points_ep ON arb_episode_points(episode_id, seen_at)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_arb_episode_points_market ON arb_episode_points(market_id, outcome, seen_at)`);
 
+  // BUG-113 follow-up: old rows predate canonical category validation. Repair
+  // them from saved markets (or title classification) before analytics read.
+  await canonicalizeEpisodeCategories(c);
+
   _inited = true;
 }
 
@@ -108,6 +148,7 @@ export async function recordArbObservations(
   await ensureDb();
   const c = getClient();
   const now = new Date().toISOString();
+  const canonicalCategory = resolveLifecycleCategory(marketTitle, category);
   let opened = 0, extended = 0, closed = 0;
 
   // Live episodes for this market
@@ -128,12 +169,12 @@ export async function recordArbObservations(
       await c.execute({
         sql: `UPDATE arb_episodes SET
                 last_seen_at = ?, scan_count = scan_count + 1,
-                last_roi_pct = ?, strategy = ?,
+                last_roi_pct = ?, strategy = ?, category = ?,
                 peak_roi_pct = MAX(peak_roi_pct, ?),
                 peak_profit  = MAX(peak_profit, ?),
                 peak_stake   = MAX(peak_stake, ?)
               WHERE id = ?`,
-        args: [now, arb.roiPct, arb.strategy, arb.roiPct, arb.expectedProfit, arb.totalStake, existing.id],
+        args: [now, arb.roiPct, arb.strategy, canonicalCategory, arb.roiPct, arb.expectedProfit, arb.totalStake, existing.id],
       });
       // UI-09: record per-scan ROI data point for the decay curve
       await c.execute({
@@ -150,7 +191,7 @@ export async function recordArbObservations(
                  first_roi_pct, last_roi_pct, peak_roi_pct,
                  first_profit, peak_profit, first_stake, peak_stake)
               VALUES (?, ?, ?, ?, ?, 'open', ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [marketId, marketTitle ?? null, category ?? null, arb.outcome, arb.strategy,
+        args: [marketId, marketTitle ?? null, canonicalCategory, arb.outcome, arb.strategy,
                now, now, arb.roiPct, arb.roiPct, arb.roiPct,
                arb.expectedProfit, arb.expectedProfit, arb.totalStake, arb.totalStake],
       });

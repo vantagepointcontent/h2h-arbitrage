@@ -4,7 +4,7 @@
  * using unique market IDs per test run and cleaning up after.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordArbObservations, getLifecycleStats } from './arb-lifecycle';
+import { recordArbObservations, getLifecycleStats, resolveLifecycleCategory } from './arb-lifecycle';
 import { createClient } from '@libsql/client';
 import path from 'path';
 
@@ -25,6 +25,20 @@ const arb = (outcome: string, roiPct: number, profit = 10, stake = 100) => ({
   outcome, strategy: 'Buy K YES + PM NO', roiPct, expectedProfit: profit, totalStake: stake,
 });
 
+describe('resolveLifecycleCategory', () => {
+  it('accepts only canonical domains and rejects entity/outcome labels', () => {
+    expect(resolveLifecycleCategory('US presidential election', 'Donald Trump')).toBe('politics');
+    expect(resolveLifecycleCategory('MLB: AL Cy Young Winner', 'Tarik Skubal')).toBe('sports');
+    expect(resolveLifecycleCategory('Will Bitcoin exceed $100k?', 'Yes')).toBe('crypto');
+    expect(resolveLifecycleCategory('Maximum temperature in Chicago?', 'A')).toBe('weather');
+  });
+
+  it('prefers a saved canonical category over a polluted incoming category', () => {
+    expect(resolveLifecycleCategory('TIME Person of the Year 2026', 'Jeremy Hansen', 'Entertainment'))
+      .toBe('entertainment');
+  });
+});
+
 describe('recordArbObservations', () => {
   it('opens a new episode for a positive arb', async () => {
     const mid = `${TEST_PREFIX}-open`;
@@ -39,6 +53,13 @@ describe('recordArbObservations', () => {
     expect(ep.status).toBe('open');
     expect(ep.first_roi_pct).toBeCloseTo(2.5);
     expect(ep.category).toBe('politics');
+  });
+
+  it('canonicalizes a polluted category before persisting it', async () => {
+    const mid = `${TEST_PREFIX}-canonical`;
+    await recordArbObservations(mid, 'MLB: AL Cy Young Winner', 'Tarik Skubal', [arb('Pitcher', 2.5)]);
+    const rows = await db.execute({ sql: `SELECT category FROM arb_episodes WHERE market_id = ?`, args: [mid] });
+    expect((rows.rows[0] as any).category).toBe('sports');
   });
 
   it('extends a live episode and tracks peaks', async () => {
