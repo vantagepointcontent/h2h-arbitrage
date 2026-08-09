@@ -18,6 +18,7 @@ export interface ClobMarket {
 }
 
 export interface ClobBook {
+  asset_id?: string;
   bids: { price: string; size: string }[];
   asks: { price: string; size: string }[];
   min_order_size: string;
@@ -216,6 +217,82 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
 }
 
 /**
+ * Fetch multiple token orderbooks with one CLOB request. Cached books are
+ * reused and only missing token IDs are sent to the batch endpoint.
+ */
+export async function fetchClobBooks(tokenIds: string[]): Promise<Map<string, ClobBook | null>> {
+  const uniqueIds = [...new Set(tokenIds.filter(Boolean))];
+  const result = new Map<string, ClobBook | null>();
+  const uncached: string[] = [];
+
+  for (const tokenId of uniqueIds) {
+    const cached = getCachedBook(tokenId);
+    if (cached !== undefined) result.set(tokenId, cached);
+    else uncached.push(tokenId);
+  }
+
+  if (uncached.length === 0) return result;
+
+  await clobSemaphore.acquire();
+  try {
+    const res = await rateLimiters.clobBook.execute(() =>
+      fetch('https://clob.polymarket.com/books', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'h2h-arbitrage/1.0',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        body: JSON.stringify(uncached.map((token_id) => ({ token_id, side: 'BUY' }))),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      }),
+    );
+
+    const books: unknown = res.ok ? await res.json() : [];
+    const byAssetId = new Map<string, ClobBook>();
+    const assetIdCounts = new Map<string, number>();
+    const isLevelArray = (value: unknown): value is ClobBook['bids'] =>
+      Array.isArray(value) && value.every((level) =>
+        level != null && typeof level === 'object' &&
+        typeof (level as { price?: unknown }).price === 'string' &&
+        typeof (level as { size?: unknown }).size === 'string',
+      );
+    if (Array.isArray(books)) {
+      for (const candidate of books) {
+        if (!candidate || typeof candidate !== 'object') continue;
+        const assetId = (candidate as { asset_id?: unknown }).asset_id;
+        if (typeof assetId === 'string') assetIdCounts.set(assetId, (assetIdCounts.get(assetId) ?? 0) + 1);
+      }
+      for (const candidate of books) {
+        if (!candidate || typeof candidate !== 'object') continue;
+        const book = candidate as ClobBook;
+        if (typeof book.asset_id === 'string' && assetIdCounts.get(book.asset_id) === 1 &&
+            isLevelArray(book.bids) && isLevelArray(book.asks)) {
+          byAssetId.set(book.asset_id, book);
+        }
+      }
+    }
+
+    for (const tokenId of uncached) {
+      const book = byAssetId.get(tokenId) ?? null;
+      setCachedBook(tokenId, book);
+      result.set(tokenId, book);
+    }
+  } catch {
+    for (const tokenId of uncached) {
+      setCachedBook(tokenId, null);
+      result.set(tokenId, null);
+    }
+  } finally {
+    clobSemaphore.release();
+  }
+
+  return result;
+}
+
+/**
  * Dollar liquidity available at the best ask only. Depth at worse prices is
  * excluded: an executable arb must be fillable at the displayed quote.
  */
@@ -368,6 +445,57 @@ export async function fetchClobMarkets(conditionIds: string[]): Promise<Map<stri
     if (market) map.set(cid, market);
   }
   return map;
+}
+
+export interface ClobPrices {
+  yesPrice: number;
+  noPrice: number;
+  bestBid: number;
+  bestAsk: number;
+  lastTradePrice: number;
+}
+
+/** Derive executable prices from token books already fetched by the caller. */
+export function getClobPricesFromBooks(
+  clob: ClobMarket,
+  yesBook: ClobBook | null = null,
+  noBook: ClobBook | null = null,
+): ClobPrices | null {
+  const clamp = (value: number) => Math.max(0, Math.min(1, value));
+  const isExecutablePrice = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1;
+
+  if (clob.neg_risk !== true && isExecutablePrice(clob.best_bid) && isExecutablePrice(clob.best_ask)) {
+    const yesPrice = clamp(clob.best_ask);
+    const noPrice = clamp(1 - clob.best_bid);
+    return {
+      yesPrice,
+      noPrice,
+      bestBid: clamp(clob.best_bid),
+      bestAsk: yesPrice,
+      lastTradePrice: clob.last_trade_price ?? yesPrice,
+    };
+  }
+
+  const yesPrices = getBestPriceFromBook(yesBook);
+  const noPrices = getBestPriceFromBook(noBook);
+  if (!yesPrices) return null;
+
+  const yesPrice = clamp(yesPrices.bestAsk);
+  const noPrice = noPrices?.bestAsk && noPrices.bestAsk > 0
+    ? clamp(noPrices.bestAsk)
+    : yesPrices.bestBid > 0
+      ? clamp(1 - yesPrices.bestBid)
+      : 0;
+  if (yesPrice === 0 && noPrice === 0) return null;
+
+  return {
+    yesPrice,
+    noPrice,
+    bestBid: clamp(yesPrices.bestBid),
+    bestAsk: yesPrice,
+    lastTradePrice: clob.last_trade_price ?? yesPrice,
+  };
 }
 
 /**

@@ -3,7 +3,9 @@
  *
  * Skips the heavy parts of /api/scan:
  *  - no multi-series Kalshi discovery
- *  - no CLOB orderbook depth fetching (uses CLOB metadata best_bid/best_ask only)
+ *  - no per-condition CLOB metadata requests; standard markets use Gamma's
+ *    aggregate CLOB quotes and neg-risk token books use one batch request
+ *  - no CLOB depth fetching (prices only)
  *  - no DB writes, no arb lifecycle tracking, no Telegram alerts
  *
  * Returns the same outcome shape as /api/scan so the UI can merge it in-place.
@@ -15,11 +17,9 @@ import {
   filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
 } from '@/lib/kalshi';
-import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
-import { fetchClobMarkets, getClobPrices } from '@/lib/polymarket-clob';
+import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from '@/lib/polymarket';
+import { ClobMarket, fetchClobBooks, getClobPricesFromBooks } from '@/lib/polymarket-clob';
 import {
-  buildKalshiArbShape,
-  buildPmArbShape,
   matchOutcomes,
   calculateAllArbitrages,
   computeApy,
@@ -59,6 +59,79 @@ export interface QuickPricesResult {
   _ts: number;
   _kalshiFetchedAt: string;
   _pmFetchedAt: string;
+}
+
+function parseStringArray(serialized: string | undefined): string[] {
+  try {
+    const parsed: unknown = JSON.parse(serialized || '[]');
+    return Array.isArray(parsed) && parsed.every((value) => typeof value === 'string')
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function quickClobMarket(market: PMMarket): ClobMarket | null {
+  const outcomes = parseStringArray(market.outcomes);
+  const tokenIds = parseStringArray(market.clobTokenIds);
+  if (outcomes.length !== tokenIds.length || outcomes.length === 0 ||
+      tokenIds.some((tokenId) => tokenId.trim() === '') ||
+      new Set(tokenIds).size !== tokenIds.length) return null;
+
+  const tokens = outcomes.map((outcome, index) => ({ token_id: tokenIds[index], outcome }));
+  if (!tokens.some((token) => token.outcome.toLowerCase() === 'yes') ||
+      !tokens.some((token) => token.outcome.toLowerCase() === 'no')) return null;
+
+  return {
+    condition_id: market.conditionId,
+    best_bid: market.bestBid,
+    best_ask: market.bestAsk,
+    last_trade_price: market.lastTradePrice,
+    closed: market.closed,
+    active: market.active,
+    neg_risk: market.negRisk === true || market.neg_risk === true,
+    tokens,
+  };
+}
+
+/** Enrich Gamma markets with executable CLOB quotes using one batch book call. */
+export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): Promise<PMMarket[]> {
+  const clobMarkets = markets.map(quickClobMarket);
+  const tokenIds = clobMarkets.flatMap((clob) => {
+    if (!clob) return [];
+    const isExecutable = (value: unknown): value is number =>
+      typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1;
+    const hasAggregateQuotes = clob.neg_risk !== true &&
+      isExecutable(clob.best_bid) && isExecutable(clob.best_ask);
+    return hasAggregateQuotes ? [] : clob.tokens.map((token) => token.token_id);
+  });
+  const books = await fetchClobBooks(tokenIds);
+
+  return markets.map((market, index) => {
+    const clob = clobMarkets[index];
+    if (!clob) {
+      return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
+    }
+    const yesToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
+    const noToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+    const live = getClobPricesFromBooks(
+      clob,
+      yesToken ? books.get(yesToken.token_id) ?? null : null,
+      noToken ? books.get(noToken.token_id) ?? null : null,
+    );
+    if (!live) {
+      return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
+    }
+    return {
+      ...market,
+      outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
+      bestBid: live.bestBid,
+      bestAsk: live.bestAsk,
+      lastTradePrice: live.lastTradePrice,
+      neg_risk: clob.neg_risk,
+    };
+  });
 }
 
 export async function quickPricesScan(marketId: string, capital = 1000): Promise<QuickPricesResult> {
@@ -111,51 +184,10 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
   const pmFilteredCount = pmMarketsRaw.length;
 
-  const conditionIds = pmMarketsRaw.map((m: any) => m.conditionId).filter(Boolean) as string[];
-  const clobTimeout = Math.max(QUICK_PM_TIMEOUT_MS, conditionIds.length * 500);
-  let clobMap: Map<string, any>;
-  try {
-    clobMap = await withTimeout(fetchClobMarkets(conditionIds), clobTimeout, 'CLOB metadata');
-  } catch {
-    clobMap = new Map();
-  }
-
-  const clobMapLower = new Map<string, any>();
-  for (const [key, val] of clobMap) {
-    clobMapLower.set(key.toLowerCase(), val);
-  }
-
-  // Fast price enrichment: use CLOB metadata only; do not fetch token orderbooks for depth.
-  // getClobPrices will still use token books as fallback when aggregate best_bid/best_ask is missing.
-  const pmMarkets: any[] = await Promise.all(
-    pmMarketsRaw.map(async (m) => {
-      const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
-      if (!clob) return m;
-      try {
-        const live = await getClobPrices(clob);
-        if (!live) {
-          const yes = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'Yes')?.price ?? 0;
-          const no = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'No')?.price ?? 0;
-          return {
-            ...m,
-            clobEmpty: true,
-            outcomePrices: JSON.stringify([yes, no]),
-            bestAsk: 0,
-            bestBid: 0,
-          };
-        }
-        return {
-          ...m,
-          outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
-          bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
-          bestAsk: live.bestAsk != null ? live.bestAsk : m.bestAsk,
-          lastTradePrice: live.lastTradePrice,
-          neg_risk: clob.neg_risk,
-        };
-      } catch {
-        return m;
-      }
-    }),
+  const pmMarkets = await withTimeout(
+    enrichQuickPmMarketsWithClobPrices(pmMarketsRaw),
+    QUICK_PM_TIMEOUT_MS,
+    'CLOB quick prices',
   );
 
   const kalshiRawCount = kalshiMarkets.length;
