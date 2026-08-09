@@ -54,6 +54,20 @@ interface KalshiPositionRaw {
   last_updated_ts: string;
 }
 
+/** Available Kalshi portfolio cash in USD. */
+export async function getKalshiCashBalance(): Promise<number> {
+  const path = '/trade-api/v2/portfolio/balance';
+  const res = await fetch(`${KALSHI_TRADE_BASE}${path}`, {
+    method: 'GET',
+    headers: makeKalshiAuthHeaders('GET', path),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Kalshi balance fetch failed: HTTP ${res.status}`);
+  const data = await res.json() as Record<string, unknown>;
+  if (data.balance_dollars != null) return Math.max(0, Number(data.balance_dollars) || 0);
+  return Math.max(0, (Number(data.balance) || 0) / 100);
+}
+
 export async function getKalshiPositions(): Promise<KalshiPosition[]> {
   const path = '/trade-api/v2/portfolio/positions';
   const url = `${KALSHI_TRADE_BASE}${path}?count_filter=position&limit=1000`;

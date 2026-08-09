@@ -119,9 +119,11 @@ interface PairedPosition {
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const [kalshiPositions, pmPositions] = await Promise.allSettled([
+    const [kalshiPositions, pmPositions, kalshiCash, pmCash] = await Promise.allSettled([
       fetchKalshiPositions(),
       fetchPmPositions(),
+      import('@/lib/kalshi-positions').then(module => module.getKalshiCashBalance()),
+      import('@/lib/polymarket-orders').then(module => module.getPmCashBalance()),
     ]);
 
     const kalshi: KalshiPositionDto[] =
@@ -158,6 +160,12 @@ export async function GET(): Promise<NextResponse> {
       positions: enriched,
       raw: { kalshi, polymarket: pm },
       errors: { kalshi: kalshiError, polymarket: pmError },
+      cash: {
+        kalshi: kalshiCash.status === 'fulfilled' ? kalshiCash.value : null,
+        polymarket: pmCash.status === 'fulfilled' ? pmCash.value : null,
+        total: (kalshiCash.status === 'fulfilled' ? kalshiCash.value : 0) + (pmCash.status === 'fulfilled' ? pmCash.value : 0),
+        complete: kalshiCash.status === 'fulfilled' && pmCash.status === 'fulfilled',
+      },
     });
   } catch (err) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });

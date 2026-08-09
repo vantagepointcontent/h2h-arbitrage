@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PlatformIcon } from '@/lib/platforms/PlatformIcon';
 import { DataTable, EmptyState, Metric } from '@/components/ui';
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 // ── Fee helpers (client-safe, mirrors matcher.ts server-side math) ──
 
@@ -143,6 +144,7 @@ interface PositionsResponse {
   success: boolean;
   positions: PairedPosition[];
   errors: { kalshi?: string | null; polymarket?: string | null };
+  cash?: { kalshi: number | null; polymarket: number | null; total: number; complete: boolean };
 }
 
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
@@ -160,11 +162,24 @@ const fmtAge = (value: string | null) => value ? `${Math.max(0, Math.floor((Date
 type SortField = 'market' | 'roi' | 'value' | 'size';
 type SortDir = 'asc' | 'desc';
 
+export function buildPortfolioAllocation(
+  positions: Array<Pick<PairedPosition, 'marketTitle' | 'totalValue'>>,
+  cashUsd: number,
+) {
+  const values = [
+    ...positions.filter(position => position.totalValue > 0).map(position => ({ name: position.marketTitle, value: position.totalValue, kind: 'position' as const })),
+    { name: 'Cash', value: Math.max(0, cashUsd), kind: 'cash' as const },
+  ];
+  const total = values.reduce((sum, item) => sum + item.value, 0);
+  return values.map(item => ({ ...item, percentage: total > 0 ? (item.value / total) * 100 : 0 }));
+}
+
 export default function OpenPositionsPanel() {
   const [positions, setPositions] = useState<PairedPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [platformErrors, setPlatformErrors] = useState<{ kalshi?: string; polymarket?: string }>({});
+  const [cash, setCash] = useState({ kalshi: null as number | null, polymarket: null as number | null, total: 0, complete: false });
   const [sortField, setSortField] = useState<SortField>('market');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [exiting, setExiting] = useState<string | null>(null);
@@ -185,6 +200,7 @@ export default function OpenPositionsPanel() {
         throw new Error(fetchErrors.join('; '));
       }
       setPositions(nextPositions);
+      setCash(data.cash ?? { kalshi: null, polymarket: null, total: 0, complete: false });
       setPlatformErrors({
         kalshi: data.errors?.kalshi || undefined,
         polymarket: data.errors?.polymarket || undefined,
@@ -313,6 +329,9 @@ export default function OpenPositionsPanel() {
   const totalPnl = positions.reduce((s, p) => s + p.totalUnrealizedPnl, 0);
   const totalRoi = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const pairedCount = positions.filter(p => p.kalshi && p.polymarket).length;
+  const allocationData = buildPortfolioAllocation(positions, cash.total);
+  const totalPortfolioValue = totalValue + cash.total;
+  const allocationColors = ['var(--status-positive)', 'var(--platform-polymarket)', 'var(--status-warning)', 'var(--accent-primary)', 'var(--status-negative)', 'var(--text-secondary)'];
 
   if (loading) {
     return <div role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-secondary)]"><Loader2 className="h-4 w-4 animate-spin" /> Loading positions…</div>;
@@ -380,6 +399,24 @@ export default function OpenPositionsPanel() {
       )}
 
       {/* Summary cards */}
+      <section aria-label="Portfolio allocation" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div><h3 className="text-sm font-semibold text-[var(--text-primary)]">Portfolio allocation</h3><p className="text-xs text-[var(--text-secondary)]">Open positions and available cash · total {fmtUsd(totalPortfolioValue)}</p></div>
+          {!cash.complete && <span className="rounded bg-[var(--status-warning)]/10 px-2 py-1 text-[10px] text-[var(--status-warning)]">Cash is partial until both accounts connect</span>}
+        </div>
+        {totalPortfolioValue > 0 ? <div className="h-80 w-full" data-testid="portfolio-allocation-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={allocationData} dataKey="value" nameKey="name" cx="50%" cy="46%" outerRadius="75%" labelLine={false} label={({ name, percentage }: any) => `${name === 'Cash' ? 'Cash' : String(name).slice(0, 18)} ${Number(percentage || 0).toFixed(1)}%`}>
+                {allocationData.map((entry, index) => <Cell key={`${entry.name}-${index}`} fill={entry.kind === 'cash' ? 'var(--text-muted)' : allocationColors[index % allocationColors.length]} />)}
+              </Pie>
+              <Tooltip formatter={(value: any, name: any) => [fmtUsd(Number(value)), String(name)]} contentStyle={{ background: 'var(--surface-workspace)', border: '1px solid var(--border-strong)', borderRadius: 8 }} />
+              <Legend formatter={(value) => String(value)} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div> : <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No positions or cash balance available.</div>}
+      </section>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Open positions" value={positions.length} hint={pairedCount > 0 ? `${pairedCount} arb pairs` : undefined} />
         <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Total value" value={fmtUsd(totalValue)} />

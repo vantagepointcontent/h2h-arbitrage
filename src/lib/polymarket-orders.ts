@@ -71,6 +71,14 @@ export function resetClobClient(): void {
   _client = null;
 }
 
+/** Available Polymarket collateral balance in USD (USDC has 6 decimals). */
+export async function getPmCashBalance(): Promise<number> {
+  const client = await getClobClient();
+  const response = await client.getBalanceAllowance({ asset_type: 'COLLATERAL' });
+  const raw = Number(response?.balance ?? 0);
+  return Number.isFinite(raw) && raw > 0 ? raw / 1_000_000 : 0;
+}
+
 export async function placePmOrder(p: PmOrderParams): Promise<PmOrderResponse> {
   if (p.price <= 0 || p.price >= 1) throw new Error(`PM price out of range: ${p.price}`);
   if (p.size <= 0) throw new Error(`PM size must be > 0, got ${p.size}`);
