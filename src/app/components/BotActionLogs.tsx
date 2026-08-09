@@ -11,7 +11,7 @@ const statusClass: Record<LogStatus,string> = { passed:'text-[var(--status-posit
 const statusIcon: Record<LogStatus,string> = { passed:'✓', failed:'✕', pending:'◷' };
 const pretty = (value: unknown) => value == null ? '—' : JSON.stringify(value, null, 2);
 
-export default function BotActionLogs() {
+export default function BotActionLogs({ selectionMethod }: { selectionMethod?: 'roi' | 'apy' | 'hybrid' }) {
   const [trades,setTrades]=useState<TradeChain[]>([]);
   const [status,setStatus]=useState<'all'|LogStatus>('all');
   const [market,setMarket]=useState('');
@@ -43,6 +43,7 @@ export default function BotActionLogs() {
       <label className="text-xs text-[var(--text-secondary)]">Since<input type="date" value={since} onChange={e=>setSince(e.target.value)} className="ml-2 min-h-11 rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]" /></label>
       <label className="text-xs text-[var(--text-secondary)]">Market ID<input value={market} onChange={e=>setMarket(e.target.value)} placeholder="All markets" className="ml-2 min-h-11 rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]" /></label>
       <label className="flex min-h-11 items-center gap-2 text-xs text-[var(--text-secondary)]"><input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)} /> Auto-refresh 30s</label>
+      <span title="Backend-ranked selection method used for new BotTrader evaluations" className="flex min-h-11 items-center rounded border border-[var(--border-strong)] px-3 text-[10px] font-bold uppercase text-[var(--text-primary)]">Method: {selectionMethod ?? 'unknown'}</span>
       <button onClick={()=>void load()} aria-label="Refresh action logs" className="min-h-11 min-w-11 rounded border border-[var(--border-strong)]"><RefreshCw className={`mx-auto h-4 w-4 ${loading?'animate-spin':''}`} /></button>
     </div>
     {error&&<div role="alert" className="rounded border border-[var(--status-negative)]/40 p-3 text-sm text-[var(--status-negative)]">{error}</div>}

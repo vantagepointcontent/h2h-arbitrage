@@ -56,7 +56,7 @@ function stubInitialFetch() {
     const url = String(input);
     if (url.includes('/analytics')) return response({ success: true, analytics });
     if (url.includes('/positions')) return response({ success: true, positions });
-    if (url.includes('/status')) return response({ enabled: false, mode: 'paper', todayCount: 2, todayStakeUsd: 10.5 });
+    if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
     throw new Error(`Unexpected fetch: ${url}`);
   }));
 }
@@ -115,7 +115,7 @@ describe('BotTraderPanel', () => {
         : positions;
       if (url.includes('/analytics')) return response({ success: true, analytics });
       if (url.includes('/positions')) return response({ success: true, positions: visiblePositions });
-      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', todayCount: 2, todayStakeUsd: 10.5 });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
       throw new Error(`Unexpected fetch: ${url}`);
     }));
 
@@ -132,7 +132,7 @@ describe('BotTraderPanel', () => {
 
     staleResolvers[0]({ ok: true, json: async () => ({ success: true, analytics }) });
     staleResolvers[1]({ ok: true, json: async () => ({ success: true, positions }) });
-    staleResolvers[2]({ ok: true, json: async () => ({ enabled: false, mode: 'paper', todayCount: 2, todayStakeUsd: 10.5 }) });
+    staleResolvers[2]({ ok: true, json: async () => ({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 }) });
 
     await waitFor(() => expect(screen.queryByText('Trump 2026')).toBeNull());
     expect(screen.getByText('Fresh open position')).toBeTruthy();

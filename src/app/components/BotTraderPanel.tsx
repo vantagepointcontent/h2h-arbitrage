@@ -66,6 +66,7 @@ interface Analytics {
 interface BotStatus {
   enabled: boolean;
   mode: 'paper' | 'production';
+  selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
   todayStakeUsd: number;
 }
@@ -216,12 +217,16 @@ export default function BotTraderPanel() {
     }
   };
 
-  const saveSetting = async (key: 'bot.enabled' | 'bot.mode', value: boolean | 'paper' | 'production', confirmation?: 'PRODUCTION') => {
+  const saveSetting = async (key: 'bot.enabled' | 'bot.mode' | 'bot.selectionMethod', value: boolean | 'paper' | 'production' | 'roi' | 'apy' | 'hybrid', confirmation?: 'PRODUCTION') => {
     if (!status) return;
     const previous = status;
     setSaving(true);
     setError(null);
-    setStatus({ ...status, ...(key === 'bot.enabled' ? { enabled: value as boolean } : { mode: value as 'paper' | 'production' }) });
+    setStatus({ ...status, ...(key === 'bot.enabled'
+      ? { enabled: value as boolean }
+      : key === 'bot.mode'
+        ? { mode: value as 'paper' | 'production' }
+        : { selectionMethod: value as 'roi' | 'apy' | 'hybrid' }) });
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
@@ -255,6 +260,17 @@ export default function BotTraderPanel() {
     setProductionConfirmOpen(true);
   };
 
+  const setRankSource = (source: 'roi' | 'apy', enabled: boolean) => {
+    if (!status) return;
+    const roiEnabled = status.selectionMethod !== 'apy';
+    const apyEnabled = status.selectionMethod !== 'roi';
+    const nextRoi = source === 'roi' ? enabled : roiEnabled;
+    const nextApy = source === 'apy' ? enabled : apyEnabled;
+    if (!nextRoi && !nextApy) return;
+    const method = nextRoi && nextApy ? 'hybrid' : nextRoi ? 'roi' : 'apy';
+    void saveSetting('bot.selectionMethod', method);
+  };
+
   const unrealized = analytics.openPositions.unrealizedPnlCents;
   const realized = analytics.settledPositions.realizedPnlCents;
   const totalPnl = unrealized + realized;
@@ -276,7 +292,16 @@ export default function BotTraderPanel() {
         {(['analytics', 'logs', 'messages'] as const).map((tab) => <button key={tab} role="tab" aria-selected={view === tab} onClick={() => setView(tab)} className={`min-h-11 rounded-md px-4 text-xs font-semibold capitalize ${view === tab ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{tab}</button>)}
       </div>
 
-      {view === 'logs' ? <BotActionLogs /> : view === 'messages' ? <BotTraderMessages /> : <div className="space-y-3">
+      {status && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+        <div><div className="text-xs font-semibold text-[var(--text-primary)]">Ranked candidate sources</div><div className="text-[10px] text-[var(--text-secondary)]">All ROI and profit values are net of trading fees. This does not enable live trading.</div></div>
+        <div className="flex items-center gap-2" role="group" aria-label="BotTrader ranked candidate sources">
+          <label title="ROI ranks eligible markets by highest fee-net return on invested capital." className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${status.selectionMethod !== 'apy' ? 'border-[var(--status-positive)] bg-[var(--status-positive)]/10 text-[var(--status-positive)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`}><input type="checkbox" checked={status.selectionMethod !== 'apy'} disabled={saving} onChange={(event) => setRankSource('roi', event.target.checked)} /> ROI</label>
+          <label title="APY ranks eligible markets by annualized yield while still requiring positive fee-net ROI." className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${status.selectionMethod !== 'roi' ? 'border-[var(--status-positive)] bg-[var(--status-positive)]/10 text-[var(--status-positive)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`}><input type="checkbox" checked={status.selectionMethod !== 'roi'} disabled={saving} onChange={(event) => setRankSource('apy', event.target.checked)} /> APY</label>
+          <span title="Hybrid requires both configured ROI and APY thresholds and ranks deterministically by ROI, then APY." className="rounded-md bg-[var(--surface-workspace)] px-2 py-1 text-[10px] font-bold uppercase text-[var(--text-primary)]">{status.selectionMethod}</span>
+        </div>
+      </div>}
+
+      {view === 'logs' ? <BotActionLogs selectionMethod={status?.selectionMethod} /> : view === 'messages' ? <BotTraderMessages /> : <div className="space-y-3">
 
       {status && (
         <div className={`rounded-lg border px-3 py-3 ${status.enabled ? 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10' : 'border-[var(--border-subtle)] bg-[var(--surface-panel)]'}`}>
@@ -284,7 +309,7 @@ export default function BotTraderPanel() {
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Bot className={`h-4 w-4 ${status.enabled ? 'text-[var(--status-positive)]' : 'text-[var(--text-secondary)]'}`} />
               <span className="font-semibold">BotTrader: {status.enabled ? 'ON' : 'OFF'}</span>
-              <span className="text-[var(--text-secondary)]">· {status.mode === 'production' ? 'Production' : 'Paper'} mode · {INTEGER.format(status.todayCount)} trades today · {formatUsd(status.todayStakeUsd)} staked</span>
+              <span className="text-[var(--text-secondary)]">· {status.mode === 'production' ? 'Production' : 'Paper'} mode · {status.selectionMethod.toUpperCase()} selection · {INTEGER.format(status.todayCount)} trades today · {formatUsd(status.todayStakeUsd)} staked</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={toggleEnabled} disabled={saving} className={`min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-50 ${status.enabled ? 'border border-[var(--status-negative)]/40 text-[var(--status-negative)]' : 'bg-[var(--status-positive)] text-black'}`}>{status.enabled ? 'Disable Bot' : 'Enable Bot'}</button>
