@@ -78,6 +78,7 @@ const ScanCategoryPicker = dynamic(() => import("@/app/components/ScanCategoryPi
 const TradesPanel = dynamic(() => import("@/app/components/TradesPanel"), { ssr: false });
 const BotTraderPanel = dynamic(() => import("@/app/components/BotTraderPanel"), { ssr: false });
 const PhantomsPanel = dynamic(() => import("@/app/components/PhantomsPanel"), { ssr: false });
+const BatchScanPanel = dynamic(() => import("@/app/components/BatchScanPanel"), { ssr: false });
 import ExecutionModeBadge from "@/app/components/ExecutionModeBadge";
 import { TradingStatusRail } from "@/app/components/shell/TradingStatusRail";
 import { MarketWorkspaceHeader, type MarketWorkspaceTab } from "@/app/components/market/MarketWorkspaceHeader";
@@ -1654,6 +1655,7 @@ export default function Home() {
               <CoupleManagementPanel />
             ) : (
               <>
+                {!activeMarketId && <BatchScanPanel onComplete={loadSavedMarkets} />}
                 {/* Scan inputs */}
                 {!activeMarketId && (
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 sm:p-4 md:p-5 mb-4 sm:mb-6">
