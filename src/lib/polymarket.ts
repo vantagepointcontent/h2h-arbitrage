@@ -21,6 +21,8 @@ export interface PMMarket {
   closed: boolean;
   endDate?: string; // ISO 8601, market close date
   neg_risk?: boolean; // true = independent binary outcomes (YES/NO don't sum to 1)
+  negRisk?: boolean; // Gamma API field name
+  clobTokenIds?: string; // Gamma JSON string, ordered like `outcomes`
   /** CLOB was reached but had no executable asks. Gamma values must not be used. */
   clobEmpty?: boolean;
   /** Dollar quantity at the live CLOB YES/NO best ask; zero means unknown or unavailable. */
