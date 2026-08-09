@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
-import { runBotTraderOnScanOutcomes, type BotTradeInput } from '@/lib/bot-trader';
-import { getSavedMarketById } from '@/lib/persistence';
+import { getBotSettings, runBotTraderOnScanOutcomes, type BotTradeInput } from '@/lib/bot-trader';
+import { getSavedMarketById, getSavedMarkets } from '@/lib/persistence';
+import { rankBotCandidates } from '@/lib/bot-candidate-selection';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket, type SingleRefreshResult } from '@/app/api/saved-markets/refresh/refresh-single';
 import logger from '@/lib/logger';
@@ -143,11 +144,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const body = await req.json();
-    const pairId = body?.pairId;
+    let pairId = body?.pairId;
     const marketTitle = body?.marketTitle;
 
-    if (typeof pairId !== 'string' || pairId.length === 0) {
-      return NextResponse.json({ error: 'Missing pairId' }, { status: 400 });
+    const settings = await getBotSettings();
+    let selectedBy = 'explicit' as string;
+    if (pairId == null && body?.ranked === true) {
+      const ranked = rankBotCandidates(await getSavedMarkets(), settings.selectionMethod, Date.now(), {
+        minRoiPct: settings.minRoiPct,
+        minApyPct: settings.minApyPct,
+      });
+      if (ranked.length === 0) {
+        return NextResponse.json({ error: 'No eligible ranked candidate', selectionMethod: settings.selectionMethod }, { status: 404 });
+      }
+      pairId = ranked[0].market.id;
+      selectedBy = settings.selectionMethod;
+    } else if (typeof pairId !== 'string' || pairId.length === 0) {
+      return NextResponse.json({ error: 'Missing or invalid pairId; pass ranked=true to select the top candidate' }, { status: 400 });
     }
 
     const market = await getSavedMarketById(pairId);
@@ -180,6 +193,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       pairId: market.id,
       marketTitle: market.eventTitle,
+      selectionMethod: selectedBy,
       evaluated: inputs.length,
       executed,
       results: botResults.map((b) => ({ executed: b.executed, dryRun: b.dryRun, reason: b.reason })),

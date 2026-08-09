@@ -21,6 +21,7 @@ function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
   return {
     enabled: true,
     mode: 'paper',
+    selectionMethod: 'hybrid',
     minRoiPct: 2.0,
     minApyPct: 0,
     minDepthUsd: 0.5,
@@ -111,6 +112,7 @@ describe('getBotSettings', () => {
         switch (key) {
           case 'bot.enabled': return true;
           case 'bot.mode': return 'paper';
+          case 'bot.selectionMethod': return 'hybrid';
           case 'bot.minRoiPct': return 2.5;
           case 'bot.minApyPct': return 0;
           case 'bot.minSharesPerLeg': return 2;

@@ -97,6 +97,7 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   // ── BotTrader (FEAT-041) ──
   { key: 'bot.enabled', section: 'bot', label: 'BotTrader enabled', description: 'Master switch. When off, no bot trades are placed.', type: 'boolean', default: false, dangerous: true },
   { key: 'bot.mode', section: 'bot', label: 'Execution mode', description: 'Paper simulates trades. Production places real orders (requires execute.mode=live).', type: 'string', default: 'paper', options: ['paper', 'production'], dangerous: true },
+  { key: 'bot.selectionMethod', section: 'bot', label: 'Candidate selection', description: 'Rank BotTrader candidates by fee-net ROI, APY, or require both in Hybrid mode.', type: 'string', default: 'hybrid', options: ['roi', 'apy', 'hybrid'] },
   { key: 'bot.minRoiPct', section: 'bot', label: 'Min ROI %', description: 'Minimum net ROI (after fees) for the bot to trigger a trade.', type: 'number', default: 2.0, min: 0, max: 50, slider: true },
   { key: 'bot.minDepthUsd', section: 'bot', label: 'Min depth per leg $', description: 'Minimum dollar depth at best ask on EACH leg (not total). $0.50 here means ~$0.50 on each leg, which is ~$1 total trade at typical $0.50 ask prices.', type: 'number', default: 0.5, min: 0.01, max: 1000, slider: true },
   { key: 'bot.minApyPct', section: 'bot', label: 'Min APY %', description: 'Minimum annualized yield. Set to 0 to disable APY filter.', type: 'number', default: 0, min: 0, max: 500, slider: true },

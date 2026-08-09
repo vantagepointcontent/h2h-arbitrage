@@ -588,19 +588,6 @@ async function pollOnce() {
         body: JSON.stringify({ action: 'promote', pairId: market.id }),
         signal: AbortSignal.timeout(5000),
       }).catch(() => {});
-      // FEAT-040: BotTrader hook for poller path.  We only have aggregate scan
-      // results here (no full UnifiedOutcome array).  The in-app refresh job path
-      // does the real outcome-level evaluation.  This hook logs when the market is
-      // positive so the operator sees BotTrader is active.
-      fetch(`${BASE_URL}/api/bot-trader/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
-        },
-        body: JSON.stringify({ pairId: market.id, marketTitle: market.eventTitle }),
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => {});
     } else {
       console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
     }

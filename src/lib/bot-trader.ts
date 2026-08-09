@@ -36,12 +36,14 @@ import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './tele
 import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
 import { createBotMessage, updateBotMessage, type BotMessageType } from './bot-trader-messages';
 import logger from './logger';
+import type { BotSelectionMethod } from './bot-candidate-selection';
 
 // ─── Types ─────────────────────────────────────────────────────
 
 export interface BotSettings {
   enabled: boolean;
   mode: 'paper' | 'production';
+  selectionMethod: BotSelectionMethod;
   minRoiPct: number;
   minApyPct: number;
   /** minimum dollar depth at best ask on EACH leg (per-leg, not total) */
@@ -121,6 +123,7 @@ export interface BotExecutionResult {
 const DEFAULT_BOT_SETTINGS: BotSettings = {
   enabled: false,
   mode: 'paper',
+  selectionMethod: 'hybrid',
   minRoiPct: 2.0,
   minApyPct: 0,
   minDepthUsd: 0.5,
@@ -135,9 +138,10 @@ const AUTO_LIVE_ORDERS_AUTHORIZED = false;
 // ─── Settings loading ────────────────────────────────────────────
 
 export async function getBotSettings(): Promise<BotSettings> {
-  const [enabled, mode, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
+  const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
     getSetting<boolean>('bot.enabled').catch(() => DEFAULT_BOT_SETTINGS.enabled),
     getSetting<string>('bot.mode').catch(() => DEFAULT_BOT_SETTINGS.mode),
+    getSetting<BotSelectionMethod>('bot.selectionMethod').catch(() => DEFAULT_BOT_SETTINGS.selectionMethod),
     getSetting<number>('bot.minRoiPct').catch(() => DEFAULT_BOT_SETTINGS.minRoiPct),
     getSetting<number>('bot.minApyPct').catch(() => DEFAULT_BOT_SETTINGS.minApyPct),
     getSetting<number>('bot.minDepthUsd').catch(() => DEFAULT_BOT_SETTINGS.minDepthUsd),
@@ -149,6 +153,7 @@ export async function getBotSettings(): Promise<BotSettings> {
   return {
     enabled: enabled === true,
     mode: mode === 'production' ? 'production' : 'paper',
+    selectionMethod: ['roi', 'apy', 'hybrid'].includes(selectionMethod) ? selectionMethod : 'hybrid',
     minRoiPct: Number.isFinite(minRoiPct) ? minRoiPct : DEFAULT_BOT_SETTINGS.minRoiPct,
     minApyPct: Number.isFinite(minApyPct) ? minApyPct : DEFAULT_BOT_SETTINGS.minApyPct,
     minDepthUsd: Number.isFinite(minDepthUsd) && minDepthUsd > 0
@@ -249,12 +254,12 @@ export function evaluateBotTrade(
     };
   }
 
-  if (roiPct < settings.minRoiPct) {
+  if (settings.selectionMethod !== 'apy' && roiPct < settings.minRoiPct) {
     reasons.push(`ROI ${roiPct.toFixed(2)}% < min ${settings.minRoiPct.toFixed(2)}%`);
   }
 
   const apyPct = input.apyPct ?? 0;
-  if (settings.minApyPct > 0 && apyPct < settings.minApyPct) {
+  if (settings.selectionMethod !== 'roi' && settings.minApyPct > 0 && apyPct < settings.minApyPct) {
     reasons.push(`APY ${apyPct.toFixed(2)}% < min ${settings.minApyPct.toFixed(2)}%`);
   }
 

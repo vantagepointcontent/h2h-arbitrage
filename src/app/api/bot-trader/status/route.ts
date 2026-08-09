@@ -6,6 +6,7 @@ import logger from '@/lib/logger';
 const DEFAULT_BOT_SETTINGS = {
   enabled: false,
   mode: 'paper',
+  selectionMethod: 'hybrid',
   minRoiPct: 2.0,
   minApyPct: 0,
   minDepthUsd: 0.5,
@@ -21,9 +22,10 @@ const DEFAULT_BOT_SETTINGS = {
  */
 export async function GET() {
   try {
-    const [enabled, mode, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
+    const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
       getSetting<boolean>('bot.enabled').catch(() => DEFAULT_BOT_SETTINGS.enabled),
       getSetting<string>('bot.mode').catch(() => DEFAULT_BOT_SETTINGS.mode),
+      getSetting<string>('bot.selectionMethod').catch(() => DEFAULT_BOT_SETTINGS.selectionMethod),
       getSetting<number>('bot.minRoiPct').catch(() => DEFAULT_BOT_SETTINGS.minRoiPct),
       getSetting<number>('bot.minApyPct').catch(() => DEFAULT_BOT_SETTINGS.minApyPct),
       getSetting<number>('bot.minDepthUsd').catch(() => DEFAULT_BOT_SETTINGS.minDepthUsd),
@@ -55,6 +57,7 @@ export async function GET() {
     const status = {
       enabled,
       mode,
+      selectionMethod,
       minRoiPct,
       minApyPct,
       minDepthUsd,
@@ -83,6 +86,7 @@ export async function GET() {
       {
         enabled: false,
         mode: 'paper',
+        selectionMethod: DEFAULT_BOT_SETTINGS.selectionMethod,
         minRoiPct: DEFAULT_BOT_SETTINGS.minRoiPct,
         minApyPct: DEFAULT_BOT_SETTINGS.minApyPct,
         minDepthUsd: DEFAULT_BOT_SETTINGS.minDepthUsd,
