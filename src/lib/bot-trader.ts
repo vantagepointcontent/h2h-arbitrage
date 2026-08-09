@@ -34,6 +34,7 @@ import {
 import { recordBotPosition } from './bot-positions';
 import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './telegram-alerts';
 import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
+import { createBotMessage, updateBotMessage, type BotMessageType } from './bot-trader-messages';
 import logger from './logger';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -646,7 +647,7 @@ export async function maybeExecuteBotTrade(
     }
   }
 
-  await sendBotTelegramAlert(input, result.success, effectiveDryRun, input.roiPct).catch((e) => {
+  await sendBotTelegramAlert(input, result.success, effectiveDryRun, input.roiPct, tradeId).catch((e) => {
     logger.warn('[bot-trader] telegram alert failed', { arbId, error: String(e) });
   });
 
@@ -666,11 +667,9 @@ async function sendBotTelegramAlert(
   success: boolean,
   dryRun: boolean,
   roiPct: number,
+  tradeId: string,
 ): Promise<void> {
   const config = await getConfigResolved();
-  if (!config) return;
-  if (await isPausedResolved()) return;
-
   const emoji = dryRun ? '🤖' : '🦾';
   const modeLabel = dryRun ? 'PAPER' : 'PRODUCTION';
   const status = success ? 'placed' : 'attempted';
@@ -685,8 +684,21 @@ async function sendBotTelegramAlert(
     `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
     `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,
   ].join('\n');
-
-  await sendTelegramMessage(config.botToken, config.chatId, text);
+  const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
+  const messageType: BotMessageType = success ? 'trade_placed' : 'trade_failed';
+  if (!config || !chatId) {
+    await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'failed', errorReason: 'Telegram not configured' });
+    return;
+  }
+  if (await isPausedResolved()) {
+    await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'paused' });
+    return;
+  }
+  const messageId = await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'pending' });
+  const sent = await sendTelegramMessage(config.botToken, chatId, text);
+  await updateBotMessage(messageId, sent.ok
+    ? { status: 'sent', telegramMessageId: sent.messageId }
+    : { status: 'failed', errorReason: sent.error || 'Telegram send failed' });
 }
 
 // ─── Convenience adapters ────────────────────────────────────────

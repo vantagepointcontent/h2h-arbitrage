@@ -83,6 +83,8 @@ export interface TelegramAlertResult {
 export interface TelegramAlertConfig {
   botToken: string;
   chatId: string;
+  /** Dedicated BotTrader destination; falls back to chatId when unset. */
+  botTraderChatId?: string;
   minRoiPct: number;
   minProfitUsd: number;
   cooldownMs: number;
@@ -133,6 +135,7 @@ export function getConfigFromEnv(): TelegramAlertConfig | null {
   return {
     botToken,
     chatId,
+    botTraderChatId: process.env.TELEGRAM_BOT_TRADER_CHAT_ID?.trim() || undefined,
     minRoiPct: parseFloat(process.env.TELEGRAM_MIN_ROI_PCT ?? '') || DEFAULT_MIN_ROI,
     minProfitUsd: parseFloat(process.env.TELEGRAM_MIN_PROFIT_USD ?? '') || DEFAULT_MIN_PROFIT,
     cooldownMs: parseInt(process.env.TELEGRAM_COOLDOWN_MS ?? '', 10) || DEFAULT_COOLDOWN_MS,

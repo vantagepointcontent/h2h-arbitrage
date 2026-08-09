@@ -12,6 +12,10 @@ import type { UnifiedOutcome } from './matcher';
 vi.mock('./bot-action-log', () => ({
   appendBotActionLog: vi.fn(async () => 1),
 }));
+vi.mock('./bot-trader-messages', () => ({
+  createBotMessage: vi.fn(async () => 1),
+  updateBotMessage: vi.fn(async () => undefined),
+}));
 
 function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
   return {
