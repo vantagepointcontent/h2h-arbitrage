@@ -604,9 +604,9 @@ export function isSchedulerRunning(): boolean {
   return schedulerRunning;
 }
 
-// Eager-start: begin scheduler as soon as this module loads on the server.
-// This ensures the 3-hour cycle starts without waiting for an API call.
-startScheduler();
+// Scheduler startup is explicit. The poller calls /api/auto-discovery/warmup,
+// and operators can use the start_scheduler action. Importing this module must
+// remain side-effect free because Next.js loads it in multiple build workers.
 
 /* ──────────────────────────── Public API ──────────────────────────── */
 
