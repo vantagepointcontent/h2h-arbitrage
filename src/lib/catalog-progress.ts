@@ -27,8 +27,19 @@ export interface SyncProgress {
   finishedAt?: string;
 }
 
+const MAX_RETAINED_RUNS = 100;
 const runs = new Map<string, SyncProgress>();
 const listeners = new Map<string, Set<(p: SyncProgress) => void>>();
+
+function pruneCompletedRuns(): void {
+  if (runs.size <= MAX_RETAINED_RUNS) return;
+  for (const [runId, progress] of runs) {
+    if (runs.size <= MAX_RETAINED_RUNS) break;
+    if (progress.step !== 'complete' && progress.step !== 'error') continue;
+    runs.delete(runId);
+    listeners.delete(runId);
+  }
+}
 
 export function createSyncRun(runId: string): SyncProgress {
   const progress: SyncProgress = {
@@ -46,6 +57,7 @@ export function createSyncRun(runId: string): SyncProgress {
   };
   runs.set(runId, progress);
   listeners.set(runId, new Set());
+  pruneCompletedRuns();
   return progress;
 }
 
@@ -77,6 +89,10 @@ export function updateSyncProgress(
   };
   runs.set(runId, next);
   listeners.get(runId)?.forEach((cb) => cb(next));
+  if (next.step === 'complete' || next.step === 'error') {
+    listeners.delete(runId);
+    pruneCompletedRuns();
+  }
   return next;
 }
 

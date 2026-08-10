@@ -64,32 +64,53 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
-      const send = (p: SyncProgress) => {
-        controller.enqueue(encoder.encode(sse(p)));
-        if (p.step === 'complete' || p.step === 'error') {
-          try {
-            controller.close();
-          } catch {}
-        }
-      };
+      let closed = false;
+      let unsubscribe = () => {};
+      let heartbeat: ReturnType<typeof setInterval> | undefined;
 
-      const unsubscribe = subscribeSyncProgress(runId, send);
-
-      request.signal.addEventListener('abort', () => {
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        if (heartbeat) clearInterval(heartbeat);
         unsubscribe();
+        request.signal.removeEventListener('abort', close);
+      };
+      const close = () => {
+        cleanup();
         try {
           controller.close();
         } catch {}
-      });
-
-      // Heartbeat to keep proxies alive
-      const heartbeat = setInterval(() => {
-        if (request.signal.aborted) {
-          clearInterval(heartbeat);
+      };
+      const send = (p: SyncProgress) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(sse(p)));
+        } catch {
+          close();
           return;
         }
-        controller.enqueue(encoder.encode(': heartbeat\n\n'));
+        if (p.step === 'complete' || p.step === 'error') close();
+      };
+
+      request.signal.addEventListener('abort', close, { once: true });
+
+      // Heartbeat to keep proxies alive. It is always cleared by close(),
+      // including normal completion and failures, not only client aborts.
+      heartbeat = setInterval(() => {
+        if (request.signal.aborted || closed) {
+          close();
+          return;
+        }
+        try {
+          controller.enqueue(encoder.encode(': heartbeat\n\n'));
+        } catch {
+          close();
+        }
       }, 5000);
+
+      unsubscribe = subscribeSyncProgress(runId, send);
+      // subscribeSyncProgress synchronously emits the current terminal snapshot.
+      if (closed) unsubscribe();
     },
   });
 
