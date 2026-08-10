@@ -192,11 +192,50 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { kalshi, polymarket } = body;
-
-    if (!kalshi && !polymarket) {
-      return NextResponse.json({ error: 'No positions specified for exit' }, { status: 400 });
+    if (typeof body?.pairId !== 'string' || body.pairId.trim().length === 0) {
+      return NextResponse.json({ error: 'Missing position pair id' }, { status: 400 });
     }
+
+    // Never trust executable order fields from the client. Resolve the current
+    // account positions and quote inputs server-side, then allow only a pair
+    // that exists in that authoritative snapshot.
+    const [kalshiPositions, pmPositions] = await Promise.all([
+      fetchKalshiPositions(),
+      fetchPmPositions(),
+    ]);
+    const verifiedPair = pairPositions(kalshiPositions, pmPositions)
+      .find((position) => position.id === body.pairId.trim());
+
+    if (!verifiedPair) {
+      return NextResponse.json({ error: 'Open position pair not found' }, { status: 404 });
+    }
+
+    const verifiedKalshi = verifiedPair.kalshi;
+    const verifiedPolymarket = verifiedPair.polymarket;
+    if (
+      (verifiedKalshi && (!Number.isFinite(verifiedKalshi.size) || verifiedKalshi.size <= 0
+        || !Number.isFinite(verifiedKalshi.currentPrice) || verifiedKalshi.currentPrice <= 0 || verifiedKalshi.currentPrice > 1))
+      || (verifiedPolymarket && (!Number.isFinite(verifiedPolymarket.size) || verifiedPolymarket.size <= 0
+        || !Number.isFinite(verifiedPolymarket.currentPrice) || verifiedPolymarket.currentPrice <= 0 || verifiedPolymarket.currentPrice > 1))
+    ) {
+      return NextResponse.json({ error: 'Open position has no executable server quote' }, { status: 409 });
+    }
+
+    // Compatibility shapes for the existing order/audit path. Every executable
+    // field below comes from the verified account snapshot, not request JSON.
+    const kalshi = verifiedKalshi ? {
+      ...verifiedKalshi,
+      priceCents: verifiedKalshi.currentPrice * 100,
+      exitPrice: verifiedKalshi.currentPrice,
+      openedAt: null as string | null,
+    } : null;
+    const polymarket = verifiedPolymarket ? {
+      ...verifiedPolymarket,
+      price: verifiedPolymarket.currentPrice,
+      exitPrice: verifiedPolymarket.currentPrice,
+      totalCost: verifiedPolymarket.initialValue,
+      openedAt: null as string | null,
+    } : null;
 
     const results: { kalshi?: any; polymarket?: any } = {};
     const errors: { kalshi?: string; polymarket?: string } = {};
