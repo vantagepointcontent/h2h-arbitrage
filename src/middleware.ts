@@ -11,16 +11,13 @@ import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
  */
 export function middleware(request: NextRequest) {
   // ── SEC-001: shared-secret guard on mutating API requests ────────────────
-  // All non-GET API calls must carry x-h2h-token matching H2H_API_TOKEN.
-  // If H2H_API_TOKEN is unset the guard is disabled (backwards compatible).
-  // localhost is always allowed so the poller and same-box tools keep working.
+  // Every mutating API call must authenticate when a token is configured.
+  // Host is client-controlled and must never be used as a localhost trust signal.
   const apiToken = process.env.H2H_API_TOKEN;
   const isMutating = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
   if (apiToken && isMutating && request.nextUrl.pathname.startsWith('/api/')) {
-    const host = request.headers.get('host') ?? '';
-    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
     const token = request.headers.get('x-h2h-token');
-    if (!isLocalhost && token !== apiToken) {
+    if (token !== apiToken) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
   }

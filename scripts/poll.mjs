@@ -583,7 +583,7 @@ async function pollOnce() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(process.env.H2H_API_TOKEN ? { 'x-api-token': process.env.H2H_API_TOKEN } : {}),
+          ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
         },
         body: JSON.stringify({ action: 'promote', pairId: market.id }),
         signal: AbortSignal.timeout(5000),
