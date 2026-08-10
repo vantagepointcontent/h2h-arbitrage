@@ -2,6 +2,7 @@ import { createClient } from '@libsql/client';
 import path from 'path';
 
 export type BotActionStatus = 'passed' | 'failed' | 'pending';
+export type BotQualificationOutcome = 'qualified' | 'dead';
 
 export interface BotActionLogInput {
   tradeId: string;
@@ -17,6 +18,7 @@ export interface BotActionLogInput {
   errorReason?: string | null;
   durationMs?: number | null;
   alertMetadata?: unknown;
+  qualificationOutcome?: BotQualificationOutcome | null;
 }
 
 export interface BotActionLogRow extends Omit<BotActionLogInput, 'requestPayload' | 'responsePayload' | 'alertMetadata' | 'timestamp'> {
@@ -56,6 +58,11 @@ async function ensureTable(): Promise<void> {
       duration_ms INTEGER,
       alert_metadata TEXT
     )`);
+    const columns = await db.execute("PRAGMA table_info(bot_action_log)");
+    const hasQualificationOutcome = columns.rows.some((row) => String(row.name) === 'qualification_outcome');
+    if (!hasQualificationOutcome) {
+      await db.execute("ALTER TABLE bot_action_log ADD COLUMN qualification_outcome TEXT CHECK(qualification_outcome IN ('qualified','dead'))");
+    }
     await db.execute('CREATE INDEX IF NOT EXISTS idx_bot_action_log_trade ON bot_action_log(trade_id, id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_bot_action_log_filters ON bot_action_log(timestamp DESC, response_status, market_id)');
     initialized = true;
@@ -80,12 +87,13 @@ export async function appendBotActionLog(input: BotActionLogInput): Promise<numb
     const result = await db.execute({
       sql: `INSERT INTO bot_action_log
         (trade_id, trigger, market_id, market_title, timestamp, step, action,
-         request_payload, response_payload, response_status, error_reason, duration_ms, alert_metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         request_payload, response_payload, response_status, error_reason, duration_ms, alert_metadata,
+         qualification_outcome)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [input.tradeId, input.trigger, input.marketId, input.marketTitle,
         input.timestamp ?? new Date().toISOString(), input.step, input.action,
         json(input.requestPayload), json(input.responsePayload), input.responseStatus,
-        input.errorReason ?? null, input.durationMs ?? null, json(input.alertMetadata)],
+        input.errorReason ?? null, input.durationMs ?? null, json(input.alertMetadata), input.qualificationOutcome ?? null],
     });
     return Number(result.lastInsertRowid ?? 0);
   } finally { db.close(); }
@@ -107,6 +115,7 @@ export async function getBotActionLogs(filters: {
   since?: string;
   cursor?: number;
   limit?: number;
+  qualified?: boolean;
 } = {}): Promise<{ rows: BotActionLogRow[]; nextCursor: number | null }> {
   await ensureTable();
   const conditions: string[] = [];
@@ -115,6 +124,10 @@ export async function getBotActionLogs(filters: {
   if (filters.marketId) { conditions.push('market_id = ?'); args.push(filters.marketId); }
   if (filters.since) { conditions.push('timestamp >= ?'); args.push(filters.since); }
   if (filters.cursor) { conditions.push('id < ?'); args.push(filters.cursor); }
+  if (filters.qualified !== undefined) {
+    conditions.push(`trade_id IN (SELECT trade_id FROM bot_action_log WHERE qualification_outcome = ?)`);
+    args.push(filters.qualified ? 'qualified' : 'dead');
+  }
   const limit = Math.min(500, Math.max(1, filters.limit ?? 200));
   args.push(limit + 1);
   const db = client();
@@ -134,6 +147,7 @@ export async function getBotActionLogs(filters: {
         responsePayload: parse(row.response_payload), responseStatus: row.response_status as BotActionStatus,
         errorReason: row.error_reason == null ? null : String(row.error_reason),
         durationMs: row.duration_ms == null ? null : Number(row.duration_ms), alertMetadata: parse(row.alert_metadata),
+        qualificationOutcome: row.qualification_outcome == null ? null : row.qualification_outcome as BotQualificationOutcome,
       })),
       nextCursor: hasMore ? Number(page.at(-1)?.id ?? 0) : null,
     };

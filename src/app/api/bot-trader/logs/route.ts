@@ -12,6 +12,7 @@ function groupByTrade(rows: BotActionLogRow[]) {
     marketTitle: string;
     startedAt: string;
     status: BotActionStatus;
+    qualified: boolean | null;
     steps: BotActionLogRow[];
   }>();
   for (const row of rows) {
@@ -22,12 +23,15 @@ function groupByTrade(rows: BotActionLogRow[]) {
       marketTitle: row.marketTitle,
       startedAt: row.timestamp,
       status: row.responseStatus,
+      qualified: row.qualificationOutcome === 'qualified' ? true : row.qualificationOutcome === 'dead' ? false : null,
       steps: [],
     };
     group.startedAt = row.timestamp < group.startedAt ? row.timestamp : group.startedAt;
     group.steps.push(row);
     if (row.responseStatus === 'failed') group.status = 'failed';
     else if (row.responseStatus === 'pending' && group.status !== 'failed') group.status = 'pending';
+    if (row.qualificationOutcome === 'qualified') group.qualified = true;
+    else if (row.qualificationOutcome === 'dead' && group.qualified !== true) group.qualified = false;
     groups.set(row.tradeId, group);
   }
   return [...groups.values()].map((group) => ({
@@ -52,12 +56,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (cursorParam && (!Number.isInteger(cursor) || (cursor ?? 0) <= 0)) {
       return NextResponse.json({ success: false, error: 'cursor must be a positive integer' }, { status: 400 });
     }
+    const qualifiedParam = params.get('qualified');
+    if (qualifiedParam && qualifiedParam !== 'true' && qualifiedParam !== 'false') {
+      return NextResponse.json({ success: false, error: 'qualified must be true or false' }, { status: 400 });
+    }
     await pruneBotActionLogs(30);
     const result = await getBotActionLogs({
       status: statusParam as BotActionStatus | undefined,
       marketId: params.get('marketId') || undefined,
       since,
       cursor,
+      qualified: qualifiedParam == null ? undefined : qualifiedParam === 'true',
     });
     return NextResponse.json({ success: true, trades: groupByTrade(result.rows), nextCursor: result.nextCursor });
   } catch (error) {

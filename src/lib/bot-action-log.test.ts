@@ -33,4 +33,18 @@ describe('bot action log persistence', () => {
     expect(passed.rows[0].requestPayload).toEqual({ roi:3.2 });
     expect(await log.pruneBotActionLogs(30)).toBe(1);
   });
+
+  it('filters whole evaluation chains by explicit qualification outcome', async () => {
+    const log = await import('./bot-action-log');
+    await log.appendBotActionLog({ tradeId:'qualified-1', trigger:'scan', marketId:'m1', marketTitle:'Qualified', step:'criteria_check', action:'eligible', responseStatus:'passed', qualificationOutcome:'qualified' });
+    await log.appendBotActionLog({ tradeId:'qualified-1', trigger:'scan', marketId:'m1', marketTitle:'Qualified', step:'execution', action:'later failed', responseStatus:'failed' });
+    await log.appendBotActionLog({ tradeId:'dead-1', trigger:'scan', marketId:'m2', marketTitle:'Dead', step:'criteria_check', action:'rejected', responseStatus:'failed', qualificationOutcome:'dead' });
+
+    const qualified = await log.getBotActionLogs({ qualified: true });
+    expect(new Set(qualified.rows.map((row) => row.tradeId))).toEqual(new Set(['qualified-1']));
+    expect(qualified.rows.some((row) => row.responseStatus === 'failed')).toBe(true);
+
+    const dead = await log.getBotActionLogs({ qualified: false });
+    expect(new Set(dead.rows.map((row) => row.tradeId))).toEqual(new Set(['dead-1']));
+  });
 });

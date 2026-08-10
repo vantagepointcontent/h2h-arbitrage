@@ -459,7 +459,7 @@ export async function maybeExecuteBotTrade(
     step: string,
     action: string,
     responseStatus: BotActionStatus,
-    details: { requestPayload?: unknown; responsePayload?: unknown; errorReason?: string | null; durationMs?: number | null; alertMetadata?: unknown } = {},
+    details: { requestPayload?: unknown; responsePayload?: unknown; errorReason?: string | null; durationMs?: number | null; alertMetadata?: unknown; qualificationOutcome?: 'qualified' | 'dead' } = {},
   ) => appendBotActionLog({
     tradeId,
     trigger: 'Scan found qualifying arb',
@@ -481,12 +481,14 @@ export async function maybeExecuteBotTrade(
     requestPayload: settings,
     responsePayload: evaluation.criteria,
     errorReason: evaluation.shouldTrade ? null : evaluation.reason,
+    qualificationOutcome: evaluation.shouldTrade ? undefined : 'dead',
   });
   if (!evaluation.shouldTrade) {
     return { executed: false, dryRun: true, reason: evaluation.reason };
   }
 
   if (!settings.enabled) {
+    await log('preflight', 'BotTrader enabled check', 'failed', { errorReason: 'BotTrader disabled', qualificationOutcome: 'dead' });
     return { executed: false, dryRun: true, reason: 'BotTrader disabled' };
   }
 
@@ -498,7 +500,7 @@ export async function maybeExecuteBotTrade(
     return true; // fail-safe: skip on error
   });
   if (alreadyOpen) {
-    await log('preflight', 'Duplicate position check', 'failed', { errorReason: `Open bot position already exists for ${arbId}` });
+    await log('preflight', 'Duplicate position check', 'failed', { errorReason: `Open bot position already exists for ${arbId}`, qualificationOutcome: 'dead' });
     return { executed: false, dryRun: true, reason: `Open bot position already exists for ${arbId}` };
   }
 
@@ -512,7 +514,7 @@ export async function maybeExecuteBotTrade(
   const proposedStake = proposedStakeUsd(input);
 
   if (todayTrades >= settings.maxTradesPerDay) {
-    await log('preflight', 'Daily trade limit check', 'failed', { responsePayload: { todayTrades, maxTradesPerDay: settings.maxTradesPerDay }, errorReason: 'Daily bot trade limit reached' });
+    await log('preflight', 'Daily trade limit check', 'failed', { responsePayload: { todayTrades, maxTradesPerDay: settings.maxTradesPerDay }, errorReason: 'Daily bot trade limit reached', qualificationOutcome: 'dead' });
     return {
       executed: false,
       dryRun: true,
@@ -521,7 +523,7 @@ export async function maybeExecuteBotTrade(
   }
 
   if (todayExposure + proposedStake > maxDailyExposure) {
-    await log('preflight', 'Daily exposure limit check', 'failed', { responsePayload: { todayExposure, proposedStake, maxDailyExposure }, errorReason: 'Daily exposure limit reached' });
+    await log('preflight', 'Daily exposure limit check', 'failed', { responsePayload: { todayExposure, proposedStake, maxDailyExposure }, errorReason: 'Daily exposure limit reached', qualificationOutcome: 'dead' });
     return {
       executed: false,
       dryRun: true,
@@ -547,7 +549,7 @@ export async function maybeExecuteBotTrade(
 
   const execReq = buildExecutionRequest(input);
   if (!execReq) {
-    await log('preflight', 'Build two-leg execution request', 'failed', { errorReason: 'Missing leg data' });
+    await log('preflight', 'Build two-leg execution request', 'failed', { errorReason: 'Missing leg data', qualificationOutcome: 'dead' });
     return { executed: false, dryRun: true, reason: 'Unable to build execution request (missing leg data)' };
   }
 
@@ -555,6 +557,7 @@ export async function maybeExecuteBotTrade(
   await log('preflight', 'Execution request and safety gates verified', 'passed', {
     requestPayload: execReq,
     responsePayload: { effectiveDryRun, autoLiveOrdersAuthorized: AUTO_LIVE_ORDERS_AUTHORIZED, todayTrades, todayExposure },
+    qualificationOutcome: 'qualified',
   });
 
   logger.info('[bot-trader] executing trade', {
