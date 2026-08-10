@@ -26,7 +26,7 @@ function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
     minApyPct: 0,
     minDepthUsd: 0.5,
     minSharesPerLeg: 1,
-    maxExpiryDays: 1,
+    maxExpiryDays: 365,
     maxTradesPerDay: 10,
     ...overrides,
   };
@@ -178,17 +178,27 @@ describe('evaluateBotTrade', () => {
     expect(ev.shouldTrade).toBe(true);
   });
 
-  it('rejects markets expiring sooner than maxExpiryDays', () => {
-    const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
-    const ev = evaluateBotTrade(makeInput({ expiryDate: soon }), baseSettings({ maxExpiryDays: 1 }));
+  it('rejects markets expiring later than maxExpiryDays', () => {
+    const later = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const ev = evaluateBotTrade(makeInput({ expiryDate: later }), baseSettings({ maxExpiryDays: 1 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('Expires');
   });
 
-  it('rejects when either leg has insufficient dollar depth', () => {
-    const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.3 }), baseSettings({ minDepthUsd: 1 }));
+  it('rejects when either leg cannot fill the configured shares at its quoted ask', () => {
+    const ev = evaluateBotTrade(makeInput({ kalshiYesAsk: 0.45, kalshiYesDepth: 0.3 }), baseSettings({ minDepthUsd: 0.01, minSharesPerLeg: 1 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('depth');
+  });
+
+  it('accepts one share at 24c with $0.24 ask-level depth instead of requiring a fixed $0.50', () => {
+    const ev = evaluateBotTrade(
+      makeInput({ kalshiYesAsk: 0.24, pmNoAsk: 0.74, kalshiYesDepth: 0.24, pmNoDepth: 0.74 }),
+      baseSettings({ minDepthUsd: 999, minSharesPerLeg: 1 }),
+    );
+    expect(ev.shouldTrade).toBe(true);
+    expect(ev.criteria.sharesK).toBeCloseTo(1, 6);
+    expect(ev.criteria.sharesP).toBeCloseTo(1, 6);
   });
 
   it('rejects when shares per leg are below minimum', () => {

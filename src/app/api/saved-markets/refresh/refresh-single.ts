@@ -36,6 +36,10 @@ export interface SingleRefreshResult {
     expectedProfit: number;
     strategy: string;
     totalStake: number;
+    kalshiYesDepth?: number | string | null;
+    kalshiNoDepth?: number | string | null;
+    pmYesDepth?: number | null;
+    pmNoDepth?: number | null;
     fees?: any;
   }[];
 }
@@ -247,11 +251,17 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       kalshiNoAsk: o.kalshi?.noAsk,
       kalshiYesBid: o.kalshi?.yesBid,
       kalshiNoBid: o.kalshi?.noBid,
+      // Preserve executable best-ask dollar depth for BotTrader qualification.
+      // Dropping these fields caused every refreshed candidate to arrive as $0.
+      kalshiYesDepth: o.kalshi?.yesAskDepth,
+      kalshiNoDepth: o.kalshi?.noAskDepth,
       pmConditionId: o.polymarket?.conditionId,
       pmYesPrice: o.polymarket?.yesPrice,
       pmNoPrice: o.polymarket?.noPrice,
       pmBestBid: o.polymarket?.bestBid,
       pmBestAsk: o.polymarket?.bestAsk,
+      pmYesDepth: o.polymarket?.askDepth,
+      pmNoDepth: o.polymarket?.noAskDepth,
       kalshiStake: o.arbitrage!.kalshiStake,
       pmStake: o.arbitrage!.pmStake,
       apyPct: o.arbitrage!.apyPct,

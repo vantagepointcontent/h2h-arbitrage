@@ -264,8 +264,8 @@ export function evaluateBotTrade(
   }
 
   const expiryDays = computeExpiryDays(input.expiryDate);
-  if (expiryDays !== null && expiryDays < settings.maxExpiryDays) {
-    reasons.push(`Expires in ${expiryDays.toFixed(2)}d < min ${settings.maxExpiryDays}d`);
+  if (expiryDays !== null && settings.maxExpiryDays > 0 && expiryDays > settings.maxExpiryDays) {
+    reasons.push(`Expires in ${expiryDays.toFixed(2)}d > max ${settings.maxExpiryDays}d`);
   }
 
   const legs = pickLegPrices(input.strategy, input);
@@ -287,9 +287,13 @@ export function evaluateBotTrade(
     );
   }
 
-  if (depthKUsd < settings.minDepthUsd || depthPUsd < settings.minDepthUsd) {
+  // Executability is price-relative: N shares at a 24c ask require $0.24 × N,
+  // not a fixed $0.50 on every leg. Depth values are best-ask dollar depth.
+  const requiredDepthKUsd = (legs.kalshiPrice ?? 0) * settings.minSharesPerLeg;
+  const requiredDepthPUsd = (legs.pmPrice ?? 0) * settings.minSharesPerLeg;
+  if (depthKUsd < requiredDepthKUsd || depthPUsd < requiredDepthPUsd) {
     reasons.push(
-      `Insufficient dollar depth: Kalshi $${depthKUsd.toFixed(2)} / PM $${depthPUsd.toFixed(2)} (min $${settings.minDepthUsd})`,
+      `Insufficient executable depth at quoted ask: Kalshi $${depthKUsd.toFixed(2)} / $${requiredDepthKUsd.toFixed(2)} required; PM $${depthPUsd.toFixed(2)} / $${requiredDepthPUsd.toFixed(2)} required`,
     );
   }
 

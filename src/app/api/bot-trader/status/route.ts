@@ -11,7 +11,7 @@ const DEFAULT_BOT_SETTINGS = {
   minApyPct: 0,
   minDepthUsd: 0.5,
   minSharesPerLeg: 1,
-  maxExpiryDays: 1,
+  maxExpiryDays: 365,
   maxTradesPerDay: 10,
 };
 
