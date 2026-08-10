@@ -184,6 +184,7 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
   pmPrice: number | null;
   kalshiOutcome: 'yes' | 'no';
   pmOutcome: 'yes' | 'no';
+  supported: boolean;
 } {
   const strategyLower = (strategy || '').toLowerCase();
 
@@ -194,6 +195,7 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
       pmPrice: input.pmYesAsk ?? null,
       kalshiOutcome: 'yes',
       pmOutcome: 'yes',
+      supported: true,
     };
   }
 
@@ -201,7 +203,7 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
   // or two PM orders on related outcomes; we only support two-leg cross-platform
   // for the bot's initial release).
   if (strategyLower.startsWith('same-platform')) {
-    return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'yes' };
+    return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'yes', supported: false };
   }
 
   if (strategyLower.includes('yes kalshi')) {
@@ -210,6 +212,7 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
       pmPrice: input.pmNoAsk ?? null,
       kalshiOutcome: 'yes',
       pmOutcome: 'no',
+      supported: true,
     };
   }
 
@@ -219,16 +222,12 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
       pmPrice: input.pmYesAsk ?? null,
       kalshiOutcome: 'no',
       pmOutcome: 'yes',
+      supported: true,
     };
   }
 
-  // Fallback: direct Kalshi YES + PM NO.
-  return {
-    kalshiPrice: input.kalshiYesAsk ?? null,
-    pmPrice: input.pmNoAsk ?? null,
-    kalshiOutcome: 'yes',
-    pmOutcome: 'no',
-  };
+  // Never guess from unknown strategy text: that can buy the opposite contract.
+  return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
 }
 
 export function evaluateBotTrade(
@@ -269,6 +268,7 @@ export function evaluateBotTrade(
   }
 
   const legs = pickLegPrices(input.strategy, input);
+  if (!legs.supported) reasons.push(`Unsupported strategy: ${input.strategy || '(empty)'}`);
   if (legs.kalshiPrice == null || legs.pmPrice == null) {
     reasons.push('Missing tradeable ask price on one or both legs');
   }
@@ -318,31 +318,9 @@ function legDepths(
   legs: ReturnType<typeof pickLegPrices>,
   input: BotTradeInput,
 ): { depthKUsd: number; depthPUsd: number } {
-  const strategyLower = (input.strategy || '').toLowerCase();
-
-  if (strategyLower.includes('yes kalshi')) {
-    return {
-      depthKUsd: input.kalshiYesDepth ?? 0,
-      depthPUsd: input.pmNoDepth ?? 0,
-    };
-  }
-  if (strategyLower.includes('yes pm')) {
-    return {
-      depthKUsd: input.kalshiNoDepth ?? 0,
-      depthPUsd: input.pmYesDepth ?? 0,
-    };
-  }
-  if (strategyLower.includes('both sides')) {
-    return {
-      depthKUsd: input.kalshiYesDepth ?? 0,
-      depthPUsd: input.pmYesDepth ?? 0,
-    };
-  }
-
-  // default: buy YES Kalshi + NO PM
   return {
-    depthKUsd: input.kalshiYesDepth ?? 0,
-    depthPUsd: input.pmNoDepth ?? 0,
+    depthKUsd: legs.kalshiOutcome === 'yes' ? input.kalshiYesDepth ?? 0 : input.kalshiNoDepth ?? 0,
+    depthPUsd: legs.pmOutcome === 'yes' ? input.pmYesDepth ?? 0 : input.pmNoDepth ?? 0,
   };
 }
 
@@ -379,23 +357,23 @@ function safeArbId(pairId: string, outcome: string): string {
   return `bot:${pairId}:${sanitized}`;
 }
 
-function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
+export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
   const legs = pickLegPrices(input.strategy, input);
-  if (legs.kalshiPrice == null || legs.pmPrice == null) return null;
+  if (!legs.supported || legs.kalshiPrice == null || legs.pmPrice == null) return null;
   if (!input.kalshiTicker || !input.pmConditionId) return null;
 
-  // The bot stakes the smaller of the two leg sizes suggested by the scan so
-  // both legs remain matched.  In practice the scanner already equalizes them,
-  // but guard against drift.
-  const capital = Math.min(
+  const sourceShares = Math.min(
     input.kalshiStake > 0 ? input.kalshiStake / legs.kalshiPrice : Infinity,
     input.pmStake > 0 ? input.pmStake / legs.pmPrice : Infinity,
   );
+  if (!Number.isFinite(sourceShares) || sourceShares <= 0) return null;
 
-  if (!Number.isFinite(capital) || capital <= 0) return null;
-
-  const kalshiStake = capital * legs.kalshiPrice;
-  const pmStake = capital * legs.pmPrice;
+  // Depth qualifies the opportunity; it does not size the placement. Each
+  // BotTrader placement is one matched share on each selected strategy leg.
+  const contracts = 1;
+  const kalshiStake = legs.kalshiPrice;
+  const pmStake = legs.pmPrice;
+  const oneShareNetProfit = input.expectedProfit / sourceShares;
 
   const kalshiOrder: OrderRequest = {
     platform: 'kalshi',
@@ -404,6 +382,7 @@ function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
     side: 'buy',
     outcome: legs.kalshiOutcome,
     size: kalshiStake,
+    contracts,
     price: legs.kalshiPrice,
     orderType: 'limit',
   };
@@ -415,6 +394,7 @@ function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
     side: 'buy',
     outcome: legs.pmOutcome,
     size: pmStake,
+    contracts,
     price: legs.pmPrice,
     orderType: 'limit',
   };
@@ -424,7 +404,7 @@ function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
     marketTitle: input.marketTitle,
     kalshiOrder,
     polymarketOrder,
-    estimatedProfit: input.expectedProfit,
+    estimatedProfit: oneShareNetProfit,
     maxSlippagePct: 2.0,
     timeoutMs: 15000,
     dryRun: true, // overwritten by caller before executeArb()
@@ -461,9 +441,10 @@ async function countTodayBotTrades(): Promise<number> {
   }
 }
 
-/** Compute total proposed stake for the trade. */
+/** Compute total proposed stake for the one-share execution plan. */
 function proposedStakeUsd(input: BotTradeInput): number {
-  return input.kalshiStake + input.pmStake;
+  const request = buildExecutionRequest(input);
+  return request ? request.kalshiOrder.size + request.polymarketOrder.size : Infinity;
 }
 
 // ─── Main orchestrator ─────────────────────────────────────────
@@ -643,11 +624,11 @@ export async function maybeExecuteBotTrade(
           strategy: input.strategy,
           kalshiSide: legs.kalshiOutcome,
           pmSide: legs.pmOutcome,
-          kalshiPrice: legs.kalshiPrice,
-          pmPrice: legs.pmPrice,
-          kalshiStake: input.kalshiStake,
-          pmStake: input.pmStake,
-          expectedProfit: input.expectedProfit,
+          kalshiPrice: execReq.kalshiOrder.price,
+          pmPrice: execReq.polymarketOrder.price,
+          kalshiStake: execReq.kalshiOrder.size,
+          pmStake: execReq.polymarketOrder.size,
+          expectedProfit: execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
         });
       }

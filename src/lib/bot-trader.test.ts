@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   evaluateBotTrade,
+  buildExecutionRequest,
   maybeExecuteBotTrade,
   unifiedOutcomeToBotInput,
   getBotSettings,
@@ -229,6 +230,12 @@ describe('evaluateBotTrade', () => {
     expect(ev.reason).toContain('Missing tradeable ask price');
   });
 
+  it('rejects unknown strategy text instead of silently buying YES Kalshi + NO PM', () => {
+    const ev = evaluateBotTrade(makeInput({ strategy: 'mystery strategy' }), baseSettings());
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('Unsupported strategy');
+  });
+
   it('accepts cross-outcome YES+YES strategy with correct leg prices', () => {
     const ev = evaluateBotTrade(
       makeInput({
@@ -253,6 +260,33 @@ describe('evaluateBotTrade', () => {
     );
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('Missing tradeable ask price');
+  });
+});
+
+describe('buildExecutionRequest', () => {
+  it('immutably carries strategy-selected YES/YES asks into one-share orders', () => {
+    const req = buildExecutionRequest(makeInput({
+      strategy: 'Buy YES both sides: Kalshi Republican + PM Democratic',
+      kalshiYesAsk: 0.40,
+      pmYesAsk: 0.52,
+      kalshiStake: 40,
+      pmStake: 52,
+      expectedProfit: 8,
+    }));
+    expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.40, contracts: 1, size: 0.40 });
+    expect(req?.polymarketOrder).toMatchObject({ outcome: 'yes', price: 0.52, contracts: 1, size: 0.52 });
+    expect(req?.estimatedProfit).toBeCloseTo(0.08, 8);
+  });
+
+  it('uses the selected NO ask on PM and never substitutes the YES ask', () => {
+    const req = buildExecutionRequest(makeInput({
+      strategy: 'Buy YES Kalshi + NO PM',
+      kalshiYesAsk: 0.03,
+      pmYesAsk: 0.07,
+      pmNoAsk: 0.94,
+    }));
+    expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.03, contracts: 1 });
+    expect(req?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.94, contracts: 1 });
   });
 });
 
