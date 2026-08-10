@@ -21,6 +21,8 @@ const positions = [{
   marketTitle: 'Trump 2026',
   kalshiTicker: 'KXTRUMP-26',
   pmConditionId: '0xabc',
+  kalshiUrl: 'https://kalshi.com/markets/kxtrump-26',
+  polymarketUrl: 'https://polymarket.com/event/trump-2026',
   strategy: 'Buy YES K + NO PM',
   kalshiSide: 'yes',
   pmSide: 'no',
@@ -79,6 +81,8 @@ describe('BotTraderPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Trump 2026')).toBeTruthy());
     expect(screen.getByRole('link', { name: 'Open Trump 2026 market' }).getAttribute('href')).toBe('/?view=scan&id=market-1');
+    expect(screen.getByRole('link', { name: 'Open exact Kalshi YES market for Trump 2026' }).getAttribute('href')).toBe('https://kalshi.com/markets/kxtrump-26');
+    expect(screen.getByRole('link', { name: 'Open exact Polymarket NO market for Trump 2026' }).getAttribute('href')).toBe('https://polymarket.com/event/trump-2026');
     expect(screen.getByText('47')).toBeTruthy();
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
