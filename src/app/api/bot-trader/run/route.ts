@@ -157,8 +157,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (ranked.length === 0) {
         return NextResponse.json({ error: 'No eligible ranked candidate', selectionMethod: settings.selectionMethod }, { status: 404 });
       }
-      pairId = ranked[0].market.id;
-      selectedBy = settings.selectionMethod;
+      const requestedLimit = Number(body?.maxCandidates ?? ranked.length);
+      const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : ranked.length));
+      const manualMatches = await getManualMatches();
+      const runs = [];
+      for (const candidate of ranked.slice(0, limit)) {
+        const market = candidate.market;
+        try {
+          const result: SingleRefreshResult = await refreshSingleMarket(market, manualMatches);
+          const inputs = toBotTradeInputs(market.id, market.eventTitle, result.expiryDate ?? undefined, result.allArbs || []);
+          const botResults = await runBotTraderOnScanOutcomes(market.id, market.eventTitle, result.expiryDate ?? undefined, inputs);
+          runs.push({
+            pairId: market.id,
+            marketTitle: market.eventTitle,
+            rankedRoiPct: candidate.roiPct,
+            rankedApyPct: candidate.apyPct,
+            evaluated: inputs.length,
+            executed: botResults.filter((item) => item.executed).length,
+            results: botResults.map((item) => ({ executed: item.executed, dryRun: item.dryRun, reason: item.reason })),
+          });
+        } catch (error) {
+          // One stale/broken candidate must not prevent the queue from moving
+          // from the next-best market to the next.
+          runs.push({ pairId: market.id, marketTitle: market.eventTitle, rankedRoiPct: candidate.roiPct, rankedApyPct: candidate.apyPct, evaluated: 0, executed: 0, error: clientSafeError(error) });
+        }
+      }
+      return NextResponse.json({
+        selectionMethod: settings.selectionMethod,
+        ranked: true,
+        candidatesAvailable: ranked.length,
+        candidatesProcessed: runs.length,
+        executed: runs.reduce((total, run) => total + run.executed, 0),
+        runs,
+      });
     } else if (typeof pairId !== 'string' || pairId.length === 0) {
       return NextResponse.json({ error: 'Missing or invalid pairId; pass ranked=true to select the top candidate' }, { status: 400 });
     }

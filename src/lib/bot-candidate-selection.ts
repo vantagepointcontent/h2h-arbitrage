@@ -12,21 +12,30 @@ type RankedCandidate<T> = { market: T; roiPct: number; apyPct: number; scannedAt
 
 const MAX_CANDIDATE_AGE_MS = 24 * 60 * 60 * 1000;
 
-function scanSummary(market: CandidateMarket): { roiPct: number; apyPct: number; scannedAt: string } | null {
+function scanSummary(
+  market: CandidateMarket,
+  method: BotSelectionMethod,
+  thresholds: { minRoiPct?: number; minApyPct?: number },
+): { roiPct: number; apyPct: number; scannedAt: string } | null {
   const result = (market.liveResult ?? market.lastScanResult) as Record<string, unknown> | null;
   if (!result) return null;
   const scannedAt = typeof result.scannedAt === 'string' ? result.scannedAt : '';
   const arbs = Array.isArray(result.allArbs) ? result.allArbs as Array<Record<string, unknown>> : [];
-  let bestRoi = Number.NEGATIVE_INFINITY;
-  let bestApy = Number.NEGATIVE_INFINITY;
-  for (const arb of arbs) {
-    const roi = typeof arb.roiPct === 'number' && Number.isFinite(arb.roiPct) ? arb.roiPct : 0;
-    const apy = typeof arb.apyPct === 'number' && Number.isFinite(arb.apyPct) ? arb.apyPct : 0;
-    bestRoi = Math.max(bestRoi, roi);
-    bestApy = Math.max(bestApy, apy);
-  }
-  if (!scannedAt || !Number.isFinite(Date.parse(scannedAt)) || bestRoi === Number.NEGATIVE_INFINITY) return null;
-  return { roiPct: bestRoi, apyPct: Math.max(0, bestApy), scannedAt };
+  const candidates = arbs.map((arb) => ({
+    roiPct: typeof arb.roiPct === 'number' && Number.isFinite(arb.roiPct) ? arb.roiPct : 0,
+    apyPct: typeof arb.apyPct === 'number' && Number.isFinite(arb.apyPct) ? Math.max(0, arb.apyPct) : 0,
+  })).filter((arb) => {
+    if (arb.roiPct <= 0) return false;
+    if (method === 'roi') return arb.roiPct >= (thresholds.minRoiPct ?? 0);
+    if (method === 'apy') return arb.apyPct >= (thresholds.minApyPct ?? 0);
+    return arb.roiPct >= (thresholds.minRoiPct ?? 0) && arb.apyPct >= (thresholds.minApyPct ?? 0);
+  });
+  if (!scannedAt || !Number.isFinite(Date.parse(scannedAt)) || candidates.length === 0) return null;
+  candidates.sort((a, b) => {
+    const primary = method === 'apy' ? b.apyPct - a.apyPct : b.roiPct - a.roiPct;
+    return primary !== 0 ? primary : (method === 'apy' ? b.roiPct - a.roiPct : b.apyPct - a.apyPct);
+  });
+  return { ...candidates[0], scannedAt };
 }
 
 export function rankBotCandidates<T extends CandidateMarket>(
@@ -38,7 +47,7 @@ export function rankBotCandidates<T extends CandidateMarket>(
   const minRoi = thresholds.minRoiPct ?? 0;
   const minApy = thresholds.minApyPct ?? 0;
   return markets.flatMap((market) => {
-    const summary = scanSummary(market);
+    const summary = scanSummary(market, method, thresholds);
     if (!summary || summary.roiPct <= 0) return [];
     const scanMs = Date.parse(summary.scannedAt);
     if (now - scanMs > MAX_CANDIDATE_AGE_MS || scanMs > now) return [];
