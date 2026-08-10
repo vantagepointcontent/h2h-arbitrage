@@ -65,7 +65,7 @@ interface Candidate {
   breakdown: ConfidenceBreakdown;
 }
 
-const DEFAULT_OPTS: Required<Omit<MatcherOptions, 'onProgress'>> = {
+export const DEFAULT_MATCHER_OPTIONS: Required<Omit<MatcherOptions, 'onProgress'>> = {
   candidateThreshold: 50,
   maxVerifications: 500,
   maxExpiryDays: 7,
@@ -264,7 +264,7 @@ export async function refreshMarketCatalog(): Promise<{
 }
 
 export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<MatchRunResult> {
-  const options = { ...DEFAULT_OPTS, ...opts };
+  const options = { ...DEFAULT_MATCHER_OPTIONS, ...opts };
   const start = Date.now();
   const errors: string[] = [];
 
