@@ -29,13 +29,23 @@ async function readState(): Promise<RefreshJobState> {
   }
 }
 
+function refreshTimeoutMs(): number {
+  return Math.max(60_000, Number(process.env.H2H_REFRESH_TIMEOUT_MS || 300_000));
+}
+
+function isStaleRunningState(state: RefreshJobState): boolean {
+  if (!state.running) return false;
+  const startedAt = Date.parse(state.startedAt);
+  return !Number.isFinite(startedAt) || Date.now() - startedAt > refreshTimeoutMs();
+}
+
 async function writeState(state: RefreshJobState) {
   await fs.writeFile(REFRESH_STATE_FILE, JSON.stringify(state, null, 2));
 }
 
-async function runRefreshJob(marketIds?: string[]) {
+export async function runRefreshJob(marketIds?: string[]) {
   const state = await readState();
-  if (state.running) return;
+  if (state.running && !isStaleRunningState(state)) return;
 
   const allMarkets = await getSavedMarkets();
   const markets = marketIds && marketIds.length > 0
@@ -64,13 +74,14 @@ async function runRefreshJob(marketIds?: string[]) {
   // 470 markets × ~1-4s each ≈ 10+ min). Worker-pool of 4 respects upstream
   // rate limiters (which serialize per-API anyway) while overlapping I/O waits.
   const CONCURRENCY = Math.max(1, Number(process.env.H2H_REFRESH_CONCURRENCY || 4));
-  const JOB_TIMEOUT_MS = Math.max(60_000, Number(process.env.H2H_REFRESH_TIMEOUT_MS || 300_000)); // 5 min default
+  const JOB_TIMEOUT_MS = refreshTimeoutMs(); // 5 min default
   let nextIdx = 0;
+  let cancelled = false;
 
   async function worker(): Promise<void> {
-    while (true) {
+    while (!cancelled) {
       const i = nextIdx++;
-      if (i >= markets.length) return;
+      if (i >= markets.length || cancelled) return;
       const market = markets[i];
       // BUG-035: skip expired markets entirely
       const expMs = market.expiryDate ? new Date(market.expiryDate).getTime() : 0;
@@ -83,6 +94,9 @@ async function runRefreshJob(marketIds?: string[]) {
 
       try {
         const result = await refreshSingleMarket(market, manualMatches);
+        // A timed-out worker may finish its in-flight network request later.
+        // Do not persist that stale result or claim another market.
+        if (cancelled) return;
         const scanResult = {
           bestRoiPct: result.bestRoiPct,
           bestProfit: result.bestProfit,
@@ -97,6 +111,7 @@ async function runRefreshJob(marketIds?: string[]) {
         await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
         newState.succeeded++;
       } catch (e: any) {
+        if (cancelled) return;
         newState.failed++;
         newState.errors.push({ id: market.id, title: market.eventTitle, error: e.message || 'Unknown error' });
         console.error(`[refresh-job] failed ${market.eventTitle}:`, e.message);
@@ -112,11 +127,15 @@ async function runRefreshJob(marketIds?: string[]) {
     }
   }
 
-  // Race the workers against a hard timeout. If the job exceeds the limit,
-  // we stop processing and mark the job as failed so the UI can show a warning
-  // instead of spinning forever.
-  const timeoutPromise = new Promise<void>((resolve) => {
-    setTimeout(() => {
+  // Mark a timed-out job immediately, then retain ownership until all in-flight
+  // workers drain. This prevents a second refresh from overlapping late workers.
+  const workersPromise = Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, markets.length) }, () => worker()),
+  );
+  let timeoutHandle: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      cancelled = true;
       console.error(`[refresh-job] timed out after ${JOB_TIMEOUT_MS}ms, processed ${newState.processed}/${newState.total}`);
       newState.running = false;
       newState.finishedAt = new Date().toISOString();
@@ -125,14 +144,20 @@ async function runRefreshJob(marketIds?: string[]) {
         title: 'Job timeout',
         error: `Refresh exceeded ${Math.round(JOB_TIMEOUT_MS / 1000)}s limit after processing ${newState.processed}/${newState.total} markets`,
       });
-      resolve();
+      resolve('timeout');
     }, JOB_TIMEOUT_MS);
   });
 
-  await Promise.race([
-    Promise.all(Array.from({ length: Math.min(CONCURRENCY, markets.length) }, () => worker())),
+  const outcome = await Promise.race([
+    workersPromise.then(() => 'complete' as const),
     timeoutPromise,
   ]);
+  if (outcome === 'complete') {
+    clearTimeout(timeoutHandle!);
+  } else {
+    await writeState(newState);
+    await workersPromise;
+  }
 
   newState.running = false;
   newState.finishedAt = new Date().toISOString();
@@ -142,7 +167,26 @@ async function runRefreshJob(marketIds?: string[]) {
 }
 
 export async function getRefreshStatus(): Promise<RefreshJobState> {
-  return readState();
+  const state = await readState();
+  if (!isStaleRunningState(state)) return state;
+
+  const recovered: RefreshJobState = {
+    ...state,
+    running: false,
+    finishedAt: new Date().toISOString(),
+    currentMarketId: undefined,
+    currentMarketTitle: undefined,
+    errors: [
+      ...state.errors,
+      {
+        id: '__stale__',
+        title: 'Interrupted refresh',
+        error: 'Recovered stale running state after the refresh process stopped',
+      },
+    ],
+  };
+  await writeState(recovered);
+  return recovered;
 }
 
 export async function startRefreshJob(marketIds?: string[]): Promise<RefreshJobState | null> {
