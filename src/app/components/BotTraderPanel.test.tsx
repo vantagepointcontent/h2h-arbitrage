@@ -78,6 +78,7 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     await waitFor(() => expect(screen.getByText('Trump 2026')).toBeTruthy());
+    expect(screen.getByRole('link', { name: 'Open Trump 2026 market' }).getAttribute('href')).toBe('/?view=scan&id=market-1');
     expect(screen.getByText('47')).toBeTruthy();
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
