@@ -159,9 +159,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
       const requestedLimit = Number(body?.maxCandidates ?? ranked.length);
       const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : ranked.length));
+      const requestedOffset = Number(body?.rankedOffset ?? 0);
+      const offset = Math.max(0, Number.isFinite(requestedOffset) ? Math.floor(requestedOffset) : 0);
       const manualMatches = await getManualMatches();
       const runs = [];
-      for (const candidate of ranked.slice(0, limit)) {
+      for (const candidate of ranked.slice(offset, offset + limit)) {
         const market = candidate.market;
         try {
           const result: SingleRefreshResult = await refreshSingleMarket(market, manualMatches);
@@ -186,6 +188,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         selectionMethod: settings.selectionMethod,
         ranked: true,
         candidatesAvailable: ranked.length,
+        rankedOffset: offset,
         candidatesProcessed: runs.length,
         executed: runs.reduce((total, run) => total + run.executed, 0),
         runs,
