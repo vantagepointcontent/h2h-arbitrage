@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createClient } from '@libsql/client';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   BotPositionStore,
   calculateBotPositionEntryCost,
   calculatePositionValuation,
+  createBotPosition,
   getKalshiResolvedPrices,
+  pollOpenBotPositions,
   type BotPosition,
 } from './bot-positions';
 import { calcKalshiFee, calcPolymarketFee } from './matcher';
@@ -59,6 +61,10 @@ describe('calculatePositionValuation', () => {
       kalshiNoBidCents: 51,
       pmYesBidCents: 42,
       pmNoBidCents: 57,
+      kalshiYesBids: [{ priceCents: 48, size: 10 }],
+      kalshiNoBids: [{ priceCents: 51, size: 10 }],
+      pmYesBids: [{ priceCents: 42, size: 10 }],
+      pmNoBids: [{ priceCents: 57, size: 10 }],
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: '2026-08-10T00:00:00.000Z',
     });
@@ -101,6 +107,51 @@ describe('calculatePositionValuation', () => {
     expect(result.currentValueCents).toBe(1005 - expectedExitFeesCents);
     expect(result.unrealizedPnlCents).toBe(result.currentValueCents - 950);
     expect(result.unrealizedRoiBps).toBe(Math.round((result.unrealizedPnlCents * 10_000) / 950));
+  });
+
+  it('fails closed when top bids exist but authoritative executable ladders are missing', () => {
+    expect(() => calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).toThrow(/executable bid depth unavailable/i);
+  });
+
+  it.each([
+    { levels: [{ priceCents: 48, size: 10 }, { priceCents: Number.NaN, size: 1 }] },
+    { levels: [{ priceCents: 48, size: 10 }, { priceCents: 47, size: -1 }] },
+    { levels: [{ priceCents: 48, size: 10 }, { priceCents: 101, size: 1 }] },
+  ])('rejects an entire mixed valid and malformed executable ladder ($levels)', ({ levels: kalshiYesBids }) => {
+    expect(() => calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      kalshiYesBids,
+      kalshiNoBids: [{ priceCents: 51, size: 10 }],
+      pmYesBids: [{ priceCents: 42, size: 10 }],
+      pmNoBids: [{ priceCents: 57, size: 10 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).toThrow(/malformed executable bid depth/i);
+  });
+
+  it('rejects duplicate normalized prices instead of silently combining or discarding levels', () => {
+    expect(() => calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      kalshiYesBids: [{ priceCents: 48, size: 5 }, { priceCents: 48, size: 5 }],
+      kalshiNoBids: [{ priceCents: 51, size: 10 }],
+      pmYesBids: [{ priceCents: 42, size: 10 }],
+      pmNoBids: [{ priceCents: 57, size: 10 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).toThrow(/duplicate executable bid price/i);
   });
 
   it('reports a loss from executable proceeds below the fee-inclusive buy cost', () => {
@@ -183,6 +234,10 @@ describe('calculatePositionValuation', () => {
       kalshiNoBidCents: 0,
       pmYesBidCents: 0,
       pmNoBidCents: 100,
+      kalshiYesBids: [{ priceCents: 100, size: 10 }],
+      kalshiNoBids: [{ priceCents: 1, size: 10 }],
+      pmYesBids: [{ priceCents: 1, size: 10 }],
+      pmNoBids: [{ priceCents: 100, size: 10 }],
       observedAt: '2026-08-11T12:00:00.000Z',
       expiryDate: '2026-08-10T00:00:00.000Z',
       kalshiResolved: true,
@@ -357,6 +412,10 @@ describe('BotPositionStore', () => {
       kalshiNoBidCents: 51,
       pmYesBidCents: 42,
       pmNoBidCents: 57,
+      kalshiYesBids: [{ priceCents: 48, size: 10 }],
+      kalshiNoBids: [{ priceCents: 51, size: 10 }],
+      pmYesBids: [{ priceCents: 42, size: 10 }],
+      pmNoBids: [{ priceCents: 57, size: 10 }],
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: '2026-08-10T00:00:00.000Z',
     });
@@ -373,5 +432,96 @@ describe('BotPositionStore', () => {
     expect(stored.currentValueCents).toBe(1022);
     expect(stored.unrealizedPnlCents).toBe(72);
     expect(stored.dryRun).toBe(false);
+  });
+});
+
+describe('pollOpenBotPositions fail-closed valuation', () => {
+  it('clears prior marks at each malformed, shallow, or stale depth observation timestamp', async () => {
+    const previousCwd = process.cwd();
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-poller-'));
+    try {
+      process.chdir(dir);
+      await mkdir(path.join(dir, 'data'));
+      const dbUrl = `file:${path.join(dir, 'data', 'edgefinder.db')}`;
+      const client = createClient({ url: dbUrl });
+      await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+      await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 1)`);
+      client.close();
+      const created = await createBotPosition({
+        ...openPosition(),
+        id: undefined,
+        dryRun: undefined,
+      } as never);
+
+      const runAttempt = async (
+        attemptedAt: string,
+        kalshiYesBids: Array<{ priceCents: number; size: number }>,
+        depthObservedAt = attemptedAt,
+      ) => pollOpenBotPositions({
+        observedAt: attemptedAt,
+        fetchKalshi: async () => ({
+          yes_bid_dollars: '0.48',
+          no_bid_dollars: '0.51',
+          close_time: '2026-08-10T00:00:00.000Z',
+          status: 'open',
+        }),
+        fetchKalshiBids: async () => ({
+          yesBids: kalshiYesBids,
+          noBids: [{ priceCents: 51, size: 10 }],
+          observedAt: depthObservedAt,
+        }),
+        fetchPmBids: async () => ({
+          yesBidCents: 42,
+          noBidCents: 57,
+          yesBids: [{ priceCents: 42, size: 10 }],
+          noBids: [{ priceCents: 57, size: 10 }],
+          resolved: false,
+          observedAt: attemptedAt,
+        }),
+      });
+      const setPriorMark = async () => {
+        const db = createClient({ url: dbUrl });
+        await db.execute({
+          sql: `UPDATE bot_positions SET current_price_kalshi = 48, current_price_pm = 57,
+            current_value = 1000, unrealized_pnl = 50, unrealized_roi_pct = 526 WHERE id = ?`,
+          args: [created.id],
+        });
+        db.close();
+      };
+      const expectClearedAt = async (attemptedAt: string) => {
+        const db = createClient({ url: dbUrl });
+        const row = (await db.execute({ sql: 'SELECT * FROM bot_positions WHERE id = ?', args: [created.id] })).rows[0];
+        db.close();
+        expect(row.current_price_kalshi).toBeNull();
+        expect(row.current_price_pm).toBeNull();
+        expect(row.current_value).toBeNull();
+        expect(row.unrealized_pnl).toBeNull();
+        expect(row.unrealized_roi_pct).toBeNull();
+        expect(row.last_valuation_at).toBe(attemptedAt);
+      };
+
+      await setPriorMark();
+      await expect(runAttempt('2026-08-08T12:00:00.000Z', [
+        { priceCents: 48, size: 10 },
+        { priceCents: Number.NaN, size: 1 },
+      ])).resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
+      await expectClearedAt('2026-08-08T12:00:00.000Z');
+
+      await setPriorMark();
+      await expect(runAttempt('2026-08-08T12:01:00.000Z', [{ priceCents: 48, size: 9 }]))
+        .resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
+      await expectClearedAt('2026-08-08T12:01:00.000Z');
+
+      await setPriorMark();
+      await expect(runAttempt(
+        '2026-08-08T12:02:00.000Z',
+        [{ priceCents: 48, size: 10 }],
+        '2026-08-08T12:00:00.000Z',
+      )).resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
+      await expectClearedAt('2026-08-08T12:02:00.000Z');
+    } finally {
+      process.chdir(previousCwd);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -63,17 +63,34 @@ export interface ExecutableBidLevel {
   size: number;
 }
 
-function parseExecutableBidLevels(levels: Array<{ price: unknown; size: unknown }> | undefined): ExecutableBidLevel[] {
-  return (levels ?? []).flatMap((level) => {
-    const price = typeof level.price === 'string' && /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(level.price)
-      ? Number(level.price)
+function parseExecutableBidLevels(levels: unknown, label: string, tupleLevels = false): ExecutableBidLevel[] {
+  if (!Array.isArray(levels)) throw new Error(`${label} executable bid depth unavailable`);
+  const parsed = levels.map((rawLevel) => {
+    const level = tupleLevels && Array.isArray(rawLevel) && rawLevel.length === 2
+      ? { price: rawLevel[0], size: rawLevel[1] }
+      : rawLevel;
+    if (!level || typeof level !== 'object' || Array.isArray(level)) {
+      throw new Error(`Malformed ${label} executable bid depth`);
+    }
+    const { price: rawPrice, size: rawSize } = level as Record<string, unknown>;
+    const price = typeof rawPrice === 'string' && /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawPrice)
+      ? Number(rawPrice)
       : null;
-    const size = typeof level.size === 'string' && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(level.size)
-      ? Number(level.size)
+    const size = typeof rawSize === 'string' && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(rawSize)
+      ? Number(rawSize)
       : null;
-    if (price == null || !Number.isFinite(price) || price <= 0 || price > 1 || size == null || !Number.isFinite(size) || size <= 0) return [];
-    return [{ priceCents: price * 100, size }];
-  }).sort((a, b) => b.priceCents - a.priceCents);
+    if (price == null || !Number.isFinite(price) || price <= 0 || price > 1
+      || size == null || !Number.isFinite(size) || size <= 0) {
+      throw new Error(`Malformed ${label} executable bid depth`);
+    }
+    return { priceCents: price * 100, size };
+  });
+  const prices = new Set<number>();
+  for (const level of parsed) {
+    if (prices.has(level.priceCents)) throw new Error(`Duplicate ${label} executable bid price`);
+    prices.add(level.priceCents);
+  }
+  return parsed.sort((a, b) => b.priceCents - a.priceCents);
 }
 
 export interface PositionQuote {
@@ -131,6 +148,12 @@ function isExecutablePriceCents(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
+function parseObservationMs(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : Number.NaN;
+  if (typeof value !== 'string' || value.length === 0) return Number.NaN;
+  return /^\d+$/.test(value) ? Number(value) : Date.parse(value);
+}
+
 function assertMoneyCents(name: string, value: number): void {
   if (!Number.isSafeInteger(value)) throw new Error(`${name} must be integer cents`);
 }
@@ -146,15 +169,24 @@ function roiBps(pnlCents: number, costCents: number): number {
 
 function fillBidLadder(
   levels: ExecutableBidLevel[] | undefined,
-  fallbackPriceCents: number | null,
   quantity: number,
   positionId: number,
   venue: 'Kalshi' | 'Polymarket',
 ): Array<{ priceCents: number; size: number }> {
-  const ladder = levels ?? (isPriceCents(fallbackPriceCents) ? [{ priceCents: fallbackPriceCents, size: quantity }] : []);
-  const valid = ladder
-    .filter((level) => isExecutablePriceCents(level.priceCents) && Number.isFinite(level.size) && level.size > 0)
-    .sort((a, b) => b.priceCents - a.priceCents);
+  if (!Array.isArray(levels)) throw new Error(`${venue} executable bid depth unavailable for bot position ${positionId}`);
+  const prices = new Set<number>();
+  for (const level of levels) {
+    if (!level || typeof level !== 'object'
+      || !isExecutablePriceCents(level.priceCents) || level.priceCents <= 0
+      || !Number.isFinite(level.size) || level.size <= 0) {
+      throw new Error(`Malformed executable bid depth on ${venue} for bot position ${positionId}`);
+    }
+    if (prices.has(level.priceCents)) {
+      throw new Error(`Duplicate executable bid price on ${venue} for bot position ${positionId}`);
+    }
+    prices.add(level.priceCents);
+  }
+  const valid = [...levels].sort((a, b) => b.priceCents - a.priceCents);
   let remaining = quantity;
   const fills: Array<{ priceCents: number; size: number }> = [];
   for (const level of valid) {
@@ -184,14 +216,38 @@ export function calculatePositionValuation(
     throw new Error(`Missing executable bid for bot position ${position.id}`);
   }
 
+  const expiryMs = quote.expiryDate ? Date.parse(quote.expiryDate) : Number.NaN;
+  const observedMs = Date.parse(quote.observedAt);
+  const expired = Number.isFinite(expiryMs) && Number.isFinite(observedMs) && expiryMs < observedMs;
+  const resolvedComplement =
+    (kalshiPrice === 100 && pmPrice === 0) ||
+    (kalshiPrice === 0 && pmPrice === 100);
+  if (expired && quote.kalshiResolved === true && quote.pmResolved === true && resolvedComplement) {
+    const payoutCents = kalshiPrice === 100
+      ? position.sharesKalshi * 100
+      : position.sharesPm * 100;
+    return {
+      status: 'settled',
+      currentPriceKalshiCents: kalshiPrice,
+      currentPricePmCents: pmPrice,
+      currentValueCents: payoutCents,
+      unrealizedPnlCents: payoutCents - position.totalCostCents,
+      unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
+      lastValuationAt: quote.observedAt,
+      settledAt: quote.observedAt,
+      realizedPnlCents: payoutCents - position.totalCostCents,
+      settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
+    };
+  }
+
   if (position.pmTheta == null || !Number.isFinite(position.pmTheta)) {
     throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
   }
 
   const kalshiLevels = position.kalshiSide === 'yes' ? quote.kalshiYesBids : quote.kalshiNoBids;
   const pmLevels = position.pmSide === 'yes' ? quote.pmYesBids : quote.pmNoBids;
-  const kalshiFills = fillBidLadder(kalshiLevels, kalshiPrice, position.sharesKalshi, position.id, 'Kalshi');
-  const pmFills = fillBidLadder(pmLevels, pmPrice, position.sharesPm, position.id, 'Polymarket');
+  const kalshiFills = fillBidLadder(kalshiLevels, position.sharesKalshi, position.id, 'Kalshi');
+  const pmFills = fillBidLadder(pmLevels, position.sharesPm, position.id, 'Polymarket');
   const kalshiGrossCents = kalshiFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
   const pmGrossCents = pmFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
   const kalshiExitFeeCents = Math.round(kalshiFills.reduce(
@@ -219,28 +275,7 @@ export function calculatePositionValuation(
     settlementSide: null,
   };
 
-  const expiryMs = quote.expiryDate ? Date.parse(quote.expiryDate) : Number.NaN;
-  const observedMs = Date.parse(quote.observedAt);
-  const expired = Number.isFinite(expiryMs) && Number.isFinite(observedMs) && expiryMs < observedMs;
-  const resolvedComplement =
-    (kalshiPrice === 100 && pmPrice === 0) ||
-    (kalshiPrice === 0 && pmPrice === 100);
-
-  if (!expired || !quote.kalshiResolved || !quote.pmResolved || !resolvedComplement) return base;
-
-  const payoutCents = kalshiPrice === 100
-    ? position.sharesKalshi * 100
-    : position.sharesPm * 100;
-  return {
-    ...base,
-    status: 'settled',
-    currentValueCents: payoutCents,
-    unrealizedPnlCents: payoutCents - position.totalCostCents,
-    unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
-    settledAt: quote.observedAt,
-    realizedPnlCents: payoutCents - position.totalCostCents,
-    settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
-  };
+  return base;
 }
 
 function rowToPosition(row: Record<string, unknown>): BotPosition {
@@ -797,13 +832,18 @@ export async function pollOpenBotPositions(dependencies?: {
     status?: string;
     settlement_value_dollars?: string;
   } | null>;
-  fetchKalshiBids?: (ticker: string) => Promise<{ yesBids: ExecutableBidLevel[]; noBids: ExecutableBidLevel[] } | null>;
+  fetchKalshiBids?: (ticker: string) => Promise<{
+    yesBids: ExecutableBidLevel[];
+    noBids: ExecutableBidLevel[];
+    observedAt?: string;
+  } | null>;
   fetchPmBids?: (conditionId: string) => Promise<{
     yesBidCents: number | null;
     noBidCents: number | null;
     yesBids?: ExecutableBidLevel[];
     noBids?: ExecutableBidLevel[];
     resolved: boolean;
+    observedAt?: string;
   } | null>;
   observedAt?: string;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
@@ -811,6 +851,7 @@ export async function pollOpenBotPositions(dependencies?: {
     import('./kalshi'),
     import('./polymarket-clob'),
   ]);
+  const observedAt = dependencies?.observedAt ?? new Date().toISOString();
   const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarket;
   const fetchKalshiBids = dependencies?.fetchKalshiBids ?? (async (ticker: string) => {
     const response = await fetch(`https://api.elections.kalshi.com/trade-api/v2/markets/${encodeURIComponent(ticker)}/orderbook`, {
@@ -819,38 +860,81 @@ export async function pollOpenBotPositions(dependencies?: {
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) return null;
-    const data = await response.json() as {
-      orderbook_fp?: { yes_dollars?: [string, string][]; no_dollars?: [string, string][] };
-      orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] };
-    };
-    const yes = data.orderbook_fp?.yes_dollars ?? data.orderbook?.yes_dollars_fp;
-    const no = data.orderbook_fp?.no_dollars ?? data.orderbook?.no_dollars_fp;
+    const data = await response.json() as unknown;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Malformed Kalshi order book payload');
+    }
+    const record = data as Record<string, unknown>;
+    const fixedPoint = record.orderbook_fp;
+    const legacy = record.orderbook;
+    if (fixedPoint != null && (typeof fixedPoint !== 'object' || Array.isArray(fixedPoint))) {
+      throw new Error('Malformed Kalshi fixed-point order book payload');
+    }
+    if (legacy != null && (typeof legacy !== 'object' || Array.isArray(legacy))) {
+      throw new Error('Malformed Kalshi legacy order book payload');
+    }
+    const book = fixedPoint != null
+      ? fixedPoint as Record<string, unknown>
+      : legacy != null
+        ? legacy as Record<string, unknown>
+        : null;
+    if (!book) throw new Error('Malformed Kalshi order book payload');
+    const yes = (book.yes_dollars ?? book.yes_dollars_fp ?? []) as unknown;
+    const no = (book.no_dollars ?? book.no_dollars_fp ?? []) as unknown;
     return {
-      yesBids: parseExecutableBidLevels(yes?.map(([price, size]) => ({ price, size }))),
-      noBids: parseExecutableBidLevels(no?.map(([price, size]) => ({ price, size }))),
+      yesBids: parseExecutableBidLevels(yes, 'Kalshi YES bid', true),
+      noBids: parseExecutableBidLevels(no, 'Kalshi NO bid', true),
+      observedAt,
     };
   });
   const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
     const market = await fetchClobMarket(conditionId);
     if (!market) return null;
-    const yesToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
-    const noToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+    if (!Array.isArray(market.tokens)) throw new Error('Malformed Polymarket token payload');
+    const yesTokens = market.tokens.filter((token) => token && typeof token.token_id === 'string'
+      && typeof token.outcome === 'string' && token.outcome.toLowerCase() === 'yes');
+    const noTokens = market.tokens.filter((token) => token && typeof token.token_id === 'string'
+      && typeof token.outcome === 'string' && token.outcome.toLowerCase() === 'no');
+    if (market.tokens.length !== 2 || yesTokens.length !== 1 || noTokens.length !== 1
+      || yesTokens[0].token_id === noTokens[0].token_id) {
+      throw new Error('Malformed Polymarket token/outcome association');
+    }
+    const yesToken = yesTokens[0];
+    const noToken = noTokens[0];
     const [yesBook, noBook] = await Promise.all([
       yesToken ? fetchClobBook(yesToken.token_id) : null,
       noToken ? fetchClobBook(noToken.token_id) : null,
     ]);
     const prices = extractClobBidPrices(market, yesBook, noBook);
+    if (prices.resolved) {
+      return {
+        ...prices,
+        yesBids: prices.yesBidCents != null
+          ? [{ priceCents: prices.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
+          : undefined,
+        noBids: prices.noBidCents != null
+          ? [{ priceCents: prices.noBidCents, size: Number.MAX_SAFE_INTEGER }]
+          : undefined,
+        observedAt,
+      };
+    }
+    if (!yesBook || !noBook || yesBook.asset_id !== yesToken.token_id || noBook.asset_id !== noToken.token_id) {
+      throw new Error('Malformed Polymarket token/outcome book association');
+    }
+    const yesObservedMs = parseObservationMs(yesBook.timestamp);
+    const noObservedMs = parseObservationMs(noBook.timestamp);
+    if (!Number.isFinite(yesObservedMs) || !Number.isFinite(noObservedMs)) {
+      throw new Error('Malformed Polymarket order book timestamp');
+    }
+    parseExecutableBidLevels(yesBook.asks, 'Polymarket YES ask');
+    parseExecutableBidLevels(noBook.asks, 'Polymarket NO ask');
     return {
       ...prices,
-      yesBids: prices.resolved && prices.yesBidCents != null
-        ? [{ priceCents: prices.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
-        : parseExecutableBidLevels(yesBook?.bids),
-      noBids: prices.resolved && prices.noBidCents != null
-        ? [{ priceCents: prices.noBidCents, size: Number.MAX_SAFE_INTEGER }]
-        : parseExecutableBidLevels(noBook?.bids),
+      yesBids: parseExecutableBidLevels(yesBook.bids, 'Polymarket YES bid'),
+      noBids: parseExecutableBidLevels(noBook.bids, 'Polymarket NO bid'),
+      observedAt: new Date(Math.min(yesObservedMs, noObservedMs)).toISOString(),
     };
   });
-  const observedAt = dependencies?.observedAt ?? new Date().toISOString();
   const open = await store().listAllOpen();
   let updated = 0;
   let settled = 0;
@@ -874,6 +958,18 @@ export async function pollOpenBotPositions(dependencies?: {
       };
       const kalshiResolution = getKalshiResolvedPrices(kalshi);
       if (!kalshiBids && !kalshiResolution.resolved) throw new Error('Kalshi executable depth unavailable');
+      const attemptedMs = parseObservationMs(observedAt);
+      if (!Number.isFinite(attemptedMs)) throw new Error('Malformed valuation observation timestamp');
+      if (!kalshiResolution.resolved
+        && (!Number.isFinite(parseObservationMs(kalshiBids?.observedAt))
+          || Math.abs(attemptedMs - parseObservationMs(kalshiBids?.observedAt)) > 60_000)) {
+        throw new Error('Stale Kalshi executable depth');
+      }
+      if (!pmBids.resolved
+        && (!Number.isFinite(parseObservationMs(pmBids.observedAt))
+          || Math.abs(attemptedMs - parseObservationMs(pmBids.observedAt)) > 60_000)) {
+        throw new Error('Stale Polymarket executable depth');
+      }
       const resolvedKalshiYesBids = kalshiResolution.resolved && kalshiResolution.yesBidCents != null
         ? [{ priceCents: kalshiResolution.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
         : kalshiBids?.yesBids ?? [];

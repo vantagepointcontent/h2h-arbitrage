@@ -19,6 +19,8 @@ export interface ClobMarket {
 }
 
 export interface ClobBook {
+  asset_id?: string;
+  timestamp?: string;
   bids: { price: string; size: string }[];
   asks: { price: string; size: string }[];
   min_order_size: string;
