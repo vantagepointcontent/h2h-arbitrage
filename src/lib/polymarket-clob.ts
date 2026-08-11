@@ -4,6 +4,7 @@
 
 import { rateLimiters } from '@/lib/rate-limiter';
 import { finiteDecimal } from '@/lib/market-price';
+import { normalizePolymarketResolution } from './settlement-resolution';
 
 export interface ClobMarket {
   condition_id: string;
@@ -315,10 +316,12 @@ export function extractClobBidPrices(
   const yesToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'yes');
   const noToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'no');
 
-  if (clob.closed === true && yesToken && noToken && yesToken.winner !== noToken.winner) {
-    if (yesToken.winner === true) return { yesBidCents: 100, noBidCents: 0, resolved: true };
-    if (noToken.winner === true) return { yesBidCents: 0, noBidCents: 100, resolved: true };
-  }
+  const resolution = normalizePolymarketResolution(clob);
+  if (resolution.verified) return {
+    yesBidCents: resolution.yesPayoutCents,
+    noBidCents: resolution.noPayoutCents,
+    resolved: true,
+  };
 
   const yesPrices = getBestPriceFromBook(yesBook);
   const noPrices = getBestPriceFromBook(noBook);

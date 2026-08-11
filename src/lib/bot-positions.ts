@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { createClient, type Client } from '@libsql/client';
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import { normalizeKalshiResolution } from './settlement-resolution';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -43,6 +44,11 @@ export interface BotPosition {
   settlementSide: SettlementSide;
   dryRun: boolean;
   selectionMethod?: BotSelectionMethod | null;
+  resolutionSource?: string | null;
+  resolutionVerifiedAt?: string | null;
+  resolutionOutcome?: BotPositionSide | null;
+  resolutionPayoutCents?: number | null;
+  resolutionValidationStatus?: 'pending' | 'verified' | 'invalid';
 }
 
 export type CreateBotPosition = Omit<BotPosition,
@@ -89,16 +95,10 @@ export function getKalshiResolvedPrices(market: KalshiSettlementMarket): {
   noBidCents: number | null;
   resolved: boolean;
 } {
-  const resolved = ['settled', 'finalized', 'resolved'].includes((market.status ?? '').toLowerCase());
-  if (!resolved) return { yesBidCents: null, noBidCents: null, resolved: false };
-  const settlement = market.settlement_value_dollars ?? '';
-  if (settlement === '1' || /^1\.0+$/.test(settlement)) {
-    return { yesBidCents: 100, noBidCents: 0, resolved: true };
-  }
-  if (settlement === '0' || /^0\.0+$/.test(settlement)) {
-    return { yesBidCents: 0, noBidCents: 100, resolved: true };
-  }
-  return { yesBidCents: null, noBidCents: null, resolved: false };
+  const resolution = normalizeKalshiResolution(market);
+  return resolution.verified
+    ? { yesBidCents: resolution.yesPayoutCents, noBidCents: resolution.noPayoutCents, resolved: true }
+    : { yesBidCents: null, noBidCents: null, resolved: false };
 }
 
 function isPriceCents(value: unknown): value is number {
@@ -216,6 +216,11 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     settlementSide: row.settlement_side != null ? String(row.settlement_side) as SettlementSide : null,
     dryRun: Boolean(Number(row.dry_run ?? 1)),
     selectionMethod: row.selection_method != null ? String(row.selection_method) as BotSelectionMethod : null,
+    resolutionSource: row.resolution_source != null ? String(row.resolution_source) : null,
+    resolutionVerifiedAt: row.resolution_verified_at != null ? String(row.resolution_verified_at) : null,
+    resolutionOutcome: row.resolution_outcome != null ? String(row.resolution_outcome) as BotPositionSide : null,
+    resolutionPayoutCents: row.resolution_payout != null ? Number(row.resolution_payout) : null,
+    resolutionValidationStatus: (row.resolution_validation_status != null ? String(row.resolution_validation_status) : 'pending') as 'pending' | 'verified' | 'invalid',
   };
 }
 
@@ -270,7 +275,12 @@ export class BotPositionStore {
         last_valuation_at TEXT,
         realized_pnl INTEGER,
         settlement_side TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL)
-        ,selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL)
+        ,selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
+        resolution_source TEXT,
+        resolution_verified_at TEXT,
+        resolution_outcome TEXT CHECK (resolution_outcome IN ('yes', 'no') OR resolution_outcome IS NULL),
+        resolution_payout INTEGER,
+        resolution_validation_status TEXT NOT NULL DEFAULT 'pending'
       )
     `);
     // Idempotent migration for installations that created the table from an
@@ -312,6 +322,11 @@ export class BotPositionStore {
       realized_pnl: 'INTEGER',
       settlement_side: 'TEXT',
       selection_method: 'TEXT',
+      resolution_source: 'TEXT',
+      resolution_verified_at: 'TEXT',
+      resolution_outcome: 'TEXT',
+      resolution_payout: 'INTEGER',
+      resolution_validation_status: "TEXT NOT NULL DEFAULT 'pending'",
     };
     for (const [name, definition] of Object.entries(migrations)) {
       if (!existing.has(name)) {
@@ -501,14 +516,21 @@ export class BotPositionStore {
       sql: `UPDATE bot_positions SET
         status = ?, current_price_kalshi = ?, current_price_pm = ?,
         current_value = ?, unrealized_pnl = ?, unrealized_roi_pct = ?,
-        last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?
+        last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
+        resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
+        resolution_payout = ?, resolution_validation_status = ?
         WHERE id = ? AND status = 'open'`,
       args: [
         valuation.status, valuation.currentPriceKalshiCents,
         valuation.currentPricePmCents, valuation.currentValueCents,
         valuation.unrealizedPnlCents, valuation.unrealizedRoiBps,
         valuation.lastValuationAt, valuation.settledAt,
-        valuation.realizedPnlCents, valuation.settlementSide, id,
+        valuation.realizedPnlCents, valuation.settlementSide,
+        valuation.status === 'settled' ? 'kalshi_market_settlement+polymarket_clob_market' : null,
+        valuation.status === 'settled' ? valuation.settledAt : null,
+        valuation.status === 'settled' ? (valuation.currentPriceKalshiCents === 100 ? 'yes' : 'no') : null,
+        valuation.status === 'settled' ? valuation.currentValueCents : null,
+        valuation.status === 'settled' ? 'verified' : 'pending', id,
       ],
     });
   }
