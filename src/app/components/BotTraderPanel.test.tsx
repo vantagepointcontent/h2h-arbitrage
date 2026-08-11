@@ -11,18 +11,6 @@ const analytics = {
   bestTrade: null,
   worstTrade: null,
   dailyPnl: [],
-  dailyPnlByMethod: {
-    roi: [{ date: '2026-08-01', realizedPnlCents: 500, unrealizedPnlCents: 100, trades: 4 }],
-    apy: [],
-    hybrid: [{ date: '2026-08-01', realizedPnlCents: -100, unrealizedPnlCents: 0, trades: 1 }],
-  },
-  filter: { method: 'all', mode: 'all' },
-  perMethod: {
-    roi: { tradeCount: 4, deployedCapitalCents: 10000, realizedPnlCents: 500, unrealizedPnlCents: 100, winRateBps: 7500, averageEntryRoiBps: 800, currentRoiBps: 600, averageApyPct: 42.5 },
-    apy: { tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null },
-    hybrid: { tradeCount: 1, deployedCapitalCents: 5000, realizedPnlCents: -100, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 200, currentRoiBps: -200, averageApyPct: 10 },
-    legacy: { tradeCount: 2, deployedCapitalCents: 2000, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null },
-  },
   timeStats: { tradesPerDayBps: 10000, averageHoldSeconds: 0 },
 };
 
@@ -53,9 +41,20 @@ const positions = [{
   currentPriceKalshiCents: 48,
   currentPricePmCents: 54,
   currentValueCents: 102,
-  unrealizedPnlCents: 5,
-  unrealizedRoiBps: 515,
-  lastValuationAt: '2026-08-08T18:00:00.000Z',
+  kalshiGrossProceedsMicrocents: 48_000_000,
+  pmGrossProceedsMicrocents: 54_000_000,
+  kalshiNetProceedsCents: 48,
+  pmNetProceedsCents: 54,
+  kalshiExitFeeCents: 0,
+  pmExitFeeCents: 0,
+  kalshiExitFeeType: 'quadratic',
+  kalshiExitFeeMultiplierPpm: 1_000_000,
+  pmExitFeeRateBps: 400,
+  // Deliberately inconsistent legacy fields: the table must derive these from
+  // currentValueCents and totalCostCents instead of trusting stale mappings.
+  unrealizedPnlCents: 97,
+  unrealizedRoiBps: 9999,
+  lastValuationAt: '2026-08-11T13:40:00.000Z',
   realizedPnlCents: null,
   settlementSide: null,
   dryRun: true,
@@ -79,6 +78,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('BotTraderPanel', () => {
@@ -88,6 +88,7 @@ describe('BotTraderPanel', () => {
   });
 
   it('renders status, analytics cents, and live positions from the bot APIs', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     stubInitialFetch();
     render(<BotTraderPanel />);
 
@@ -95,16 +96,65 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('link', { name: 'Open Trump 2026 market' }).getAttribute('href')).toBe('/?view=scan&id=market-1');
     expect(screen.getByRole('link', { name: 'Open exact Kalshi YES market for Trump 2026' }).getAttribute('href')).toBe('https://kalshi.com/markets/kxtrump-26');
     expect(screen.getByRole('link', { name: 'Open exact Polymarket NO market for Trump 2026' }).getAttribute('href')).toBe('https://polymarket.com/event/trump-2026');
-    expect(screen.getByText('47')).toBeTruthy();
-    expect(screen.getByText('3')).toBeTruthy();
-    expect(screen.getByText('12')).toBeTruthy();
-    expect(screen.getByText('68.4%')).toBeTruthy();
-    expect(screen.getByText('+$12.34')).toBeTruthy();
-    expect(screen.getByText('+$5.67')).toBeTruthy();
-    expect(screen.getByText('+$18.01')).toBeTruthy();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades1');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades0');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions1');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate0.0%');
+    expect(screen.getAllByText('+$0.05')).toHaveLength(3);
     expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
     expect(screen.getByText(/2 trades today/)).toBeTruthy();
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
+  });
+
+  it('maps buy cost, executable current value, P&L, and percentage ROI into their labelled columns', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const row = marketLink.closest('tr');
+    expect(row).toBeTruthy();
+    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells).toHaveLength(10);
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('$1.02');
+    expect(cells[6]).toBe('+$0.05');
+    expect(cells[7]).toBe('+5.2%');
+  });
+
+  it('shows stale open marks explicitly and does not invent zero P&L or ROI', async () => {
+    vi.setSystemTime(new Date('2026-08-11T14:00:01.000Z'));
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('Stale');
+    expect(cells[6]).toBe('Stale');
+    expect(cells[7]).toBe('Stale');
+  });
+
+  it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({
+        success: true,
+        positions: [{ ...positions[0], totalCostCents: 0, currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null }],
+      });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells[4]).toBe('$0.00');
+    expect(cells[5]).toBe('Unavailable');
+    expect(cells[6]).toBe('Unavailable');
+    expect(cells[7]).toBe('Unavailable');
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {
@@ -119,52 +169,95 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
   });
 
-  it('composes selection-method and paper/production analytics filters', async () => {
-    stubInitialFetch();
-    render(<BotTraderPanel />);
-    await screen.findByText('Trump 2026');
-    expect(screen.getByRole('listitem', { name: 'roi method performance' })).toBeTruthy();
-    expect(screen.getAllByText('Legacy / Unknown').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'apy' }));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Analytics trading mode' }), { target: { value: 'production' } });
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes('/api/bot-trader/analytics?method=apy&mode=production'))).toBe(true));
-    expect(screen.getByText('No performance data for this filter.')).toBeTruthy();
-  });
-
-  it('ignores stale refresh responses after a newer filter request completes', async () => {
-    let phase: 'initial' | 'stale' | 'fresh' = 'initial';
-    const staleResolvers: Array<(value: { ok: boolean; json: () => Promise<unknown> }) => void> = [];
+  it('reconciles every summary card to the exact combined status and mode population', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const mixedPositions = [
+      { ...positions[0], id: 1, marketTitle: 'Paper open profit' },
+      { ...positions[0], id: 2, marketTitle: 'Prod open loss', dryRun: false, totalCostCents: 100, currentValueCents: 80 },
+      { ...positions[0], id: 3, marketTitle: 'Paper settled win', status: 'settled', currentValueCents: 130, realizedPnlCents: 30 },
+      { ...positions[0], id: 4, marketTitle: 'Prod settled loss', status: 'settled', dryRun: false, currentValueCents: 60, realizedPnlCents: -40 },
+    ];
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input);
-      if (phase === 'stale') {
-        return new Promise((resolve) => staleResolvers.push(resolve));
-      }
-      const visiblePositions = phase === 'fresh'
-        ? [{ ...positions[0], id: 2, marketTitle: 'Fresh open position' }]
-        : positions;
-      if (url.includes('/analytics')) return response({ success: true, analytics });
-      if (url.includes('/positions')) return response({ success: true, positions: visiblePositions });
+      if (url.includes('/positions')) return response({ success: true, positions: mixedPositions });
       if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
       throw new Error(`Unexpected fetch: ${url}`);
     }));
+    render(<BotTraderPanel />);
+    await screen.findByText('Paper open profit');
 
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'production' } });
+    expect(screen.queryByText('Paper open profit')).toBeNull();
+    expect(screen.getByText('Prod open loss')).toBeTruthy();
+    expect(screen.queryByText('Prod settled loss')).toBeNull();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades0');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades1');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions1');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate0.0%');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized-$0.20');
+    expect(screen.getByText('Realized').parentElement?.textContent).toBe('Realized$0.00');
+    expect(screen.getByText('Total P&L').parentElement?.textContent).toBe('Total P&L-$0.20');
+
+    fireEvent.click(screen.getByRole('button', { name: 'settled' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'paper' } });
+    expect(screen.getByText('Paper settled win')).toBeTruthy();
+    expect(screen.queryByText('Paper open profit')).toBeNull();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades1');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades0');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions0');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate100.0%');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized$0.00');
+    expect(screen.getByText('Realized').parentElement?.textContent).toBe('Realized+$0.30');
+    expect(screen.getByText('Total P&L').parentElement?.textContent).toBe('Total P&L+$0.30');
+  });
+
+  it('expands authoritative per-leg gross, fee, and net proceeds that sum to Current Value', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const feePosition = {
+      ...positions[0],
+      sharesKalshi: 10,
+      sharesPm: 10,
+      totalCostCents: 978,
+      currentPriceKalshiCents: 46,
+      currentPricePmCents: 55,
+      kalshiGrossProceedsMicrocents: 455_000_000,
+      pmGrossProceedsMicrocents: 550_000_000,
+      kalshiNetProceedsCents: 437,
+      pmNetProceedsCents: 540,
+      kalshiExitFeeCents: 18,
+      pmExitFeeCents: 10,
+      currentValueCents: 977,
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/positions')) return response({ success: true, positions: [feePosition] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('10 held');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('45.500¢ VWAP');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$4.55 gross');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$0.18 fee');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$4.37 net');
+    expect(screen.getByTestId('polymarket-liquidation').textContent).toContain('4.00%');
+    expect(screen.getByTestId('polymarket-liquidation').textContent).toContain('$5.40 net');
+    expect(screen.getByTestId('combined-net-proceeds').textContent).toBe('Combined net proceeds$9.77');
+    expect(screen.getByTestId('combined-net-proceeds').textContent).toContain('$9.77');
+  });
+
+  it('filters the complete position population locally by status and paper/production mode', async () => {
+    stubInitialFetch();
     render(<BotTraderPanel />);
     await screen.findByText('Trump 2026');
 
-    phase = 'stale';
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
-    await waitFor(() => expect(staleResolvers).toHaveLength(3));
-
-    phase = 'fresh';
-    fireEvent.click(screen.getByRole('button', { name: 'open' }));
-    await screen.findByText('Fresh open position');
-
-    staleResolvers[0]({ ok: true, json: async () => ({ success: true, analytics }) });
-    staleResolvers[1]({ ok: true, json: async () => ({ success: true, positions }) });
-    staleResolvers[2]({ ok: true, json: async () => ({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 }) });
-
-    await waitFor(() => expect(screen.queryByText('Trump 2026')).toBeNull());
-    expect(screen.getByText('Fresh open position')).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'production' } });
+    expect(screen.queryByText('Trump 2026')).toBeNull();
+    expect(screen.getByText('No BotTrader positions.')).toBeTruthy();
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes('/positions'))).toHaveLength(1);
   });
 
   it('requires exact production confirmation and forwards it to the gated settings API', async () => {

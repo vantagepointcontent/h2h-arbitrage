@@ -39,6 +39,7 @@ export interface LiveArbResult {
   pmNoTokenId?: string;
   /** Stable parent market identity used by execution and revalidation. */
   pmConditionId?: string;
+  category?: string;
   /** ARB-01a: classification of the arb strategy.
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
@@ -213,6 +214,7 @@ function computeSingleOutcome(
     pmYesTokenId,
     pmNoTokenId,
     pmConditionId,
+    category,
     arbType: 'direct',
     lastUpdate: new Date().toISOString(),
   };

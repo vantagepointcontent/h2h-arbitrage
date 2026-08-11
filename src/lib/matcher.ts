@@ -133,6 +133,7 @@ export function normalizeOutcomePlatforms(outcome: UnifiedOutcome): UnifiedOutco
 /** Default fee parameters per platform. Polymarket theta varies by category. */
 export function getPolymarketTheta(category?: string): number {
   const c = (category || 'other').toLowerCase();
+  if (c.includes('geopol')) return 0;
   if (c.includes('crypto')) return 0.07;
   if (c.includes('sport')) return 0.03;
   if (c.includes('finance')) return 0.04;
@@ -142,7 +143,6 @@ export function getPolymarketTheta(category?: string): number {
   if (c.includes('weather')) return 0.05;
   if (c.includes('mention')) return 0.04;
   if (c.includes('tech')) return 0.04;
-  if (c.includes('geopol')) return 0;
   return 0.05;
 }
 
