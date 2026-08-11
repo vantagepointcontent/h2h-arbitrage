@@ -22,9 +22,10 @@ import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
 import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
 import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '@/lib/persistence';
+import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
-import { runBotTraderOnLiveArbs } from '@/lib/bot-trader';
+
 import logger from '@/lib/logger';
 
 // ── Config ──────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ function rebuildIndexes(hot: WatchTarget[], titles: Map<string, string>) {
       p = { pairId: t.pairId, category: t.category, title: titles.get(t.pairId) ?? t.pairId, outcomes: [], kalshiTickers: new Set(), pmTokens: new Set() };
       hotPairs.set(t.pairId, p);
     }
-    p.outcomes.push({ artist: t.artist, kalshiTicker: t.kalshiTicker, pmYesTokenId: t.pmYesToken, pmNoTokenId: t.pmNoToken });
+    p.outcomes.push({ artist: t.artist, kalshiTicker: t.kalshiTicker, pmYesTokenId: t.pmYesToken, pmNoTokenId: t.pmNoToken, pmConditionId: t.pmConditionId });
     p.kalshiTickers.add(t.kalshiTicker);
     p.pmTokens.add(t.pmYesToken).add(t.pmNoToken);
 
@@ -314,18 +315,6 @@ async function computePair(pairId: string): Promise<void> {
     });
   }
 
-  // FEAT-040: BotTrader hook — evaluate criteria and simulate/execute (paper-only
-  // unless explicitly authorized).  Run after lifecycle/alerts so the episode has
-  // already been recorded and persistence is warmed up.
-  try {
-    const botResults = await runBotTraderOnLiveArbs(pairId, pair.title, undefined, positive);
-    const executed = botResults.filter((b) => b.executed).length;
-    if (executed > 0) {
-      logger.info('[watcher] BotTrader executed', { pairId, executed, total: botResults.length });
-    }
-  } catch (err) {
-    logger.warn('[watcher] BotTrader hook failed', { pairId, err });
-  }
 }
 
 // ── WS-107: liveResult persistence ───────────────────────────────
@@ -400,6 +389,47 @@ async function writeLiveResult(
 
   try {
     await updateSavedMarketLiveResult(pairId, liveResult);
+    if (clean.length > 0) {
+      const pair = hotPairs.get(pairId);
+      const persisted = await persistAndConsumeBotScan(pairId, {
+        bestRoiPct: best?.roiPct ?? 0,
+        bestProfit: best?.expectedProfit ?? 0,
+        strategy: best?.strategy ?? 'No arb',
+        outcomeCount: results.length,
+        matchedCount,
+        kalshiCount: results.filter((r) => r.kalshiYesAsk != null).length,
+        pmCount: results.filter((r) => r.pmYesAsk != null).length,
+        positiveArbCount: clean.length,
+        totalStake: clean.reduce((sum, r) => sum + r.kalshiStake + r.pmStake, 0),
+        scannedAt: liveResult.scannedAt,
+        marketTitle: pair?.title ?? pairId,
+        arbType: best?.arbType,
+        raw: {
+          category: pair?.category,
+          allArbs: clean.map((r) => ({
+            artist: r.artist,
+            strategy: r.strategy,
+            roiPct: r.roiPct,
+            expectedProfit: r.expectedProfit,
+            kalshiStake: r.kalshiStake,
+            pmStake: r.pmStake,
+            kalshiTicker: r.kalshiTicker,
+            pmConditionId: r.pmConditionId,
+            kalshiYesAsk: r.kalshiYesAsk,
+            kalshiNoAsk: r.kalshiNoAsk,
+            pmBestAsk: r.pmYesAsk,
+            pmNoPrice: r.pmNoAsk,
+            kalshiYesDepth: r.kalshiYesDepth,
+            kalshiNoDepth: r.kalshiNoDepth,
+            pmYesDepth: r.pmYesDepth,
+            pmNoDepth: r.pmNoDepth,
+            fees: r.fees,
+            stale: r.stale,
+          })),
+        },
+      }, 'watcher');
+      logger.debug('[watcher] persisted BotTrader scan decision', { pairId, scanId: persisted.id, state: persisted.decision?.state });
+    }
     liveWriteCount++;
   } catch (err) {
     liveWriteErrors++;

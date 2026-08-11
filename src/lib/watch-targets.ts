@@ -37,12 +37,14 @@ async function ensureTables(): Promise<void> {
       kalshi_ticker  TEXT NOT NULL,
       pm_yes_token   TEXT NOT NULL,
       pm_no_token    TEXT NOT NULL,
+      pm_condition_id TEXT,
       artist         TEXT NOT NULL DEFAULT '',
       category       TEXT,
       resolved_at    TEXT NOT NULL,
       PRIMARY KEY (pair_id, kalshi_ticker)
     )
   `);
+  try { await c.execute(`ALTER TABLE watch_targets ADD COLUMN pm_condition_id TEXT`); } catch { /* column already exists */ }
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_watch_targets_pair ON watch_targets(pair_id)`);
   await c.execute(`
     CREATE TABLE IF NOT EXISTS watch_tier_state (
@@ -62,6 +64,7 @@ export interface WatchTarget {
   kalshiTicker: string;
   pmYesToken: string;
   pmNoToken: string;
+  pmConditionId?: string;
   artist: string;
   category?: string;
   resolvedAt: string;
@@ -96,7 +99,7 @@ export async function refreshWatchTargets(): Promise<{ resolved: number; failed:
 
   const cutoff = new Date(Date.now() - RESOLVE_TTL_MS).toISOString();
   const freshRows = await c.execute(
-    `SELECT DISTINCT pair_id FROM watch_targets WHERE resolved_at >= ?`,
+    `SELECT DISTINCT pair_id FROM watch_targets WHERE resolved_at >= ? AND pm_condition_id IS NOT NULL AND pm_condition_id != ''`,
     [cutoff],
   );
   const fresh = new Set(freshRows.rows.map((r) => String(r.pair_id)));
@@ -121,9 +124,9 @@ export async function refreshWatchTargets(): Promise<{ resolved: number; failed:
         await c.execute(`DELETE FROM watch_targets WHERE pair_id = ?`, [pairId]);
         for (const o of r.matchedOutcomes) {
           await c.execute(
-            `INSERT OR REPLACE INTO watch_targets (pair_id, kalshi_ticker, pm_yes_token, pm_no_token, artist, category, resolved_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [pairId, o.kalshiTicker, o.pmYesTokenId, o.pmNoTokenId, o.artist, r.category ?? (m.category ? String(m.category) : null), now],
+            `INSERT OR REPLACE INTO watch_targets (pair_id, kalshi_ticker, pm_yes_token, pm_no_token, pm_condition_id, artist, category, resolved_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [pairId, o.kalshiTicker, o.pmYesTokenId, o.pmNoTokenId, o.pmConditionId ?? null, o.artist, r.category ?? (m.category ? String(m.category) : null), now],
           );
         }
         resolved++;
@@ -162,7 +165,7 @@ export async function computeTiers(): Promise<TierAssignment> {
   const hotMaxPm = await getSetting<number>('watcher.hotMaxPmTokens');
 
   const rows = await c.execute(`
-    SELECT wt.pair_id, wt.kalshi_ticker, wt.pm_yes_token, wt.pm_no_token, wt.artist, wt.category, wt.resolved_at,
+    SELECT wt.pair_id, wt.kalshi_ticker, wt.pm_yes_token, wt.pm_no_token, wt.pm_condition_id, wt.artist, wt.category, wt.resolved_at,
            sm.favorite, sm.expiry_date,
            COALESCE(ts.promote_flag, 0) AS promote_flag,
            (SELECT MAX(ae.last_seen_at) FROM arb_episodes ae WHERE ae.market_id = wt.pair_id) AS last_episode_at,
@@ -204,6 +207,7 @@ export async function computeTiers(): Promise<TierAssignment> {
       kalshiTicker: String(r.kalshi_ticker),
       pmYesToken: String(r.pm_yes_token),
       pmNoToken: String(r.pm_no_token),
+      pmConditionId: String(r.pm_condition_id || ''),
       artist: String(r.artist),
       category: r.category ? String(r.category) : undefined,
       resolvedAt: String(r.resolved_at),

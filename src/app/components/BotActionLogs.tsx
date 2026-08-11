@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 type LogStatus = 'passed' | 'failed' | 'pending';
 interface ActionStep { id:number; timestamp:string; step:string; action:string; responseStatus:LogStatus; errorReason:string|null; durationMs:number|null; requestPayload:unknown; responsePayload:unknown; alertMetadata:unknown }
 interface TradeChain { tradeId:string; trigger:string; marketId:string; marketTitle:string; startedAt:string; status:LogStatus; qualified:boolean|null; steps:ActionStep[] }
+interface ScanDecision { scanId:number; state:string; reasonCode:string; reason:string; updatedAt:string }
 
 const statusClass: Record<LogStatus,string> = { passed:'text-[var(--status-positive)]', failed:'text-[var(--status-negative)]', pending:'text-[var(--status-warning)]' };
 const statusIcon: Record<LogStatus,string> = { passed:'✓', failed:'✕', pending:'◷' };
@@ -13,6 +14,7 @@ const pretty = (value: unknown) => value == null ? '—' : JSON.stringify(value,
 
 export default function BotActionLogs({ selectionMethod }: { selectionMethod?: 'roi' | 'apy' | 'hybrid' }) {
   const [trades,setTrades]=useState<TradeChain[]>([]);
+  const [decisions,setDecisions]=useState<ScanDecision[]>([]);
   const [status,setStatus]=useState<'all'|LogStatus>('all');
   const [market,setMarket]=useState('');
   const [since,setSince]=useState('');
@@ -32,7 +34,7 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: '
       const response=await fetch(`/api/bot-trader/logs?${q}`,{cache:'no-store'});
       const data=await response.json();
       if(!response.ok||!data.success) throw new Error(data.error||'Failed to load action logs');
-      setTrades(data.trades||[]); setError(null);
+      setTrades(data.trades||[]); setDecisions(data.decisions||[]); setError(null);
     } catch(cause) { setError(cause instanceof Error?cause.message:'Failed to load action logs'); }
     finally { setLoading(false); }
   },[market,since,status,qualifiedOnly]);
@@ -50,6 +52,13 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: '
       <button onClick={()=>void load()} aria-label="Refresh action logs" className="min-h-11 min-w-11 rounded border border-[var(--border-strong)]"><RefreshCw className={`mx-auto h-4 w-4 ${loading?'animate-spin':''}`} /></button>
     </div>
     {error&&<div role="alert" className="rounded border border-[var(--status-negative)]/40 p-3 text-sm text-[var(--status-negative)]">{error}</div>}
+    {decisions.length>0&&<div className="space-y-2" aria-label="Persisted scan decisions">
+      <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">Completed scan reconciliation</h3>
+      {decisions.map(decision=><article key={decision.scanId} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2"><strong className="text-[var(--text-primary)]">Scan #{decision.scanId}</strong><span className="rounded bg-[var(--surface-workspace)] px-2 py-1 font-mono">{decision.state}</span><span className="font-mono text-[var(--text-secondary)]">{decision.reasonCode}</span></div>
+        <p className="mt-2 text-[var(--text-secondary)]">{decision.reason}</p>
+      </article>)}
+    </div>}
     <div className="space-y-2">
       {trades.map(trade=>{const open=expanded.has(trade.tradeId);return <article key={trade.tradeId} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
         <button onClick={()=>setExpanded(current=>{const next=new Set(current);open?next.delete(trade.tradeId):next.add(trade.tradeId);return next})} className="flex min-h-14 w-full items-center gap-3 px-3 text-left">

@@ -37,6 +37,8 @@ export interface LiveArbResult {
   kalshiTicker?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
+  /** Stable parent market identity used by execution and revalidation. */
+  pmConditionId?: string;
   /** ARB-01a: classification of the arb strategy.
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
@@ -61,6 +63,7 @@ export interface LiveMatchedOutcome {
   kalshiTicker: string;
   pmYesTokenId: string;
   pmNoTokenId: string;
+  pmConditionId?: string;
 }
 
 export function parseBookStaleMs(value: unknown): number {
@@ -74,7 +77,7 @@ function computeSingleOutcome(
   capital: number,
   category?: string,
 ): LiveArbResult {
-  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId } = outcome;
+  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId } = outcome;
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
@@ -209,6 +212,7 @@ function computeSingleOutcome(
     kalshiTicker,
     pmYesTokenId,
     pmNoTokenId,
+    pmConditionId,
     arbType: 'direct',
     lastUpdate: new Date().toISOString(),
   };
@@ -267,6 +271,7 @@ export function computeAllLiveArbitrages(
           pmFee: fees.pmFee,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         };
+        cur.pmConditionId = comp.pmConditionId;
       }
     }
   }

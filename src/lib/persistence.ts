@@ -791,11 +791,15 @@ export interface LastScanResult {
     kalshiNoAsk?: number;
     kalshiYesBid?: number;
     kalshiNoBid?: number;
+    kalshiYesDepth?: number | string | null;
+    kalshiNoDepth?: number | string | null;
     pmConditionId?: string;
     pmYesPrice?: number;
     pmNoPrice?: number;
     pmBestBid?: number;
     pmBestAsk?: number;
+    pmYesDepth?: number | null;
+    pmNoDepth?: number | null;
     kalshiStake?: number;
     pmStake?: number;
     apyPct?: number;

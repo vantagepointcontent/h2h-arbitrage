@@ -50,6 +50,8 @@ export interface UnifiedOutcome {
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket' | null;
     sellPrice: number;
+    /** Exact Polymarket parent identity selected by cross-outcome strategies. */
+    pmConditionId?: string;
     /** True when ROI exceeds the sanity threshold AND depth on some leg was
      *  unknown/assumed-infinite — almost certainly a phantom quote on an
      *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
@@ -450,7 +452,7 @@ export function calculateArbitrageMax(
   depthPNo: number,
   category?: string,
   maxCapital = 1000,
-) {
+): UnifiedOutcome['arbitrage'] {
   const kYes = kalshi.yesAsk;
   const kNo = kalshi.noAsk;
   const pYes = pm.bestAsk;
@@ -720,7 +722,7 @@ export function calculateBestArbitrageForOutcome(
   const depthPNo = parseDepth(current.polymarket.noAskDepth);
 
   // Base: within-outcome arbitrages (existing yellow methods)
-  let best = calculateArbitrageMax(
+  let best: UnifiedOutcome['arbitrage'] = calculateArbitrageMax(
     current.kalshi,
     current.polymarket,
     depthKYes,
@@ -775,6 +777,7 @@ export function calculateBestArbitrageForOutcome(
             buyPrice: kYesA,
             sellPlatform: 'polymarket',
             sellPrice: pYesB,
+            pmConditionId: complement.polymarket.conditionId,
             fees: {
               kalshiFee: fees.kalshiFee,
               pmFee: fees.pmFee,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, saveScanResult, getMarketUrlsById } from '@/lib/persistence';
+import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, getMarketUrlsById } from '@/lib/persistence';
+import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
     // If the request also carried a scan result, persist it to SQLite
     if (body.scanResult) {
       try {
-        const saved = await saveScanResult(market.id, {
+        const saved = await persistAndConsumeBotScan(market.id, {
           bestRoiPct: body.scanResult.bestRoiPct ?? 0,
           bestProfit: body.scanResult.bestProfit ?? 0,
           strategy: body.scanResult.strategy ?? '',
@@ -175,7 +176,7 @@ export async function POST(request: NextRequest) {
           marketTitle: market.eventTitle,
           kalshiUrl: body.kalshiUrl,
           polymarketUrl: body.polymarketUrl,
-        });
+        }, 'scheduled');
         return NextResponse.json({ market, scanResultId: saved.id }, { status: 201 });
       } catch (scanErr: any) {
         // Non-fatal — market was still created

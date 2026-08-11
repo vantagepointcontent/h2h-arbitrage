@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
+const { processBacklogMock } = vi.hoisted(() => ({
+  processBacklogMock: vi.fn(async () => [{ state: 'placed' }, { state: 'disabled' }]),
+}));
+vi.mock('@/lib/bot-scan-consumer', () => ({ processBotScanBacklog: processBacklogMock }));
+
 function makeRequest(body: unknown, token?: string): NextRequest {
   return new NextRequest('http://localhost/api/bot-trader/run', {
     method: 'POST',
@@ -40,5 +45,12 @@ describe('/api/bot-trader/run token guard', () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toContain('pairId');
+  });
+
+  it('runs the durable catch-up queue without requiring a pair id', async () => {
+    const res = await POST(makeRequest({ catchUp: true, limit: 25 }, 'secret-token'));
+    expect(res.status).toBe(200);
+    expect(processBacklogMock).toHaveBeenCalledWith(25);
+    expect(await res.json()).toMatchObject({ processed: 2, byState: { placed: 1, disabled: 1 } });
   });
 });

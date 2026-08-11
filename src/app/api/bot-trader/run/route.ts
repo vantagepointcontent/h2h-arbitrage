@@ -6,6 +6,7 @@ import { rankBotCandidates } from '@/lib/bot-candidate-selection';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket, type SingleRefreshResult } from '@/app/api/saved-markets/refresh/refresh-single';
 import logger from '@/lib/logger';
+import { processBotScanBacklog } from '@/lib/bot-scan-consumer';
 
 function authorized(request: NextRequest): boolean {
   const token = process.env.H2H_API_TOKEN;
@@ -144,11 +145,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const body = await req.json();
-    let pairId = body?.pairId;
+    if (body?.catchUp === true) {
+      const requestedLimit = Number(body?.limit);
+      const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 200)
+        : 50;
+      const decisions = await processBotScanBacklog(limit);
+      const byState = decisions.reduce<Record<string, number>>((counts, decision) => {
+        counts[decision.state] = (counts[decision.state] ?? 0) + 1;
+        return counts;
+      }, {});
+      return NextResponse.json({ processed: decisions.length, byState, decisions });
+    }
+    const pairId = body?.pairId;
     const marketTitle = body?.marketTitle;
 
     const settings = await getBotSettings();
-    let selectedBy = 'explicit' as string;
+    const selectedBy = 'explicit';
     if (pairId == null && body?.ranked === true) {
       const ranked = rankBotCandidates(await getSavedMarkets(), settings.selectionMethod, Date.now(), {
         minRoiPct: settings.minRoiPct,

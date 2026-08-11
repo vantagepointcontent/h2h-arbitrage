@@ -1,8 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { getSavedMarkets, SavedMarket, updateSavedMarketScanResult } from '@/lib/persistence';
+import { getSavedMarkets, updateSavedMarketScanResult } from '@/lib/persistence';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket } from '@/app/api/saved-markets/refresh/refresh-single';
+import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 
 const REFRESH_STATE_FILE = path.join(process.cwd(), 'data', 'refresh-job-state.json');
 
@@ -105,16 +106,21 @@ export async function runRefreshJob(marketIds?: string[]) {
           matchedCount: result.matchedCount,
           kalshiCount: result.kalshiCount,
           pmCount: result.pmCount,
+          positiveArbCount: result.allArbs.filter((arb) => arb.roiPct > 0).length,
           scannedAt: result.scannedAt,
           allArbs: result.allArbs,
+          expiryDate: result.expiryDate,
+          category: market.category,
         };
         await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
+        await persistAndConsumeBotScan(market.id, scanResult, 'scheduled');
         newState.succeeded++;
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
         newState.failed++;
-        newState.errors.push({ id: market.id, title: market.eventTitle, error: e.message || 'Unknown error' });
-        console.error(`[refresh-job] failed ${market.eventTitle}:`, e.message);
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        newState.errors.push({ id: market.id, title: market.eventTitle, error: message });
+        console.error(`[refresh-job] failed ${market.eventTitle}:`, message);
       }
 
       newState.processed++;

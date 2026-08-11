@@ -240,7 +240,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     scannedAt: new Date().toISOString(),
     totalStake: bestNetArb ? (bestNetArb.arbitrage!.kalshiStake ?? 0) + (bestNetArb.arbitrage!.pmStake ?? 0) : 0,
     expiryDate: pmEvent.endDate,
-    allArbs: netArbs.map(o => ({
+    allArbs: netArbs.map(o => {
+      const selectedPmConditionId = o.arbitrage?.pmConditionId ?? o.polymarket?.conditionId;
+      const selectedPmLeg = withArbitrage.find(candidate => candidate.polymarket?.conditionId === selectedPmConditionId)?.polymarket ?? o.polymarket;
+      return {
       artist: o.artist,
       roiPct: o.arbitrage!.roiPct,
       expectedProfit: o.arbitrage!.expectedProfit,
@@ -255,13 +258,13 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       // Dropping these fields caused every refreshed candidate to arrive as $0.
       kalshiYesDepth: o.kalshi?.yesAskDepth,
       kalshiNoDepth: o.kalshi?.noAskDepth,
-      pmConditionId: o.polymarket?.conditionId,
-      pmYesPrice: o.polymarket?.yesPrice,
-      pmNoPrice: o.polymarket?.noPrice,
-      pmBestBid: o.polymarket?.bestBid,
-      pmBestAsk: o.polymarket?.bestAsk,
-      pmYesDepth: o.polymarket?.askDepth,
-      pmNoDepth: o.polymarket?.noAskDepth,
+      pmConditionId: selectedPmConditionId,
+      pmYesPrice: selectedPmLeg?.yesPrice,
+      pmNoPrice: selectedPmLeg?.noPrice,
+      pmBestBid: selectedPmLeg?.bestBid,
+      pmBestAsk: selectedPmLeg?.bestAsk,
+      pmYesDepth: selectedPmLeg?.askDepth,
+      pmNoDepth: selectedPmLeg?.noAskDepth,
       kalshiStake: o.arbitrage!.kalshiStake,
       pmStake: o.arbitrage!.pmStake,
       apyPct: o.arbitrage!.apyPct,
@@ -270,6 +273,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       sellPlatform: o.arbitrage!.sellPlatform,
       sellPrice: o.arbitrage!.sellPrice,
       fees: o.arbitrage!.fees,
-    })),
+    };
+    }),
   };
 }

@@ -173,6 +173,7 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
       kalshiTicker: o.kalshi!.ticker,
       pmYesTokenId: tokens.yes,
       pmNoTokenId: tokens.no,
+      pmConditionId: cid,
     });
     allKalshiTickers.add(o.kalshi!.ticker);
     allPmTokenIds.add(tokens.yes);

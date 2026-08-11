@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotActionLogs, pruneBotActionLogs, type BotActionLogRow, type BotActionStatus } from '@/lib/bot-action-log';
 import { clientSafeError } from '@/lib/error-handler';
+import { getBotScanDecisions } from '@/lib/bot-scan-consumer';
 
 const VALID_STATUS = new Set<BotActionStatus>(['passed', 'failed', 'pending']);
 
@@ -61,14 +62,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'qualified must be true or false' }, { status: 400 });
     }
     await pruneBotActionLogs(30);
-    const result = await getBotActionLogs({
+    const [result, decisions] = await Promise.all([getBotActionLogs({
       status: statusParam as BotActionStatus | undefined,
       marketId: params.get('marketId') || undefined,
       since,
       cursor,
       qualified: qualifiedParam == null ? undefined : qualifiedParam === 'true',
-    });
-    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), nextCursor: result.nextCursor });
+    }), getBotScanDecisions(200)]);
+    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), decisions, nextCursor: result.nextCursor });
   } catch (error) {
     return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
   }

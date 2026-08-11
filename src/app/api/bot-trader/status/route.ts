@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSetting } from '@/lib/settings';
 import { getExecutions, getTodayBotExposure } from '@/lib/persistence';
 import logger from '@/lib/logger';
+import { getBotScanDecisions } from '@/lib/bot-scan-consumer';
 
 const DEFAULT_BOT_SETTINGS = {
   enabled: false,
@@ -37,13 +38,17 @@ export async function GET() {
     const todayStart = new Date().toISOString().slice(0, 10);
     const todayEnd = `${todayStart}T23:59:59.999Z`;
 
-    const [todayStakeUsd, todayTrades] = await Promise.all([
+    const [todayStakeUsd, todayTrades, recentDecisions] = await Promise.all([
       getTodayBotExposure().catch((e) => {
         logger.warn('[bot-trader-status] getTodayBotExposure failed', { error: String(e) });
         return 0;
       }),
       getExecutions(10_000, 'bot').catch((e) => {
         logger.warn('[bot-trader-status] getExecutions failed', { error: String(e) });
+        return [];
+      }),
+      getBotScanDecisions(100).catch((e) => {
+        logger.warn('[bot-trader-status] getBotScanDecisions failed', { error: String(e) });
         return [];
       }),
     ]);
@@ -71,6 +76,12 @@ export async function GET() {
       lastTradeRoiPct: lastTrade?.result && typeof lastTrade.result === 'object' && 'actualProfit' in lastTrade.result
         ? Number((lastTrade.result as { actualProfit?: unknown }).actualProfit ?? null)
         : null,
+      scanDecisions: {
+        count: recentDecisions.length,
+        latest: recentDecisions[0] ?? null,
+        byState: Object.fromEntries([...new Set(recentDecisions.map((decision) => decision.state))]
+          .map((state) => [state, recentDecisions.filter((decision) => decision.state === state).length])),
+      },
       error: null,
     };
 

@@ -15,7 +15,8 @@ import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth,
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
-import { getSavedMarkets, findSavedMarketByUrls, updateSavedMarketScanResult, appendScanHistory, saveScanResult } from '@/lib/persistence';
+import { getSavedMarkets, findSavedMarketByUrls, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
+import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
@@ -418,23 +419,30 @@ export async function POST(request: NextRequest) {
           // closed-but-not-yet-past-endDate markets as expired.
           pmClosed,
           priceResolved,
-          allArbs: netArbs.map(o => ({
+          allArbs: netArbs.map(o => {
+            const selectedPmConditionId = o.arbitrage?.pmConditionId ?? o.polymarket?.conditionId;
+            const selectedPmLeg = withArbitrage.find(candidate => candidate.polymarket?.conditionId === selectedPmConditionId)?.polymarket ?? o.polymarket;
+            return {
             artist: o.artist,
             roiPct: o.arbitrage!.roiPct,
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
-            arbType: o.arbitrage!.arbType,
+            arbType: o.arbitrage!.arbType ?? undefined,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
             kalshiTicker: o.kalshi?.ticker,
             kalshiYesAsk: o.kalshi?.yesAsk,
             kalshiNoAsk: o.kalshi?.noAsk,
             kalshiYesBid: o.kalshi?.yesBid,
             kalshiNoBid: o.kalshi?.noBid,
-            pmConditionId: o.polymarket?.conditionId,
-            pmYesPrice: o.polymarket?.yesPrice,
-            pmNoPrice: o.polymarket?.noPrice,
-            pmBestBid: o.polymarket?.bestBid,
-            pmBestAsk: o.polymarket?.bestAsk,
+            kalshiYesDepth: o.kalshi?.yesAskDepth,
+            kalshiNoDepth: o.kalshi?.noAskDepth,
+            pmConditionId: selectedPmConditionId,
+            pmYesPrice: selectedPmLeg?.yesPrice,
+            pmNoPrice: selectedPmLeg?.noPrice,
+            pmBestBid: selectedPmLeg?.bestBid,
+            pmBestAsk: selectedPmLeg?.bestAsk,
+            pmYesDepth: selectedPmLeg?.askDepth,
+            pmNoDepth: selectedPmLeg?.noAskDepth,
             kalshiStake: o.arbitrage!.kalshiStake,
             pmStake: o.arbitrage!.pmStake,
             apyPct: o.arbitrage!.apyPct,
@@ -443,7 +451,8 @@ export async function POST(request: NextRequest) {
             sellPlatform: o.arbitrage!.sellPlatform,
             sellPrice: o.arbitrage!.sellPrice,
             fees: o.arbitrage!.fees,
-          })),
+          };
+          }),
         };
         await Promise.all([
           updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate),
@@ -455,7 +464,7 @@ export async function POST(request: NextRequest) {
             positiveArbCount: positiveArbs.length,
             matchedCount,
           }),
-          saveScanResult(market.id, {
+          persistAndConsumeBotScan(market.id, {
           bestRoiPct: scanResult.bestRoiPct,
           bestProfit: scanResult.bestProfit,
           strategy: scanResult.strategy,
@@ -470,11 +479,13 @@ export async function POST(request: NextRequest) {
           arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
           // PERF-P2: raw blob only stored when there are arbs to drill into —
           // zero-arb scans (vast majority) get NULL, keeping the DB lean.
-          raw: (scanResult.allArbs?.length ?? 0) > 0 ? { allArbs: scanResult.allArbs } : undefined,
+          raw: (scanResult.allArbs?.length ?? 0) > 0
+            ? { allArbs: scanResult.allArbs, expiryDate: pmEvent.endDate, category: scanCategory }
+            : undefined,
           marketTitle: pmEvent.title || market.eventTitle,
           kalshiUrl,
           polymarketUrl,
-        }),
+        }, 'scan_api'),
         ]);
 
         // ── Arb lifecycle tracking: open/extend/close episodes ──

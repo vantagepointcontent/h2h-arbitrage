@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   updateSavedMarketScanResult: vi.fn(),
   getManualMatches: vi.fn(),
   refreshSingleMarket: vi.fn(),
+  persistAndConsumeBotScan: vi.fn(),
 }));
 
 vi.mock('fs', () => ({ promises: { readFile: mocks.readFile, writeFile: mocks.writeFile } }));
@@ -18,6 +19,7 @@ vi.mock('@/lib/manual-matches', () => ({ getManualMatches: mocks.getManualMatche
 vi.mock('@/app/api/saved-markets/refresh/refresh-single', () => ({
   refreshSingleMarket: mocks.refreshSingleMarket,
 }));
+vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
 
 import { getRefreshStatus, runRefreshJob } from './refresh-job';
 
@@ -35,6 +37,7 @@ beforeEach(() => {
   mocks.getSavedMarkets.mockResolvedValue(markets);
   mocks.getManualMatches.mockResolvedValue([]);
   mocks.updateSavedMarketScanResult.mockResolvedValue(undefined);
+  mocks.persistAndConsumeBotScan.mockResolvedValue({ id: 1, decision: null, backlogProcessed: 0 });
 });
 
 afterEach(() => {
@@ -44,6 +47,29 @@ afterEach(() => {
 });
 
 describe('refresh job timeout cancellation', () => {
+  it('persists completed scheduled scans through the durable BotTrader consumer', async () => {
+    mocks.getSavedMarkets.mockResolvedValue([markets[0]]);
+    mocks.refreshSingleMarket.mockResolvedValue({
+      bestRoiPct: 3,
+      bestProfit: 3,
+      strategy: 'test',
+      matchedCount: 1,
+      kalshiCount: 1,
+      pmCount: 1,
+      scannedAt: new Date().toISOString(),
+      allArbs: [{ artist: 'A', roiPct: 3 }],
+      expiryDate: null,
+    });
+
+    await runRefreshJob();
+
+    expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
+      'one',
+      expect.objectContaining({ positiveArbCount: 1 }),
+      'scheduled',
+    );
+  });
+
   it('recovers a persisted running state left behind by a stopped process', async () => {
     mocks.readFile.mockResolvedValue(JSON.stringify({
       running: true,
@@ -67,7 +93,7 @@ describe('refresh job timeout cancellation', () => {
   });
 
   it('keeps ownership until workers drain and blocks post-timeout persistence', async () => {
-    let resolveRefresh!: (value: any) => void;
+    let resolveRefresh!: (value: unknown) => void;
     mocks.refreshSingleMarket.mockImplementation(() => new Promise((resolve) => {
       resolveRefresh = resolve;
     }));
