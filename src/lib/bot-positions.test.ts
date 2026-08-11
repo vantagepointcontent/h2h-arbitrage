@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   BotPositionStore,
+  calculateBotPositionEntryCost,
   calculatePositionValuation,
   getKalshiResolvedPrices,
   type BotPosition,
 } from './bot-positions';
+import { calcKalshiFee, calcPolymarketFee } from './matcher';
 
 function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
   return {
@@ -73,6 +75,65 @@ describe('calculatePositionValuation', () => {
       realizedPnlCents: null,
       settlementSide: null,
     });
+  });
+
+  it('liquidates the full held quantity through both bid ladders and subtracts exit fees on both legs', () => {
+    const result = calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 50,
+      kalshiNoBidCents: 45,
+      pmYesBidCents: 45,
+      pmNoBidCents: 55,
+      kalshiYesBids: [{ priceCents: 50.5, size: 5 }, { priceCents: 40.5, size: 5 }],
+      kalshiNoBids: [{ priceCents: 45, size: 10 }],
+      pmYesBids: [{ priceCents: 45, size: 10 }],
+      pmNoBids: [{ priceCents: 55, size: 10 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: '2026-08-10T00:00:00.000Z',
+    });
+
+    const expectedExitFeesCents = Math.round((
+      calcKalshiFee(5, 0.505)
+      + calcKalshiFee(5, 0.405)
+      + calcPolymarketFee(10, 0.55, 0.04)
+    ) * 100);
+    expect(result.currentPriceKalshiCents).toBe(46);
+    expect(result.currentPricePmCents).toBe(55);
+    expect(result.currentValueCents).toBe(1005 - expectedExitFeesCents);
+    expect(result.unrealizedPnlCents).toBe(result.currentValueCents - 950);
+    expect(result.unrealizedRoiBps).toBe(Math.round((result.unrealizedPnlCents * 10_000) / 950));
+  });
+
+  it('reports a loss from executable proceeds below the fee-inclusive buy cost', () => {
+    const result = calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 40,
+      kalshiNoBidCents: 60,
+      pmYesBidCents: 50,
+      pmNoBidCents: 50,
+      kalshiYesBids: [{ priceCents: 40, size: 10 }],
+      kalshiNoBids: [{ priceCents: 60, size: 10 }],
+      pmYesBids: [{ priceCents: 50, size: 10 }],
+      pmNoBids: [{ priceCents: 50, size: 10 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    });
+    expect(result.currentValueCents).toBeLessThan(950);
+    expect(result.unrealizedPnlCents).toBe(result.currentValueCents - 950);
+    expect(result.unrealizedRoiBps).toBeLessThan(0);
+  });
+
+  it('fails closed when either held leg lacks enough executable bid depth', () => {
+    expect(() => calculatePositionValuation(openPosition(), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      kalshiYesBids: [{ priceCents: 48, size: 9 }],
+      kalshiNoBids: [{ priceCents: 51, size: 10 }],
+      pmYesBids: [{ priceCents: 42, size: 10 }],
+      pmNoBids: [{ priceCents: 57, size: 10 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).toThrow(/insufficient executable bid depth/i);
   });
 
   it('fails closed when an executable bid is missing', () => {
@@ -156,13 +217,30 @@ describe('calculatePositionValuation', () => {
   });
 });
 
+describe('calculateBotPositionEntryCost', () => {
+  it('persists Buy Cost as both acquisition legs plus both entry execution fees', () => {
+    const result = calculateBotPositionEntryCost({
+      buyPriceKalshiCents: 45.1,
+      buyPricePmCents: 50,
+      sharesKalshi: 10,
+      sharesPm: 10,
+      pmTheta: 0.04,
+    });
+    const expectedKalshiFee = Math.round(calcKalshiFee(10, 0.451) * 100);
+    const expectedPmFee = Math.round(calcPolymarketFee(10, 0.50, 0.04) * 100);
+    expect(result.kalshiEntryFeeCents).toBe(expectedKalshiFee);
+    expect(result.pmEntryFeeCents).toBe(expectedPmFee);
+    expect(result.totalCostCents).toBe(451 + 500 + expectedKalshiFee + expectedPmFee);
+  });
+});
+
 describe('BotPositionStore', () => {
   const dirs: string[] = [];
   afterEach(async () => {
     await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
-  it('creates the full table, records initial held-to-settlement value, and prevents duplicate open pairs', async () => {
+  it('creates the full table without inventing an executable mark and prevents duplicate open pairs', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
     dirs.push(dir);
     const dbUrl = `file:${path.join(dir, 'test.db')}`;
@@ -198,8 +276,12 @@ describe('BotPositionStore', () => {
       selectionMethod: 'hybrid',
     });
 
-    expect(created.currentValueCents).toBe(1000);
-    expect(created.unrealizedPnlCents).toBe(50);
+    expect(created.currentPriceKalshiCents).toBeNull();
+    expect(created.currentPricePmCents).toBeNull();
+    expect(created.currentValueCents).toBeNull();
+    expect(created.unrealizedPnlCents).toBeNull();
+    expect(created.unrealizedRoiBps).toBeNull();
+    expect(created.lastValuationAt).toBeNull();
     expect(created.dryRun).toBe(true);
     expect(created.selectionMethod).toBe('hybrid');
     await expect(store.hasOpenPair('KXTEST', '0xabc')).resolves.toBe(true);
@@ -279,6 +361,13 @@ describe('BotPositionStore', () => {
       expiryDate: '2026-08-10T00:00:00.000Z',
     });
     await store.updateValuation(created.id, valuation);
+    await store.clearOpenValuation(created.id, '2026-08-08T11:59:00.000Z');
+    await store.updateValuation(created.id, {
+      ...valuation,
+      currentValueCents: 1,
+      unrealizedPnlCents: -949,
+      lastValuationAt: '2026-08-08T11:58:00.000Z',
+    });
 
     const [stored] = await store.list({ status: 'open', limit: 10 });
     expect(stored.currentValueCents).toBe(1022);

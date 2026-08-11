@@ -58,11 +58,33 @@ export type CreateBotPosition = Omit<BotPosition,
   'settlementSide' | 'dryRun'
 >;
 
+export interface ExecutableBidLevel {
+  priceCents: number;
+  size: number;
+}
+
+function parseExecutableBidLevels(levels: Array<{ price: unknown; size: unknown }> | undefined): ExecutableBidLevel[] {
+  return (levels ?? []).flatMap((level) => {
+    const price = typeof level.price === 'string' && /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(level.price)
+      ? Number(level.price)
+      : null;
+    const size = typeof level.size === 'string' && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(level.size)
+      ? Number(level.size)
+      : null;
+    if (price == null || !Number.isFinite(price) || price <= 0 || price > 1 || size == null || !Number.isFinite(size) || size <= 0) return [];
+    return [{ priceCents: price * 100, size }];
+  }).sort((a, b) => b.priceCents - a.priceCents);
+}
+
 export interface PositionQuote {
   kalshiYesBidCents: number | null;
   kalshiNoBidCents: number | null;
   pmYesBidCents: number | null;
   pmNoBidCents: number | null;
+  kalshiYesBids?: ExecutableBidLevel[];
+  kalshiNoBids?: ExecutableBidLevel[];
+  pmYesBids?: ExecutableBidLevel[];
+  pmNoBids?: ExecutableBidLevel[];
   observedAt: string;
   expiryDate: string | null;
   kalshiResolved?: boolean;
@@ -105,6 +127,10 @@ function isPriceCents(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100;
 }
 
+function isExecutablePriceCents(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
 function assertMoneyCents(name: string, value: number): void {
   if (!Number.isSafeInteger(value)) throw new Error(`${name} must be integer cents`);
 }
@@ -116,6 +142,31 @@ function assertShares(name: string, value: number): void {
 function roiBps(pnlCents: number, costCents: number): number {
   if (costCents <= 0) return 0;
   return Math.round((pnlCents * 10_000) / costCents);
+}
+
+function fillBidLadder(
+  levels: ExecutableBidLevel[] | undefined,
+  fallbackPriceCents: number | null,
+  quantity: number,
+  positionId: number,
+  venue: 'Kalshi' | 'Polymarket',
+): Array<{ priceCents: number; size: number }> {
+  const ladder = levels ?? (isPriceCents(fallbackPriceCents) ? [{ priceCents: fallbackPriceCents, size: quantity }] : []);
+  const valid = ladder
+    .filter((level) => isExecutablePriceCents(level.priceCents) && Number.isFinite(level.size) && level.size > 0)
+    .sort((a, b) => b.priceCents - a.priceCents);
+  let remaining = quantity;
+  const fills: Array<{ priceCents: number; size: number }> = [];
+  for (const level of valid) {
+    if (remaining <= 1e-9) break;
+    const size = Math.min(remaining, level.size);
+    fills.push({ priceCents: level.priceCents, size });
+    remaining -= size;
+  }
+  if (remaining > 1e-9) {
+    throw new Error(`Insufficient executable bid depth on ${venue} for bot position ${positionId}`);
+  }
+  return fills;
 }
 
 export function calculatePositionValuation(
@@ -137,15 +188,28 @@ export function calculatePositionValuation(
     throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
   }
 
-  const kalshiExitFeeCents = Math.round(calcKalshiFee(position.sharesKalshi, kalshiPrice / 100) * 100);
-  const pmExitFeeCents = Math.round(calcPolymarketFee(position.sharesPm, pmPrice / 100, position.pmTheta) * 100);
-  const currentValueCents =
-    kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm - kalshiExitFeeCents - pmExitFeeCents;
+  const kalshiLevels = position.kalshiSide === 'yes' ? quote.kalshiYesBids : quote.kalshiNoBids;
+  const pmLevels = position.pmSide === 'yes' ? quote.pmYesBids : quote.pmNoBids;
+  const kalshiFills = fillBidLadder(kalshiLevels, kalshiPrice, position.sharesKalshi, position.id, 'Kalshi');
+  const pmFills = fillBidLadder(pmLevels, pmPrice, position.sharesPm, position.id, 'Polymarket');
+  const kalshiGrossCents = kalshiFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
+  const pmGrossCents = pmFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
+  const kalshiExitFeeCents = Math.round(kalshiFills.reduce(
+    (total, fill) => total + calcKalshiFee(fill.size, fill.priceCents / 100),
+    0,
+  ) * 100);
+  const pmExitFeeCents = Math.round(pmFills.reduce(
+    (total, fill) => total + calcPolymarketFee(fill.size, fill.priceCents / 100, position.pmTheta!),
+    0,
+  ) * 100);
+  const currentKalshiPrice = Math.round(kalshiGrossCents / position.sharesKalshi);
+  const currentPmPrice = Math.round(pmGrossCents / position.sharesPm);
+  const currentValueCents = Math.round(kalshiGrossCents + pmGrossCents) - kalshiExitFeeCents - pmExitFeeCents;
   const unrealizedPnlCents = currentValueCents - position.totalCostCents;
   const base: PositionValuation = {
     status: 'open',
-    currentPriceKalshiCents: kalshiPrice,
-    currentPricePmCents: pmPrice,
+    currentPriceKalshiCents: currentKalshiPrice,
+    currentPricePmCents: currentPmPrice,
     currentValueCents,
     unrealizedPnlCents,
     unrealizedRoiBps: roiBps(unrealizedPnlCents, position.totalCostCents),
@@ -368,7 +432,6 @@ export class BotPositionStore {
       throw new Error('An open bot position already exists for this market pair');
     }
 
-    const initialRoiBps = roiBps(input.expectedProfitCents, input.totalCostCents);
     let result;
     try {
       result = await this.client.execute({
@@ -387,9 +450,7 @@ export class BotPositionStore {
           input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
           input.expectedProfitCents, input.feesCents, input.category, input.pmTheta,
           input.kalshiEntryFeeCents, input.pmEntryFeeCents, input.openedAt,
-          input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
-          input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
-          input.openedAt,
+          input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
         ],
       });
@@ -474,14 +535,15 @@ export class BotPositionStore {
     });
   }
 
-  async list(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
+  async list(options: { status?: BotPositionStatus | 'all'; limit?: number; offset?: number } = {}): Promise<BotPosition[]> {
     await this.ensureSchema();
     const status = options.status ?? 'all';
     const limit = Math.min(1000, Math.max(1, Math.trunc(options.limit ?? 100)));
+    const offset = Math.max(0, Math.trunc(options.offset ?? 0));
     const where = status === 'all' ? '' : 'WHERE bp.status = ?';
-    const args: Array<string | number> = status === 'all' ? [limit] : [status, limit];
+    const args: Array<string | number> = status === 'all' ? [limit, offset] : [status, limit, offset];
     const result = await this.client.execute({
-      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id ${where} ORDER BY bp.opened_at DESC LIMIT ?`,
+      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id ${where} ORDER BY bp.opened_at DESC LIMIT ? OFFSET ?`,
       args,
     });
     return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
@@ -519,7 +581,8 @@ export class BotPositionStore {
         last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
         resolution_payout = ?, resolution_validation_status = ?
-        WHERE id = ? AND status = 'open'`,
+        WHERE id = ? AND status = 'open'
+          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
       args: [
         valuation.status, valuation.currentPriceKalshiCents,
         valuation.currentPricePmCents, valuation.currentValueCents,
@@ -531,7 +594,20 @@ export class BotPositionStore {
         valuation.status === 'settled' ? (valuation.currentPriceKalshiCents === 100 ? 'yes' : 'no') : null,
         valuation.status === 'settled' ? valuation.currentValueCents : null,
         valuation.status === 'settled' ? 'verified' : 'pending', id,
+        valuation.lastValuationAt,
       ],
+    });
+  }
+
+  async clearOpenValuation(id: number, attemptedAt: string): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_positions SET
+        current_price_kalshi = NULL, current_price_pm = NULL, current_value = NULL,
+        unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?
+        WHERE id = ? AND status = 'open'
+          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
+      args: [attemptedAt, id, attemptedAt],
     });
   }
 
@@ -562,12 +638,31 @@ export interface BotPositionInput {
   pmSide: BotPositionSide;
   kalshiPrice: number;
   pmPrice: number;
-  kalshiStake: number;
-  pmStake: number;
+  kalshiContracts: number;
+  pmContracts: number;
   expectedProfit: number;
   expiryDate?: string | null;
   selectionMethod?: BotSelectionMethod | null;
   category?: string | null;
+}
+
+export function calculateBotPositionEntryCost(input: {
+  buyPriceKalshiCents: number;
+  buyPricePmCents: number;
+  sharesKalshi: number;
+  sharesPm: number;
+  pmTheta: number;
+}): { kalshiEntryFeeCents: number; pmEntryFeeCents: number; totalCostCents: number } {
+  const kalshiEntryFeeCents = Math.round(calcKalshiFee(input.sharesKalshi, input.buyPriceKalshiCents / 100) * 100);
+  const pmEntryFeeCents = Math.round(calcPolymarketFee(input.sharesPm, input.buyPricePmCents / 100, input.pmTheta) * 100);
+  return {
+    kalshiEntryFeeCents,
+    pmEntryFeeCents,
+    totalCostCents: Math.round(
+      input.sharesKalshi * input.buyPriceKalshiCents
+      + input.sharesPm * input.buyPricePmCents
+    ) + kalshiEntryFeeCents + pmEntryFeeCents,
+  };
 }
 
 export async function recordBotPosition(input: BotPositionInput): Promise<void> {
@@ -575,11 +670,15 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
   const pmTheta = getPolymarketTheta(input.category);
   const buyPriceKalshiCents = Math.round(input.kalshiPrice * 100);
   const buyPricePmCents = Math.round(input.pmPrice * 100);
-  const sharesKalshi = Math.max(1, Math.floor(input.kalshiStake / input.kalshiPrice + 1e-9));
-  const sharesPm = Math.max(1, Math.floor(input.pmStake / input.pmPrice + 1e-9));
-  const kalshiEntryFeeCents = Math.round(calcKalshiFee(sharesKalshi, input.kalshiPrice) * 100);
-  const pmEntryFeeCents = Math.round(calcPolymarketFee(sharesPm, input.pmPrice, pmTheta) * 100);
-  const totalCostCents = sharesKalshi * buyPriceKalshiCents + sharesPm * buyPricePmCents + kalshiEntryFeeCents + pmEntryFeeCents;
+  const sharesKalshi = input.kalshiContracts;
+  const sharesPm = input.pmContracts;
+  const { kalshiEntryFeeCents, pmEntryFeeCents, totalCostCents } = calculateBotPositionEntryCost({
+    buyPriceKalshiCents: input.kalshiPrice * 100,
+    buyPricePmCents: input.pmPrice * 100,
+    sharesKalshi,
+    sharesPm,
+    pmTheta,
+  });
   const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
   const expectedProfitCents = expectedPayoutCents - totalCostCents;
 
@@ -626,7 +725,7 @@ export async function releaseBotMarketPair(kalshiTicker: string, pmConditionId: 
   return store().releasePair(kalshiTicker, pmConditionId);
 }
 
-export async function getBotPositions(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
+export async function getBotPositions(options: { status?: BotPositionStatus | 'all'; limit?: number; offset?: number } = {}): Promise<BotPosition[]> {
   return store().list(options);
 }
 
@@ -698,17 +797,58 @@ export async function pollOpenBotPositions(dependencies?: {
     status?: string;
     settlement_value_dollars?: string;
   } | null>;
-  fetchPmBids?: (conditionId: string) => Promise<{ yesBidCents: number | null; noBidCents: number | null; resolved: boolean } | null>;
+  fetchKalshiBids?: (ticker: string) => Promise<{ yesBids: ExecutableBidLevel[]; noBids: ExecutableBidLevel[] } | null>;
+  fetchPmBids?: (conditionId: string) => Promise<{
+    yesBidCents: number | null;
+    noBidCents: number | null;
+    yesBids?: ExecutableBidLevel[];
+    noBids?: ExecutableBidLevel[];
+    resolved: boolean;
+  } | null>;
   observedAt?: string;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
-  const [{ fetchKalshiMarket }, { fetchClobMarket, getClobBidPrices }] = await Promise.all([
+  const [{ fetchKalshiMarket }, { fetchClobMarket, fetchClobBook, extractClobBidPrices }] = await Promise.all([
     import('./kalshi'),
     import('./polymarket-clob'),
   ]);
   const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarket;
+  const fetchKalshiBids = dependencies?.fetchKalshiBids ?? (async (ticker: string) => {
+    const response = await fetch(`https://api.elections.kalshi.com/trade-api/v2/markets/${encodeURIComponent(ticker)}/orderbook`, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as {
+      orderbook_fp?: { yes_dollars?: [string, string][]; no_dollars?: [string, string][] };
+      orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] };
+    };
+    const yes = data.orderbook_fp?.yes_dollars ?? data.orderbook?.yes_dollars_fp;
+    const no = data.orderbook_fp?.no_dollars ?? data.orderbook?.no_dollars_fp;
+    return {
+      yesBids: parseExecutableBidLevels(yes?.map(([price, size]) => ({ price, size }))),
+      noBids: parseExecutableBidLevels(no?.map(([price, size]) => ({ price, size }))),
+    };
+  });
   const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
     const market = await fetchClobMarket(conditionId);
-    return market ? getClobBidPrices(market) : null;
+    if (!market) return null;
+    const yesToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
+    const noToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+    const [yesBook, noBook] = await Promise.all([
+      yesToken ? fetchClobBook(yesToken.token_id) : null,
+      noToken ? fetchClobBook(noToken.token_id) : null,
+    ]);
+    const prices = extractClobBidPrices(market, yesBook, noBook);
+    return {
+      ...prices,
+      yesBids: prices.resolved && prices.yesBidCents != null
+        ? [{ priceCents: prices.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
+        : parseExecutableBidLevels(yesBook?.bids),
+      noBids: prices.resolved && prices.noBidCents != null
+        ? [{ priceCents: prices.noBidCents, size: Number.MAX_SAFE_INTEGER }]
+        : parseExecutableBidLevels(noBook?.bids),
+    };
   });
   const observedAt = dependencies?.observedAt ?? new Date().toISOString();
   const open = await store().listAllOpen();
@@ -721,8 +861,9 @@ export async function pollOpenBotPositions(dependencies?: {
       if (!position.kalshiTicker || !position.pmConditionId) {
         throw new Error('Position is missing venue market identifiers');
       }
-      const [kalshi, pmBids] = await Promise.all([
+      const [kalshi, kalshiBids, pmBids] = await Promise.all([
         fetchKalshi(position.kalshiTicker),
+        fetchKalshiBids(position.kalshiTicker),
         fetchPmBids(position.pmConditionId),
       ]);
       if (!kalshi || !pmBids) throw new Error('Venue quote unavailable');
@@ -732,11 +873,22 @@ export async function pollOpenBotPositions(dependencies?: {
         return isPriceCents(cents) ? cents : null;
       };
       const kalshiResolution = getKalshiResolvedPrices(kalshi);
+      if (!kalshiBids && !kalshiResolution.resolved) throw new Error('Kalshi executable depth unavailable');
+      const resolvedKalshiYesBids = kalshiResolution.resolved && kalshiResolution.yesBidCents != null
+        ? [{ priceCents: kalshiResolution.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
+        : kalshiBids?.yesBids ?? [];
+      const resolvedKalshiNoBids = kalshiResolution.resolved && kalshiResolution.noBidCents != null
+        ? [{ priceCents: kalshiResolution.noBidCents, size: Number.MAX_SAFE_INTEGER }]
+        : kalshiBids?.noBids ?? [];
       const valuation = calculatePositionValuation(position, {
         kalshiYesBidCents: kalshiResolution.yesBidCents ?? parseCents(kalshi.yes_bid_dollars),
         kalshiNoBidCents: kalshiResolution.noBidCents ?? parseCents(kalshi.no_bid_dollars),
         pmYesBidCents: pmBids.yesBidCents,
         pmNoBidCents: pmBids.noBidCents,
+        kalshiYesBids: resolvedKalshiYesBids,
+        kalshiNoBids: resolvedKalshiNoBids,
+        pmYesBids: pmBids.yesBids,
+        pmNoBids: pmBids.noBids,
         observedAt,
         expiryDate: kalshi.close_time ?? position.expiryDate,
         kalshiResolved: kalshiResolution.resolved,
@@ -746,6 +898,7 @@ export async function pollOpenBotPositions(dependencies?: {
       updated += 1;
       if (valuation.status === 'settled') settled += 1;
     } catch (error) {
+      await store().clearOpenValuation(position.id, observedAt);
       errors.push({ id: position.id, error: error instanceof Error ? error.message : String(error) });
     }
   }));

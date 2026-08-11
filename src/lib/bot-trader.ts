@@ -22,6 +22,7 @@ import {
   type ExecutionRequest,
   type OrderSide,
   type OrderRequest,
+  type OrderResult,
 } from './auto-execute';
 import { getSetting, type getExecutionMode } from './settings';
 import { executionModeToDryRun } from './execution-mode';
@@ -230,6 +231,24 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
 
   // Never guess from unknown strategy text: that can buy the opposite contract.
   return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
+}
+
+export function getAuthoritativeMatchedFill(result: {
+  kalshiResult: Pick<OrderResult, 'filledContracts' | 'filledPrice'>;
+  polymarketResult: Pick<OrderResult, 'filledContracts' | 'filledPrice'>;
+}): { kalshiContracts: number; pmContracts: number; kalshiPrice: number; pmPrice: number } | null {
+  const kalshiContracts = result.kalshiResult.filledContracts;
+  const pmContracts = result.polymarketResult.filledContracts;
+  const kalshiPrice = result.kalshiResult.filledPrice;
+  const pmPrice = result.polymarketResult.filledPrice;
+  if (
+    !Number.isSafeInteger(kalshiContracts) || Number(kalshiContracts) <= 0
+    || !Number.isSafeInteger(pmContracts) || Number(pmContracts) <= 0
+    || kalshiContracts !== pmContracts
+    || typeof kalshiPrice !== 'number' || !Number.isFinite(kalshiPrice) || kalshiPrice <= 0 || kalshiPrice > 1
+    || typeof pmPrice !== 'number' || !Number.isFinite(pmPrice) || pmPrice <= 0 || pmPrice > 1
+  ) return null;
+  return { kalshiContracts: Number(kalshiContracts), pmContracts: Number(pmContracts), kalshiPrice, pmPrice };
 }
 
 export function evaluateBotTrade(
@@ -620,7 +639,8 @@ export async function maybeExecuteBotTrade(
   if (executionId != null) {
     try {
       const legs = pickLegPrices(input.strategy, input);
-      if (legs.kalshiPrice != null && legs.pmPrice != null) {
+      const fill = getAuthoritativeMatchedFill(result);
+      if (legs.kalshiPrice != null && legs.pmPrice != null && fill) {
         await recordBotPosition({
           executionId,
           pairId: input.pairId,
@@ -630,11 +650,11 @@ export async function maybeExecuteBotTrade(
           strategy: input.strategy,
           kalshiSide: legs.kalshiOutcome,
           pmSide: legs.pmOutcome,
-          kalshiPrice: execReq.kalshiOrder.price,
-          pmPrice: execReq.polymarketOrder.price,
-          kalshiStake: execReq.kalshiOrder.size,
-          pmStake: execReq.polymarketOrder.size,
-          expectedProfit: execReq.estimatedProfit,
+          kalshiPrice: fill.kalshiPrice,
+          pmPrice: fill.pmPrice,
+          kalshiContracts: fill.kalshiContracts,
+          pmContracts: fill.pmContracts,
+          expectedProfit: result.actualProfit ?? execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,
           category: input.category ?? null,

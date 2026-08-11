@@ -18,9 +18,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
       return NextResponse.json({ success: false, error: 'limit must be between 1 and 1000' }, { status: 400 });
     }
+    const offsetParam = params.get('offset');
+    if (offsetParam != null && !/^\d+$/.test(offsetParam)) {
+      return NextResponse.json({ success: false, error: 'offset must be a non-negative integer' }, { status: 400 });
+    }
+    const offset = offsetParam == null ? 0 : Number(offsetParam);
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      return NextResponse.json({ success: false, error: 'offset must be a non-negative integer' }, { status: 400 });
+    }
     const storedPositions = await getBotPositions({
       status: statusParam as BotPositionStatus | 'all',
       limit,
+      offset,
     });
     const positions = await Promise.all(storedPositions.map(async (position) => {
       if (!position.marketId) return { ...position, kalshiUrl: null, polymarketUrl: null };

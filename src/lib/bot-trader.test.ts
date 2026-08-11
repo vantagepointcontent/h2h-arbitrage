@@ -5,6 +5,7 @@ import {
   maybeExecuteBotTrade,
   unifiedOutcomeToBotInput,
   getBotSettings,
+  getAuthoritativeMatchedFill,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -17,6 +18,26 @@ vi.mock('./bot-trader-messages', () => ({
   createBotMessage: vi.fn(async () => 1),
   updateBotMessage: vi.fn(async () => undefined),
 }));
+
+describe('getAuthoritativeMatchedFill', () => {
+  it('uses venue-reported matched contracts and fill prices, including matched partial fills', () => {
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.451 },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.497 },
+    })).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
+  });
+
+  it('refuses to invent a position from mismatched, zero, or missing venue fills', () => {
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 1, filledPrice: 0.50 },
+    })).toBeNull();
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 0, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 0, filledPrice: 0.50 },
+    })).toBeNull();
+  });
+});
 
 function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
   return {
@@ -313,7 +334,7 @@ describe('unifiedOutcomeToBotInput', () => {
         lastPrice: 0.50,
         yesAskDepth: '$1.2K',
         noAskDepth: '0',
-      } as any,
+      } as UnifiedOutcome['kalshi'],
     });
     const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
     expect(input.kalshiYesDepth).toBe(1200);

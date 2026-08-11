@@ -41,9 +41,11 @@ const positions = [{
   currentPriceKalshiCents: 48,
   currentPricePmCents: 54,
   currentValueCents: 102,
-  unrealizedPnlCents: 5,
-  unrealizedRoiBps: 515,
-  lastValuationAt: '2026-08-08T18:00:00.000Z',
+  // Deliberately inconsistent legacy fields: the table must derive these from
+  // currentValueCents and totalCostCents instead of trusting stale mappings.
+  unrealizedPnlCents: 97,
+  unrealizedRoiBps: 9999,
+  lastValuationAt: '2026-08-11T13:40:00.000Z',
   realizedPnlCents: null,
   settlementSide: null,
   dryRun: true,
@@ -67,6 +69,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('BotTraderPanel', () => {
@@ -76,6 +79,7 @@ describe('BotTraderPanel', () => {
   });
 
   it('renders status, analytics cents, and live positions from the bot APIs', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     stubInitialFetch();
     render(<BotTraderPanel />);
 
@@ -83,16 +87,65 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('link', { name: 'Open Trump 2026 market' }).getAttribute('href')).toBe('/?view=scan&id=market-1');
     expect(screen.getByRole('link', { name: 'Open exact Kalshi YES market for Trump 2026' }).getAttribute('href')).toBe('https://kalshi.com/markets/kxtrump-26');
     expect(screen.getByRole('link', { name: 'Open exact Polymarket NO market for Trump 2026' }).getAttribute('href')).toBe('https://polymarket.com/event/trump-2026');
-    expect(screen.getByText('47')).toBeTruthy();
-    expect(screen.getByText('3')).toBeTruthy();
-    expect(screen.getByText('12')).toBeTruthy();
-    expect(screen.getByText('68.4%')).toBeTruthy();
-    expect(screen.getByText('+$12.34')).toBeTruthy();
-    expect(screen.getByText('+$5.67')).toBeTruthy();
-    expect(screen.getByText('+$18.01')).toBeTruthy();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades1');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades0');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions1');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate0.0%');
+    expect(screen.getAllByText('+$0.05')).toHaveLength(3);
     expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
     expect(screen.getByText(/2 trades today/)).toBeTruthy();
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
+  });
+
+  it('maps buy cost, executable current value, P&L, and percentage ROI into their labelled columns', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const row = marketLink.closest('tr');
+    expect(row).toBeTruthy();
+    const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells).toHaveLength(10);
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('$1.02');
+    expect(cells[6]).toBe('+$0.05');
+    expect(cells[7]).toBe('+5.2%');
+  });
+
+  it('shows stale open marks explicitly and does not invent zero P&L or ROI', async () => {
+    vi.setSystemTime(new Date('2026-08-11T14:00:01.000Z'));
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('Stale');
+    expect(cells[6]).toBe('Stale');
+    expect(cells[7]).toBe('Stale');
+  });
+
+  it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({
+        success: true,
+        positions: [{ ...positions[0], totalCostCents: 0, currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null }],
+      });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
+    const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
+    expect(cells[4]).toBe('$0.00');
+    expect(cells[5]).toBe('Unavailable');
+    expect(cells[6]).toBe('Unavailable');
+    expect(cells[7]).toBe('Unavailable');
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {
@@ -107,40 +160,15 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
   });
 
-  it('ignores stale refresh responses after a newer filter request completes', async () => {
-    let phase: 'initial' | 'stale' | 'fresh' = 'initial';
-    const staleResolvers: Array<(value: { ok: boolean; json: () => Promise<unknown> }) => void> = [];
-    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
-      const url = String(input);
-      if (phase === 'stale') {
-        return new Promise((resolve) => staleResolvers.push(resolve));
-      }
-      const visiblePositions = phase === 'fresh'
-        ? [{ ...positions[0], id: 2, marketTitle: 'Fresh open position' }]
-        : positions;
-      if (url.includes('/analytics')) return response({ success: true, analytics });
-      if (url.includes('/positions')) return response({ success: true, positions: visiblePositions });
-      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
-      throw new Error(`Unexpected fetch: ${url}`);
-    }));
-
+  it('filters the complete position population locally by status and paper/production mode', async () => {
+    stubInitialFetch();
     render(<BotTraderPanel />);
     await screen.findByText('Trump 2026');
 
-    phase = 'stale';
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
-    await waitFor(() => expect(staleResolvers).toHaveLength(3));
-
-    phase = 'fresh';
-    fireEvent.click(screen.getByRole('button', { name: 'open' }));
-    await screen.findByText('Fresh open position');
-
-    staleResolvers[0]({ ok: true, json: async () => ({ success: true, analytics }) });
-    staleResolvers[1]({ ok: true, json: async () => ({ success: true, positions }) });
-    staleResolvers[2]({ ok: true, json: async () => ({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 }) });
-
-    await waitFor(() => expect(screen.queryByText('Trump 2026')).toBeNull());
-    expect(screen.getByText('Fresh open position')).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'production' } });
+    expect(screen.queryByText('Trump 2026')).toBeNull();
+    expect(screen.getByText('No BotTrader positions.')).toBeTruthy();
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes('/positions'))).toHaveLength(1);
   });
 
   it('requires exact production confirmation and forwards it to the gated settings API', async () => {
