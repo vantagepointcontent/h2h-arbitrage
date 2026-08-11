@@ -6,11 +6,20 @@
 
 // matchOutcomes import removed — chooseBestPmStructure no longer needs it
 
-export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-  );
-  return Promise.race([promise, timeout]);
+export async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms,
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+  }
 }
 
 /**

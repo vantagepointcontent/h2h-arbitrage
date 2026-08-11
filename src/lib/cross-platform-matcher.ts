@@ -20,6 +20,7 @@ import {
   fetchAllPolymarketMarkets,
   PMMarket,
 } from './polymarket';
+import { withTimeout as withSharedTimeout } from './scan-shared';
 import {
   MarketCatalogRow,
   MatchedPair,
@@ -148,12 +149,7 @@ function buildPolymarketUrl(slug: string): string {
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), ms),
-      ),
-    ]);
+    return await withSharedTimeout(promise, ms, 'market verification');
   } catch {
     return null;
   }
