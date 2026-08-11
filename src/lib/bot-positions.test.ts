@@ -65,6 +65,10 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     currentPriceKalshiCents: 45,
     currentPricePmCents: 55,
     currentValueCents: 1000,
+    kalshiGrossProceedsMicrocents: 450_000_000,
+    pmGrossProceedsMicrocents: 550_000_000,
+    kalshiNetProceedsCents: 450,
+    pmNetProceedsCents: 550,
     kalshiExitFeeCents: 0,
     pmExitFeeCents: 0,
     unrealizedPnlCents: 22,
@@ -97,6 +101,10 @@ describe('calculatePositionValuation', () => {
       currentPriceKalshiCents: 48,
       currentPricePmCents: 57,
       currentValueCents: 1022,
+      kalshiGrossProceedsMicrocents: 480_000_000,
+      pmGrossProceedsMicrocents: 570_000_000,
+      kalshiNetProceedsCents: 462,
+      pmNetProceedsCents: 560,
       kalshiExitFeeCents: 18,
       pmExitFeeCents: 10,
       unrealizedPnlCents: 44,
@@ -129,9 +137,49 @@ describe('calculatePositionValuation', () => {
     ) * 100);
     expect(result.currentPriceKalshiCents).toBe(46);
     expect(result.currentPricePmCents).toBe(55);
+    expect(result.kalshiGrossProceedsMicrocents).toBe(455_000_000);
+    expect(result.pmGrossProceedsMicrocents).toBe(550_000_000);
+    expect(result.kalshiNetProceedsCents + result.pmNetProceedsCents).toBe(result.currentValueCents);
     expect(result.currentValueCents).toBe(1005 - expectedExitFeesCents);
     expect(result.unrealizedPnlCents).toBe(result.currentValueCents - 978);
     expect(result.unrealizedRoiBps).toBe(Math.round((result.unrealizedPnlCents * 10_000) / 978));
+  });
+
+  it('preserves sub-cent per-leg depth proceeds while allocating the combined rounded net exactly', () => {
+    const result = calculatePositionValuation(openPosition({
+      sharesKalshi: 1,
+      sharesPm: 1,
+      buyPriceKalshiCents: 45,
+      buyPricePmCents: 50,
+      totalCostCents: 95,
+      expectedPayoutCents: 100,
+      expectedProfitCents: 5,
+      feesCents: 0,
+      kalshiEntryFeeMultiplierPpm: 0,
+      kalshiEntryFeeCents: 0,
+      pmTheta: 0,
+      pmEntryFeeRateBps: 0,
+      pmEntryFeeCents: 0,
+      kalshiExitFeeMultiplierPpm: 0,
+      pmExitFeeRateBps: 0,
+    }), {
+      kalshiYesBidCents: 51,
+      kalshiNoBidCents: 49,
+      pmYesBidCents: 51,
+      pmNoBidCents: 49,
+      kalshiYesBids: [{ priceCents: 50.55, size: 1 }],
+      kalshiNoBids: [{ priceCents: 49.45, size: 1 }],
+      pmYesBids: [{ priceCents: 50.55, size: 1 }],
+      pmNoBids: [{ priceCents: 49.45, size: 1 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    });
+
+    expect(result.kalshiGrossProceedsMicrocents).toBe(50_550_000);
+    expect(result.pmGrossProceedsMicrocents).toBe(49_450_000);
+    expect(result.kalshiNetProceedsCents).toBe(51);
+    expect(result.pmNetProceedsCents).toBe(49);
+    expect(result.currentValueCents).toBe(100);
   });
 
   it('applies the Kalshi cent ceiling once after aggregating raw fees across depth levels', () => {
@@ -547,6 +595,8 @@ describe('BotPositionStore', () => {
     columnsClient.close();
     expect(columns.rows.map((row) => String(row.name))).toEqual(expect.arrayContaining([
       'execution_id', 'buy_price_kalshi', 'buy_price_pm', 'current_value',
+      'kalshi_gross_proceeds_microcents', 'pm_gross_proceeds_microcents',
+      'kalshi_net_proceeds', 'pm_net_proceeds',
       'unrealized_pnl', 'unrealized_roi_pct', 'realized_pnl', 'settlement_side', 'selection_method',
       'kalshi_entry_fee_multiplier_ppm', 'pm_entry_fee_rate_bps', 'pm_entry_token_id',
       'kalshi_exit_fee_multiplier_ppm', 'pm_exit_fee_rate_bps', 'pm_exit_token_id',
@@ -570,6 +620,10 @@ describe('BotPositionStore', () => {
     expect(legacy.pmEntryFeeRateBps).toBeNull();
     expect(legacy.kalshiExitFeeMultiplierPpm).toBeNull();
     expect(legacy.pmExitFeeRateBps).toBeNull();
+    expect(legacy.kalshiGrossProceedsMicrocents).toBeNull();
+    expect(legacy.pmGrossProceedsMicrocents).toBeNull();
+    expect(legacy.kalshiNetProceedsCents).toBeNull();
+    expect(legacy.pmNetProceedsCents).toBeNull();
     expect(() => calculatePositionValuation({
       ...legacy,
       sharesKalshi: 1,
@@ -699,6 +753,10 @@ describe('BotPositionStore', () => {
 
     const [stored] = await store.list({ status: 'open', limit: 10 });
     expect(stored.currentValueCents).toBe(1022);
+    expect(stored.kalshiGrossProceedsMicrocents).toBe(480_000_000);
+    expect(stored.pmGrossProceedsMicrocents).toBe(570_000_000);
+    expect(stored.kalshiNetProceedsCents).toBe(462);
+    expect(stored.pmNetProceedsCents).toBe(560);
     expect(stored.unrealizedPnlCents).toBe(44);
     expect(stored.kalshiExitFeeSource).toBe('kalshi-series:KXTEST');
     expect(stored.pmExitFeeSource).toBe('polymarket-clob:/fee-rate');
@@ -773,7 +831,10 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         const db = createClient({ url: dbUrl });
         await db.execute({
           sql: `UPDATE bot_positions SET current_price_kalshi = 48, current_price_pm = 57,
-            current_value = 1000, unrealized_pnl = 50, unrealized_roi_pct = 526 WHERE id = ?`,
+            current_value = 1000,
+            kalshi_gross_proceeds_microcents = 480000000, pm_gross_proceeds_microcents = 570000000,
+            kalshi_net_proceeds = 480, pm_net_proceeds = 520,
+            unrealized_pnl = 50, unrealized_roi_pct = 526 WHERE id = ?`,
           args: [created.id],
         });
         db.close();
@@ -785,6 +846,10 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         expect(row.current_price_kalshi).toBeNull();
         expect(row.current_price_pm).toBeNull();
         expect(row.current_value).toBeNull();
+        expect(row.kalshi_gross_proceeds_microcents).toBeNull();
+        expect(row.pm_gross_proceeds_microcents).toBeNull();
+        expect(row.kalshi_net_proceeds).toBeNull();
+        expect(row.pm_net_proceeds).toBeNull();
         expect(row.unrealized_pnl).toBeNull();
         expect(row.unrealized_roi_pct).toBeNull();
         expect(row.last_valuation_at).toBe(attemptedAt);

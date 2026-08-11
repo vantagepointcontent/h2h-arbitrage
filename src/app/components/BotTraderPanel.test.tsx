@@ -41,6 +41,15 @@ const positions = [{
   currentPriceKalshiCents: 48,
   currentPricePmCents: 54,
   currentValueCents: 102,
+  kalshiGrossProceedsMicrocents: 48_000_000,
+  pmGrossProceedsMicrocents: 54_000_000,
+  kalshiNetProceedsCents: 48,
+  pmNetProceedsCents: 54,
+  kalshiExitFeeCents: 0,
+  pmExitFeeCents: 0,
+  kalshiExitFeeType: 'quadratic',
+  kalshiExitFeeMultiplierPpm: 1_000_000,
+  pmExitFeeRateBps: 400,
   // Deliberately inconsistent legacy fields: the table must derive these from
   // currentValueCents and totalCostCents instead of trusting stale mappings.
   unrealizedPnlCents: 97,
@@ -158,6 +167,86 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText('KXTRUMP-26')).toBeTruthy();
     expect(screen.getByText('0xabc')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
+  });
+
+  it('reconciles every summary card to the exact combined status and mode population', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const mixedPositions = [
+      { ...positions[0], id: 1, marketTitle: 'Paper open profit' },
+      { ...positions[0], id: 2, marketTitle: 'Prod open loss', dryRun: false, totalCostCents: 100, currentValueCents: 80 },
+      { ...positions[0], id: 3, marketTitle: 'Paper settled win', status: 'settled', currentValueCents: 130, realizedPnlCents: 30 },
+      { ...positions[0], id: 4, marketTitle: 'Prod settled loss', status: 'settled', dryRun: false, currentValueCents: 60, realizedPnlCents: -40 },
+    ];
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/positions')) return response({ success: true, positions: mixedPositions });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+    await screen.findByText('Paper open profit');
+
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'production' } });
+    expect(screen.queryByText('Paper open profit')).toBeNull();
+    expect(screen.getByText('Prod open loss')).toBeTruthy();
+    expect(screen.queryByText('Prod settled loss')).toBeNull();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades0');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades1');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions1');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate0.0%');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized-$0.20');
+    expect(screen.getByText('Realized').parentElement?.textContent).toBe('Realized$0.00');
+    expect(screen.getByText('Total P&L').parentElement?.textContent).toBe('Total P&L-$0.20');
+
+    fireEvent.click(screen.getByRole('button', { name: 'settled' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter position mode' }), { target: { value: 'paper' } });
+    expect(screen.getByText('Paper settled win')).toBeTruthy();
+    expect(screen.queryByText('Paper open profit')).toBeNull();
+    expect(screen.getByText('Paper Trades').parentElement?.textContent).toBe('Paper Trades1');
+    expect(screen.getByText('Prod Trades').parentElement?.textContent).toBe('Prod Trades0');
+    expect(screen.getByText('Open Positions').parentElement?.textContent).toBe('Open Positions0');
+    expect(screen.getByText('Win Rate').parentElement?.textContent).toBe('Win Rate100.0%');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized$0.00');
+    expect(screen.getByText('Realized').parentElement?.textContent).toBe('Realized+$0.30');
+    expect(screen.getByText('Total P&L').parentElement?.textContent).toBe('Total P&L+$0.30');
+  });
+
+  it('expands authoritative per-leg gross, fee, and net proceeds that sum to Current Value', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const feePosition = {
+      ...positions[0],
+      sharesKalshi: 10,
+      sharesPm: 10,
+      totalCostCents: 978,
+      currentPriceKalshiCents: 46,
+      currentPricePmCents: 55,
+      kalshiGrossProceedsMicrocents: 455_000_000,
+      pmGrossProceedsMicrocents: 550_000_000,
+      kalshiNetProceedsCents: 437,
+      pmNetProceedsCents: 540,
+      kalshiExitFeeCents: 18,
+      pmExitFeeCents: 10,
+      currentValueCents: 977,
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/positions')) return response({ success: true, positions: [feePosition] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('10 held');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('45.500¢ VWAP');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$4.55 gross');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$0.18 fee');
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('$4.37 net');
+    expect(screen.getByTestId('polymarket-liquidation').textContent).toContain('4.00%');
+    expect(screen.getByTestId('polymarket-liquidation').textContent).toContain('$5.40 net');
+    expect(screen.getByTestId('combined-net-proceeds').textContent).toBe('Combined net proceeds$9.77');
+    expect(screen.getByTestId('combined-net-proceeds').textContent).toContain('$9.77');
   });
 
   it('filters the complete position population locally by status and paper/production mode', async () => {

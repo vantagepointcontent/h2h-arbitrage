@@ -45,6 +45,15 @@ interface BotPosition {
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
   currentValueCents: number | null;
+  kalshiGrossProceedsMicrocents: number | null;
+  pmGrossProceedsMicrocents: number | null;
+  kalshiNetProceedsCents: number | null;
+  pmNetProceedsCents: number | null;
+  kalshiExitFeeCents: number | null;
+  pmExitFeeCents: number | null;
+  kalshiExitFeeType: 'quadratic' | null;
+  kalshiExitFeeMultiplierPpm: number | null;
+  pmExitFeeRateBps: number | null;
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
@@ -94,8 +103,10 @@ interface BotStatus {
 
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 });
 const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 function formatCents(cents: number, signed = false): string {
   const value = cents / 100;
@@ -112,6 +123,14 @@ function formatBps(bps: number, signed = false): string {
   const value = bps / 100;
   const prefix = signed && value > 0 ? '+' : '';
   return `${prefix}${ONE_DECIMAL.format(value)}%`;
+}
+
+function formatMicrocents(microcents: number): string {
+  return PRECISE_USD.format(microcents / 100_000_000);
+}
+
+function formatVwapCents(grossProceedsMicrocents: number, quantity: number): string {
+  return `${THREE_DECIMAL.format(grossProceedsMicrocents / 1_000_000 / quantity)}¢`;
 }
 
 function pnlClass(value: number): string {
@@ -223,12 +242,14 @@ export default function BotTraderPanel() {
     };
   }, [load]);
 
-  const modePositions = useMemo(
-    () => positions.filter((position) => modeFilter === 'all' || (modeFilter === 'paper') === position.dryRun),
-    [modeFilter, positions],
+  const filteredPositions = useMemo(
+    () => positions.filter((position) =>
+      (modeFilter === 'all' || (modeFilter === 'paper') === position.dryRun)
+      && (filter === 'all' || position.status === filter)),
+    [filter, modeFilter, positions],
   );
 
-  const sortedPositions = useMemo(() => modePositions.filter((position) => filter === 'all' || position.status === filter).sort((a, b) => {
+  const sortedPositions = useMemo(() => filteredPositions.slice().sort((a, b) => {
     const sortablePnl = (position: BotPosition) => {
       if (position.status !== 'open') return position.realizedPnlCents ?? Number.NEGATIVE_INFINITY;
       const mark = openPositionMark(position);
@@ -245,7 +266,7 @@ export default function BotTraderPanel() {
     };
     const [left, right] = values[sortKey];
     return sortDirection === 'asc' ? left - right : right - left;
-  }), [filter, modePositions, sortDirection, sortKey]);
+  }), [filteredPositions, sortDirection, sortKey]);
 
   const changeSort = (next: SortKey) => {
     if (next === sortKey) setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
@@ -309,21 +330,21 @@ export default function BotTraderPanel() {
     void saveSetting('bot.selectionMethod', method);
   };
 
-  const openModePositions = modePositions.filter((position) => position.status === 'open');
-  const openMarks = openModePositions.map((position) => openPositionMark(position));
+  const openFilteredPositions = filteredPositions.filter((position) => position.status === 'open');
+  const openMarks = openFilteredPositions.map((position) => openPositionMark(position));
   const hasUnavailableUnrealized = openMarks.some((mark) => !mark.available);
   const unrealized = openMarks.reduce((total, mark) => total + (mark.available ? mark.pnlCents : 0), 0);
-  const realized = modePositions.reduce(
+  const realized = filteredPositions.reduce(
     (total, position) => total + (position.status === 'open' ? 0 : position.realizedPnlCents ?? 0),
     0,
   );
   const totalPnl = hasUnavailableUnrealized ? null : unrealized + realized;
-  const paperTrades = modePositions.filter((position) => position.dryRun).length;
-  const productionTrades = modePositions.filter((position) => !position.dryRun).length;
-  const settledModePositions = modePositions.filter((position) => position.status !== 'open');
-  const winRateBps = settledModePositions.length === 0
+  const paperTrades = filteredPositions.filter((position) => position.dryRun).length;
+  const productionTrades = filteredPositions.filter((position) => !position.dryRun).length;
+  const settledFilteredPositions = filteredPositions.filter((position) => position.status !== 'open');
+  const winRateBps = settledFilteredPositions.length === 0
     ? 0
-    : Math.round((settledModePositions.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000) / settledModePositions.length);
+    : Math.round((settledFilteredPositions.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000) / settledFilteredPositions.length);
 
   if (loading) {
     return <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-[var(--text-secondary)]"><Loader2 className="h-4 w-4 animate-spin" /> Loading BotTrader analytics…</div>;
@@ -372,7 +393,7 @@ export default function BotTraderPanel() {
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <MetricCard label="Paper Trades" value={INTEGER.format(paperTrades)} />
         <MetricCard label="Prod Trades" value={INTEGER.format(productionTrades)} />
-        <MetricCard label="Open Positions" value={INTEGER.format(openModePositions.length)} />
+        <MetricCard label="Open Positions" value={INTEGER.format(openFilteredPositions.length)} />
         <MetricCard label="Win Rate" value={formatBps(winRateBps)} />
       </div>
 
@@ -407,6 +428,27 @@ export default function BotTraderPanel() {
                   ? (openMark?.available ? openMark.roiBps : null)
                   : positionRoiBps(position);
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
+                const hasLiquidationBreakdown = openUnavailableLabel == null
+                  && position.currentValueCents != null
+                  && Number.isSafeInteger(position.kalshiGrossProceedsMicrocents)
+                  && Number.isSafeInteger(position.pmGrossProceedsMicrocents)
+                  && Number.isSafeInteger(position.kalshiNetProceedsCents)
+                  && Number.isSafeInteger(position.pmNetProceedsCents)
+                  && Number.isSafeInteger(position.kalshiExitFeeCents)
+                  && Number.isSafeInteger(position.pmExitFeeCents)
+                  && position.sharesKalshi > 0
+                  && position.sharesPm > 0
+                  && position.kalshiExitFeeType === 'quadratic'
+                  && Number.isSafeInteger(position.kalshiExitFeeMultiplierPpm)
+                  && Number.isSafeInteger(position.pmExitFeeRateBps)
+                  && position.kalshiNetProceedsCents! + position.pmNetProceedsCents! === position.currentValueCents;
+                const liquidationUnavailableLabel = openUnavailableLabel ?? (hasLiquidationBreakdown ? null : 'Unavailable');
+                const kalshiNetProceedsCents = hasLiquidationBreakdown
+                  ? position.kalshiNetProceedsCents!
+                  : null;
+                const pmNetProceedsCents = hasLiquidationBreakdown
+                  ? position.pmNetProceedsCents!
+                  : null;
                 return [
                   <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
@@ -420,7 +462,33 @@ export default function BotTraderPanel() {
                     <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
-                  isExpanded && <tr key={`detail-${position.id}`}><td colSpan={10} className="bg-[var(--surface-workspace)] px-10 py-3"><div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-6"><div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div><div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div><div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div><div><span className="text-[var(--text-secondary)]">Current prices</span><div>{openUnavailableLabel ?? `${position.currentPriceKalshiCents == null ? '—' : formatCents(position.currentPriceKalshiCents)} K · ${position.currentPricePmCents == null ? '—' : formatCents(position.currentPricePmCents)} PM`}</div></div><div><span className="text-[var(--text-secondary)]">Shares</span><div>{INTEGER.format(position.sharesKalshi)} K · {INTEGER.format(position.sharesPm)} PM</div></div><div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div></div></td></tr>,
+                  isExpanded && <tr key={`detail-${position.id}`}>
+                    <td colSpan={10} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
+                        <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
+                      </div>
+                      {liquidationUnavailableLabel ? (
+                        <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Liquidation breakdown: {liquidationUnavailableLabel}</div>
+                      ) : (
+                        <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
+                          <div data-testid="kalshi-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()}</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} held · {formatVwapCents(position.kalshiGrossProceedsMicrocents!, position.sharesKalshi)} VWAP · {formatMicrocents(position.kalshiGrossProceedsMicrocents!)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.kalshiExitFeeCents!)} fee ({position.kalshiExitFeeType}, ×{(position.kalshiExitFeeMultiplierPpm! / 1_000_000).toFixed(6)}) · <strong className="text-[var(--text-primary)]">{formatCents(kalshiNetProceedsCents!)} net</strong></div>
+                          </div>
+                          <div data-testid="polymarket-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()}</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} held · {formatVwapCents(position.pmGrossProceedsMicrocents!, position.sharesPm)} VWAP · {formatMicrocents(position.pmGrossProceedsMicrocents!)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.pmExitFeeCents!)} fee ({(position.pmExitFeeRateBps! / 100).toFixed(2)}%) · <strong className="text-[var(--text-primary)]">{formatCents(pmNetProceedsCents!)} net</strong></div>
+                          </div>
+                          <div data-testid="combined-net-proceeds" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Combined net proceeds</span><span className="tabular-nums">{formatCents(kalshiNetProceedsCents! + pmNetProceedsCents!)}</span></div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>,
                 ];
               })}
             </tbody>

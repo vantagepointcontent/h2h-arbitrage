@@ -80,6 +80,10 @@ export interface BotPosition {
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
   currentValueCents: number | null;
+  kalshiGrossProceedsMicrocents: number | null;
+  pmGrossProceedsMicrocents: number | null;
+  kalshiNetProceedsCents: number | null;
+  pmNetProceedsCents: number | null;
   kalshiExitFeeCents: number | null;
   pmExitFeeCents: number | null;
   unrealizedPnlCents: number | null;
@@ -98,7 +102,9 @@ export interface BotPosition {
 
 export type CreateBotPosition = Omit<BotPosition,
   'id' | 'status' | 'settledAt' | 'currentPriceKalshiCents' |
-  'currentPricePmCents' | 'currentValueCents' | 'unrealizedPnlCents' |
+  'currentPricePmCents' | 'currentValueCents' |
+  'kalshiGrossProceedsMicrocents' | 'pmGrossProceedsMicrocents' |
+  'kalshiNetProceedsCents' | 'pmNetProceedsCents' | 'unrealizedPnlCents' |
   'kalshiExitFeeCents' | 'pmExitFeeCents' | 'unrealizedRoiBps' |
   'lastValuationAt' | 'realizedPnlCents' |
   'settlementSide' | 'dryRun'
@@ -159,6 +165,10 @@ export interface PositionValuation {
   currentPriceKalshiCents: number;
   currentPricePmCents: number;
   currentValueCents: number;
+  kalshiGrossProceedsMicrocents: number;
+  pmGrossProceedsMicrocents: number;
+  kalshiNetProceedsCents: number;
+  pmNetProceedsCents: number;
   kalshiExitFeeCents: number;
   pmExitFeeCents: number;
   unrealizedPnlCents: number;
@@ -428,6 +438,17 @@ function fillBidLadder(
   return fills;
 }
 
+function calculateGrossProceedsMicrocents(
+  fills: Array<{ priceCents: number; size: number }>,
+  venue: 'Kalshi' | 'Polymarket',
+): number {
+  let numerator = 0n;
+  for (const fill of fills) {
+    numerator += fixedPoint(fill.priceCents, `${venue} fill price`) * fixedPoint(fill.size, `${venue} fill size`);
+  }
+  return roundRatio(numerator, FEE_SCALE);
+}
+
 export function calculatePositionValuation(
   position: BotPosition,
   quote: PositionQuote,
@@ -459,6 +480,10 @@ export function calculatePositionValuation(
       currentPriceKalshiCents: kalshiPrice,
       currentPricePmCents: pmPrice,
       currentValueCents: payoutCents,
+      kalshiGrossProceedsMicrocents: position.sharesKalshi * kalshiPrice * Number(FEE_SCALE),
+      pmGrossProceedsMicrocents: position.sharesPm * pmPrice * Number(FEE_SCALE),
+      kalshiNetProceedsCents: position.sharesKalshi * kalshiPrice,
+      pmNetProceedsCents: position.sharesPm * pmPrice,
       kalshiExitFeeCents: 0,
       pmExitFeeCents: 0,
       unrealizedPnlCents: payoutCents - position.totalCostCents,
@@ -479,19 +504,31 @@ export function calculatePositionValuation(
   const pmLevels = position.pmSide === 'yes' ? quote.pmYesBids : quote.pmNoBids;
   const kalshiFills = fillBidLadder(kalshiLevels, position.sharesKalshi, position.id, 'Kalshi');
   const pmFills = fillBidLadder(pmLevels, position.sharesPm, position.id, 'Polymarket');
-  const kalshiGrossCents = kalshiFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
-  const pmGrossCents = pmFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
+  const kalshiGrossProceedsMicrocents = calculateGrossProceedsMicrocents(kalshiFills, 'Kalshi');
+  const pmGrossProceedsMicrocents = calculateGrossProceedsMicrocents(pmFills, 'Polymarket');
   const kalshiExitFeeCents = calculateKalshiFeeCents(kalshiFills, position.kalshiExitFeeMultiplierPpm!);
   const pmExitFeeCents = calculatePolymarketFeeCents(pmFills, position.pmExitFeeRateBps!);
-  const currentKalshiPrice = Math.round(kalshiGrossCents / position.sharesKalshi);
-  const currentPmPrice = Math.round(pmGrossCents / position.sharesPm);
-  const currentValueCents = Math.round(kalshiGrossCents + pmGrossCents) - kalshiExitFeeCents - pmExitFeeCents;
+  const currentKalshiPrice = Math.round(kalshiGrossProceedsMicrocents / Number(FEE_SCALE) / position.sharesKalshi);
+  const currentPmPrice = Math.round(pmGrossProceedsMicrocents / Number(FEE_SCALE) / position.sharesPm);
+  const combinedGrossCents = roundRatio(
+    BigInt(kalshiGrossProceedsMicrocents + pmGrossProceedsMicrocents),
+    FEE_SCALE,
+  );
+  const currentValueCents = combinedGrossCents - kalshiExitFeeCents - pmExitFeeCents;
+  // Allocate the single combined-cent rounding residual deterministically at
+  // the ledger boundary without corrupting either venue's precise depth gross.
+  const kalshiNetProceedsCents = roundRatio(BigInt(kalshiGrossProceedsMicrocents), FEE_SCALE) - kalshiExitFeeCents;
+  const pmNetProceedsCents = currentValueCents - kalshiNetProceedsCents;
   const unrealizedPnlCents = currentValueCents - position.totalCostCents;
   const base: PositionValuation = {
     status: 'open',
     currentPriceKalshiCents: currentKalshiPrice,
     currentPricePmCents: currentPmPrice,
     currentValueCents,
+    kalshiGrossProceedsMicrocents,
+    pmGrossProceedsMicrocents,
+    kalshiNetProceedsCents,
+    pmNetProceedsCents,
     kalshiExitFeeCents,
     pmExitFeeCents,
     unrealizedPnlCents,
@@ -555,6 +592,10 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     currentPriceKalshiCents: row.current_price_kalshi != null ? Number(row.current_price_kalshi) : null,
     currentPricePmCents: row.current_price_pm != null ? Number(row.current_price_pm) : null,
     currentValueCents: row.current_value != null ? Number(row.current_value) : null,
+    kalshiGrossProceedsMicrocents: row.kalshi_gross_proceeds_microcents != null ? Number(row.kalshi_gross_proceeds_microcents) : null,
+    pmGrossProceedsMicrocents: row.pm_gross_proceeds_microcents != null ? Number(row.pm_gross_proceeds_microcents) : null,
+    kalshiNetProceedsCents: row.kalshi_net_proceeds != null ? Number(row.kalshi_net_proceeds) : null,
+    pmNetProceedsCents: row.pm_net_proceeds != null ? Number(row.pm_net_proceeds) : null,
     kalshiExitFeeCents: row.kalshi_exit_fee != null ? Number(row.kalshi_exit_fee) : null,
     pmExitFeeCents: row.pm_exit_fee != null ? Number(row.pm_exit_fee) : null,
     unrealizedPnlCents: row.unrealized_pnl != null ? Number(row.unrealized_pnl) : null,
@@ -638,6 +679,10 @@ export class BotPositionStore {
         current_price_kalshi INTEGER,
         current_price_pm INTEGER,
         current_value INTEGER,
+        kalshi_gross_proceeds_microcents INTEGER,
+        pm_gross_proceeds_microcents INTEGER,
+        kalshi_net_proceeds INTEGER,
+        pm_net_proceeds INTEGER,
         kalshi_exit_fee INTEGER,
         pm_exit_fee INTEGER,
         unrealized_pnl INTEGER,
@@ -706,6 +751,10 @@ export class BotPositionStore {
       current_price_kalshi: 'INTEGER',
       current_price_pm: 'INTEGER',
       current_value: 'INTEGER',
+      kalshi_gross_proceeds_microcents: 'INTEGER',
+      pm_gross_proceeds_microcents: 'INTEGER',
+      kalshi_net_proceeds: 'INTEGER',
+      pm_net_proceeds: 'INTEGER',
       kalshi_exit_fee: 'INTEGER',
       pm_exit_fee: 'INTEGER',
       unrealized_pnl: 'INTEGER',
@@ -922,7 +971,10 @@ export class BotPositionStore {
     await this.client.execute({
       sql: `UPDATE bot_positions SET
         status = ?, current_price_kalshi = ?, current_price_pm = ?,
-        current_value = ?, kalshi_exit_fee = ?, pm_exit_fee = ?,
+        current_value = ?,
+        kalshi_gross_proceeds_microcents = ?, pm_gross_proceeds_microcents = ?,
+        kalshi_net_proceeds = ?, pm_net_proceeds = ?,
+        kalshi_exit_fee = ?, pm_exit_fee = ?,
         unrealized_pnl = ?, unrealized_roi_pct = ?,
         last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
@@ -932,6 +984,8 @@ export class BotPositionStore {
       args: [
         valuation.status, valuation.currentPriceKalshiCents,
         valuation.currentPricePmCents, valuation.currentValueCents,
+        valuation.kalshiGrossProceedsMicrocents, valuation.pmGrossProceedsMicrocents,
+        valuation.kalshiNetProceedsCents, valuation.pmNetProceedsCents,
         valuation.kalshiExitFeeCents, valuation.pmExitFeeCents,
         valuation.unrealizedPnlCents, valuation.unrealizedRoiBps,
         valuation.lastValuationAt, valuation.settledAt,
@@ -981,7 +1035,10 @@ export class BotPositionStore {
         pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?, pm_exit_fee_source = ?,
         pm_exit_fee_observed_at = ?, pm_exit_fee_version = ?,
         status = ?, current_price_kalshi = ?, current_price_pm = ?,
-        current_value = ?, kalshi_exit_fee = ?, pm_exit_fee = ?,
+        current_value = ?,
+        kalshi_gross_proceeds_microcents = ?, pm_gross_proceeds_microcents = ?,
+        kalshi_net_proceeds = ?, pm_net_proceeds = ?,
+        kalshi_exit_fee = ?, pm_exit_fee = ?,
         unrealized_pnl = ?, unrealized_roi_pct = ?, last_valuation_at = ?,
         settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = NULL, resolution_verified_at = NULL,
@@ -993,7 +1050,10 @@ export class BotPositionStore {
         kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
         polymarket.tokenId, polymarket.feeRateBps, polymarket.source, polymarket.observedAt, polymarket.version,
         valuation.status, valuation.currentPriceKalshiCents, valuation.currentPricePmCents,
-        valuation.currentValueCents, valuation.kalshiExitFeeCents, valuation.pmExitFeeCents,
+        valuation.currentValueCents,
+        valuation.kalshiGrossProceedsMicrocents, valuation.pmGrossProceedsMicrocents,
+        valuation.kalshiNetProceedsCents, valuation.pmNetProceedsCents,
+        valuation.kalshiExitFeeCents, valuation.pmExitFeeCents,
         valuation.unrealizedPnlCents, valuation.unrealizedRoiBps, valuation.lastValuationAt,
         valuation.settledAt, valuation.realizedPnlCents, valuation.settlementSide,
         id, polymarket.tokenId, valuation.lastValuationAt,
@@ -1006,6 +1066,8 @@ export class BotPositionStore {
     await this.client.execute({
       sql: `UPDATE bot_positions SET
         current_price_kalshi = NULL, current_price_pm = NULL, current_value = NULL,
+        kalshi_gross_proceeds_microcents = NULL, pm_gross_proceeds_microcents = NULL,
+        kalshi_net_proceeds = NULL, pm_net_proceeds = NULL,
         kalshi_exit_fee = NULL, pm_exit_fee = NULL,
         unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?
         WHERE id = ? AND status = 'open'
