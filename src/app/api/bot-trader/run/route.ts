@@ -41,6 +41,7 @@ function toBotTradeInput(
   pairId: string,
   marketTitle: string,
   expiryDate: string | undefined,
+  category: string | undefined,
   arb: RefreshArbRow,
 ): BotTradeInput {
   return {
@@ -64,6 +65,7 @@ function toBotTradeInput(
     pmYesDepth: arb.pmYesDepth ?? 0,
     pmNoDepth: arb.pmNoDepth ?? 0,
     expiryDate,
+    category,
   };
 }
 
@@ -71,6 +73,7 @@ function toBotTradeInputs(
   pairId: string,
   marketTitle: string,
   expiryDate: string | undefined,
+  category: string | undefined,
   rows: unknown[],
 ): BotTradeInput[] {
   const arbs: RefreshArbRow[] = [];
@@ -80,7 +83,7 @@ function toBotTradeInputs(
   }
   return arbs
     .filter((arb) => arb.roiPct > 0)
-    .map((arb) => toBotTradeInput(pairId, marketTitle, expiryDate, arb));
+    .map((arb) => toBotTradeInput(pairId, marketTitle, expiryDate, category, arb));
 }
 
 function parseRefreshArbRow(row: unknown): RefreshArbRow | null {
@@ -144,11 +147,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const body = await req.json();
-    let pairId = body?.pairId;
+    const pairId = body?.pairId;
     const marketTitle = body?.marketTitle;
 
     const settings = await getBotSettings();
-    let selectedBy = 'explicit' as string;
+    const selectedBy = 'explicit' as string;
     if (pairId == null && body?.ranked === true) {
       const ranked = rankBotCandidates(await getSavedMarkets(), settings.selectionMethod, Date.now(), {
         minRoiPct: settings.minRoiPct,
@@ -167,7 +170,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const market = candidate.market;
         try {
           const result: SingleRefreshResult = await refreshSingleMarket(market, manualMatches);
-          const inputs = toBotTradeInputs(market.id, market.eventTitle, result.expiryDate ?? undefined, result.allArbs || []);
+          const inputs = toBotTradeInputs(market.id, market.eventTitle, result.expiryDate ?? undefined, market.category, result.allArbs || []);
           for (const input of inputs) input.selectionMethod = settings.selectionMethod;
           const botResults = await runBotTraderOnScanOutcomes(market.id, market.eventTitle, result.expiryDate ?? undefined, inputs);
           runs.push({
@@ -210,6 +213,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       market.id,
       marketTitle || market.eventTitle,
       result.expiryDate ?? undefined,
+      market.category,
       result.allArbs || [],
     );
 

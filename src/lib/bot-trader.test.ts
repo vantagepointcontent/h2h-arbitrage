@@ -77,6 +77,7 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     pmYesDepth: 60,
     pmNoDepth: 55,
     expiryDate: farFuture,
+    category: 'Politics',
     ...overrides,
   };
 }
@@ -370,6 +371,15 @@ describe('maybeExecuteBotTrade safety', () => {
       }),
       getExecutionMode: vi.fn().mockResolvedValue('paper'),
     }));
+    vi.doMock('./bot-positions', async (importOriginal) => ({
+      ...(await importOriginal()),
+      fetchAuthoritativeBotFeeConfig: vi.fn().mockResolvedValue({
+        kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000' },
+        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
+        pmTheta: 0.04,
+      }),
+      recordBotPosition: vi.fn().mockResolvedValue(undefined),
+    }));
   });
 
   afterEach(() => {
@@ -377,6 +387,7 @@ describe('maybeExecuteBotTrade safety', () => {
     vi.unstubAllEnvs();
     vi.doUnmock('./persistence');
     vi.doUnmock('./settings');
+    vi.doUnmock('./bot-positions');
   });
 
   it('simulates in paper mode even when production requested', async () => {
@@ -385,6 +396,17 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.dryRun).toBe(true);
     expect(result.executed).toBe(true);
     expect(result.reason).toContain('Paper');
+  });
+
+  it('fails closed before execution when authoritative fee lookup fails', async () => {
+    const positions = await import('./bot-positions');
+    vi.mocked(positions.fetchAuthoritativeBotFeeConfig).mockRejectedValueOnce(new Error('fee endpoint unavailable'));
+    const persistence = await import('./persistence');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const result = await maybeExecuteBotTrade(makeInput());
+    expect(result.executed).toBe(false);
+    expect(result.reason).toMatch(/fee authority/i);
+    expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
 });
 

@@ -1,12 +1,35 @@
 import path from 'node:path';
 import { createClient, type Client } from '@libsql/client';
-import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import { getPolymarketTheta } from './matcher';
 import { normalizeKalshiResolution } from './settlement-resolution';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
 export type SettlementSide = 'kalshi' | 'pm' | null;
 export type BotSelectionMethod = 'roi' | 'apy' | 'hybrid';
+export type KalshiFeeType = 'quadratic';
+
+export interface AuthoritativeKalshiFeeConfig {
+  feeType: KalshiFeeType;
+  feeMultiplierPpm: number;
+  source: string;
+  observedAt: string;
+  version: string;
+}
+
+export interface AuthoritativePolymarketFeeConfig {
+  tokenId: string;
+  feeRateBps: number;
+  source: string;
+  observedAt: string;
+  version: string;
+}
+
+export interface AuthoritativeBotFeeConfig {
+  kalshi: AuthoritativeKalshiFeeConfig;
+  polymarket: AuthoritativePolymarketFeeConfig;
+  pmTheta: number;
+}
 
 export interface BotPosition {
   id: number;
@@ -28,8 +51,28 @@ export interface BotPosition {
   feesCents: number;
   category: string | null;
   pmTheta: number | null;
+  kalshiEntryFeeType: KalshiFeeType | null;
+  kalshiEntryFeeMultiplierPpm: number | null;
+  kalshiEntryFeeSource: string | null;
+  kalshiEntryFeeObservedAt: string | null;
+  kalshiEntryFeeVersion: string | null;
+  pmEntryTokenId: string | null;
+  pmEntryFeeRateBps: number | null;
+  pmEntryFeeSource: string | null;
+  pmEntryFeeObservedAt: string | null;
+  pmEntryFeeVersion: string | null;
   kalshiEntryFeeCents: number;
   pmEntryFeeCents: number;
+  kalshiExitFeeType: KalshiFeeType | null;
+  kalshiExitFeeMultiplierPpm: number | null;
+  kalshiExitFeeSource: string | null;
+  kalshiExitFeeObservedAt: string | null;
+  kalshiExitFeeVersion: string | null;
+  pmExitTokenId: string | null;
+  pmExitFeeRateBps: number | null;
+  pmExitFeeSource: string | null;
+  pmExitFeeObservedAt: string | null;
+  pmExitFeeVersion: string | null;
   status: BotPositionStatus;
   openedAt: string;
   expiryDate: string | null;
@@ -37,6 +80,8 @@ export interface BotPosition {
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
   currentValueCents: number | null;
+  kalshiExitFeeCents: number | null;
+  pmExitFeeCents: number | null;
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
@@ -54,7 +99,8 @@ export interface BotPosition {
 export type CreateBotPosition = Omit<BotPosition,
   'id' | 'status' | 'settledAt' | 'currentPriceKalshiCents' |
   'currentPricePmCents' | 'currentValueCents' | 'unrealizedPnlCents' |
-  'unrealizedRoiBps' | 'lastValuationAt' | 'realizedPnlCents' |
+  'kalshiExitFeeCents' | 'pmExitFeeCents' | 'unrealizedRoiBps' |
+  'lastValuationAt' | 'realizedPnlCents' |
   'settlementSide' | 'dryRun'
 >;
 
@@ -113,6 +159,8 @@ export interface PositionValuation {
   currentPriceKalshiCents: number;
   currentPricePmCents: number;
   currentValueCents: number;
+  kalshiExitFeeCents: number;
+  pmExitFeeCents: number;
   unrealizedPnlCents: number;
   unrealizedRoiBps: number;
   lastValuationAt: string;
@@ -162,6 +210,185 @@ function assertShares(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer contract count`);
 }
 
+const FEE_SCALE = 1_000_000n;
+const FEE_CONFIG_MAX_AGE_MS = 60_000;
+
+function fixedPoint(value: number, label: string): bigint {
+  if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be a finite non-negative number`);
+  const scaled = Math.round(value * Number(FEE_SCALE));
+  if (!Number.isSafeInteger(scaled)) throw new Error(`${label} exceeds fixed-point limits`);
+  return BigInt(scaled);
+}
+
+function ceilRatio(numerator: bigint, denominator: bigint): number {
+  const value = Number((numerator + denominator - 1n) / denominator);
+  if (!Number.isSafeInteger(value)) throw new Error('Fee exceeds safe integer cents');
+  return value;
+}
+
+function roundRatio(numerator: bigint, denominator: bigint): number {
+  const value = Number((numerator + denominator / 2n) / denominator);
+  if (!Number.isSafeInteger(value)) throw new Error('Fee exceeds safe integer cents');
+  return value;
+}
+
+function calculateKalshiFeeCents(
+  fills: Array<{ priceCents: number; size: number }>,
+  feeMultiplierPpm: number,
+): number {
+  if (!Number.isSafeInteger(feeMultiplierPpm) || feeMultiplierPpm < 0 || feeMultiplierPpm > 10_000_000) {
+    throw new Error('Malformed authoritative Kalshi fee configuration');
+  }
+  const multiplier = BigInt(feeMultiplierPpm);
+  let numerator = 0n;
+  for (const fill of fills) {
+    const quantity = fixedPoint(fill.size, 'Kalshi fill size');
+    const price = fixedPoint(fill.priceCents / 100, 'Kalshi fill price');
+    numerator += 7n * quantity * price * (FEE_SCALE - price) * multiplier;
+  }
+  return ceilRatio(numerator, FEE_SCALE ** 4n);
+}
+
+function calculatePolymarketFeeCents(
+  fills: Array<{ priceCents: number; size: number }>,
+  feeRateBps: number,
+): number {
+  if (!Number.isSafeInteger(feeRateBps) || feeRateBps < 0 || feeRateBps > 10_000) {
+    throw new Error('Malformed authoritative Polymarket fee configuration');
+  }
+  let numerator = 0n;
+  for (const fill of fills) {
+    const quantity = fixedPoint(fill.size, 'Polymarket fill size');
+    const price = fixedPoint(fill.priceCents / 100, 'Polymarket fill price');
+    numerator += quantity * price * (FEE_SCALE - price) * BigInt(feeRateBps) * 100n;
+  }
+  return roundRatio(numerator, FEE_SCALE ** 3n * 10_000n);
+}
+
+function assertCurrentFeeAuthority(position: BotPosition, observedAt: string): void {
+  const observedMs = Date.parse(observedAt);
+  const kalshiFeeMs = Date.parse(position.kalshiExitFeeObservedAt ?? '');
+  const pmFeeMs = Date.parse(position.pmExitFeeObservedAt ?? '');
+  if (position.kalshiExitFeeType !== 'quadratic'
+    || !Number.isSafeInteger(position.kalshiExitFeeMultiplierPpm)
+    || !position.kalshiExitFeeSource?.trim() || !position.kalshiExitFeeVersion?.trim()
+    || !Number.isFinite(kalshiFeeMs)) {
+    throw new Error(`Missing or malformed authoritative Kalshi fee configuration for bot position ${position.id}`);
+  }
+  if (!position.pmExitTokenId?.trim() || !Number.isSafeInteger(position.pmExitFeeRateBps)
+    || !position.pmExitFeeSource?.trim() || !position.pmExitFeeVersion?.trim()
+    || !Number.isFinite(pmFeeMs)) {
+    throw new Error(`Missing or malformed authoritative Polymarket fee configuration for bot position ${position.id}`);
+  }
+  if (position.pmEntryTokenId == null || position.pmExitTokenId !== position.pmEntryTokenId) {
+    throw new Error(`Conflicting Polymarket token fee configuration for bot position ${position.id}`);
+  }
+  const expectedPmFeeRateBps = Math.round((position.pmTheta ?? Number.NaN) * 10_000);
+  if (!Number.isSafeInteger(expectedPmFeeRateBps) || expectedPmFeeRateBps !== position.pmExitFeeRateBps) {
+    throw new Error(`Conflicting Polymarket fee configuration for bot position ${position.id}`);
+  }
+  if (!Number.isFinite(observedMs)
+    || Math.abs(observedMs - kalshiFeeMs) > FEE_CONFIG_MAX_AGE_MS
+    || Math.abs(observedMs - pmFeeMs) > FEE_CONFIG_MAX_AGE_MS) {
+    throw new Error(`Stale authoritative fee configuration for bot position ${position.id}`);
+  }
+}
+
+function assertEntryFeeAuthority(input: CreateBotPosition): void {
+  const openedMs = Date.parse(input.openedAt);
+  const kalshiObservedMs = Date.parse(input.kalshiEntryFeeObservedAt ?? '');
+  const pmObservedMs = Date.parse(input.pmEntryFeeObservedAt ?? '');
+  if (input.kalshiEntryFeeType !== 'quadratic'
+    || !Number.isSafeInteger(input.kalshiEntryFeeMultiplierPpm)
+    || !input.kalshiEntryFeeSource?.trim() || !input.kalshiEntryFeeVersion?.trim()
+    || !Number.isFinite(kalshiObservedMs)) {
+    throw new Error('Missing or malformed authoritative Kalshi entry fee configuration');
+  }
+  if (!input.pmEntryTokenId?.trim() || !Number.isSafeInteger(input.pmEntryFeeRateBps)
+    || !input.pmEntryFeeSource?.trim() || !input.pmEntryFeeVersion?.trim()
+    || !Number.isFinite(pmObservedMs)) {
+    throw new Error('Missing or malformed authoritative Polymarket entry fee configuration');
+  }
+  if (!Number.isFinite(openedMs)
+    || kalshiObservedMs > openedMs || pmObservedMs > openedMs
+    || Math.abs(openedMs - kalshiObservedMs) > FEE_CONFIG_MAX_AGE_MS
+    || Math.abs(openedMs - pmObservedMs) > FEE_CONFIG_MAX_AGE_MS) {
+    throw new Error('Stale authoritative entry fee configuration');
+  }
+  if (Math.round((input.pmTheta ?? Number.NaN) * 10_000) !== input.pmEntryFeeRateBps) {
+    throw new Error('Conflicting authoritative Polymarket entry fee configuration');
+  }
+  if (input.kalshiExitFeeType !== input.kalshiEntryFeeType
+    || input.kalshiExitFeeMultiplierPpm !== input.kalshiEntryFeeMultiplierPpm
+    || input.pmExitTokenId !== input.pmEntryTokenId
+    || input.pmExitFeeRateBps !== input.pmEntryFeeRateBps) {
+    throw new Error('Conflicting initial entry and exit fee configuration');
+  }
+  if (!input.kalshiExitFeeSource?.trim() || !input.kalshiExitFeeVersion?.trim()
+    || !input.pmExitFeeSource?.trim() || !input.pmExitFeeVersion?.trim()
+    || input.kalshiExitFeeObservedAt !== input.kalshiEntryFeeObservedAt
+    || input.pmExitFeeObservedAt !== input.pmEntryFeeObservedAt) {
+    throw new Error('Missing or malformed authoritative initial exit fee configuration');
+  }
+  const expected = calculateBotPositionEntryCost({
+    buyPriceKalshiCents: input.buyPriceKalshiCents,
+    buyPricePmCents: input.buyPricePmCents,
+    sharesKalshi: input.sharesKalshi,
+    sharesPm: input.sharesPm,
+    kalshiFeeMultiplierPpm: input.kalshiEntryFeeMultiplierPpm!,
+    pmFeeRateBps: input.pmEntryFeeRateBps!,
+    pmTheta: input.pmTheta!,
+  });
+  if (input.kalshiEntryFeeCents !== expected.kalshiEntryFeeCents
+    || input.pmEntryFeeCents !== expected.pmEntryFeeCents
+    || input.feesCents !== expected.kalshiEntryFeeCents + expected.pmEntryFeeCents
+    || input.totalCostCents !== expected.totalCostCents
+    || input.expectedPayoutCents !== Math.min(input.sharesKalshi, input.sharesPm) * 100
+    || input.expectedProfitCents !== input.expectedPayoutCents - input.totalCostCents) {
+    throw new Error('Persisted entry economics conflict with authoritative entry fee configuration');
+  }
+}
+
+function assertPersistedEntryEconomics(position: BotPosition): void {
+  const openedMs = Date.parse(position.openedAt);
+  const kalshiObservedMs = Date.parse(position.kalshiEntryFeeObservedAt ?? '');
+  const pmObservedMs = Date.parse(position.pmEntryFeeObservedAt ?? '');
+  if (position.kalshiEntryFeeType !== 'quadratic'
+    || !Number.isSafeInteger(position.kalshiEntryFeeMultiplierPpm)
+    || !position.kalshiEntryFeeSource?.trim() || !position.kalshiEntryFeeVersion?.trim()
+    || !Number.isFinite(kalshiObservedMs)
+    || !position.pmEntryTokenId?.trim() || !Number.isSafeInteger(position.pmEntryFeeRateBps)
+    || !position.pmEntryFeeSource?.trim() || !position.pmEntryFeeVersion?.trim()
+    || !Number.isFinite(pmObservedMs)) {
+    throw new Error(`Missing or malformed authoritative entry fee configuration for bot position ${position.id}`);
+  }
+  if (!Number.isFinite(openedMs) || kalshiObservedMs > openedMs || pmObservedMs > openedMs
+    || openedMs - kalshiObservedMs > FEE_CONFIG_MAX_AGE_MS
+    || openedMs - pmObservedMs > FEE_CONFIG_MAX_AGE_MS) {
+    throw new Error(`Stale authoritative entry fee configuration for bot position ${position.id}`);
+  }
+  if (Math.round((position.pmTheta ?? Number.NaN) * 10_000) !== position.pmEntryFeeRateBps) {
+    throw new Error(`Conflicting authoritative entry fee configuration for bot position ${position.id}`);
+  }
+  const expected = calculateBotPositionEntryCost({
+    buyPriceKalshiCents: position.buyPriceKalshiCents,
+    buyPricePmCents: position.buyPricePmCents,
+    sharesKalshi: position.sharesKalshi,
+    sharesPm: position.sharesPm,
+    kalshiFeeMultiplierPpm: position.kalshiEntryFeeMultiplierPpm!,
+    pmFeeRateBps: position.pmEntryFeeRateBps!,
+    pmTheta: position.pmTheta,
+  });
+  if (position.kalshiEntryFeeCents !== expected.kalshiEntryFeeCents
+    || position.pmEntryFeeCents !== expected.pmEntryFeeCents
+    || position.feesCents !== expected.kalshiEntryFeeCents + expected.pmEntryFeeCents
+    || position.totalCostCents !== expected.totalCostCents
+    || position.expectedPayoutCents !== Math.min(position.sharesKalshi, position.sharesPm) * 100
+    || position.expectedProfitCents !== position.expectedPayoutCents - position.totalCostCents) {
+    throw new Error(`Persisted entry economics conflict with authoritative fee configuration for bot position ${position.id}`);
+  }
+}
+
 function roiBps(pnlCents: number, costCents: number): number {
   if (costCents <= 0) return 0;
   return Math.round((pnlCents * 10_000) / costCents);
@@ -205,6 +432,7 @@ export function calculatePositionValuation(
   position: BotPosition,
   quote: PositionQuote,
 ): PositionValuation {
+  assertPersistedEntryEconomics(position);
   const kalshiPrice = position.kalshiSide === 'yes'
     ? quote.kalshiYesBidCents
     : quote.kalshiNoBidCents;
@@ -231,6 +459,8 @@ export function calculatePositionValuation(
       currentPriceKalshiCents: kalshiPrice,
       currentPricePmCents: pmPrice,
       currentValueCents: payoutCents,
+      kalshiExitFeeCents: 0,
+      pmExitFeeCents: 0,
       unrealizedPnlCents: payoutCents - position.totalCostCents,
       unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
       lastValuationAt: quote.observedAt,
@@ -243,6 +473,7 @@ export function calculatePositionValuation(
   if (position.pmTheta == null || !Number.isFinite(position.pmTheta)) {
     throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
   }
+  assertCurrentFeeAuthority(position, quote.observedAt);
 
   const kalshiLevels = position.kalshiSide === 'yes' ? quote.kalshiYesBids : quote.kalshiNoBids;
   const pmLevels = position.pmSide === 'yes' ? quote.pmYesBids : quote.pmNoBids;
@@ -250,14 +481,8 @@ export function calculatePositionValuation(
   const pmFills = fillBidLadder(pmLevels, position.sharesPm, position.id, 'Polymarket');
   const kalshiGrossCents = kalshiFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
   const pmGrossCents = pmFills.reduce((total, fill) => total + fill.priceCents * fill.size, 0);
-  const kalshiExitFeeCents = Math.round(kalshiFills.reduce(
-    (total, fill) => total + calcKalshiFee(fill.size, fill.priceCents / 100),
-    0,
-  ) * 100);
-  const pmExitFeeCents = Math.round(pmFills.reduce(
-    (total, fill) => total + calcPolymarketFee(fill.size, fill.priceCents / 100, position.pmTheta!),
-    0,
-  ) * 100);
+  const kalshiExitFeeCents = calculateKalshiFeeCents(kalshiFills, position.kalshiExitFeeMultiplierPpm!);
+  const pmExitFeeCents = calculatePolymarketFeeCents(pmFills, position.pmExitFeeRateBps!);
   const currentKalshiPrice = Math.round(kalshiGrossCents / position.sharesKalshi);
   const currentPmPrice = Math.round(pmGrossCents / position.sharesPm);
   const currentValueCents = Math.round(kalshiGrossCents + pmGrossCents) - kalshiExitFeeCents - pmExitFeeCents;
@@ -267,6 +492,8 @@ export function calculatePositionValuation(
     currentPriceKalshiCents: currentKalshiPrice,
     currentPricePmCents: currentPmPrice,
     currentValueCents,
+    kalshiExitFeeCents,
+    pmExitFeeCents,
     unrealizedPnlCents,
     unrealizedRoiBps: roiBps(unrealizedPnlCents, position.totalCostCents),
     lastValuationAt: quote.observedAt,
@@ -299,8 +526,28 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     feesCents: Number(row.fees ?? 0),
     category: row.category != null ? String(row.category) : null,
     pmTheta: row.pm_theta != null ? Number(row.pm_theta) : null,
+    kalshiEntryFeeType: row.kalshi_entry_fee_type === 'quadratic' ? 'quadratic' : null,
+    kalshiEntryFeeMultiplierPpm: row.kalshi_entry_fee_multiplier_ppm != null ? Number(row.kalshi_entry_fee_multiplier_ppm) : null,
+    kalshiEntryFeeSource: row.kalshi_entry_fee_source != null ? String(row.kalshi_entry_fee_source) : null,
+    kalshiEntryFeeObservedAt: row.kalshi_entry_fee_observed_at != null ? String(row.kalshi_entry_fee_observed_at) : null,
+    kalshiEntryFeeVersion: row.kalshi_entry_fee_version != null ? String(row.kalshi_entry_fee_version) : null,
+    pmEntryTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
+    pmEntryFeeRateBps: row.pm_entry_fee_rate_bps != null ? Number(row.pm_entry_fee_rate_bps) : null,
+    pmEntryFeeSource: row.pm_entry_fee_source != null ? String(row.pm_entry_fee_source) : null,
+    pmEntryFeeObservedAt: row.pm_entry_fee_observed_at != null ? String(row.pm_entry_fee_observed_at) : null,
+    pmEntryFeeVersion: row.pm_entry_fee_version != null ? String(row.pm_entry_fee_version) : null,
     kalshiEntryFeeCents: Number(row.kalshi_entry_fee ?? 0),
     pmEntryFeeCents: Number(row.pm_entry_fee ?? 0),
+    kalshiExitFeeType: row.kalshi_exit_fee_type === 'quadratic' ? 'quadratic' : null,
+    kalshiExitFeeMultiplierPpm: row.kalshi_exit_fee_multiplier_ppm != null ? Number(row.kalshi_exit_fee_multiplier_ppm) : null,
+    kalshiExitFeeSource: row.kalshi_exit_fee_source != null ? String(row.kalshi_exit_fee_source) : null,
+    kalshiExitFeeObservedAt: row.kalshi_exit_fee_observed_at != null ? String(row.kalshi_exit_fee_observed_at) : null,
+    kalshiExitFeeVersion: row.kalshi_exit_fee_version != null ? String(row.kalshi_exit_fee_version) : null,
+    pmExitTokenId: row.pm_exit_token_id != null ? String(row.pm_exit_token_id) : null,
+    pmExitFeeRateBps: row.pm_exit_fee_rate_bps != null ? Number(row.pm_exit_fee_rate_bps) : null,
+    pmExitFeeSource: row.pm_exit_fee_source != null ? String(row.pm_exit_fee_source) : null,
+    pmExitFeeObservedAt: row.pm_exit_fee_observed_at != null ? String(row.pm_exit_fee_observed_at) : null,
+    pmExitFeeVersion: row.pm_exit_fee_version != null ? String(row.pm_exit_fee_version) : null,
     status: String(row.status) as BotPositionStatus,
     openedAt: String(row.opened_at),
     expiryDate: row.expiry_date != null ? String(row.expiry_date) : null,
@@ -308,6 +555,8 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     currentPriceKalshiCents: row.current_price_kalshi != null ? Number(row.current_price_kalshi) : null,
     currentPricePmCents: row.current_price_pm != null ? Number(row.current_price_pm) : null,
     currentValueCents: row.current_value != null ? Number(row.current_value) : null,
+    kalshiExitFeeCents: row.kalshi_exit_fee != null ? Number(row.kalshi_exit_fee) : null,
+    pmExitFeeCents: row.pm_exit_fee != null ? Number(row.pm_exit_fee) : null,
     unrealizedPnlCents: row.unrealized_pnl != null ? Number(row.unrealized_pnl) : null,
     unrealizedRoiBps: row.unrealized_roi_pct != null ? Number(row.unrealized_roi_pct) : null,
     lastValuationAt: row.last_valuation_at != null ? String(row.last_valuation_at) : null,
@@ -360,8 +609,28 @@ export class BotPositionStore {
         fees INTEGER NOT NULL DEFAULT 0,
         category TEXT,
         pm_theta REAL,
+        kalshi_entry_fee_type TEXT,
+        kalshi_entry_fee_multiplier_ppm INTEGER,
+        kalshi_entry_fee_source TEXT,
+        kalshi_entry_fee_observed_at TEXT,
+        kalshi_entry_fee_version TEXT,
+        pm_entry_token_id TEXT,
+        pm_entry_fee_rate_bps INTEGER,
+        pm_entry_fee_source TEXT,
+        pm_entry_fee_observed_at TEXT,
+        pm_entry_fee_version TEXT,
         kalshi_entry_fee INTEGER NOT NULL DEFAULT 0,
         pm_entry_fee INTEGER NOT NULL DEFAULT 0,
+        kalshi_exit_fee_type TEXT,
+        kalshi_exit_fee_multiplier_ppm INTEGER,
+        kalshi_exit_fee_source TEXT,
+        kalshi_exit_fee_observed_at TEXT,
+        kalshi_exit_fee_version TEXT,
+        pm_exit_token_id TEXT,
+        pm_exit_fee_rate_bps INTEGER,
+        pm_exit_fee_source TEXT,
+        pm_exit_fee_observed_at TEXT,
+        pm_exit_fee_version TEXT,
         status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
         opened_at TEXT NOT NULL,
         expiry_date TEXT,
@@ -369,6 +638,8 @@ export class BotPositionStore {
         current_price_kalshi INTEGER,
         current_price_pm INTEGER,
         current_value INTEGER,
+        kalshi_exit_fee INTEGER,
+        pm_exit_fee INTEGER,
         unrealized_pnl INTEGER,
         unrealized_roi_pct INTEGER,
         last_valuation_at TEXT,
@@ -406,8 +677,28 @@ export class BotPositionStore {
       fees: 'INTEGER NOT NULL DEFAULT 0',
       category: 'TEXT',
       pm_theta: 'REAL',
+      kalshi_entry_fee_type: 'TEXT',
+      kalshi_entry_fee_multiplier_ppm: 'INTEGER',
+      kalshi_entry_fee_source: 'TEXT',
+      kalshi_entry_fee_observed_at: 'TEXT',
+      kalshi_entry_fee_version: 'TEXT',
+      pm_entry_token_id: 'TEXT',
+      pm_entry_fee_rate_bps: 'INTEGER',
+      pm_entry_fee_source: 'TEXT',
+      pm_entry_fee_observed_at: 'TEXT',
+      pm_entry_fee_version: 'TEXT',
       kalshi_entry_fee: 'INTEGER NOT NULL DEFAULT 0',
       pm_entry_fee: 'INTEGER NOT NULL DEFAULT 0',
+      kalshi_exit_fee_type: 'TEXT',
+      kalshi_exit_fee_multiplier_ppm: 'INTEGER',
+      kalshi_exit_fee_source: 'TEXT',
+      kalshi_exit_fee_observed_at: 'TEXT',
+      kalshi_exit_fee_version: 'TEXT',
+      pm_exit_token_id: 'TEXT',
+      pm_exit_fee_rate_bps: 'INTEGER',
+      pm_exit_fee_source: 'TEXT',
+      pm_exit_fee_observed_at: 'TEXT',
+      pm_exit_fee_version: 'TEXT',
       status: "TEXT NOT NULL DEFAULT 'open'",
       opened_at: "TEXT NOT NULL DEFAULT ''",
       expiry_date: 'TEXT',
@@ -415,6 +706,8 @@ export class BotPositionStore {
       current_price_kalshi: 'INTEGER',
       current_price_pm: 'INTEGER',
       current_value: 'INTEGER',
+      kalshi_exit_fee: 'INTEGER',
+      pm_exit_fee: 'INTEGER',
       unrealized_pnl: 'INTEGER',
       unrealized_roi_pct: 'INTEGER',
       last_valuation_at: 'TEXT',
@@ -452,6 +745,7 @@ export class BotPositionStore {
     await this.ensureSchema();
     assertShares('sharesKalshi', input.sharesKalshi);
     assertShares('sharesPm', input.sharesPm);
+    assertEntryFeeAuthority(input);
     for (const [name, value] of Object.entries({
       buyPriceKalshiCents: input.buyPriceKalshiCents,
       buyPricePmCents: input.buyPricePmCents,
@@ -474,17 +768,33 @@ export class BotPositionStore {
           execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
           shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
-          fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee, status, opened_at, expiry_date, current_price_kalshi,
+          fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee,
+          kalshi_entry_fee_type, kalshi_entry_fee_multiplier_ppm, kalshi_entry_fee_source,
+          kalshi_entry_fee_observed_at, kalshi_entry_fee_version, pm_entry_token_id,
+          pm_entry_fee_rate_bps, pm_entry_fee_source, pm_entry_fee_observed_at, pm_entry_fee_version,
+          kalshi_exit_fee_type, kalshi_exit_fee_multiplier_ppm, kalshi_exit_fee_source,
+          kalshi_exit_fee_observed_at, kalshi_exit_fee_version, pm_exit_token_id,
+          pm_exit_fee_rate_bps, pm_exit_fee_source, pm_exit_fee_observed_at, pm_exit_fee_version,
+          status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
           input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
           input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
           input.expectedProfitCents, input.feesCents, input.category, input.pmTheta,
-          input.kalshiEntryFeeCents, input.pmEntryFeeCents, input.openedAt,
+          input.kalshiEntryFeeCents, input.pmEntryFeeCents,
+          input.kalshiEntryFeeType, input.kalshiEntryFeeMultiplierPpm, input.kalshiEntryFeeSource,
+          input.kalshiEntryFeeObservedAt, input.kalshiEntryFeeVersion, input.pmEntryTokenId,
+          input.pmEntryFeeRateBps, input.pmEntryFeeSource, input.pmEntryFeeObservedAt, input.pmEntryFeeVersion,
+          input.kalshiExitFeeType, input.kalshiExitFeeMultiplierPpm, input.kalshiExitFeeSource,
+          input.kalshiExitFeeObservedAt, input.kalshiExitFeeVersion, input.pmExitTokenId,
+          input.pmExitFeeRateBps, input.pmExitFeeSource, input.pmExitFeeObservedAt, input.pmExitFeeVersion,
+          input.openedAt,
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
         ],
@@ -612,7 +922,8 @@ export class BotPositionStore {
     await this.client.execute({
       sql: `UPDATE bot_positions SET
         status = ?, current_price_kalshi = ?, current_price_pm = ?,
-        current_value = ?, unrealized_pnl = ?, unrealized_roi_pct = ?,
+        current_value = ?, kalshi_exit_fee = ?, pm_exit_fee = ?,
+        unrealized_pnl = ?, unrealized_roi_pct = ?,
         last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
         resolution_payout = ?, resolution_validation_status = ?
@@ -621,6 +932,7 @@ export class BotPositionStore {
       args: [
         valuation.status, valuation.currentPriceKalshiCents,
         valuation.currentPricePmCents, valuation.currentValueCents,
+        valuation.kalshiExitFeeCents, valuation.pmExitFeeCents,
         valuation.unrealizedPnlCents, valuation.unrealizedRoiBps,
         valuation.lastValuationAt, valuation.settledAt,
         valuation.realizedPnlCents, valuation.settlementSide,
@@ -634,11 +946,67 @@ export class BotPositionStore {
     });
   }
 
+  async updateExitFeeConfig(
+    id: number,
+    kalshi: AuthoritativeKalshiFeeConfig,
+    polymarket: AuthoritativePolymarketFeeConfig,
+  ): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_positions SET
+        kalshi_exit_fee_type = ?, kalshi_exit_fee_multiplier_ppm = ?,
+        kalshi_exit_fee_source = ?, kalshi_exit_fee_observed_at = ?, kalshi_exit_fee_version = ?,
+        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?, pm_exit_fee_source = ?,
+        pm_exit_fee_observed_at = ?, pm_exit_fee_version = ?
+        WHERE id = ? AND status = 'open'`,
+      args: [
+        kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
+        polymarket.tokenId, polymarket.feeRateBps, polymarket.source, polymarket.observedAt, polymarket.version,
+        id,
+      ],
+    });
+  }
+
+  async updateValuationWithFeeConfig(
+    id: number,
+    valuation: PositionValuation,
+    kalshi: AuthoritativeKalshiFeeConfig,
+    polymarket: AuthoritativePolymarketFeeConfig,
+  ): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_positions SET
+        kalshi_exit_fee_type = ?, kalshi_exit_fee_multiplier_ppm = ?,
+        kalshi_exit_fee_source = ?, kalshi_exit_fee_observed_at = ?, kalshi_exit_fee_version = ?,
+        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?, pm_exit_fee_source = ?,
+        pm_exit_fee_observed_at = ?, pm_exit_fee_version = ?,
+        status = ?, current_price_kalshi = ?, current_price_pm = ?,
+        current_value = ?, kalshi_exit_fee = ?, pm_exit_fee = ?,
+        unrealized_pnl = ?, unrealized_roi_pct = ?, last_valuation_at = ?,
+        settled_at = ?, realized_pnl = ?, settlement_side = ?,
+        resolution_source = NULL, resolution_verified_at = NULL,
+        resolution_outcome = NULL, resolution_payout = NULL,
+        resolution_validation_status = 'pending'
+        WHERE id = ? AND status = 'open' AND pm_entry_token_id = ?
+          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
+      args: [
+        kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
+        polymarket.tokenId, polymarket.feeRateBps, polymarket.source, polymarket.observedAt, polymarket.version,
+        valuation.status, valuation.currentPriceKalshiCents, valuation.currentPricePmCents,
+        valuation.currentValueCents, valuation.kalshiExitFeeCents, valuation.pmExitFeeCents,
+        valuation.unrealizedPnlCents, valuation.unrealizedRoiBps, valuation.lastValuationAt,
+        valuation.settledAt, valuation.realizedPnlCents, valuation.settlementSide,
+        id, polymarket.tokenId, valuation.lastValuationAt,
+      ],
+    });
+  }
+
   async clearOpenValuation(id: number, attemptedAt: string): Promise<void> {
     await this.ensureSchema();
     await this.client.execute({
       sql: `UPDATE bot_positions SET
         current_price_kalshi = NULL, current_price_pm = NULL, current_value = NULL,
+        kalshi_exit_fee = NULL, pm_exit_fee = NULL,
         unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?
         WHERE id = ? AND status = 'open'
           AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
@@ -687,9 +1055,21 @@ export function calculateBotPositionEntryCost(input: {
   sharesKalshi: number;
   sharesPm: number;
   pmTheta: number;
+  kalshiFeeMultiplierPpm: number;
+  pmFeeRateBps: number;
 }): { kalshiEntryFeeCents: number; pmEntryFeeCents: number; totalCostCents: number } {
-  const kalshiEntryFeeCents = Math.round(calcKalshiFee(input.sharesKalshi, input.buyPriceKalshiCents / 100) * 100);
-  const pmEntryFeeCents = Math.round(calcPolymarketFee(input.sharesPm, input.buyPricePmCents / 100, input.pmTheta) * 100);
+  const expectedPmFeeRateBps = Math.round(input.pmTheta * 10_000);
+  if (!Number.isSafeInteger(expectedPmFeeRateBps) || expectedPmFeeRateBps !== input.pmFeeRateBps) {
+    throw new Error('Conflicting authoritative Polymarket entry fee configuration');
+  }
+  const kalshiEntryFeeCents = calculateKalshiFeeCents(
+    [{ size: input.sharesKalshi, priceCents: input.buyPriceKalshiCents }],
+    input.kalshiFeeMultiplierPpm,
+  );
+  const pmEntryFeeCents = calculatePolymarketFeeCents(
+    [{ size: input.sharesPm, priceCents: input.buyPricePmCents }],
+    input.pmFeeRateBps,
+  );
   return {
     kalshiEntryFeeCents,
     pmEntryFeeCents,
@@ -700,19 +1080,160 @@ export function calculateBotPositionEntryCost(input: {
   };
 }
 
-export async function recordBotPosition(input: BotPositionInput): Promise<void> {
-  if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
+async function fetchFeeJson(url: string): Promise<Record<string, unknown>> {
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Authoritative fee endpoint returned HTTP ${response.status}`);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Malformed authoritative fee response');
+  return data as Record<string, unknown>;
+}
+
+export async function fetchAuthoritativeBotFeeConfig(input: {
+  kalshiTicker: string;
+  pmConditionId: string;
+  pmTokenId?: string;
+  pmSide: BotPositionSide;
+  category: string;
+  observedAt?: string;
+}, dependencies?: {
+  fetchJson?: (url: string) => Promise<Record<string, unknown>>;
+  fetchPmMarket?: (conditionId: string) => Promise<{
+    tokens: Array<{ token_id?: unknown; outcome?: unknown }>;
+  } | null>;
+}): Promise<AuthoritativeBotFeeConfig> {
+  if (input.observedAt != null && !Number.isFinite(Date.parse(input.observedAt))) {
+    throw new Error('Malformed fee observation timestamp');
+  }
+  const getJson = dependencies?.fetchJson ?? fetchFeeJson;
+  const marketPayload = await getJson(
+    `https://external-api.kalshi.com/trade-api/v2/markets/${encodeURIComponent(input.kalshiTicker)}`,
+  );
+  const market = marketPayload.market;
+  const eventTicker = market && typeof market === 'object' && !Array.isArray(market)
+    ? (market as Record<string, unknown>).event_ticker
+    : null;
+  if (typeof eventTicker !== 'string' || !eventTicker.trim()) throw new Error('Kalshi market is missing authoritative event metadata');
+  const eventPayload = await getJson(
+    `https://external-api.kalshi.com/trade-api/v2/events/${encodeURIComponent(eventTicker)}`,
+  );
+  const event = eventPayload.event;
+  if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Malformed Kalshi event fee metadata');
+  const eventRecord = event as Record<string, unknown>;
+  const seriesTicker = eventRecord.series_ticker;
+  if (typeof seriesTicker !== 'string' || !seriesTicker.trim()) throw new Error('Kalshi event is missing authoritative series metadata');
+  const seriesPayload = await getJson(
+    `https://external-api.kalshi.com/trade-api/v2/series/${encodeURIComponent(seriesTicker)}`,
+  );
+  const series = seriesPayload.series;
+  if (!series || typeof series !== 'object' || Array.isArray(series)) throw new Error('Malformed Kalshi series fee metadata');
+  const seriesRecord = series as Record<string, unknown>;
+  const overrideType = eventRecord.fee_type_override;
+  const overrideMultiplier = eventRecord.fee_multiplier_override;
+  const hasOverride = overrideType != null || overrideMultiplier != null;
+  if (hasOverride && (overrideType == null || overrideMultiplier == null)) {
+    throw new Error('Conflicting Kalshi event fee override');
+  }
+  const feeType = hasOverride ? overrideType : seriesRecord.fee_type;
+  const feeMultiplier = hasOverride ? overrideMultiplier : seriesRecord.fee_multiplier;
+  if (feeType !== 'quadratic' || typeof feeMultiplier !== 'number' || !Number.isFinite(feeMultiplier)
+    || feeMultiplier < 0 || feeMultiplier > 10) {
+    throw new Error('Missing, malformed, or unsupported authoritative Kalshi fee configuration');
+  }
+  const feeMultiplierPpm = Math.round(feeMultiplier * 1_000_000);
+  if (!Number.isSafeInteger(feeMultiplierPpm)) throw new Error('Malformed authoritative Kalshi fee multiplier');
+
+  let tokenId = input.pmTokenId?.trim() ?? '';
+  if (!tokenId) {
+    const fetchPmMarket = dependencies?.fetchPmMarket ?? (async (conditionId: string) => {
+      const { fetchClobMarket } = await import('./polymarket-clob');
+      return fetchClobMarket(conditionId);
+    });
+    const pmMarket = await fetchPmMarket(input.pmConditionId);
+    if (!pmMarket || !Array.isArray(pmMarket.tokens)) throw new Error('Polymarket market fee metadata unavailable');
+    const matchingTokens = pmMarket.tokens.filter((token): token is { token_id: string; outcome: string } =>
+      token != null && typeof token.token_id === 'string'
+      && typeof token.outcome === 'string' && token.outcome.toLowerCase() === input.pmSide);
+    if (matchingTokens.length !== 1 || !matchingTokens[0].token_id.trim()) {
+      throw new Error('Polymarket held token fee metadata is missing or ambiguous');
+    }
+    tokenId = matchingTokens[0].token_id.trim();
+  }
+  const pmFeePayload = await getJson(
+    `https://clob.polymarket.com/fee-rate?token_id=${encodeURIComponent(tokenId)}`,
+  );
+  const feeRateBps = pmFeePayload.base_fee;
+  if (typeof feeRateBps !== 'number' || !Number.isSafeInteger(feeRateBps) || feeRateBps < 0 || feeRateBps > 10_000) {
+    throw new Error('Missing or malformed authoritative Polymarket token fee rate');
+  }
   const pmTheta = getPolymarketTheta(input.category);
+  if (Math.round(pmTheta * 10_000) !== feeRateBps) {
+    throw new Error('Conflicting authoritative Polymarket category and token fee configuration');
+  }
+  const observedAt = input.observedAt ?? new Date().toISOString();
+  const thetaSource = `matcher-category-theta:${encodeURIComponent(input.category.trim().toLowerCase())}`;
+  return {
+    kalshi: {
+      feeType,
+      feeMultiplierPpm,
+      source: hasOverride
+        ? `https://external-api.kalshi.com/trade-api/v2/events/${encodeURIComponent(eventTicker)}`
+        : `https://external-api.kalshi.com/trade-api/v2/series/${encodeURIComponent(seriesTicker)}`,
+      observedAt,
+      version: `${feeType}:${feeMultiplierPpm}:${String(hasOverride
+        ? eventRecord.last_updated_ts ?? 'upstream-version-unavailable'
+        : seriesRecord.last_updated_ts ?? 'upstream-version-unavailable')}`,
+    },
+    polymarket: {
+      tokenId,
+      feeRateBps,
+      source: `https://clob.polymarket.com/fee-rate?token_id=${encodeURIComponent(tokenId)}|${thetaSource}`,
+      observedAt,
+      version: `token-fee-rate:${feeRateBps}|matcher-category-theta-v1:${Math.round(pmTheta * 1_000_000)}`,
+    },
+    pmTheta,
+  };
+}
+
+export async function recordBotPosition(
+  input: BotPositionInput,
+  feeAuthority: AuthoritativeBotFeeConfig,
+): Promise<void> {
+  if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
+  if (!input.kalshiTicker || !input.pmConditionId) throw new Error('Missing venue identifiers for authoritative fee lookup');
+  const openedAt = new Date().toISOString();
+  assertCurrentFeeAuthority({
+    id: 0,
+    pmTheta: feeAuthority.pmTheta,
+    pmEntryTokenId: feeAuthority.polymarket.tokenId,
+    kalshiExitFeeType: feeAuthority.kalshi.feeType,
+    kalshiExitFeeMultiplierPpm: feeAuthority.kalshi.feeMultiplierPpm,
+    kalshiExitFeeSource: feeAuthority.kalshi.source,
+    kalshiExitFeeObservedAt: feeAuthority.kalshi.observedAt,
+    kalshiExitFeeVersion: feeAuthority.kalshi.version,
+    pmExitTokenId: feeAuthority.polymarket.tokenId,
+    pmExitFeeRateBps: feeAuthority.polymarket.feeRateBps,
+    pmExitFeeSource: feeAuthority.polymarket.source,
+    pmExitFeeObservedAt: feeAuthority.polymarket.observedAt,
+    pmExitFeeVersion: feeAuthority.polymarket.version,
+  } as BotPosition, openedAt);
+  const authority = feeAuthority;
+  const { pmTheta } = authority;
   const buyPriceKalshiCents = Math.round(input.kalshiPrice * 100);
   const buyPricePmCents = Math.round(input.pmPrice * 100);
   const sharesKalshi = input.kalshiContracts;
   const sharesPm = input.pmContracts;
   const { kalshiEntryFeeCents, pmEntryFeeCents, totalCostCents } = calculateBotPositionEntryCost({
-    buyPriceKalshiCents: input.kalshiPrice * 100,
-    buyPricePmCents: input.pmPrice * 100,
+    buyPriceKalshiCents,
+    buyPricePmCents,
     sharesKalshi,
     sharesPm,
     pmTheta,
+    kalshiFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
+    pmFeeRateBps: authority.polymarket.feeRateBps,
   });
   const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
   const expectedProfitCents = expectedPayoutCents - totalCostCents;
@@ -736,9 +1257,29 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
     feesCents: kalshiEntryFeeCents + pmEntryFeeCents,
     category: input.category,
     pmTheta,
+    kalshiEntryFeeType: authority.kalshi.feeType,
+    kalshiEntryFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
+    kalshiEntryFeeSource: authority.kalshi.source,
+    kalshiEntryFeeObservedAt: authority.kalshi.observedAt,
+    kalshiEntryFeeVersion: authority.kalshi.version,
+    pmEntryTokenId: authority.polymarket.tokenId,
+    pmEntryFeeRateBps: authority.polymarket.feeRateBps,
+    pmEntryFeeSource: authority.polymarket.source,
+    pmEntryFeeObservedAt: authority.polymarket.observedAt,
+    pmEntryFeeVersion: authority.polymarket.version,
     kalshiEntryFeeCents,
     pmEntryFeeCents,
-    openedAt: new Date().toISOString(),
+    kalshiExitFeeType: authority.kalshi.feeType,
+    kalshiExitFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
+    kalshiExitFeeSource: authority.kalshi.source,
+    kalshiExitFeeObservedAt: authority.kalshi.observedAt,
+    kalshiExitFeeVersion: authority.kalshi.version,
+    pmExitTokenId: authority.polymarket.tokenId,
+    pmExitFeeRateBps: authority.polymarket.feeRateBps,
+    pmExitFeeSource: authority.polymarket.source,
+    pmExitFeeObservedAt: authority.polymarket.observedAt,
+    pmExitFeeVersion: authority.polymarket.version,
+    openedAt,
     expiryDate: input.expiryDate ?? null,
     selectionMethod: input.selectionMethod ?? null,
   });
@@ -845,6 +1386,7 @@ export async function pollOpenBotPositions(dependencies?: {
     resolved: boolean;
     observedAt?: string;
   } | null>;
+  fetchFeeConfig?: typeof fetchAuthoritativeBotFeeConfig;
   observedAt?: string;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
   const [{ fetchKalshiMarket }, { fetchClobMarket, fetchClobBook, extractClobBidPrices }] = await Promise.all([
@@ -976,7 +1518,34 @@ export async function pollOpenBotPositions(dependencies?: {
       const resolvedKalshiNoBids = kalshiResolution.resolved && kalshiResolution.noBidCents != null
         ? [{ priceCents: kalshiResolution.noBidCents, size: Number.MAX_SAFE_INTEGER }]
         : kalshiBids?.noBids ?? [];
-      const valuation = calculatePositionValuation(position, {
+      let valuedPosition = position;
+      if (!(kalshiResolution.resolved && pmBids.resolved)) {
+        if (!position.category?.trim()) throw new Error('Position is missing authoritative market category');
+        const authority = await (dependencies?.fetchFeeConfig ?? fetchAuthoritativeBotFeeConfig)({
+          kalshiTicker: position.kalshiTicker,
+          pmConditionId: position.pmConditionId,
+          pmTokenId: position.pmEntryTokenId ?? undefined,
+          pmSide: position.pmSide,
+          category: position.category,
+        });
+        if (authority.pmTheta !== position.pmTheta) {
+          throw new Error('Conflicting persisted and current Polymarket fee theta');
+        }
+        valuedPosition = {
+          ...position,
+          kalshiExitFeeType: authority.kalshi.feeType,
+          kalshiExitFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
+          kalshiExitFeeSource: authority.kalshi.source,
+          kalshiExitFeeObservedAt: authority.kalshi.observedAt,
+          kalshiExitFeeVersion: authority.kalshi.version,
+          pmExitTokenId: authority.polymarket.tokenId,
+          pmExitFeeRateBps: authority.polymarket.feeRateBps,
+          pmExitFeeSource: authority.polymarket.source,
+          pmExitFeeObservedAt: authority.polymarket.observedAt,
+          pmExitFeeVersion: authority.polymarket.version,
+        };
+      }
+      const valuation = calculatePositionValuation(valuedPosition, {
         kalshiYesBidCents: kalshiResolution.yesBidCents ?? parseCents(kalshi.yes_bid_dollars),
         kalshiNoBidCents: kalshiResolution.noBidCents ?? parseCents(kalshi.no_bid_dollars),
         pmYesBidCents: pmBids.yesBidCents,
@@ -990,7 +1559,23 @@ export async function pollOpenBotPositions(dependencies?: {
         kalshiResolved: kalshiResolution.resolved,
         pmResolved: pmBids.resolved,
       });
-      await store().updateValuation(position.id, valuation);
+      if (valuedPosition !== position) {
+        await store().updateValuationWithFeeConfig(position.id, valuation, {
+          feeType: valuedPosition.kalshiExitFeeType!,
+          feeMultiplierPpm: valuedPosition.kalshiExitFeeMultiplierPpm!,
+          source: valuedPosition.kalshiExitFeeSource!,
+          observedAt: valuedPosition.kalshiExitFeeObservedAt!,
+          version: valuedPosition.kalshiExitFeeVersion!,
+        }, {
+          tokenId: valuedPosition.pmExitTokenId!,
+          feeRateBps: valuedPosition.pmExitFeeRateBps!,
+          source: valuedPosition.pmExitFeeSource!,
+          observedAt: valuedPosition.pmExitFeeObservedAt!,
+          version: valuedPosition.pmExitFeeVersion!,
+        });
+      } else {
+        await store().updateValuation(position.id, valuation);
+      }
       updated += 1;
       if (valuation.status === 'settled') settled += 1;
     } catch (error) {

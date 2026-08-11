@@ -171,6 +171,7 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
     liveMatched.push({
       artist: o.artist,
       kalshiTicker: o.kalshi!.ticker,
+      pmConditionId: cid,
       pmYesTokenId: tokens.yes,
       pmNoTokenId: tokens.no,
     });
