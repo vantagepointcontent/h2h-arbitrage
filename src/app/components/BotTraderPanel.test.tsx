@@ -3,6 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BotTraderPanel, { positionRoiBps } from './BotTraderPanel';
 
+const EMPTY_ANALYTICS_FOR_TEST = {
+  totalBotTrades: { paper: 0, production: 0, total: 0 },
+  openPositions: { count: 0, unrealizedPnlCents: 0 },
+  settledPositions: { count: 0, realizedPnlCents: 0, winRateBps: 0 },
+  dailyPnl: [],
+};
+
 const analytics = {
   totalBotTrades: { paper: 47, production: 3, total: 50 },
   openPositions: { count: 12, unrealizedPnlCents: 1234 },
@@ -43,7 +50,7 @@ const positions = [{
   currentValueCents: 102,
   unrealizedPnlCents: 5,
   unrealizedRoiBps: 515,
-  lastValuationAt: '2026-08-08T18:00:00.000Z',
+  lastValuationAt: new Date().toISOString(),
   realizedPnlCents: null,
   settlementSide: null,
   dryRun: true,
@@ -93,6 +100,13 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
     expect(screen.getByText(/2 trades today/)).toBeTruthy();
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
+    expect(screen.getByText('Configured opportunities')).toBeTruthy();
+    expect(screen.getByText(/Selection rules only; not placement attempts or positions/)).toBeTruthy();
+    expect(screen.getByText('Open positions')).toBeTruthy();
+    expect(screen.getAllByText('Current executable value').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('+5.2% of allocated capital')).toBeTruthy();
+    expect(screen.getByText('Paper')).toBeTruthy();
+    expect(screen.getByText('Placed · Open')).toBeTruthy();
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {
@@ -104,7 +118,67 @@ describe('BotTraderPanel', () => {
 
     expect(screen.getByText('KXTRUMP-26')).toBeTruthy();
     expect(screen.getByText('0xabc')).toBeTruthy();
+    expect(screen.getByText('Kalshi leg')).toBeTruthy();
+    expect(screen.getByText('Polymarket leg')).toBeTruthy();
+    expect(screen.getByText(/Current executable value = Kalshi bid/)).toBeTruthy();
+    expect(screen.getByText(/P\/L % denominator: allocated capital/)).toBeTruthy();
+    expect(screen.getByText(/Balanced: 1 contract on each leg/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
+  });
+
+  it('labels stale or unavailable open valuations instead of presenting them as current', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, positions: [
+        { ...positions[0], id: 2, marketTitle: 'Old valuation market', lastValuationAt: '2020-01-01T00:00:00.000Z' },
+        { ...positions[0], id: 3, marketTitle: 'Missing quote', currentPricePmCents: null, currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null },
+      ] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+    await screen.findByText('Old valuation market');
+    expect(screen.getByText('Stale valuation')).toBeTruthy();
+    expect(screen.getByText('Last executable quote (stale)')).toBeTruthy();
+    expect(screen.getByText('Valuation unavailable')).toBeTruthy();
+    expect(screen.getByText('Missing Polymarket executable bid')).toBeTruthy();
+    expect(screen.getAllByText('Stale quote')).toHaveLength(2);
+  });
+
+  it('separates completed trades and labels settlement value and realized return', async () => {
+    const settled = {
+      ...positions[0], id: 4, marketTitle: 'Settled market', status: 'settled',
+      currentValueCents: 100, realizedPnlCents: 3, settledAt: '2026-08-09T12:00:00.000Z', settlementSide: 'kalshi',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, positions: [settled] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+    await screen.findByText('Settled market');
+    expect(screen.getByText('Completed / settled trades')).toBeTruthy();
+    expect(screen.getAllByText('Settlement value').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('+3.1% of allocated capital')).toBeTruthy();
+    expect(screen.getByText('Placed · Settled')).toBeTruthy();
+  });
+
+  it('shows explicit empty states for open and completed positions', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: EMPTY_ANALYTICS_FOR_TEST });
+      if (url.includes('/positions')) return response({ success: true, positions: [] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+    expect(await screen.findByText('No open BotTrader positions.')).toBeTruthy();
+    expect(screen.getByText('No completed BotTrader trades.')).toBeTruthy();
   });
 
   it('ignores stale refresh responses after a newer filter request completes', async () => {

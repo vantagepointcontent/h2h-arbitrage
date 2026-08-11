@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bot,
@@ -139,7 +139,104 @@ function StatusBadge({ status }: { status: PositionStatus }) {
     settled: 'bg-[var(--platform-polymarket)]/15 text-[var(--platform-polymarket)]',
     closed: 'bg-[var(--status-negative)]/15 text-[var(--status-negative)]',
   };
-  return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>{status}</span>;
+  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>Placed · {label}</span>;
+}
+
+const VALUATION_STALE_MS = 2 * 60_000;
+
+function positionPnl(position: BotPosition): number | null {
+  return position.status === 'open' ? position.unrealizedPnlCents : position.realizedPnlCents;
+}
+
+function valuationState(position: BotPosition): 'fresh' | 'stale' | 'unavailable' | 'settled' {
+  if (position.status !== 'open') return 'settled';
+  if (position.currentValueCents == null || position.unrealizedPnlCents == null || position.unrealizedRoiBps == null || !position.lastValuationAt) return 'unavailable';
+  const age = Date.now() - Date.parse(position.lastValuationAt);
+  return !Number.isFinite(age) || age > VALUATION_STALE_MS ? 'stale' : 'fresh';
+}
+
+function PositionTable({
+  title,
+  description,
+  positions,
+  kind,
+  expanded,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  positions: BotPosition[];
+  kind: 'open' | 'completed';
+  expanded: Set<number>;
+  onToggle: (id: number) => void;
+}) {
+  const emptyText = kind === 'open' ? 'No open BotTrader positions.' : 'No completed BotTrader trades.';
+  return <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
+    <div className="border-b border-[var(--border-subtle)] px-3 py-2">
+      <div className="text-sm font-semibold text-[var(--text-primary)]">{title}</div>
+      <div className="text-[10px] text-[var(--text-secondary)]">{description}</div>
+    </div>
+    <div className="overflow-x-auto" data-testid={`bot-${kind}-positions-scroll`}>
+      <table className="w-full min-w-[1040px] text-xs">
+        <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">
+          <th className="w-8 px-2 py-2" />
+          <th className="px-2 py-2 text-left font-medium">Placed trade</th>
+          <th className="px-2 py-2 text-left font-medium">Mode / execution</th>
+          <th title="Capital spent to enter both legs; this is the P/L percentage denominator" className="px-2 py-2 text-right font-medium">Allocated capital</th>
+          <th className="px-2 py-2 text-right font-medium">{kind === 'open' ? 'Current executable value' : 'Settlement value'}</th>
+          <th className="px-2 py-2 text-right font-medium">{kind === 'open' ? 'Current P/L' : 'Realized P/L'}</th>
+          <th title="Return divided by allocated capital" className="px-2 py-2 text-right font-medium">P/L %</th>
+          <th className="px-2 py-2 text-right font-medium">Updated</th>
+        </tr></thead>
+        <tbody className="divide-y divide-[var(--border-subtle)]">
+          {positions.map((position) => {
+            const isExpanded = expanded.has(position.id);
+            const quoteState = valuationState(position);
+            const pnl = positionPnl(position);
+            const roiBps = position.status === 'open' ? position.unrealizedRoiBps : positionRoiBps(position);
+            const missingQuote = position.currentPriceKalshiCents == null
+              ? 'Missing Kalshi executable bid'
+              : position.currentPricePmCents == null ? 'Missing Polymarket executable bid' : null;
+            const valueLabel = quoteState === 'fresh' ? 'Current executable value'
+              : quoteState === 'stale' ? 'Last executable quote (stale)'
+                : quoteState === 'unavailable' ? 'Valuation unavailable' : 'Settlement value';
+            const updatedAt = position.status === 'open' ? position.lastValuationAt : (position.settledAt ?? position.lastValuationAt);
+            const kalshiCapital = position.buyPriceKalshiCents * position.sharesKalshi;
+            const pmCapital = position.buyPricePmCents * position.sharesPm;
+            const balanced = position.sharesKalshi === position.sharesPm;
+            return <Fragment key={position.id}>
+              <tr className="hover:bg-[var(--border-subtle)]/50">
+                <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={() => onToggle(position.id)} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
+                <td className="max-w-72 px-2 py-2"><div className="font-medium text-[var(--text-primary)]">{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}</div><div className="mt-1 text-[9px] text-[var(--text-muted)]">Execution #{position.executionId} · {new Date(position.openedAt).toLocaleString()}</div><div className="mt-1 flex gap-2 text-[9px]">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}</div></td>
+                <td className="px-2 py-2"><div className="flex flex-wrap gap-1"><span className="rounded bg-[var(--surface-workspace)] px-1.5 py-0.5 text-[9px] font-bold uppercase">{position.dryRun ? 'Paper' : 'Live'}</span><StatusBadge status={position.status} /></div><div className="mt-1 max-w-52 truncate text-[10px] text-[var(--text-secondary)]">{position.strategy || 'Strategy unavailable'}</div></td>
+                <td className="px-2 py-2 text-right tabular-nums"><div>{formatCents(position.totalCostCents)}</div><div className="text-[9px] text-[var(--text-secondary)]">+ {formatCents(position.feesCents)} fees</div></td>
+                <td className="px-2 py-2 text-right tabular-nums"><div>{position.currentValueCents == null ? '—' : formatCents(position.currentValueCents)}</div><div className={`text-[9px] ${quoteState === 'stale' ? 'text-[var(--status-warning)]' : quoteState === 'unavailable' ? 'text-[var(--status-negative)]' : 'text-[var(--text-secondary)]'}`}>{valueLabel}</div>{quoteState === 'stale' && <div className="mt-1 text-[9px] font-bold uppercase text-[var(--status-warning)]">Stale valuation</div>}{missingQuote && <div className="mt-1 text-[9px] text-[var(--status-negative)]">{missingQuote}</div>}</td>
+                <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--text-muted)]' : pnlClass(pnl)}`}><div>{pnl == null ? '—' : formatCents(pnl, true)}</div>{quoteState === 'stale' && <div className="text-[9px] font-normal text-[var(--status-warning)]">Stale quote</div>}</td>
+                <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null ? 'text-[var(--text-muted)]' : pnlClass(roiBps)}`}><div>{roiBps == null ? '—' : `${formatBps(roiBps, true)} of allocated capital`}</div>{quoteState === 'stale' && <div className="text-[9px] text-[var(--status-warning)]">Stale quote</div>}</td>
+                <td className="px-2 py-2 text-right text-[var(--text-secondary)]">{updatedAt ? <><div title={new Date(updatedAt).toLocaleString()}>{timeAgo(updatedAt)}</div><div className="text-[9px]">{new Date(updatedAt).toLocaleString()}</div></> : 'Never valued'}</td>
+              </tr>
+              {isExpanded && <tr><td colSpan={8} className="bg-[var(--surface-workspace)] px-4 py-3">
+                <div className="grid gap-2 lg:grid-cols-2">
+                  {([
+                    { platform: 'Kalshi', side: position.kalshiSide, shares: position.sharesKalshi, entry: position.buyPriceKalshiCents, current: position.currentPriceKalshiCents, capital: kalshiCapital, id: position.kalshiTicker, url: position.kalshiUrl },
+                    { platform: 'Polymarket', side: position.pmSide, shares: position.sharesPm, entry: position.buyPricePmCents, current: position.currentPricePmCents, capital: pmCapital, id: position.pmConditionId, url: position.polymarketUrl },
+                  ] as const).map((leg) => <div key={leg.platform} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
+                    <div className="flex items-center justify-between"><strong className="text-xs text-[var(--text-primary)]">{leg.platform} leg</strong><span className="text-[9px] font-bold uppercase text-[var(--text-secondary)]">{leg.side}</span></div>
+                    <div className="mt-1 truncate text-[10px] text-[var(--text-secondary)]" title={position.marketTitle}>{position.marketTitle}</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><div><span className="text-[var(--text-secondary)]">Fill / quantity</span><div>Filled {INTEGER.format(leg.shares)} contracts</div></div><div><span className="text-[var(--text-secondary)]">Entry price</span><div>{formatCents(leg.entry)} per contract</div></div><div><span className="text-[var(--text-secondary)]">Leg capital</span><div>{formatCents(leg.capital)}</div></div><div><span className="text-[var(--text-secondary)]">Executable bid</span><div>{leg.current == null ? 'Missing quote' : formatCents(leg.current)}</div></div><div><span className="text-[var(--text-secondary)]">Venue fee</span><div>Not itemized</div></div><div><span className="text-[var(--text-secondary)]">Venue market ID</span><div className="truncate font-mono" title={leg.id ?? ''}>{leg.id || 'Unavailable'}</div></div></div>
+                    {leg.url && <a href={leg.url} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mt-2 inline-block text-[10px] text-[var(--status-info)] underline">Open exact {leg.platform} market</a>}
+                  </div>)}
+                </div>
+                <div className="mt-2 rounded-lg border border-[var(--border-subtle)] p-3 text-[10px]"><strong className="text-[var(--text-primary)]">Reconciliation</strong><div className="mt-1 text-[var(--text-secondary)]">Allocated capital = {formatCents(kalshiCapital)} Kalshi + {formatCents(pmCapital)} Polymarket = {formatCents(position.totalCostCents)}. Combined fees: {formatCents(position.feesCents)}.</div><div className="mt-1 text-[var(--text-secondary)]">{position.status === 'open' ? 'Current executable value = Kalshi bid × filled quantity + Polymarket bid × filled quantity. Current P/L = executable value − allocated capital − fees.' : 'Realized P/L = settlement value − allocated capital − fees.'} P/L % denominator: allocated capital ({formatCents(position.totalCostCents)}).</div><div className={`mt-1 ${balanced ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}`}>{balanced ? `Balanced: ${INTEGER.format(position.sharesKalshi)} contract${position.sharesKalshi === 1 ? '' : 's'} on each leg.` : `Imbalance: ${INTEGER.format(position.sharesKalshi)} Kalshi vs ${INTEGER.format(position.sharesPm)} Polymarket contracts.`}</div>{missingQuote && <div className="mt-1 text-[var(--status-negative)]">Valuation unavailable: {missingQuote}.</div>}</div>
+              </td></tr>}
+            </Fragment>;
+          })}
+        </tbody>
+      </table>
+      {positions.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">{emptyText}</div>}
+    </div>
+  </div>;
 }
 
 export default function BotTraderPanel() {
@@ -219,6 +316,13 @@ export default function BotTraderPanel() {
     }
   };
 
+  const toggleExpanded = (id: number) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+
   const saveSetting = async (key: 'bot.enabled' | 'bot.mode' | 'bot.selectionMethod', value: boolean | 'paper' | 'production' | 'roi' | 'apy' | 'hybrid', confirmation?: 'PRODUCTION') => {
     if (!status) return;
     const previous = status;
@@ -291,11 +395,11 @@ export default function BotTraderPanel() {
       {error && <div role="alert" className="rounded-lg border border-[var(--status-negative)]/40 bg-[var(--status-negative)]/10 px-3 py-2 text-xs text-[var(--status-negative)]">{error}</div>}
 
       <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-1" role="tablist" aria-label="BotTrader views">
-        {(['analytics', 'logs', 'messages'] as const).map((tab) => <button key={tab} role="tab" aria-selected={view === tab} onClick={() => setView(tab)} className={`min-h-11 rounded-md px-4 text-xs font-semibold capitalize ${view === tab ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{tab}</button>)}
+        {([['analytics', 'Positions & P/L'], ['logs', 'Placement attempts'], ['messages', 'Messages']] as const).map(([tab, label]) => <button key={tab} role="tab" aria-selected={view === tab} onClick={() => setView(tab)} className={`min-h-11 rounded-md px-4 text-xs font-semibold ${view === tab ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{label}</button>)}
       </div>
 
       {status && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-        <div><div className="text-xs font-semibold text-[var(--text-primary)]">Ranked candidate sources</div><div className="text-[10px] text-[var(--text-secondary)]">All ROI and profit values are net of trading fees. This does not enable live trading.</div></div>
+        <div><div className="text-xs font-semibold text-[var(--text-primary)]">Configured opportunities</div><div className="text-[10px] text-[var(--text-secondary)]">Selection rules only; not placement attempts or positions. ROI and profit values are net of trading fees. This does not enable live trading.</div></div>
         <div className="flex items-center gap-2" role="group" aria-label="BotTrader ranked candidate sources">
           <label title="ROI ranks eligible markets by highest fee-net return on invested capital." className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${status.selectionMethod !== 'apy' ? 'border-[var(--status-positive)] bg-[var(--status-positive)]/10 text-[var(--status-positive)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`}><input type="checkbox" checked={status.selectionMethod !== 'apy'} disabled={saving} onChange={(event) => setRankSource('roi', event.target.checked)} /> ROI</label>
           <label title="APY ranks eligible markets by annualized yield while still requiring positive fee-net ROI." className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${status.selectionMethod !== 'roi' ? 'border-[var(--status-positive)] bg-[var(--status-positive)]/10 text-[var(--status-positive)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`}><input type="checkbox" checked={status.selectionMethod !== 'roi'} disabled={saving} onChange={(event) => setRankSource('apy', event.target.checked)} /> APY</label>
@@ -334,46 +438,19 @@ export default function BotTraderPanel() {
         <MetricCard label="Total P&L" value={formatCents(totalPnl, true)} valueClass={pnlClass(totalPnl)} />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
-              {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
-            </div>
-            <label className="text-xs text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
-            <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+        <div><div className="text-sm font-semibold text-[var(--text-primary)]">Placed trades</div><div className="text-[10px] text-[var(--text-secondary)]">Only successful two-leg placements become positions. Attempts and failures are in Placement attempts.</div></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
+            {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
           </div>
-        </div>
-
-        <div className="overflow-x-auto" data-testid="bot-positions-scroll">
-          <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {sortedPositions.map((position) => {
-                const isExpanded = expanded.has(position.id);
-                const pnl = position.status === 'open' ? (position.unrealizedPnlCents ?? 0) : (position.realizedPnlCents ?? 0);
-                const roiBps = positionRoiBps(position);
-                return [
-                  <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
-                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>,
-                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(position.totalCostCents)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{position.currentValueCents == null ? '—' : formatCents(position.currentValueCents)}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnlClass(pnl)}`}>{formatCents(pnl, true)}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${pnlClass(roiBps)}`}>{formatBps(roiBps, true)}</td>
-                    <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
-                    <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
-                  </tr>,
-                  isExpanded && <tr key={`detail-${position.id}`}><td colSpan={9} className="bg-[var(--surface-workspace)] px-10 py-3"><div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-6"><div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div><div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div><div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div><div><span className="text-[var(--text-secondary)]">Current prices</span><div>{position.currentPriceKalshiCents == null ? '—' : formatCents(position.currentPriceKalshiCents)} K · {position.currentPricePmCents == null ? '—' : formatCents(position.currentPricePmCents)} PM</div></div><div><span className="text-[var(--text-secondary)]">Shares</span><div>{INTEGER.format(position.sharesKalshi)} K · {INTEGER.format(position.sharesPm)} PM</div></div><div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div></div></td></tr>,
-                ];
-              })}
-            </tbody>
-          </table>
-          {sortedPositions.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No {filter === 'all' ? '' : `${filter} `}BotTrader positions.</div>}
+          <label className="text-xs text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">P/L %</option></select></label>
+          <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
         </div>
       </div>
+
+      {filter !== 'settled' && <PositionTable title="Open positions" description="Successfully placed trades valued at executable venue bids; expand to reconcile both legs." positions={sortedPositions.filter((position) => position.status === 'open')} kind="open" expanded={expanded} onToggle={toggleExpanded} />}
+      {filter !== 'open' && <PositionTable title="Completed / settled trades" description="Final settlement value and realized P/L; these values are not presented as current executable quotes." positions={sortedPositions.filter((position) => position.status !== 'open')} kind="completed" expanded={expanded} onToggle={toggleExpanded} />}
 
       {productionConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="production-confirm-title" onClick={() => setProductionConfirmOpen(false)}>

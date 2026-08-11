@@ -71,6 +71,19 @@ describe('calculatePositionValuation', () => {
     });
   });
 
+  it('subtracts fees from executable P/L while using allocated capital as the return denominator', () => {
+    const result = calculatePositionValuation(openPosition({ feesCents: 7 }), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: '2026-08-10T00:00:00.000Z',
+    });
+    expect(result.unrealizedPnlCents).toBe(93);
+    expect(result.unrealizedRoiBps).toBe(979);
+  });
+
   it('fails closed when an executable bid is missing', () => {
     expect(() => calculatePositionValuation(openPosition(), {
       kalshiYesBidCents: null,
@@ -178,8 +191,12 @@ describe('BotPositionStore', () => {
       expiryDate: '2026-08-10T00:00:00.000Z',
     });
 
-    expect(created.currentValueCents).toBe(1000);
-    expect(created.unrealizedPnlCents).toBe(50);
+    expect(created.currentPriceKalshiCents).toBeNull();
+    expect(created.currentPricePmCents).toBeNull();
+    expect(created.currentValueCents).toBeNull();
+    expect(created.unrealizedPnlCents).toBeNull();
+    expect(created.unrealizedRoiBps).toBeNull();
+    expect(created.lastValuationAt).toBeNull();
     expect(created.dryRun).toBe(true);
     await expect(store.hasOpenPair('KXTEST', '0xabc')).resolves.toBe(true);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);

@@ -128,7 +128,9 @@ export function calculatePositionValuation(
 
   const currentValueCents =
     kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm;
-  const unrealizedPnlCents = currentValueCents - position.totalCostCents;
+  // Executable P/L is net of fees already paid/allocated to the position.
+  // Keep totalCostCents as the explicit ROI denominator so the UI can state it.
+  const unrealizedPnlCents = currentValueCents - position.totalCostCents - position.feesCents;
   const base: PositionValuation = {
     status: 'open',
     currentPriceKalshiCents: kalshiPrice,
@@ -158,8 +160,8 @@ export function calculatePositionValuation(
     ...base,
     status: 'settled',
     currentValueCents: payoutCents,
-    unrealizedPnlCents: payoutCents - position.totalCostCents,
-    unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
+    unrealizedPnlCents: payoutCents - position.totalCostCents - position.feesCents,
+    unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents - position.feesCents, position.totalCostCents),
     settledAt: quote.observedAt,
     realizedPnlCents: payoutCents - position.totalCostCents - position.feesCents,
     settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
@@ -325,7 +327,6 @@ export class BotPositionStore {
       throw new Error('An open bot position already exists for this market pair');
     }
 
-    const initialRoiBps = roiBps(input.expectedProfitCents, input.totalCostCents);
     let result;
     try {
       result = await this.client.execute({
@@ -343,9 +344,7 @@ export class BotPositionStore {
           input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
           input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
           input.expectedProfitCents, input.feesCents, input.openedAt,
-          input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
-          input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
-          input.openedAt,
+          input.expiryDate, null, null, null, null, null, null,
         ],
       });
     } catch (error) {

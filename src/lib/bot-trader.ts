@@ -19,6 +19,7 @@ import type { UnifiedOutcome } from './matcher';
 import type { LiveArbResult } from './live-arb-engine';
 import {
   executeArb,
+  type ExecutionResult,
   type ExecutionRequest,
   type OrderSide,
   type OrderRequest,
@@ -116,6 +117,39 @@ export interface BotExecutionResult {
   reason: string;
   executionRecord?: ExecutionRecord;
   executionResult?: Awaited<ReturnType<typeof executeArb>>;
+}
+
+export function matchedPositionFill(result: Pick<ExecutionResult, 'success' | 'unhedged' | 'kalshiResult' | 'polymarketResult'>): {
+  contracts: number;
+  kalshiPrice: number;
+  pmPrice: number;
+} | null {
+  if (result.unhedged || !['filled', 'partial'].includes(result.kalshiResult.status) || !['filled', 'partial'].includes(result.polymarketResult.status)) return null;
+  const kalshiContracts = result.kalshiResult.filledContracts;
+  const pmContracts = result.polymarketResult.filledContracts;
+  const kalshiPrice = result.kalshiResult.filledPrice;
+  const pmPrice = result.polymarketResult.filledPrice;
+  const values = [kalshiContracts, pmContracts, kalshiPrice, pmPrice];
+  if (!values.every((value) => typeof value === 'number' && Number.isFinite(value))) return null;
+  const roundedContracts = Math.round(kalshiContracts as number);
+  if (roundedContracts <= 0 || Math.abs((kalshiContracts as number) - roundedContracts) > 1e-6 || Math.abs((pmContracts as number) - roundedContracts) > 1e-6) return null;
+  if ((kalshiPrice as number) <= 0 || (kalshiPrice as number) > 1 || (pmPrice as number) <= 0 || (pmPrice as number) > 1) return null;
+  return { contracts: roundedContracts, kalshiPrice: kalshiPrice as number, pmPrice: pmPrice as number };
+}
+
+export function positionProfitFromFill(
+  fill: { contracts: number; kalshiPrice: number; pmPrice: number },
+  request: ExecutionRequest,
+): number {
+  const requestedContracts = Math.min(
+    request.kalshiOrder.contracts ?? request.kalshiOrder.size / request.kalshiOrder.price,
+    request.polymarketOrder.contracts ?? request.polymarketOrder.size / request.polymarketOrder.price,
+  );
+  const requestedPayout = requestedContracts;
+  const requestedCost = request.kalshiOrder.size + request.polymarketOrder.size;
+  const requestedFees = Math.max(0, requestedPayout - requestedCost - request.estimatedProfit);
+  const allocatedFees = requestedContracts > 0 ? requestedFees * fill.contracts / requestedContracts : 0;
+  return fill.contracts - fill.contracts * (fill.kalshiPrice + fill.pmPrice) - allocatedFees;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────
@@ -613,8 +647,10 @@ export async function maybeExecuteBotTrade(
     logger.warn('[bot-trader] persistExecution failed', { arbId, error: String(e) });
   }
 
-  // Record bot position linked to the execution
-  if (executionId != null) {
+  // A durable position requires authoritative, matched fills on both legs.
+  // Failed, mismatched, or fill-unknown attempts remain in executions/action logs.
+  const positionFill = matchedPositionFill(result);
+  if (executionId != null && positionFill) {
     try {
       const legs = pickLegPrices(input.strategy, input);
       if (legs.kalshiPrice != null && legs.pmPrice != null) {
@@ -627,11 +663,11 @@ export async function maybeExecuteBotTrade(
           strategy: input.strategy,
           kalshiSide: legs.kalshiOutcome,
           pmSide: legs.pmOutcome,
-          kalshiPrice: execReq.kalshiOrder.price,
-          pmPrice: execReq.polymarketOrder.price,
-          kalshiStake: execReq.kalshiOrder.size,
-          pmStake: execReq.polymarketOrder.size,
-          expectedProfit: execReq.estimatedProfit,
+          kalshiPrice: positionFill.kalshiPrice,
+          pmPrice: positionFill.pmPrice,
+          kalshiStake: positionFill.contracts * positionFill.kalshiPrice,
+          pmStake: positionFill.contracts * positionFill.pmPrice,
+          expectedProfit: positionProfitFromFill(positionFill, execReq),
           expiryDate: input.expiryDate ?? null,
         });
       }

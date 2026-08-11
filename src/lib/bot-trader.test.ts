@@ -5,6 +5,8 @@ import {
   maybeExecuteBotTrade,
   unifiedOutcomeToBotInput,
   getBotSettings,
+  matchedPositionFill,
+  positionProfitFromFill,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -313,10 +315,46 @@ describe('unifiedOutcomeToBotInput', () => {
         lastPrice: 0.50,
         yesAskDepth: '$1.2K',
         noAskDepth: '0',
-      } as any,
+      } as UnifiedOutcome['kalshi'],
     });
     const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
     expect(input.kalshiYesDepth).toBe(1200);
+  });
+});
+
+describe('matchedPositionFill', () => {
+  const execution = {
+    success: true,
+    kalshiResult: { platform: 'kalshi' as const, status: 'partial' as const, filledContracts: 7, filledPrice: 0.46, timestamp: '2026-08-10T00:00:00.000Z' },
+    polymarketResult: { platform: 'polymarket' as const, status: 'partial' as const, filledContracts: 7, filledPrice: 0.51, timestamp: '2026-08-10T00:00:00.000Z' },
+    actualProfit: 0.21,
+    rollbackExecuted: false,
+    unhedged: false,
+    executionTimeMs: 10,
+    steps: [],
+  };
+
+  it('uses authoritative matched fill quantities and prices for a partial placement', () => {
+    expect(matchedPositionFill(execution)).toEqual({ contracts: 7, kalshiPrice: 0.46, pmPrice: 0.51 });
+  });
+
+  it('rejects mismatched, missing, or unsuccessful fills instead of inventing a position', () => {
+    expect(matchedPositionFill({ ...execution, polymarketResult: { ...execution.polymarketResult, filledContracts: 6 } })).toBeNull();
+    expect(matchedPositionFill({ ...execution, kalshiResult: { ...execution.kalshiResult, filledContracts: undefined } })).toBeNull();
+    expect(matchedPositionFill({ ...execution, unhedged: true })).toBeNull();
+  });
+
+  it('keeps an authoritative matched residual after excess-fill rollback', () => {
+    expect(matchedPositionFill({ ...execution, success: false })).toEqual({ contracts: 7, kalshiPrice: 0.46, pmPrice: 0.51 });
+  });
+
+  it('scales configured net fees to actual fills instead of treating gross spread as net profit', () => {
+    const request = buildExecutionRequest(makeInput());
+    expect(request).toBeTruthy();
+    request!.kalshiOrder = { ...request!.kalshiOrder, contracts: 10, size: 4.5, price: 0.45 };
+    request!.polymarketOrder = { ...request!.polymarketOrder, contracts: 10, size: 5, price: 0.5 };
+    request!.estimatedProfit = 0.3;
+    expect(positionProfitFromFill({ contracts: 5, kalshiPrice: 0.46, pmPrice: 0.51 }, request!)).toBeCloseTo(0.05, 8);
   });
 });
 

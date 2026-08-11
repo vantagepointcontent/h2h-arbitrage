@@ -46,8 +46,8 @@ function toCents(dollars: string | undefined): number | null {
 function getPmPrices(market: Awaited<ReturnType<typeof fetchClobMarket>>): { yes: number | null; no: number | null } {
   if (!market) return { yes: null, no: null };
 
-  const yesToken = market.tokens?.find((t: any) => t.outcome === 'Yes');
-  const noToken = market.tokens?.find((t: any) => t.outcome === 'No');
+  const yesToken = market.tokens?.find((t) => t.outcome === 'Yes');
+  const noToken = market.tokens?.find((t) => t.outcome === 'No');
 
   if (market.neg_risk === true) {
     // Neg-risk markets: each token trades independently.
@@ -114,11 +114,11 @@ async function getOpenPositions(): Promise<BotPositionRow[]> {
                    total_cost, fees, expiry_date
             FROM bot_positions WHERE status = 'open'`,
     });
-    return (res.rows as any[]).map((r: any) => ({
+    return (res.rows as unknown as Array<Record<string, unknown>>).map((r) => ({
       id: Number(r.id),
-      kalshi_ticker: r.kalshi_ticker ?? null,
-      pm_condition_id: r.pm_condition_id ?? null,
-      strategy: r.strategy ?? null,
+      kalshi_ticker: r.kalshi_ticker == null ? null : String(r.kalshi_ticker),
+      pm_condition_id: r.pm_condition_id == null ? null : String(r.pm_condition_id),
+      strategy: r.strategy == null ? null : String(r.strategy),
       kalshi_side: String(r.kalshi_side) as 'yes' | 'no',
       pm_side: String(r.pm_side) as 'yes' | 'no',
       shares_kalshi: Number(r.shares_kalshi),
@@ -158,6 +158,7 @@ async function updateValuation(
 async function settlePosition(
   positionId: number,
   side: 'kalshi' | 'pm',
+  payout: number,
   realizedPnl: number,
 ) {
   const db = getDb();
@@ -169,12 +170,12 @@ async function settlePosition(
                 settled_at = ?,
                 settlement_side = ?,
                 realized_pnl = ?,
-                current_value = NULL,
+                current_value = ?,
                 unrealized_pnl = NULL,
                 unrealized_roi_pct = NULL,
                 last_valuation_at = ?
             WHERE id = ?`,
-      args: [now, side, realizedPnl, now, positionId],
+      args: [now, side, realizedPnl, payout, now, positionId],
     });
   } finally {
     db.close();
@@ -250,7 +251,7 @@ async function valuateOnce() {
           : pos.shares_pm * 100;
 
         const realizedPnl = payout - pos.total_cost - pos.fees;
-        await settlePosition(pos.id, side, realizedPnl);
+        await settlePosition(pos.id, side, payout, realizedPnl);
         console.log(`[${iso}] Position ${pos.id} SETTLED — side: ${side}, payout: ${payout}c, realized_pnl: ${realizedPnl}c`);
         continue;
       }
@@ -259,7 +260,7 @@ async function valuateOnce() {
       const kalshiValue = currentKalshiPrice != null ? currentKalshiPrice * pos.shares_kalshi : null;
       const pmValue = currentPmPrice != null ? currentPmPrice * pos.shares_pm : null;
       const currentValue = (kalshiValue != null && pmValue != null) ? kalshiValue + pmValue : null;
-      const unrealizedPnl = currentValue != null ? currentValue - pos.total_cost : null;
+      const unrealizedPnl = currentValue != null ? currentValue - pos.total_cost - pos.fees : null;
       const unrealizedRoiBps = (unrealizedPnl != null && pos.total_cost > 0)
         ? Math.round((unrealizedPnl * 10_000) / pos.total_cost)
         : null;

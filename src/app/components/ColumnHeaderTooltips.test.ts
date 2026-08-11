@@ -18,8 +18,8 @@ describe('UI-040 explanatory tooltips', () => {
     expect(dashboard).toContain('Write-Ahead Log size');
 
     const bot = read('BotTraderPanel.tsx');
-    expect(bot).toContain('Total dollars spent on both legs');
-    expect(bot).toContain('Unrealized return as a percentage');
+    expect(bot).toContain('Capital spent to enter both legs; this is the P/L percentage denominator');
+    expect(bot).toContain('Return divided by allocated capital');
 
     const trades = read('TradesPanel.tsx');
     expect(trades).toContain('Realized profit or loss after all trading fees');
