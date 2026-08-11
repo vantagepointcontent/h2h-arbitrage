@@ -7,6 +7,7 @@ import {
   BotPositionStore,
   calculatePositionValuation,
   getKalshiResolvedPrices,
+  summarizeBotPositions,
   type BotPosition,
 } from './bot-positions';
 
@@ -49,6 +50,29 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     ...overrides,
   };
 }
+
+describe('summarizeBotPositions', () => {
+  it('reconciles fee-net capital, P&L, ROI, win rate, and entry APY for one method', () => {
+    const rows = [
+      openPosition({ id: 1, selectionMethod: 'roi', totalCostCents: 1000, expectedProfitCents: 100, unrealizedPnlCents: 50, openedAt: '2026-08-01T00:00:00.000Z', expiryDate: '2026-08-11T00:00:00.000Z' }),
+      openPosition({ id: 2, selectionMethod: 'roi', status: 'settled', totalCostCents: 1000, expectedProfitCents: 100, unrealizedPnlCents: null, realizedPnlCents: 200, settledAt: '2026-08-05T00:00:00.000Z', openedAt: '2026-08-01T00:00:00.000Z', expiryDate: '2026-08-11T00:00:00.000Z' }),
+    ];
+    expect(summarizeBotPositions(rows)).toEqual({
+      tradeCount: 2,
+      deployedCapitalCents: 2000,
+      realizedPnlCents: 200,
+      unrealizedPnlCents: 50,
+      winRateBps: 10_000,
+      averageEntryRoiBps: 1000,
+      currentRoiBps: 1250,
+      averageApyPct: 365,
+    });
+  });
+
+  it('returns honest zero and no-data values for an empty method', () => {
+    expect(summarizeBotPositions([])).toEqual({ tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null });
+  });
+});
 
 describe('calculatePositionValuation', () => {
   it('marks an open YES-Kalshi/NO-PM position to executable sell bids using integer cents', () => {

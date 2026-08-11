@@ -11,6 +11,18 @@ const analytics = {
   bestTrade: null,
   worstTrade: null,
   dailyPnl: [],
+  dailyPnlByMethod: {
+    roi: [{ date: '2026-08-01', realizedPnlCents: 500, unrealizedPnlCents: 100, trades: 4 }],
+    apy: [],
+    hybrid: [{ date: '2026-08-01', realizedPnlCents: -100, unrealizedPnlCents: 0, trades: 1 }],
+  },
+  filter: { method: 'all', mode: 'all' },
+  perMethod: {
+    roi: { tradeCount: 4, deployedCapitalCents: 10000, realizedPnlCents: 500, unrealizedPnlCents: 100, winRateBps: 7500, averageEntryRoiBps: 800, currentRoiBps: 600, averageApyPct: 42.5 },
+    apy: { tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null },
+    hybrid: { tradeCount: 1, deployedCapitalCents: 5000, realizedPnlCents: -100, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 200, currentRoiBps: -200, averageApyPct: 10 },
+    legacy: { tradeCount: 2, deployedCapitalCents: 2000, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null },
+  },
   timeStats: { tradesPerDayBps: 10000, averageHoldSeconds: 0 },
 };
 
@@ -105,6 +117,18 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText('KXTRUMP-26')).toBeTruthy();
     expect(screen.getByText('0xabc')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
+  });
+
+  it('composes selection-method and paper/production analytics filters', async () => {
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+    await screen.findByText('Trump 2026');
+    expect(screen.getByRole('listitem', { name: 'roi method performance' })).toBeTruthy();
+    expect(screen.getAllByText('Legacy / Unknown').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'apy' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Analytics trading mode' }), { target: { value: 'production' } });
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes('/api/bot-trader/analytics?method=apy&mode=production'))).toBe(true));
+    expect(screen.getByText('No performance data for this filter.')).toBeTruthy();
   });
 
   it('ignores stale refresh responses after a newer filter request completes', async () => {

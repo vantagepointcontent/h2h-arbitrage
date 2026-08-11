@@ -487,14 +487,20 @@ export class BotPositionStore {
     return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
   }
 
-  async listAllForAnalytics(): Promise<BotPosition[]> {
+  async listAllForAnalytics(options: { mode?: 'all' | 'paper' | 'production'; limit?: number } = {}): Promise<BotPosition[]> {
     await this.ensureSchema();
-    const result = await this.client.execute(`
+    const limit = Math.min(5000, Math.max(1, Math.trunc(options.limit ?? 5000)));
+    const mode = options.mode ?? 'all';
+    const where = mode === 'all' ? '' : `WHERE e.dry_run = ?`;
+    const args: Array<number> = mode === 'all' ? [limit] : [mode === 'paper' ? 1 : 0, limit];
+    const result = await this.client.execute({ sql: `
       SELECT bp.*, e.dry_run
       FROM bot_positions bp
       LEFT JOIN executions e ON e.id = bp.execution_id
+      ${where}
       ORDER BY bp.opened_at DESC
-    `);
+      LIMIT ?
+    `, args });
     return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
   }
 
@@ -638,11 +644,60 @@ export interface BotPositionAnalytics {
   bestTrade: BotPosition | null;
   worstTrade: BotPosition | null;
   dailyPnl: Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>;
+  dailyPnlByMethod: Record<BotSelectionMethod, Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>>;
   timeStats: { tradesPerDayBps: number; averageHoldSeconds: number };
+  filter: { method: 'all' | BotSelectionMethod | 'legacy'; mode: 'all' | 'paper' | 'production' };
+  perMethod: Record<BotSelectionMethod | 'legacy', {
+    tradeCount: number; deployedCapitalCents: number; realizedPnlCents: number;
+    unrealizedPnlCents: number; winRateBps: number; averageEntryRoiBps: number;
+    currentRoiBps: number; averageApyPct: number | null;
+  }>;
 }
 
-export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
-  const positions = await store().listAllForAnalytics();
+export function summarizeBotPositions(rows: BotPosition[]) {
+  const totalNumbers = (values: number[]) => values.reduce((total, value) => total + value, 0);
+  const closed = rows.filter((position) => position.status === 'settled');
+  const openRows = rows.filter((position) => position.status === 'open');
+  const deployedCapitalCents = totalNumbers(rows.map((position) => position.totalCostCents));
+  const realizedPnlCents = totalNumbers(closed.map((position) => position.realizedPnlCents ?? 0));
+  const unrealizedPnlCents = totalNumbers(openRows.map((position) => position.unrealizedPnlCents ?? 0));
+  const apyValues = rows.flatMap((position) => {
+    if (!position.expiryDate) return [];
+    const durationDays = (Date.parse(position.expiryDate) - Date.parse(position.openedAt)) / 86_400_000;
+    if (!Number.isFinite(durationDays) || durationDays <= 0) return [];
+    return [roiBps(position.expectedProfitCents, position.totalCostCents) / 100 * 365 / durationDays];
+  });
+  return {
+    tradeCount: rows.length, deployedCapitalCents, realizedPnlCents, unrealizedPnlCents,
+    winRateBps: closed.length === 0 ? 0 : Math.round(closed.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000 / closed.length),
+    averageEntryRoiBps: rows.length === 0 ? 0 : Math.round(totalNumbers(rows.map((position) => roiBps(position.expectedProfitCents, position.totalCostCents))) / rows.length),
+    currentRoiBps: deployedCapitalCents === 0 ? 0 : roiBps(realizedPnlCents + unrealizedPnlCents, deployedCapitalCents),
+    averageApyPct: apyValues.length === 0 ? null : Math.round(totalNumbers(apyValues) / apyValues.length * 100) / 100,
+  };
+}
+
+function dailyPnlFor(rows: BotPosition[]) {
+  const dates = new Map<string, { realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>();
+  for (const position of rows) {
+    const date = position.openedAt.slice(0, 10);
+    const value = dates.get(date) ?? { realizedPnlCents: 0, unrealizedPnlCents: 0, trades: 0 };
+    value.trades += 1;
+    value.realizedPnlCents += position.realizedPnlCents ?? 0;
+    value.unrealizedPnlCents += position.status === 'open' ? position.unrealizedPnlCents ?? 0 : 0;
+    dates.set(date, value);
+  }
+  return [...dates.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, values]) => ({ date, ...values }));
+}
+
+export async function getBotPositionAnalytics(options: {
+  method?: 'all' | BotSelectionMethod | 'legacy';
+  mode?: 'all' | 'paper' | 'production';
+} = {}): Promise<BotPositionAnalytics> {
+  const method = options.method ?? 'all';
+  const mode = options.mode ?? 'all';
+  const allPositions = await store().listAllForAnalytics({ mode, limit: 5000 });
+  const positions = method === 'all' ? allPositions : allPositions.filter((position) =>
+    method === 'legacy' ? position.selectionMethod == null : position.selectionMethod === method);
   const paper = positions.filter((position) => position.dryRun).length;
   const production = positions.length - paper;
   const open = positions.filter((position) => position.status === 'open');
@@ -650,21 +705,18 @@ export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
   const score = (position: BotPosition) => position.realizedPnlCents ?? position.unrealizedPnlCents ?? 0;
   const ranked = [...positions].sort((a, b) => score(b) - score(a));
-  const dates = new Map<string, { realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>();
-  for (const position of positions) {
-    const date = position.openedAt.slice(0, 10);
-    const row = dates.get(date) ?? { realizedPnlCents: 0, unrealizedPnlCents: 0, trades: 0 };
-    row.trades += 1;
-    row.realizedPnlCents += position.realizedPnlCents ?? 0;
-    row.unrealizedPnlCents += position.status === 'open' ? position.unrealizedPnlCents ?? 0 : 0;
-    dates.set(date, row);
-  }
-  const distinctDays = Math.max(1, dates.size);
+  const dailyPnl = dailyPnlFor(positions);
+  const distinctDays = Math.max(1, dailyPnl.length);
   const holdSeconds = settled.map((position) => {
     const start = Date.parse(position.openedAt);
     const end = position.settledAt ? Date.parse(position.settledAt) : start;
     return Math.max(0, Math.round((end - start) / 1000));
   });
+  const summarizeMethod = (key: BotSelectionMethod | 'legacy') => summarizeBotPositions(
+    allPositions.filter((position) => key === 'legacy'
+      ? position.selectionMethod == null
+      : position.selectionMethod === key),
+  );
   return {
     totalBotTrades: { paper, production, total: positions.length },
     openPositions: {
@@ -682,10 +734,22 @@ export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
     },
     bestTrade: ranked[0] ?? null,
     worstTrade: ranked.at(-1) ?? null,
-    dailyPnl: [...dates.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, values]) => ({ date, ...values })),
+    dailyPnl,
+    dailyPnlByMethod: {
+      roi: dailyPnlFor(allPositions.filter((position) => position.selectionMethod === 'roi')),
+      apy: dailyPnlFor(allPositions.filter((position) => position.selectionMethod === 'apy')),
+      hybrid: dailyPnlFor(allPositions.filter((position) => position.selectionMethod === 'hybrid')),
+    },
     timeStats: {
       tradesPerDayBps: Math.round(positions.length * 10_000 / distinctDays),
       averageHoldSeconds: holdSeconds.length === 0 ? 0 : Math.round(sum(holdSeconds) / holdSeconds.length),
+    },
+    filter: { method, mode },
+    perMethod: {
+      roi: summarizeMethod('roi'),
+      apy: summarizeMethod('apy'),
+      hybrid: summarizeMethod('hybrid'),
+      legacy: summarizeMethod('legacy'),
     },
   };
 }

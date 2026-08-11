@@ -59,12 +59,23 @@ export function positionRoiBps(position: Pick<BotPosition, 'status' | 'totalCost
   return Math.round(((position.realizedPnlCents ?? 0) * 10_000) / position.totalCostCents);
 }
 
+type AnalyticsMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
+type AnalyticsMode = 'all' | 'paper' | 'production';
+interface MethodAnalytics {
+  tradeCount: number; deployedCapitalCents: number; realizedPnlCents: number;
+  unrealizedPnlCents: number; winRateBps: number; averageEntryRoiBps: number;
+  currentRoiBps: number; averageApyPct: number | null;
+}
 interface Analytics {
   totalBotTrades: { paper: number; production: number; total: number };
   openPositions: { count: number; unrealizedPnlCents: number };
   settledPositions: { count: number; realizedPnlCents: number; winRateBps: number };
   dailyPnl: Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>;
+  dailyPnlByMethod: Record<'roi' | 'apy' | 'hybrid', Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>>;
+  filter: { method: AnalyticsMethod; mode: AnalyticsMode };
+  perMethod: Record<'roi' | 'apy' | 'hybrid' | 'legacy', MethodAnalytics>;
 }
+const EMPTY_METHOD: MethodAnalytics = { tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null };
 
 interface BotStatus {
   enabled: boolean;
@@ -79,6 +90,9 @@ const EMPTY_ANALYTICS: Analytics = {
   openPositions: { count: 0, unrealizedPnlCents: 0 },
   settledPositions: { count: 0, realizedPnlCents: 0, winRateBps: 0 },
   dailyPnl: [],
+  dailyPnlByMethod: { roi: [], apy: [], hybrid: [] },
+  filter: { method: 'all', mode: 'all' },
+  perMethod: { roi: EMPTY_METHOD, apy: EMPTY_METHOD, hybrid: EMPTY_METHOD, legacy: EMPTY_METHOD },
 };
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -149,6 +163,9 @@ export default function BotTraderPanel() {
   const [positions, setPositions] = useState<BotPosition[]>([]);
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [filter, setFilter] = useState<PositionFilter>('all');
+  const [analyticsMethod, setAnalyticsMethod] = useState<AnalyticsMethod>('all');
+  const [analyticsMode, setAnalyticsMode] = useState<AnalyticsMode>('all');
+  const [overlayMethods, setOverlayMethods] = useState<Record<'roi' | 'apy' | 'hybrid', boolean>>({ roi: true, apy: true, hybrid: true });
   const [sortKey, setSortKey] = useState<SortKey>('openedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -167,7 +184,7 @@ export default function BotTraderPanel() {
     setError(null);
     try {
       const [analyticsRes, positionsRes, statusRes] = await Promise.all([
-        fetch('/api/bot-trader/analytics', { cache: 'no-store' }),
+        fetch(`/api/bot-trader/analytics?method=${analyticsMethod}&mode=${analyticsMode}`, { cache: 'no-store' }),
         fetch(`/api/bot-trader/positions?status=${filter}`, { cache: 'no-store' }),
         fetch('/api/bot-trader/status', { cache: 'no-store' }),
       ]);
@@ -178,7 +195,8 @@ export default function BotTraderPanel() {
       if (!positionsRes.ok || !positionsData.success) throw new Error(positionsData.error || 'Failed to load positions');
       if (!statusRes.ok) throw new Error(statusData.error || 'Failed to load bot status');
       if (requestId !== requestIdRef.current) return;
-      setAnalytics(analyticsData.analytics ?? EMPTY_ANALYTICS);
+      const nextAnalytics = analyticsData.analytics ?? EMPTY_ANALYTICS;
+      setAnalytics({ ...EMPTY_ANALYTICS, ...nextAnalytics, perMethod: { ...EMPTY_ANALYTICS.perMethod, ...(nextAnalytics.perMethod ?? {}) } });
       setPositions(positionsData.positions ?? []);
       setStatus(statusData);
     } catch (cause) {
@@ -191,7 +209,7 @@ export default function BotTraderPanel() {
         setRefreshing(false);
       }
     }
-  }, [filter]);
+  }, [analyticsMethod, analyticsMode, filter]);
 
   useEffect(() => {
     const initialId = window.setTimeout(() => void load(true), 0);
@@ -327,6 +345,26 @@ export default function BotTraderPanel() {
         <MetricCard label="Prod Trades" value={INTEGER.format(analytics.totalBotTrades.production)} />
         <MetricCard label="Open Positions" value={INTEGER.format(analytics.openPositions.count)} />
         <MetricCard label="Win Rate" value={formatBps(analytics.settledPositions.winRateBps)} />
+      </div>
+
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Performance by selection method</div><div className="text-[10px] text-[var(--text-secondary)]">Fee-net values. Legacy attribution is kept separate.</div></div>
+          <div className="flex flex-wrap gap-2"><div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Analytics method filter">{(['all', 'roi', 'apy', 'hybrid'] as const).map((value) => <button key={value} onClick={() => setAnalyticsMethod(value)} aria-pressed={analyticsMethod === value} className={`min-h-11 rounded-md px-3 text-xs uppercase ${analyticsMethod === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{value}</button>)}</div><label className="text-xs text-[var(--text-secondary)]">Mode <select aria-label="Analytics trading mode" value={analyticsMode} onChange={(event) => setAnalyticsMode(event.target.value as AnalyticsMode)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="all">All</option><option value="paper">Paper</option><option value="production">Production</option></select></label></div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Method comparison">
+          {(['roi', 'apy', 'hybrid', 'legacy'] as const).map((method) => { const item = analytics.perMethod[method] ?? EMPTY_METHOD; const netPnl = item.realizedPnlCents + item.unrealizedPnlCents; return <button type="button" role="listitem" key={method} onClick={() => method !== 'legacy' && setAnalyticsMethod(method)} className={`rounded-lg border p-3 text-left ${analyticsMethod === method ? 'border-[var(--status-positive)]' : 'border-[var(--border-subtle)]'} bg-[var(--surface-workspace)]`} aria-label={`${method} method performance`}><div className="text-xs font-bold uppercase text-[var(--text-primary)]">{method === 'legacy' ? 'Legacy / Unknown' : method}</div><div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-[var(--text-secondary)]"><span>Trades</span><strong className="text-right text-[var(--text-primary)]">{item.tradeCount}</strong><span>Capital</span><strong className="text-right text-[var(--text-primary)]">{formatCents(item.deployedCapitalCents)}</strong><span>Net P&amp;L</span><strong className={`text-right ${pnlClass(netPnl)}`}>{formatCents(netPnl, true)}</strong><span>Win rate</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.winRateBps)}</strong><span>Entry ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.averageEntryRoiBps)}</strong><span>Current ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.currentRoiBps, true)}</strong><span>Selection APY</span><strong className="text-right text-[var(--text-primary)]">{item.averageApyPct == null ? 'No data' : `${ONE_DECIMAL.format(item.averageApyPct)}%`}</strong></div></button>; })}
+        </div>
+        <div className="mt-3" aria-label="Daily fee-net performance chart"><div className="mb-1 text-[10px] font-semibold uppercase text-[var(--text-secondary)]">Daily net P&amp;L · {analyticsMethod.toUpperCase()} · {analyticsMode}</div>{analytics.dailyPnl.length === 0 ? <div className="rounded border border-dashed border-[var(--border-strong)] py-5 text-center text-xs text-[var(--text-secondary)]">No performance data for this filter.</div> : <div className="flex h-28 items-end gap-1 overflow-x-auto">{analytics.dailyPnl.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; const peak = Math.max(...analytics.dailyPnl.map((row) => Math.abs(row.realizedPnlCents + row.unrealizedPnlCents)), 1); const height = Math.max(8, Math.abs(pnl) / peak * 100); return <div key={day.date} className="flex min-w-8 flex-1 flex-col items-center justify-end" title={`${day.date}: ${formatCents(pnl, true)}`}><div className={`w-full rounded-t ${pnl >= 0 ? 'bg-[var(--status-positive)]' : 'bg-[var(--status-negative)]'}`} style={{ height: `${height}%` }} /><span className="mt-1 text-[8px] text-[var(--text-muted)]">{day.date.slice(5)}</span></div>; })}</div>}</div>
+        <div className="mt-3" aria-label="Method overlay chart">
+          <div className="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Overlay method series">
+            <span className="text-[10px] font-semibold uppercase text-[var(--text-secondary)]">Overlay</span>
+            {(['roi', 'apy', 'hybrid'] as const).map((method) => <button type="button" key={method} aria-label={`${method} overlay series`} aria-pressed={overlayMethods[method]} onClick={() => setOverlayMethods((current) => ({ ...current, [method]: !current[method] }))} className={`min-h-9 rounded px-2 text-[10px] font-bold uppercase ${overlayMethods[method] ? 'bg-[var(--status-info)] text-black' : 'border border-[var(--border-strong)] text-[var(--text-secondary)]'}`}>{method}</button>)}
+          </div>
+          <div className="grid gap-2" aria-label="Daily P&L overlay series">
+            {(['roi', 'apy', 'hybrid'] as const).filter((method) => overlayMethods[method]).map((method) => { const series = analytics.dailyPnlByMethod?.[method] ?? []; const peak = Math.max(...series.map((day) => Math.abs(day.realizedPnlCents + day.unrealizedPnlCents)), 1); return <div key={method} className="grid grid-cols-[4rem_1fr] items-center gap-2"><span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">{method}</span><div className="flex h-12 items-end gap-1" aria-label={`${method} daily net P&L series`}>{series.length === 0 ? <span className="self-center text-[10px] text-[var(--text-muted)]">No data</span> : series.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; return <div key={day.date} className={`min-w-3 flex-1 rounded-t ${pnl >= 0 ? 'bg-[var(--status-positive)]' : 'bg-[var(--status-negative)]'}`} style={{ height: `${Math.max(6, Math.abs(pnl) / peak * 100)}%` }} title={`${method.toUpperCase()} ${day.date}: ${formatCents(pnl, true)}`} />; })}</div></div>; })}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
