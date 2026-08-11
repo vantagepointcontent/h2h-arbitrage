@@ -28,7 +28,6 @@ import { executionModeToDryRun } from './execution-mode';
 import {
   persistExecution,
   getTodayBotExposure,
-  hasOpenBotPosition,
   type ExecutionRecord,
 } from './persistence';
 import { recordBotPosition } from './bot-positions';
@@ -118,6 +117,8 @@ export interface BotExecutionResult {
   reason: string;
   executionRecord?: ExecutionRecord;
   executionResult?: Awaited<ReturnType<typeof executeArb>>;
+  positionPersisted?: boolean;
+  persistenceError?: string;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────
@@ -496,15 +497,6 @@ export async function maybeExecuteBotTrade(
 
   const arbId = safeArbId(input.pairId, input.outcome);
 
-  // Duplicate-prevention: don't stack trades on the same pair/outcome.
-  const alreadyOpen = await hasOpenBotPosition(arbId).catch((e) => {
-    logger.warn('[bot-trader] duplicate check failed', { arbId, error: String(e) });
-    return true; // fail-safe: skip on error
-  });
-  if (alreadyOpen) {
-    await log('preflight', 'Duplicate position check', 'failed', { errorReason: `Open bot position already exists for ${arbId}`, qualificationOutcome: 'dead' });
-    return { executed: false, dryRun: true, reason: `Open bot position already exists for ${arbId}` };
-  }
 
   // Daily exposure + trade count limits.
   const todayExposure = await getTodayBotExposure().catch((e) => {
@@ -609,18 +601,38 @@ export async function maybeExecuteBotTrade(
     selectionMethod: input.selectionMethod ?? null,
   };
 
+  const kalshiFilled = result.kalshiResult.filledContracts;
+  const pmFilled = result.polymarketResult.filledContracts;
+  const matchedResidualQuantity = Number.isSafeInteger(kalshiFilled) && Number(kalshiFilled) > 0
+    && Number.isSafeInteger(pmFilled) && Number(pmFilled) > 0
+    ? Math.min(Number(kalshiFilled), Number(pmFilled))
+    : 0;
+  const positionExpected = result.success || matchedResidualQuantity > 0;
+
   let executionId: number | undefined;
+  let positionPersisted = !positionExpected;
+  let persistenceError: string | undefined;
   try {
     executionId = await persistExecution(executionRecord);
   } catch (e) {
+    persistenceError = `Execution persistence failed: ${String(e)}`;
     logger.warn('[bot-trader] persistExecution failed', { arbId, error: String(e) });
   }
 
   // Record bot position linked to the execution
-  if (executionId != null) {
+  if (executionId != null && positionExpected) {
     try {
       const legs = pickLegPrices(input.strategy, input);
       if (legs.kalshiPrice != null && legs.pmPrice != null) {
+        const kalshiPrice = result.kalshiResult.filledPrice;
+        const pmPrice = result.polymarketResult.filledPrice;
+        const kalshiQuantity = matchedResidualQuantity;
+        const pmQuantity = matchedResidualQuantity;
+        if (!Number.isFinite(kalshiPrice) || !Number.isFinite(pmPrice)
+          || !Number.isSafeInteger(kalshiQuantity) || Number(kalshiQuantity) <= 0
+          || !Number.isSafeInteger(pmQuantity) || Number(pmQuantity) <= 0) {
+          throw new Error('Successful bot execution is missing authoritative fill price or quantity');
+        }
         await recordBotPosition({
           executionId,
           pairId: input.pairId,
@@ -630,17 +642,20 @@ export async function maybeExecuteBotTrade(
           strategy: input.strategy,
           kalshiSide: legs.kalshiOutcome,
           pmSide: legs.pmOutcome,
-          kalshiPrice: execReq.kalshiOrder.price,
-          pmPrice: execReq.polymarketOrder.price,
-          kalshiStake: execReq.kalshiOrder.size,
-          pmStake: execReq.polymarketOrder.size,
+          kalshiPrice: Number(kalshiPrice),
+          pmPrice: Number(pmPrice),
+          kalshiQuantity: Number(kalshiQuantity),
+          pmQuantity: Number(pmQuantity),
+          executedAt: executionRecord.timestamp,
           expectedProfit: execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,
           category: input.category ?? null,
         });
+        positionPersisted = true;
       }
     } catch (e) {
+      persistenceError = `Position persistence failed: ${String(e)}`;
       logger.warn('[bot-trader] recordBotPosition failed', { arbId, error: String(e) });
     }
   }
@@ -650,13 +665,15 @@ export async function maybeExecuteBotTrade(
   });
 
   return {
-    executed: result.success || (effectiveDryRun && !result.unhedged),
+    executed: result.success || matchedResidualQuantity > 0 || (effectiveDryRun && !result.unhedged),
     dryRun: effectiveDryRun,
     reason: effectiveDryRun
       ? `Paper trade simulated for ${input.marketTitle}`
       : `Production trade executed for ${input.marketTitle}`,
     executionRecord,
     executionResult: result,
+    positionPersisted,
+    persistenceError,
   };
 }
 

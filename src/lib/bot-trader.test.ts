@@ -363,6 +363,8 @@ describe('maybeExecuteBotTrade safety', () => {
     const result = await maybeExecuteBotTrade(makeInput());
     expect(result.dryRun).toBe(true);
     expect(result.executed).toBe(true);
+    expect(result.positionPersisted).toBe(false);
+    expect(result.persistenceError).toContain('Missing authoritative market category');
     expect(result.reason).toContain('Paper');
   });
 });

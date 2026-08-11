@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotPositions, type BotPositionStatus } from '@/lib/bot-positions';
+import { getBotPositionMarkets } from '@/lib/bot-positions';
 import { clientSafeError } from '@/lib/error-handler';
 import { getMarketUrlsById } from '@/lib/persistence';
 
@@ -18,20 +18,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
       return NextResponse.json({ success: false, error: 'limit must be between 1 and 1000' }, { status: 400 });
     }
-    const storedPositions = await getBotPositions({
-      status: statusParam as BotPositionStatus | 'all',
+    const cursor = params.get('cursor');
+    if (cursor != null && (cursor.length === 0 || cursor.length > 2048)) {
+      return NextResponse.json({ success: false, error: 'cursor is invalid' }, { status: 400 });
+    }
+    const page = await getBotPositionMarkets({
+      status: statusParam as 'all' | 'open' | 'settled',
       limit,
+      cursor,
     });
-    const positions = await Promise.all(storedPositions.map(async (position) => {
-      if (!position.marketId) return { ...position, kalshiUrl: null, polymarketUrl: null };
-      const urls = await getMarketUrlsById(position.marketId);
-      return { ...position, kalshiUrl: urls?.kalshiUrl ?? null, polymarketUrl: urls?.polymarketUrl ?? null };
+    const markets = await Promise.all(page.markets.map(async (market) => {
+      const urls = market.marketId ? await getMarketUrlsById(market.marketId) : null;
+      const kalshiUrl = urls?.kalshiUrl ?? null;
+      const polymarketUrl = urls?.polymarketUrl ?? null;
+      const executions = market.executions.map((execution) => ({ ...execution, kalshiUrl, polymarketUrl }));
+      return { ...market, kalshiUrl, polymarketUrl, executions, entries: executions };
     }));
+    const positions = markets.flatMap((market) => market.executions);
     return NextResponse.json(
-      { success: true, count: positions.length, positions },
+      {
+        success: true,
+        count: positions.length,
+        marketCount: markets.length,
+        markets,
+        nextCursor: page.nextCursor,
+        positions,
+      },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
     );
   } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid positions cursor') {
+      return NextResponse.json({ success: false, error: 'cursor is invalid' }, { status: 400 });
+    }
     return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
   }
 }

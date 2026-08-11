@@ -175,7 +175,18 @@ describe('durable BotTrader scan consumer', () => {
     expect(result.state).toBe('placed');
     expect(h.events.map((event) => event.state)).toEqual(['received', 'placement_attempted', 'placed']);
     expect(h.deps.execute).toHaveBeenCalledTimes(1);
+    expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledTimes(1);
+    expect(h.deps.releaseOpportunity).toHaveBeenCalledTimes(1);
     expect(result.placementCount).toBe(1);
+  });
+
+  it('fails before placement when the durable exposure guard cannot be armed', async () => {
+    const h = harness();
+    vi.mocked(h.deps.retainOpportunityForExposure!).mockRejectedValueOnce(new Error('database unavailable'));
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({ state: 'failed', reasonCode: 'exposure_guard_failed', placementCount: 0 });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+    expect(h.deps.releaseOpportunity).toHaveBeenCalled();
   });
 
   it('persists disabled instead of silently returning', async () => {
@@ -250,6 +261,15 @@ describe('durable BotTrader scan consumer', () => {
     const h = harness({ execute: execution({ executed: false, reason: 'Second leg failed', executionResult: { success: false, unhedged: true } as never }) });
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result).toMatchObject({ state: 'partial_or_unhedged', reasonCode: 'partial_or_unhedged' });
+  });
+
+  it('retains the reservation when execution succeeds but position persistence fails', async () => {
+    const h = harness({ execute: execution({ executed: true, positionPersisted: false, persistenceError: 'position write failed' }) });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({ state: 'partial_or_unhedged', reasonCode: 'position_persistence_failed' });
+    expect(result.reason).toContain('position write failed');
+    expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledOnce();
+    expect(h.deps.releaseOpportunity).not.toHaveBeenCalled();
   });
 
   it('fails closed as possible exposure and retains the reservation when placement throws', async () => {

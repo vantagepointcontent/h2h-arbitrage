@@ -17,16 +17,26 @@ CREATE TABLE IF NOT EXISTS bot_positions (
   pm_side         TEXT    NOT NULL CHECK (pm_side IN ('yes', 'no')),
   buy_price_kalshi INTEGER NOT NULL,
   buy_price_pm    INTEGER NOT NULL,
-  shares_kalshi   INTEGER NOT NULL,
+  shares_kalshi INTEGER NOT NULL,
   shares_pm       INTEGER NOT NULL,
+  live_shares_kalshi INTEGER NOT NULL,
+  live_shares_pm INTEGER NOT NULL,
+  live_principal INTEGER NOT NULL,
+  live_fees      INTEGER NOT NULL,
+  live_cost      INTEGER NOT NULL,
   total_cost      INTEGER NOT NULL,
   expected_payout INTEGER NOT NULL,
   expected_profit INTEGER NOT NULL,
   fees            INTEGER NOT NULL DEFAULT 0,
+  category        TEXT,
+  pm_theta        REAL,
+  kalshi_entry_fee INTEGER NOT NULL DEFAULT 0,
+  pm_entry_fee    INTEGER NOT NULL DEFAULT 0,
   status          TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
   opened_at       TEXT    NOT NULL,
   expiry_date     TEXT,
   settled_at      TEXT,
+  closed_at       TEXT,
   current_price_kalshi INTEGER,
   current_price_pm     INTEGER,
   current_value        INTEGER,
@@ -34,7 +44,13 @@ CREATE TABLE IF NOT EXISTS bot_positions (
   unrealized_roi_pct   INTEGER,
   last_valuation_at    TEXT,
   realized_pnl         INTEGER,
-  settlement_side      TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL)
+  settlement_side      TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL),
+  selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
+  resolution_source TEXT,
+  resolution_verified_at TEXT,
+  resolution_outcome TEXT CHECK (resolution_outcome IN ('yes', 'no') OR resolution_outcome IS NULL),
+  resolution_payout INTEGER,
+  resolution_validation_status TEXT NOT NULL DEFAULT 'pending'
 );
 
 -- Reservation table for pre-execution duplicate prevention
@@ -46,10 +62,10 @@ CREATE TABLE IF NOT EXISTS bot_position_reservations (
 
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_bot_positions_status     ON bot_positions(status, opened_at DESC);
-CREATE INDEX IF NOT EXISTS idx_bot_positions_execution  ON bot_positions(execution_id);
-
--- Unique index: prevent duplicate open positions for same market pair
+-- One durable position row per successful execution. Repeated executions in
+-- the same venue pair are intentionally allowed.
 DROP INDEX IF EXISTS idx_bot_positions_open_pair;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair
-  ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id))
-  WHERE status = 'open';
+-- Execution lookup is non-unique so legacy duplicate rows remain readable. New
+-- inserts use one atomic INSERT ... WHERE NOT EXISTS statement.
+DROP INDEX IF EXISTS idx_bot_positions_execution;
+CREATE INDEX IF NOT EXISTS idx_bot_positions_execution ON bot_positions(execution_id);

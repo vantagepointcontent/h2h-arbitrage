@@ -257,7 +257,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const reserved: BotScanCandidate[] = [];
     for (const item of executable) {
       if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item))) {
-        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved or have an open BotTrader position' });
+        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved by an in-flight placement' });
         continue;
       }
       reserved.push(item);
@@ -284,33 +284,44 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     };
     for (let index = 0; index < reserved.length; index++) {
       const item = reserved[index];
+      if (deps.retainOpportunityForExposure) {
+        try {
+          await deps.retainOpportunityForExposure(item);
+        } catch (error) {
+          await deps.releaseOpportunity?.(item).catch(() => undefined);
+          await releaseRemaining(index + 1);
+          return finish({
+            state: 'failed',
+            reasonCode: 'exposure_guard_failed',
+            reason: `Failed to arm exposure guard before placement: ${String(error)}`,
+            placementCount: 0,
+            attempts: claimed.attempts + index,
+            details: { rejections },
+          });
+        }
+      }
       try {
         const result = await deps.execute(candidateToInput(scan, item, settings));
         results.push({ outcome: item.outcome, result });
-        if (result.executionResult?.unhedged === true) {
-          await deps.retainOpportunityForExposure?.(item).catch((error) => {
-            logger.error('[bot-scan-consumer] failed to retain reservation for unhedged exposure', { error: String(error) });
-          });
+        if (result.executionResult?.unhedged === true || (result.executed && result.positionPersisted === false)) {
           await releaseRemaining(index + 1);
           break;
-        } else if (!result.executed) {
+        } else {
           await deps.releaseOpportunity?.(item).catch((error) => {
-            logger.warn('[bot-scan-consumer] failed to release rejected opportunity reservation', { error: String(error) });
+            logger.warn('[bot-scan-consumer] failed to release completed opportunity reservation', { error: String(error) });
           });
         }
       } catch (error) {
         results.push({ outcome: item.outcome, error: error instanceof Error ? error.message : String(error) });
         // executeArb can throw after one venue accepted an order. Preserve this
         // reservation as possible exposure and stop all further placements.
-        await deps.retainOpportunityForExposure?.(item).catch((retainError) => {
-          logger.error('[bot-scan-consumer] failed to retain reservation after unknown execution outcome', { error: String(retainError) });
-        });
         await releaseRemaining(index + 1);
         break;
       }
     }
 
     const unhedged = results.find((item) => item.result?.executionResult?.unhedged === true);
+    const untracked = results.find((item) => item.result?.executed === true && item.result.positionPersisted === false);
     const unknownExposure = results.find((item) => item.error);
     const placed = results.filter((item) => item.result?.executed === true);
     const dailyLimit = results.find((item) => /daily .*limit/i.test(item.result?.reason ?? ''));
@@ -320,6 +331,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
 
     if (unhedged) {
       return finish({ state: 'partial_or_unhedged', reasonCode: 'partial_or_unhedged', reason: unhedged.result?.reason ?? 'Placement left partial or unhedged exposure', placementCount: placed.length, attempts: claimed.attempts + reserved.length, details });
+    }
+    if (untracked) {
+      return finish({ state: 'partial_or_unhedged', reasonCode: 'position_persistence_failed', reason: untracked.result?.persistenceError ?? 'Executed exposure was not durably recorded as a position', placementCount: placed.length, attempts: claimed.attempts + results.length, details });
     }
     if (unknownExposure) {
       return finish({ state: 'partial_or_unhedged', reasonCode: 'execution_outcome_unknown', reason: `Execution outcome is unknown and may include venue exposure: ${unknownExposure.error}`, placementCount: placed.length, attempts: claimed.attempts + results.length, details });
