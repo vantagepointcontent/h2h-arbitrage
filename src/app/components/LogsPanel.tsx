@@ -16,6 +16,13 @@ import {
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { classifyArbType, getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
+import {
+  buildHistoricalLegs,
+  calculatePriceChange,
+  type HistoricalPriceLeg,
+  type QuoteOutcome,
+  type QuotePlatform,
+} from "@/lib/log-price-comparison";
 
 interface LogEntry {
   id: number;
@@ -702,6 +709,19 @@ function logApyPct(log: LogEntry): number | null {
   }
 }
 
+type ClientCurrentQuote = {
+  platform: QuotePlatform;
+  marketId: string;
+  outcome: QuoteOutcome;
+  status: 'available' | 'unavailable' | 'closed' | 'resolved' | 'error';
+  priceNow: number | null;
+  source: string;
+  quotedAt: string;
+  stale: boolean;
+};
+
+type ComparisonCache = Map<string, { quotes: ClientCurrentQuote[]; fetchedAt: number }>;
+
 function LogRow({
   log,
   expanded,
@@ -723,6 +743,8 @@ function LogRow({
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbTypeMeta = getArbTypeMeta(log.strategy);
   const apy = logApyPct(log);
+  // Kept at row scope so collapsing does not discard the brief lazy-fetch cache.
+  const [comparisonCache] = useState<ComparisonCache>(() => new Map());
 
   const savedMarket = savedMarkets.get(log.market_id);
   const marketName = log.market_name ?? log.market_title ?? savedMarket?.title;
@@ -827,6 +849,7 @@ function LogRow({
                         <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(arb.expectedProfit)}</span></span>
                         <span>{arb.strategy}</span>
                       </div>
+                      <HistoricalCurrentPriceComparison arb={arb} cache={comparisonCache} />
                       {arb.fees && (
                         <div className="text-[10px] text-[#8A9BA8] mt-1 pt-1 border-t border-[#182533]">
                           Fees — <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.kalshiFee ?? 0)} · <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.pmFee ?? 0)} · Net: {fmtUsd(arb.fees.worstCaseNetProfit ?? arb.fees.netProfitIfKalshiWins ?? 0)}
@@ -843,6 +866,151 @@ function LogRow({
         </tr>
       )}
     </>
+  );
+}
+
+function HistoricalCurrentPriceComparison({
+  arb,
+  cache,
+}: {
+  arb: Record<string, unknown>;
+  cache: ComparisonCache;
+}) {
+  const legs = useMemo(() => buildHistoricalLegs(arb), [arb]);
+  const cacheKey = legs.map((leg) => `${leg.platform}:${leg.marketId ?? 'missing'}:${leg.outcome}`).join('|');
+  const cached = cache.get(cacheKey);
+  const identityMissing = legs.some((leg) => !leg.marketId);
+  const [quotes, setQuotes] = useState<ClientCurrentQuote[] | null>(cached?.quotes ?? null);
+  const [fetchState, setFetchState] = useState<'loading' | 'ready' | 'error' | 'rate-limited'>(
+    cached ? 'ready' : identityMissing ? 'error' : 'loading',
+  );
+
+  useEffect(() => {
+    const currentCached = cache.get(cacheKey);
+    if (currentCached && Date.now() - currentCached.fetchedAt <= 30_000) return;
+    if (identityMissing) return;
+
+    let cancelled = false;
+    void fetch('/api/logs/current-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        legs: legs.map(({ platform, marketId, outcome }) => ({ platform, marketId, outcome })),
+      }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        if (response.status === 429) {
+          if (!cancelled) setFetchState('rate-limited');
+          return;
+        }
+        throw new Error('Current quote request failed');
+      }
+      const data = await response.json();
+      if (!Array.isArray(data?.quotes) || data.quotes.length !== 2) throw new Error('Invalid current quote response');
+      const nextQuotes = data.quotes as ClientCurrentQuote[];
+      cache.set(cacheKey, { quotes: nextQuotes, fetchedAt: Date.now() });
+      if (!cancelled) {
+        setQuotes(nextQuotes);
+        setFetchState('ready');
+      }
+    }).catch(() => {
+      if (!cancelled) setFetchState('error');
+    });
+    return () => { cancelled = true; };
+  }, [cache, cacheKey, identityMissing, legs]);
+
+  if (fetchState === 'loading') {
+    return <div className="mt-2 border-t border-[#182533] pt-2 text-[10px] text-[#8A9BA8]">Loading current executable prices…</div>;
+  }
+  if (fetchState === 'rate-limited') {
+    return <div className="mt-2 border-t border-[#182533] pt-2 text-[10px] text-amber-400">Rate limited — current prices unavailable.</div>;
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5 border-t border-[#182533] pt-2" aria-label="Historical versus current executable prices">
+      {legs.map((leg) => (
+        <PriceComparisonLeg
+          key={`${leg.platform}:${leg.outcome}`}
+          historical={leg}
+          current={quotes?.find((quote) => quote.platform === leg.platform && quote.outcome === leg.outcome) ?? null}
+          requestFailed={fetchState === 'error'}
+        />
+      ))}
+    </div>
+  );
+}
+
+const quoteCurrency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+function formatQuotePrice(price: number | null): string {
+  return price == null ? 'Unavailable' : quoteCurrency.format(price);
+}
+
+function currentStatusText(quote: ClientCurrentQuote | null, requestFailed: boolean): string {
+  if (requestFailed) return 'Quote fetch failed';
+  if (!quote) return 'Unavailable';
+  if (quote.status === 'resolved') return 'Resolved market';
+  if (quote.status === 'closed') return 'Closed market';
+  if (quote.status === 'error') return 'Quote fetch failed';
+  if (quote.status === 'unavailable' || quote.priceNow == null) return 'Unavailable';
+  return formatQuotePrice(quote.priceNow);
+}
+
+function PriceComparisonLeg({
+  historical,
+  current,
+  requestFailed,
+}: {
+  historical: HistoricalPriceLeg;
+  current: ClientCurrentQuote | null;
+  requestFailed: boolean;
+}) {
+  const change = calculatePriceChange(historical.priceThen, current?.status === 'available' ? current.priceNow : null);
+  const directionClass = change?.direction === 'up'
+    ? 'text-[#5DBE81]'
+    : change?.direction === 'down'
+      ? 'text-[#ef4444]'
+      : 'text-[#A8B8C4]';
+  const sign = change ? (change.direction === 'up' ? '+' : change.direction === 'down' ? '−' : '') : '';
+  const changeText = change
+    ? `${sign}${quoteCurrency.format(Math.abs(change.absolute))} (${sign}${Math.abs(change.percentage).toFixed(2)}%)`
+    : 'Unavailable';
+  const platformName = historical.platform === 'kalshi' ? 'Kalshi' : 'Polymarket';
+  const freshness = current?.quotedAt
+    ? new Date(current.quotedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
+
+  return (
+    <div className="grid grid-cols-[minmax(100px,1.15fr)_repeat(3,minmax(72px,1fr))] items-center gap-2 rounded bg-[#0E1621] px-2 py-1.5 text-[10px]">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1 font-semibold text-[#FFFFFF]">
+          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${historical.platform === 'kalshi' ? 'bg-sky-400' : 'bg-violet-400'}`} />
+          {platformName} {historical.outcome.toUpperCase()}
+        </div>
+        <div className="truncate font-mono text-[9px] text-[#8A9BA8]" title={historical.marketId ?? undefined}>{historical.marketId ?? 'Identifier missing'}</div>
+      </div>
+      <div>
+        <div className="text-[9px] uppercase tracking-wide text-[#8A9BA8]">Price then</div>
+        <div className="font-mono font-semibold text-[#FFFFFF]">{formatQuotePrice(historical.priceThen)}</div>
+      </div>
+      <div>
+        <div className="text-[9px] uppercase tracking-wide text-[#8A9BA8]">Price now</div>
+        <div className="font-mono font-semibold text-[#FFFFFF]">{currentStatusText(current, requestFailed)}</div>
+        {current?.stale ? <div className="font-semibold text-amber-400">Stale quote</div> : null}
+      </div>
+      <div>
+        <div className="text-[9px] uppercase tracking-wide text-[#8A9BA8]">Change</div>
+        <div className={`font-mono font-semibold ${directionClass}`}>{changeText}</div>
+        {current?.status === 'available' && (
+          <div className="text-[9px] text-[#8A9BA8]">{current.source}{freshness ? ` · ${freshness}` : ''}</div>
+        )}
+      </div>
+    </div>
   );
 }
 
