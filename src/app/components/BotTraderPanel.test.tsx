@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import BotTraderPanel, { positionRoiBps } from './BotTraderPanel';
 
 const analytics = {
@@ -61,6 +61,74 @@ const positions = [{
   dryRun: true,
 }];
 
+const repeatedMarket = {
+  marketKey: 'market:market-1',
+  marketId: 'market-1',
+  marketTitle: 'Trump 2026',
+  kalshiTicker: 'KXTRUMP-26',
+  pmConditionId: '0xabc',
+  currentLiveStakeCents: 9640,
+  currentValueCents: 9900,
+  unrealizedPnlCents: 260,
+  realizedPnlCents: -120,
+  status: 'open',
+  latestExecutionAt: '2026-08-08T17:00:00.000Z',
+  executions: [
+    {
+      entryId: 102,
+      executionId: 502,
+      tradeId: 'trade-second',
+      executedAt: '2026-08-08T17:00:00.000Z',
+      mode: 'paper',
+      strategy: 'Buy YES K + NO PM',
+      status: 'closed',
+      legs: [
+        { venue: 'kalshi', marketRef: 'KXTRUMP-26', side: 'yes', executionPriceCents: 43, originalQuantity: 100, originalPrincipalCents: 4300, entryFeeCents: 30, remainingOpenQuantity: 0, remainingOpenPrincipalCents: 0, remainingOpenFeeCents: 0, currentExecutablePriceCents: null, currentLiquidationValueCents: null },
+        { venue: 'polymarket', marketRef: '0xabc', side: 'no', executionPriceCents: 51, originalQuantity: 100, originalPrincipalCents: 5100, entryFeeCents: 40, remainingOpenQuantity: 0, remainingOpenPrincipalCents: 0, remainingOpenFeeCents: 0, currentExecutablePriceCents: null, currentLiquidationValueCents: null },
+      ],
+      executionPrincipalCents: 9400,
+      executionFeesCents: 70,
+      executionBuyCostCents: 9470,
+      remainingOpenPrincipalCents: 0,
+      remainingOpenFeesCents: 0,
+      remainingOpenCostCents: 0,
+      currentValueCents: 0,
+      unrealizedPnlCents: 0,
+      realizedPnlCents: -120,
+      openedAt: '2026-08-08T17:00:00.000Z',
+      closedAt: '2026-08-09T17:00:00.000Z',
+      settledAt: null,
+      lastValuationAt: '2026-08-09T17:00:00.000Z',
+    },
+    {
+      entryId: 101,
+      executionId: 501,
+      tradeId: 'trade-first',
+      executedAt: '2026-08-08T16:00:00.000Z',
+      mode: 'production',
+      strategy: 'Buy YES K + NO PM',
+      status: 'open',
+      legs: [
+        { venue: 'kalshi', marketRef: 'KXTRUMP-26', side: 'yes', executionPriceCents: 45, originalQuantity: 100, originalPrincipalCents: 4500, entryFeeCents: 20, remainingOpenQuantity: 100, remainingOpenPrincipalCents: 4500, remainingOpenFeeCents: 20, currentExecutablePriceCents: 46, currentLiquidationValueCents: 4580 },
+        { venue: 'polymarket', marketRef: '0xabc', side: 'no', executionPriceCents: 51, originalQuantity: 100, originalPrincipalCents: 5100, entryFeeCents: 20, remainingOpenQuantity: 100, remainingOpenPrincipalCents: 5100, remainingOpenFeeCents: 20, currentExecutablePriceCents: 54, currentLiquidationValueCents: 5320 },
+      ],
+      executionPrincipalCents: 9600,
+      executionFeesCents: 40,
+      executionBuyCostCents: 9640,
+      remainingOpenPrincipalCents: 9600,
+      remainingOpenFeesCents: 40,
+      remainingOpenCostCents: 9640,
+      currentValueCents: 9900,
+      unrealizedPnlCents: 260,
+      realizedPnlCents: 0,
+      openedAt: '2026-08-08T16:00:00.000Z',
+      closedAt: null,
+      settledAt: null,
+      lastValuationAt: '2026-08-08T18:00:00.000Z',
+    },
+  ],
+};
+
 function response(data: unknown, ok = true) {
   return Promise.resolve({ ok, json: async () => data });
 }
@@ -105,6 +173,76 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
     expect(screen.getByText(/2 trades today/)).toBeTruthy();
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
+  });
+
+  it('renders repeated executions as stable rows with immutable distinct buy costs and closed history', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, markets: [repeatedMarket] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+
+    const parent = await screen.findByTestId('market-market:market-1');
+    expect(within(parent).getByText('$96.40')).toBeTruthy();
+    const first = screen.getByTestId('execution-501');
+    const second = screen.getByTestId('execution-502');
+    expect(within(first).getByLabelText('Execution 501 Buy Cost').textContent).toBe('$96.40');
+    expect(within(second).getByLabelText('Execution 502 Buy Cost').textContent).toBe('$94.70');
+    expect(within(first).getByText(/trade-first/)).toBeTruthy();
+    expect(within(second).getByText(/trade-second/)).toBeTruthy();
+    expect(within(second).getByText('closed')).toBeTruthy();
+    expect(within(second).getByText(/43¢ × 100/)).toBeTruthy();
+    expect(within(second).getByText(/51¢ × 100/)).toBeTruthy();
+    expect(within(second).getByLabelText('Execution 502 remaining exposure').textContent).toBe('$0.00');
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Trump 2026' }));
+    expect(screen.queryByTestId('execution-501')).toBeNull();
+  });
+
+  it('updates only the parent live total on refetch while preserving execution identities and buy costs', async () => {
+    let closed = false;
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) {
+        const market = closed
+          ? { ...repeatedMarket, currentLiveStakeCents: 0, currentValueCents: 0, unrealizedPnlCents: 0, status: 'closed' }
+          : repeatedMarket;
+        return response({ success: true, markets: [market] });
+      }
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+    await screen.findByTestId('execution-501');
+    closed = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
+
+    await waitFor(() => expect(within(screen.getByTestId('market-market:market-1')).getByLabelText('Trump 2026 live stake').textContent).toBe('$0.00'));
+    expect(within(screen.getByTestId('execution-501')).getByLabelText('Execution 501 Buy Cost').textContent).toBe('$96.40');
+    expect(within(screen.getByTestId('execution-502')).getByLabelText('Execution 502 Buy Cost').textContent).toBe('$94.70');
+  });
+
+  it('keeps the legacy single-entry response readable and makes Buy Cost fee-inclusive', async () => {
+    const legacy = [{ ...positions[0], totalCostCents: 100, feesCents: 3 }];
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, positions: legacy });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+    const execution = screen.getByTestId('execution-9');
+    expect(within(execution).getByLabelText('Execution 9 Buy Cost').textContent).toBe('$1.00');
+    expect(screen.getAllByText('Trump 2026')).toHaveLength(1);
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {

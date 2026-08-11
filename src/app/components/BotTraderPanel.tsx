@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bot,
@@ -12,7 +12,7 @@ import {
 import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
 
-type PositionStatus = 'open' | 'settled' | 'closed';
+type PositionStatus = 'open' | 'partially_closed' | 'settled' | 'closed';
 type PositionFilter = 'all' | 'open' | 'settled';
 type SortKey = 'openedAt' | 'pnl' | 'roi';
 type SortDirection = 'asc' | 'desc';
@@ -53,10 +53,154 @@ interface BotPosition {
   selectionMethod: 'roi' | 'apy' | 'hybrid' | null;
 }
 
+interface ExecutionLeg {
+  venue: 'kalshi' | 'polymarket';
+  marketRef: string | null;
+  side: 'yes' | 'no';
+  executionPriceCents: number;
+  originalQuantity: number;
+  originalPrincipalCents: number;
+  entryFeeCents: number;
+  remainingOpenQuantity: number;
+  remainingOpenPrincipalCents: number;
+  remainingOpenFeeCents: number;
+  currentExecutablePriceCents: number | null;
+  currentLiquidationValueCents: number | null;
+}
+
+interface BotExecution {
+  entryId: number;
+  executionId: number;
+  tradeId?: string;
+  executedAt: string;
+  mode: 'paper' | 'production';
+  strategy: string | null;
+  selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
+  status: PositionStatus;
+  legs: ExecutionLeg[];
+  executionPrincipalCents: number;
+  executionFeesCents: number;
+  executionBuyCostCents: number;
+  remainingOpenPrincipalCents: number;
+  remainingOpenFeesCents: number;
+  remainingOpenCostCents: number;
+  currentValueCents: number;
+  unrealizedPnlCents: number;
+  realizedPnlCents: number;
+  openedAt: string;
+  closedAt: string | null;
+  settledAt: string | null;
+  lastValuationAt: string | null;
+  kalshiUrl?: string | null;
+  polymarketUrl?: string | null;
+}
+
+interface BotPositionMarket {
+  marketKey: string;
+  marketId: string | null;
+  marketTitle: string;
+  kalshiTicker: string | null;
+  pmConditionId: string | null;
+  kalshiUrl?: string | null;
+  polymarketUrl?: string | null;
+  currentLiveStakeCents: number;
+  currentValueCents: number;
+  unrealizedPnlCents: number;
+  realizedPnlCents: number;
+  status: PositionStatus;
+  latestExecutionAt: string;
+  executions: BotExecution[];
+}
+
 export function positionRoiBps(position: Pick<BotPosition, 'status' | 'totalCostCents' | 'realizedPnlCents' | 'unrealizedRoiBps'>): number {
   if (position.status === 'open') return position.unrealizedRoiBps ?? 0;
   if (position.totalCostCents <= 0) return 0;
   return Math.round(((position.realizedPnlCents ?? 0) * 10_000) / position.totalCostCents);
+}
+
+function legacyExecution(position: BotPosition): BotExecution {
+  const buyCost = position.totalCostCents;
+  const principalCost = Math.max(0, position.totalCostCents - position.feesCents);
+  const isOpen = position.status === 'open';
+  return {
+    entryId: position.id,
+    executionId: position.executionId,
+    executedAt: position.openedAt,
+    mode: position.dryRun ? 'paper' : 'production',
+    strategy: position.strategy,
+    selectionMethod: position.selectionMethod,
+    status: position.status,
+    legs: [
+      {
+        venue: 'kalshi', marketRef: position.kalshiTicker, side: position.kalshiSide,
+        executionPriceCents: position.buyPriceKalshiCents, originalQuantity: position.sharesKalshi,
+        originalPrincipalCents: position.buyPriceKalshiCents * position.sharesKalshi,
+        entryFeeCents: 0, remainingOpenQuantity: isOpen ? position.sharesKalshi : 0,
+        remainingOpenPrincipalCents: isOpen ? position.buyPriceKalshiCents * position.sharesKalshi : 0,
+        remainingOpenFeeCents: 0, currentExecutablePriceCents: position.currentPriceKalshiCents,
+        currentLiquidationValueCents: null,
+      },
+      {
+        venue: 'polymarket', marketRef: position.pmConditionId, side: position.pmSide,
+        executionPriceCents: position.buyPricePmCents, originalQuantity: position.sharesPm,
+        originalPrincipalCents: position.buyPricePmCents * position.sharesPm,
+        entryFeeCents: position.feesCents, remainingOpenQuantity: isOpen ? position.sharesPm : 0,
+        remainingOpenPrincipalCents: isOpen ? position.buyPricePmCents * position.sharesPm : 0,
+        remainingOpenFeeCents: isOpen ? position.feesCents : 0,
+        currentExecutablePriceCents: position.currentPricePmCents, currentLiquidationValueCents: null,
+      },
+    ],
+    executionPrincipalCents: principalCost,
+    executionFeesCents: position.feesCents,
+    executionBuyCostCents: buyCost,
+    remainingOpenPrincipalCents: isOpen ? principalCost : 0,
+    remainingOpenFeesCents: isOpen ? position.feesCents : 0,
+    remainingOpenCostCents: isOpen ? buyCost : 0,
+    currentValueCents: position.currentValueCents ?? 0,
+    unrealizedPnlCents: position.unrealizedPnlCents ?? 0,
+    realizedPnlCents: position.realizedPnlCents ?? 0,
+    openedAt: position.openedAt,
+    closedAt: position.status === 'closed' ? position.settledAt : null,
+    settledAt: position.settledAt,
+    lastValuationAt: position.lastValuationAt,
+    kalshiUrl: position.kalshiUrl,
+    polymarketUrl: position.polymarketUrl,
+  };
+}
+
+type PositionPayload = {
+  markets?: Array<BotPositionMarket & { liveStakeCents?: number; latestOpenedAt?: string; entries?: BotExecution[] }>;
+  positions?: BotPosition[];
+};
+
+export function normalizePositionMarkets(payload: PositionPayload): BotPositionMarket[] {
+  if (Array.isArray(payload.markets)) {
+    return payload.markets.map((market) => ({
+      ...market,
+      currentLiveStakeCents: market.currentLiveStakeCents ?? market.liveStakeCents ?? 0,
+      latestExecutionAt: market.latestExecutionAt ?? market.latestOpenedAt ?? '',
+      executions: market.executions ?? market.entries ?? [],
+    }));
+  }
+  return (payload.positions ?? []).map((position) => {
+    const execution = legacyExecution(position);
+    return {
+      marketKey: `legacy-execution:${position.executionId}`,
+      marketId: position.marketId,
+      marketTitle: position.marketTitle,
+      kalshiTicker: position.kalshiTicker,
+      pmConditionId: position.pmConditionId,
+      kalshiUrl: position.kalshiUrl,
+      polymarketUrl: position.polymarketUrl,
+      currentLiveStakeCents: execution.remainingOpenCostCents,
+      currentValueCents: execution.currentValueCents,
+      unrealizedPnlCents: execution.unrealizedPnlCents,
+      realizedPnlCents: execution.realizedPnlCents,
+      status: execution.status,
+      latestExecutionAt: execution.executedAt,
+      executions: [execution],
+    };
+  });
 }
 
 type AnalyticsMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
@@ -151,16 +295,42 @@ function MetricCard({ label, value, valueClass = '' }: { label: string; value: s
 function StatusBadge({ status }: { status: PositionStatus }) {
   const styles: Record<PositionStatus, string> = {
     open: 'bg-[var(--status-positive)]/15 text-[var(--status-positive)]',
+    partially_closed: 'bg-[var(--status-info)]/15 text-[var(--status-info)]',
     settled: 'bg-[var(--platform-polymarket)]/15 text-[var(--platform-polymarket)]',
     closed: 'bg-[var(--status-negative)]/15 text-[var(--status-negative)]',
   };
   return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>{status}</span>;
 }
 
+function ExecutionDetailRow({ execution }: { execution: BotExecution }) {
+  return (
+    <tr data-testid={`execution-${execution.executionId}`} className="bg-[#071a33] text-[var(--text-primary)]">
+      <td colSpan={10} className="px-10 py-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px]">
+          <strong className="font-mono text-[var(--status-info)]">Execution #{execution.executionId}{execution.tradeId ? ` · ${execution.tradeId}` : ''}</strong>
+          <span title={new Date(execution.executedAt).toISOString()}>Executed {new Date(execution.executedAt).toLocaleString()}</span>
+          <span className="uppercase text-[var(--text-secondary)]">{execution.mode}</span>
+          <span>{execution.strategy || 'Strategy unavailable'}</span>
+          <span>Buy Cost <strong aria-label={`Execution ${execution.executionId} Buy Cost`} className="tabular-nums">{formatCents(execution.executionBuyCostCents)}</strong> <span className="text-[var(--text-muted)]">({formatCents(execution.executionPrincipalCents)} + {formatCents(execution.executionFeesCents)} fees)</span></span>
+          <StatusBadge status={execution.status} />
+          <span>Remaining exposure: <strong aria-label={`Execution ${execution.executionId} remaining exposure`} className="tabular-nums">{formatCents(execution.remainingOpenCostCents)}</strong></span>
+        </div>
+        <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-[var(--text-secondary)]">
+          {execution.legs.map((leg) => (
+            <span key={`${execution.executionId}-${leg.venue}`}>
+              <strong className="uppercase text-[var(--text-primary)]">{leg.venue}</strong> {leg.side.toUpperCase()} · {INTEGER.format(leg.executionPriceCents)}¢ × {INTEGER.format(leg.originalQuantity)} · fees {formatCents(leg.entryFeeCents)} · open {INTEGER.format(leg.remainingOpenQuantity)} · <span className="font-mono">{leg.marketRef || 'unknown market'}</span>
+            </span>
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function BotTraderPanel() {
   const [view, setView] = useState<'analytics' | 'logs' | 'messages'>('analytics');
   const [analytics, setAnalytics] = useState<Analytics>(EMPTY_ANALYTICS);
-  const [positions, setPositions] = useState<BotPosition[]>([]);
+  const [markets, setMarkets] = useState<BotPositionMarket[]>([]);
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [filter, setFilter] = useState<PositionFilter>('all');
   const [analyticsMethod, setAnalyticsMethod] = useState<AnalyticsMethod>('all');
@@ -168,7 +338,7 @@ export default function BotTraderPanel() {
   const [overlayMethods, setOverlayMethods] = useState<Record<'roi' | 'apy' | 'hybrid', boolean>>({ roi: true, apy: true, hybrid: true });
   const [sortKey, setSortKey] = useState<SortKey>('openedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [executionVisibility, setExecutionVisibility] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -197,7 +367,7 @@ export default function BotTraderPanel() {
       if (requestId !== requestIdRef.current) return;
       const nextAnalytics = analyticsData.analytics ?? EMPTY_ANALYTICS;
       setAnalytics({ ...EMPTY_ANALYTICS, ...nextAnalytics, perMethod: { ...EMPTY_ANALYTICS.perMethod, ...(nextAnalytics.perMethod ?? {}) } });
-      setPositions(positionsData.positions ?? []);
+      setMarkets(normalizePositionMarkets(positionsData));
       setStatus(statusData);
     } catch (cause) {
       if (requestId === requestIdRef.current) {
@@ -220,15 +390,15 @@ export default function BotTraderPanel() {
     };
   }, [load]);
 
-  const sortedPositions = useMemo(() => [...positions].sort((a, b) => {
+  const sortedMarkets = useMemo(() => [...markets].sort((a, b) => {
     const values: Record<SortKey, [number, number]> = {
-      openedAt: [Date.parse(a.openedAt), Date.parse(b.openedAt)],
-      pnl: [a.status === 'open' ? (a.unrealizedPnlCents ?? 0) : (a.realizedPnlCents ?? 0), b.status === 'open' ? (b.unrealizedPnlCents ?? 0) : (b.realizedPnlCents ?? 0)],
-      roi: [positionRoiBps(a), positionRoiBps(b)],
+      openedAt: [Date.parse(a.latestExecutionAt), Date.parse(b.latestExecutionAt)],
+      pnl: [a.status === 'open' || a.status === 'partially_closed' ? a.unrealizedPnlCents : a.realizedPnlCents, b.status === 'open' || b.status === 'partially_closed' ? b.unrealizedPnlCents : b.realizedPnlCents],
+      roi: [a.currentLiveStakeCents > 0 ? Math.round(a.unrealizedPnlCents * 10_000 / a.currentLiveStakeCents) : 0, b.currentLiveStakeCents > 0 ? Math.round(b.unrealizedPnlCents * 10_000 / b.currentLiveStakeCents) : 0],
     };
     const [left, right] = values[sortKey];
     return sortDirection === 'asc' ? left - right : right - left;
-  }), [positions, sortDirection, sortKey]);
+  }), [markets, sortDirection, sortKey]);
 
   const changeSort = (next: SortKey) => {
     if (next === sortKey) setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
@@ -387,31 +557,37 @@ export default function BotTraderPanel() {
 
         <div className="overflow-x-auto" data-testid="bot-positions-scroll">
           <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand execution history" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Durable executions in this market" className="px-2 py-2 text-center font-medium">Executions</th><th title="Current open exposure only" className="px-2 py-2 text-left font-medium">Exposure</th><th title="Cumulative fee-inclusive cost of open exposure" className="px-2 py-2 text-right font-medium">Live Stake</th><th title="Current market value of remaining open exposure" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return on remaining open cost" className="px-2 py-2 text-right font-medium">ROI</th><th title="Market state" className="px-2 py-2 text-center font-medium">Status</th><th title="Most recent execution" className="px-2 py-2 text-right font-medium">Latest</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
-              {sortedPositions.map((position) => {
-                const isExpanded = expanded.has(position.id);
-                const pnl = position.status === 'open' ? (position.unrealizedPnlCents ?? 0) : (position.realizedPnlCents ?? 0);
-                const roiBps = positionRoiBps(position);
-                return [
-                  <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
-                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>,
-                    <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>,
-                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(position.totalCostCents)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{position.currentValueCents == null ? '—' : formatCents(position.currentValueCents)}</td>
+              {sortedMarkets.map((market) => {
+                const showExecutions = executionVisibility[market.marketKey] ?? market.executions.length > 1;
+                const pnl = market.status === 'open' || market.status === 'partially_closed' ? market.unrealizedPnlCents : market.realizedPnlCents;
+                const roiBps = market.currentLiveStakeCents > 0 ? Math.round(market.unrealizedPnlCents * 10_000 / market.currentLiveStakeCents) : 0;
+                const firstExecution = market.executions[0];
+                const kalshiLeg = firstExecution?.legs.find((leg) => leg.venue === 'kalshi');
+                const pmLeg = firstExecution?.legs.find((leg) => leg.venue === 'polymarket');
+                const kalshiUrl = market.kalshiUrl ?? firstExecution?.kalshiUrl;
+                const polymarketUrl = market.polymarketUrl ?? firstExecution?.polymarketUrl;
+                const toggle = () => setExecutionVisibility((current) => ({ ...current, [market.marketKey]: !showExecutions }));
+                return <Fragment key={market.marketKey}>
+                  <tr data-testid={`market-${market.marketKey}`} onClick={toggle} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={showExecutions}>
+                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); toggle(); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${showExecutions ? 'Collapse' : 'Expand'} ${market.marketTitle}`}>{showExecutions ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
+                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={market.marketTitle}>{market.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(market.marketId)}`} aria-label={`Open ${market.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{market.marketTitle}</a> : <span className="block truncate">{market.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{kalshiUrl && <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${(kalshiLeg?.side ?? 'yes').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {(kalshiLeg?.side ?? 'yes').toUpperCase()}</a>}{polymarketUrl && <a href={polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${(pmLeg?.side ?? 'no').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {(pmLeg?.side ?? 'no').toUpperCase()}</a>}{!kalshiUrl && !polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}</div></td>
+                    <td className="px-2 py-2 text-center tabular-nums">{INTEGER.format(market.executions.length)}</td>
+                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">Open execution cost</td>
+                    <td aria-label={`${market.marketTitle} live stake`} className="px-2 py-2 text-right tabular-nums">{formatCents(market.currentLiveStakeCents)}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(market.currentValueCents)}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnlClass(pnl)}`}>{formatCents(pnl, true)}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${pnlClass(roiBps)}`}>{formatBps(roiBps, true)}</td>
-                    <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
-                    <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
-                  </tr>,
-                  isExpanded && <tr key={`detail-${position.id}`}><td colSpan={10} className="bg-[var(--surface-workspace)] px-10 py-3"><div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-6"><div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div><div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div><div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div><div><span className="text-[var(--text-secondary)]">Current prices</span><div>{position.currentPriceKalshiCents == null ? '—' : formatCents(position.currentPriceKalshiCents)} K · {position.currentPricePmCents == null ? '—' : formatCents(position.currentPricePmCents)} PM</div></div><div><span className="text-[var(--text-secondary)]">Shares</span><div>{INTEGER.format(position.sharesKalshi)} K · {INTEGER.format(position.sharesPm)} PM</div></div><div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div></div></td></tr>,
-                ];
+                    <td className="px-2 py-2 text-center"><StatusBadge status={market.status} /></td>
+                    <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(market.latestExecutionAt).toLocaleString()}>{timeAgo(market.latestExecutionAt)}</td>
+                  </tr>
+                  {showExecutions && market.executions.map((execution) => <ExecutionDetailRow key={`execution-${execution.executionId}`} execution={execution} />)}
+                </Fragment>;
               })}
             </tbody>
           </table>
-          {sortedPositions.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No {filter === 'all' ? '' : `${filter} `}BotTrader positions.</div>}
+          {sortedMarkets.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No {filter === 'all' ? '' : `${filter} `}BotTrader positions.</div>}
         </div>
       </div>
 

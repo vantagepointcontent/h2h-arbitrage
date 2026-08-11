@@ -18,8 +18,8 @@ describe('UI-040 explanatory tooltips', () => {
     expect(dashboard).toContain('Write-Ahead Log size');
 
     const bot = read('BotTraderPanel.tsx');
-    expect(bot).toContain('Total dollars spent on both legs');
-    expect(bot).toContain('Unrealized return as a percentage');
+    expect(bot).toContain('Cumulative fee-inclusive cost of open exposure');
+    expect(bot).toContain('Unrealized return on remaining open cost');
 
     const trades = read('TradesPanel.tsx');
     expect(trades).toContain('Realized profit or loss after all trading fees');
