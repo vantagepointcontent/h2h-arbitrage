@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { createClient, type Client } from '@libsql/client';
+import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -24,6 +25,10 @@ export interface BotPosition {
   expectedPayoutCents: number;
   expectedProfitCents: number;
   feesCents: number;
+  category: string | null;
+  pmTheta: number | null;
+  kalshiEntryFeeCents: number;
+  pmEntryFeeCents: number;
   status: BotPositionStatus;
   openedAt: string;
   expiryDate: string | null;
@@ -128,8 +133,14 @@ export function calculatePositionValuation(
     throw new Error(`Missing executable bid for bot position ${position.id}`);
   }
 
+  if (position.pmTheta == null || !Number.isFinite(position.pmTheta)) {
+    throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
+  }
+
+  const kalshiExitFeeCents = Math.round(calcKalshiFee(position.sharesKalshi, kalshiPrice / 100) * 100);
+  const pmExitFeeCents = Math.round(calcPolymarketFee(position.sharesPm, pmPrice / 100, position.pmTheta) * 100);
   const currentValueCents =
-    kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm;
+    kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm - kalshiExitFeeCents - pmExitFeeCents;
   const unrealizedPnlCents = currentValueCents - position.totalCostCents;
   const base: PositionValuation = {
     status: 'open',
@@ -163,7 +174,7 @@ export function calculatePositionValuation(
     unrealizedPnlCents: payoutCents - position.totalCostCents,
     unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
     settledAt: quote.observedAt,
-    realizedPnlCents: payoutCents - position.totalCostCents - position.feesCents,
+    realizedPnlCents: payoutCents - position.totalCostCents,
     settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
   };
 }
@@ -187,6 +198,10 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     expectedPayoutCents: Number(row.expected_payout),
     expectedProfitCents: Number(row.expected_profit),
     feesCents: Number(row.fees ?? 0),
+    category: row.category != null ? String(row.category) : null,
+    pmTheta: row.pm_theta != null ? Number(row.pm_theta) : null,
+    kalshiEntryFeeCents: Number(row.kalshi_entry_fee ?? 0),
+    pmEntryFeeCents: Number(row.pm_entry_fee ?? 0),
     status: String(row.status) as BotPositionStatus,
     openedAt: String(row.opened_at),
     expiryDate: row.expiry_date != null ? String(row.expiry_date) : null,
@@ -239,6 +254,10 @@ export class BotPositionStore {
         expected_payout INTEGER NOT NULL,
         expected_profit INTEGER NOT NULL,
         fees INTEGER NOT NULL DEFAULT 0,
+        category TEXT,
+        pm_theta REAL,
+        kalshi_entry_fee INTEGER NOT NULL DEFAULT 0,
+        pm_entry_fee INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
         opened_at TEXT NOT NULL,
         expiry_date TEXT,
@@ -276,6 +295,10 @@ export class BotPositionStore {
       expected_payout: 'INTEGER NOT NULL DEFAULT 0',
       expected_profit: 'INTEGER NOT NULL DEFAULT 0',
       fees: 'INTEGER NOT NULL DEFAULT 0',
+      category: 'TEXT',
+      pm_theta: 'REAL',
+      kalshi_entry_fee: 'INTEGER NOT NULL DEFAULT 0',
+      pm_entry_fee: 'INTEGER NOT NULL DEFAULT 0',
       status: "TEXT NOT NULL DEFAULT 'open'",
       opened_at: "TEXT NOT NULL DEFAULT ''",
       expiry_date: 'TEXT',
@@ -338,16 +361,17 @@ export class BotPositionStore {
           execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
           shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
-          fees, status, opened_at, expiry_date, current_price_kalshi,
+          fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee, status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
           input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
           input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
-          input.expectedProfitCents, input.feesCents, input.openedAt,
+          input.expectedProfitCents, input.feesCents, input.category, input.pmTheta,
+          input.kalshiEntryFeeCents, input.pmEntryFeeCents, input.openedAt,
           input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
           input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
           input.openedAt,
@@ -521,16 +545,21 @@ export interface BotPositionInput {
   expectedProfit: number;
   expiryDate?: string | null;
   selectionMethod?: BotSelectionMethod | null;
+  category?: string | null;
 }
 
 export async function recordBotPosition(input: BotPositionInput): Promise<void> {
+  if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
+  const pmTheta = getPolymarketTheta(input.category);
   const buyPriceKalshiCents = Math.round(input.kalshiPrice * 100);
   const buyPricePmCents = Math.round(input.pmPrice * 100);
   const sharesKalshi = Math.max(1, Math.floor(input.kalshiStake / input.kalshiPrice + 1e-9));
   const sharesPm = Math.max(1, Math.floor(input.pmStake / input.pmPrice + 1e-9));
-  const totalCostCents = sharesKalshi * buyPriceKalshiCents + sharesPm * buyPricePmCents;
+  const kalshiEntryFeeCents = Math.round(calcKalshiFee(sharesKalshi, input.kalshiPrice) * 100);
+  const pmEntryFeeCents = Math.round(calcPolymarketFee(sharesPm, input.pmPrice, pmTheta) * 100);
+  const totalCostCents = sharesKalshi * buyPriceKalshiCents + sharesPm * buyPricePmCents + kalshiEntryFeeCents + pmEntryFeeCents;
   const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
-  const expectedProfitCents = Math.round(input.expectedProfit * 100);
+  const expectedProfitCents = expectedPayoutCents - totalCostCents;
 
   await createBotPosition({
     executionId: input.executionId,
@@ -548,7 +577,11 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
     totalCostCents,
     expectedPayoutCents,
     expectedProfitCents,
-    feesCents: Math.max(0, expectedPayoutCents - totalCostCents - expectedProfitCents),
+    feesCents: kalshiEntryFeeCents + pmEntryFeeCents,
+    category: input.category,
+    pmTheta,
+    kalshiEntryFeeCents,
+    pmEntryFeeCents,
     openedAt: new Date().toISOString(),
     expiryDate: input.expiryDate ?? null,
     selectionMethod: input.selectionMethod ?? null,

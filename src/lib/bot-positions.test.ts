@@ -29,6 +29,10 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     expectedPayoutCents: 1000,
     expectedProfitCents: 50,
     feesCents: 0,
+    category: 'Politics',
+    pmTheta: 0.04,
+    kalshiEntryFeeCents: 0,
+    pmEntryFeeCents: 0,
     status: 'open',
     openedAt: '2026-08-01T00:00:00.000Z',
     expiryDate: '2026-08-10T00:00:00.000Z',
@@ -61,9 +65,9 @@ describe('calculatePositionValuation', () => {
       status: 'open',
       currentPriceKalshiCents: 48,
       currentPricePmCents: 57,
-      currentValueCents: 1050,
-      unrealizedPnlCents: 100,
-      unrealizedRoiBps: 1053,
+      currentValueCents: 1022,
+      unrealizedPnlCents: 72,
+      unrealizedRoiBps: 758,
       lastValuationAt: '2026-08-08T12:00:00.000Z',
       settledAt: null,
       realizedPnlCents: null,
@@ -82,8 +86,19 @@ describe('calculatePositionValuation', () => {
     })).toThrow(/missing executable/i);
   });
 
-  it('settles only after expiry when held-side prices are exactly 100 and 0 cents, net of fees', () => {
-    const result = calculatePositionValuation(openPosition({ feesCents: 7 }), {
+  it('fails closed instead of inventing a default fee theta for legacy positions', () => {
+    expect(() => calculatePositionValuation(openPosition({ pmTheta: null }), {
+      kalshiYesBidCents: 48,
+      kalshiNoBidCents: 51,
+      pmYesBidCents: 42,
+      pmNoBidCents: 57,
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).toThrow(/missing authoritative Polymarket theta/i);
+  });
+
+  it('settles only after expiry when held-side prices are exactly 100 and 0 cents without double-counting persisted entry fees', () => {
+    const result = calculatePositionValuation(openPosition({ feesCents: 7, totalCostCents: 957 }), {
       kalshiYesBidCents: 100,
       kalshiNoBidCents: 0,
       pmYesBidCents: 100,
@@ -124,7 +139,7 @@ describe('calculatePositionValuation', () => {
     });
     expect(kalshiResolution).toEqual({ yesBidCents: 100, noBidCents: 0, resolved: true });
 
-    const result = calculatePositionValuation(openPosition({ feesCents: 7 }), {
+    const result = calculatePositionValuation(openPosition({ feesCents: 7, totalCostCents: 957 }), {
       kalshiYesBidCents: kalshiResolution.yesBidCents,
       kalshiNoBidCents: kalshiResolution.noBidCents,
       pmYesBidCents: 100,
@@ -174,6 +189,10 @@ describe('BotPositionStore', () => {
       expectedPayoutCents: 1000,
       expectedProfitCents: 50,
       feesCents: 0,
+    category: 'Politics',
+    pmTheta: 0.04,
+    kalshiEntryFeeCents: 0,
+    pmEntryFeeCents: 0,
       openedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: '2026-08-10T00:00:00.000Z',
       selectionMethod: 'hybrid',
@@ -262,8 +281,8 @@ describe('BotPositionStore', () => {
     await store.updateValuation(created.id, valuation);
 
     const [stored] = await store.list({ status: 'open', limit: 10 });
-    expect(stored.currentValueCents).toBe(1050);
-    expect(stored.unrealizedPnlCents).toBe(100);
+    expect(stored.currentValueCents).toBe(1022);
+    expect(stored.unrealizedPnlCents).toBe(72);
     expect(stored.dryRun).toBe(false);
   });
 });

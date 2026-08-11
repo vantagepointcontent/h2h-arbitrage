@@ -637,6 +637,7 @@ export async function maybeExecuteBotTrade(
           expectedProfit: execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,
+          category: input.category ?? null,
         });
       }
     } catch (e) {
