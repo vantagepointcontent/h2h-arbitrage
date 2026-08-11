@@ -176,11 +176,13 @@ describe('BotPositionStore', () => {
       feesCents: 0,
       openedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: '2026-08-10T00:00:00.000Z',
+      selectionMethod: 'hybrid',
     });
 
     expect(created.currentValueCents).toBe(1000);
     expect(created.unrealizedPnlCents).toBe(50);
     expect(created.dryRun).toBe(true);
+    expect(created.selectionMethod).toBe('hybrid');
     await expect(store.hasOpenPair('KXTEST', '0xabc')).resolves.toBe(true);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
 
@@ -189,7 +191,7 @@ describe('BotPositionStore', () => {
     columnsClient.close();
     expect(columns.rows.map((row) => String(row.name))).toEqual(expect.arrayContaining([
       'execution_id', 'buy_price_kalshi', 'buy_price_pm', 'current_value',
-      'unrealized_pnl', 'unrealized_roi_pct', 'realized_pnl', 'settlement_side',
+      'unrealized_pnl', 'unrealized_roi_pct', 'realized_pnl', 'settlement_side', 'selection_method',
     ]));
   });
 

@@ -168,6 +168,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         try {
           const result: SingleRefreshResult = await refreshSingleMarket(market, manualMatches);
           const inputs = toBotTradeInputs(market.id, market.eventTitle, result.expiryDate ?? undefined, result.allArbs || []);
+          for (const input of inputs) input.selectionMethod = settings.selectionMethod;
           const botResults = await runBotTraderOnScanOutcomes(market.id, market.eventTitle, result.expiryDate ?? undefined, inputs);
           runs.push({
             pairId: market.id,

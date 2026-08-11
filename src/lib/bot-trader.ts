@@ -108,6 +108,8 @@ export interface BotTradeInput {
   /** Market expiry ISO string */
   expiryDate?: string | null;
   category?: string;
+  /** Immutable ranked-selection attribution. Null for explicit/manual runs. */
+  selectionMethod?: BotSelectionMethod | null;
 }
 
 export interface BotExecutionResult {
@@ -604,6 +606,7 @@ export async function maybeExecuteBotTrade(
     estimatedProfit: input.expectedProfit,
     steps: result.steps,
     source: 'bot',
+    selectionMethod: input.selectionMethod ?? null,
   };
 
   let executionId: number | undefined;
@@ -633,6 +636,7 @@ export async function maybeExecuteBotTrade(
           pmStake: execReq.polymarketOrder.size,
           expectedProfit: execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
+          selectionMethod: input.selectionMethod ?? null,
         });
       }
     } catch (e) {

@@ -4,6 +4,7 @@ import { createClient, type Client } from '@libsql/client';
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
 export type SettlementSide = 'kalshi' | 'pm' | null;
+export type BotSelectionMethod = 'roi' | 'apy' | 'hybrid';
 
 export interface BotPosition {
   id: number;
@@ -36,6 +37,7 @@ export interface BotPosition {
   realizedPnlCents: number | null;
   settlementSide: SettlementSide;
   dryRun: boolean;
+  selectionMethod?: BotSelectionMethod | null;
 }
 
 export type CreateBotPosition = Omit<BotPosition,
@@ -198,6 +200,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     realizedPnlCents: row.realized_pnl != null ? Number(row.realized_pnl) : null,
     settlementSide: row.settlement_side != null ? String(row.settlement_side) as SettlementSide : null,
     dryRun: Boolean(Number(row.dry_run ?? 1)),
+    selectionMethod: row.selection_method != null ? String(row.selection_method) as BotSelectionMethod : null,
   };
 }
 
@@ -248,6 +251,7 @@ export class BotPositionStore {
         last_valuation_at TEXT,
         realized_pnl INTEGER,
         settlement_side TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL)
+        ,selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL)
       )
     `);
     // Idempotent migration for installations that created the table from an
@@ -284,6 +288,7 @@ export class BotPositionStore {
       last_valuation_at: 'TEXT',
       realized_pnl: 'INTEGER',
       settlement_side: 'TEXT',
+      selection_method: 'TEXT',
     };
     for (const [name, definition] of Object.entries(migrations)) {
       if (!existing.has(name)) {
@@ -335,8 +340,8 @@ export class BotPositionStore {
           shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
           fees, status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
-          last_valuation_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          last_valuation_at, selection_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -346,6 +351,7 @@ export class BotPositionStore {
           input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
           input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
           input.openedAt,
+          input.selectionMethod ?? null,
         ],
       });
     } catch (error) {
@@ -514,6 +520,7 @@ export interface BotPositionInput {
   pmStake: number;
   expectedProfit: number;
   expiryDate?: string | null;
+  selectionMethod?: BotSelectionMethod | null;
 }
 
 export async function recordBotPosition(input: BotPositionInput): Promise<void> {
@@ -544,6 +551,7 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
     feesCents: Math.max(0, expectedPayoutCents - totalCostCents - expectedProfitCents),
     openedAt: new Date().toISOString(),
     expiryDate: input.expiryDate ?? null,
+    selectionMethod: input.selectionMethod ?? null,
   });
 }
 

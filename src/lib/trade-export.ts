@@ -2,7 +2,7 @@ import type { ClosedPosition, ExecutionRecord } from './persistence';
 
 export const TRADE_EXPORT_HEADERS = [
   'Timestamp', 'Platform', 'Event Name', 'Market Name', 'Side', 'Shares',
-  'Price', 'Fees', 'Realized P&L', 'Arb ID', 'Status',
+  'Price', 'Fees', 'Realized P&L', 'Arb ID', 'Status', 'Method',
 ] as const;
 
 export type TradeExportRow = readonly (string | number)[];
@@ -36,6 +36,7 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
       execution.marketTitle, marketName, String(order.outcome ?? '').toUpperCase(),
       finite(leg.filledSize ?? order.size), finite(leg.filledPrice ?? order.price),
       finite(leg.fees ?? leg.fee), '', execution.arbId, status,
+      execution.source === 'bot' ? (execution.selectionMethod ?? 'Legacy/Unknown') : 'Manual',
     ] satisfies TradeExportRow];
   });
 }
@@ -52,7 +53,7 @@ export function closedPositionRow(position: ClosedPosition): TradeExportRow {
     finite(position.feesPaid),
     finite(position.realizedPnl),
     position.pairId ?? '',
-    'closed',
+    'closed', 'Manual',
   ];
 }
 

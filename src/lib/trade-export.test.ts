@@ -13,7 +13,9 @@ describe('trade export', () => {
     expect(executionRows({ ...base, dryRun: true })).toEqual([]);
     const rows = executionRows({ ...base, dryRun: false });
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toEqual(['2026-08-08T10:00:00.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled']);
+    expect(rows[0]).toEqual(['2026-08-08T10:00:00.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
+    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.at(-1)).toBe('apy');
+    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.at(-1)).toBe('Legacy/Unknown');
   });
 
   it('exports closed P&L and protects spreadsheet cells', () => {

@@ -61,6 +61,8 @@ interface ExecutionRecord {
     alerts?: { level: 'warning' | 'error' | 'info'; message: string; leg?: string; action?: string }[];
   } | null;
   estimatedProfit: number;
+  source?: 'manual' | 'bot';
+  selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
 }
 
 interface ClosedPositionRecord {
@@ -111,6 +113,11 @@ function StatusBadge({ status }: { status: string }) {
       {s.icon} {status}
     </span>
   );
+}
+
+function MethodBadge({ trade }: { trade: Pick<ExecutionRecord, 'source' | 'selectionMethod'> }) {
+  const label = trade.source !== 'bot' ? 'Manual' : trade.selectionMethod ? trade.selectionMethod.toUpperCase() : 'Legacy/Unknown';
+  return <span className="whitespace-nowrap rounded bg-[#8A9BA8]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#8A9BA8]">{label}</span>;
 }
 
 /** Format a timestamp for the timeline: HH:MM:SS.mmm */
@@ -297,6 +304,8 @@ export default function TradesPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'real' | 'dry' | 'pending'>('all');
+  const [methodFilter, setMethodFilter] = useState<'all' | 'roi' | 'apy' | 'hybrid' | 'legacy'>('all');
+  const [methodSort, setMethodSort] = useState<'none' | 'asc' | 'desc'>('none');
   const [cancelling, setCancelling] = useState<number | null>(null);
   const [subTab, setSubTab] = useState<'positions' | 'history'>('positions');
 
@@ -311,7 +320,7 @@ export default function TradesPanel() {
     setError(null);
     try {
       const [executionRes, closedRes] = await Promise.all([
-        fetch('/api/executions?limit=500', { cache: 'no-store' }),
+        fetch(`/api/executions?limit=500${methodFilter === 'all' ? '' : `&method=${methodFilter}`}${methodSort === 'none' ? '' : `&sortMethod=${methodSort}`}`, { cache: 'no-store' }),
         fetch('/api/closed-positions?limit=500', { cache: 'no-store' }),
       ]);
       const [executionData, closedData] = await Promise.all([executionRes.json(), closedRes.json()]);
@@ -324,7 +333,7 @@ export default function TradesPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [methodFilter, methodSort]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -465,6 +474,10 @@ export default function TradesPanel() {
                   </button>
                 ))}
               </div>
+              <select aria-label="Filter trades by selection method" value={methodFilter} onChange={(event) => setMethodFilter(event.target.value as typeof methodFilter)} className="min-h-8 rounded-lg border border-[#232E3C] bg-[#0E1621] px-2 text-xs text-[#8A9BA8]">
+                <option value="all">All methods</option><option value="roi">ROI</option><option value="apy">APY</option><option value="hybrid">Hybrid</option><option value="legacy">Legacy/Unknown</option>
+              </select>
+              <button type="button" onClick={() => setMethodSort((value) => value === 'asc' ? 'desc' : 'asc')} className="min-h-8 rounded-lg border border-[#232E3C] px-2 text-xs text-[#8A9BA8]" title="Sort by immutable selection method">Method {methodSort === 'asc' ? '↑' : methodSort === 'desc' ? '↓' : '↕'}</button>
               <button
                 onClick={load}
                 className="p-1.5 rounded-lg border border-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
@@ -561,6 +574,7 @@ export default function TradesPanel() {
                     <th title="Expand the execution timeline" className="text-center px-2 py-3 font-medium w-8">{/* expand toggle */}</th>
                     <th title="When execution was requested" className="text-left px-4 py-3 font-medium">Time</th>
                     <th title="Market event name" className="text-left px-4 py-3 font-medium">Market</th>
+                    <th title="Immutable selection method captured when the trade was chosen" className="text-center px-4 py-3 font-medium">Method</th>
                     <th title="Kalshi or Polymarket execution venue" className="text-left px-4 py-3 font-medium">Platform</th>
                     <th title="YES or NO contract side" className="text-left px-4 py-3 font-medium">Side</th>
                     <th title="Requested dollar size" className="text-right px-4 py-3 font-medium">Size</th>
@@ -635,6 +649,7 @@ export default function TradesPanel() {
                                   <td rowSpan={legs.length} className="px-4 py-3 text-xs text-[#FFFFFF] max-w-[200px] truncate align-top" title={t.marketTitle}>
                                     {t.marketTitle}
                                   </td>
+                                  <td rowSpan={legs.length} className="px-4 py-3 text-center align-top"><MethodBadge trade={t} /></td>
                                 </>
                               )}
                               <td className="px-4 py-3 text-xs text-[#8A9BA8] whitespace-nowrap">

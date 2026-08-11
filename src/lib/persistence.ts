@@ -1330,7 +1330,8 @@ async function ensureExecutionsTable(): Promise<void> {
       polymarket_order TEXT,
       result           TEXT,
       estimated_profit REAL    NOT NULL DEFAULT 0,
-      steps            TEXT
+      steps            TEXT,
+      selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL)
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
@@ -1338,6 +1339,10 @@ async function ensureExecutionsTable(): Promise<void> {
   try { await c.execute(`ALTER TABLE executions ADD COLUMN steps TEXT`); } catch { /* column already exists */ }
   // FEAT-040: add source column for manual vs bot execution tracking
   try { await c.execute(`ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`); } catch { /* column already exists */ }
+  // DATA-003: immutable attribution captured when BotTrader selects a trade.
+  // Existing rows remain NULL: historical intent must never be guessed.
+  try { await c.execute(`ALTER TABLE executions ADD COLUMN selection_method TEXT`); } catch { /* column already exists */ }
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
   _executionsReady = true;
 }
 
@@ -1355,14 +1360,15 @@ export interface ExecutionRecord {
   estimatedProfit: number;
   steps?: unknown;
   source?: 'manual' | 'bot';
+  selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<number> {
   await ensureExecutionsTable();
   const c = getClient();
   const res = await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
@@ -1373,18 +1379,30 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.estimatedProfit ?? 0,
       e.steps != null ? JSON.stringify(e.steps) : null,
       e.source ?? 'manual',
+      e.source === 'bot' ? (e.selectionMethod ?? null) : null,
     ],
   });
   return Number((res.rows as any[])[0]?.id ?? 0);
 }
 
-export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Promise<ExecutionRecord[]> {
+export async function getExecutions(
+  limit = 200,
+  source?: 'manual' | 'bot',
+  options: { selectionMethod?: 'roi' | 'apy' | 'hybrid' | 'legacy'; sortMethod?: 'asc' | 'desc' } = {},
+): Promise<ExecutionRecord[]> {
   await ensureExecutionsTable();
   const c = getClient();
-  const sql = source
-    ? `SELECT * FROM executions WHERE source = ? ORDER BY timestamp DESC LIMIT ?`
-    : `SELECT * FROM executions ORDER BY timestamp DESC LIMIT ?`;
-  const args = source ? [source, Math.min(10_000, Math.max(1, limit))] : [Math.min(10_000, Math.max(1, limit))];
+  const clauses: string[] = [];
+  const args: Array<string | number> = [];
+  if (source) { clauses.push('source = ?'); args.push(source); }
+  if (options.selectionMethod === 'legacy') clauses.push('selection_method IS NULL');
+  else if (options.selectionMethod) { clauses.push('selection_method = ?'); args.push(options.selectionMethod); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const order = options.sortMethod
+    ? `CASE WHEN selection_method IS NULL THEN 1 ELSE 0 END, selection_method ${options.sortMethod === 'asc' ? 'ASC' : 'DESC'}, timestamp DESC`
+    : 'timestamp DESC';
+  const sql = `SELECT * FROM executions ${where} ORDER BY ${order} LIMIT ?`;
+  args.push(Math.min(10_000, Math.max(1, limit)));
   const res = await c.execute({ sql, args });
   return (res.rows as any[]).map((r) => rowToExecutionRecord(r));
 }
@@ -1404,6 +1422,7 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     estimatedProfit: Number(r.estimated_profit ?? 0),
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
     source: (r.source ?? 'manual') as 'manual' | 'bot',
+    selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
   };
 }
 
