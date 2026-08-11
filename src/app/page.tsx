@@ -239,7 +239,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms" | "couple-management">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "opportunities" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms" | "couple-management">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -266,6 +266,9 @@ export default function Home() {
       const state = e.state;
       if (state?.view === "overview") {
         setViewMode("overview");
+        setActiveMarketId(null);
+      } else if (state?.view === "opportunities") {
+        setViewMode("opportunities");
         setActiveMarketId(null);
       } else if (state?.view === "marketfinder") {
         setViewMode("marketfinder");
@@ -449,6 +452,8 @@ export default function Home() {
         setViewMode("overview");
       } else if (view === "markets") {
         setViewMode("overview");
+      } else if (view === "opportunities") {
+        setViewMode("opportunities");
       } else if (view === "marketfinder") {
         setViewMode("marketfinder");
         window.history.replaceState({ view: "marketfinder" }, "", "/?view=marketfinder");
@@ -996,6 +1001,13 @@ export default function Home() {
     window.history.replaceState({ view: "markets" }, "", "/?view=markets");
   };
 
+  const goToOpportunities = () => {
+    setCouplingPanelOpen(false);
+    setViewMode("opportunities");
+    setActiveMarketId(null);
+    window.history.replaceState({ view: "opportunities" }, "", "/?view=opportunities");
+  };
+
   const goToLogs = () => {
     setCouplingPanelOpen(false);
     setViewMode("logs");
@@ -1498,6 +1510,7 @@ export default function Home() {
           scanProgress={scanProgress}
           scanAllError={scanAllError}
           onGoOverview={goToOverview}
+          onGoOpportunities={goToOpportunities}
           onGoScan={goToScan}
           onGoMarketFinder={goToMarketFinder}
           onGoLogs={goToLogs}
@@ -1524,8 +1537,9 @@ export default function Home() {
                 <Loader2 className="h-5 w-5 animate-spin text-[var(--status-positive)]" />
                 Loading workspace...
               </div>
-            ) : viewMode === "overview" ? (
+            ) : viewMode === "overview" || viewMode === "opportunities" ? (
               <OverviewPanel
+                mode={viewMode === "opportunities" ? "opportunities" : "markets"}
                 markets={savedMarkets}
                 loading={overviewLoading}
                 onLoad={() => {

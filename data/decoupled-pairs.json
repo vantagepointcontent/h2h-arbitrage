@@ -38,5 +38,13 @@
     "pmTitle": "OpenAI",
     "id": "62e6f646-9393-4539-adf3-30938ac13dd9",
     "decoupledAt": "2026-07-09T14:59:16.428Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-LAG",
+    "pmConditionId": "0xfa4b4e1b72cbe5f2ed5dcdca162b16bc77d1c15575ad16fc03f41cb78d72e0f8",
+    "kalshiTitle": "Los Angeles G",
+    "pmTitle": "Los Angeles G",
+    "id": "8ab76e34-9738-4a47-ae33-567cdaa98d29",
+    "decoupledAt": "2026-08-08T20:01:28.357Z"
   }
 ]

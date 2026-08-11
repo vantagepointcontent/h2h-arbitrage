@@ -1,6 +1,6 @@
 {
   "1779565300940-jqb54rc": {
-    "avgMs": 2119,
+    "avgMs": 1938,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -12,13 +12,13 @@
     "cooldownUntil": 0
   },
   "1780947518057-wjbasjw": {
-    "avgMs": 12924,
+    "avgMs": 9896,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779652505195-fchs4a3": {
-    "avgMs": 24369,
+    "avgMs": 3283,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -36,301 +36,301 @@
     "cooldownUntil": 0
   },
   "1782999196726-house-akal": {
-    "avgMs": 4835,
+    "avgMs": 9077,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1781177131219-rbowt9m": {
-    "avgMs": 7405,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al01": {
-    "avgMs": 4805,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al02": {
-    "avgMs": 4039,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al04": {
-    "avgMs": 4037,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al03": {
-    "avgMs": 4118,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al05": {
-    "avgMs": 5216,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al06": {
-    "avgMs": 5665,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ar01": {
-    "avgMs": 5309,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-al07": {
-    "avgMs": 5901,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ar02": {
-    "avgMs": 5321,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ar03": {
-    "avgMs": 5360,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ar04": {
-    "avgMs": 5343,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co03": {
-    "avgMs": 4629,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co04": {
-    "avgMs": 5020,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co05": {
-    "avgMs": 5178,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co06": {
-    "avgMs": 5350,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co07": {
-    "avgMs": 5437,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-co08": {
-    "avgMs": 5976,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-mo06": {
-    "avgMs": 7958,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-mo07": {
-    "avgMs": 5220,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-mo08": {
-    "avgMs": 5636,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-mt01": {
-    "avgMs": 6297,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-mt02": {
-    "avgMs": 6905,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ne01": {
-    "avgMs": 7602,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ne02": {
-    "avgMs": 8119,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ne03": {
-    "avgMs": 7146,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nv01": {
-    "avgMs": 7571,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nv02": {
-    "avgMs": 7328,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nv03": {
-    "avgMs": 7371,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nv04": {
-    "avgMs": 7191,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nh01": {
-    "avgMs": 7996,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nh02": {
-    "avgMs": 8055,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj01": {
-    "avgMs": 6631,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj02": {
-    "avgMs": 6738,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj03": {
-    "avgMs": 6686,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj04": {
-    "avgMs": 6234,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj05": {
-    "avgMs": 6015,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj06": {
-    "avgMs": 2111,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj07": {
-    "avgMs": 5778,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj08": {
-    "avgMs": 6352,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj09": {
-    "avgMs": 5911,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj10": {
-    "avgMs": 7065,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj11": {
-    "avgMs": 7714,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nj12": {
-    "avgMs": 7066,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nm01": {
-    "avgMs": 7666,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nm02": {
     "avgMs": 8087,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
+  "1782999196726-house-al01": {
+    "avgMs": 10201,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al02": {
+    "avgMs": 6046,
+    "consecFails": 2,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al04": {
+    "avgMs": 6440,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al03": {
+    "avgMs": 5634,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al05": {
+    "avgMs": 7266,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al06": {
+    "avgMs": 8991,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ar01": {
+    "avgMs": 7736,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-al07": {
+    "avgMs": 10869,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ar02": {
+    "avgMs": 5815,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ar03": {
+    "avgMs": 5377,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ar04": {
+    "avgMs": 5582,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co03": {
+    "avgMs": 5839,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co04": {
+    "avgMs": 5708,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co05": {
+    "avgMs": 7532,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co06": {
+    "avgMs": 7655,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co07": {
+    "avgMs": 7338,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-co08": {
+    "avgMs": 7135,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-mo06": {
+    "avgMs": 8032,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-mo07": {
+    "avgMs": 8497,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-mo08": {
+    "avgMs": 7734,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-mt01": {
+    "avgMs": 10576,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-mt02": {
+    "avgMs": 8158,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ne01": {
+    "avgMs": 7736,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ne02": {
+    "avgMs": 7408,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ne03": {
+    "avgMs": 7197,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nv01": {
+    "avgMs": 6785,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nv02": {
+    "avgMs": 6980,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nv03": {
+    "avgMs": 6886,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nv04": {
+    "avgMs": 6945,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nh01": {
+    "avgMs": 5990,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nh02": {
+    "avgMs": 6250,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj01": {
+    "avgMs": 6788,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj02": {
+    "avgMs": 6389,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj03": {
+    "avgMs": 6445,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj04": {
+    "avgMs": 7267,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj05": {
+    "avgMs": 6555,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj06": {
+    "avgMs": 6686,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj07": {
+    "avgMs": 7136,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj08": {
+    "avgMs": 7762,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj09": {
+    "avgMs": 7543,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj10": {
+    "avgMs": 7320,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj11": {
+    "avgMs": 6083,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nj12": {
+    "avgMs": 6082,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nm01": {
+    "avgMs": 6068,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nm02": {
+    "avgMs": 6369,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
   "1782999196727-house-nm03": {
-    "avgMs": 8024,
+    "avgMs": 7587,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-ny01": {
-    "avgMs": 7848,
+    "avgMs": 7747,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-ny02": {
-    "avgMs": 8329,
+    "avgMs": 7494,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -342,1340 +342,1340 @@
     "cooldownUntil": 0
   },
   "1780947342746-x2ck9fp": {
-    "avgMs": 7856,
+    "avgMs": 24238,
     "consecFails": 0,
-    "trips": 1,
-    "cooldownUntil": 1786146321867
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "1782999196726-house-ct02": {
-    "avgMs": 6170,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ct03": {
-    "avgMs": 7252,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ct04": {
-    "avgMs": 5466,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ct05": {
-    "avgMs": 6318,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ct01": {
-    "avgMs": 6147,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az01": {
-    "avgMs": 5380,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl08": {
-    "avgMs": 5371,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl09": {
-    "avgMs": 5331,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl10": {
-    "avgMs": 5338,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl11": {
-    "avgMs": 5366,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl26": {
-    "avgMs": 6126,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl27": {
-    "avgMs": 5466,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl28": {
-    "avgMs": 5428,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga01": {
-    "avgMs": 5431,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga02": {
-    "avgMs": 5516,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga03": {
-    "avgMs": 5527,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga04": {
-    "avgMs": 5345,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga05": {
-    "avgMs": 5367,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga06": {
-    "avgMs": 5498,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga07": {
-    "avgMs": 6214,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny03": {
-    "avgMs": 7658,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny04": {
-    "avgMs": 7477,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny05": {
-    "avgMs": 7249,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny06": {
-    "avgMs": 6856,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny07": {
-    "avgMs": 7378,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny08": {
-    "avgMs": 7363,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny09": {
     "avgMs": 7504,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
-  "1782999196727-house-ny10": {
-    "avgMs": 7331,
+  "1782999196726-house-ct03": {
+    "avgMs": 6470,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
-  "1782999196727-house-ny11": {
-    "avgMs": 7773,
+  "1782999196726-house-ct04": {
+    "avgMs": 7687,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
-  "1782999196727-house-ny12": {
-    "avgMs": 7802,
+  "1782999196726-house-ct05": {
+    "avgMs": 6856,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
-  "1782999196727-house-ny13": {
-    "avgMs": 7679,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny14": {
-    "avgMs": 7398,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny15": {
-    "avgMs": 7243,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny16": {
-    "avgMs": 6147,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny17": {
-    "avgMs": 4921,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny18": {
-    "avgMs": 5139,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny19": {
-    "avgMs": 5303,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny20": {
-    "avgMs": 5925,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny21": {
-    "avgMs": 5547,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny22": {
-    "avgMs": 6277,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny23": {
-    "avgMs": 7005,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny24": {
-    "avgMs": 7176,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny25": {
-    "avgMs": 6033,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ny26": {
-    "avgMs": 5237,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc01": {
-    "avgMs": 6139,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc02": {
-    "avgMs": 5700,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tn08": {
-    "avgMs": 6033,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tn09": {
-    "avgMs": 6117,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx01": {
-    "avgMs": 5927,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx02": {
-    "avgMs": 7028,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx03": {
-    "avgMs": 5686,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx04": {
-    "avgMs": 6880,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx07": {
-    "avgMs": 6677,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx08": {
-    "avgMs": 6673,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx09": {
-    "avgMs": 6795,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx38": {
-    "avgMs": 7599,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ut01": {
-    "avgMs": 7398,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ut02": {
-    "avgMs": 6827,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ut03": {
-    "avgMs": 6982,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ut04": {
-    "avgMs": 6938,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va01": {
-    "avgMs": 5910,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va02": {
-    "avgMs": 6032,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va03": {
-    "avgMs": 6156,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va04": {
-    "avgMs": 6324,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va05": {
-    "avgMs": 6385,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va06": {
-    "avgMs": 7352,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va07": {
-    "avgMs": 7072,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va08": {
-    "avgMs": 7483,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va09": {
-    "avgMs": 7341,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va10": {
-    "avgMs": 7048,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc03": {
-    "avgMs": 5614,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc04": {
-    "avgMs": 7066,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1781177189235-6heq6ti": {
-    "avgMs": 5550,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1779565498134-v5tij6n": {
-    "avgMs": 9630,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc05": {
-    "avgMs": 7467,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc06": {
-    "avgMs": 7674,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc07": {
-    "avgMs": 8181,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc08": {
-    "avgMs": 8361,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc09": {
-    "avgMs": 7936,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc10": {
-    "avgMs": 7651,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc11": {
-    "avgMs": 8067,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc12": {
-    "avgMs": 8360,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc13": {
-    "avgMs": 7703,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-nc14": {
-    "avgMs": 7536,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ndal": {
-    "avgMs": 8315,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh01": {
-    "avgMs": 8156,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh02": {
-    "avgMs": 7552,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh03": {
-    "avgMs": 7932,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh04": {
-    "avgMs": 7720,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh05": {
-    "avgMs": 5552,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx05": {
-    "avgMs": 6286,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx06": {
-    "avgMs": 6715,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx10": {
-    "avgMs": 7939,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx11": {
-    "avgMs": 7139,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx12": {
-    "avgMs": 7253,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-tx13": {
-    "avgMs": 7158,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-va11": {
-    "avgMs": 7354,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az02": {
-    "avgMs": 5380,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az03": {
-    "avgMs": 4973,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az05": {
-    "avgMs": 5408,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az06": {
-    "avgMs": 5517,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az04": {
-    "avgMs": 5348,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga08": {
-    "avgMs": 7170,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga09": {
-    "avgMs": 5892,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga10": {
-    "avgMs": 5777,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga11": {
-    "avgMs": 5672,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az07": {
-    "avgMs": 4584,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga12": {
-    "avgMs": 6222,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga13": {
-    "avgMs": 5422,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ga14": {
-    "avgMs": 5422,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-hi01": {
-    "avgMs": 5461,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-hi02": {
-    "avgMs": 5332,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-id01": {
-    "avgMs": 5548,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-id02": {
-    "avgMs": 5350,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il01": {
-    "avgMs": 5610,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il02": {
-    "avgMs": 5490,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il03": {
-    "avgMs": 5457,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il04": {
-    "avgMs": 4918,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il06": {
-    "avgMs": 4008,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il05": {
-    "avgMs": 5858,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il07": {
-    "avgMs": 5444,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il08": {
-    "avgMs": 6364,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il09": {
-    "avgMs": 6641,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il10": {
-    "avgMs": 5348,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il11": {
-    "avgMs": 5359,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il12": {
-    "avgMs": 5361,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il13": {
-    "avgMs": 5443,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il14": {
-    "avgMs": 5466,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il15": {
-    "avgMs": 5437,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il17": {
-    "avgMs": 6137,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-il16": {
-    "avgMs": 5954,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in01": {
-    "avgMs": 5343,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in02": {
-    "avgMs": 5346,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh06": {
-    "avgMs": 3976,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh08": {
-    "avgMs": 3717,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh14": {
-    "avgMs": 3599,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh07": {
-    "avgMs": 3150,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh15": {
-    "avgMs": 4836,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh11": {
-    "avgMs": 7944,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh09": {
-    "avgMs": 6178,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh10": {
-    "avgMs": 7019,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-oh12": {
-    "avgMs": 6415,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ok01": {
-    "avgMs": 6523,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-vtal": {
-    "avgMs": 8136,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-wa01": {
-    "avgMs": 7842,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-wa03": {
-    "avgMs": 8092,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-wa02": {
-    "avgMs": 7694,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-wa04": {
-    "avgMs": 7883,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-wa05": {
-    "avgMs": 7520,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az09": {
-    "avgMs": 4861,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca01": {
-    "avgMs": 7479,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-az08": {
-    "avgMs": 5151,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca02": {
-    "avgMs": 6872,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca03": {
-    "avgMs": 5452,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca06": {
-    "avgMs": 6662,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca05": {
-    "avgMs": 5407,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca08": {
-    "avgMs": 6930,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca10": {
-    "avgMs": 6510,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca09": {
-    "avgMs": 6595,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca13": {
-    "avgMs": 6694,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca15": {
-    "avgMs": 5682,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1779617150327-ntzesfy": {
-    "avgMs": 33025,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca16": {
-    "avgMs": 5511,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca18": {
-    "avgMs": 5913,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca17": {
-    "avgMs": 5813,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca19": {
-    "avgMs": 6161,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca20": {
-    "avgMs": 6153,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca21": {
-    "avgMs": 6148,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca23": {
-    "avgMs": 6171,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca22": {
-    "avgMs": 6222,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca24": {
-    "avgMs": 5528,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca25": {
-    "avgMs": 5333,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl01": {
-    "avgMs": 5516,
-    "consecFails": 1,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca26": {
-    "avgMs": 5334,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ca27": {
-    "avgMs": 4762,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-deal": {
-    "avgMs": 6602,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl02": {
-    "avgMs": 5366,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-fl03": {
-    "avgMs": 6760,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in04": {
-    "avgMs": 5386,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in05": {
-    "avgMs": 5674,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in03": {
-    "avgMs": 6186,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in06": {
-    "avgMs": 5657,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in09": {
-    "avgMs": 6007,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-in08": {
-    "avgMs": 5665,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ia01": {
-    "avgMs": 6095,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ia02": {
-    "avgMs": 6165,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ia03": {
-    "avgMs": 6371,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-ok02": {
-    "avgMs": 6644,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ia04": {
-    "avgMs": 6190,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-or03": {
-    "avgMs": 7443,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-or04": {
-    "avgMs": 8125,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-or05": {
-    "avgMs": 7804,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-or06": {
-    "avgMs": 7961,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa02": {
-    "avgMs": 7953,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa03": {
-    "avgMs": 7684,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa04": {
-    "avgMs": 7877,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa05": {
-    "avgMs": 7976,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa06": {
-    "avgMs": 7783,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa10": {
-    "avgMs": 8079,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa11": {
-    "avgMs": 7961,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa12": {
-    "avgMs": 7680,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa13": {
-    "avgMs": 8121,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa14": {
-    "avgMs": 8027,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-pa15": {
-    "avgMs": 7912,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-sc04": {
-    "avgMs": 8043,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-sc05": {
-    "avgMs": 8219,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196727-house-sc06": {
+  "1782999196726-house-ct01": {
     "avgMs": 7571,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
+  "1782999196726-house-az01": {
+    "avgMs": 5355,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl08": {
+    "avgMs": 4687,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl09": {
+    "avgMs": 7750,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl10": {
+    "avgMs": 7690,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl11": {
+    "avgMs": 11816,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl26": {
+    "avgMs": 6893,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl27": {
+    "avgMs": 5760,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl28": {
+    "avgMs": 6986,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga01": {
+    "avgMs": 6598,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga02": {
+    "avgMs": 6438,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga03": {
+    "avgMs": 6858,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga04": {
+    "avgMs": 6995,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga05": {
+    "avgMs": 6052,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga06": {
+    "avgMs": 7128,
+    "consecFails": 2,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga07": {
+    "avgMs": 7714,
+    "consecFails": 2,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny03": {
+    "avgMs": 6318,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny04": {
+    "avgMs": 3218,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny05": {
+    "avgMs": 3375,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny06": {
+    "avgMs": 3725,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny07": {
+    "avgMs": 7141,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny08": {
+    "avgMs": 7015,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny09": {
+    "avgMs": 7344,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny10": {
+    "avgMs": 7583,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny11": {
+    "avgMs": 7867,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny12": {
+    "avgMs": 7852,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny13": {
+    "avgMs": 8136,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny14": {
+    "avgMs": 8242,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny15": {
+    "avgMs": 7888,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny16": {
+    "avgMs": 7995,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny17": {
+    "avgMs": 8206,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny18": {
+    "avgMs": 6952,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny19": {
+    "avgMs": 7669,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny20": {
+    "avgMs": 7848,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny21": {
+    "avgMs": 7849,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny22": {
+    "avgMs": 7228,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny23": {
+    "avgMs": 6808,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny24": {
+    "avgMs": 4304,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny25": {
+    "avgMs": 4762,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ny26": {
+    "avgMs": 5426,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc01": {
+    "avgMs": 6041,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc02": {
+    "avgMs": 6553,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tn08": {
+    "avgMs": 5399,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tn09": {
+    "avgMs": 5353,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx01": {
+    "avgMs": 6413,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx02": {
+    "avgMs": 7361,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx03": {
+    "avgMs": 7790,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx04": {
+    "avgMs": 7710,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx07": {
+    "avgMs": 7826,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx08": {
+    "avgMs": 8085,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx09": {
+    "avgMs": 8150,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx38": {
+    "avgMs": 7235,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ut01": {
+    "avgMs": 6946,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ut02": {
+    "avgMs": 7536,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ut03": {
+    "avgMs": 7623,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ut04": {
+    "avgMs": 8156,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va01": {
+    "avgMs": 8530,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va02": {
+    "avgMs": 8352,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va03": {
+    "avgMs": 8200,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va04": {
+    "avgMs": 8018,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va05": {
+    "avgMs": 7534,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va06": {
+    "avgMs": 7383,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va07": {
+    "avgMs": 7382,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va08": {
+    "avgMs": 7596,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va09": {
+    "avgMs": 7921,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va10": {
+    "avgMs": 6876,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc03": {
+    "avgMs": 7524,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc04": {
+    "avgMs": 7874,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1781177189235-6heq6ti": {
+    "avgMs": 7621,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1779565498134-v5tij6n": {
+    "avgMs": 6944,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc05": {
+    "avgMs": 7716,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc06": {
+    "avgMs": 3522,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc07": {
+    "avgMs": 3127,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc08": {
+    "avgMs": 3049,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc09": {
+    "avgMs": 3896,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc10": {
+    "avgMs": 7679,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc11": {
+    "avgMs": 7509,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc12": {
+    "avgMs": 8016,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc13": {
+    "avgMs": 7848,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-nc14": {
+    "avgMs": 7827,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ndal": {
+    "avgMs": 8043,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh01": {
+    "avgMs": 6928,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh02": {
+    "avgMs": 6775,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh03": {
+    "avgMs": 6640,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh04": {
+    "avgMs": 7065,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh05": {
+    "avgMs": 7181,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx05": {
+    "avgMs": 7756,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx06": {
+    "avgMs": 7401,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx10": {
+    "avgMs": 8352,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx11": {
+    "avgMs": 8511,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx12": {
+    "avgMs": 8069,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-tx13": {
+    "avgMs": 8303,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-va11": {
+    "avgMs": 6891,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az02": {
+    "avgMs": 5857,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az03": {
+    "avgMs": 5688,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az05": {
+    "avgMs": 5619,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az06": {
+    "avgMs": 6300,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az04": {
+    "avgMs": 5757,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga08": {
+    "avgMs": 7118,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga09": {
+    "avgMs": 6187,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga10": {
+    "avgMs": 6280,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga11": {
+    "avgMs": 6175,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az07": {
+    "avgMs": 6257,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga12": {
+    "avgMs": 6035,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga13": {
+    "avgMs": 8421,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ga14": {
+    "avgMs": 8722,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-hi01": {
+    "avgMs": 8858,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-hi02": {
+    "avgMs": 8901,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-id01": {
+    "avgMs": 8106,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-id02": {
+    "avgMs": 7049,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il01": {
+    "avgMs": 6658,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il02": {
+    "avgMs": 7122,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il03": {
+    "avgMs": 7393,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il04": {
+    "avgMs": 7344,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il06": {
+    "avgMs": 7658,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il05": {
+    "avgMs": 7843,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il07": {
+    "avgMs": 7552,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il08": {
+    "avgMs": 7600,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il09": {
+    "avgMs": 7243,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il10": {
+    "avgMs": 6766,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il11": {
+    "avgMs": 6420,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il12": {
+    "avgMs": 6032,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il13": {
+    "avgMs": 5996,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il14": {
+    "avgMs": 6530,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il15": {
+    "avgMs": 7199,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il17": {
+    "avgMs": 6746,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-il16": {
+    "avgMs": 7081,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in01": {
+    "avgMs": 5757,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in02": {
+    "avgMs": 5612,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh06": {
+    "avgMs": 7959,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh08": {
+    "avgMs": 8116,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh14": {
+    "avgMs": 8094,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh07": {
+    "avgMs": 8181,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh15": {
+    "avgMs": 7961,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh11": {
+    "avgMs": 7123,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh09": {
+    "avgMs": 8002,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh10": {
+    "avgMs": 7554,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-oh12": {
+    "avgMs": 5140,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ok01": {
+    "avgMs": 4394,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-vtal": {
+    "avgMs": 7447,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-wa01": {
+    "avgMs": 7351,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-wa03": {
+    "avgMs": 7808,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-wa02": {
+    "avgMs": 7243,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-wa04": {
+    "avgMs": 4766,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-wa05": {
+    "avgMs": 3729,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-az09": {
+    "avgMs": 6005,
+    "consecFails": 1,
+    "trips": 1,
+    "cooldownUntil": 1786461852560
+  },
+  "1782999196726-house-ca01": {
+    "avgMs": 6061,
+    "consecFails": 0,
+    "trips": 1,
+    "cooldownUntil": 1786463688344
+  },
+  "1782999196726-house-az08": {
+    "avgMs": 6718,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca02": {
+    "avgMs": 5836,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca03": {
+    "avgMs": 5544,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca06": {
+    "avgMs": 5668,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca05": {
+    "avgMs": 5684,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca08": {
+    "avgMs": 9545,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca10": {
+    "avgMs": 6791,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca09": {
+    "avgMs": 6757,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca13": {
+    "avgMs": 6429,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca15": {
+    "avgMs": 6590,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1779617150327-ntzesfy": {
+    "avgMs": 2614,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca16": {
+    "avgMs": 6592,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca18": {
+    "avgMs": 6061,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca17": {
+    "avgMs": 8237,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca19": {
+    "avgMs": 6450,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca20": {
+    "avgMs": 6484,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca21": {
+    "avgMs": 6017,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca23": {
+    "avgMs": 6822,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca22": {
+    "avgMs": 5765,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca24": {
+    "avgMs": 6935,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca25": {
+    "avgMs": 7165,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl01": {
+    "avgMs": 5693,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca26": {
+    "avgMs": 7629,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ca27": {
+    "avgMs": 7420,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-deal": {
+    "avgMs": 8047,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl02": {
+    "avgMs": 5519,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-fl03": {
+    "avgMs": 5753,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in04": {
+    "avgMs": 5646,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in05": {
+    "avgMs": 6307,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in03": {
+    "avgMs": 5440,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in06": {
+    "avgMs": 8657,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in09": {
+    "avgMs": 7800,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-in08": {
+    "avgMs": 8178,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ia01": {
+    "avgMs": 8292,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ia02": {
+    "avgMs": 8216,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ia03": {
+    "avgMs": 7693,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-ok02": {
+    "avgMs": 4781,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ia04": {
+    "avgMs": 7709,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-or03": {
+    "avgMs": 5336,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-or04": {
+    "avgMs": 6620,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-or05": {
+    "avgMs": 6183,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-or06": {
+    "avgMs": 6757,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa02": {
+    "avgMs": 7128,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa03": {
+    "avgMs": 7562,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa04": {
+    "avgMs": 7686,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa05": {
+    "avgMs": 7647,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa06": {
+    "avgMs": 7554,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa10": {
+    "avgMs": 7716,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa11": {
+    "avgMs": 7344,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa12": {
+    "avgMs": 7430,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa13": {
+    "avgMs": 8026,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa14": {
+    "avgMs": 7643,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-pa15": {
+    "avgMs": 7855,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-sc04": {
+    "avgMs": 7905,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-sc05": {
+    "avgMs": 7974,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196727-house-sc06": {
+    "avgMs": 7716,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
   "1782999196727-house-tx14": {
-    "avgMs": 6859,
+    "avgMs": 8254,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx15": {
-    "avgMs": 7030,
+    "avgMs": 8385,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx16": {
-    "avgMs": 6540,
+    "avgMs": 8071,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx17": {
-    "avgMs": 6095,
+    "avgMs": 8354,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx18": {
-    "avgMs": 5937,
+    "avgMs": 8170,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx19": {
-    "avgMs": 5992,
+    "avgMs": 8370,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx20": {
-    "avgMs": 5542,
+    "avgMs": 8085,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx21": {
-    "avgMs": 5464,
+    "avgMs": 8228,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wa06": {
-    "avgMs": 7702,
+    "avgMs": 3841,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wa07": {
-    "avgMs": 7939,
+    "avgMs": 4671,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wa08": {
-    "avgMs": 7034,
-    "consecFails": 1,
+    "avgMs": 3288,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wa09": {
-    "avgMs": 6942,
-    "consecFails": 1,
+    "avgMs": 5520,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wa10": {
-    "avgMs": 8391,
+    "avgMs": 4982,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi01": {
-    "avgMs": 6967,
-    "consecFails": 1,
+    "avgMs": 6371,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi02": {
-    "avgMs": 7009,
-    "consecFails": 1,
+    "avgMs": 6769,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
@@ -1686,13 +1686,13 @@
     "cooldownUntil": 0
   },
   "1779652525824-sl6nqkx": {
-    "avgMs": 3355,
+    "avgMs": 2008,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779565414697-01jpgss": {
-    "avgMs": 3904,
+    "avgMs": 1913,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -1704,380 +1704,380 @@
     "cooldownUntil": 0
   },
   "1779615969341-4z00t8d": {
-    "avgMs": 19875,
+    "avgMs": 3958,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779921626235-sb1i94e": {
-    "avgMs": 7068,
+    "avgMs": 11239,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779918758511-quuqz22": {
-    "avgMs": 13727,
+    "avgMs": 11342,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl04": {
-    "avgMs": 3491,
+    "avgMs": 7588,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ks01": {
-    "avgMs": 5886,
+    "avgMs": 7499,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ks02": {
-    "avgMs": 6636,
+    "avgMs": 6425,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ks03": {
-    "avgMs": 6440,
+    "avgMs": 7307,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ks04": {
-    "avgMs": 5109,
+    "avgMs": 6385,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ky01": {
-    "avgMs": 5345,
+    "avgMs": 6825,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ky02": {
-    "avgMs": 5448,
+    "avgMs": 6836,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ky03": {
-    "avgMs": 5448,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ky04": {
-    "avgMs": 4775,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ky05": {
-    "avgMs": 5063,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ky06": {
-    "avgMs": 4580,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la01": {
-    "avgMs": 5986,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la02": {
-    "avgMs": 6373,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la03": {
-    "avgMs": 6383,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la04": {
-    "avgMs": 6143,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la05": {
-    "avgMs": 5923,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-la06": {
-    "avgMs": 6321,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-me01": {
-    "avgMs": 6565,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md01": {
-    "avgMs": 6414,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md02": {
-    "avgMs": 4700,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md03": {
-    "avgMs": 6929,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md04": {
-    "avgMs": 4867,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md05": {
-    "avgMs": 5457,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md06": {
-    "avgMs": 4696,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md07": {
-    "avgMs": 5149,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-md08": {
-    "avgMs": 5877,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma01": {
-    "avgMs": 6330,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma02": {
-    "avgMs": 6671,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma03": {
-    "avgMs": 6760,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma04": {
-    "avgMs": 6095,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma05": {
-    "avgMs": 6165,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma06": {
-    "avgMs": 6235,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma07": {
-    "avgMs": 5921,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma08": {
-    "avgMs": 6236,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-ma09": {
-    "avgMs": 6315,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi01": {
-    "avgMs": 6750,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi02": {
-    "avgMs": 6267,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi03": {
-    "avgMs": 8370,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi04": {
-    "avgMs": 6264,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi05": {
-    "avgMs": 6242,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi06": {
-    "avgMs": 6341,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi08": {
-    "avgMs": 6561,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi09": {
-    "avgMs": 7938,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi10": {
-    "avgMs": 8148,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi11": {
-    "avgMs": 8050,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi12": {
-    "avgMs": 8234,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mi13": {
-    "avgMs": 7761,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mn01": {
-    "avgMs": 8130,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mn02": {
-    "avgMs": 7244,
-    "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
-  },
-  "1782999196726-house-mn03": {
     "avgMs": 7599,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
+  "1782999196726-house-ky04": {
+    "avgMs": 8460,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ky05": {
+    "avgMs": 8608,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ky06": {
+    "avgMs": 6947,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la01": {
+    "avgMs": 7858,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la02": {
+    "avgMs": 7741,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la03": {
+    "avgMs": 8156,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la04": {
+    "avgMs": 8866,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la05": {
+    "avgMs": 9246,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-la06": {
+    "avgMs": 7735,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-me01": {
+    "avgMs": 7750,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md01": {
+    "avgMs": 7687,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md02": {
+    "avgMs": 7654,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md03": {
+    "avgMs": 7486,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md04": {
+    "avgMs": 7619,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md05": {
+    "avgMs": 7878,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md06": {
+    "avgMs": 7943,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md07": {
+    "avgMs": 7529,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-md08": {
+    "avgMs": 7764,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma01": {
+    "avgMs": 8808,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma02": {
+    "avgMs": 7522,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma03": {
+    "avgMs": 8111,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma04": {
+    "avgMs": 8596,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma05": {
+    "avgMs": 6925,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma06": {
+    "avgMs": 7582,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma07": {
+    "avgMs": 7197,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma08": {
+    "avgMs": 5856,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-ma09": {
+    "avgMs": 6625,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi01": {
+    "avgMs": 7037,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi02": {
+    "avgMs": 7676,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi03": {
+    "avgMs": 7250,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi04": {
+    "avgMs": 6637,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi05": {
+    "avgMs": 6937,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi06": {
+    "avgMs": 8048,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi08": {
+    "avgMs": 7296,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi09": {
+    "avgMs": 7927,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi10": {
+    "avgMs": 8115,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi11": {
+    "avgMs": 8735,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi12": {
+    "avgMs": 8260,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mi13": {
+    "avgMs": 8359,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mn01": {
+    "avgMs": 8231,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mn02": {
+    "avgMs": 7540,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "1782999196726-house-mn03": {
+    "avgMs": 6997,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
   "1782999196726-house-mn04": {
-    "avgMs": 6488,
+    "avgMs": 6945,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780521673191-sxsf08c": {
-    "avgMs": 10577,
+    "avgMs": 23209,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780516372802-ky4zbp8": {
-    "avgMs": 3542,
+    "avgMs": 10585,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780524610133-tw8c996": {
-    "avgMs": 4292,
+    "avgMs": 1900,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779921598922-8sg17v8": {
-    "avgMs": 9060,
-    "consecFails": 2,
+    "avgMs": 2344,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780525241216-nevhd9n": {
-    "avgMs": 1106,
+    "avgMs": 2543,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780515968723-d0aycj7": {
-    "avgMs": 30288,
+    "avgMs": 4868,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780516130290-bbhg6o1": {
-    "avgMs": 19458,
+    "avgMs": 23745,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780525145160-9gggiip": {
-    "avgMs": 11347,
-    "consecFails": 1,
+    "avgMs": 15780,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780612499359-fuv0rf2": {
-    "avgMs": 4806,
-    "consecFails": 1,
+    "avgMs": 6434,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
@@ -2088,506 +2088,506 @@
     "cooldownUntil": 1786102439832
   },
   "1780612579960-z55igki": {
-    "avgMs": 5472,
-    "consecFails": 1,
+    "avgMs": 6655,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780616663733-gqtyl8u": {
-    "avgMs": 5598,
-    "consecFails": 1,
+    "avgMs": 7117,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1781993194195-7cj9e17": {
-    "avgMs": 7220,
+    "avgMs": 15526,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782650649084-gy4qfq6": {
-    "avgMs": 2124,
+    "avgMs": 8389,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca28": {
-    "avgMs": 3238,
+    "avgMs": 7869,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca30": {
-    "avgMs": 5262,
+    "avgMs": 8021,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1781520333275-tmumx79": {
-    "avgMs": 8733,
-    "consecFails": 1,
+    "avgMs": 9369,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca31": {
-    "avgMs": 5324,
+    "avgMs": 7856,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca32": {
-    "avgMs": 5358,
+    "avgMs": 8108,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca33": {
-    "avgMs": 5370,
+    "avgMs": 7811,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca35": {
-    "avgMs": 5420,
+    "avgMs": 11843,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca36": {
-    "avgMs": 5348,
+    "avgMs": 9489,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca38": {
-    "avgMs": 5394,
+    "avgMs": 6644,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca39": {
-    "avgMs": 5349,
+    "avgMs": 6637,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca41": {
-    "avgMs": 5376,
+    "avgMs": 6832,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca42": {
-    "avgMs": 5357,
+    "avgMs": 6593,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca43": {
-    "avgMs": 5673,
-    "consecFails": 1,
+    "avgMs": 6987,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca44": {
-    "avgMs": 5599,
-    "consecFails": 1,
+    "avgMs": 8369,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca46": {
-    "avgMs": 4984,
-    "consecFails": 1,
+    "avgMs": 7894,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca47": {
-    "avgMs": 5093,
+    "avgMs": 3261,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca48": {
-    "avgMs": 5101,
+    "avgMs": 6380,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca49": {
-    "avgMs": 5257,
-    "consecFails": 1,
+    "avgMs": 4697,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca50": {
-    "avgMs": 5107,
+    "avgMs": 6945,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca51": {
-    "avgMs": 4014,
+    "avgMs": 6793,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ca52": {
-    "avgMs": 3383,
+    "avgMs": 6227,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-co01": {
-    "avgMs": 3750,
+    "avgMs": 6565,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-co02": {
-    "avgMs": 5118,
+    "avgMs": 5678,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl05": {
-    "avgMs": 5421,
+    "avgMs": 8016,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl06": {
-    "avgMs": 5403,
+    "avgMs": 5685,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl07": {
-    "avgMs": 5467,
+    "avgMs": 3993,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl12": {
-    "avgMs": 5357,
+    "avgMs": 5725,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl13": {
-    "avgMs": 5377,
+    "avgMs": 5696,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl14": {
-    "avgMs": 5378,
+    "avgMs": 6706,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl15": {
-    "avgMs": 3819,
+    "avgMs": 7328,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl16": {
-    "avgMs": 3300,
+    "avgMs": 7650,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl17": {
-    "avgMs": 3928,
+    "avgMs": 8116,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl18": {
-    "avgMs": 4807,
+    "avgMs": 8365,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl19": {
-    "avgMs": 5585,
+    "avgMs": 7777,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl20": {
-    "avgMs": 5597,
+    "avgMs": 7491,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl21": {
-    "avgMs": 5879,
+    "avgMs": 7700,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl22": {
-    "avgMs": 5740,
+    "avgMs": 7018,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl24": {
-    "avgMs": 6056,
+    "avgMs": 7040,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-fl25": {
-    "avgMs": 6133,
+    "avgMs": 7536,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mn05": {
-    "avgMs": 6786,
+    "avgMs": 4477,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mn06": {
-    "avgMs": 6845,
+    "avgMs": 4313,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mn07": {
-    "avgMs": 4257,
+    "avgMs": 4207,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mn08": {
-    "avgMs": 4442,
+    "avgMs": 4916,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ms01": {
-    "avgMs": 4989,
+    "avgMs": 5097,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ms02": {
-    "avgMs": 4413,
+    "avgMs": 5329,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ms03": {
-    "avgMs": 4958,
+    "avgMs": 5487,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-ms04": {
-    "avgMs": 6055,
+    "avgMs": 6336,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mo01": {
-    "avgMs": 6672,
+    "avgMs": 7095,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mo02": {
-    "avgMs": 7620,
+    "avgMs": 6042,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196726-house-mo03": {
-    "avgMs": 7387,
+    "avgMs": 6055,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-mo04": {
-    "avgMs": 7162,
+    "avgMs": 6835,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-mo05": {
-    "avgMs": 7480,
+    "avgMs": 7222,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-sc07": {
-    "avgMs": 5475,
+    "avgMs": 7727,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-sdal": {
-    "avgMs": 4079,
+    "avgMs": 7397,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn01": {
-    "avgMs": 6229,
+    "avgMs": 7764,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn02": {
-    "avgMs": 4712,
+    "avgMs": 7682,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn03": {
-    "avgMs": 5125,
+    "avgMs": 7918,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn04": {
-    "avgMs": 5887,
+    "avgMs": 6200,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn05": {
-    "avgMs": 5878,
+    "avgMs": 6538,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn06": {
-    "avgMs": 6351,
+    "avgMs": 6012,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tn07": {
-    "avgMs": 6279,
+    "avgMs": 6065,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx22": {
-    "avgMs": 5019,
+    "avgMs": 7887,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx23": {
-    "avgMs": 5096,
+    "avgMs": 7491,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx24": {
-    "avgMs": 5837,
+    "avgMs": 6831,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx25": {
-    "avgMs": 5789,
+    "avgMs": 4399,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx26": {
-    "avgMs": 5701,
+    "avgMs": 3584,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx27": {
-    "avgMs": 6131,
+    "avgMs": 3553,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx28": {
-    "avgMs": 6189,
+    "avgMs": 3682,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx29": {
-    "avgMs": 6430,
+    "avgMs": 5479,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx30": {
-    "avgMs": 6444,
+    "avgMs": 4824,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx31": {
-    "avgMs": 6440,
+    "avgMs": 6161,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx32": {
-    "avgMs": 6834,
+    "avgMs": 6536,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx36": {
-    "avgMs": 6395,
+    "avgMs": 7369,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-tx37": {
-    "avgMs": 6244,
+    "avgMs": 6984,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi03": {
     "avgMs": 6973,
-    "consecFails": 1,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi04": {
-    "avgMs": 8104,
+    "avgMs": 6987,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wyal": {
-    "avgMs": 7557,
+    "avgMs": 6482,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi05": {
-    "avgMs": 7874,
+    "avgMs": 7352,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi06": {
-    "avgMs": 7917,
+    "avgMs": 7170,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782999196727-house-wi07": {
-    "avgMs": 8441,
-    "consecFails": 2,
+    "avgMs": 8112,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
@@ -2598,7 +2598,7 @@
     "cooldownUntil": 0
   },
   "1780947788335-qp3d590": {
-    "avgMs": 16793,
+    "avgMs": 17172,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -2634,73 +2634,67 @@
     "cooldownUntil": 0
   },
   "fdf69429-8442-4b60-8881-4139f689bb60": {
-    "avgMs": 18185,
-    "consecFails": 1,
-    "trips": 1,
-    "cooldownUntil": 1786145998966
+    "avgMs": 10391,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "1780524929760-fwvrvx2": {
-    "avgMs": 45591,
+    "avgMs": 23103,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780616584214-jghi7cb": {
-    "avgMs": 38129,
-    "consecFails": 2,
+    "avgMs": 12467,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1781521870595-oqgkld7": {
-    "avgMs": 43964,
+    "avgMs": 34386,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1781522252009-181a6ca": {
-    "avgMs": 40984,
+    "avgMs": 38167,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1782915377416-r23zhuu": {
-    "avgMs": 34892,
-    "consecFails": 1,
+    "avgMs": 6745,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1779918332608-3at7dls": {
-    "avgMs": 24401,
+    "avgMs": 11314,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "e4e109ba-e537-4d96-9f88-e27dfe80353a": {
-    "avgMs": 47192,
+    "avgMs": 7319,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "1780947485064-f22ikcd": {
-    "avgMs": 25372,
+    "avgMs": 17912,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "685e008f-34ad-4664-9cd6-48bbea7c32f7": {
-    "avgMs": 14961,
-    "consecFails": 1,
-    "trips": 1,
-    "cooldownUntil": 1786145998963
-  },
-  "1782999196726-house-me02": {
-    "avgMs": 0,
+    "avgMs": 9177,
     "consecFails": 0,
-    "trips": 202,
-    "cooldownUntil": 1786148007220
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "1780515890597-uyepmew": {
-    "avgMs": 25829,
+    "avgMs": 16913,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -2712,13 +2706,13 @@
     "cooldownUntil": 0
   },
   "dfaa0e81-590c-41f2-b478-7a0032523d6f": {
-    "avgMs": 21317,
+    "avgMs": 7952,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "e7c2e142-949d-42c1-80ab-e11c60a7842e": {
-    "avgMs": 11063,
+    "avgMs": 7518,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -2838,10 +2832,10 @@
     "cooldownUntil": 0
   },
   "2185ee08-b3f1-4a06-a7e7-f3ba68cf745c": {
-    "avgMs": 7515,
+    "avgMs": 7425,
     "consecFails": 0,
-    "trips": 1,
-    "cooldownUntil": 1786146118280
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "e1a5a77e-9265-4aeb-a34a-69f6150d771e": {
     "avgMs": 5763,
@@ -2874,10 +2868,10 @@
     "cooldownUntil": 0
   },
   "ef17c07f-1509-4016-b0b2-d4959f4b8014": {
-    "avgMs": 47080,
+    "avgMs": 9648,
     "consecFails": 0,
-    "trips": 0,
-    "cooldownUntil": 0
+    "trips": 1,
+    "cooldownUntil": 1786406345778
   },
   "3af4ff72-82c0-494d-a5a3-609fb1f0abf6": {
     "avgMs": 6119,
@@ -2892,7 +2886,7 @@
     "cooldownUntil": 0
   },
   "5da5e38b-d4e1-4ed3-8347-26aa3407036c": {
-    "avgMs": 23825,
+    "avgMs": 12193,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -2940,19 +2934,19 @@
     "cooldownUntil": 0
   },
   "9bb8038e-2c64-43dc-8e56-b3f00bc3b134": {
-    "avgMs": 49443,
-    "consecFails": 1,
-    "trips": 1,
-    "cooldownUntil": 1786145998971
+    "avgMs": 24238,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "b2a32642-a451-405f-a400-42253eb5f5e8": {
-    "avgMs": 38265,
+    "avgMs": 16797,
     "consecFails": 0,
-    "trips": 1,
-    "cooldownUntil": 1786144799474
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "ea8197d0-5a5b-468c-8f04-8c0da23b9a56": {
-    "avgMs": 45235,
+    "avgMs": 31967,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -2964,10 +2958,10 @@
     "cooldownUntil": 0
   },
   "3d120378-3bac-4d75-af80-270f5fd68997": {
-    "avgMs": 42412,
+    "avgMs": 7064,
     "consecFails": 0,
-    "trips": 8,
-    "cooldownUntil": 1786147837671
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "a286ce90-ceaf-4ade-a0f5-41ec4c389a92": {
     "avgMs": 4453,
@@ -2988,127 +2982,127 @@
     "cooldownUntil": 0
   },
   "84a6bc4c-5741-4352-afd3-7924bf75652e": {
-    "avgMs": 10127,
+    "avgMs": 179,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "cd37d782-e556-478e-ab42-7ad85a64b2c3": {
-    "avgMs": 42934,
+    "avgMs": 9132,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "60793b42-cced-400f-9802-8001e90e8064": {
-    "avgMs": 22929,
+    "avgMs": 5331,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "62044ec2-d586-4374-b48a-695e428bae65": {
-    "avgMs": 35916,
+    "avgMs": 7574,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "5d1d6b6c-c764-4e0a-b7f9-dcfa6785c99c": {
-    "avgMs": 21289,
+    "avgMs": 285,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "d10bf2a7-87f8-4e79-baf4-da223d290be6": {
-    "avgMs": 25415,
-    "consecFails": 0,
+    "avgMs": 5175,
+    "consecFails": 2,
     "trips": 0,
     "cooldownUntil": 0
   },
   "9df7fe23-3f0f-40f6-bd26-2fbb66159651": {
-    "avgMs": 25863,
+    "avgMs": 29140,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "4157052a-5b8c-477f-93a0-ef4e8797644d": {
-    "avgMs": 22049,
-    "consecFails": 0,
+    "avgMs": 17371,
+    "consecFails": 2,
     "trips": 0,
     "cooldownUntil": 0
   },
   "154ead6b-4487-4595-8572-239fd8b0a8e4": {
     "avgMs": 0,
     "consecFails": 0,
-    "trips": 14,
-    "cooldownUntil": 1786146341719
+    "trips": 93,
+    "cooldownUntil": 1786466875140
   },
   "cafac9ad-4f29-4187-b848-87c429ac41ea": {
-    "avgMs": 19976,
+    "avgMs": 35965,
     "consecFails": 0,
-    "trips": 1,
-    "cooldownUntil": 1786146233670
+    "trips": 4,
+    "cooldownUntil": 1786296309893
   },
   "b7be0140-5ed7-44e6-ad5f-685cc1617157": {
-    "avgMs": 8988,
+    "avgMs": 629,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "03558124-09a2-4b1e-9c9d-b3c923d8b88b": {
-    "avgMs": 5423,
+    "avgMs": 312,
     "consecFails": 0,
-    "trips": 4,
-    "cooldownUntil": 1786146741405
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "a9cf0c7e-e178-4c2a-9d99-928341341518": {
-    "avgMs": 14433,
+    "avgMs": 649,
     "consecFails": 0,
-    "trips": 4,
-    "cooldownUntil": 1786146841080
+    "trips": 0,
+    "cooldownUntil": 0
   },
   "c7824a32-9a71-47a7-932d-894823c88f02": {
-    "avgMs": 10789,
+    "avgMs": 430,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "c80ed73f-6564-4f04-b6d4-57adb4d72184": {
-    "avgMs": 5232,
-    "consecFails": 1,
+    "avgMs": 554,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "ab2cb87f-7ef0-4b3b-b507-c6314af4d6e7": {
-    "avgMs": 40555,
-    "consecFails": 2,
+    "avgMs": 33004,
+    "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "d4f3a7e5-a342-4651-b8db-a524931e2216": {
-    "avgMs": 13725,
+    "avgMs": 16913,
+    "consecFails": 0,
+    "trips": 1,
+    "cooldownUntil": 1786235473520
+  },
+  "f84088f6-88fa-4abe-b5e4-c531166ac287": {
+    "avgMs": 8218,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
-  "f84088f6-88fa-4abe-b5e4-c531166ac287": {
-    "avgMs": 8959,
-    "consecFails": 0,
-    "trips": 4,
-    "cooldownUntil": 1786146741408
-  },
   "ab70e420-2090-4cb5-95cb-581494d3d555": {
-    "avgMs": 9883,
+    "avgMs": 1029,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "d54f2810-4ddc-49a5-b12c-528d4d48cf41": {
-    "avgMs": 9913,
+    "avgMs": 480,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "370cdc74-fbb7-42d8-a4eb-1edd2c0a22de": {
-    "avgMs": 9894,
+    "avgMs": 424,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -3120,7 +3114,7 @@
     "cooldownUntil": 0
   },
   "471af062-4008-4c82-9658-8b26d6160b6e": {
-    "avgMs": 16090,
+    "avgMs": 599,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
@@ -3132,25 +3126,97 @@
     "cooldownUntil": 0
   },
   "200f3596-1ebe-40bd-8b12-5a0e3268fd71": {
-    "avgMs": 13233,
+    "avgMs": 9779,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "dd4d9b9a-1e5e-4fde-9a7d-52b9a96ff2ca": {
-    "avgMs": 25302,
+    "avgMs": 831,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "2d210b56-9ecd-4735-b964-5ccacc52a50e": {
-    "avgMs": 26531,
+    "avgMs": 461,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0
   },
   "16ce7393-2522-4902-a59c-5ea023075f5a": {
-    "avgMs": 43581,
+    "avgMs": 562,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "46aef3a1-8f34-4935-8d56-2e9cf7393d48": {
+    "avgMs": 609,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "7d682a1e-bc8c-491d-82c2-ff1a1c837ba4": {
+    "avgMs": 323,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "e4b8d745-aa73-4362-88d6-0eb6191a2e28": {
+    "avgMs": 6539,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "23c922fb-211e-4fa7-9442-17f5cdf2fa59": {
+    "avgMs": 205,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "906b461c-88a8-405b-8027-aae2fe98a264": {
+    "avgMs": 189,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "721ce284-99e3-4170-a927-2dfc01a1bdd8": {
+    "avgMs": 10208,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "d782d04f-f297-4c5e-9e02-6ddc3fa8b607": {
+    "avgMs": 6879,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "13f50709-5f7f-47fa-bb28-adf05226dc2d": {
+    "avgMs": 8103,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "17cf9a63-3a51-42b8-986b-3f408a96d695": {
+    "avgMs": 2518,
+    "consecFails": 0,
+    "trips": 5,
+    "cooldownUntil": 1786334710565
+  },
+  "002501e5-8c1d-4492-9ed1-6411e87bf93a": {
+    "avgMs": 6800,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "302f4a86-eb7b-49fa-911d-2a8b2a40b002": {
+    "avgMs": 5828,
+    "consecFails": 0,
+    "trips": 0,
+    "cooldownUntil": 0
+  },
+  "fd91f406-d2bb-43cf-8ea8-3cfafafda79d": {
+    "avgMs": 238,
     "consecFails": 0,
     "trips": 0,
     "cooldownUntil": 0

@@ -30,6 +30,7 @@ function OverviewPanelInner({
   timeUntilExpiry,
   formatExpiry,
   onSelectMarket,
+  mode = "markets",
 }: {
   markets: SavedMarket[];
   loading: boolean;
@@ -48,6 +49,7 @@ function OverviewPanelInner({
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
   onSelectMarket: (m: SavedMarket) => void;
+  mode?: "markets" | "opportunities";
 }) {
   // Auto-load on mount only — prevents infinite loop if parent re-creates callback
   useEffect(() => { onLoad(); }, []);
@@ -231,20 +233,33 @@ function OverviewPanelInner({
       }));
   })), [markets]);
 
+  if (mode === "opportunities") {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight">Opportunity Queue</h2>
+        </div>
+        {opportunityModels.length > 0 ? (
+          <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)]">
+            <OpportunityQueue
+              opportunities={opportunityModels}
+              onPrepare={(opportunity) => {
+                const market = markets.find((item) => item.id === opportunity.marketId);
+                if (market) onSelectMarket(market);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--surface-panel)] p-8 text-center text-sm text-[var(--text-secondary)]">
+            No actionable opportunities right now.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {opportunityModels.length > 0 && (
-        <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)]">
-          <OpportunityQueue
-            opportunities={opportunityModels}
-            onPrepare={(opportunity) => {
-              const market = markets.find((item) => item.id === opportunity.marketId);
-              if (market) onSelectMarket(market);
-            }}
-          />
-        </div>
-      )}
-
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">

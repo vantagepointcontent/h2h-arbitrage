@@ -1,85 +1,19 @@
 {
-  "status": "degraded",
+  "status": "ok",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 473,
-  "startedAt": "2026-08-07T23:41:47.144Z",
-  "finishedAt": "2026-08-07T23:42:37.213Z",
-  "durationMs": 50069,
-  "successCount": 27,
-  "failureCount": 13,
-  "skippedCount": 425,
-  "avgScanMs": 5951,
-  "maxScanMs": 34041,
-  "errors": [
-    {
-      "market": "New Mexico Governor Election Winner",
-      "error": "timeout after 16416ms (adaptive)",
-      "durationMs": 16416
-    },
-    {
-      "market": "FL-19 Republican Primary Winner",
-      "error": "timeout after 26199ms (adaptive)",
-      "durationMs": 26199
-    },
-    {
-      "market": "MLB: 2026 American League Champion",
-      "error": "timeout after 34041ms (adaptive)",
-      "durationMs": 34041
-    },
-    {
-      "market": "VA-06 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 8
-    },
-    {
-      "market": "VA-07 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "WA-08 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 11
-    },
-    {
-      "market": "WA-09 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "WI-01 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "WI-02 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "WI-03 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "Next Prime Minister of Sweden",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "Sweden Parliamentary Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "Big Brother Season 28: 3rd Place",
-      "error": "HTTP 429",
-      "durationMs": 2
-    }
-  ],
-  "breakerSkipped": 8,
-  "openBreakers": 8
+  "marketCount": 480,
+  "startedAt": "2026-08-11T15:54:39.611Z",
+  "finishedAt": "2026-08-11T15:55:12.696Z",
+  "durationMs": 33085,
+  "successCount": 24,
+  "failureCount": 0,
+  "skippedCount": 454,
+  "avgScanMs": 6438,
+  "maxScanMs": 9981,
+  "errors": [],
+  "breakerSkipped": 2,
+  "openBreakers": 1
 }

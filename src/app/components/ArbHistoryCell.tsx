@@ -17,20 +17,35 @@ interface Props {
  */
 export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }: Props) {
   const [points, setPoints] = useState<SpreadPoint[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const now = Date.now();
-    const from = now - 30 * 60 * 1000;
-    getSpreadsForOutcome(marketId, outcomeArtist, from, now)
-      .then((pts) => {
-        if (!cancelled) setPoints(pts);
-      })
-      .catch(() => {
-        if (!cancelled) setPoints([]);
-      });
+    const load = () => {
+      const now = Date.now();
+      const from = now - 30 * 60 * 1000;
+      getSpreadsForOutcome(marketId, outcomeArtist, from, now)
+        .then((pts) => {
+          if (!cancelled) {
+            setPoints(pts);
+            setLoaded(true);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPoints([]);
+            setLoaded(true);
+          }
+        });
+    };
+    setLoaded(false);
+    load();
+    // Spread samples are written after each scan. Re-read IndexedDB so the
+    // cell can become a chart without requiring a page remount.
+    const intervalId = window.setInterval(load, 30_000);
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [marketId, outcomeArtist]);
 
@@ -51,7 +66,7 @@ export function ArbHistoryCell({ marketId, outcomeArtist, onExpand, isExpanded }
   }, [points]);
 
   if (!sparkData) {
-    return <span className="text-[#8A9BA8] text-xs">Collecting data…</span>;
+    return <span className="text-[#8A9BA8] text-xs">{loaded ? `${points.length}/5 samples` : "Loading…"}</span>;
   }
 
   // Build SVG sparkline path

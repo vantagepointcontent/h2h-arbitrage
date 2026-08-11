@@ -222,6 +222,7 @@ export class RateLimiter {
     let lastError: unknown;
     const maxRetries = this.config.maxRetries;
     const baseDelay = this.config.retryBaseDelayMs;
+    let saw429 = false;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -229,16 +230,20 @@ export class RateLimiter {
 
         // If the result is a Response-like object with status 429, retry
         if (
-          attempt < maxRetries &&
           result &&
           typeof result === 'object' &&
           'status' in result &&
           (result as any).status === 429
         ) {
-          const delay = this.backoffDelay(attempt, baseDelay);
+          saw429 = true;
           this._retry429Count++;
-          await new Promise(r => setTimeout(r, delay));
-          continue;
+          if (attempt < maxRetries) {
+            const delay = this.backoffDelay(attempt, baseDelay);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          // Final attempt was a 429 — fall through to throw RateLimitedError below.
+          break;
         }
 
         return result;
@@ -252,6 +257,10 @@ export class RateLimiter {
       }
     }
 
+    if (saw429) {
+      const message = lastError instanceof Error ? lastError.message : 'Rate limited';
+      throw new RateLimitedError(`${this.label}: ${message}`, maxRetries);
+    }
     throw lastError;
   }
 
@@ -369,3 +378,19 @@ export const rateLimiters = {
 } as const;
 
 export type RateLimiterKey = keyof typeof rateLimiters;
+
+/** FEAT-046: distinguish final 429 exhaustion from generic errors. */
+export class RateLimitedError extends Error {
+  constructor(
+    message: string,
+    public readonly retries: number,
+  ) {
+    super(message);
+    this.name = 'RateLimitedError';
+  }
+}
+
+/** Returns true if the error originated from exhausting 429 retries. */
+export function isRateLimitedError(err: unknown): err is RateLimitedError {
+  return err instanceof RateLimitedError || (err instanceof Error && err.name === 'RateLimitedError');
+}

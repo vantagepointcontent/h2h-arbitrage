@@ -1,0 +1,3418 @@
+diff --git a/scripts/poll.mjs b/scripts/poll.mjs
+index 97f0fcf..45976d5 100644
+--- a/scripts/poll.mjs
++++ b/scripts/poll.mjs
+@@ -34,31 +34,45 @@ const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathn
+ const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
+ const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
+ const fs = await import('fs');
+-// FEAT-MarketCatalog: refresh all-platform catalog every 6 hours via the app API
+-let lastCatalogSyncAt = 0;
+-const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+-
+-async function triggerCatalogSync() {
++// FEAT-046: refresh all-platform catalog once daily at 04:00 UTC via PM2 cron.
++// The previous 6-hour interval is replaced by a single off-peak daily run so
++// the catalog job never interferes with normal user-triggered scans.
++const CATALOG_CRON = '0 4 * * *';
++let lastCatalogRunAt = 0;
++let catalogJobRunning = false;
++
++async function runDailyCatalogRefresh() {
++  if (catalogJobRunning) return;
++  catalogJobRunning = true;
+   try {
+-    const res = await fetch(`${BASE_URL}/api/catalog/sync`, {
++    console.log(`[${new Date().toISOString()}] Starting daily catalog refresh`);
++    const res = await fetch(`${BASE_URL}/api/catalog/refresh`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+       },
+-      signal: AbortSignal.timeout(600000),
++      signal: AbortSignal.timeout(3_600_000), // 1 hour max for full refresh
+     });
+     if (res.ok) {
+       const json = await res.json().catch(() => ({}));
+-      console.log(`[${new Date().toISOString()}] Catalog sync OK:`, JSON.stringify(json));
++      console.log(`[${new Date().toISOString()}] Daily catalog refresh OK:`, JSON.stringify(json));
+     } else {
+-      console.warn(`[${new Date().toISOString()}] Catalog sync failed: HTTP ${res.status}`);
++      console.warn(`[${new Date().toISOString()}] Daily catalog refresh failed: HTTP ${res.status}`);
+     }
+   } catch (e) {
+-    console.warn(`[${new Date().toISOString()}] Catalog sync error:`, e.message);
++    console.warn(`[${new Date().toISOString()}] Daily catalog refresh error:`, e.message);
++  } finally {
++    catalogJobRunning = false;
++    lastCatalogRunAt = Date.now();
+   }
+ }
+ 
++// Legacy helper kept for backwards compatibility; now only called manually or by cron.
++async function triggerCatalogSync() {
++  return runDailyCatalogRefresh();
++}
++
+ 
+ // UI-033: snapshot rate-limiter metrics every ~60s so the dashboard can show
+ // historical API capacity utilization. We track the last snapshot time
+@@ -66,6 +80,33 @@ async function triggerCatalogSync() {
+ let lastLimiterSnapshotAt = 0;
+ const LIMITER_SNAPSHOT_INTERVAL_MS = 60000;
+ 
++// FEAT-043: mark open BotTrader positions to executable venue bids every 10m.
++// This is independent of market scan cadence and still runs when no saved
++// markets are due. The app owns SQLite writes; the poller only calls its API.
++const BOT_VALUATION_INTERVAL_MS = 10 * 60_000;
++let lastBotValuationAt = 0;
++
++async function valueBotPositions() {
++  try {
++    const res = await fetch(`${BASE_URL}/api/bot-trader/positions/valuate`, {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
++      },
++      signal: AbortSignal.timeout(60_000),
++    });
++    if (!res.ok) {
++      console.warn(`[${new Date().toISOString()}] Bot position valuation failed: HTTP ${res.status}`);
++      return;
++    }
++    const result = await res.json().catch(() => ({}));
++    console.log(`[${new Date().toISOString()}] Bot positions valued: ${result.updated ?? 0} updated, ${result.settled ?? 0} settled, ${(result.errors ?? []).length} error(s)`);
++  } catch (error) {
++    console.warn(`[${new Date().toISOString()}] Bot position valuation error:`, error.message);
++  }
++}
++
+ async function snapshotLimiters() {
+   try {
+     const res = await fetch(`${BASE_URL}/api/snapshot-limiters`, {
+@@ -455,10 +496,13 @@ function formatInterval(ms) {
+ async function pollOnce() {
+   const startedAt = new Date();
+ 
+-  // FEAT-MarketCatalog: trigger a full catalog refresh every 6 hours
+-  if (Date.now() - lastCatalogSyncAt >= CATALOG_SYNC_INTERVAL_MS) {
+-    lastCatalogSyncAt = Date.now();
+-    await triggerCatalogSync();
++  // FEAT-046: trigger the daily catalog refresh at 04:00 UTC. We keep a local
++  // guard so we don't re-run if the process restarts later the same day.
++  const nowUtc = new Date();
++  const currentDay = nowUtc.toISOString().slice(0, 10);
++  const currentHourMinute = `${String(nowUtc.getUTCHours()).padStart(2, '0')}:${String(nowUtc.getUTCMinutes()).padStart(2, '0')}`;
++  if (currentHourMinute >= '04:00' && lastCatalogRunAt < new Date(`${currentDay}T04:00:00Z`).getTime()) {
++    await runDailyCatalogRefresh();
+   }
+ 
+   const cycleStart = Date.now();
+@@ -470,6 +514,11 @@ async function pollOnce() {
+     await snapshotLimiters();
+   }
+ 
++  if (Date.now() - lastBotValuationAt >= BOT_VALUATION_INTERVAL_MS) {
++    lastBotValuationAt = Date.now();
++    await valueBotPositions();
++  }
++
+   // Reload adaptive config each cycle (hot-reload friendly)
+   const adaptiveConfig = loadAdaptiveConfig();
+   const adaptiveEnabled = adaptiveConfig?.enabled ?? false;
+@@ -571,6 +620,19 @@ async function pollOnce() {
+         body: JSON.stringify({ action: 'promote', pairId: market.id }),
+         signal: AbortSignal.timeout(5000),
+       }).catch(() => {});
++      // FEAT-040: BotTrader hook for poller path.  We only have aggregate scan
++      // results here (no full UnifiedOutcome array).  The in-app refresh job path
++      // does the real outcome-level evaluation.  This hook logs when the market is
++      // positive so the operator sees BotTrader is active.
++      fetch(`${BASE_URL}/api/bot-trader/run`, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
++        },
++        body: JSON.stringify({ pairId: market.id, marketTitle: market.eventTitle }),
++        signal: AbortSignal.timeout(5000),
++      }).catch(() => {});
+     } else {
+       console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
+     }
+diff --git a/src/lib/auto-execute.test.ts b/src/lib/auto-execute.test.ts
+index aae1b7a..53b6125 100644
+--- a/src/lib/auto-execute.test.ts
++++ b/src/lib/auto-execute.test.ts
+@@ -4,6 +4,8 @@ import {
+   executeArb,
+   getSafetyLimitsFromEnv,
+   shouldSimulateExecution,
++  areFilledContractsMatched,
++  isCompleteClose,
+   type ExecutionRequest,
+   type SafetyLimits,
+   type OrderRequest,
+@@ -158,6 +160,58 @@ describe('executeArb', () => {
+     expect(limits.dailyLossLimit).toBeGreaterThan(0);
+   });
+ 
++  it('matches hedged fills by contract quantity rather than unequal dollar notionals', () => {
++    expect(areFilledContractsMatched(
++      { platform: 'kalshi', status: 'filled', filledSize: 45, filledPrice: 0.45, filledContracts: 100, timestamp: '' },
++      { platform: 'polymarket', status: 'filled', filledSize: 52, filledPrice: 0.52, filledContracts: 100, timestamp: '' },
++    )).toEqual({ matched: true, kalshiContracts: 100, polymarketContracts: 100 });
++  });
++
++  it('fails closed instead of reconstructing missing contract units from rounded notionals', () => {
++    expect(areFilledContractsMatched(
++      { platform: 'kalshi', status: 'filled', filledSize: 45, filledPrice: 0.45, timestamp: '' },
++      { platform: 'polymarket', status: 'filled', filledSize: 52, filledPrice: 0.52, timestamp: '' },
++    ).matched).toBe(false);
++  });
++
++  it('uses authoritative filled contract units instead of reconstructing them from rounded notionals', () => {
++    expect(areFilledContractsMatched(
++      {
++        platform: 'kalshi', status: 'filled', filledSize: 13.94,
++        filledPrice: 0.45, filledContracts: 31, timestamp: '',
++      },
++      {
++        platform: 'polymarket', status: 'filled', filledSize: 16.11,
++        filledPrice: 0.52, filledContracts: 31, timestamp: '',
++      },
++    )).toEqual({ matched: true, kalshiContracts: 31, polymarketContracts: 31 });
++  });
++
++  it('retains the matched residual contracts after successfully closing an unequal-fill excess', async () => {
++    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
++    random
++      .mockReturnValueOnce(0.5) // Kalshi order fills
++      .mockReturnValueOnce(0.5) // Kalshi slippage = 0
++      .mockReturnValueOnce(0.9) // Kalshi gets the larger partial fill
++      .mockReturnValueOnce(0.5) // Kalshi order id
++      .mockReturnValueOnce(0.5) // PM order fills
++      .mockReturnValueOnce(0.5) // PM slippage = 0
++      .mockReturnValueOnce(0.5); // PM gets the smaller partial fill; later calls default to successful 0.5
++
++    const result = await executeArb(makeRequest(0.45, 45, 0.52, 52, true, 2, 1));
++
++    expect(result.rollbackExecuted).toBe(true);
++    expect(result.unhedged).toBe(false);
++    expect(result.kalshiResult.filledContracts).toBe(92);
++    expect(result.polymarketResult.filledContracts).toBe(92);
++  });
++
++  it('requires the venue to confirm the entire requested excess close', () => {
++    expect(isCompleteClose(8, 8)).toBe(true);
++    expect(isCompleteClose(8, 3)).toBe(false);
++    expect(isCompleteClose(8, null)).toBe(false);
++  });
++
+   it('partial fill handling calculates netExposure', async () => {
+     const req = makeRequest(0.45, 100, 0.50, 100, true);
+     const result = await executeArb(req);
+diff --git a/src/lib/auto-execute.ts b/src/lib/auto-execute.ts
+index 53635c3..67dc5bc 100644
+--- a/src/lib/auto-execute.ts
++++ b/src/lib/auto-execute.ts
+@@ -35,6 +35,8 @@ export interface OrderRequest {
+   side: OrderSide;
+   outcome: 'yes' | 'no';
+   size: number;         // dollar amount
++  /** Exact requested contract/share units when known by the caller. */
++  contracts?: number;
+   price: number;        // limit price (0-1)
+   orderType: OrderType;
+ }
+@@ -43,6 +45,8 @@ export interface OrderResult {
+   platform: 'kalshi' | 'polymarket';
+   status: OrderStatus;
+   filledSize?: number;
++  /** Authoritative venue-reported contracts/shares. */
++  filledContracts?: number;
+   filledPrice?: number;
+   orderId?: string;
+   error?: string;
+@@ -161,6 +165,7 @@ function simulateOrder(req: OrderRequest): OrderResult {
+       platform: req.platform,
+       status: 'pending',
+       filledSize: 0,
++      filledContracts: 0,
+       filledPrice: req.price,
+       orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+       timestamp: new Date().toISOString(),
+@@ -170,10 +175,13 @@ function simulateOrder(req: OrderRequest): OrderResult {
+   const slippage = (Math.random() - 0.5) * 0.005;
+   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
+   const fillRatio = 0.85 + Math.random() * 0.15; // 85-100% fill
++  const requestedContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
++  const filledContracts = Math.floor(requestedContracts * fillRatio);
+   return {
+     platform: req.platform,
+     status: fillRatio >= 0.99 ? 'filled' : 'partial',
+-    filledSize: req.size * fillRatio,
++    filledSize: filledContracts * filledPrice,
++    filledContracts,
+     filledPrice,
+     orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+     timestamp: new Date().toISOString(),
+@@ -184,10 +192,12 @@ function simulateOrder(req: OrderRequest): OrderResult {
+ function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
+   const slippage = (Math.random() - 0.5) * 0.005;
+   const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
++  const filledContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
+   return {
+     platform: req.platform,
+     status: 'filled',
+-    filledSize: req.size,
++    filledSize: filledContracts * filledPrice,
++    filledContracts,
+     filledPrice,
+     orderId,
+     timestamp: new Date().toISOString(),
+@@ -212,7 +222,7 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
+   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+     try {
+       const priceCents = Math.round(req.price * 100);
+-      const count = Math.max(1, Math.floor(req.size / req.price)); // $size → contracts
++      const count = Math.max(1, Math.floor(req.contracts ?? (req.size / req.price))); // $size → contracts
+       const r = await placeKalshiOrder({
+         ticker: req.ticker,
+         side: req.outcome,
+@@ -225,6 +235,7 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
+         platform: 'kalshi',
+         status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
+         filledSize: filledContracts * req.price,
++        filledContracts,
+         filledPrice: req.price,
+         orderId: r.orderId,
+         timestamp: new Date().toISOString(),
+@@ -249,12 +260,14 @@ async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
+   let lastErr: any;
+   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+     try {
+-      const size = req.size / req.price; // $size → shares
++      const size = req.contracts ?? (req.size / req.price); // $size → shares
+       const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
++      const filledContracts = r.filledContracts;
+       return {
+         platform: 'polymarket',
+-        status: r.status === 'matched' ? 'filled' : 'pending',
+-        filledSize: r.status === 'matched' ? req.size : 0,
++        status: r.status === 'matched' && filledContracts != null ? 'filled' : 'pending',
++        filledSize: filledContracts != null ? filledContracts * req.price : 0,
++        filledContracts: filledContracts ?? undefined,
+         filledPrice: req.price,
+         orderId: r.orderId,
+         timestamp: new Date().toISOString(),
+@@ -352,11 +365,34 @@ function isSettled(status: OrderStatus): boolean {
+ 
+ /** Determine if an order has any fill (partial or full). */
+ function hasFill(r: OrderResult): boolean {
+-  return (r.filledSize ?? 0) > 0;
++  return (r.filledContracts ?? 0) > 0 || (r.filledSize ?? 0) > 0;
++}
++
++/** Compare hedge coverage in contracts; filledSize is dollar notional. */
++export function areFilledContractsMatched(
++  kalshiResult: OrderResult,
++  polymarketResult: OrderResult,
++): { matched: boolean; kalshiContracts: number; polymarketContracts: number } {
++  const kalshiContracts = kalshiResult.filledContracts ?? 0;
++  const polymarketContracts = polymarketResult.filledContracts ?? 0;
++  const authoritative =
++    Number.isFinite(kalshiResult.filledContracts) &&
++    Number.isFinite(polymarketResult.filledContracts);
++  return {
++    matched: authoritative && Math.abs(kalshiContracts - polymarketContracts) < 1e-6,
++    kalshiContracts,
++    polymarketContracts,
++  };
+ }
+ 
+ /** Close a filled position by placing a sell order at the fill price.
+  *  Returns true if the close succeeded, false if it failed (exposure remains). */
++export function isCompleteClose(requestedContracts: number, filledContracts: number | null): boolean {
++  return Number.isFinite(requestedContracts) && requestedContracts > 0 &&
++    filledContracts != null && Number.isFinite(filledContracts) &&
++    filledContracts + 1e-9 >= requestedContracts;
++}
++
+ async function autoCloseLeg(
+   leg: OrderResult,
+   req: OrderRequest,
+@@ -364,6 +400,8 @@ async function autoCloseLeg(
+   dryRun: boolean,
+ ): Promise<boolean> {
+   if (!hasFill(leg) || !leg.orderId) return true; // nothing to close
++  const contracts = leg.filledContracts;
++  if (contracts == null || !Number.isFinite(contracts) || contracts <= 0) return false;
+ 
+   if (dryRun) {
+     // Simulate: 90% success rate for close
+@@ -374,7 +412,7 @@ async function autoCloseLeg(
+     if (leg.platform === 'kalshi') {
+       const { placeKalshiSellOrder } = await import('./kalshi-orders');
+       const priceCents = Math.round((leg.filledPrice ?? req.price) * 100);
+-      const count = Math.max(1, Math.floor((leg.filledSize ?? 0) / (leg.filledPrice ?? req.price)));
++      const count = Math.max(1, Math.floor(contracts));
+       const r = await placeKalshiSellOrder({
+         ticker: req.ticker!,
+         side: req.outcome,
+@@ -382,16 +420,15 @@ async function autoCloseLeg(
+         priceCents,
+         clientOrderId: `h2h-close-${arbId}-k`.slice(0, 64),
+       });
+-      return r.status === 'executed' || r.filledCount > 0;
++      return isCompleteClose(contracts, r.filledCount);
+     } else {
+       const { placePmSellOrder } = await import('./polymarket-orders');
+-      const size = (leg.filledSize ?? 0) / (leg.filledPrice ?? req.price);
+       const r = await placePmSellOrder({
+         tokenId: req.conditionId!,
+         price: leg.filledPrice ?? req.price,
+-        size,
++        size: contracts,
+       });
+-      return r.status === 'matched' || r.success;
++      return isCompleteClose(contracts, r.filledContracts);
+     }
+   } catch {
+     return false; // close failed — exposure remains
+@@ -423,6 +460,7 @@ async function pollOrder(
+         platform: 'kalshi',
+         status: updated.status === 'executed' ? 'filled' : (updated.status as OrderStatus),
+         filledSize: updated.filledCount * (leg.filledPrice ?? req.price),
++        filledContracts: updated.filledCount,
+         filledPrice: leg.filledPrice ?? req.price,
+         orderId: leg.orderId,
+         timestamp: new Date().toISOString(),
+@@ -431,10 +469,18 @@ async function pollOrder(
+       const { getPmOrder } = await import('./polymarket-orders');
+       const updated = await getPmOrder(leg.orderId);
+       if (!updated) return leg;
++      const filledContracts = updated.filledContracts ?? leg.filledContracts;
+       return {
+         platform: 'polymarket',
+-        status: updated.status === 'matched' ? 'filled' : (updated.status as OrderStatus),
+-        filledSize: updated.status === 'matched' ? req.size : leg.filledSize,
++        status: updated.status === 'matched' && updated.filledContracts != null
++          ? 'filled'
++          : updated.filledContracts != null && updated.filledContracts > 0
++            ? 'partial'
++            : 'pending',
++        filledSize: filledContracts != null
++          ? filledContracts * (leg.filledPrice ?? req.price)
++          : leg.filledSize,
++        filledContracts,
+         filledPrice: leg.filledPrice ?? req.price,
+         orderId: leg.orderId,
+         timestamp: new Date().toISOString(),
+@@ -682,30 +728,28 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
+     }
+     rollbackExecuted = true;
+   } else if (kFilled && pFilled) {
+-    // Both have fills — check if matched
+-    const kFill = kalshiResult.filledSize ?? 0;
+-    const pFill = polymarketResult.filledSize ?? 0;
+-    const minFill = Math.min(kFill, pFill);
+-    const maxFill = Math.max(kFill, pFill);
+-
+-    if (minFill < maxFill) {
+-      // Mismatched fills — cancel both and close the excess
+-      addStep('failed', `Mismatched fills — Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing $${(maxFill - minFill).toFixed(2)} excess`);
++    // Both have fills — compare hedge coverage in contracts, not dollars.
++    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
++    const { kalshiContracts: kFill, polymarketContracts: pFill } = match;
++
++    if (!match.matched) {
++      // Mismatched contracts — cancel both and close the excess contracts.
++      addStep('failed', `Mismatched fills — Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`);
+       alerts.push({
+         level: 'warning',
+-        message: `Mismatched fills: Kalshi $${kFill.toFixed(2)} vs Polymarket $${pFill.toFixed(2)} — closing excess`,
++        message: `Mismatched fills: Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`,
+         action: 'close excess',
+       });
+       if (!effectiveDryRun) {
+         await cancelLeg(kalshiResult);
+         await cancelLeg(polymarketResult);
+       }
+-      // Close the excess from the larger leg
+-      const excess = maxFill - minFill;
++      const excessContracts = Math.abs(kFill - pFill);
+       const largerLeg = kFill > pFill ? kalshiResult : polymarketResult;
+       const largerReq = kFill > pFill ? req.kalshiOrder : req.polymarketOrder;
++      const excessNotional = excessContracts * (largerLeg.filledPrice ?? largerReq.price);
+       const closed = await autoCloseLeg(
+-        { ...largerLeg, filledSize: excess },
++        { ...largerLeg, filledSize: excessNotional, filledContracts: excessContracts },
+         largerReq,
+         req.arbId,
+         effectiveDryRun,
+@@ -714,9 +758,24 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
+         unhedged = true;
+         alerts.push({
+           level: 'error',
+-          message: `Failed to close $${excess.toFixed(2)} excess — unhedged exposure remains`,
++          message: `Failed to close ${excessContracts.toFixed(4)} excess contracts — unhedged exposure remains`,
+           action: 'manual close required',
+         });
++      } else {
++        const matchedContracts = Math.min(kFill, pFill);
++        if (kFill > pFill) {
++          kalshiResult = {
++            ...kalshiResult,
++            filledContracts: matchedContracts,
++            filledSize: matchedContracts * (kalshiResult.filledPrice ?? req.kalshiOrder.price),
++          };
++        } else {
++          polymarketResult = {
++            ...polymarketResult,
++            filledContracts: matchedContracts,
++            filledSize: matchedContracts * (polymarketResult.filledPrice ?? req.polymarketOrder.price),
++          };
++        }
+       }
+       rollbackExecuted = true;
+     } else {
+@@ -725,7 +784,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
+       const anyPartial = kalshiResult.status === 'partial' || polymarketResult.status === 'partial';
+       addStep(
+         anyPartial ? 'partial' : 'success',
+-        `Both legs filled and matched — Kalshi $${kFill.toFixed(2)}, Polymarket $${pFill.toFixed(2)}` +
++        `Both legs filled and matched — ${kFill.toFixed(4)} contracts per leg` +
+           (anyPartial ? ' (partial fills)' : ''),
+       );
+     }
+@@ -800,15 +859,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
+   let netExposure: number | undefined;
+ 
+   if (kalshiResult.filledSize && polymarketResult.filledSize && kalshiResult.filledPrice && polymarketResult.filledPrice) {
+-    const kalshiFilled = kalshiResult.filledSize;
+-    const pmFilled = polymarketResult.filledSize;
+-    const minFill = Math.min(kalshiFilled, pmFilled);
+-    const maxFill = Math.max(kalshiFilled, pmFilled);
+-    netExposure = unhedged ? (maxFill - minFill) : 0;
++    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
++    const minContracts = Math.min(match.kalshiContracts, match.polymarketContracts);
++    const kalshiNotional = kalshiResult.filledSize;
++    const pmNotional = polymarketResult.filledSize;
++    netExposure = unhedged ? Math.abs(kalshiNotional - pmNotional) : 0;
+ 
+-    // Profit = minFill * (1 - buyYesPrice - buyNoPrice) — simplified
+     const spread = 1 - kalshiResult.filledPrice - polymarketResult.filledPrice;
+-    actualProfit = minFill * spread;
++    actualProfit = minContracts * spread;
+   } else if (unhedged) {
+     // One leg filled, other didn't — all of the filled amount is exposure
+     netExposure = (kalshiResult.filledSize ?? 0) + (polymarketResult.filledSize ?? 0);
+diff --git a/src/lib/kalshi.ts b/src/lib/kalshi.ts
+index cecf575..37cd994 100644
+--- a/src/lib/kalshi.ts
++++ b/src/lib/kalshi.ts
+@@ -18,6 +18,8 @@ export interface KalshiMarket {
+   volume_24h_fp?: string;
+   close_time?: string;
+   status?: string;
++  settlement_value_dollars?: string;
++  settlement_ts?: string;
+   yes_bid_size_fp?: string;
+   no_bid_size_fp?: string;
+   yes_ask_size_fp?: string;
+@@ -207,89 +209,105 @@ const kalshiAllMemo = createTtlMemo<KalshiMarket[]>(30_000);
+ 
+ /** Paginate through all open Kalshi markets.
+  * Uses cursor-based pagination if available; falls back to offset if the API
+- * returns one. Honors the existing kalshi rate limiter. */
++ * returns one. Honors the existing kalshi rate limiter.
++ *
++ * FEAT-046: supports category filtering, incremental `since`, resume cursor,
++ * and explicit per-page delay. */
+ export async function fetchAllKalshiMarkets(options?: {
+-  onPage?: (count: number) => void;
++  onPage?: (count: number, cursor?: string | null, page429s?: number) => void;
++  maxPages?: number;
++  category?: string;
++  since?: string | null;
++  resumeCursor?: string | null;
++  minPageDelayMs?: number;
+ }): Promise<KalshiMarket[]> {
+-  return kalshiAllMemo('all-open', async () => {
++  const maxPages = Math.min(Math.max(options?.maxPages ?? 500, 1), 500);
++  const minPageDelayMs = Math.max(0, options?.minPageDelayMs ?? 0);
++  const category = options?.category;
++  const resumeCursor = options?.resumeCursor ?? null;
++  const since = options?.since ?? null;
++
++  // Cache only unfiltered, non-incremental, non-resuming fetches.
++  const cacheKey = category ? `category:${category}` : 'all-open';
++  const canMemo = !since && !resumeCursor;
++
++  const doFetch = async (): Promise<KalshiMarket[]> => {
+     const all: KalshiMarket[] = [];
+     const seen = new Set<string>();
+ 
+-    // Fetch first page to discover cursor/offset and total shape.
+-    const firstPage = await fetchKalshiPage(null, 0);
++    const firstPage = await fetchKalshiPage(null, 0, { category, since });
+     if (!firstPage) return all;
+     accumulate(firstPage.markets);
+-    options?.onPage?.(all.length);
++    options?.onPage?.(all.length, firstPage.nextCursor ?? null, 0);
+ 
+-    let cursor: string | null = firstPage.nextCursor;
++    let cursor: string | null = resumeCursor || firstPage.nextCursor;
+     let offset = firstPage.markets.length;
+-    const maxPages = 500;
+     let safety = firstPage.markets.length > 0 ? 1 : 0;
+ 
+-    // Prefetch remaining pages in parallel, bounded by rate limiter queue.
+-    const pending: Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null>[] = [];
+-    while (safety < maxPages && (cursor || offset > 0)) {
+-      const capturedCursor = cursor;
+-      const capturedOffset = offset;
+-      pending.push(
+-        fetchKalshiPage(capturedCursor, capturedOffset).then((page) => {
+-          if (page) {
+-            accumulate(page.markets);
+-            options?.onPage?.(all.length);
+-          }
+-          return page;
+-        }),
+-      );
+-      if (cursor) {
+-        // Cannot guess next cursor without reading response; stop parallel speculation.
+-        break;
+-      }
+-      offset += 1000;
+-      safety += 1;
+-    }
+-
+-    // If cursor-based, continue sequentially after first page.
+     if (cursor) {
+       while (safety < maxPages && cursor) {
+-        const page = await fetchKalshiPage(cursor, offset);
++        if (minPageDelayMs > 0) await sleep(minPageDelayMs);
++        const page = await fetchKalshiPage(cursor, 0, { category, since });
+         if (!page || page.markets.length === 0) break;
+         accumulate(page.markets);
+-        options?.onPage?.(all.length);
++        options?.onPage?.(all.length, page.nextCursor ?? null, 0);
+         cursor = page.nextCursor;
+-        if (!cursor) break;
+         safety += 1;
+       }
+     } else {
+-      // Wait for parallel offset pages and keep fetching if any page returned full 1000.
++      const pending: Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null>[] = [];
++      while (safety < maxPages) {
++        if (minPageDelayMs > 0 && pending.length > 0) await sleep(minPageDelayMs);
++        pending.push(
++          fetchKalshiPage(null, offset, { category, since }).then((page) => {
++            if (page) {
++              accumulate(page.markets);
++              options?.onPage?.(all.length, page.nextCursor ?? null, 0);
++            }
++            return page;
++          }),
++        );
++        offset += 1000;
++        safety += 1;
++      }
++
+       let maxNextOffset = offset;
+       const results = await Promise.all(pending);
++      const fullPages: { offset: number; markets: KalshiMarket[] }[] = [];
+       for (const page of results) {
+-        if (page) {
+-          maxNextOffset = Math.max(maxNextOffset, page.offset + page.markets.length);
+-          if (page.markets.length === 1000) {
+-            // Fetch subsequent pages sequentially starting after this page.
+-            let subOffset = page.offset + page.markets.length;
+-            let safety2 = 0;
+-            while (safety2 < maxPages) {
+-              const sub = await fetchKalshiPage(null, subOffset);
+-              if (!sub || sub.markets.length === 0) break;
+-              accumulate(sub.markets);
+-              options?.onPage?.(all.length);
+-              subOffset += sub.markets.length;
+-              if (sub.markets.length < 1000) break;
+-              safety2 += 1;
+-            }
+-            maxNextOffset = Math.max(maxNextOffset, subOffset);
+-          }
+-        }
++        if (!page) continue;
++        maxNextOffset = Math.max(maxNextOffset, page.offset + page.markets.length);
++        if (page.markets.length === 1000) fullPages.push(page);
+       }
++
++      const continuationResults = await Promise.all(
++        fullPages.map(async (page) => {
++          const cont: KalshiMarket[] = [];
++          let subOffset = page.offset + page.markets.length;
++          let subSafety = 0;
++          while (subSafety < maxPages) {
++            if (minPageDelayMs > 0) await sleep(minPageDelayMs);
++            const sub = await fetchKalshiPage(null, subOffset, { category, since });
++            if (!sub || sub.markets.length === 0) break;
++            cont.push(...sub.markets);
++            subOffset += sub.markets.length;
++            if (sub.markets.length < 1000) break;
++            subSafety += 1;
++          }
++          return cont;
++        }),
++      );
++      for (const markets of continuationResults) accumulate(markets);
++      maxNextOffset = Math.max(maxNextOffset, ...fullPages.map((p) => p.offset + 1000));
++
+       offset = maxNextOffset;
+-      // Final safety sequential pass: keep going until a page is empty.
++      safety = 0;
+       while (safety < maxPages) {
+-        const page = await fetchKalshiPage(null, offset);
++        if (minPageDelayMs > 0) await sleep(minPageDelayMs);
++        const page = await fetchKalshiPage(null, offset, { category, since });
+         if (!page || page.markets.length === 0) break;
+         accumulate(page.markets);
+-        options?.onPage?.(all.length);
++        options?.onPage?.(all.length, page.nextCursor ?? null, 0);
+         offset += page.markets.length;
+         if (page.markets.length < 1000) break;
+         safety += 1;
+@@ -306,12 +324,27 @@ export async function fetchAllKalshiMarkets(options?: {
+         }
+       }
+     }
+-  });
++  };
++
++  if (canMemo) {
++    return kalshiAllMemo(cacheKey, doFetch);
++  }
++  return doFetch();
++}
++
++function sleep(ms: number): Promise<void> {
++  return new Promise((r) => setTimeout(r, ms));
++}
++
++interface FetchKalshiPageOptions {
++  category?: string;
++  since?: string | null;
+ }
+ 
+ async function fetchKalshiPage(
+   cursor: string | null,
+   offset: number,
++  opts: FetchKalshiPageOptions,
+ ): Promise<{ markets: KalshiMarket[]; nextCursor: string | null; offset: number } | null> {
+   const params = new URLSearchParams({
+     status: 'open',
+@@ -323,6 +356,12 @@ async function fetchKalshiPage(
+   } else {
+     params.set('offset', String(offset));
+   }
++  if (opts.category) {
++    params.set('event_category', opts.category);
++  }
++  if (opts.since) {
++    params.set('created_after', opts.since);
++  }
+   params.set('_t', String(Date.now()));
+ 
+   const res = await rateLimiters.kalshi.execute(() =>
+diff --git a/src/lib/persistence.ts b/src/lib/persistence.ts
+index 9778da6..0d7a80e 100644
+--- a/src/lib/persistence.ts
++++ b/src/lib/persistence.ts
+@@ -1357,10 +1357,10 @@ export interface ExecutionRecord {
+   source?: 'manual' | 'bot';
+ }
+ 
+-export async function persistExecution(e: ExecutionRecord): Promise<void> {
++export async function persistExecution(e: ExecutionRecord): Promise<{ id: number }> {
+   await ensureExecutionsTable();
+   const c = getClient();
+-  await c.execute({
++  const result = await c.execute({
+     sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     args: [
+@@ -1374,6 +1374,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<void> {
+       e.source ?? 'manual',
+     ],
+   });
++  return { id: Number(result.lastInsertRowid ?? 0) };
+ }
+ 
+ export async function getExecutions(limit = 200, source?: 'manual' | 'bot'): Promise<ExecutionRecord[]> {
+@@ -2124,3 +2125,133 @@ export async function approveMatchedPair(id: number): Promise<{ approved: boolea
+ export async function rejectMatchedPair(id: number): Promise<boolean> {
+   return updateMatchedPairStatus(id, 'rejected');
+ }
++
++// ── FEAT-046: Market Catalog fetch job metadata ───────────────────
++
++export interface MarketCatalogMetaRow {
++  id: number;
++  platform: 'kalshi' | 'polymarket';
++  category: string;
++  lastFullFetchAt: string | null;
++  lastRunAt: string | null;
++  lastRunStatus: 'running' | 'idle' | 'failed' | 'aborted';
++  lastSuccessfulOffset: string | null;
++  marketsFetched: number;
++  rateLimitHits: number;
++  errorMessage: string | null;
++}
++
++function rowToMarketCatalogMeta(r: any): MarketCatalogMetaRow {
++  return {
++    id: Number(r.id),
++    platform: String(r.platform) as 'kalshi' | 'polymarket',
++    category: String(r.category ?? ''),
++    lastFullFetchAt: r.last_full_fetch_at ? String(r.last_full_fetch_at) : null,
++    lastRunAt: r.last_run_at ? String(r.last_run_at) : null,
++    lastRunStatus: String(r.last_run_status ?? 'idle') as MarketCatalogMetaRow['lastRunStatus'],
++    lastSuccessfulOffset: r.last_successful_offset ? String(r.last_successful_offset) : null,
++    marketsFetched: Number(r.markets_fetched ?? 0),
++    rateLimitHits: Number(r.rate_limit_hits ?? 0),
++    errorMessage: r.error_message ? String(r.error_message) : null,
++  };
++}
++
++async function ensureMarketCatalogMetaTable(): Promise<void> {
++  await ensureDb();
++  const c = getClient();
++  await c.execute(`
++    CREATE TABLE IF NOT EXISTS market_catalog_meta (
++      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
++      platform            TEXT    NOT NULL,
++      category            TEXT    NOT NULL DEFAULT '',
++      last_full_fetch_at  TEXT,
++      last_run_at         TEXT,
++      last_run_status     TEXT,
++      last_successful_offset TEXT,
++      markets_fetched     INTEGER NOT NULL DEFAULT 0,
++      rate_limit_hits     INTEGER NOT NULL DEFAULT 0,
++      error_message       TEXT,
++      UNIQUE(platform, category)
++    )
++  `);
++  await c.execute(`CREATE INDEX IF NOT EXISTS idx_market_catalog_meta_run ON market_catalog_meta(platform, category, last_run_at DESC)`);
++}
++
++/** Get one category meta row (or default shell) for a platform/category. */
++export async function getMarketCatalogMeta(platform: 'kalshi' | 'polymarket', category: string): Promise<MarketCatalogMetaRow> {
++  await ensureMarketCatalogMetaTable();
++  const c = getClient();
++  const res = await c.execute({
++    sql: `SELECT * FROM market_catalog_meta WHERE platform = ? AND category = ?`,
++    args: [platform, category],
++  });
++  const rows = res.rows as any[];
++  if (rows.length > 0) return rowToMarketCatalogMeta(rows[0]);
++  return {
++    id: 0,
++    platform,
++    category,
++    lastFullFetchAt: null,
++    lastRunAt: null,
++    lastRunStatus: 'idle',
++    lastSuccessfulOffset: null,
++    marketsFetched: 0,
++    rateLimitHits: 0,
++    errorMessage: null,
++  };
++}
++
++/** Upsert category-level catalog job metadata. */
++export async function setMarketCatalogMeta(
++  platform: 'kalshi' | 'polymarket',
++  category: string,
++  patch: Partial<Omit<MarketCatalogMetaRow, 'id' | 'platform' | 'category'>>,
++): Promise<void> {
++  await ensureMarketCatalogMetaTable();
++  const c = getClient();
++  await c.execute({
++    sql: `INSERT INTO market_catalog_meta
++            (platform, category, last_full_fetch_at, last_run_at, last_run_status,
++             last_successful_offset, markets_fetched, rate_limit_hits, error_message)
++          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
++          ON CONFLICT(platform, category) DO UPDATE SET
++            last_full_fetch_at = COALESCE(excluded.last_full_fetch_at, last_full_fetch_at),
++            last_run_at = COALESCE(excluded.last_run_at, last_run_at),
++            last_run_status = COALESCE(excluded.last_run_status, last_run_status),
++            last_successful_offset = COALESCE(excluded.last_successful_offset, last_successful_offset),
++            markets_fetched = COALESCE(excluded.markets_fetched, markets_fetched),
++            rate_limit_hits = COALESCE(excluded.rate_limit_hits, rate_limit_hits),
++            error_message = COALESCE(excluded.error_message, error_message)`,
++    args: [
++      platform,
++      category,
++      patch.lastFullFetchAt ?? null,
++      patch.lastRunAt ?? null,
++      patch.lastRunStatus ?? null,
++      patch.lastSuccessfulOffset ?? null,
++      patch.marketsFetched ?? null,
++      patch.rateLimitHits ?? null,
++      patch.errorMessage ?? null,
++    ],
++  });
++}
++
++/** Get status overview for all catalog fetch categories. */
++export async function getMarketCatalogMetaOverview(): Promise<{
++  categories: MarketCatalogMetaRow[];
++  totalMarkets: number;
++  staleMarkets: number;
++}> {
++  await ensureMarketCatalogMetaTable();
++  const c = getClient();
++  const [catRes, countRes, staleRes] = await Promise.all([
++    c.execute(`SELECT * FROM market_catalog_meta ORDER BY platform, category`),
++    c.execute(`SELECT COUNT(*) AS cnt FROM market_catalog`),
++    c.execute(`SELECT COUNT(*) AS cnt FROM market_catalog WHERE stale = 1`),
++  ]);
++  return {
++    categories: (catRes.rows as any[]).map(rowToMarketCatalogMeta),
++    totalMarkets: Number((countRes.rows as any[])[0]?.cnt ?? 0),
++    staleMarkets: Number((staleRes.rows as any[])[0]?.cnt ?? 0),
++  };
++}
+diff --git a/src/lib/polymarket-clob.ts b/src/lib/polymarket-clob.ts
+index c72a618..9658412 100644
+--- a/src/lib/polymarket-clob.ts
++++ b/src/lib/polymarket-clob.ts
+@@ -291,6 +291,63 @@ function getBestPriceFromBook(book: ClobBook | null): { bestBid: number; bestAsk
+   return { bestBid: bestBid ?? 0, bestAsk: bestAsk ?? 0 };
+ }
+ 
++export interface ClobBidPrices {
++  yesBidCents: number | null;
++  noBidCents: number | null;
++  resolved: boolean;
++}
++
++function priceToCents(value: unknown): number | null {
++  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null;
++  return Math.round(value * 100);
++}
++
++/**
++ * Extract executable sell prices for both outcome tokens. Token books are the
++ * source of truth and are deliberately scanned for MAX(bid), because CLOB
++ * levels are not reliably sorted. Token metadata `price` is never used.
++ */
++export function extractClobBidPrices(
++  clob: ClobMarket,
++  yesBook: ClobBook | null,
++  noBook: ClobBook | null,
++): ClobBidPrices {
++  const yesToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'yes');
++  const noToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'no');
++
++  if (clob.closed === true && yesToken && noToken && yesToken.winner !== noToken.winner) {
++    if (yesToken.winner === true) return { yesBidCents: 100, noBidCents: 0, resolved: true };
++    if (noToken.winner === true) return { yesBidCents: 0, noBidCents: 100, resolved: true };
++  }
++
++  const yesPrices = getBestPriceFromBook(yesBook);
++  const noPrices = getBestPriceFromBook(noBook);
++  let yesBidCents = yesPrices && yesPrices.bestBid > 0 ? priceToCents(yesPrices.bestBid) : null;
++  let noBidCents = noPrices && noPrices.bestBid > 0 ? priceToCents(noPrices.bestBid) : null;
++
++  // Aggregate complementary quotes are valid only for standard binary markets.
++  // Neg-risk outcomes are independent and must never be inferred as 1-price.
++  if (clob.neg_risk !== true) {
++    if (yesBidCents == null) yesBidCents = priceToCents(clob.best_bid);
++    if (noBidCents == null && typeof clob.best_ask === 'number' && clob.best_ask > 0) {
++      noBidCents = priceToCents(1 - clob.best_ask);
++    }
++  }
++  return { yesBidCents, noBidCents, resolved: false };
++}
++
++/** Fetch executable YES/NO sell bids from the two token orderbooks. */
++export async function getClobBidPrices(clob: ClobMarket): Promise<ClobBidPrices> {
++  const yesToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'yes');
++  const noToken = clob.tokens?.find((token) => token.outcome.toLowerCase() === 'no');
++  if (!yesToken || !noToken) return extractClobBidPrices(clob, null, null);
++  const [yesBook, noBook] = await Promise.all([
++    fetchClobBook(yesToken.token_id),
++    fetchClobBook(noToken.token_id),
++  ]);
++  return extractClobBidPrices(clob, yesBook, noBook);
++}
++
+ export async function fetchClobMarkets(conditionIds: string[]): Promise<Map<string, ClobMarket>> {
+   // Deduplicate conditionIds and filter out already-cached ones
+   const uniqueIds = [...new Set(conditionIds)];
+diff --git a/src/lib/polymarket-orders.ts b/src/lib/polymarket-orders.ts
+index dc1a2d0..056aba1 100644
+--- a/src/lib/polymarket-orders.ts
++++ b/src/lib/polymarket-orders.ts
+@@ -25,9 +25,18 @@ export interface PmOrderResponse {
+   orderId: string;
+   status: string;         // matched | live | delayed | unmatched
+   success: boolean;
++  filledContracts: number | null;
+   raw: unknown;
+ }
+ 
++export function parsePmFilledContracts(raw: unknown): number | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const order = raw as Record<string, unknown>;
++  const value = order.size_matched ?? order.sizeMatched;
++  const parsed = typeof value === 'number' || typeof value === 'string' ? Number(value) : Number.NaN;
++  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
++}
++
+ let _client: any = null;
+ 
+ async function getClobClient(): Promise<any> {
+@@ -93,6 +102,7 @@ export async function placePmOrder(p: PmOrderParams): Promise<PmOrderResponse> {
+     orderId: resp?.orderID ?? resp?.orderId ?? '',
+     status: resp?.status ?? 'unknown',
+     success,
++    filledContracts: parsePmFilledContracts(resp),
+     raw: resp,
+   };
+ }
+@@ -119,6 +129,7 @@ export async function getPmOrder(orderId: string): Promise<PmOrderResponse | nul
+       orderId: String(order.id ?? order.order_id ?? orderId),
+       status,
+       success: true,
++      filledContracts: parsePmFilledContracts(order),
+       raw: order,
+     };
+   } catch (err) {
+@@ -157,6 +168,7 @@ export async function placePmSellOrder(p: PmOrderParams): Promise<PmOrderRespons
+     orderId: resp?.orderID ?? resp?.orderId ?? '',
+     status: resp?.status ?? 'unknown',
+     success,
++    filledContracts: parsePmFilledContracts(resp),
+     raw: resp,
+   };
+ }
+diff --git a/src/lib/polymarket-clob-bids.test.ts b/src/lib/polymarket-clob-bids.test.ts
+new file mode 100644
+index 0000000..3d16bb2
+--- /dev/null
++++ b/src/lib/polymarket-clob-bids.test.ts
+@@ -0,0 +1,57 @@
++import { describe, expect, it } from 'vitest';
++import { extractClobBidPrices, type ClobBook, type ClobMarket } from './polymarket-clob';
++
++const book = (bids: Array<[string, string]>): ClobBook => ({
++  bids: bids.map(([price, size]) => ({ price, size })),
++  asks: [],
++  min_order_size: '1',
++  tick_size: '0.01',
++});
++
++const market: ClobMarket = {
++  condition_id: '0xabc',
++  tokens: [
++    { token_id: 'yes-token', outcome: 'Yes' },
++    { token_id: 'no-token', outcome: 'No' },
++  ],
++};
++
++describe('extractClobBidPrices', () => {
++  it('uses the maximum executable bid from unsorted YES and NO token books', () => {
++    expect(extractClobBidPrices(market, book([['0.20', '3'], ['0.47', '2'], ['0.31', '4']]), book([['0.52', '1'], ['0.44', '2']]))).toEqual({
++      yesBidCents: 47,
++      noBidCents: 52,
++      resolved: false,
++    });
++  });
++
++  it('never uses token metadata midpoint as an executable bid', () => {
++    expect(extractClobBidPrices({
++      ...market,
++      neg_risk: true,
++      tokens: [
++        { token_id: 'yes-token', outcome: 'Yes', price: 0.61 },
++        { token_id: 'no-token', outcome: 'No', price: 0.39 },
++      ],
++    }, null, null)).toEqual({ yesBidCents: null, noBidCents: null, resolved: false });
++  });
++
++  it('uses aggregate complementary quotes only for a standard binary market', () => {
++    expect(extractClobBidPrices({ ...market, best_bid: 0.46, best_ask: 0.49, neg_risk: false }, null, null)).toEqual({
++      yesBidCents: 46,
++      noBidCents: 51,
++      resolved: false,
++    });
++  });
++
++  it('maps resolved token winners to exact 100/0 cent values even when books are empty', () => {
++    expect(extractClobBidPrices({
++      ...market,
++      closed: true,
++      tokens: [
++        { token_id: 'yes-token', outcome: 'Yes', winner: false },
++        { token_id: 'no-token', outcome: 'No', winner: true },
++      ],
++    }, null, null)).toEqual({ yesBidCents: 0, noBidCents: 100, resolved: true });
++  });
++});
+diff --git a/src/lib/polymarket-orders.test.ts b/src/lib/polymarket-orders.test.ts
+new file mode 100644
+index 0000000..e40ae97
+--- /dev/null
++++ b/src/lib/polymarket-orders.test.ts
+@@ -0,0 +1,17 @@
++import { describe, expect, it } from 'vitest';
++import { parsePmFilledContracts } from './polymarket-orders';
++
++describe('parsePmFilledContracts', () => {
++  it('parses authoritative size_matched contract units from a polled order', () => {
++    expect(parsePmFilledContracts({ size_matched: '31.000000' })).toBe(31);
++  });
++
++  it('does not infer a full fill when the venue omits matched size', () => {
++    expect(parsePmFilledContracts({ status: 'matched', original_size: '31' })).toBeNull();
++  });
++
++  it('rejects malformed or negative matched sizes', () => {
++    expect(parsePmFilledContracts({ size_matched: '-1' })).toBeNull();
++    expect(parsePmFilledContracts({ size_matched: 'not-a-number' })).toBeNull();
++  });
++});
+diff --git a/src/lib/bot-trader.ts b/src/lib/bot-trader.ts
+new file mode 100644
+index 0000000..3e763a6
+--- /dev/null
++++ b/src/lib/bot-trader.ts
+@@ -0,0 +1,815 @@
++/**
++ * BotTrader Engine — FEAT-040
++ *
++ * Scan-driven auto-execution.  Evaluates arbitrage opportunities against
++ * configurable criteria and, when allowed, simulates or places trades.
++ *
++ * SAFETY:
++ *   • `bot.mode === 'production'` alone is NOT enough to place live orders.
++ *   • Real orders require BOTH `bot.mode === 'production'` AND the global
++ *     `execute.mode === 'live'`.
++ *   • Paper mode (`bot.mode === 'paper'` or `execute.mode === 'paper'`) always
++ *     simulates, even when `bot.mode` is production.
++ *   • The production/live path is currently BLOCKED by a hard-coded `false`
++ *     guard in `maybeExecuteBotTrade`.  Victor must explicitly authorize
++ *     automatic live order placement before that guard is removed.
++ */
++
++import type { UnifiedOutcome } from './matcher';
++import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
++import type { LiveArbResult } from './live-arb-engine';
++import {
++  executeArb,
++  areFilledContractsMatched,
++  type ExecutionRequest,
++  type OrderSide,
++  type OrderRequest,
++} from './auto-execute';
++import { getSetting, type getExecutionMode } from './settings';
++import { executionModeToDryRun } from './execution-mode';
++import {
++  persistExecution,
++  getTodayBotExposure,
++  type ExecutionRecord,
++} from './persistence';
++import {
++  createBotPosition,
++  hasOpenBotMarketPair,
++  reserveBotMarketPair,
++  retainBotMarketPairForExposure,
++  releaseBotMarketPair,
++} from './bot-positions';
++import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './telegram-alerts';
++import logger from './logger';
++
++// ─── Types ─────────────────────────────────────────────────────
++
++export interface BotSettings {
++  enabled: boolean;
++  mode: 'paper' | 'production';
++  minRoiPct: number;
++  minApyPct: number;
++  /** minimum dollar depth at best ask on EACH leg (per-leg, not total) */
++  minDepthUsd: number;
++  /** minimum shares available at best ask on BOTH legs */
++  minSharesPerLeg: number;
++  /** skip markets expiring sooner than this (days) */
++  maxExpiryDays: number;
++  maxTradesPerDay: number;
++}
++
++export interface BotTradeEvaluation {
++  shouldTrade: boolean;
++  reason: string;
++  criteria: {
++    roiPct: number;
++    apyPct: number;
++    /** dollar depth at the Kalshi ask used by the selected strategy */
++    depthKUsd: number;
++    /** dollar depth at the Polymarket ask used by the selected strategy */
++    depthPUsd: number;
++    /** shares available at the Kalshi ask */
++    sharesK: number;
++    /** shares available at the Polymarket ask */
++    sharesP: number;
++    expiryDays: number | null;
++  };
++}
++
++export interface BotTradeInput {
++  /** Stable pair identifier (saved-market id or live pair id) */
++  pairId: string;
++  marketTitle: string;
++  /** Outcome name/artist used in the arb */
++  outcome: string;
++  strategy: string;
++  roiPct: number;
++  apyPct?: number | null;
++  expectedProfit: number;
++  kalshiStake: number;
++  pmStake: number;
++  /** Kalshi ticker for the leg the strategy buys on Kalshi (if any) */
++  kalshiTicker?: string | null;
++  /** Polymarket conditionId/tokenId for the leg the strategy buys on PM (if any) */
++  pmConditionId?: string | null;
++  /** Kalshi YES ask */
++  kalshiYesAsk?: number | null;
++  /** Kalshi NO ask */
++  kalshiNoAsk?: number | null;
++  /** Polymarket YES ask */
++  pmYesAsk?: number | null;
++  /** Polymarket NO ask */
++  pmNoAsk?: number | null;
++  /** Dollar depth at Kalshi YES ask */
++  kalshiYesDepth?: number;
++  /** Dollar depth at Kalshi NO ask */
++  kalshiNoDepth?: number;
++  /** Dollar depth at PM YES ask */
++  pmYesDepth?: number;
++  /** Dollar depth at PM NO ask */
++  pmNoDepth?: number;
++  /** Market expiry ISO string */
++  expiryDate?: string | null;
++  category?: string;
++}
++
++export interface BotExecutionResult {
++  executed: boolean;
++  dryRun: boolean;
++  reason: string;
++  executionRecord?: ExecutionRecord;
++  executionResult?: Awaited<ReturnType<typeof executeArb>>;
++}
++
++// ─── Defaults ────────────────────────────────────────────────────
++
++const DEFAULT_BOT_SETTINGS: BotSettings = {
++  enabled: false,
++  mode: 'paper',
++  minRoiPct: 2.0,
++  minApyPct: 0,
++  minDepthUsd: 0.5,
++  minSharesPerLeg: 1,
++  maxExpiryDays: 1,
++  maxTradesPerDay: 10,
++};
++
++/** MASTER SAFETY GUARD: keep `false` until Victor authorizes auto-live orders. */
++const AUTO_LIVE_ORDERS_AUTHORIZED = false;
++
++// ─── Settings loading ────────────────────────────────────────────
++
++export async function getBotSettings(): Promise<BotSettings> {
++  const [enabled, mode, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
++    getSetting<boolean>('bot.enabled').catch(() => DEFAULT_BOT_SETTINGS.enabled),
++    getSetting<string>('bot.mode').catch(() => DEFAULT_BOT_SETTINGS.mode),
++    getSetting<number>('bot.minRoiPct').catch(() => DEFAULT_BOT_SETTINGS.minRoiPct),
++    getSetting<number>('bot.minApyPct').catch(() => DEFAULT_BOT_SETTINGS.minApyPct),
++    getSetting<number>('bot.minDepthUsd').catch(() => DEFAULT_BOT_SETTINGS.minDepthUsd),
++    getSetting<number>('bot.minSharesPerLeg').catch(() => DEFAULT_BOT_SETTINGS.minSharesPerLeg),
++    getSetting<number>('bot.maxExpiryDays').catch(() => DEFAULT_BOT_SETTINGS.maxExpiryDays),
++    getSetting<number>('bot.maxTradesPerDay').catch(() => DEFAULT_BOT_SETTINGS.maxTradesPerDay),
++  ]);
++
++  return {
++    enabled: enabled === true,
++    mode: mode === 'production' ? 'production' : 'paper',
++    minRoiPct: Number.isFinite(minRoiPct) ? minRoiPct : DEFAULT_BOT_SETTINGS.minRoiPct,
++    minApyPct: Number.isFinite(minApyPct) ? minApyPct : DEFAULT_BOT_SETTINGS.minApyPct,
++    minDepthUsd: Number.isFinite(minDepthUsd) && minDepthUsd > 0
++      ? minDepthUsd
++      : DEFAULT_BOT_SETTINGS.minDepthUsd,
++    minSharesPerLeg: Number.isFinite(minSharesPerLeg) && minSharesPerLeg >= 1
++      ? Math.floor(minSharesPerLeg)
++      : DEFAULT_BOT_SETTINGS.minSharesPerLeg,
++    maxExpiryDays: Number.isFinite(maxExpiryDays) ? maxExpiryDays : DEFAULT_BOT_SETTINGS.maxExpiryDays,
++    maxTradesPerDay: Number.isFinite(maxTradesPerDay) && maxTradesPerDay >= 1
++      ? Math.floor(maxTradesPerDay)
++      : DEFAULT_BOT_SETTINGS.maxTradesPerDay,
++  };
++}
++
++// ─── Evaluation ──────────────────────────────────────────────────
++
++function computeExpiryDays(expiryDate: string | undefined | null): number | null {
++  if (!expiryDate) return null;
++  const ms = new Date(expiryDate).getTime();
++  if (!Number.isFinite(ms)) return null;
++  const diffMs = ms - Date.now();
++  return Math.max(0, diffMs / (1000 * 60 * 60 * 24));
++}
++
++function pickLegPrices(strategy: string, input: BotTradeInput): {
++  kalshiPrice: number | null;
++  pmPrice: number | null;
++  kalshiOutcome: 'yes' | 'no';
++  pmOutcome: 'yes' | 'no';
++} {
++  const strategyLower = (strategy || '').toLowerCase();
++
++  // Cross-outcome: buy YES on both platforms.
++  if (strategyLower.includes('both sides')) {
++    return {
++      kalshiPrice: input.kalshiYesAsk ?? null,
++      pmPrice: input.pmYesAsk ?? null,
++      kalshiOutcome: 'yes',
++      pmOutcome: 'yes',
++    };
++  }
++
++  // Same-platform internal arbs are not bot-tradeable (they require two Kalshi
++  // or two PM orders on related outcomes; we only support two-leg cross-platform
++  // for the bot's initial release).
++  if (strategyLower.startsWith('same-platform')) {
++    return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'yes' };
++  }
++
++  if (strategyLower.includes('yes kalshi')) {
++    return {
++      kalshiPrice: input.kalshiYesAsk ?? null,
++      pmPrice: input.pmNoAsk ?? null,
++      kalshiOutcome: 'yes',
++      pmOutcome: 'no',
++    };
++  }
++
++  if (strategyLower.includes('yes pm')) {
++    return {
++      kalshiPrice: input.kalshiNoAsk ?? null,
++      pmPrice: input.pmYesAsk ?? null,
++      kalshiOutcome: 'no',
++      pmOutcome: 'yes',
++    };
++  }
++
++  // Fallback: direct Kalshi YES + PM NO.
++  return {
++    kalshiPrice: input.kalshiYesAsk ?? null,
++    pmPrice: input.pmNoAsk ?? null,
++    kalshiOutcome: 'yes',
++    pmOutcome: 'no',
++  };
++}
++
++export function evaluateBotTrade(
++  input: BotTradeInput,
++  settings: BotSettings,
++): BotTradeEvaluation {
++  const reasons: string[] = [];
++
++  if (!settings.enabled) {
++    return {
++      shouldTrade: false,
++      reason: 'BotTrader is disabled',
++      criteria: buildCriteria(input, reasons),
++    };
++  }
++
++  const roiPct = input.roiPct ?? 0;
++  if (roiPct <= 0) {
++    return {
++      shouldTrade: false,
++      reason: `ROI ${roiPct.toFixed(2)}% is not positive`,
++      criteria: buildCriteria(input, reasons),
++    };
++  }
++
++  if (roiPct < settings.minRoiPct) {
++    reasons.push(`ROI ${roiPct.toFixed(2)}% < min ${settings.minRoiPct.toFixed(2)}%`);
++  }
++
++  const apyPct = input.apyPct ?? 0;
++  if (settings.minApyPct > 0 && apyPct < settings.minApyPct) {
++    reasons.push(`APY ${apyPct.toFixed(2)}% < min ${settings.minApyPct.toFixed(2)}%`);
++  }
++
++  const expiryDays = computeExpiryDays(input.expiryDate);
++  if (expiryDays !== null && expiryDays < settings.maxExpiryDays) {
++    reasons.push(`Expires in ${expiryDays.toFixed(2)}d < min ${settings.maxExpiryDays}d`);
++  }
++
++  const legs = pickLegPrices(input.strategy, input);
++  if (legs.kalshiPrice == null || legs.pmPrice == null) {
++    reasons.push('Missing tradeable ask price on one or both legs');
++  }
++
++  const { depthKUsd, depthPUsd } = legDepths(legs, input);
++  const sharesK = legs.kalshiPrice != null && legs.kalshiPrice > 0
++    ? depthKUsd / legs.kalshiPrice
++    : 0;
++  const sharesP = legs.pmPrice != null && legs.pmPrice > 0
++    ? depthPUsd / legs.pmPrice
++    : 0;
++
++  if (sharesK < settings.minSharesPerLeg || sharesP < settings.minSharesPerLeg) {
++    reasons.push(
++      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (min ${settings.minSharesPerLeg})`,
++    );
++  }
++
++  if (depthKUsd < settings.minDepthUsd || depthPUsd < settings.minDepthUsd) {
++    reasons.push(
++      `Insufficient dollar depth: Kalshi $${depthKUsd.toFixed(2)} / PM $${depthPUsd.toFixed(2)} (min $${settings.minDepthUsd})`,
++    );
++  }
++
++  const criteria = buildCriteria(input, reasons, { depthKUsd, depthPUsd, sharesK, sharesP, expiryDays });
++
++  if (reasons.length > 0) {
++    return {
++      shouldTrade: false,
++      reason: reasons.join('; '),
++      criteria,
++    };
++  }
++
++  return {
++    shouldTrade: true,
++    reason: `ROI ${roiPct.toFixed(2)}%, APY ${apyPct.toFixed(2)}%, shares K=${sharesK.toFixed(2)} P=${sharesP.toFixed(2)}, depth K=$${depthKUsd.toFixed(2)} P=$${depthPUsd.toFixed(2)}`,
++    criteria,
++  };
++}
++
++function legDepths(
++  legs: ReturnType<typeof pickLegPrices>,
++  input: BotTradeInput,
++): { depthKUsd: number; depthPUsd: number } {
++  const strategyLower = (input.strategy || '').toLowerCase();
++
++  if (strategyLower.includes('yes kalshi')) {
++    return {
++      depthKUsd: input.kalshiYesDepth ?? 0,
++      depthPUsd: input.pmNoDepth ?? 0,
++    };
++  }
++  if (strategyLower.includes('yes pm')) {
++    return {
++      depthKUsd: input.kalshiNoDepth ?? 0,
++      depthPUsd: input.pmYesDepth ?? 0,
++    };
++  }
++  if (strategyLower.includes('both sides')) {
++    return {
++      depthKUsd: input.kalshiYesDepth ?? 0,
++      depthPUsd: input.pmYesDepth ?? 0,
++    };
++  }
++
++  // default: buy YES Kalshi + NO PM
++  return {
++    depthKUsd: input.kalshiYesDepth ?? 0,
++    depthPUsd: input.pmNoDepth ?? 0,
++  };
++}
++
++function buildCriteria(
++  input: BotTradeInput,
++  reasons: string[],
++  overrides?: Partial<BotTradeEvaluation['criteria']>,
++): BotTradeEvaluation['criteria'] {
++  const expiryDays = computeExpiryDays(input.expiryDate);
++  const legs = pickLegPrices(input.strategy, input);
++  const { depthKUsd, depthPUsd } = legDepths(legs, input);
++  const sharesK = legs.kalshiPrice != null && legs.kalshiPrice > 0
++    ? depthKUsd / legs.kalshiPrice
++    : 0;
++  const sharesP = legs.pmPrice != null && legs.pmPrice > 0
++    ? depthPUsd / legs.pmPrice
++    : 0;
++
++  return {
++    roiPct: input.roiPct ?? 0,
++    apyPct: input.apyPct ?? 0,
++    depthKUsd: overrides?.depthKUsd ?? depthKUsd,
++    depthPUsd: overrides?.depthPUsd ?? depthPUsd,
++    sharesK: overrides?.sharesK ?? sharesK,
++    sharesP: overrides?.sharesP ?? sharesP,
++    expiryDays: overrides?.expiryDays ?? expiryDays,
++  };
++}
++
++// ─── Execution helpers ───────────────────────────────────────────
++
++function safeArbId(pairId: string, outcome: string): string {
++  const sanitized = (outcome || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
++  return `bot:${pairId}:${sanitized}`;
++}
++
++function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
++  const legs = pickLegPrices(input.strategy, input);
++  if (legs.kalshiPrice == null || legs.pmPrice == null) return null;
++  if (!input.kalshiTicker || !input.pmConditionId) return null;
++
++  // Execute matched whole contracts. Monetary arithmetic is converted to integer
++  // cents before sizing so the two legs cannot drift through float rounding.
++  const kalshiPriceCents = Math.round(legs.kalshiPrice * 100);
++  const pmPriceCents = Math.round(legs.pmPrice * 100);
++  if (kalshiPriceCents <= 0 || pmPriceCents <= 0) return null;
++  const contracts = Math.floor(Math.min(
++    input.kalshiStake > 0 ? Math.round(input.kalshiStake * 100) / kalshiPriceCents : Infinity,
++    input.pmStake > 0 ? Math.round(input.pmStake * 100) / pmPriceCents : Infinity,
++  ));
++
++  if (!Number.isSafeInteger(contracts) || contracts <= 0) return null;
++
++  const kalshiStake = (contracts * kalshiPriceCents) / 100;
++  const pmStake = (contracts * pmPriceCents) / 100;
++
++  const kalshiOrder: OrderRequest = {
++    platform: 'kalshi',
++    marketId: input.kalshiTicker,
++    ticker: input.kalshiTicker,
++    side: 'buy',
++    outcome: legs.kalshiOutcome,
++    size: kalshiStake,
++    contracts,
++    price: kalshiPriceCents / 100,
++    orderType: 'limit',
++  };
++
++  const polymarketOrder: OrderRequest = {
++    platform: 'polymarket',
++    marketId: input.pmConditionId,
++    conditionId: input.pmConditionId,
++    side: 'buy',
++    outcome: legs.pmOutcome,
++    size: pmStake,
++    contracts,
++    price: pmPriceCents / 100,
++    orderType: 'limit',
++  };
++
++  return {
++    arbId: safeArbId(input.pairId, input.outcome),
++    marketTitle: input.marketTitle,
++    kalshiOrder,
++    polymarketOrder,
++    estimatedProfit: input.expectedProfit,
++    maxSlippagePct: 2.0,
++    timeoutMs: 15000,
++    dryRun: true, // overwritten by caller before executeArb()
++    scanTime: new Date().toISOString(),
++    bestPriceFound: true,
++  };
++}
++
++/** Sum dollar stake for a bot trade record. */
++function botStakeUsd(record: ExecutionRecord): number {
++  const k = record.kalshiOrder && typeof record.kalshiOrder === 'object' && record.kalshiOrder != null
++    ? Number((record.kalshiOrder as { size?: unknown }).size ?? 0)
++    : 0;
++  const p = record.polymarketOrder && typeof record.polymarketOrder === 'object' && record.polymarketOrder != null
++    ? Number((record.polymarketOrder as { size?: unknown }).size ?? 0)
++    : 0;
++  const kValid = Number.isFinite(k) && k > 0 ? k : 0;
++  const pValid = Number.isFinite(p) && p > 0 ? p : 0;
++  return kValid + pValid;
++}
++
++async function countTodayBotTrades(): Promise<number> {
++  const { createClient } = await import('@libsql/client');
++  const c = createClient({ url: `file:${process.cwd()}/data/edgefinder.db` });
++  try {
++    const today = new Date().toISOString().slice(0, 10);
++    const res = await c.execute({
++      sql: `SELECT COUNT(*) AS cnt FROM executions WHERE source = 'bot' AND timestamp >= ? AND timestamp < ?`,
++      args: [`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
++    });
++    return Number((res.rows as Array<{ cnt?: unknown }>)[0]?.cnt ?? 0);
++  } finally {
++    c.close();
++  }
++}
++
++/** Compute total proposed stake for the trade. */
++function proposedStakeUsd(input: BotTradeInput): number {
++  return input.kalshiStake + input.pmStake;
++}
++
++// ─── Main orchestrator ─────────────────────────────────────────
++
++export async function maybeExecuteBotTrade(
++  input: BotTradeInput,
++): Promise<BotExecutionResult> {
++  const settings = await getBotSettings();
++
++  const evaluation = evaluateBotTrade(input, settings);
++  if (!evaluation.shouldTrade) {
++    return { executed: false, dryRun: true, reason: evaluation.reason };
++  }
++
++  if (!settings.enabled) {
++    return { executed: false, dryRun: true, reason: 'BotTrader disabled' };
++  }
++
++  const arbId = safeArbId(input.pairId, input.outcome);
++
++  // Duplicate-prevention: only actual open positions count. Historical
++  // successful executions must not block a pair forever after settlement.
++  const alreadyOpen = await hasOpenBotMarketPair(
++    input.kalshiTicker ?? null,
++    input.pmConditionId ?? null,
++  ).catch((e) => {
++    logger.warn('[bot-trader] duplicate check failed', { arbId, error: String(e) });
++    return true; // fail-safe: skip on error
++  });
++  if (alreadyOpen) {
++    return { executed: false, dryRun: true, reason: `Open bot position already exists for ${arbId}` };
++  }
++
++  // Daily exposure + trade count limits.
++  const todayExposure = await getTodayBotExposure().catch((e) => {
++    logger.warn('[bot-trader] daily exposure check failed', { error: String(e) });
++    return Infinity;
++  });
++  const todayTrades = await countTodayBotTrades().catch(() => 0);
++  const maxDailyExposure = await getSetting<number>('execute.maxDailyExposure').catch(() => 500);
++  const proposedStake = proposedStakeUsd(input);
++
++  if (todayTrades >= settings.maxTradesPerDay) {
++    return {
++      executed: false,
++      dryRun: true,
++      reason: `Daily bot trade limit reached (${todayTrades}/${settings.maxTradesPerDay})`,
++    };
++  }
++
++  if (todayExposure + proposedStake > maxDailyExposure) {
++    return {
++      executed: false,
++      dryRun: true,
++      reason: `Daily exposure limit reached: today $${todayExposure.toFixed(2)} + proposed $${proposedStake.toFixed(2)} > $${maxDailyExposure}`,
++    };
++  }
++
++  // Resolve global execution mode.
++  const { getExecutionMode } = await import('./settings');
++  const globalMode = await getExecutionMode().catch(() => 'paper' as const);
++  const globalDryRun = executionModeToDryRun(globalMode);
++
++  // Determine effective mode: production only when explicitly authorized.
++  const wantsProduction = settings.mode === 'production' && globalMode === 'live';
++  const effectiveDryRun = globalDryRun || !wantsProduction || !AUTO_LIVE_ORDERS_AUTHORIZED;
++
++  if (wantsProduction && !AUTO_LIVE_ORDERS_AUTHORIZED) {
++    logger.warn('[bot-trader] production/live requested but not yet authorized; falling back to paper simulation', {
++      pairId: input.pairId,
++      marketTitle: input.marketTitle,
++    });
++  }
++
++  const execReq = buildExecutionRequest(input);
++  if (!execReq) {
++    return { executed: false, dryRun: true, reason: 'Unable to build execution request (missing leg data)' };
++  }
++
++  execReq.dryRun = effectiveDryRun;
++
++  logger.info('[bot-trader] executing trade', {
++    arbId,
++    pairId: input.pairId,
++    marketTitle: input.marketTitle,
++    dryRun: effectiveDryRun,
++    mode: settings.mode,
++    globalMode,
++  });
++
++  const reserved = await reserveBotMarketPair(input.kalshiTicker!, input.pmConditionId!).catch((error) => {
++    logger.warn('[bot-trader] pair reservation failed', { arbId, error: String(error) });
++    return false;
++  });
++  if (!reserved) {
++    return { executed: false, dryRun: true, reason: `Open or in-flight bot position already exists for ${arbId}` };
++  }
++
++  let result: Awaited<ReturnType<typeof executeArb>>;
++  try {
++    result = await executeArb(execReq);
++  } catch (error) {
++    await releaseBotMarketPair(input.kalshiTicker!, input.pmConditionId!).catch(() => {});
++    throw error;
++  }
++
++  const executionRecord: ExecutionRecord = {
++    timestamp: new Date().toISOString(),
++    arbId,
++    marketTitle: input.marketTitle,
++    dryRun: effectiveDryRun,
++    success: result.success,
++    strategy: input.strategy,
++    kalshiOrder: execReq.kalshiOrder,
++    polymarketOrder: execReq.polymarketOrder,
++    result,
++    estimatedProfit: input.expectedProfit,
++    steps: result.steps,
++    source: 'bot',
++  };
++
++  const persistedExecution = await persistExecution(executionRecord).catch((e) => {
++    logger.warn('[bot-trader] persistExecution failed', { arbId, error: String(e) });
++    return null;
++  });
++
++  const fillMatch = areFilledContractsMatched(result.kalshiResult, result.polymarketResult);
++  const hasAuthoritativeFills =
++    Number.isSafeInteger(result.kalshiResult.filledContracts) &&
++    Number.isSafeInteger(result.polymarketResult.filledContracts) &&
++    fillMatch.matched &&
++    fillMatch.kalshiContracts > 0 &&
++    (result.kalshiResult.filledPrice ?? 0) > 0 &&
++    (result.polymarketResult.filledPrice ?? 0) > 0 &&
++    ['filled', 'partial'].includes(result.kalshiResult.status) &&
++    ['filled', 'partial'].includes(result.polymarketResult.status);
++  const positionOpened = hasAuthoritativeFills && !result.unhedged;
++  let positionPersisted = false;
++  if (positionOpened && persistedExecution) {
++    const kalshiPrice = result.kalshiResult.filledPrice!;
++    const pmPrice = result.polymarketResult.filledPrice!;
++    const kalshiPriceCents = Math.round(kalshiPrice * 100);
++    const pmPriceCents = Math.round(pmPrice * 100);
++    const sharesKalshi = result.kalshiResult.filledContracts!;
++    const sharesPm = result.polymarketResult.filledContracts!;
++    const totalCostCents =
++      sharesKalshi * kalshiPriceCents + sharesPm * pmPriceCents;
++    const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
++    const feeDollars =
++      calcKalshiFee(sharesKalshi, kalshiPrice) +
++      calcPolymarketFee(sharesPm, pmPrice, getPolymarketTheta(input.category));
++    const feesCents = Math.ceil(feeDollars * 100 - 1e-9);
++    await createBotPosition({
++      executionId: persistedExecution.id,
++      marketId: input.pairId,
++      marketTitle: input.marketTitle,
++      kalshiTicker: input.kalshiTicker ?? null,
++      pmConditionId: input.pmConditionId ?? null,
++      strategy: input.strategy,
++      kalshiSide: execReq.kalshiOrder.outcome,
++      pmSide: execReq.polymarketOrder.outcome,
++      buyPriceKalshiCents: kalshiPriceCents,
++      buyPricePmCents: pmPriceCents,
++      sharesKalshi,
++      sharesPm,
++      totalCostCents,
++      expectedPayoutCents,
++      expectedProfitCents: expectedPayoutCents - totalCostCents,
++      feesCents,
++      openedAt: executionRecord.timestamp,
++      expiryDate: input.expiryDate ?? null,
++    }).then(() => {
++      positionPersisted = true;
++    }).catch((e) => {
++      logger.error('[bot-trader] bot position persistence failed; pair reservation retained', { arbId, error: String(e) });
++      return retainBotMarketPairForExposure(input.kalshiTicker!, input.pmConditionId!).catch((retainError) => {
++        logger.error('[bot-trader] failed to mark pair reservation as durable exposure', {
++          arbId,
++          error: String(retainError),
++        });
++      });
++    });
++  }
++  const cleanWithoutPosition = !positionOpened && !result.unhedged;
++  if (cleanWithoutPosition || positionPersisted) {
++    await releaseBotMarketPair(input.kalshiTicker!, input.pmConditionId!).catch((error) => {
++      logger.warn('[bot-trader] pair reservation release failed', { arbId, error: String(error) });
++    });
++  }
++
++  await sendBotTelegramAlert(input, result.success, effectiveDryRun, input.roiPct).catch((e) => {
++    logger.warn('[bot-trader] telegram alert failed', { arbId, error: String(e) });
++  });
++
++  return {
++    executed: result.success || (effectiveDryRun && !result.unhedged),
++    dryRun: effectiveDryRun,
++    reason: effectiveDryRun
++      ? `Paper trade simulated for ${input.marketTitle}`
++      : `Production trade executed for ${input.marketTitle}`,
++    executionRecord,
++    executionResult: result,
++  };
++}
++
++async function sendBotTelegramAlert(
++  input: BotTradeInput,
++  success: boolean,
++  dryRun: boolean,
++  roiPct: number,
++): Promise<void> {
++  const config = await getConfigResolved();
++  if (!config) return;
++  if (await isPausedResolved()) return;
++
++  const emoji = dryRun ? '🤖' : '🦾';
++  const modeLabel = dryRun ? 'PAPER' : 'PRODUCTION';
++  const status = success ? 'placed' : 'attempted';
++
++  const text = [
++    `${emoji} <b>BotTrader ${status} — ${modeLabel}</b>`,
++    '',
++    `<b>Market:</b> ${input.marketTitle}`,
++    `<b>Outcome:</b> ${input.outcome}`,
++    `<b>Strategy:</b> ${input.strategy}`,
++    `<b>ROI:</b> ${roiPct.toFixed(2)}%`,
++    `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
++    `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,
++  ].join('\n');
++
++  await sendTelegramMessage(config.botToken, config.chatId, text);
++}
++
++// ─── Convenience adapters ────────────────────────────────────────
++
++export function unifiedOutcomeToBotInput(
++  pairId: string,
++  marketTitle: string,
++  expiryDate: string | undefined,
++  outcome: UnifiedOutcome,
++): BotTradeInput {
++  const a = outcome.arbitrage;
++  return {
++    pairId,
++    marketTitle,
++    outcome: outcome.artist,
++    strategy: a.strategy,
++    roiPct: a.roiPct,
++    apyPct: a.apyPct ?? null,
++    expectedProfit: a.expectedProfit,
++    kalshiStake: a.kalshiStake,
++    pmStake: a.pmStake,
++    kalshiTicker: outcome.kalshi?.ticker ?? null,
++    pmConditionId: outcome.polymarket?.conditionId ?? null,
++    kalshiYesAsk: outcome.kalshi?.yesAsk ?? null,
++    kalshiNoAsk: outcome.kalshi?.noAsk ?? null,
++    pmYesAsk: outcome.polymarket?.bestAsk ?? null,
++    pmNoAsk: outcome.polymarket?.noPrice ?? null,
++    kalshiYesDepth: parseDepth(outcome.kalshi?.yesAskDepth),
++    kalshiNoDepth: parseDepth(outcome.kalshi?.noAskDepth),
++    pmYesDepth: outcome.polymarket?.askDepth ?? 0,
++    pmNoDepth: outcome.polymarket?.noAskDepth ?? 0,
++    expiryDate,
++  };
++}
++
++export function liveArbResultToBotInput(
++  pairId: string,
++  marketTitle: string,
++  expiryDate: string | undefined,
++  result: LiveArbResult,
++): BotTradeInput {
++  return {
++    pairId,
++    marketTitle,
++    outcome: result.artist,
++    strategy: result.strategy,
++    roiPct: result.roiPct,
++    apyPct: null,
++    expectedProfit: result.expectedProfit,
++    kalshiStake: result.kalshiStake,
++    pmStake: result.pmStake,
++    kalshiTicker: result.kalshiTicker ?? null,
++    pmConditionId: result.pmYesTokenId ?? null,
++    kalshiYesAsk: result.kalshiYesAsk,
++    kalshiNoAsk: result.kalshiNoAsk,
++    pmYesAsk: result.pmYesAsk,
++    pmNoAsk: result.pmNoAsk,
++    kalshiYesDepth: result.kalshiYesDepth,
++    kalshiNoDepth: result.kalshiNoDepth,
++    pmYesDepth: result.pmYesDepth,
++    pmNoDepth: result.pmNoDepth,
++    expiryDate,
++  };
++}
++
++// Parse depth helper (mirror matcher.parseDepth for local use without import cycle)
++function parseDepth(val: string | number | null | undefined): number {
++  if (val == null) return 0;
++  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : 0;
++  const s = String(val).trim().replace(/^\$/, '');
++  if (s === 'Infinity') return 0;
++  const m = s.match(/^(\d[\d,]*(?:\.\d+)?)\s*([KMB]?)\s*$/i);
++  if (!m) return 0;
++  let num = parseFloat(m[1].replace(/,/g, ''));
++  const suffix = (m[2] || '').toUpperCase();
++  if (suffix === 'K') num *= 1000;
++  if (suffix === 'M') num *= 1_000_000;
++  if (suffix === 'B') num *= 1_000_000_000;
++  return Number.isFinite(num) && num > 0 ? num : 0;
++}
++
++// ─── Scan hooks ──────────────────────────────────────────────────
++
++export async function runBotTraderOnScanOutcomes(
++  pairId: string,
++  marketTitle: string,
++  expiryDate: string | undefined,
++  inputs: BotTradeInput[],
++): Promise<BotExecutionResult[]> {
++  const settings = await getBotSettings();
++  if (!settings.enabled) return [];
++
++  const results: BotExecutionResult[] = [];
++  for (const input of inputs) {
++    if (input.roiPct <= 0 || input.strategy === 'No arb') continue;
++    const res = await maybeExecuteBotTrade(input);
++    results.push(res);
++  }
++  return results;
++}
++
++export async function runBotTraderOnLiveArbs(
++  pairId: string,
++  marketTitle: string,
++  expiryDate: string | undefined,
++  results: LiveArbResult[],
++): Promise<BotExecutionResult[]> {
++  const settings = await getBotSettings();
++  if (!settings.enabled) return [];
++
++  const execs: BotExecutionResult[] = [];
++  for (const r of results) {
++    if (r.stale || r.expectedProfit <= 0 || r.strategy === 'No arb') continue;
++    const input = liveArbResultToBotInput(pairId, marketTitle, expiryDate, r);
++    execs.push(await maybeExecuteBotTrade(input));
++  }
++  return execs;
++}
+diff --git a/src/lib/bot-trader.test.ts b/src/lib/bot-trader.test.ts
+new file mode 100644
+index 0000000..cd0a54e
+--- /dev/null
++++ b/src/lib/bot-trader.test.ts
+@@ -0,0 +1,414 @@
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import {
++  evaluateBotTrade,
++  maybeExecuteBotTrade,
++  unifiedOutcomeToBotInput,
++  getBotSettings,
++  type BotSettings,
++  type BotTradeInput,
++} from './bot-trader';
++import type { UnifiedOutcome } from './matcher';
++
++function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
++  return {
++    enabled: true,
++    mode: 'paper',
++    minRoiPct: 2.0,
++    minApyPct: 0,
++    minDepthUsd: 0.5,
++    minSharesPerLeg: 1,
++    maxExpiryDays: 1,
++    maxTradesPerDay: 10,
++    ...overrides,
++  };
++}
++
++function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
++  const farFuture = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
++  return {
++    pairId: 'pair-1',
++    marketTitle: 'Test Market',
++    outcome: 'Team A',
++    strategy: 'Buy YES Kalshi + NO PM',
++    roiPct: 3.0,
++    apyPct: 0,
++    expectedProfit: 1.5,
++    kalshiStake: 45,
++    pmStake: 50,
++    kalshiTicker: 'KXTEST-A',
++    pmConditionId: 'pm-condition-a',
++    kalshiYesAsk: 0.45,
++    kalshiNoAsk: 0.58,
++    pmYesAsk: 0.55,
++    pmNoAsk: 0.52,
++    kalshiYesDepth: 50,
++    kalshiNoDepth: 60,
++    pmYesDepth: 60,
++    pmNoDepth: 55,
++    expiryDate: farFuture,
++    ...overrides,
++  };
++}
++
++function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome {
++  const farFuture = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
++  return {
++    artist: 'Team A',
++    kalshi: {
++      ticker: 'KXTEST-A',
++      yesBid: 0.44,
++      yesAsk: 0.45,
++      noBid: 0.57,
++      noAsk: 0.58,
++      lastPrice: 0.50,
++      yesAskDepth: '50',
++      noAskDepth: '60',
++    },
++    polymarket: {
++      marketId: 'pm-market-a',
++      conditionId: 'pm-condition-a',
++      yesPrice: 0.54,
++      noPrice: 0.52,
++      bestBid: 0.53,
++      bestAsk: 0.55,
++      lastTradePrice: 0.54,
++      askDepth: 60,
++      noAskDepth: 55,
++    },
++    arbitrage: {
++      strategy: 'Buy YES Kalshi + NO PM',
++      kalshiStake: 45,
++      pmStake: 50,
++      expectedProfit: 1.5,
++      roiPct: 3.0,
++      apyPct: 0,
++      maxCapital: 100,
++      buyPlatform: 'kalshi',
++      buyPrice: 0.45,
++      sellPlatform: 'polymarket',
++      sellPrice: 0.52,
++      arbType: 'direct',
++    },
++    source: 'auto',
++    ...overrides,
++  } as UnifiedOutcome;
++}
++
++describe('getBotSettings', () => {
++  beforeEach(() => {
++    vi.resetModules();
++    vi.doMock('./settings', async (importOriginal) => ({
++      ...(await importOriginal()),
++      getSetting: vi.fn(async (key: string) => {
++        switch (key) {
++          case 'bot.enabled': return true;
++          case 'bot.mode': return 'paper';
++          case 'bot.minRoiPct': return 2.5;
++          case 'bot.minApyPct': return 0;
++          case 'bot.minSharesPerLeg': return 2;
++          case 'bot.maxExpiryDays': return 1;
++          case 'bot.maxTradesPerDay': return 5;
++          default: return undefined;
++        }
++      }),
++    }));
++  });
++
++  afterEach(() => {
++    vi.doUnmock('./settings');
++    vi.restoreAllMocks();
++  });
++
++  it('loads and coerces settings from DB', async () => {
++    const { getBotSettings } = await import('./bot-trader');
++    const settings = await getBotSettings();
++    expect(settings.enabled).toBe(true);
++    expect(settings.mode).toBe('paper');
++    expect(settings.minRoiPct).toBe(2.5);
++    expect(settings.minSharesPerLeg).toBe(2);
++    expect(settings.maxTradesPerDay).toBe(5);
++  });
++});
++
++describe('evaluateBotTrade', () => {
++  it('approves a simple profitable trade with enough depth', () => {
++    const ev = evaluateBotTrade(makeInput(), baseSettings());
++    expect(ev.shouldTrade).toBe(true);
++    expect(ev.criteria.sharesK).toBeCloseTo(111.11, 1);
++    expect(ev.criteria.sharesP).toBeCloseTo(105.77, 1);
++    expect(ev.criteria.expiryDays).toBeGreaterThan(6);
++  });
++
++  it('rejects when disabled', () => {
++    const ev = evaluateBotTrade(makeInput(), baseSettings({ enabled: false }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('disabled');
++  });
++
++  it('rejects non-positive ROI', () => {
++    const ev = evaluateBotTrade(makeInput({ roiPct: 0 }), baseSettings());
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('not positive');
++  });
++
++  it('rejects ROI below minimum', () => {
++    const ev = evaluateBotTrade(makeInput({ roiPct: 1.5 }), baseSettings({ minRoiPct: 2.0 }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('ROI');
++  });
++
++  it('rejects APY below minimum when APY filter enabled', () => {
++    const ev = evaluateBotTrade(makeInput({ apyPct: 5 }), baseSettings({ minApyPct: 10 }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('APY');
++  });
++
++  it('allows APY below minimum when filter disabled (minApyPct=0)', () => {
++    const ev = evaluateBotTrade(makeInput({ apyPct: 0 }), baseSettings({ minApyPct: 0 }));
++    expect(ev.shouldTrade).toBe(true);
++  });
++
++  it('rejects markets expiring sooner than maxExpiryDays', () => {
++    const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
++    const ev = evaluateBotTrade(makeInput({ expiryDate: soon }), baseSettings({ maxExpiryDays: 1 }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('Expires');
++  });
++
++  it('rejects when either leg has insufficient dollar depth', () => {
++    const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.3 }), baseSettings({ minDepthUsd: 1 }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('depth');
++  });
++
++  it('rejects when shares per leg are below minimum', () => {
++    const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.9, pmNoDepth: 0.9 }), baseSettings({ minSharesPerLeg: 2 }));
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('shares');
++  });
++
++  it('handles $1 placement: 0.5 share per leg at $0.50 ask → ~$0.50/leg depth satisfies per-leg $0.50 minimum', () => {
++    // The setting is per-leg depth. With $0.50 ask and $0.50 depth per leg, each leg
++    // has exactly 1 share available, for a ~$1 total trade. This matches the
++    // acceptance text: "approximately $0.50 per leg".
++    const ev = evaluateBotTrade(
++      makeInput({ kalshiYesAsk: 0.5, pmNoAsk: 0.5, kalshiYesDepth: 0.5, pmNoDepth: 0.5 }),
++      baseSettings({ minDepthUsd: 0.5, minSharesPerLeg: 1 }),
++    );
++    expect(ev.shouldTrade).toBe(true);
++    expect(ev.criteria.sharesK).toBeCloseTo(1, 3);
++    expect(ev.criteria.sharesP).toBeCloseTo(1, 3);
++  });
++
++  it('rejects same-platform internal arbs (not yet bot-tradeable)', () => {
++    const ev = evaluateBotTrade(
++      makeInput({ strategy: 'Same-platform YES+YES Kalshi: A + B' }),
++      baseSettings(),
++    );
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('Missing tradeable ask price');
++  });
++
++  it('accepts cross-outcome YES+YES strategy with correct leg prices', () => {
++    const ev = evaluateBotTrade(
++      makeInput({
++        strategy: 'Buy YES both sides: Kalshi A + PM B',
++        kalshiYesAsk: 0.42,
++        pmYesAsk: 0.55,
++      }),
++      baseSettings(),
++    );
++    expect(ev.criteria.sharesK).toBeCloseTo(119.05, 1);
++    expect(ev.criteria.sharesP).toBeCloseTo(109.09, 1);
++    expect(ev.shouldTrade).toBe(true);
++  });
++
++  it('rejects cross-outcome with missing yes ask', () => {
++    const ev = evaluateBotTrade(
++      makeInput({
++        strategy: 'Buy YES both sides: Kalshi A + PM B',
++        kalshiYesAsk: null,
++      }),
++      baseSettings(),
++    );
++    expect(ev.shouldTrade).toBe(false);
++    expect(ev.reason).toContain('Missing tradeable ask price');
++  });
++});
++
++describe('unifiedOutcomeToBotInput', () => {
++  it('maps a UnifiedOutcome into a BotTradeInput', () => {
++    const o = makeUnifiedOutcome();
++    const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
++    expect(input.pairId).toBe('pair-1');
++    expect(input.marketTitle).toBe('Test Market');
++    expect(input.outcome).toBe('Team A');
++    expect(input.kalshiTicker).toBe('KXTEST-A');
++    expect(input.pmConditionId).toBe('pm-condition-a');
++    expect(input.pmYesDepth).toBe(60);
++  });
++
++  it('normalizes Kalshi string depth into numbers', () => {
++    const o = makeUnifiedOutcome({
++      kalshi: {
++        ticker: 'KXTEST-A',
++        yesBid: 0.44,
++        yesAsk: 0.45,
++        noBid: 0.57,
++        noAsk: 0.58,
++        lastPrice: 0.50,
++        yesAskDepth: '$1.2K',
++        noAskDepth: '0',
++      } as any,
++    });
++    const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
++    expect(input.kalshiYesDepth).toBe(1200);
++  });
++});
++
++describe('maybeExecuteBotTrade safety', () => {
++  beforeEach(() => {
++    vi.resetModules();
++    vi.stubEnv('H2H_DRY_RUN', 'true');
++    vi.spyOn(Math, 'random').mockReturnValue(0.5);
++    vi.doMock('./persistence', async (importOriginal) => ({
++      ...(await importOriginal()),
++      hasOpenBotPosition: vi.fn().mockResolvedValue(false),
++      getTodayBotExposure: vi.fn().mockResolvedValue(0),
++      persistExecution: vi.fn().mockResolvedValue({ id: 77 }),
++    }));
++    vi.doMock('./bot-positions', async (importOriginal) => ({
++      ...(await importOriginal()),
++      hasOpenBotMarketPair: vi.fn().mockResolvedValue(false),
++      reserveBotMarketPair: vi.fn().mockResolvedValue(true),
++      retainBotMarketPairForExposure: vi.fn().mockResolvedValue(undefined),
++      releaseBotMarketPair: vi.fn().mockResolvedValue(undefined),
++      createBotPosition: vi.fn().mockResolvedValue({ id: 9 }),
++    }));
++    vi.doMock('./settings', async (importOriginal) => ({
++      ...(await importOriginal()),
++      getSetting: vi.fn(async (key: string) => {
++        switch (key) {
++          case 'bot.enabled': return true;
++          case 'bot.mode': return 'paper';
++          case 'bot.minRoiPct': return 0.5;
++          case 'bot.minApyPct': return 0;
++          case 'bot.minDepthUsd': return 0.01;
++          case 'bot.minSharesPerLeg': return 1;
++          case 'bot.maxExpiryDays': return 0;
++          case 'bot.maxTradesPerDay': return 100;
++          case 'execute.maxDailyExposure': return 10000;
++          default: return undefined;
++        }
++      }),
++      getExecutionMode: vi.fn().mockResolvedValue('paper'),
++    }));
++  });
++
++  afterEach(() => {
++    vi.restoreAllMocks();
++    vi.unstubAllEnvs();
++    vi.doUnmock('./persistence');
++    vi.doUnmock('./bot-positions');
++    vi.doUnmock('./settings');
++    vi.doUnmock('./auto-execute');
++  });
++
++  it('simulates in paper mode even when production requested', async () => {
++    const { maybeExecuteBotTrade } = await import('./bot-trader');
++    const result = await maybeExecuteBotTrade(makeInput());
++    expect(result.dryRun).toBe(true);
++    expect(result.executed).toBe(true);
++    expect(result.reason).toContain('Paper');
++  });
++
++  it('records a linked open position with integer-cent prices and matched whole contracts', async () => {
++    const { maybeExecuteBotTrade } = await import('./bot-trader');
++    const { createBotPosition } = await import('./bot-positions');
++
++    await maybeExecuteBotTrade(makeInput());
++
++    expect(createBotPosition).toHaveBeenCalledWith(expect.objectContaining({
++      executionId: 77,
++      marketId: 'pair-1',
++      kalshiTicker: 'KXTEST-A',
++      pmConditionId: 'pm-condition-a',
++      kalshiSide: 'yes',
++      pmSide: 'no',
++      buyPriceKalshiCents: 45,
++      buyPricePmCents: 52,
++      sharesKalshi: 96,
++      sharesPm: 96,
++      totalCostCents: 9312,
++      expectedPayoutCents: 9600,
++      expectedProfitCents: 288,
++      feesCents: 287,
++    }));
++  });
++
++  it('records the matched residual position after unequal fills are successfully reduced', async () => {
++    vi.doMock('./auto-execute', async (importOriginal) => ({
++      ...(await importOriginal()),
++      executeArb: vi.fn().mockResolvedValue({
++        success: false,
++        kalshiResult: {
++          platform: 'kalshi', status: 'partial', filledSize: 41.4,
++          filledPrice: 0.45, filledContracts: 92, timestamp: '',
++        },
++        polymarketResult: {
++          platform: 'polymarket', status: 'partial', filledSize: 47.84,
++          filledPrice: 0.52, filledContracts: 92, timestamp: '',
++        },
++        rollbackExecuted: true,
++        unhedged: false,
++        executionTimeMs: 1,
++        steps: [],
++      }),
++    }));
++    const { maybeExecuteBotTrade } = await import('./bot-trader');
++    const { createBotPosition } = await import('./bot-positions');
++
++    await maybeExecuteBotTrade(makeInput());
++
++    expect(createBotPosition).toHaveBeenCalledWith(expect.objectContaining({
++      sharesKalshi: 92,
++      sharesPm: 92,
++      totalCostCents: 8924,
++      expectedPayoutCents: 9200,
++    }));
++  });
++
++  it('retains the pair reservation when matched exposure cannot be persisted', async () => {
++    const {
++      createBotPosition,
++      releaseBotMarketPair,
++      retainBotMarketPairForExposure,
++    } = await import('./bot-positions');
++    vi.mocked(createBotPosition).mockRejectedValueOnce(new Error('disk unavailable'));
++    const { maybeExecuteBotTrade } = await import('./bot-trader');
++
++    await maybeExecuteBotTrade(makeInput());
++
++    expect(createBotPosition).toHaveBeenCalled();
++    expect(retainBotMarketPairForExposure).toHaveBeenCalledWith('KXTEST-A', 'pm-condition-a');
++    expect(releaseBotMarketPair).not.toHaveBeenCalled();
++  });
++});
++
++describe('edge cases', () => {
++  it('returns disabled when enabled=false without hitting persistence', () => {
++    const ev = evaluateBotTrade(makeInput(), baseSettings({ enabled: false }));
++    expect(ev.shouldTrade).toBe(false);
++  });
++
++  it('handles missing expiryDate gracefully', () => {
++    const ev = evaluateBotTrade(makeInput({ expiryDate: null }), baseSettings());
++    expect(ev.shouldTrade).toBe(true);
++    expect(ev.criteria.expiryDays).toBeNull();
++  });
++
++  it('handles malformed expiryDate', () => {
++    const ev = evaluateBotTrade(makeInput({ expiryDate: 'not-a-date' }), baseSettings());
++    expect(ev.criteria.expiryDays).toBeNull();
++  });
++});
+diff --git a/src/lib/bot-positions.ts b/src/lib/bot-positions.ts
+new file mode 100644
+index 0000000..cab1fcb
+--- /dev/null
++++ b/src/lib/bot-positions.ts
+@@ -0,0 +1,641 @@
++import path from 'node:path';
++import { createClient, type Client } from '@libsql/client';
++
++export type BotPositionStatus = 'open' | 'settled' | 'closed';
++export type BotPositionSide = 'yes' | 'no';
++export type SettlementSide = 'kalshi' | 'pm' | null;
++
++export interface BotPosition {
++  id: number;
++  executionId: number;
++  marketId: string | null;
++  marketTitle: string;
++  kalshiTicker: string | null;
++  pmConditionId: string | null;
++  strategy: string | null;
++  kalshiSide: BotPositionSide;
++  pmSide: BotPositionSide;
++  buyPriceKalshiCents: number;
++  buyPricePmCents: number;
++  sharesKalshi: number;
++  sharesPm: number;
++  totalCostCents: number;
++  expectedPayoutCents: number;
++  expectedProfitCents: number;
++  feesCents: number;
++  status: BotPositionStatus;
++  openedAt: string;
++  expiryDate: string | null;
++  settledAt: string | null;
++  currentPriceKalshiCents: number | null;
++  currentPricePmCents: number | null;
++  currentValueCents: number | null;
++  unrealizedPnlCents: number | null;
++  unrealizedRoiBps: number | null;
++  lastValuationAt: string | null;
++  realizedPnlCents: number | null;
++  settlementSide: SettlementSide;
++  dryRun: boolean;
++}
++
++export type CreateBotPosition = Omit<BotPosition,
++  'id' | 'status' | 'settledAt' | 'currentPriceKalshiCents' |
++  'currentPricePmCents' | 'currentValueCents' | 'unrealizedPnlCents' |
++  'unrealizedRoiBps' | 'lastValuationAt' | 'realizedPnlCents' |
++  'settlementSide' | 'dryRun'
++>;
++
++export interface PositionQuote {
++  kalshiYesBidCents: number | null;
++  kalshiNoBidCents: number | null;
++  pmYesBidCents: number | null;
++  pmNoBidCents: number | null;
++  observedAt: string;
++  expiryDate: string | null;
++  kalshiResolved?: boolean;
++  pmResolved?: boolean;
++}
++
++export interface PositionValuation {
++  status: 'open' | 'settled';
++  currentPriceKalshiCents: number;
++  currentPricePmCents: number;
++  currentValueCents: number;
++  unrealizedPnlCents: number;
++  unrealizedRoiBps: number;
++  lastValuationAt: string;
++  settledAt: string | null;
++  realizedPnlCents: number | null;
++  settlementSide: SettlementSide;
++}
++
++interface KalshiSettlementMarket {
++  status?: string;
++  settlement_value_dollars?: string;
++  yes_bid_dollars?: string;
++  no_bid_dollars?: string;
++}
++
++/** Return authoritative binary settlement prices, independent of empty books. */
++export function getKalshiResolvedPrices(market: KalshiSettlementMarket): {
++  yesBidCents: number | null;
++  noBidCents: number | null;
++  resolved: boolean;
++} {
++  const resolved = ['settled', 'finalized', 'resolved'].includes((market.status ?? '').toLowerCase());
++  if (!resolved) return { yesBidCents: null, noBidCents: null, resolved: false };
++  const settlement = market.settlement_value_dollars ?? '';
++  if (settlement === '1' || /^1\.0+$/.test(settlement)) {
++    return { yesBidCents: 100, noBidCents: 0, resolved: true };
++  }
++  if (settlement === '0' || /^0\.0+$/.test(settlement)) {
++    return { yesBidCents: 0, noBidCents: 100, resolved: true };
++  }
++  return { yesBidCents: null, noBidCents: null, resolved: false };
++}
++
++function isPriceCents(value: unknown): value is number {
++  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100;
++}
++
++function assertMoneyCents(name: string, value: number): void {
++  if (!Number.isSafeInteger(value)) throw new Error(`${name} must be integer cents`);
++}
++
++function assertShares(name: string, value: number): void {
++  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer contract count`);
++}
++
++function roiBps(pnlCents: number, costCents: number): number {
++  if (costCents <= 0) return 0;
++  return Math.round((pnlCents * 10_000) / costCents);
++}
++
++export function calculatePositionValuation(
++  position: BotPosition,
++  quote: PositionQuote,
++): PositionValuation {
++  const kalshiPrice = position.kalshiSide === 'yes'
++    ? quote.kalshiYesBidCents
++    : quote.kalshiNoBidCents;
++  const pmPrice = position.pmSide === 'yes'
++    ? quote.pmYesBidCents
++    : quote.pmNoBidCents;
++
++  if (!isPriceCents(kalshiPrice) || !isPriceCents(pmPrice)) {
++    throw new Error(`Missing executable bid for bot position ${position.id}`);
++  }
++
++  const currentValueCents =
++    kalshiPrice * position.sharesKalshi + pmPrice * position.sharesPm;
++  const unrealizedPnlCents = currentValueCents - position.totalCostCents;
++  const base: PositionValuation = {
++    status: 'open',
++    currentPriceKalshiCents: kalshiPrice,
++    currentPricePmCents: pmPrice,
++    currentValueCents,
++    unrealizedPnlCents,
++    unrealizedRoiBps: roiBps(unrealizedPnlCents, position.totalCostCents),
++    lastValuationAt: quote.observedAt,
++    settledAt: null,
++    realizedPnlCents: null,
++    settlementSide: null,
++  };
++
++  const expiryMs = quote.expiryDate ? Date.parse(quote.expiryDate) : Number.NaN;
++  const observedMs = Date.parse(quote.observedAt);
++  const expired = Number.isFinite(expiryMs) && Number.isFinite(observedMs) && expiryMs < observedMs;
++  const resolvedComplement =
++    (kalshiPrice === 100 && pmPrice === 0) ||
++    (kalshiPrice === 0 && pmPrice === 100);
++
++  if (!expired || !quote.kalshiResolved || !quote.pmResolved || !resolvedComplement) return base;
++
++  const payoutCents = kalshiPrice === 100
++    ? position.sharesKalshi * 100
++    : position.sharesPm * 100;
++  return {
++    ...base,
++    status: 'settled',
++    currentValueCents: payoutCents,
++    unrealizedPnlCents: payoutCents - position.totalCostCents,
++    unrealizedRoiBps: roiBps(payoutCents - position.totalCostCents, position.totalCostCents),
++    settledAt: quote.observedAt,
++    realizedPnlCents: payoutCents - position.totalCostCents - position.feesCents,
++    settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
++  };
++}
++
++function rowToPosition(row: Record<string, unknown>): BotPosition {
++  return {
++    id: Number(row.id),
++    executionId: Number(row.execution_id),
++    marketId: row.market_id != null ? String(row.market_id) : null,
++    marketTitle: String(row.market_title),
++    kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
++    pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
++    strategy: row.strategy != null ? String(row.strategy) : null,
++    kalshiSide: String(row.kalshi_side) as BotPositionSide,
++    pmSide: String(row.pm_side) as BotPositionSide,
++    buyPriceKalshiCents: Number(row.buy_price_kalshi),
++    buyPricePmCents: Number(row.buy_price_pm),
++    sharesKalshi: Number(row.shares_kalshi),
++    sharesPm: Number(row.shares_pm),
++    totalCostCents: Number(row.total_cost),
++    expectedPayoutCents: Number(row.expected_payout),
++    expectedProfitCents: Number(row.expected_profit),
++    feesCents: Number(row.fees ?? 0),
++    status: String(row.status) as BotPositionStatus,
++    openedAt: String(row.opened_at),
++    expiryDate: row.expiry_date != null ? String(row.expiry_date) : null,
++    settledAt: row.settled_at != null ? String(row.settled_at) : null,
++    currentPriceKalshiCents: row.current_price_kalshi != null ? Number(row.current_price_kalshi) : null,
++    currentPricePmCents: row.current_price_pm != null ? Number(row.current_price_pm) : null,
++    currentValueCents: row.current_value != null ? Number(row.current_value) : null,
++    unrealizedPnlCents: row.unrealized_pnl != null ? Number(row.unrealized_pnl) : null,
++    unrealizedRoiBps: row.unrealized_roi_pct != null ? Number(row.unrealized_roi_pct) : null,
++    lastValuationAt: row.last_valuation_at != null ? String(row.last_valuation_at) : null,
++    realizedPnlCents: row.realized_pnl != null ? Number(row.realized_pnl) : null,
++    settlementSide: row.settlement_side != null ? String(row.settlement_side) as SettlementSide : null,
++    dryRun: Boolean(Number(row.dry_run ?? 1)),
++  };
++}
++
++export class BotPositionStore {
++  private readonly client: Client;
++  private schemaReady: Promise<void> | null = null;
++
++  constructor(dbUrl = `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}`) {
++    this.client = createClient({ url: dbUrl });
++  }
++
++  private ensureSchema(): Promise<void> {
++    if (!this.schemaReady) this.schemaReady = this.createSchema();
++    return this.schemaReady;
++  }
++
++  private async createSchema(): Promise<void> {
++    await this.client.execute('PRAGMA busy_timeout = 5000');
++    await this.client.execute('PRAGMA foreign_keys = ON');
++    await this.client.execute(`
++      CREATE TABLE IF NOT EXISTS bot_positions (
++        id INTEGER PRIMARY KEY AUTOINCREMENT,
++        execution_id INTEGER NOT NULL REFERENCES executions(id),
++        market_id TEXT,
++        market_title TEXT NOT NULL,
++        kalshi_ticker TEXT,
++        pm_condition_id TEXT,
++        strategy TEXT,
++        kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
++        pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
++        buy_price_kalshi INTEGER NOT NULL,
++        buy_price_pm INTEGER NOT NULL,
++        shares_kalshi INTEGER NOT NULL,
++        shares_pm INTEGER NOT NULL,
++        total_cost INTEGER NOT NULL,
++        expected_payout INTEGER NOT NULL,
++        expected_profit INTEGER NOT NULL,
++        fees INTEGER NOT NULL DEFAULT 0,
++        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
++        opened_at TEXT NOT NULL,
++        expiry_date TEXT,
++        settled_at TEXT,
++        current_price_kalshi INTEGER,
++        current_price_pm INTEGER,
++        current_value INTEGER,
++        unrealized_pnl INTEGER,
++        unrealized_roi_pct INTEGER,
++        last_valuation_at TEXT,
++        realized_pnl INTEGER,
++        settlement_side TEXT CHECK (settlement_side IN ('kalshi', 'pm') OR settlement_side IS NULL)
++      )
++    `);
++    // Idempotent migration for installations that created the table from an
++    // earlier FEAT-043 draft. SQLite ignores no columns implicitly, so add each
++    // missing column explicitly before creating indexes.
++    const info = await this.client.execute('PRAGMA table_info(bot_positions)');
++    const existing = new Set(info.rows.map((row) => String(row.name)));
++    const migrations: Record<string, string> = {
++      execution_id: 'INTEGER REFERENCES executions(id)',
++      market_id: 'TEXT',
++      market_title: "TEXT NOT NULL DEFAULT ''",
++      kalshi_ticker: 'TEXT',
++      pm_condition_id: 'TEXT',
++      strategy: 'TEXT',
++      kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
++      pm_side: "TEXT NOT NULL DEFAULT 'no'",
++      buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
++      buy_price_pm: 'INTEGER NOT NULL DEFAULT 0',
++      shares_kalshi: 'INTEGER NOT NULL DEFAULT 0',
++      shares_pm: 'INTEGER NOT NULL DEFAULT 0',
++      total_cost: 'INTEGER NOT NULL DEFAULT 0',
++      expected_payout: 'INTEGER NOT NULL DEFAULT 0',
++      expected_profit: 'INTEGER NOT NULL DEFAULT 0',
++      fees: 'INTEGER NOT NULL DEFAULT 0',
++      status: "TEXT NOT NULL DEFAULT 'open'",
++      opened_at: "TEXT NOT NULL DEFAULT ''",
++      expiry_date: 'TEXT',
++      settled_at: 'TEXT',
++      current_price_kalshi: 'INTEGER',
++      current_price_pm: 'INTEGER',
++      current_value: 'INTEGER',
++      unrealized_pnl: 'INTEGER',
++      unrealized_roi_pct: 'INTEGER',
++      last_valuation_at: 'TEXT',
++      realized_pnl: 'INTEGER',
++      settlement_side: 'TEXT',
++    };
++    for (const [name, definition] of Object.entries(migrations)) {
++      if (!existing.has(name)) {
++        await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
++      }
++    }
++    await this.client.execute(`
++      CREATE TABLE IF NOT EXISTS bot_position_reservations (
++        pair_key TEXT PRIMARY KEY,
++        reserved_at TEXT NOT NULL,
++        exposure_at_risk INTEGER NOT NULL DEFAULT 0
++      )
++    `);
++    const reservationInfo = await this.client.execute('PRAGMA table_info(bot_position_reservations)');
++    if (!reservationInfo.rows.some((row) => String(row.name) === 'exposure_at_risk')) {
++      await this.client.execute(`ALTER TABLE bot_position_reservations ADD COLUMN exposure_at_risk INTEGER NOT NULL DEFAULT 0`);
++    }
++    await this.client.execute(`CREATE INDEX IF NOT EXISTS idx_bot_positions_status ON bot_positions(status, opened_at DESC)`);
++    await this.client.execute(`DROP INDEX IF EXISTS idx_bot_positions_open_pair`);
++    await this.client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id)) WHERE status = 'open'`);
++  }
++
++  async create(input: CreateBotPosition): Promise<BotPosition> {
++    await this.ensureSchema();
++    assertShares('sharesKalshi', input.sharesKalshi);
++    assertShares('sharesPm', input.sharesPm);
++    for (const [name, value] of Object.entries({
++      buyPriceKalshiCents: input.buyPriceKalshiCents,
++      buyPricePmCents: input.buyPricePmCents,
++      totalCostCents: input.totalCostCents,
++      expectedPayoutCents: input.expectedPayoutCents,
++      expectedProfitCents: input.expectedProfitCents,
++      feesCents: input.feesCents,
++    })) assertMoneyCents(name, value);
++    if (!isPriceCents(input.buyPriceKalshiCents) || !isPriceCents(input.buyPricePmCents)) {
++      throw new Error('Buy prices must be integer cents from 0 through 100');
++    }
++    if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId)) {
++      throw new Error('An open bot position already exists for this market pair');
++    }
++
++    const initialRoiBps = roiBps(input.expectedProfitCents, input.totalCostCents);
++    let result;
++    try {
++      result = await this.client.execute({
++        sql: `INSERT INTO bot_positions (
++          execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
++          strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
++          shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
++          fees, status, opened_at, expiry_date, current_price_kalshi,
++          current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
++          last_valuation_at
++        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)`,
++        args: [
++          input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
++          input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
++          input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
++          input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
++          input.expectedProfitCents, input.feesCents, input.openedAt,
++          input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
++          input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
++          input.openedAt,
++        ],
++      });
++    } catch (error) {
++      if (String(error).includes('UNIQUE constraint failed')) {
++        throw new Error('An open bot position already exists for this market pair');
++      }
++      throw error;
++    }
++    const id = Number(result.lastInsertRowid ?? 0);
++    const created = await this.getById(id);
++    if (!created) throw new Error('Created bot position could not be read back');
++    return created;
++  }
++
++  async getById(id: number): Promise<BotPosition | null> {
++    await this.ensureSchema();
++    const result = await this.client.execute({
++      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id WHERE bp.id = ?`,
++      args: [id],
++    });
++    return result.rows[0] ? rowToPosition(result.rows[0] as Record<string, unknown>) : null;
++  }
++
++  async hasOpenPair(kalshiTicker: string | null, pmConditionId: string | null): Promise<boolean> {
++    await this.ensureSchema();
++    if (!kalshiTicker || !pmConditionId) return false;
++    const result = await this.client.execute({
++      sql: `SELECT 1 FROM bot_positions WHERE status = 'open' AND lower(kalshi_ticker) = lower(?) AND lower(pm_condition_id) = lower(?) LIMIT 1`,
++      args: [kalshiTicker, pmConditionId],
++    });
++    return result.rows.length > 0;
++  }
++
++  private pairKey(kalshiTicker: string, pmConditionId: string): string {
++    return `${kalshiTicker.trim().toLowerCase()}\u0000${pmConditionId.trim().toLowerCase()}`;
++  }
++
++  async reservePair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
++    await this.ensureSchema();
++    // Automatic live orders are hard-disabled; a 10-minute lease recovers paper
++    // reservations after process crashes while remaining far longer than the
++    // 15-second execution timeout.
++    const staleBefore = new Date(Date.now() - 10 * 60_000).toISOString();
++    await this.client.execute({
++      sql: `DELETE FROM bot_position_reservations WHERE reserved_at < ? AND exposure_at_risk = 0`,
++      args: [staleBefore],
++    });
++    if (await this.hasOpenPair(kalshiTicker, pmConditionId)) return false;
++    try {
++      await this.client.execute({
++        sql: `INSERT INTO bot_position_reservations (pair_key, reserved_at) VALUES (?, ?)`,
++        args: [this.pairKey(kalshiTicker, pmConditionId), new Date().toISOString()],
++      });
++      // Close the narrow gap between the precheck and reservation insert: a
++      // prior reservation may have committed its position and released while
++      // this caller waited on SQLite's writer lock.
++      if (await this.hasOpenPair(kalshiTicker, pmConditionId)) {
++        await this.releasePair(kalshiTicker, pmConditionId);
++        return false;
++      }
++      return true;
++    } catch (error) {
++      if (String(error).includes('UNIQUE constraint failed')) return false;
++      throw error;
++    }
++  }
++
++  async releasePair(kalshiTicker: string, pmConditionId: string): Promise<void> {
++    await this.ensureSchema();
++    await this.client.execute({
++      sql: `DELETE FROM bot_position_reservations WHERE pair_key = ?`,
++      args: [this.pairKey(kalshiTicker, pmConditionId)],
++    });
++  }
++
++  async retainPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {
++    await this.ensureSchema();
++    await this.client.execute({
++      sql: `UPDATE bot_position_reservations SET exposure_at_risk = 1 WHERE pair_key = ?`,
++      args: [this.pairKey(kalshiTicker, pmConditionId)],
++    });
++  }
++
++  async list(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
++    await this.ensureSchema();
++    const status = options.status ?? 'all';
++    const limit = Math.min(1000, Math.max(1, Math.trunc(options.limit ?? 100)));
++    const where = status === 'all' ? '' : 'WHERE bp.status = ?';
++    const args: Array<string | number> = status === 'all' ? [limit] : [status, limit];
++    const result = await this.client.execute({
++      sql: `SELECT bp.*, e.dry_run FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id ${where} ORDER BY bp.opened_at DESC LIMIT ?`,
++      args,
++    });
++    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
++  }
++
++  async listAllForAnalytics(): Promise<BotPosition[]> {
++    await this.ensureSchema();
++    const result = await this.client.execute(`
++      SELECT bp.*, e.dry_run
++      FROM bot_positions bp
++      LEFT JOIN executions e ON e.id = bp.execution_id
++      ORDER BY bp.opened_at DESC
++    `);
++    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
++  }
++
++  async listAllOpen(): Promise<BotPosition[]> {
++    await this.ensureSchema();
++    const result = await this.client.execute(`
++      SELECT bp.*, e.dry_run
++      FROM bot_positions bp
++      LEFT JOIN executions e ON e.id = bp.execution_id
++      WHERE bp.status = 'open'
++      ORDER BY bp.opened_at ASC
++    `);
++    return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
++  }
++
++  async updateValuation(id: number, valuation: PositionValuation): Promise<void> {
++    await this.ensureSchema();
++    await this.client.execute({
++      sql: `UPDATE bot_positions SET
++        status = ?, current_price_kalshi = ?, current_price_pm = ?,
++        current_value = ?, unrealized_pnl = ?, unrealized_roi_pct = ?,
++        last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?
++        WHERE id = ? AND status = 'open'`,
++      args: [
++        valuation.status, valuation.currentPriceKalshiCents,
++        valuation.currentPricePmCents, valuation.currentValueCents,
++        valuation.unrealizedPnlCents, valuation.unrealizedRoiBps,
++        valuation.lastValuationAt, valuation.settledAt,
++        valuation.realizedPnlCents, valuation.settlementSide, id,
++      ],
++    });
++  }
++
++  close(): void {
++    this.client.close();
++  }
++}
++
++let defaultStore: BotPositionStore | null = null;
++function store(): BotPositionStore {
++  if (!defaultStore) defaultStore = new BotPositionStore();
++  return defaultStore;
++}
++
++export async function createBotPosition(input: CreateBotPosition): Promise<BotPosition> {
++  return store().create(input);
++}
++
++export async function hasOpenBotMarketPair(kalshiTicker: string | null, pmConditionId: string | null): Promise<boolean> {
++  return store().hasOpenPair(kalshiTicker, pmConditionId);
++}
++
++export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
++  return store().reservePair(kalshiTicker, pmConditionId);
++}
++
++export async function retainBotMarketPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {
++  return store().retainPairForExposure(kalshiTicker, pmConditionId);
++}
++
++export async function releaseBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<void> {
++  return store().releasePair(kalshiTicker, pmConditionId);
++}
++
++export async function getBotPositions(options: { status?: BotPositionStatus | 'all'; limit?: number } = {}): Promise<BotPosition[]> {
++  return store().list(options);
++}
++
++export interface BotPositionAnalytics {
++  totalBotTrades: { paper: number; production: number; total: number };
++  openPositions: { count: number; unrealizedPnlCents: number };
++  settledPositions: { count: number; realizedPnlCents: number; winRateBps: number };
++  averageRoi: { atTradeBps: number; currentBps: number };
++  bestTrade: BotPosition | null;
++  worstTrade: BotPosition | null;
++  dailyPnl: Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>;
++  timeStats: { tradesPerDayBps: number; averageHoldSeconds: number };
++}
++
++export async function getBotPositionAnalytics(): Promise<BotPositionAnalytics> {
++  const positions = await store().listAllForAnalytics();
++  const paper = positions.filter((position) => position.dryRun).length;
++  const production = positions.length - paper;
++  const open = positions.filter((position) => position.status === 'open');
++  const settled = positions.filter((position) => position.status === 'settled');
++  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
++  const score = (position: BotPosition) => position.realizedPnlCents ?? position.unrealizedPnlCents ?? 0;
++  const ranked = [...positions].sort((a, b) => score(b) - score(a));
++  const dates = new Map<string, { realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>();
++  for (const position of positions) {
++    const date = position.openedAt.slice(0, 10);
++    const row = dates.get(date) ?? { realizedPnlCents: 0, unrealizedPnlCents: 0, trades: 0 };
++    row.trades += 1;
++    row.realizedPnlCents += position.realizedPnlCents ?? 0;
++    row.unrealizedPnlCents += position.status === 'open' ? position.unrealizedPnlCents ?? 0 : 0;
++    dates.set(date, row);
++  }
++  const distinctDays = Math.max(1, dates.size);
++  const holdSeconds = settled.map((position) => {
++    const start = Date.parse(position.openedAt);
++    const end = position.settledAt ? Date.parse(position.settledAt) : start;
++    return Math.max(0, Math.round((end - start) / 1000));
++  });
++  return {
++    totalBotTrades: { paper, production, total: positions.length },
++    openPositions: {
++      count: open.length,
++      unrealizedPnlCents: sum(open.map((position) => position.unrealizedPnlCents ?? 0)),
++    },
++    settledPositions: {
++      count: settled.length,
++      realizedPnlCents: sum(settled.map((position) => position.realizedPnlCents ?? 0)),
++      winRateBps: settled.length === 0 ? 0 : Math.round(settled.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000 / settled.length),
++    },
++    averageRoi: {
++      atTradeBps: positions.length === 0 ? 0 : Math.round(sum(positions.map((position) => roiBps(position.expectedProfitCents, position.totalCostCents))) / positions.length),
++      currentBps: positions.length === 0 ? 0 : Math.round(sum(positions.map((position) => position.unrealizedRoiBps ?? 0)) / positions.length),
++    },
++    bestTrade: ranked[0] ?? null,
++    worstTrade: ranked.at(-1) ?? null,
++    dailyPnl: [...dates.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, values]) => ({ date, ...values })),
++    timeStats: {
++      tradesPerDayBps: Math.round(positions.length * 10_000 / distinctDays),
++      averageHoldSeconds: holdSeconds.length === 0 ? 0 : Math.round(sum(holdSeconds) / holdSeconds.length),
++    },
++  };
++}
++
++export async function pollOpenBotPositions(dependencies?: {
++  fetchKalshi?: (ticker: string) => Promise<{
++    yes_bid_dollars?: string;
++    no_bid_dollars?: string;
++    close_time?: string;
++    status?: string;
++    settlement_value_dollars?: string;
++  } | null>;
++  fetchPmBids?: (conditionId: string) => Promise<{ yesBidCents: number | null; noBidCents: number | null; resolved: boolean } | null>;
++  observedAt?: string;
++}): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
++  const [{ fetchKalshiMarket }, { fetchClobMarket, getClobBidPrices }] = await Promise.all([
++    import('./kalshi'),
++    import('./polymarket-clob'),
++  ]);
++  const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarket;
++  const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
++    const market = await fetchClobMarket(conditionId);
++    return market ? getClobBidPrices(market) : null;
++  });
++  const observedAt = dependencies?.observedAt ?? new Date().toISOString();
++  const open = await store().listAllOpen();
++  let updated = 0;
++  let settled = 0;
++  const errors: Array<{ id: number; error: string }> = [];
++
++  await Promise.all(open.map(async (position) => {
++    try {
++      if (!position.kalshiTicker || !position.pmConditionId) {
++        throw new Error('Position is missing venue market identifiers');
++      }
++      const [kalshi, pmBids] = await Promise.all([
++        fetchKalshi(position.kalshiTicker),
++        fetchPmBids(position.pmConditionId),
++      ]);
++      if (!kalshi || !pmBids) throw new Error('Venue quote unavailable');
++      const parseCents = (value: string | undefined): number | null => {
++        if (value == null || !/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)) return null;
++        const cents = Math.round(Number(value) * 100);
++        return isPriceCents(cents) ? cents : null;
++      };
++      const kalshiResolution = getKalshiResolvedPrices(kalshi);
++      const valuation = calculatePositionValuation(position, {
++        kalshiYesBidCents: kalshiResolution.yesBidCents ?? parseCents(kalshi.yes_bid_dollars),
++        kalshiNoBidCents: kalshiResolution.noBidCents ?? parseCents(kalshi.no_bid_dollars),
++        pmYesBidCents: pmBids.yesBidCents,
++        pmNoBidCents: pmBids.noBidCents,
++        observedAt,
++        expiryDate: kalshi.close_time ?? position.expiryDate,
++        kalshiResolved: kalshiResolution.resolved,
++        pmResolved: pmBids.resolved,
++      });
++      await store().updateValuation(position.id, valuation);
++      updated += 1;
++      if (valuation.status === 'settled') settled += 1;
++    } catch (error) {
++      errors.push({ id: position.id, error: error instanceof Error ? error.message : String(error) });
++    }
++  }));
++  return { updated, settled, errors };
++}
+diff --git a/src/lib/bot-positions.test.ts b/src/lib/bot-positions.test.ts
+new file mode 100644
+index 0000000..8754f93
+--- /dev/null
++++ b/src/lib/bot-positions.test.ts
+@@ -0,0 +1,267 @@
++import { afterEach, describe, expect, it } from 'vitest';
++import { createClient } from '@libsql/client';
++import { mkdtemp, rm } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import {
++  BotPositionStore,
++  calculatePositionValuation,
++  getKalshiResolvedPrices,
++  type BotPosition,
++} from './bot-positions';
++
++function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
++  return {
++    id: 1,
++    executionId: 7,
++    marketId: 'pair-1',
++    marketTitle: 'Test market',
++    kalshiTicker: 'KXTEST',
++    pmConditionId: '0xabc',
++    strategy: 'Buy YES Kalshi + NO PM',
++    kalshiSide: 'yes',
++    pmSide: 'no',
++    buyPriceKalshiCents: 45,
++    buyPricePmCents: 50,
++    sharesKalshi: 10,
++    sharesPm: 10,
++    totalCostCents: 950,
++    expectedPayoutCents: 1000,
++    expectedProfitCents: 50,
++    feesCents: 0,
++    status: 'open',
++    openedAt: '2026-08-01T00:00:00.000Z',
++    expiryDate: '2026-08-10T00:00:00.000Z',
++    settledAt: null,
++    currentPriceKalshiCents: 45,
++    currentPricePmCents: 55,
++    currentValueCents: 1000,
++    unrealizedPnlCents: 50,
++    unrealizedRoiBps: 526,
++    lastValuationAt: '2026-08-01T00:00:00.000Z',
++    realizedPnlCents: null,
++    settlementSide: null,
++    dryRun: true,
++    ...overrides,
++  };
++}
++
++describe('calculatePositionValuation', () => {
++  it('marks an open YES-Kalshi/NO-PM position to executable sell bids using integer cents', () => {
++    const result = calculatePositionValuation(openPosition(), {
++      kalshiYesBidCents: 48,
++      kalshiNoBidCents: 51,
++      pmYesBidCents: 42,
++      pmNoBidCents: 57,
++      observedAt: '2026-08-08T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++    });
++
++    expect(result).toEqual({
++      status: 'open',
++      currentPriceKalshiCents: 48,
++      currentPricePmCents: 57,
++      currentValueCents: 1050,
++      unrealizedPnlCents: 100,
++      unrealizedRoiBps: 1053,
++      lastValuationAt: '2026-08-08T12:00:00.000Z',
++      settledAt: null,
++      realizedPnlCents: null,
++      settlementSide: null,
++    });
++  });
++
++  it('fails closed when an executable bid is missing', () => {
++    expect(() => calculatePositionValuation(openPosition(), {
++      kalshiYesBidCents: null,
++      kalshiNoBidCents: 100,
++      pmYesBidCents: 100,
++      pmNoBidCents: 0,
++      observedAt: '2026-08-08T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++    })).toThrow(/missing executable/i);
++  });
++
++  it('settles only after expiry when held-side prices are exactly 100 and 0 cents, net of fees', () => {
++    const result = calculatePositionValuation(openPosition({ feesCents: 7 }), {
++      kalshiYesBidCents: 100,
++      kalshiNoBidCents: 0,
++      pmYesBidCents: 100,
++      pmNoBidCents: 0,
++      observedAt: '2026-08-11T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++      kalshiResolved: true,
++      pmResolved: true,
++    });
++
++    expect(result.status).toBe('settled');
++    expect(result.currentValueCents).toBe(1000);
++    expect(result.realizedPnlCents).toBe(43);
++    expect(result.settlementSide).toBe('kalshi');
++    expect(result.settledAt).toBe('2026-08-11T12:00:00.000Z');
++  });
++
++  it('does not settle contradictory resolution prices', () => {
++    const result = calculatePositionValuation(openPosition(), {
++      kalshiYesBidCents: 100,
++      kalshiNoBidCents: 0,
++      pmYesBidCents: 0,
++      pmNoBidCents: 100,
++      observedAt: '2026-08-11T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++      kalshiResolved: true,
++      pmResolved: true,
++    });
++    expect(result.status).toBe('open');
++  });
++
++  it('uses authoritative Kalshi settlement value when finalized books have no bids', () => {
++    const kalshiResolution = getKalshiResolvedPrices({
++      status: 'settled',
++      settlement_value_dollars: '1.0000',
++      yes_bid_dollars: undefined,
++      no_bid_dollars: undefined,
++    });
++    expect(kalshiResolution).toEqual({ yesBidCents: 100, noBidCents: 0, resolved: true });
++
++    const result = calculatePositionValuation(openPosition({ feesCents: 7 }), {
++      kalshiYesBidCents: kalshiResolution.yesBidCents,
++      kalshiNoBidCents: kalshiResolution.noBidCents,
++      pmYesBidCents: 100,
++      pmNoBidCents: 0,
++      observedAt: '2026-08-11T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++      kalshiResolved: kalshiResolution.resolved,
++      pmResolved: true,
++    });
++
++    expect(result.status).toBe('settled');
++    expect(result.settlementSide).toBe('kalshi');
++    expect(result.realizedPnlCents).toBe(43);
++  });
++});
++
++describe('BotPositionStore', () => {
++  const dirs: string[] = [];
++  afterEach(async () => {
++    await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
++  });
++
++  it('creates the full table, records initial held-to-settlement value, and prevents duplicate open pairs', async () => {
++    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
++    dirs.push(dir);
++    const dbUrl = `file:${path.join(dir, 'test.db')}`;
++    const client = createClient({ url: dbUrl });
++    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
++    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 1)`);
++    client.close();
++
++    const store = new BotPositionStore(dbUrl);
++    const created = await store.create({
++      executionId: 7,
++      marketId: 'pair-1',
++      marketTitle: 'Test market',
++      kalshiTicker: 'KXTEST',
++      pmConditionId: '0xabc',
++      strategy: 'Buy YES Kalshi + NO PM',
++      kalshiSide: 'yes',
++      pmSide: 'no',
++      buyPriceKalshiCents: 45,
++      buyPricePmCents: 50,
++      sharesKalshi: 10,
++      sharesPm: 10,
++      totalCostCents: 950,
++      expectedPayoutCents: 1000,
++      expectedProfitCents: 50,
++      feesCents: 0,
++      openedAt: '2026-08-08T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++    });
++
++    expect(created.currentValueCents).toBe(1000);
++    expect(created.unrealizedPnlCents).toBe(50);
++    expect(created.dryRun).toBe(true);
++    await expect(store.hasOpenPair('KXTEST', '0xabc')).resolves.toBe(true);
++    await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
++
++    const columnsClient = createClient({ url: dbUrl });
++    const columns = await columnsClient.execute('PRAGMA table_info(bot_positions)');
++    columnsClient.close();
++    expect(columns.rows.map((row) => String(row.name))).toEqual(expect.arrayContaining([
++      'execution_id', 'buy_price_kalshi', 'buy_price_pm', 'current_value',
++      'unrealized_pnl', 'unrealized_roi_pct', 'realized_pnl', 'settlement_side',
++    ]));
++  });
++
++  it('atomically reserves a normalized venue pair across concurrent clients', async () => {
++    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
++    dirs.push(dir);
++    const dbUrl = `file:${path.join(dir, 'test.db')}`;
++    const client = createClient({ url: dbUrl });
++    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
++    client.close();
++    const first = new BotPositionStore(dbUrl);
++    const second = new BotPositionStore(dbUrl);
++
++    const results = await Promise.all([
++      first.reservePair('KXTEST', '0xAbC'),
++      second.reservePair('kxtest', '0xabc'),
++    ]);
++
++    expect(results.filter(Boolean)).toHaveLength(1);
++    await first.releasePair('KXTEST', '0xABC');
++    await expect(second.reservePair('kxtest', '0xabc')).resolves.toBe(true);
++    first.close();
++    second.close();
++  });
++
++  it('does not expire a reservation protecting known unpersisted exposure', async () => {
++    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
++    dirs.push(dir);
++    const dbUrl = `file:${path.join(dir, 'test.db')}`;
++    const client = createClient({ url: dbUrl });
++    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
++    client.close();
++    const store = new BotPositionStore(dbUrl);
++
++    await expect(store.reservePair('KXTEST', '0xabc')).resolves.toBe(true);
++    await store.retainPairForExposure('KXTEST', '0xabc');
++    const agingClient = createClient({ url: dbUrl });
++    await agingClient.execute(`UPDATE bot_position_reservations SET reserved_at = '2000-01-01T00:00:00.000Z'`);
++    agingClient.close();
++
++    await expect(store.reservePair('kxtest', '0xABC')).resolves.toBe(false);
++    store.close();
++  });
++
++  it('updates a persisted open position with valuation and settlement output', async () => {
++    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
++    dirs.push(dir);
++    const dbUrl = `file:${path.join(dir, 'test.db')}`;
++    const client = createClient({ url: dbUrl });
++    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
++    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 0)`);
++    client.close();
++    const store = new BotPositionStore(dbUrl);
++    const created = await store.create({
++      ...openPosition(),
++      id: undefined,
++      dryRun: undefined,
++    } as never);
++
++    const valuation = calculatePositionValuation(created, {
++      kalshiYesBidCents: 48,
++      kalshiNoBidCents: 51,
++      pmYesBidCents: 42,
++      pmNoBidCents: 57,
++      observedAt: '2026-08-08T12:00:00.000Z',
++      expiryDate: '2026-08-10T00:00:00.000Z',
++    });
++    await store.updateValuation(created.id, valuation);
++
++    const [stored] = await store.list({ status: 'open', limit: 10 });
++    expect(stored.currentValueCents).toBe(1050);
++    expect(stored.unrealizedPnlCents).toBe(100);
++    expect(stored.dryRun).toBe(false);
++  });
++});
+diff --git a/src/app/api/bot-trader/positions/route.ts b/src/app/api/bot-trader/positions/route.ts
+new file mode 100644
+index 0000000..5fe04f3
+--- /dev/null
++++ b/src/app/api/bot-trader/positions/route.ts
+@@ -0,0 +1,31 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { getBotPositions, type BotPositionStatus } from '@/lib/bot-positions';
++import { clientSafeError } from '@/lib/error-handler';
++
++export async function GET(request: NextRequest): Promise<NextResponse> {
++  try {
++    const params = new URL(request.url).searchParams;
++    const statusParam = params.get('status') ?? 'all';
++    if (!['open', 'settled', 'all'].includes(statusParam)) {
++      return NextResponse.json({ success: false, error: 'status must be open, settled, or all' }, { status: 400 });
++    }
++    const limitParam = params.get('limit');
++    if (limitParam != null && !/^\d+$/.test(limitParam)) {
++      return NextResponse.json({ success: false, error: 'limit must be an integer' }, { status: 400 });
++    }
++    const limit = limitParam == null ? 100 : Number(limitParam);
++    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
++      return NextResponse.json({ success: false, error: 'limit must be between 1 and 1000' }, { status: 400 });
++    }
++    const positions = await getBotPositions({
++      status: statusParam as BotPositionStatus | 'all',
++      limit,
++    });
++    return NextResponse.json(
++      { success: true, count: positions.length, positions },
++      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
++    );
++  } catch (error) {
++    return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/bot-trader/positions/route.test.ts b/src/app/api/bot-trader/positions/route.test.ts
+new file mode 100644
+index 0000000..206926e
+--- /dev/null
++++ b/src/app/api/bot-trader/positions/route.test.ts
+@@ -0,0 +1,21 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { GET } from './route';
++import { getBotPositions } from '@/lib/bot-positions';
++
++vi.mock('@/lib/bot-positions', () => ({ getBotPositions: vi.fn() }));
++
++describe('GET /api/bot-trader/positions', () => {
++  beforeEach(() => vi.mocked(getBotPositions).mockReset().mockResolvedValue([]));
++
++  it('accepts status and bounded integer limit', async () => {
++    const response = await GET(new Request('http://localhost/api/bot-trader/positions?status=open&limit=25') as never);
++    expect(response.status).toBe(200);
++    expect(getBotPositions).toHaveBeenCalledWith({ status: 'open', limit: 25 });
++    await expect(response.json()).resolves.toEqual({ success: true, count: 0, positions: [] });
++  });
++
++  it('rejects invalid status and malformed limits', async () => {
++    expect((await GET(new Request('http://localhost/api/bot-trader/positions?status=closed') as never)).status).toBe(400);
++    expect((await GET(new Request('http://localhost/api/bot-trader/positions?limit=1.5') as never)).status).toBe(400);
++  });
++});
+diff --git a/src/app/api/bot-trader/positions/valuate/route.ts b/src/app/api/bot-trader/positions/valuate/route.ts
+new file mode 100644
+index 0000000..d99f744
+--- /dev/null
++++ b/src/app/api/bot-trader/positions/valuate/route.ts
+@@ -0,0 +1,18 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { pollOpenBotPositions } from '@/lib/bot-positions';
++import { clientSafeError } from '@/lib/error-handler';
++
++function authorized(request: NextRequest): boolean {
++  const token = process.env.H2H_API_TOKEN;
++  return !token || request.headers.get('x-h2h-token') === token;
++}
++
++export async function POST(request: NextRequest): Promise<NextResponse> {
++  if (!authorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
++  try {
++    const result = await pollOpenBotPositions();
++    return NextResponse.json({ success: true, ...result });
++  } catch (error) {
++    return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/bot-trader/positions/valuate/route.test.ts b/src/app/api/bot-trader/positions/valuate/route.test.ts
+new file mode 100644
+index 0000000..294315c
+--- /dev/null
++++ b/src/app/api/bot-trader/positions/valuate/route.test.ts
+@@ -0,0 +1,27 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { NextRequest } from 'next/server';
++import { POST } from './route';
++import { pollOpenBotPositions } from '@/lib/bot-positions';
++
++vi.mock('@/lib/bot-positions', () => ({ pollOpenBotPositions: vi.fn() }));
++
++afterEach(() => {
++  vi.unstubAllEnvs();
++  vi.mocked(pollOpenBotPositions).mockReset();
++});
++
++describe('POST /api/bot-trader/positions/valuate', () => {
++  it('requires the shared token and runs the valuation poller', async () => {
++    vi.stubEnv('H2H_API_TOKEN', 'secret');
++    const unauthorized = await POST(new NextRequest('http://localhost/api/bot-trader/positions/valuate', { method: 'POST' }));
++    expect(unauthorized.status).toBe(401);
++
++    vi.mocked(pollOpenBotPositions).mockResolvedValue({ updated: 2, settled: 1, errors: [] });
++    const authorized = await POST(new NextRequest('http://localhost/api/bot-trader/positions/valuate', {
++      method: 'POST',
++      headers: { 'x-h2h-token': 'secret' },
++    }));
++    expect(authorized.status).toBe(200);
++    await expect(authorized.json()).resolves.toEqual({ success: true, updated: 2, settled: 1, errors: [] });
++  });
++});
+diff --git a/src/app/api/bot-trader/analytics/route.ts b/src/app/api/bot-trader/analytics/route.ts
+new file mode 100644
+index 0000000..879a273
+--- /dev/null
++++ b/src/app/api/bot-trader/analytics/route.ts
+@@ -0,0 +1,15 @@
++import { NextResponse } from 'next/server';
++import { getBotPositionAnalytics } from '@/lib/bot-positions';
++import { clientSafeError } from '@/lib/error-handler';
++
++export async function GET(): Promise<NextResponse> {
++  try {
++    const analytics = await getBotPositionAnalytics();
++    return NextResponse.json(
++      { success: true, analytics },
++      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
++    );
++  } catch (error) {
++    return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/bot-trader/analytics/route.test.ts b/src/app/api/bot-trader/analytics/route.test.ts
+new file mode 100644
+index 0000000..e871f72
+--- /dev/null
++++ b/src/app/api/bot-trader/analytics/route.test.ts
+@@ -0,0 +1,20 @@
++import { describe, expect, it, vi } from 'vitest';
++import { GET } from './route';
++import { getBotPositionAnalytics } from '@/lib/bot-positions';
++
++vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn() }));
++
++describe('GET /api/bot-trader/analytics', () => {
++  it('returns aggregated bot position analytics without caching', async () => {
++    vi.mocked(getBotPositionAnalytics).mockResolvedValue({
++      totalBotTrades: { paper: 2, production: 1, total: 3 },
++    } as never);
++    const response = await GET();
++    expect(response.status).toBe(200);
++    expect(response.headers.get('cache-control')).toContain('no-store');
++    await expect(response.json()).resolves.toEqual({
++      success: true,
++      analytics: { totalBotTrades: { paper: 2, production: 1, total: 3 } },
++    });
++  });
++});

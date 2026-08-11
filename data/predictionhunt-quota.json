@@ -1,0 +1,6 @@
+{
+  "status": "exhausted",
+  "checkedAt": "2026-08-10T11:09:57.850Z",
+  "nextCheckAt": "2026-08-11T00:00:00.000Z",
+  "reason": "rate_limit.exceeded_month"
+}

@@ -202,52 +202,44 @@ const gammaAllMemo = createTtlMemo<PMMarket[]>(30_000);
  * Fetch all active (open) Polymarket markets via Gamma API.
  * Paginates through `/markets?limit=500&active=true&closed=false`.
  * Uses the existing gamma rate limiter. No PredictionHunt dependency.
- */
+ *
+ * FEAT-046: supports tag filtering, incremental `since`, resume cursor,
+ * and explicit per-page delay. */
 export async function fetchAllPolymarketMarkets(options?: {
-  onPage?: (count: number) => void;
+  onPage?: (count: number, cursor?: string | null, page429s?: number) => void;
+  maxPages?: number;
+  tag?: string;
+  since?: string | null;
+  resumeCursor?: string | null;
+  minPageDelayMs?: number;
 }): Promise<PMMarket[]> {
-  return gammaAllMemo('all-active', async () => {
+  const maxPages = Math.min(Math.max(options?.maxPages ?? 100, 1), 100);
+  const minPageDelayMs = Math.max(0, options?.minPageDelayMs ?? 0);
+  const tag = options?.tag;
+  const since = options?.since ?? null;
+  const resumeCursor = options?.resumeCursor ?? null;
+
+  const cacheKey = tag ? `tag:${tag}` : 'all-active';
+  const canMemo = !since && !resumeCursor;
+
+  const doFetch = async (): Promise<PMMarket[]> => {
     const all: PMMarket[] = [];
     const seen = new Set<string>();
 
-    // First page gives us nextCursor; fetch in parallel with bounded speculation.
-    const firstPage = await fetchPMPage(null);
+    const firstPage = await fetchPMPage(null, { tag, since });
     if (!firstPage) return all;
     accumulate(firstPage.markets);
-    options?.onPage?.(all.length);
+    options?.onPage?.(all.length, firstPage.nextCursor ?? null, 0);
 
-    let cursor = firstPage.nextCursor;
-    const maxPages = 100;
+    let cursor: string | null = resumeCursor || firstPage.nextCursor;
     let safety = firstPage.markets.length > 0 ? 1 : 0;
 
-    // Gamma uses cursor-based pagination. Prefetch a window of pages in parallel
-    // by resolving each cursor sequentially but issuing fetches as soon as we know
-    // the next cursor. This saturates the 30 req/s limiter while respecting cursors.
     while (safety < maxPages && cursor) {
-      // Issue up to 10 parallel cursor-resolved fetches in a sliding window.
-      const window: Promise<{ markets: PMMarket[]; nextCursor: string | null } | null>[] = [];
-      let windowCursor: string | null = cursor;
-      for (let i = 0; i < 10 && windowCursor; i++) {
-        const captured = windowCursor;
-        window.push(
-          fetchPMPage(captured).then((page) => {
-            if (page) {
-              accumulate(page.markets);
-              options?.onPage?.(all.length);
-            }
-            return page;
-          }),
-        );
-        // We don't know the next cursor until the page returns, so we issue only
-        // the first page of the window and will discover the rest via awaits.
-        break;
-      }
-
-      const page = await Promise.race(window);
-      if (!page || !page.nextCursor) {
-        cursor = null;
-        break;
-      }
+      if (minPageDelayMs > 0) await sleep(minPageDelayMs);
+      const page = await fetchPMPage(cursor, { tag, since });
+      if (!page || page.markets.length === 0) break;
+      accumulate(page.markets);
+      options?.onPage?.(all.length, page.nextCursor ?? null, 0);
       cursor = page.nextCursor;
       safety += 1;
     }
@@ -262,11 +254,18 @@ export async function fetchAllPolymarketMarkets(options?: {
         }
       }
     }
-  });
+  };
+
+  if (canMemo) {
+    return gammaAllMemo(cacheKey, doFetch);
+  }
+  return doFetch();
 }
+
 
 async function fetchPMPage(
   cursor: string | null,
+  opts: { tag?: string; since?: string | null },
 ): Promise<{ markets: PMMarket[]; nextCursor: string | null } | null> {
   const params = new URLSearchParams({
     limit: '500',
@@ -274,6 +273,10 @@ async function fetchPMPage(
     closed: 'false',
   });
   if (cursor) params.set('cursor', cursor);
+  if (opts.tag) params.set('tag', opts.tag);
+  if (opts.since) {
+    params.set('updated_at_min', opts.since);
+  }
   params.set('_t', String(Date.now()));
 
   const res = await rateLimiters.gamma.execute(() =>
@@ -293,4 +296,8 @@ async function fetchPMPage(
     : typeof data.cursor === 'string' && data.cursor ? data.cursor
     : null;
   return { markets, nextCursor };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
