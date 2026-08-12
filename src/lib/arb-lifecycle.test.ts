@@ -3,13 +3,27 @@
  * Uses the real module against the real DB file path — so we isolate by
  * using unique market IDs per test run and cleaning up after.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { recordArbObservations, getLifecycleStats, resolveLifecycleCategory } from './arb-lifecycle';
 import { createClient } from '@libsql/client';
 import path from 'path';
 
 const TEST_PREFIX = `test-lifecycle-${Date.now()}`;
 const db = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
+
+beforeAll(async () => {
+  // A fresh checkout has no runtime-created persistence schema yet. Lifecycle
+  // joins saved markets for canonical categories, so create its real minimum
+  // contract instead of relying on another test file to initialize the DB.
+  await db.execute(`CREATE TABLE IF NOT EXISTS saved_markets (
+    id TEXT PRIMARY KEY,
+    kalshi_url TEXT NOT NULL,
+    polymarket_url TEXT NOT NULL,
+    event_title TEXT NOT NULL DEFAULT '',
+    category TEXT,
+    created_at TEXT NOT NULL
+  )`);
+});
 
 afterAll(async () => {
   const marketPattern = `${TEST_PREFIX}%`;
