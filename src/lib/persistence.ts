@@ -471,15 +471,15 @@ export async function* queryScanHistoryStream(opts: {
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
 
   let emitted = 0;
-  let lastCursor: string | null = null;
+  let lastCursor: { scannedAt: string; id: number } | null = null;
 
   while (emitted < maxRows) {
     const thisLimit = Math.min(chunkSize, maxRows - emitted);
     let cursorWhere = where;
     const cursorArgs = [...args];
     if (lastCursor) {
-      cursorWhere += ' AND scanned_at < ?';
-      cursorArgs.push(lastCursor);
+      cursorWhere += ' AND (scanned_at < ? OR (scanned_at = ? AND id < ?))';
+      cursorArgs.push(lastCursor.scannedAt, lastCursor.scannedAt, lastCursor.id);
     }
 
     const res = await c.execute({
@@ -488,7 +488,7 @@ export async function* queryScanHistoryStream(opts: {
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
             FROM scan_results${cursorWhere}
-            ORDER BY scanned_at DESC LIMIT ?`,
+            ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],
     });
 
@@ -497,7 +497,8 @@ export async function* queryScanHistoryStream(opts: {
 
     yield batch;
     emitted += batch.length;
-    lastCursor = batch[batch.length - 1].scanned_at as string;
+    const lastRow = batch[batch.length - 1];
+    lastCursor = { scannedAt: lastRow.scanned_at as string, id: Number(lastRow.id) };
 
     if (batch.length < thisLimit) break;
   }

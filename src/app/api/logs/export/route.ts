@@ -35,14 +35,33 @@ const escapeCsv = (val: unknown): string => {
   return s;
 };
 
+function toIsoDate(value: string | null): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`Invalid date value: "${value}"`);
+  }
+  return d.toISOString();
+}
+
 function buildFilters(searchParams: URLSearchParams) {
   const marketId = searchParams.get('marketId') || undefined;
   const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
   const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
-  const fromDate = searchParams.get('fromDate') || undefined;
-  const toDate = searchParams.get('toDate') || undefined;
+  const fromDate = toIsoDate(searchParams.get('fromDate'));
+  const toDate = toIsoDate(searchParams.get('toDate'));
+  if (fromDate && toDate && fromDate > toDate) {
+    throw new Error('fromDate must be before or equal to toDate');
+  }
   const maxRows = parseExportLimit(searchParams.get('limit'));
   return { marketId, minRoi, positiveArbOnly, fromDate, toDate, maxRows };
+}
+
+function isValidationError(err: unknown): err is Error {
+  return err instanceof Error && (
+    err.message.startsWith('Invalid date value') ||
+    err.message.startsWith('fromDate must be')
+  );
 }
 
 /**
@@ -108,6 +127,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
+    if (isValidationError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: clientSafeError(err, 'Failed to export logs') },
       { status: 500 }
@@ -135,6 +157,9 @@ export async function HEAD(request: NextRequest) {
       },
     });
   } catch (err) {
+    if (isValidationError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: clientSafeError(err, 'Failed to estimate export size') },
       { status: 500 }
