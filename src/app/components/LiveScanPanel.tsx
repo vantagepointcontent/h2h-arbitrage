@@ -93,6 +93,11 @@ interface PrevCellValues {
 
 type FlashColor = "green" | "red";
 
+const LIVE_READY_STATUS = "Streaming live prices";
+const LIVE_RETRY_STATUS = "Reconnecting to live prices... Last known prices remain visible. If this persists, press Stop then Start.";
+const LIVE_DISCONNECTED_STATUS = "Live scan disconnected — press Start to retry.";
+const INITIALIZATION_TIMEOUT_MS = 15_000;
+
 interface FlashEntry {
   color: FlashColor;
   nonce: number;
@@ -176,6 +181,9 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const tabCounterRef = useRef(0);
   const tabsRef = useRef<TabState[]>([]);
+  const streamsRef = useRef<Map<string, EventSource>>(new Map());
+  const startTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const initializationTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   const selectedMarket = useMemo(
@@ -220,19 +228,34 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
   // Cleanup all live streams and flash timers on unmount. The ref avoids the
   // empty-dependency cleanup capturing the initial (empty) tabs array.
   useEffect(() => {
+    const startTimers = startTimersRef.current;
+    const initializationTimers = initializationTimersRef.current;
+    const streams = streamsRef.current;
     return () => {
+      startTimers.forEach((timer) => clearTimeout(timer));
+      startTimers.clear();
+      initializationTimers.forEach((timer) => clearTimeout(timer));
+      initializationTimers.clear();
+      streams.forEach((stream) => stream.close());
+      streams.clear();
       tabsRef.current.forEach((tab) => {
-        tab.eventSource?.close();
         tab.flashTimers.forEach((timer) => clearTimeout(timer));
       });
     };
   }, []);
 
   const stopTab = useCallback((tabId: string) => {
+    const startTimer = startTimersRef.current.get(tabId);
+    if (startTimer) clearTimeout(startTimer);
+    startTimersRef.current.delete(tabId);
+    const initializationTimer = initializationTimersRef.current.get(tabId);
+    if (initializationTimer) clearTimeout(initializationTimer);
+    initializationTimersRef.current.delete(tabId);
+    streamsRef.current.get(tabId)?.close();
+    streamsRef.current.delete(tabId);
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id !== tabId) return t;
-        t.eventSource?.close();
         t.flashTimers.forEach((timer) => clearTimeout(timer));
         return { ...t, running: false, loading: false, status: "Stopped", eventSource: null };
       })
@@ -240,10 +263,17 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
   }, []);
 
   const closeTab = useCallback((tabId: string) => {
+    const startTimer = startTimersRef.current.get(tabId);
+    if (startTimer) clearTimeout(startTimer);
+    startTimersRef.current.delete(tabId);
+    const initializationTimer = initializationTimersRef.current.get(tabId);
+    if (initializationTimer) clearTimeout(initializationTimer);
+    initializationTimersRef.current.delete(tabId);
+    streamsRef.current.get(tabId)?.close();
+    streamsRef.current.delete(tabId);
     setTabs((prev) => {
       const tab = prev.find((t) => t.id === tabId);
       if (tab) {
-        tab.eventSource?.close();
         tab.flashTimers.forEach((timer) => clearTimeout(timer));
       }
       const remaining = prev.filter((t) => t.id !== tabId);
@@ -258,22 +288,27 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
   }, [activeTabId]);
 
   const startTab = useCallback(async (tabId: string) => {
+    startTimersRef.current.delete(tabId);
+    const initializationTimer = initializationTimersRef.current.get(tabId);
+    if (initializationTimer) clearTimeout(initializationTimer);
+    initializationTimersRef.current.delete(tabId);
+    streamsRef.current.get(tabId)?.close();
+    streamsRef.current.delete(tabId);
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id !== tabId) return t;
-        // Clear previous state
-        t.eventSource?.close();
+        // Keep the last valid result visible while a new connection initializes.
         t.flashTimers.forEach((timer) => clearTimeout(timer));
         return {
           ...t,
           error: "",
-          result: null,
           flashes: {},
           flashesRef: {},
           prevValues: new Map(),
           flashTimers: new Map(),
           loading: true,
-          status: "Connecting...",
+          running: true,
+          status: "Connecting to live prices...",
           eventSource: null,
           expandedArtist: null,
         };
@@ -308,42 +343,77 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
       params.set("capital", String(capital));
       params.set("marketId", market.id); // HOOKUP-02: keys historical lifespan for persistence score
       const es = new EventSource(`/api/ws/live-scan?${params.toString()}`);
+      streamsRef.current.set(tabId, es);
 
-      es.onopen = () => {
+      const isCurrentStream = () => streamsRef.current.get(tabId) === es;
+      const disconnect = (error: string) => {
+        if (!isCurrentStream()) return;
+        const initializationTimer = initializationTimersRef.current.get(tabId);
+        if (initializationTimer) clearTimeout(initializationTimer);
+        initializationTimersRef.current.delete(tabId);
+        es.close();
+        streamsRef.current.delete(tabId);
         setTabs((prev) =>
           prev.map((t) =>
             t.id === tabId
-              ? { ...t, loading: false, running: true, status: "Streaming live prices", error: "", eventSource: es }
+              ? { ...t, error, running: false, loading: false, status: LIVE_DISCONNECTED_STATUS, eventSource: null }
+              : t
+          )
+        );
+      };
+
+      initializationTimersRef.current.set(tabId, setTimeout(() => {
+        disconnect("Exchange initialization timed out. Check venue availability, then press Start to retry.");
+      }, INITIALIZATION_TIMEOUT_MS));
+
+      es.onopen = () => {
+        if (!isCurrentStream()) return;
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId
+              ? { ...t, running: true, status: "Connected; initializing exchanges...", error: "", eventSource: es }
               : t
           )
         );
       };
 
       es.onmessage = (ev) => {
-        const data = JSON.parse(ev.data);
+        if (!isCurrentStream()) return;
+        let data: { type?: string; message?: string; error?: string; result?: LiveScanResult };
+        try {
+          data = JSON.parse(ev.data);
+        } catch {
+          disconnect("The live stream sent an invalid response. Press Start to retry.");
+          return;
+        }
         if (data.error) {
-          setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId
-                ? { ...t, error: data.error, running: false, loading: false, status: "Error" }
-                : t
-            )
-          );
-          es.close();
+          disconnect(data.error);
           return;
         }
         if (data.type === "status") {
+          const message = data.message || "Connecting to exchanges...";
+          const retrying = /reconnect|retry|disconnected/i.test(message);
           setTabs((prev) =>
-            prev.map((t) => (t.id === tabId ? { ...t, status: data.message } : t))
+            prev.map((t) => (t.id === tabId ? {
+              ...t,
+              running: true,
+              loading: !t.result,
+              error: "",
+              status: retrying ? `${message} Last known prices remain visible.` : message,
+            } : t))
           );
           return;
         }
-        if (data.type === "result") {
+        if (data.type === "result" && data.result) {
+          const initializationTimer = initializationTimersRef.current.get(tabId);
+          if (initializationTimer) clearTimeout(initializationTimer);
+          initializationTimersRef.current.delete(tabId);
+          const result = data.result;
           setTabs((prev) =>
             prev.map((t) => {
               if (t.id !== tabId) return t;
               // Compute flash diffs
-              const newOutcomes = data.result.outcomes as LiveArbOutcome[];
+              const newOutcomes = result.outcomes;
               const prevMap = t.prevValues;
               const newFlashes: Record<string, FlashEntry> = {};
               const flashRef = { ...t.flashesRef };
@@ -413,7 +483,11 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
               const mergedFlashes = { ...flashRef, ...newFlashes };
               return {
                 ...t,
-                result: data.result,
+                result,
+                running: true,
+                loading: false,
+                error: "",
+                status: LIVE_READY_STATUS,
                 flashes: mergedFlashes,
                 flashesRef: mergedFlashes,
                 prevValues: prevMap,
@@ -425,21 +499,14 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
       };
 
       es.onerror = () => {
+        if (!isCurrentStream()) return;
         // EventSource fires onerror for transient issues (proxy timeouts,
         // network blips, browser connection management). The stream may
         // still be alive on the server side. Instead of immediately killing
         // the connection, check if readyState is CLOSED (fatal) vs
         // CONNECTING (browser is auto-reconnecting).
         if (es.readyState === EventSource.CLOSED) {
-          // Fatal — server closed the connection
-          setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId
-                ? { ...t, error: "Stream disconnected.", running: false, loading: false, status: "Disconnected" }
-                : t
-            )
-          );
-          es.close();
+          disconnect("The live price stream disconnected. Check your network, then press Start to retry.");
         } else {
           // readyState === CONNECTING — browser is auto-reconnecting.
           // Update status but DON'T close the EventSource. The browser
@@ -448,7 +515,7 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
           setTabs((prev) =>
             prev.map((t) =>
               t.id === tabId
-                ? { ...t, status: "Reconnecting...", loading: true }
+                ? { ...t, status: LIVE_RETRY_STATUS, loading: !t.result, running: true }
                 : t
             )
           );
@@ -458,7 +525,7 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
       setTabs((prev) =>
         prev.map((t) =>
           t.id === tabId
-            ? { ...t, error: String(err), loading: false, status: "Error" }
+            ? { ...t, error: String(err), running: false, loading: false, status: LIVE_DISCONNECTED_STATUS }
             : t
         )
       );
@@ -494,7 +561,7 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(tabId);
     // Auto-start the new tab
-    setTimeout(() => startTab(tabId), 50);
+    startTimersRef.current.set(tabId, setTimeout(() => startTab(tabId), 50));
   }, [selectedMarket, tabs, startTab]);
 
   const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId) || null, [tabs, activeTabId]);
