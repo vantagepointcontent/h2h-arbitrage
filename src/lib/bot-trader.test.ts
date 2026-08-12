@@ -6,6 +6,7 @@ import {
   unifiedOutcomeToBotInput,
   getBotSettings,
   getAuthoritativeMatchedFill,
+  sanitizeExecutionResultForPersistence,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -22,20 +23,59 @@ vi.mock('./bot-trader-messages', () => ({
 describe('getAuthoritativeMatchedFill', () => {
   it('uses venue-reported matched contracts and fill prices, including matched partial fills', () => {
     expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.451 },
-      polymarketResult: { filledContracts: 2, filledPrice: 0.497 },
-    })).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
+      kalshiResult: { filledContracts: 2, filledPrice: 0.451, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.497, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
+    }, 'venue')).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
   });
 
-  it('refuses to invent a position from mismatched, zero, or missing venue fills', () => {
+  it('refuses to invent a position from mismatched, zero, or missing venue evidence', () => {
     expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.45 },
-      polymarketResult: { filledContracts: 1, filledPrice: 0.50 },
-    })).toBeNull();
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { filledContracts: 1, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
+    }, 'venue')).toBeNull();
     expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 0, filledPrice: 0.45 },
-      polymarketResult: { filledContracts: 0, filledPrice: 0.50 },
+      kalshiResult: { filledContracts: 0, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { filledContracts: 0, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
+    }, 'venue')).toBeNull();
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: '', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.50, orderId: 'pm-1', timestamp: 'not-a-timestamp' },
+    }, 'venue')).toBeNull();
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
     })).toBeNull();
+  });
+});
+
+describe('sanitizeExecutionResultForPersistence', () => {
+  it('removes locally fabricated live fill price, quantity, and timestamp evidence', () => {
+    const result = {
+      success: true,
+      kalshiResult: { platform: 'kalshi' as const, status: 'filled' as const, filledSize: 0.45, filledContracts: 1, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
+      polymarketResult: { platform: 'polymarket' as const, status: 'filled' as const, filledSize: 0.50, filledContracts: 1, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
+      rollbackExecuted: false,
+      unhedged: false,
+      executionTimeMs: 10,
+      actualProfit: 0.05,
+      netExposure: 0.45,
+      steps: [{
+        timestamp: '2026-08-12T12:00:02.000Z', status: 'success' as const,
+        description: 'Both legs placed; Kalshi filled $0.45, Polymarket filled $0.50',
+        metadata: { filledPrice: 0.45 },
+      }],
+      alerts: [{ level: 'warning' as const, message: 'Unhedged exposure $0.45', leg: 'kalshi' as const }],
+    };
+    expect(sanitizeExecutionResultForPersistence(result, false)).toMatchObject({
+      kalshiResult: { orderId: 'k-1', filledSize: undefined, filledContracts: undefined, filledPrice: undefined, timestamp: '' },
+      polymarketResult: { orderId: 'pm-1', filledSize: undefined, filledContracts: undefined, filledPrice: undefined, timestamp: '' },
+      actualProfit: undefined,
+      netExposure: undefined,
+      steps: [{ timestamp: '', description: expect.not.stringContaining('$0.45') }],
+      alerts: [{ message: expect.not.stringContaining('$0.45') }],
+    });
+    expect(result.kalshiResult.filledPrice).toBe(0.45);
+    expect(sanitizeExecutionResultForPersistence(result, true)).toBe(result);
   });
 });
 
@@ -324,9 +364,13 @@ describe('buildExecutionRequest', () => {
       kalshiYesAsk: 0.03,
       pmYesAsk: 0.07,
       pmNoAsk: 0.94,
+      pmYesTokenId: 'pm-yes-token',
+      pmNoTokenId: 'pm-no-token',
     }));
     expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.03, contracts: 1 });
-    expect(req?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.94, contracts: 1 });
+    expect(req?.polymarketOrder).toMatchObject({
+      outcome: 'no', price: 0.94, contracts: 1, conditionId: 'pm-no-token', marketId: 'pm-no-token',
+    });
   });
 });
 
@@ -409,12 +453,26 @@ describe('maybeExecuteBotTrade safety', () => {
   });
 
   it('simulates in paper mode even when production requested', async () => {
+    const execution = await import('./auto-execute');
+    const executeSpy = vi.spyOn(execution, 'executeArb');
     const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const positions = await import('./bot-positions');
     const result = await maybeExecuteBotTrade(makeInput());
     expect(result.dryRun).toBe(true);
     expect(result.executed).toBe(true);
-    expect(result.positionPersisted).toBe(false);
-    expect(result.persistenceError).toContain('Missing authoritative market category');
+    expect(result.positionPersisted).toBe(true);
+    expect(result.persistenceError).toBeUndefined();
+    expect(positions.recordBotPosition).toHaveBeenCalledWith(expect.objectContaining({
+      kalshiQuantity: 1,
+      pmQuantity: 1,
+    }), expect.objectContaining({
+      kalshi: expect.objectContaining({ feeMultiplierPpm: 1_000_000 }),
+      polymarket: expect.objectContaining({ feeRateBps: 400 }),
+    }));
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      dryRun: true,
+      polymarketOrder: expect.objectContaining({ conditionId: 'pm-no-token', marketId: 'pm-no-token' }),
+    }));
     expect(result.reason).toContain('Paper');
   });
 
@@ -422,10 +480,13 @@ describe('maybeExecuteBotTrade safety', () => {
     const positions = await import('./bot-positions');
     vi.mocked(positions.fetchAuthoritativeBotFeeConfig).mockRejectedValueOnce(new Error('fee endpoint unavailable'));
     const persistence = await import('./persistence');
+    const execution = await import('./auto-execute');
+    const executeSpy = vi.spyOn(execution, 'executeArb');
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const result = await maybeExecuteBotTrade(makeInput());
     expect(result.executed).toBe(false);
     expect(result.reason).toMatch(/fee authority/i);
+    expect(executeSpy).not.toHaveBeenCalled();
     expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
 });

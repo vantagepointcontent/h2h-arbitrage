@@ -8,6 +8,24 @@ export type BotPositionSide = 'yes' | 'no';
 export type SettlementSide = 'kalshi' | 'pm' | null;
 export type BotSelectionMethod = 'roi' | 'apy' | 'hybrid';
 
+export interface AuthoritativeBotFeeConfig {
+  kalshi: {
+    feeType: 'quadratic';
+    feeMultiplierPpm: number;
+    source: string;
+    observedAt: string;
+    version: string;
+  };
+  polymarket: {
+    tokenId: string;
+    feeRateBps: number;
+    source: string;
+    observedAt: string;
+    version: string;
+  };
+  pmTheta: number;
+}
+
 export interface BotPosition {
   id: number;
   executionId: number;
@@ -1131,16 +1149,112 @@ export interface BotPositionInput {
   category?: string | null;
 }
 
-export async function recordBotPosition(input: BotPositionInput): Promise<void> {
-  if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
+async function fetchFeeJson(url: string): Promise<Record<string, unknown>> {
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', 'User-Agent': 'h2h-arbitrage/1.0' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Authoritative fee endpoint returned HTTP ${response.status}`);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Malformed authoritative fee response');
+  return data as Record<string, unknown>;
+}
+
+export async function fetchAuthoritativeBotFeeConfig(input: {
+  kalshiTicker: string;
+  pmConditionId: string;
+  pmTokenId?: string;
+  pmSide: BotPositionSide;
+  category: string;
+  observedAt?: string;
+}, dependencies?: {
+  fetchJson?: (url: string) => Promise<Record<string, unknown>>;
+  fetchPmMarket?: (conditionId: string) => Promise<{ tokens: Array<{ token_id?: unknown; outcome?: unknown }> } | null>;
+}): Promise<AuthoritativeBotFeeConfig> {
+  const getJson = dependencies?.fetchJson ?? fetchFeeJson;
+  const marketPayload = await getJson(`https://external-api.kalshi.com/trade-api/v2/markets/${encodeURIComponent(input.kalshiTicker)}`);
+  const market = marketPayload.market;
+  const eventTicker = market && typeof market === 'object' && !Array.isArray(market)
+    ? (market as Record<string, unknown>).event_ticker : null;
+  if (typeof eventTicker !== 'string' || !eventTicker.trim()) throw new Error('Kalshi market is missing authoritative event metadata');
+  const eventPayload = await getJson(`https://external-api.kalshi.com/trade-api/v2/events/${encodeURIComponent(eventTicker)}`);
+  const event = eventPayload.event;
+  if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Malformed Kalshi event fee metadata');
+  const eventRecord = event as Record<string, unknown>;
+  const seriesTicker = eventRecord.series_ticker;
+  if (typeof seriesTicker !== 'string' || !seriesTicker.trim()) throw new Error('Kalshi event is missing authoritative series metadata');
+  const seriesPayload = await getJson(`https://external-api.kalshi.com/trade-api/v2/series/${encodeURIComponent(seriesTicker)}`);
+  const series = seriesPayload.series;
+  if (!series || typeof series !== 'object' || Array.isArray(series)) throw new Error('Malformed Kalshi series fee metadata');
+  const seriesRecord = series as Record<string, unknown>;
+  const overrideType = eventRecord.fee_type_override;
+  const overrideMultiplier = eventRecord.fee_multiplier_override;
+  const hasOverride = overrideType != null || overrideMultiplier != null;
+  if (hasOverride && (overrideType == null || overrideMultiplier == null)) throw new Error('Conflicting Kalshi event fee override');
+  const feeType = hasOverride ? overrideType : seriesRecord.fee_type;
+  const feeMultiplier = hasOverride ? overrideMultiplier : seriesRecord.fee_multiplier;
+  if (feeType !== 'quadratic' || typeof feeMultiplier !== 'number' || !Number.isFinite(feeMultiplier)
+    || feeMultiplier < 0 || feeMultiplier > 10) {
+    throw new Error('Missing, malformed, or unsupported authoritative Kalshi fee configuration');
+  }
+  const feeMultiplierPpm = Math.round(feeMultiplier * 1_000_000);
+  if (!Number.isSafeInteger(feeMultiplierPpm)) throw new Error('Malformed authoritative Kalshi fee multiplier');
+
+  let tokenId = input.pmTokenId?.trim() ?? '';
+  if (!tokenId) {
+    const fetchPmMarket = dependencies?.fetchPmMarket ?? (async (conditionId: string) => {
+      const { fetchClobMarket } = await import('./polymarket-clob');
+      return fetchClobMarket(conditionId);
+    });
+    const pmMarket = await fetchPmMarket(input.pmConditionId);
+    if (!pmMarket || !Array.isArray(pmMarket.tokens)) throw new Error('Polymarket market fee metadata unavailable');
+    const tokens = pmMarket.tokens.filter((token): token is { token_id: string; outcome: string } =>
+      typeof token?.token_id === 'string' && typeof token.outcome === 'string'
+      && token.outcome.toLowerCase() === input.pmSide);
+    if (tokens.length !== 1 || !tokens[0].token_id.trim()) throw new Error('Polymarket held token fee metadata is missing or ambiguous');
+    tokenId = tokens[0].token_id.trim();
+  }
+  const pmFeePayload = await getJson(`https://clob.polymarket.com/fee-rate?token_id=${encodeURIComponent(tokenId)}`);
+  const feeRateBps = pmFeePayload.base_fee;
+  if (typeof feeRateBps !== 'number' || !Number.isSafeInteger(feeRateBps) || feeRateBps < 0 || feeRateBps > 10_000) {
+    throw new Error('Missing or malformed authoritative Polymarket token fee rate');
+  }
   const pmTheta = getPolymarketTheta(input.category);
+  if (Math.round(pmTheta * 10_000) !== feeRateBps) throw new Error('Conflicting authoritative Polymarket category and token fee configuration');
+  const observedAt = input.observedAt ?? new Date().toISOString();
+  return {
+    kalshi: {
+      feeType, feeMultiplierPpm,
+      source: hasOverride ? `kalshi-event:${eventTicker}` : `kalshi-series:${seriesTicker}`,
+      observedAt, version: `${feeType}:${feeMultiplierPpm}`,
+    },
+    polymarket: {
+      tokenId, feeRateBps, source: 'polymarket-clob:/fee-rate', observedAt,
+      version: `token-fee-rate:${feeRateBps}`,
+    },
+    pmTheta,
+  };
+}
+
+export async function recordBotPosition(input: BotPositionInput, feeAuthority: AuthoritativeBotFeeConfig): Promise<void> {
+  if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
+  if (feeAuthority.pmTheta !== getPolymarketTheta(input.category)
+    || feeAuthority.polymarket.feeRateBps !== Math.round(feeAuthority.pmTheta * 10_000)) {
+    throw new Error('Conflicting authoritative Polymarket fee configuration');
+  }
+  const pmTheta = feeAuthority.pmTheta;
   const buyPriceKalshiCents = Math.round(input.kalshiPrice * 100);
   const buyPricePmCents = Math.round(input.pmPrice * 100);
   assertShares('kalshiQuantity', input.kalshiQuantity);
   assertShares('pmQuantity', input.pmQuantity);
   const sharesKalshi = input.kalshiQuantity;
   const sharesPm = input.pmQuantity;
-  const kalshiEntryFeeCents = Math.round(calcKalshiFee(sharesKalshi, input.kalshiPrice) * 100);
+  const kalshiEntryFeeCents = calculateAuthoritativeKalshiFeeCents(
+    sharesKalshi,
+    input.kalshiPrice,
+    feeAuthority.kalshi.feeMultiplierPpm,
+  );
   const pmEntryFeeCents = Math.round(calcPolymarketFee(sharesPm, input.pmPrice, pmTheta) * 100);
   const totalCostCents = sharesKalshi * buyPriceKalshiCents + sharesPm * buyPricePmCents + kalshiEntryFeeCents + pmEntryFeeCents;
   const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
@@ -1174,6 +1288,19 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
     expiryDate: input.expiryDate ?? null,
     selectionMethod: input.selectionMethod ?? null,
   });
+}
+
+export function calculateAuthoritativeKalshiFeeCents(
+  contracts: number,
+  price: number,
+  feeMultiplierPpm: number,
+): number {
+  if (!Number.isSafeInteger(feeMultiplierPpm) || feeMultiplierPpm < 0) {
+    throw new Error('Invalid authoritative Kalshi fee multiplier');
+  }
+  if (feeMultiplierPpm === 0) return 0;
+  const authoritativeRate = 0.07 * feeMultiplierPpm / 1_000_000;
+  return Math.round(calcKalshiFee(contracts, price, authoritativeRate) * 100);
 }
 
 export async function hasOpenBotMarketPair(kalshiTicker: string | null, pmConditionId: string | null): Promise<boolean> {

@@ -20,8 +20,10 @@ import type { LiveArbResult } from './live-arb-engine';
 import {
   executeArb,
   type ExecutionRequest,
+  type ExecutionResult,
   type OrderSide,
   type OrderRequest,
+  type OrderResult,
 } from './auto-execute';
 import { getSetting, type getExecutionMode } from './settings';
 import { executionModeToDryRun } from './execution-mode';
@@ -30,7 +32,11 @@ import {
   getTodayBotExposure,
   type ExecutionRecord,
 } from './persistence';
-import { recordBotPosition } from './bot-positions';
+import {
+  fetchAuthoritativeBotFeeConfig,
+  recordBotPosition,
+  type AuthoritativeBotFeeConfig,
+} from './bot-positions';
 import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './telegram-alerts';
 import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
 import { createBotMessage, updateBotMessage, type BotMessageType } from './bot-trader-messages';
@@ -89,6 +95,10 @@ export interface BotTradeInput {
   kalshiTicker?: string | null;
   /** Polymarket conditionId/tokenId for the leg the strategy buys on PM (if any) */
   pmConditionId?: string | null;
+  /** Exact Polymarket YES token id when available. */
+  pmYesTokenId?: string | null;
+  /** Exact Polymarket NO token id when available. */
+  pmNoTokenId?: string | null;
   /** Kalshi YES ask */
   kalshiYesAsk?: number | null;
   /** Kalshi NO ask */
@@ -237,6 +247,61 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
 
   // Never guess from unknown strategy text: that can buy the opposite contract.
   return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
+}
+
+export function getAuthoritativeMatchedFill(result: {
+  kalshiResult: Pick<OrderResult, 'filledContracts' | 'filledPrice' | 'orderId' | 'timestamp'>;
+  polymarketResult: Pick<OrderResult, 'filledContracts' | 'filledPrice' | 'orderId' | 'timestamp'>;
+}, evidenceSource?: 'venue' | 'synthetic'): { kalshiContracts: number; pmContracts: number; kalshiPrice: number; pmPrice: number } | null {
+  const kalshiContracts = result.kalshiResult.filledContracts;
+  const pmContracts = result.polymarketResult.filledContracts;
+  const kalshiPrice = result.kalshiResult.filledPrice;
+  const pmPrice = result.polymarketResult.filledPrice;
+  if (
+    !Number.isSafeInteger(kalshiContracts) || Number(kalshiContracts) <= 0
+    || !Number.isSafeInteger(pmContracts) || Number(pmContracts) <= 0
+    || kalshiContracts !== pmContracts
+    || typeof kalshiPrice !== 'number' || !Number.isFinite(kalshiPrice) || kalshiPrice <= 0 || kalshiPrice > 1
+    || typeof pmPrice !== 'number' || !Number.isFinite(pmPrice) || pmPrice <= 0 || pmPrice > 1
+    || !evidenceSource
+    || !result.kalshiResult.orderId?.trim() || !result.polymarketResult.orderId?.trim()
+    || !Number.isFinite(Date.parse(result.kalshiResult.timestamp))
+    || !Number.isFinite(Date.parse(result.polymarketResult.timestamp))
+  ) return null;
+  return { kalshiContracts: Number(kalshiContracts), pmContracts: Number(pmContracts), kalshiPrice, pmPrice };
+}
+
+export function sanitizeExecutionResultForPersistence(
+  result: ExecutionResult,
+  dryRun: boolean,
+): ExecutionResult {
+  if (dryRun) return result;
+  const withoutFabricatedFill = (leg: OrderResult): OrderResult => ({
+    ...leg,
+    filledSize: undefined,
+    filledContracts: undefined,
+    filledPrice: undefined,
+    // Live adapters currently stamp local observation time, not venue fill time.
+    timestamp: '',
+  });
+  return {
+    ...result,
+    kalshiResult: withoutFabricatedFill(result.kalshiResult),
+    polymarketResult: withoutFabricatedFill(result.polymarketResult),
+    actualProfit: undefined,
+    netExposure: undefined,
+    steps: result.steps.map((step) => ({
+      timestamp: '',
+      status: step.status,
+      description: 'Live execution step; fill details withheld pending venue reconciliation',
+    })),
+    alerts: result.alerts?.map((alert) => ({
+      level: alert.level,
+      leg: alert.leg,
+      action: alert.action,
+      message: 'Live execution alert; fill details withheld pending venue reconciliation',
+    })),
+  };
 }
 
 export function evaluateBotTrade(
@@ -398,8 +463,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
 
   const polymarketOrder: OrderRequest = {
     platform: 'polymarket',
-    marketId: input.pmConditionId,
-    conditionId: input.pmConditionId,
+    marketId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
+    conditionId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
     side: 'buy',
     outcome: legs.pmOutcome,
     size: pmStake,
@@ -560,6 +625,29 @@ export async function maybeExecuteBotTrade(
     qualificationOutcome: 'qualified',
   });
 
+  const entryLegs = pickLegPrices(input.strategy, input);
+  let feeAuthority: AuthoritativeBotFeeConfig;
+  try {
+    if (!entryLegs.supported || !input.kalshiTicker || !input.pmConditionId || !input.category?.trim()) {
+      throw new Error('Missing supported venue legs, identifiers, or market category');
+    }
+    feeAuthority = await fetchAuthoritativeBotFeeConfig({
+      kalshiTicker: input.kalshiTicker,
+      pmConditionId: input.pmConditionId,
+      pmTokenId: entryLegs.pmOutcome === 'yes' ? input.pmYesTokenId ?? undefined : input.pmNoTokenId ?? undefined,
+      pmSide: entryLegs.pmOutcome,
+      category: input.category,
+    });
+    // Placement and fee evidence must identify the same selected CLOB token.
+    execReq.polymarketOrder.marketId = feeAuthority.polymarket.tokenId;
+    execReq.polymarketOrder.conditionId = feeAuthority.polymarket.tokenId;
+  } catch (error) {
+    const reason = `Authoritative fee authority unavailable: ${String(error)}`;
+    await log('safety-gate', reason, 'failed', { errorReason: reason });
+    logger.warn('[bot-trader] fee authority preflight failed', { arbId, error: String(error) });
+    return { executed: false, dryRun: effectiveDryRun, reason };
+  }
+
   logger.info('[bot-trader] executing trade', {
     arbId,
     pairId: input.pairId,
@@ -571,8 +659,9 @@ export async function maybeExecuteBotTrade(
 
   const executionStarted = Date.now();
   const result = await executeArb(execReq);
+  const reportedResult = sanitizeExecutionResultForPersistence(result, effectiveDryRun);
   const executionDurationMs = Date.now() - executionStarted;
-  for (const step of result.steps ?? []) {
+  for (const step of reportedResult.steps ?? []) {
     const rawStatus = String(step.status ?? '').toLowerCase();
     const responseStatus: BotActionStatus = rawStatus === 'failed' || rawStatus === 'timeout' ? 'failed' : rawStatus === 'pending' ? 'pending' : 'passed';
     await log('execution', step.description || 'Execution step', responseStatus, {
@@ -585,10 +674,10 @@ export async function maybeExecuteBotTrade(
     : `Trade attempt failed for ${input.marketTitle}`,
   result.success ? 'passed' : 'failed', {
     requestPayload: execReq,
-    responsePayload: result,
+    responsePayload: reportedResult,
     errorReason: result.success ? null : (result.error || 'Execution failed'),
     durationMs: executionDurationMs,
-    alertMetadata: result.alerts,
+    alertMetadata: reportedResult.alerts,
   });
 
   const executionRecord: ExecutionRecord = {
@@ -600,20 +689,19 @@ export async function maybeExecuteBotTrade(
     strategy: input.strategy,
     kalshiOrder: execReq.kalshiOrder,
     polymarketOrder: execReq.polymarketOrder,
-    result,
+    result: reportedResult,
     estimatedProfit: input.expectedProfit,
-    steps: result.steps,
+    steps: reportedResult.steps,
     source: 'bot',
     selectionMethod: input.selectionMethod ?? null,
   };
 
-  const kalshiFilled = result.kalshiResult.filledContracts;
-  const pmFilled = result.polymarketResult.filledContracts;
-  const matchedResidualQuantity = Number.isSafeInteger(kalshiFilled) && Number(kalshiFilled) > 0
-    && Number.isSafeInteger(pmFilled) && Number(pmFilled) > 0
-    ? Math.min(Number(kalshiFilled), Number(pmFilled))
-    : 0;
-  const positionExpected = result.success || matchedResidualQuantity > 0;
+  // Dry-run results are explicitly synthetic. The current live adapters expose
+  // requested prices/local timestamps, so they cannot be promoted to venue evidence.
+  const fill = getAuthoritativeMatchedFill(result, effectiveDryRun ? 'synthetic' : undefined);
+  // A successful live placement with no venue-proven fill remains untracked
+  // exposure. Report positionPersisted=false so the consumer retains its lock.
+  const positionExpected = fill != null || !effectiveDryRun;
 
   let executionId: number | undefined;
   let positionPersisted = !positionExpected;
@@ -628,17 +716,7 @@ export async function maybeExecuteBotTrade(
   // Record bot position linked to the execution
   if (executionId != null && positionExpected) {
     try {
-      const legs = pickLegPrices(input.strategy, input);
-      if (legs.kalshiPrice != null && legs.pmPrice != null) {
-        const kalshiPrice = result.kalshiResult.filledPrice;
-        const pmPrice = result.polymarketResult.filledPrice;
-        const kalshiQuantity = matchedResidualQuantity;
-        const pmQuantity = matchedResidualQuantity;
-        if (!Number.isFinite(kalshiPrice) || !Number.isFinite(pmPrice)
-          || !Number.isSafeInteger(kalshiQuantity) || Number(kalshiQuantity) <= 0
-          || !Number.isSafeInteger(pmQuantity) || Number(pmQuantity) <= 0) {
-          throw new Error('Successful bot execution is missing authoritative fill price or quantity');
-        }
+      if (entryLegs.kalshiPrice != null && entryLegs.pmPrice != null && fill) {
         await recordBotPosition({
           executionId,
           pairId: input.pairId,
@@ -646,12 +724,12 @@ export async function maybeExecuteBotTrade(
           kalshiTicker: input.kalshiTicker ?? null,
           pmConditionId: input.pmConditionId ?? null,
           strategy: input.strategy,
-          kalshiSide: legs.kalshiOutcome,
-          pmSide: legs.pmOutcome,
-          kalshiPrice: Number(kalshiPrice),
-          pmPrice: Number(pmPrice),
-          kalshiQuantity: Number(kalshiQuantity),
-          pmQuantity: Number(pmQuantity),
+          kalshiSide: entryLegs.kalshiOutcome,
+          pmSide: entryLegs.pmOutcome,
+          kalshiPrice: fill.kalshiPrice,
+          pmPrice: fill.pmPrice,
+          kalshiQuantity: fill.kalshiContracts,
+          pmQuantity: fill.pmContracts,
           executedAt: executionRecord.timestamp,
           expectedProfit: execReq.estimatedProfit,
           expectedRoiPct: input.roiPct,
@@ -659,7 +737,7 @@ export async function maybeExecuteBotTrade(
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,
           category: input.category ?? null,
-        });
+        }, feeAuthority);
         positionPersisted = true;
       }
     } catch (e) {
@@ -673,13 +751,13 @@ export async function maybeExecuteBotTrade(
   });
 
   return {
-    executed: result.success || matchedResidualQuantity > 0 || (effectiveDryRun && !result.unhedged),
+    executed: result.success || fill != null || (effectiveDryRun && !result.unhedged),
     dryRun: effectiveDryRun,
     reason: effectiveDryRun
       ? `Paper trade simulated for ${input.marketTitle}`
       : `Production trade executed for ${input.marketTitle}`,
     executionRecord,
-    executionResult: result,
+    executionResult: reportedResult,
     positionPersisted,
     persistenceError,
   };
@@ -774,7 +852,10 @@ export function liveArbResultToBotInput(
     kalshiStake: result.kalshiStake,
     pmStake: result.pmStake,
     kalshiTicker: result.kalshiTicker ?? null,
-    pmConditionId: result.pmYesTokenId ?? null,
+    pmConditionId: result.pmConditionId ?? null,
+    pmYesTokenId: result.pmYesTokenId ?? null,
+    pmNoTokenId: result.pmNoTokenId ?? null,
+    category: result.category,
     kalshiYesAsk: result.kalshiYesAsk,
     kalshiNoAsk: result.kalshiNoAsk,
     pmYesAsk: result.pmYesAsk,

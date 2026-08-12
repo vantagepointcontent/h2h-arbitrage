@@ -10,8 +10,16 @@ import {
   getKalshiResolvedPrices,
   pollOpenBotPositions,
   summarizeBotPositions,
+  calculateAuthoritativeKalshiFeeCents,
   type BotPosition,
 } from './bot-positions';
+
+describe('calculateAuthoritativeKalshiFeeCents', () => {
+  it('applies the authoritative multiplier before the venue cent ceiling', () => {
+    expect(calculateAuthoritativeKalshiFeeCents(1, 0.14, 1_250_000)).toBe(2);
+    expect(calculateAuthoritativeKalshiFeeCents(1, 0.14, 0)).toBe(0);
+  });
+});
 
 function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
   return {
