@@ -190,6 +190,24 @@ describe('evaluateBotTrade', () => {
     expect(ev.reason).toContain('ROI');
   });
 
+  it('accepts exactly 2.00% ROI at the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 2.0 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(true);
+    expect(ev.criteria.roiPct).toBeCloseTo(2.0, 5);
+  });
+
+  it('rejects 1.99% ROI just below the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 1.99 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('ROI');
+  });
+
+  it('accepts 2.01% ROI above the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 2.01 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(true);
+    expect(ev.criteria.roiPct).toBeCloseTo(2.01, 5);
+  });
+
   it('rejects APY below minimum when APY filter enabled', () => {
     const ev = evaluateBotTrade(makeInput({ apyPct: 5 }), baseSettings({ minApyPct: 10 }));
     expect(ev.shouldTrade).toBe(false);
