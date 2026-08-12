@@ -6,6 +6,7 @@ import {
   unifiedOutcomeToBotInput,
   getBotSettings,
   getAuthoritativeMatchedFill,
+  createSyntheticMatchedFillEvidence,
   sanitizeExecutionResultForPersistence,
   type BotSettings,
   type BotTradeInput,
@@ -21,30 +22,36 @@ vi.mock('./bot-trader-messages', () => ({
 }));
 
 describe('getAuthoritativeMatchedFill', () => {
-  it('uses venue-reported matched contracts and fill prices, including matched partial fills', () => {
-    expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.451, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { filledContracts: 2, filledPrice: 0.497, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
-    }, 'venue')).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
+  it('accepts only a complete, internally consistent producer evidence cohort', () => {
+    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
+      kalshi: { contracts: 2, price: 0.451, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 2, price: 0.497, feeCents: 2, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
+    }))).toEqual({
+      source: 'synthetic', kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497,
+      kalshiFeeCents: 1, pmFeeCents: 2, kalshiExecutionId: 'k-1', pmExecutionId: 'pm-1',
+      kalshiExecutedAt: '2026-08-12T12:00:00.000Z', pmExecutedAt: '2026-08-12T12:00:01.000Z',
+    });
   });
 
-  it('refuses to invent a position from mismatched, zero, or missing venue evidence', () => {
+  it('refuses incomplete or internally inconsistent evidence', () => {
+    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
+      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 1, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
+    }))).toBeNull();
+    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
+      kalshi: { contracts: 2, price: 0.45, feeCents: -1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
+    }))).toBeNull();
+    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
+      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: '', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: 'not-a-timestamp' },
+    }))).toBeNull();
     expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { filledContracts: 1, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
-    }, 'venue')).toBeNull();
-    expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 0, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { filledContracts: 0, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
-    }, 'venue')).toBeNull();
-    expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: '', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { filledContracts: 2, filledPrice: 0.50, orderId: 'pm-1', timestamp: 'not-a-timestamp' },
-    }, 'venue')).toBeNull();
-    expect(getAuthoritativeMatchedFill({
-      kalshiResult: { filledContracts: 2, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { filledContracts: 2, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
-    })).toBeNull();
+      source: 'venue',
+      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
+    } as never)).toBeNull();
+    expect(getAuthoritativeMatchedFill(undefined)).toBeNull();
   });
 });
 
@@ -66,14 +73,23 @@ describe('sanitizeExecutionResultForPersistence', () => {
       }],
       alerts: [{ level: 'warning' as const, message: 'Unhedged exposure $0.45', leg: 'kalshi' as const }],
     };
-    expect(sanitizeExecutionResultForPersistence(result, false)).toMatchObject({
-      kalshiResult: { orderId: 'k-1', filledSize: undefined, filledContracts: undefined, filledPrice: undefined, timestamp: '' },
-      polymarketResult: { orderId: 'pm-1', filledSize: undefined, filledContracts: undefined, filledPrice: undefined, timestamp: '' },
+    const sanitized = sanitizeExecutionResultForPersistence(result, false);
+    expect(sanitized).toMatchObject({
+      success: false,
+      kalshiResult: { orderId: 'k-1', status: 'pending' },
+      polymarketResult: { orderId: 'pm-1', status: 'pending' },
       actualProfit: undefined,
       netExposure: undefined,
-      steps: [{ timestamp: '', description: expect.not.stringContaining('$0.45') }],
+      steps: [{ description: expect.not.stringContaining('$0.45') }],
       alerts: [{ message: expect.not.stringContaining('$0.45') }],
     });
+    for (const leg of [sanitized.kalshiResult, sanitized.polymarketResult]) {
+      expect(leg).not.toHaveProperty('filledSize');
+      expect(leg).not.toHaveProperty('filledContracts');
+      expect(leg).not.toHaveProperty('filledPrice');
+      expect(leg).not.toHaveProperty('timestamp');
+    }
+    expect(sanitized.steps[0]).not.toHaveProperty('timestamp');
     expect(result.kalshiResult.filledPrice).toBe(0.45);
     expect(sanitizeExecutionResultForPersistence(result, true)).toBe(result);
   });

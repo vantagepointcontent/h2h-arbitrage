@@ -7,6 +7,8 @@ export const TRADE_EXPORT_HEADERS = [
 
 export type TradeExportRow = readonly (string | number)[];
 
+type ExportValueRecord = Record<string, unknown>;
+
 function finite(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -20,21 +22,27 @@ export function escapeTradeCsv(value: unknown): string {
 }
 
 export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
-  if (execution.dryRun) return [];
-  const result = (execution.result ?? {}) as Record<string, any>;
+  if (execution.dryRun || !execution.success) return [];
+  const result = (execution.result ?? {}) as ExportValueRecord;
   return ([
     ['Kalshi', execution.kalshiOrder, result.kalshiResult],
     ['Polymarket', execution.polymarketOrder, result.polymarketResult],
   ] as const).flatMap(([platform, rawOrder, rawResult]) => {
     if (!rawOrder) return [];
-    const order = rawOrder as Record<string, any>;
-    const leg = (rawResult ?? {}) as Record<string, any>;
+    const order = rawOrder as ExportValueRecord;
+    const leg = (rawResult ?? {}) as ExportValueRecord;
+    const filledSize = Number(leg.filledSize);
+    const filledPrice = Number(leg.filledPrice);
+    if (!['filled', 'partial'].includes(String(leg.status))
+      || !Number.isFinite(filledSize) || filledSize <= 0
+      || !Number.isFinite(filledPrice) || filledPrice <= 0 || filledPrice > 1) return [];
     const marketName = String(order.ticker ?? order.marketId ?? order.conditionId ?? '');
     const status = String(leg.status ?? (execution.success ? 'open' : 'failed'));
     return [[
-      new Date(leg.timestamp ?? execution.timestamp).toISOString(), platform,
+      new Date(typeof leg.timestamp === 'string' && Number.isFinite(Date.parse(leg.timestamp))
+        ? leg.timestamp : execution.timestamp).toISOString(), platform,
       execution.marketTitle, marketName, String(order.outcome ?? '').toUpperCase(),
-      finite(leg.filledSize ?? order.size), finite(leg.filledPrice ?? order.price),
+      filledSize, filledPrice,
       finite(leg.fees ?? leg.fee), '', execution.arbId, status,
       execution.source === 'bot' ? (execution.selectionMethod ?? 'Legacy/Unknown') : 'Manual',
     ] satisfies TradeExportRow];

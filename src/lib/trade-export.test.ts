@@ -12,10 +12,23 @@ describe('trade export', () => {
     };
     expect(executionRows({ ...base, dryRun: true })).toEqual([]);
     const rows = executionRows({ ...base, dryRun: false });
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual(['2026-08-08T10:00:00.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.at(-1)).toBe('apy');
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.at(-1)).toBe('Legacy/Unknown');
+  });
+
+  it('does not export requested order values as fills for an unverified live acknowledgement', () => {
+    expect(executionRows({
+      timestamp: '2026-08-08T10:00:00.000Z', arbId: 'arb-pending', marketTitle: 'Pending',
+      dryRun: false, success: false, estimatedProfit: 2,
+      kalshiOrder: { ticker: 'K-1', outcome: 'yes', size: 10, price: 0.4 },
+      polymarketOrder: { conditionId: 'P-1', outcome: 'no', size: 10, price: 0.5 },
+      result: {
+        kalshiResult: { status: 'pending', orderId: 'k-1' },
+        polymarketResult: { status: 'pending', orderId: 'pm-1' },
+      },
+    })).toEqual([]);
   });
 
   it('exports closed P&L and protects spreadsheet cells', () => {

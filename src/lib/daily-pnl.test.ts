@@ -84,4 +84,18 @@ describe('UI-025 daily P&L summary', () => {
       },
     });
   });
+
+  it('excludes unverified live acknowledgements from successful-trade analytics', () => {
+    const result = summarizeDailyPnl({
+      now,
+      executions: [{
+        timestamp: '2026-07-31T13:00:00.000Z', dryRun: false, success: false,
+        kalshiOrder: { size: 10, price: 0.4 }, polymarketOrder: { size: 8, price: 0.5 },
+        result: { kalshiResult: { status: 'pending' }, polymarketResult: { status: 'pending' } },
+      }],
+      closedPositions: [], positions: [],
+    });
+    expect(result.totalTrades).toBe(0);
+    expect(result.totalVolume).toBe(0);
+  });
 });

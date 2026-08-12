@@ -249,26 +249,67 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
   return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
 }
 
-export function getAuthoritativeMatchedFill(result: {
-  kalshiResult: Pick<OrderResult, 'filledContracts' | 'filledPrice' | 'orderId' | 'timestamp'>;
-  polymarketResult: Pick<OrderResult, 'filledContracts' | 'filledPrice' | 'orderId' | 'timestamp'>;
-}, evidenceSource?: 'venue' | 'synthetic'): { kalshiContracts: number; pmContracts: number; kalshiPrice: number; pmPrice: number } | null {
-  const kalshiContracts = result.kalshiResult.filledContracts;
-  const pmContracts = result.polymarketResult.filledContracts;
-  const kalshiPrice = result.kalshiResult.filledPrice;
-  const pmPrice = result.polymarketResult.filledPrice;
+export interface MatchedFillLegEvidence {
+  contracts: number;
+  price: number;
+  feeCents: number;
+  executionId: string;
+  executedAt: string;
+}
+
+const MATCHED_FILL_EVIDENCE = Symbol('BotTraderMatchedFillEvidence');
+
+interface MatchedFillEvidence {
+  readonly [MATCHED_FILL_EVIDENCE]: true;
+  source: 'venue' | 'synthetic';
+  kalshi: MatchedFillLegEvidence;
+  polymarket: MatchedFillLegEvidence;
+}
+
+export function createSyntheticMatchedFillEvidence(input: {
+  kalshi: MatchedFillLegEvidence;
+  polymarket: MatchedFillLegEvidence;
+}): MatchedFillEvidence {
+  return { ...input, source: 'synthetic', [MATCHED_FILL_EVIDENCE]: true };
+}
+
+export interface AuthoritativeMatchedFill {
+  source: MatchedFillEvidence['source'];
+  kalshiContracts: number;
+  pmContracts: number;
+  kalshiPrice: number;
+  pmPrice: number;
+  kalshiFeeCents: number;
+  pmFeeCents: number;
+  kalshiExecutionId: string;
+  pmExecutionId: string;
+  kalshiExecutedAt: string;
+  pmExecutedAt: string;
+}
+
+export function getAuthoritativeMatchedFill(evidence?: MatchedFillEvidence): AuthoritativeMatchedFill | null {
+  if (!evidence || evidence[MATCHED_FILL_EVIDENCE] !== true) return null;
+  const { kalshi, polymarket } = evidence;
   if (
-    !Number.isSafeInteger(kalshiContracts) || Number(kalshiContracts) <= 0
-    || !Number.isSafeInteger(pmContracts) || Number(pmContracts) <= 0
-    || kalshiContracts !== pmContracts
-    || typeof kalshiPrice !== 'number' || !Number.isFinite(kalshiPrice) || kalshiPrice <= 0 || kalshiPrice > 1
-    || typeof pmPrice !== 'number' || !Number.isFinite(pmPrice) || pmPrice <= 0 || pmPrice > 1
-    || !evidenceSource
-    || !result.kalshiResult.orderId?.trim() || !result.polymarketResult.orderId?.trim()
-    || !Number.isFinite(Date.parse(result.kalshiResult.timestamp))
-    || !Number.isFinite(Date.parse(result.polymarketResult.timestamp))
+    !Number.isSafeInteger(kalshi.contracts) || kalshi.contracts <= 0
+    || !Number.isSafeInteger(polymarket.contracts) || polymarket.contracts <= 0
+    || kalshi.contracts !== polymarket.contracts
+    || !Number.isFinite(kalshi.price) || kalshi.price <= 0 || kalshi.price > 1
+    || !Number.isFinite(polymarket.price) || polymarket.price <= 0 || polymarket.price > 1
+    || !Number.isSafeInteger(kalshi.feeCents) || kalshi.feeCents < 0
+    || !Number.isSafeInteger(polymarket.feeCents) || polymarket.feeCents < 0
+    || !kalshi.executionId.trim() || !polymarket.executionId.trim()
+    || !Number.isFinite(Date.parse(kalshi.executedAt))
+    || !Number.isFinite(Date.parse(polymarket.executedAt))
   ) return null;
-  return { kalshiContracts: Number(kalshiContracts), pmContracts: Number(pmContracts), kalshiPrice, pmPrice };
+  return {
+    source: evidence.source,
+    kalshiContracts: kalshi.contracts, pmContracts: polymarket.contracts,
+    kalshiPrice: kalshi.price, pmPrice: polymarket.price,
+    kalshiFeeCents: kalshi.feeCents, pmFeeCents: polymarket.feeCents,
+    kalshiExecutionId: kalshi.executionId, pmExecutionId: polymarket.executionId,
+    kalshiExecutedAt: kalshi.executedAt, pmExecutedAt: polymarket.executedAt,
+  };
 }
 
 export function sanitizeExecutionResultForPersistence(
@@ -276,25 +317,22 @@ export function sanitizeExecutionResultForPersistence(
   dryRun: boolean,
 ): ExecutionResult {
   if (dryRun) return result;
-  const withoutFabricatedFill = (leg: OrderResult): OrderResult => ({
-    ...leg,
-    filledSize: undefined,
-    filledContracts: undefined,
-    filledPrice: undefined,
-    // Live adapters currently stamp local observation time, not venue fill time.
-    timestamp: '',
-  });
+  const withoutFabricatedFill = (leg: OrderResult): OrderResult => {
+    const { filledSize: _filledSize, filledContracts: _filledContracts, filledPrice: _filledPrice, timestamp: _timestamp, ...acknowledgement } = leg;
+    // The persisted JSON intentionally omits a timestamp until the venue supplies one.
+    return { ...acknowledgement, status: 'pending' } as OrderResult;
+  };
   return {
     ...result,
+    success: false,
     kalshiResult: withoutFabricatedFill(result.kalshiResult),
     polymarketResult: withoutFabricatedFill(result.polymarketResult),
     actualProfit: undefined,
     netExposure: undefined,
     steps: result.steps.map((step) => ({
-      timestamp: '',
       status: step.status,
       description: 'Live execution step; fill details withheld pending venue reconciliation',
-    })),
+    } as typeof step)),
     alerts: result.alerts?.map((alert) => ({
       level: alert.level,
       leg: alert.leg,
@@ -669,13 +707,13 @@ export async function maybeExecuteBotTrade(
       errorReason: responseStatus === 'failed' ? step.description : null,
     });
   }
-  await log('result', result.success
+  await log('result', reportedResult.success
     ? `${effectiveDryRun ? 'Paper simulation completed' : 'Trade completed'} for ${input.marketTitle}`
-    : `Trade attempt failed for ${input.marketTitle}`,
-  result.success ? 'passed' : 'failed', {
+    : `${effectiveDryRun ? 'Trade attempt failed' : 'Trade acknowledgement pending authoritative reconciliation'} for ${input.marketTitle}`,
+  reportedResult.success ? 'passed' : (effectiveDryRun ? 'failed' : 'pending'), {
     requestPayload: execReq,
     responsePayload: reportedResult,
-    errorReason: result.success ? null : (result.error || 'Execution failed'),
+    errorReason: reportedResult.success ? null : (result.error || (effectiveDryRun ? 'Execution failed' : 'Authoritative fill reconciliation required')),
     durationMs: executionDurationMs,
     alertMetadata: reportedResult.alerts,
   });
@@ -685,7 +723,7 @@ export async function maybeExecuteBotTrade(
     arbId,
     marketTitle: input.marketTitle,
     dryRun: effectiveDryRun,
-    success: result.success,
+    success: reportedResult.success,
     strategy: input.strategy,
     kalshiOrder: execReq.kalshiOrder,
     polymarketOrder: execReq.polymarketOrder,
@@ -698,7 +736,22 @@ export async function maybeExecuteBotTrade(
 
   // Dry-run results are explicitly synthetic. The current live adapters expose
   // requested prices/local timestamps, so they cannot be promoted to venue evidence.
-  const fill = getAuthoritativeMatchedFill(result, effectiveDryRun ? 'synthetic' : undefined);
+  const fill = effectiveDryRun ? getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
+    kalshi: {
+      contracts: result.kalshiResult.filledContracts ?? 0,
+      price: result.kalshiResult.filledPrice ?? 0,
+      feeCents: 0,
+      executionId: result.kalshiResult.orderId ?? `paper:${arbId}:kalshi`,
+      executedAt: result.kalshiResult.timestamp ?? executionRecord.timestamp,
+    },
+    polymarket: {
+      contracts: result.polymarketResult.filledContracts ?? 0,
+      price: result.polymarketResult.filledPrice ?? 0,
+      feeCents: 0,
+      executionId: result.polymarketResult.orderId ?? `paper:${arbId}:polymarket`,
+      executedAt: result.polymarketResult.timestamp ?? executionRecord.timestamp,
+    },
+  })) : null;
   // A successful live placement with no venue-proven fill remains untracked
   // exposure. Report positionPersisted=false so the consumer retains its lock.
   const positionExpected = fill != null || !effectiveDryRun;
@@ -746,16 +799,16 @@ export async function maybeExecuteBotTrade(
     }
   }
 
-  await sendBotTelegramAlert(input, result.success, effectiveDryRun, input.roiPct, tradeId).catch((e) => {
+  await sendBotTelegramAlert(input, reportedResult.success, effectiveDryRun, input.roiPct, tradeId).catch((e) => {
     logger.warn('[bot-trader] telegram alert failed', { arbId, error: String(e) });
   });
 
   return {
-    executed: result.success || fill != null || (effectiveDryRun && !result.unhedged),
+    executed: reportedResult.success || fill != null || (effectiveDryRun && !result.unhedged),
     dryRun: effectiveDryRun,
     reason: effectiveDryRun
       ? `Paper trade simulated for ${input.marketTitle}`
-      : `Production trade executed for ${input.marketTitle}`,
+      : `Production order acknowledgement pending authoritative fill reconciliation for ${input.marketTitle}`,
     executionRecord,
     executionResult: reportedResult,
     positionPersisted,
