@@ -63,7 +63,7 @@ describe('LogsPanel', () => {
   it('loads exactly two current leg quotes only on expansion and reuses the brief row cache', async () => {
     let resolveCurrent!: (value: unknown) => void;
     const currentResponse = new Promise((resolve) => { resolveCurrent = resolve; });
-    const fetchMock = vi.fn((input: RequestInfo | URL, _options?: RequestInit) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ json: async () => ({ logs: [comparisonLog()] }) });
       if (url === '/api/logs/current-prices') return currentResponse;
@@ -80,7 +80,8 @@ describe('LogsPanel', () => {
     await waitFor(() => expect(screen.getByText('Loading current executable prices…')).toBeTruthy());
     const currentCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/logs/current-prices');
     expect(currentCall).toBeTruthy();
-    expect(JSON.parse(String((currentCall?.[1] as RequestInit).body))).toEqual({ legs: [
+    const body = currentCall?.[1] as { body?: string } | undefined;
+    expect(body?.body && JSON.parse(body.body)).toEqual({ legs: [
       { platform: 'kalshi', marketId: 'KX-EXACT', outcome: 'yes' },
       { platform: 'polymarket', marketId: '0xexact', outcome: 'no' },
     ] });

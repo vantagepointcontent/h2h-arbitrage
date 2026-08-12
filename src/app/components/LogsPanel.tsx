@@ -5,15 +5,13 @@ import {
   Download,
   Filter,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
   ChevronUp,
   ChevronDown,
   Search,
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { classifyArbType, getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import {
@@ -83,7 +81,6 @@ export default function LogsPanel() {
   const [eventType, setEventType] = useState<EventType>("all");
   const [arbTypeFilter, setArbTypeFilter] = useState<ArbTypeFilter>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const lastLogCountRef = useRef(0);
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>("scanned_at");
@@ -122,8 +119,8 @@ export default function LogsPanel() {
         setNextCursor(data.nextCursor);
         setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
       }
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch logs");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : String(e)) || "Failed to fetch logs");
     } finally {
       setLoading(false);
     }
@@ -150,8 +147,8 @@ export default function LogsPanel() {
         setNextCursor(data.nextCursor);
         setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
       }
-    } catch (e: any) {
-      setError(e.message || "Failed to load more logs");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : String(e)) || "Failed to load more logs");
     } finally {
       setLoadingMore(false);
     }
@@ -519,7 +516,7 @@ export default function LogsPanel() {
             ].map((opt) => (
               <button
                 key={opt.key}
-                onClick={() => setDateRange(opt.key as any)}
+                onClick={() => setDateRange(opt.key as "today" | "7d" | "30d" | "month")}
                 className="min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors text-[#8A9BA8] hover:text-[#FFFFFF]"
               >
                 {opt.label}
@@ -761,10 +758,10 @@ function LogRow({
   };
 
   // Parse raw_result for expanded view
-  let rawArbs: any[] = [];
+  let rawArbs: unknown[] = [];
   if (expanded && log.raw_result) {
     try {
-      const parsed = JSON.parse(log.raw_result);
+      const parsed = JSON.parse(log.raw_result) as { allArbs?: unknown[]; arbs?: unknown[] } | null;
       rawArbs = parsed?.allArbs ?? parsed?.arbs ?? [];
     } catch {
       // ignore
@@ -831,13 +828,16 @@ function LogRow({
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {rawArbs.map((arb: any, i: number) => (
+                  {rawArbs.map((rawArb, i) => {
+                    const arb = rawArb as Record<string, unknown>;
+                    const arbFees = (arb.fees ?? {}) as Record<string, unknown>;
+                    return (
                     <div key={i} className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-[#FFFFFF]">{arb.artist || arb.strategy || "\u2014"}</span>
+                        <span className="text-xs font-medium text-[#FFFFFF]">{String(arb.artist || arb.strategy || "—")}</span>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const meta = getArbTypeMeta(arb.strategy);
+                            const meta = getArbTypeMeta(String(arb.strategy));
                             return meta ? (
                               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.badgeClass}`}>
                                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
@@ -845,23 +845,24 @@ function LogRow({
                               </span>
                             ) : null;
                           })()}
-                          <span className={`text-xs font-mono font-semibold ${arb.roiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                            {fmtPct(arb.roiPct)}
+                          <span className={`text-xs font-mono font-semibold ${Number(arb.roiPct) > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                            {fmtPct(Number(arb.roiPct))}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-[#8A9BA8]">
-                        <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(arb.expectedProfit)}</span></span>
-                        <span>{arb.strategy}</span>
+                        <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(Number(arb.expectedProfit))}</span></span>
+                        <span>{String(arb.strategy)}</span>
                       </div>
                       <HistoricalCurrentPriceComparison arb={arb} cache={comparisonCache} />
                       {arb.fees && (
                         <div className="text-[10px] text-[#8A9BA8] mt-1 pt-1 border-t border-[#182533]">
-                          Fees — <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.kalshiFee ?? 0)} · <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(arb.fees.pmFee ?? 0)} · Net: {fmtUsd(arb.fees.worstCaseNetProfit ?? arb.fees.netProfitIfKalshiWins ?? 0)}
+                          Fees — <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(Number(arbFees.kalshiFee ?? 0))} · <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(Number(arbFees.pmFee ?? 0))} · Net: {fmtUsd(Number(arbFees.worstCaseNetProfit ?? arbFees.netProfitIfKalshiWins ?? 0))}
                         </div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (
