@@ -48,6 +48,10 @@ export interface BotPosition {
   totalCostCents: number;
   expectedPayoutCents: number;
   expectedProfitCents: number;
+  /** Immutable placement-time snapshots. Null means a legacy row without a snapshot. */
+  expectedRoiBps?: number | null;
+  expectedApyBps?: number | null;
+  unitId?: string | null;
   feesCents: number;
   category: string | null;
   pmTheta: number | null;
@@ -560,6 +564,9 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     totalCostCents: Number(row.total_cost),
     expectedPayoutCents: Number(row.expected_payout),
     expectedProfitCents: Number(row.expected_profit),
+    expectedRoiBps: row.expected_roi_bps != null ? Number(row.expected_roi_bps) : null,
+    expectedApyBps: row.expected_apy_bps != null ? Number(row.expected_apy_bps) : null,
+    unitId: row.unit_id != null ? String(row.unit_id) : null,
     feesCents: Number(row.fees ?? 0),
     category: row.category != null ? String(row.category) : null,
     pmTheta: row.pm_theta != null ? Number(row.pm_theta) : null,
@@ -647,6 +654,9 @@ export class BotPositionStore {
         total_cost INTEGER NOT NULL,
         expected_payout INTEGER NOT NULL,
         expected_profit INTEGER NOT NULL,
+        expected_roi_bps INTEGER,
+        expected_apy_bps INTEGER,
+        unit_id TEXT,
         fees INTEGER NOT NULL DEFAULT 0,
         category TEXT,
         pm_theta REAL,
@@ -719,6 +729,9 @@ export class BotPositionStore {
       total_cost: 'INTEGER NOT NULL DEFAULT 0',
       expected_payout: 'INTEGER NOT NULL DEFAULT 0',
       expected_profit: 'INTEGER NOT NULL DEFAULT 0',
+      expected_roi_bps: 'INTEGER',
+      expected_apy_bps: 'INTEGER',
+      unit_id: 'TEXT',
       fees: 'INTEGER NOT NULL DEFAULT 0',
       category: 'TEXT',
       pm_theta: 'REAL',
@@ -774,6 +787,19 @@ export class BotPositionStore {
         await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
       }
     }
+    // FEAT-054: backfill placement-time snapshots for legacy rows so the
+    // Positions table can display Expected ROI/APY without treating every
+    // pre-existing open position as missing data.
+    await this.client.execute(`
+      UPDATE bot_positions
+      SET expected_roi_bps = COALESCE(expected_roi_bps, ROUND(expected_profit * 10000.0 / NULLIF(total_cost, 0)))
+      WHERE expected_roi_bps IS NULL AND total_cost > 0
+    `);
+    await this.client.execute(`
+      UPDATE bot_positions
+      SET expected_apy_bps = COALESCE(expected_apy_bps, ROUND(expected_roi_bps * 365.0 / NULLIF((julianday(expiry_date) - julianday(opened_at)), 0)))
+      WHERE expected_apy_bps IS NULL AND expected_roi_bps IS NOT NULL AND expiry_date IS NOT NULL AND opened_at IS NOT NULL
+    `);
     await this.client.execute(`
       CREATE TABLE IF NOT EXISTS bot_position_reservations (
         pair_key TEXT PRIMARY KEY,
@@ -817,7 +843,8 @@ export class BotPositionStore {
           execution_id, market_id, market_title, kalshi_ticker, pm_condition_id,
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
           shares_kalshi, shares_pm, total_cost, expected_payout, expected_profit,
-          fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee,
+ expected_roi_bps, expected_apy_bps, unit_id,
+ fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee,
           kalshi_entry_fee_type, kalshi_entry_fee_multiplier_ppm, kalshi_entry_fee_source,
           kalshi_entry_fee_observed_at, kalshi_entry_fee_version, pm_entry_token_id,
           pm_entry_fee_rate_bps, pm_entry_fee_source, pm_entry_fee_observed_at, pm_entry_fee_version,
@@ -827,7 +854,7 @@ export class BotPositionStore {
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
@@ -835,7 +862,8 @@ export class BotPositionStore {
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
           input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
           input.sharesPm, input.totalCostCents, input.expectedPayoutCents,
-          input.expectedProfitCents, input.feesCents, input.category, input.pmTheta,
+          input.expectedProfitCents, input.expectedRoiBps ?? null, input.expectedApyBps ?? null, input.unitId ?? null,
+          input.feesCents, input.category, input.pmTheta,
           input.kalshiEntryFeeCents, input.pmEntryFeeCents,
           input.kalshiEntryFeeType, input.kalshiEntryFeeMultiplierPpm, input.kalshiEntryFeeSource,
           input.kalshiEntryFeeObservedAt, input.kalshiEntryFeeVersion, input.pmEntryTokenId,
@@ -883,7 +911,7 @@ export class BotPositionStore {
     return `${kalshiTicker.trim().toLowerCase()}\u0000${pmConditionId.trim().toLowerCase()}`;
   }
 
-  async reservePair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
+  async reservePair(kalshiTicker: string, pmConditionId: string, maxUnitsPerMarket = 1): Promise<boolean> {
     await this.ensureSchema();
     // Automatic live orders are hard-disabled; a 10-minute lease recovers paper
     // reservations after process crashes while remaining far longer than the
@@ -893,7 +921,13 @@ export class BotPositionStore {
       sql: `DELETE FROM bot_position_reservations WHERE reserved_at < ? AND exposure_at_risk = 0`,
       args: [staleBefore],
     });
-    if (await this.hasOpenPair(kalshiTicker, pmConditionId)) return false;
+    const active = await this.client.execute({
+      sql: `SELECT COUNT(*) AS count FROM bot_positions
+        WHERE status = 'open' AND (shares_kalshi > 0 OR shares_pm > 0)
+          AND lower(kalshi_ticker) = lower(?) AND lower(pm_condition_id) = lower(?)`,
+      args: [kalshiTicker, pmConditionId],
+    });
+    if (Number(active.rows[0]?.count ?? 0) >= maxUnitsPerMarket) return false;
     try {
       await this.client.execute({
         sql: `INSERT INTO bot_position_reservations (pair_key, reserved_at) VALUES (?, ?)`,
@@ -1112,6 +1146,8 @@ export interface BotPositionInput {
   kalshiContracts: number;
   pmContracts: number;
   expectedProfit: number;
+  expectedRoiPct?: number | null;
+  expectedApyPct?: number | null;
   expiryDate?: string | null;
   selectionMethod?: BotSelectionMethod | null;
   category?: string | null;
@@ -1322,6 +1358,9 @@ export async function recordBotPosition(
     totalCostCents,
     expectedPayoutCents,
     expectedProfitCents,
+    expectedRoiBps: input.expectedRoiPct == null ? null : Math.round(input.expectedRoiPct * 100),
+    expectedApyBps: input.expectedApyPct == null ? null : Math.round(input.expectedApyPct * 100),
+    unitId: `execution:${input.executionId}`,
     feesCents: kalshiEntryFeeCents + pmEntryFeeCents,
     category: input.category,
     pmTheta,
@@ -1357,8 +1396,8 @@ export async function hasOpenBotMarketPair(kalshiTicker: string | null, pmCondit
   return store().hasOpenPair(kalshiTicker, pmConditionId);
 }
 
-export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
-  return store().reservePair(kalshiTicker, pmConditionId);
+export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string, maxUnitsPerMarket = 1): Promise<boolean> {
+  return store().reservePair(kalshiTicker, pmConditionId, maxUnitsPerMarket);
 }
 
 export async function retainBotMarketPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {

@@ -104,6 +104,7 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'bot.minSharesPerLeg', section: 'bot', label: 'Min executable shares per leg', description: 'Require this many shares at the selected best ask on BOTH legs. Required dollar depth is calculated per leg as ask price × shares (for example, 1 share at 24¢ requires $0.24 depth).', type: 'number', default: 1, min: 1, max: 100, slider: true },
   { key: 'bot.maxExpiryDays', section: 'bot', label: 'Max expiry (days)', description: 'Skip markets expiring later than this. Set 0 to disable.', type: 'number', default: 365, min: 0, max: 365, slider: true },
   { key: 'bot.maxTradesPerDay', section: 'bot', label: 'Max trades per day', description: 'Hard cap on bot trades per UTC day.', type: 'number', default: 10, min: 1, max: 100, slider: true },
+  { key: 'bot.maxUnitsPerMarket', section: 'bot', label: 'Max units per market', description: 'Maximum simultaneous BotTrader executions per market pair. New candidates are rejected when this cap is reached.', type: 'number', default: 3, min: 1, max: 20, slider: true },
 
   // ── Display ──
   { key: 'display.defaultSort', section: 'display', label: 'Default overview sort', description: 'Initial sort order in Overview.', type: 'string', default: 'apy', options: ['apy', 'roi', 'name', 'expiry'] },

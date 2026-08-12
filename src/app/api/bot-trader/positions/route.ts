@@ -36,8 +36,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const urls = await getMarketUrlsById(position.marketId);
       return { ...position, kalshiUrl: urls?.kalshiUrl ?? null, polymarketUrl: urls?.polymarketUrl ?? null };
     }));
+    const marketActiveUnits = new Map<string, number>();
+    for (const p of positions) {
+      if (p.status !== 'open' || !p.marketId) continue;
+      marketActiveUnits.set(p.marketId, (marketActiveUnits.get(p.marketId) ?? 0) + 1);
+    }
+    const enrichedPositions = positions.map((p) => ({
+      ...p,
+      activeUnits: p.marketId ? (marketActiveUnits.get(p.marketId) ?? 0) : 1,
+      maxUnitsPerMarket: 3,
+    }));
     return NextResponse.json(
-      { success: true, count: positions.length, positions },
+      { success: true, count: enrichedPositions.length, positions: enrichedPositions },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
     );
   } catch (error) {

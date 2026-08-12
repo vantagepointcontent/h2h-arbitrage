@@ -115,11 +115,11 @@ describe('BotTraderPanel', () => {
     const row = marketLink.closest('tr');
     expect(row).toBeTruthy();
     const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells).toHaveLength(10);
-    expect(cells[4]).toBe('$0.97');
-    expect(cells[5]).toBe('$1.02');
-    expect(cells[6]).toBe('+$0.05');
-    expect(cells[7]).toBe('+5.2%');
+    expect(cells).toHaveLength(13);
+    expect(cells[7]).toBe('$0.97');
+    expect(cells[8]).toBe('$1.02');
+    expect(cells[9]).toBe('+$0.05');
+    expect(cells[10]).toBe('+5.2%');
   });
 
   it('shows stale open marks explicitly and does not invent zero P&L or ROI', async () => {
@@ -129,10 +129,10 @@ describe('BotTraderPanel', () => {
 
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells[4]).toBe('$0.97');
-    expect(cells[5]).toBe('Stale');
-    expect(cells[6]).toBe('Stale');
-    expect(cells[7]).toBe('Stale');
+    expect(cells[7]).toBe('$0.97');
+    expect(cells[8]).toBe('Stale');
+    expect(cells[9]).toBe('Stale');
+    expect(cells[10]).toBe('Stale');
   });
 
   it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
@@ -151,10 +151,10 @@ describe('BotTraderPanel', () => {
 
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells[4]).toBe('$0.00');
-    expect(cells[5]).toBe('Unavailable');
-    expect(cells[6]).toBe('Unavailable');
-    expect(cells[7]).toBe('Unavailable');
+    expect(cells[7]).toBe('$0.00');
+    expect(cells[8]).toBe('Unavailable');
+    expect(cells[9]).toBe('Unavailable');
+    expect(cells[10]).toBe('Unavailable');
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {

@@ -56,6 +56,10 @@ interface BotPosition {
   pmExitFeeRateBps: number | null;
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
+  expectedRoiBps?: number | null;
+  expectedApyBps?: number | null;
+  activeUnits?: number | null;
+  maxUnitsPerMarket?: number | null;
   lastValuationAt: string | null;
   realizedPnlCents: number | null;
   settlementSide: 'kalshi' | 'pm' | null;
@@ -99,6 +103,7 @@ interface BotStatus {
   selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
   todayStakeUsd: number;
+  maxUnitsPerMarket?: number;
 }
 
 
@@ -107,6 +112,11 @@ const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency
 const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+function formatNullableBps(bps: number | null | undefined, signed = false): string {
+  if (bps == null) return '—';
+  return formatBps(bps, signed);
+}
 
 function formatCents(cents: number, signed = false): string {
   const value = cents / 100;
@@ -418,16 +428,19 @@ export default function BotTraderPanel() {
 
         <div className="overflow-x-auto" data-testid="bot-positions-scroll">
           <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Active BotTrader executions in this market pair" className="px-2 py-2 text-center font-medium">Units</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Expected fee-net return at placement" className="px-2 py-2 text-right font-medium">Exp ROI</th><th title="Annualized yield at placement" className="px-2 py-2 text-right font-medium">Exp APY</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">Current ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedPositions.map((position) => {
                 const isExpanded = expanded.has(position.id);
                 const openMark = position.status === 'open' ? openPositionMark(position) : null;
                 const pnl = position.status === 'open' ? (openMark?.available ? openMark.pnlCents : null) : position.realizedPnlCents;
-                const roiBps = position.status === 'open'
+                const currentRoiBps = position.status === 'open'
                   ? (openMark?.available ? openMark.roiBps : null)
                   : positionRoiBps(position);
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
+                const unitsLabel = position.status === 'open'
+                  ? `${position.activeUnits ?? 1}/${position.maxUnitsPerMarket ?? status?.maxUnitsPerMarket ?? 3}`
+                  : '—';
                 const hasLiquidationBreakdown = openUnavailableLabel == null
                   && position.currentValueCents != null
                   && Number.isSafeInteger(position.kalshiGrossProceedsMicrocents)
@@ -454,11 +467,14 @@ export default function BotTraderPanel() {
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
                     <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
+                    <td className="px-2 py-2 text-center tabular-nums text-[var(--text-secondary)]">{unitsLabel}</td>
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${position.expectedRoiBps == null ? 'text-[var(--text-muted)]' : pnlClass(position.expectedRoiBps)}`}>{formatNullableBps(position.expectedRoiBps, true)}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${position.expectedApyBps == null ? 'text-[var(--text-muted)]' : pnlClass(position.expectedApyBps)}`}>{position.expectedApyBps == null ? '—' : formatBps(position.expectedApyBps)}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{formatCents(position.totalCostCents)}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${openUnavailableLabel ? 'text-[var(--status-warning)]' : ''}`}>{openUnavailableLabel ?? (position.status === 'open' && openMark?.available ? formatCents(openMark.currentValueCents) : position.currentValueCents == null ? 'Unavailable' : formatCents(position.currentValueCents))}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{openUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || openUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{openUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${currentRoiBps == null || openUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(currentRoiBps)}`}>{openUnavailableLabel ?? (currentRoiBps == null ? 'Unavailable' : formatBps(currentRoiBps, true))}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
