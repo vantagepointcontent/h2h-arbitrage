@@ -2,9 +2,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertCircle, Calendar, Check, Download, Filter, Globe, Hash, Loader2, RefreshCw, Save } from "lucide-react";
+import { AlertCircle, Calendar, Check, CheckCircle2, Circle, Download, Filter, Globe, Hash, Loader2, RefreshCw, Save, Search } from "lucide-react";
 import { CATEGORIES, CategoryName } from "@/lib/categories";
 import { getTimeAgo, isMatched, formatPercent, formatCurrency, formatRelativeTime, formatProfitDisplay } from "@/app/lib/page-shared";
+import type { SyncProgress } from '@/lib/catalog-progress';
+import { getSyncProgressPercent, getSyncStepState } from './marketfinder-progress';
 
 /* ── MarketFinder Panel ── */
 export function MarketFinderPanel({
@@ -12,6 +14,9 @@ export function MarketFinderPanel({
   savedMarketUrls,
   loading,
   syncing,
+  syncProgress,
+  scannedMatches,
+  scannedLoading,
   error,
   lastSync,
   savingIds,
@@ -25,6 +30,7 @@ export function MarketFinderPanel({
   autoRefreshEnabled,
   onFetch,
   onSync,
+  onLoadScannedMatches,
   onSaveToH2H,
   onToggleSelected,
   onToggleSelectAll,
@@ -44,6 +50,9 @@ export function MarketFinderPanel({
   savedMarketUrls: { kalshi: string; pm: string }[];
   loading: boolean;
   syncing: boolean;
+  syncProgress: SyncProgress | null;
+  scannedMatches: any[];
+  scannedLoading: boolean;
   error: string;
   lastSync: any;
   savingIds: Set<string>;
@@ -57,10 +66,11 @@ export function MarketFinderPanel({
   autoRefreshEnabled: boolean;
   onFetch: () => void;
   onSync: () => void;
+  onLoadScannedMatches: () => void;
   onSaveToH2H: (m: any) => void;
   onToggleSelected: (id: string) => void;
   onToggleSelectAll: (visibleIds: string[]) => void;
-  onBulkSave: () => void;
+  onBulkSave: (ids?: string[]) => void;
   onSetCategories: (cats: string[]) => void;
   onSetExpiryDays: (days: number) => void;
   onSetFetchCount: (count: number) => void;
@@ -74,17 +84,20 @@ export function MarketFinderPanel({
 }) {
   // Local fetch count (defaults to prop, user-adjustable via slider)
   const [localFetchCount, setLocalFetchCount] = useState(fetchCount);
+  const [scannedView, setScannedView] = useState(false);
+  const [scannedSearch, setScannedSearch] = useState('');
+  const [scannedSort, setScannedSort] = useState<'confidence' | 'expiry' | 'title'>('confidence');
 
   const normalized = (url: string) => (url || '').split('?')[0].replace(/\/$/, '').toLowerCase();
 
   // Determine which data source to use
-  const displayMarkets = showAllPlatforms ? allMarkets : markets;
+  const displayMarkets = scannedView ? scannedMatches : showAllPlatforms ? allMarkets : markets;
 
   const filtered = displayMarkets.filter((m) => {
     const kUrl = normalized(m.kalshiUrl);
     const pmUrl = normalized(m.polymarketUrl);
     // When showing all platforms, allow markets with only one URL
-    if (showAllPlatforms) {
+    if (showAllPlatforms && !scannedView) {
       // Apply match filter
       if (matchFilter === 'matched' && (!kUrl || !pmUrl)) return false;
       if (matchFilter === 'unmatched' && kUrl && pmUrl) return false;
@@ -92,9 +105,15 @@ export function MarketFinderPanel({
     }
     // Matched-only mode: require both URLs and not already saved
     if (!kUrl || !pmUrl) return false;
-    return !savedMarketUrls.some(
+    const notSaved = !savedMarketUrls.some(
       (saved) => (kUrl && normalized(saved.kalshi) === kUrl) || (pmUrl && normalized(saved.pm) === pmUrl)
     );
+    if (!notSaved) return false;
+    if (scannedView && scannedSearch.trim()) {
+      const query = scannedSearch.trim().toLowerCase();
+      return `${m.title || ''} ${m.kalshiTitle || ''} ${m.polymarketTitle || ''} ${m.eventType || ''}`.toLowerCase().includes(query);
+    }
+    return true;
   });
 
   // Category filter (applied to both modes)
@@ -103,7 +122,14 @@ export function MarketFinderPanel({
     : filtered;
 
   // Sort: markets with spread < threshold first, then by spread, then by expiry
-  const sorted = categoryFiltered.sort((a, b) => {
+  const sorted = [...categoryFiltered].sort((a, b) => {
+    if (scannedView) {
+      if (scannedSort === 'confidence') return (b.confidence ?? 0) - (a.confidence ?? 0) || String(a.title).localeCompare(String(b.title));
+      if (scannedSort === 'title') return String(a.title).localeCompare(String(b.title));
+      const aExpiry = a.eventDate ? Date.parse(a.eventDate) : Number.POSITIVE_INFINITY;
+      const bExpiry = b.eventDate ? Date.parse(b.eventDate) : Number.POSITIVE_INFINITY;
+      return aExpiry - bExpiry;
+    }
     const aBelow = a.spreadPct != null && a.spreadPct <= spreadThreshold;
     const bBelow = b.spreadPct != null && b.spreadPct <= spreadThreshold;
     if (aBelow !== bBelow) return aBelow ? -1 : 1;
@@ -120,7 +146,7 @@ export function MarketFinderPanel({
   const allSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const indeterminate = selectedVisibleCount > 0 && !allSelected;
 
-  const hiddenCount = showAllPlatforms ? 0 : markets.length - sorted.length;
+  const hiddenCount = showAllPlatforms || scannedView ? 0 : markets.length - sorted.length;
 
   return (
     <div className="space-y-5">
@@ -132,28 +158,30 @@ export function MarketFinderPanel({
             MarketFinder
           </h2>
           <p className="text-xs text-[#8A9BA8] mt-0.5">
-            {showAllPlatforms
+            {scannedView
+              ? `${scannedMatches.length} verified matches waiting to be added`
+              : showAllPlatforms
               ? `All platforms — ${allMarkets.length} markets`
-              : `PredictionHunt matched events — Kalshi + Polymarket only`}
+              : `Matched events — Kalshi + Polymarket only`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {lastSync && !showAllPlatforms && (
+          {lastSync && !showAllPlatforms && !scannedView && (
             <span className="text-[10px] text-[#8A9BA8]">
               Last sync: {getTimeAgo(lastSync.finishedAt || lastSync.startedAt)}
             </span>
           )}
           <button
             onClick={onFetchAll}
-            disabled={loading}
+            disabled={loading || syncing}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#232E3C] text-[#8A9BA8] text-sm font-medium hover:bg-[#182533] hover:text-[#FFFFFF] transition-all border border-[#232E3C] disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {loading ? "Fetching..." : "Fetch All"}
+            {loading && syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {loading && syncing ? "Scanning..." : "Fetch All"}
           </button>
           <button
             onClick={onSync}
-            disabled={syncing}
+            disabled={syncing || loading}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] text-sm font-medium hover:bg-[#5DBE81]/20 transition-all border border-[#5DBE81]/20 disabled:opacity-50"
           >
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -162,25 +190,107 @@ export function MarketFinderPanel({
         </div>
       </div>
 
-      {/* View toggle: Matched vs All Platforms */}
+      {/* View tabs */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
         <span className="text-xs text-[#8A9BA8]">View:</span>
         <button
-          onClick={() => !showAllPlatforms && onToggleShowAllPlatforms()}
-          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#8A9BA8]'}`}
+          onClick={() => {
+            setScannedView(false);
+            if (!showAllPlatforms) onToggleShowAllPlatforms();
+          }}
+          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${showAllPlatforms && !scannedView ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]'}`}
         >
           All Platforms
         </button>
         <button
-          onClick={() => showAllPlatforms && onToggleShowAllPlatforms()}
-          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${!showAllPlatforms ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#8A9BA8]'}`}
+          onClick={() => {
+            setScannedView(false);
+            if (showAllPlatforms) onToggleShowAllPlatforms();
+          }}
+          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${!showAllPlatforms && !scannedView ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]'}`}
         >
           Matched Only
         </button>
+        <button
+          onClick={() => {
+            setScannedView(true);
+            onLoadScannedMatches();
+          }}
+          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${scannedView ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#182533] text-[#8A9BA8] hover:text-[#FFFFFF]'}`}
+        >
+          Scanned but not added
+          {scannedMatches.length > 0 && <span className="ml-1 text-[9px]">({scannedMatches.length})</span>}
+        </button>
       </div>
 
+      {syncProgress && (syncing || syncProgress.step === 'complete' || syncProgress.step === 'error') && (
+        <div className="rounded-xl border border-[#182533] bg-[#0E1621] p-4" aria-live="polite">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-[#FFFFFF]">Catalog scan progress</h3>
+              <p className="mt-0.5 text-xs text-[#8A9BA8]">{syncProgress.message}</p>
+            </div>
+            <span className="font-mono text-sm text-[#5DBE81]">{getSyncProgressPercent(syncProgress)}%</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Market catalog scan"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={getSyncProgressPercent(syncProgress)}
+            className="mb-4 h-1.5 overflow-hidden rounded-full bg-[#182533]"
+          >
+            <div className="h-full rounded-full bg-[#5DBE81] transition-[width] duration-300" style={{ width: `${getSyncProgressPercent(syncProgress)}%` }} />
+          </div>
+          <div className="space-y-0">
+            {[
+              { index: 1, label: 'Fetching Kalshi markets', count: syncProgress.kalshiCount ? `${syncProgress.kalshiCount.toLocaleString()} fetched` : 'Waiting' },
+              { index: 2, label: 'Fetching Polymarket markets', count: syncProgress.polymarketCount ? `${syncProgress.polymarketCount.toLocaleString()} fetched` : 'Waiting' },
+              { index: 3, label: 'Matching cross-platform pairs', count: syncProgress.candidates ? `${syncProgress.candidates.toLocaleString()} candidates` : 'Waiting' },
+              { index: 4, label: 'Verifying matched pairs', count: syncProgress.verifiedTotal ? `${syncProgress.verified.toLocaleString()}/${syncProgress.verifiedTotal.toLocaleString()} verified` : 'Waiting' },
+              { index: 5, label: `Complete — ${syncProgress.newPairs.toLocaleString()} new markets found`, count: syncProgress.step === 'complete' ? 'Ready to review' : 'Waiting' },
+            ].map((step, position, steps) => {
+              const state = getSyncStepState(step.index, syncProgress);
+              return (
+                <div key={step.index} className="relative flex gap-3 pb-3 last:pb-0">
+                  {position < steps.length - 1 && <div className={`absolute left-[7px] top-4 h-full w-px ${state === 'done' ? 'bg-[#5DBE81]' : 'bg-[#182533]'}`} />}
+                  <div className="relative z-10 mt-0.5 bg-[#0E1621]">
+                    {state === 'done' ? <CheckCircle2 className="h-4 w-4 text-[#5DBE81]" /> : state === 'active' ? <Loader2 className="h-4 w-4 animate-spin text-[#5DBE81]" /> : state === 'error' ? <AlertCircle className="h-4 w-4 text-[#ef4444]" /> : <Circle className="h-4 w-4 text-[#8A9BA8]" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`text-xs font-medium ${state === 'active' || state === 'done' ? 'text-[#5DBE81]' : state === 'error' ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{step.label}</div>
+                    <div className="text-[10px] text-[#8A9BA8]">{step.count}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {scannedView && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#232E3C] bg-[#182533]/50 px-3 py-2">
+          <label className="relative min-w-52 flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8A9BA8]" />
+            <input
+              type="search"
+              value={scannedSearch}
+              onChange={(event) => setScannedSearch(event.target.value)}
+              placeholder="Search scanned matches"
+              className="w-full rounded-md border border-[#232E3C] bg-[#0E1621] py-1.5 pl-8 pr-3 text-xs text-[#FFFFFF] outline-none focus:border-[#5DBE81]"
+            />
+          </label>
+          <span className="text-xs text-[#8A9BA8]">Sort:</span>
+          {(['confidence', 'expiry', 'title'] as const).map((sort) => (
+            <button key={sort} onClick={() => setScannedSort(sort)} className={`rounded px-2 py-1 text-[11px] font-medium ${scannedSort === sort ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'}`}>
+              {sort.charAt(0).toUpperCase() + sort.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Matched/Unmatched filter (only in All Platforms mode) */}
-      {showAllPlatforms && (
+      {showAllPlatforms && !scannedView && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#182533]/50 border border-[#232E3C]">
           <span className="text-xs text-[#8A9BA8]">Match:</span>
           {(["all", "matched", "unmatched"] as const).map(f => (
@@ -320,7 +430,7 @@ export function MarketFinderPanel({
             Retry
           </button>
         </div>
-      ) : loading ? (
+      ) : loading || (scannedView && scannedLoading) ? (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
           {/* Skeleton rows */}
           {[...Array(6)].map((_, i) => (
@@ -339,7 +449,7 @@ export function MarketFinderPanel({
         </div>
       ) : sorted.length === 0 ? (
         <div className="py-20 text-center text-sm text-[#8A9BA8]">
-          No markets found. Try syncing to fetch from PredictionHunt.
+          {scannedView ? 'No scanned matches are waiting to be added.' : 'No markets found. Try syncing the direct market catalog.'}
         </div>
       ) : (
         <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-hidden overflow-x-auto">
@@ -354,13 +464,23 @@ export function MarketFinderPanel({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {scannedView && sorted.length > 0 && (
+                <button
+                  onClick={() => onBulkSave(visibleIds)}
+                  disabled={bulkSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81] text-[#0E1621] text-xs font-semibold hover:bg-[#76D399] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {bulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Add All ({sorted.length})
+                </button>
+              )}
               <button
                 onClick={() => onBulkSave()}
                 disabled={bulkSaving || selectedVisibleCount === 0}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] text-xs font-medium hover:bg-[#5DBE81]/20 transition-all border border-[#5DBE81]/20 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {bulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                {bulkSaving ? "Saving..." : `Save Selected (${selectedVisibleCount})`}
+                {bulkSaving ? "Saving..." : `Add Selected (${selectedVisibleCount})`}
               </button>
             </div>
           </div>
@@ -381,7 +501,7 @@ export function MarketFinderPanel({
                 <th className="text-left px-4 py-3 font-medium w-40">Expiry</th>
                 <th className="text-right px-4 py-3 font-medium w-24"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/kalshi-icon.png" alt="Kalshi" className="w-3.5 h-3.5 rounded-sm" /></span></th>
                 <th className="text-right px-4 py-3 font-medium w-24"><span className="inline-flex items-center gap-1 flex-row-reverse"><img src="/polymarket-icon.png" alt="Polymarket" className="w-3.5 h-3.5 rounded-sm" /></span></th>
-                <th className="text-right px-4 py-3 font-medium w-24">Spread</th>
+                <th className="text-right px-4 py-3 font-medium w-24">{scannedView ? 'Confidence' : 'Spread'}</th>
                 <th className="text-left px-4 py-3 font-medium w-40">Links</th>
                 <th className="text-center px-4 py-3 font-medium w-32"></th>
               </tr>
@@ -414,7 +534,8 @@ export function MarketFinderPanel({
                       <div className="font-medium text-[#FFFFFF] text-sm">{m.title}</div>
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#182533] text-[#8A9BA8]">{m.eventType}</span>
-                        {showAllPlatforms && matchBadge}
+                        {showAllPlatforms && !scannedView && matchBadge}
+                        {scannedView && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-[#5DBE81]/15 text-[#5DBE81]">{m.status === 'auto_queued' ? 'Auto queued' : 'Review'}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -429,10 +550,14 @@ export function MarketFinderPanel({
                       <span className="text-xs font-mono text-[#a855f7]">{fmtPrice(m.pmPrice?.yesAsk)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-mono ${m.spreadPct != null ? (m.spreadPct <= spreadThreshold ? "text-[#5DBE81]" : "text-[#8A9BA8]") : "text-[#8A9BA8]"}`}>{m.spreadPct != null ? `${m.spreadPct.toFixed(1)}%` : "—"}</span>
+                      {scannedView ? (
+                        <span className="text-xs font-mono text-[#5DBE81]">{Number(m.confidence ?? 0).toFixed(0)}%</span>
+                      ) : (
+                        <span className={`text-xs font-mono ${m.spreadPct != null ? (m.spreadPct <= spreadThreshold ? "text-[#5DBE81]" : "text-[#8A9BA8]") : "text-[#8A9BA8]"}`}>{m.spreadPct != null ? `${m.spreadPct.toFixed(1)}%` : "—"}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      {showAllPlatforms ? (
+                      {showAllPlatforms && !scannedView ? (
                         <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${m.platform === 'polymarket' ? 'bg-[#5DBE81]/15 text-[#5DBE81]' : 'bg-[#facc15]/15 text-[#facc15]'}`}>
                           {m.platform}
                         </span>
@@ -462,7 +587,7 @@ export function MarketFinderPanel({
                           disabled={!m.kalshiUrl || !m.polymarketUrl}
                           className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#5DBE81]/10 text-[#5DBE81] hover:bg-[#5DBE81]/20 transition-colors border border-[#5DBE81]/20 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          Add
+                          Add to H2H
                         </button>
                       )}
                     </td>

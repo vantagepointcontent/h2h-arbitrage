@@ -1736,7 +1736,7 @@ export async function queryMarketCatalog(opts: {
 }): Promise<{ rows: MarketCatalogRow[]; total: number; nextCursor: number | null }> {
   await ensureMarketCatalogTable();
   const c = getClient();
-  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 1000);
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 10000);
   const cursor = Math.max(opts.cursor ?? 0, 0);
   const sortBy = ['fetched_at', 'expiry_date', 'title'].includes(opts.sortBy ?? '') ? opts.sortBy! : 'fetched_at';
   const sortDir = opts.sortDir === 'asc' ? 'ASC' : 'DESC';

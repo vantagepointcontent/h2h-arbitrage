@@ -84,7 +84,7 @@ function pmMarket(title: string, slug: string, category = 'politics', expiry?: s
   };
 }
 
-function binaryKalshi(ticker: string, status = 'open') {
+function binaryKalshi(ticker: string, status = 'active') {
   return {
     ticker,
     status,

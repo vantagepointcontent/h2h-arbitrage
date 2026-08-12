@@ -209,47 +209,32 @@ export async function fetchAllPolymarketMarkets(options?: {
   return gammaAllMemo('all-active', async () => {
     const all: PMMarket[] = [];
     const seen = new Set<string>();
-
-    // First page gives us nextCursor; fetch in parallel with bounded speculation.
-    const firstPage = await fetchPMPage(null);
-    if (!firstPage) return all;
-    accumulate(firstPage.markets);
-    options?.onPage?.(all.length);
-
-    let cursor = firstPage.nextCursor;
+    const pageSize = 100; // Gamma currently caps this endpoint at 100 rows.
+    const windowSize = 10;
     const maxPages = 100;
-    let safety = firstPage.markets.length > 0 ? 1 : 0;
 
-    // Gamma uses cursor-based pagination. Prefetch a window of pages in parallel
-    // by resolving each cursor sequentially but issuing fetches as soon as we know
-    // the next cursor. This saturates the 30 req/s limiter while respecting cursors.
-    while (safety < maxPages && cursor) {
-      // Issue up to 10 parallel cursor-resolved fetches in a sliding window.
-      const window: Promise<{ markets: PMMarket[]; nextCursor: string | null } | null>[] = [];
-      let windowCursor: string | null = cursor;
-      for (let i = 0; i < 10 && windowCursor; i++) {
-        const captured = windowCursor;
-        window.push(
-          fetchPMPage(captured).then((page) => {
-            if (page) {
-              accumulate(page.markets);
-              options?.onPage?.(all.length);
-            }
-            return page;
-          }),
-        );
-        // We don't know the next cursor until the page returns, so we issue only
-        // the first page of the window and will discover the rest via awaits.
-        break;
-      }
+    const firstPage = await fetchPMPage(0, pageSize);
+    if (!firstPage) return all;
+    accumulate(firstPage);
+    options?.onPage?.(all.length);
+    if (firstPage.length < pageSize) return all;
 
-      const page = await Promise.race(window);
-      if (!page || !page.nextCursor) {
-        cursor = null;
-        break;
+    let nextPage = 1;
+    while (nextPage < maxPages) {
+      const offsets = Array.from(
+        { length: Math.min(windowSize, maxPages - nextPage) },
+        (_, index) => (nextPage + index) * pageSize,
+      );
+      const pages = await Promise.all(offsets.map((offset) => fetchPMPage(offset, pageSize)));
+      let reachedEnd = false;
+      for (const page of pages) {
+        if (!page) continue;
+        accumulate(page);
+        options?.onPage?.(all.length);
+        if (page.length < pageSize) reachedEnd = true;
       }
-      cursor = page.nextCursor;
-      safety += 1;
+      nextPage += offsets.length;
+      if (reachedEnd) break;
     }
 
     return all;
@@ -265,15 +250,13 @@ export async function fetchAllPolymarketMarkets(options?: {
   });
 }
 
-async function fetchPMPage(
-  cursor: string | null,
-): Promise<{ markets: PMMarket[]; nextCursor: string | null } | null> {
+async function fetchPMPage(offset: number, limit: number): Promise<PMMarket[] | null> {
   const params = new URLSearchParams({
-    limit: '500',
+    limit: String(limit),
+    offset: String(offset),
     active: 'true',
     closed: 'false',
   });
-  if (cursor) params.set('cursor', cursor);
   params.set('_t', String(Date.now()));
 
   const res = await rateLimiters.gamma.execute(() =>
@@ -286,11 +269,9 @@ async function fetchPMPage(
       },
     ),
   );
+  // Gamma returns 422 when an offset is past the final page.
+  if (res.status === 422) return [];
   if (!res.ok) throw new Error(`Polymarket API error: ${res.status}`);
   const data: any = await res.json();
-  const markets: PMMarket[] = Array.isArray(data) ? data : (data.markets || []);
-  const nextCursor = typeof data.nextCursor === 'string' && data.nextCursor ? data.nextCursor
-    : typeof data.cursor === 'string' && data.cursor ? data.cursor
-    : null;
-  return { markets, nextCursor };
+  return Array.isArray(data) ? data : (data.markets || []);
 }

@@ -107,6 +107,7 @@ import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
   ManualMatch, LastScanResult, SavedMarket, ScanResult, OverviewSort,
 } from "@/app/lib/page-shared";
+import type { SyncProgress } from "@/lib/catalog-progress";
 
 
 /* ── Swipe gesture hook (Home-only) ── */
@@ -1155,6 +1156,9 @@ export default function Home() {
   // MarketFinder state
   const [mfMarkets, setMfMarkets] = useState<any[]>([]);
   const [mfAllMarkets, setMfAllMarkets] = useState<any[]>([]);
+  const [mfScannedMatches, setMfScannedMatches] = useState<any[]>([]);
+  const [mfScannedLoading, setMfScannedLoading] = useState(false);
+  const [mfSyncProgress, setMfSyncProgress] = useState<SyncProgress | null>(null);
   const [mfLoading, setMfLoading] = useState(false);
   const [mfSyncing, setMfSyncing] = useState(false);
   const [mfError, setMfError] = useState("");
@@ -1163,6 +1167,10 @@ export default function Home() {
   // MF category filter — multi-select (empty = all categories)
   const [mfCategories, setMfCategories] = useState<string[]>(getStoredMfCategories);
   const mfAutoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mfCatalogSyncRef = useRef<{ generation: number; controller: AbortController | null }>({
+    generation: 0,
+    controller: null,
+  });
 
   // MF cache with TTL
   const mfCacheRef = useRef<{ data: any[]; fetchedAt: number }>({ data: [], fetchedAt: 0 });
@@ -1294,12 +1302,16 @@ export default function Home() {
   }, [mfSelectedIds]);
 
   // Bulk save selected markets
-  const mfBulkSave = useCallback(async () => {
-    if (mfSelectedIds.size === 0 || mfBulkSaving) return;
+  const mfBulkSave = useCallback(async (ids?: string[]) => {
+    const targetIds = ids ? new Set(ids) : mfSelectedIds;
+    if (targetIds.size === 0 || mfBulkSaving) return;
     setMfBulkSaving(true);
     setMfBulkMsg("");
 
-    const toSave = mfMarkets.filter(m => mfSelectedIds.has(m.id) && m.kalshiUrl && m.polymarketUrl);
+    const candidates = [...mfMarkets, ...mfScannedMatches];
+    const uniqueCandidates = Array.from(new Map(candidates.map((market) => [market.id, market])).values());
+    const toSave = uniqueCandidates.filter(m => targetIds.has(m.id) && m.kalshiUrl && m.polymarketUrl);
+    const savedIds = new Set<string>();
     let saved = 0;
     let failed = 0;
 
@@ -1319,6 +1331,7 @@ export default function Home() {
         const data = await res.json();
         if (data.success) {
           saved++;
+          savedIds.add(m.id);
         } else {
           failed++;
         }
@@ -1330,7 +1343,7 @@ export default function Home() {
     // Clear selections for successfully saved markets
     setMfSelectedIds(prev => {
       const next = new Set(prev);
-      toSave.forEach(m => next.delete(m.id));
+      savedIds.forEach(id => next.delete(id));
       return next;
     });
 
@@ -1343,7 +1356,7 @@ export default function Home() {
       setMfBulkMsg(`${saved} market${saved !== 1 ? "s" : ""} saved to EdgeFinder`);
     }
     setTimeout(() => setMfBulkMsg(""), 3000);
-  }, [mfSelectedIds, mfBulkSaving, mfMarkets]);
+  }, [mfSelectedIds, mfBulkSaving, mfMarkets, mfScannedMatches]);
 
   /** Fetch fresh MF markets from API with current category + expiry + fetchCount filters */
   const fetchFreshMfMarkets = useCallback((showLoading: boolean) => {
@@ -1373,48 +1386,127 @@ export default function Home() {
       .finally(() => { if (showLoading) setMfLoading(false); });
   }, [mfCategories, mfExpiryDays, mfFetchCount]);
 
-  /** Fetch ALL markets from both platforms (raw, unmatched) */
-  const fetchAllMfMarkets = useCallback(() => {
-    setMfLoading(true);
-    setMfError("");
-    fetch("/api/predictionhunt/markets?action=fetch-all", { method: "POST" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) {
-          // Combine PM + Kalshi markets into unified format
-          const pm = (d.polymarket || []).map((m: any) => ({
-            ...m,
-            id: `pm-${m.id}`,
-            platform: 'polymarket',
-            title: m.title,
-            eventType: m.category || 'unknown',
-            eventDate: m.expiration_date,
-            polymarketUrl: m.source_url,
-            kalshiUrl: null,
-            spreadPct: null,
-            matched: false,
-          }));
-          const k = (d.kalshi || []).map((m: any) => ({
-            ...m,
-            id: `k-${m.id}`,
-            platform: 'kalshi',
-            title: m.title,
-            eventType: m.category || 'unknown',
-            eventDate: m.expiration_date,
-            polymarketUrl: null,
-            kalshiUrl: m.source_url,
-            spreadPct: null,
-            matched: false,
-          }));
-          // Merge and sort by title
-          const all = [...pm, ...k].sort((a, b) => a.title.localeCompare(b.title));
-          setMfAllMarkets(all);
-          setMfShowAllPlatforms(true);
-        }
-      })
-      .catch(() => setMfError("Failed to fetch all markets"))
-      .finally(() => setMfLoading(false));
+  const fetchScannedMatches = useCallback(async (showLoading = true) => {
+    if (showLoading) setMfScannedLoading(true);
+    try {
+      const response = await fetch('/api/matches?status=auto_queued,pending_review&notSaved=true', {
+        headers: { 'Cache-Control': 'no-store' },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || `Matches request failed (${response.status})`);
+      setMfScannedMatches(data.matches || []);
+    } catch (error) {
+      setMfError(error instanceof Error ? error.message : 'Failed to fetch scanned matches');
+    } finally {
+      if (showLoading) setMfScannedLoading(false);
+    }
   }, []);
+
+  const loadAllCatalogMarkets = useCallback(async () => {
+    const loadPlatform = async (platform: 'kalshi' | 'polymarket'): Promise<any[]> => {
+      const rows: any[] = [];
+      let cursor: number | null = 0;
+      let pages = 0;
+      while (cursor !== null && pages < 100) {
+        const response: Response = await fetch(
+          `/api/catalog?platform=${platform}&limit=10000&cursor=${cursor}&sortBy=title&sortDir=asc`,
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+        const data: { rows?: any[]; nextCursor?: number; error?: string } = await response.json();
+        if (!response.ok) throw new Error(data?.error || `Catalog request failed (${response.status})`);
+        rows.push(...(data.rows || []));
+        cursor = typeof data.nextCursor === 'number' ? data.nextCursor : null;
+        pages += 1;
+      }
+      return rows;
+    };
+    const [kalshiRows, polymarketRows] = await Promise.all([
+      loadPlatform('kalshi'),
+      loadPlatform('polymarket'),
+    ]);
+    const all = [...kalshiRows, ...polymarketRows].map((market: any) => ({
+      ...market,
+      id: `catalog-${market.platform}-${market.id}`,
+      title: market.title,
+      eventType: market.category || 'unknown',
+      eventDate: market.expiryDate,
+      polymarketUrl: market.platform === 'polymarket' ? market.sourceUrl : null,
+      kalshiUrl: market.platform === 'kalshi' ? market.sourceUrl : null,
+      spreadPct: null,
+      matched: false,
+    }));
+    setMfAllMarkets(all);
+    setMfShowAllPlatforms(true);
+  }, []);
+
+  const runCatalogSync = useCallback(async (showAllAfter = false) => {
+    mfCatalogSyncRef.current.controller?.abort();
+    const controller = new AbortController();
+    const generation = mfCatalogSyncRef.current.generation + 1;
+    mfCatalogSyncRef.current = { generation, controller };
+    setMfSyncing(true);
+    setMfLoading(showAllAfter);
+    setMfError("");
+    setMfSyncProgress(null);
+    try {
+      const response = await fetch("/api/catalog/sync", { method: "POST", signal: controller.signal });
+      if (!response.ok || !response.body) throw new Error(`Catalog sync failed (${response.status})`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let terminalProgress: SyncProgress | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+        for (const event of events) {
+          const dataLine = event.split('\n').find((line) => line.startsWith('data: '));
+          if (!dataLine) continue;
+          const progress = JSON.parse(dataLine.slice(6)) as SyncProgress;
+          if (mfCatalogSyncRef.current.generation !== generation) return;
+          setMfSyncProgress(progress);
+          if (progress.step === 'error') throw new Error(progress.error || progress.message);
+          if (progress.step === 'complete') terminalProgress = progress;
+        }
+      }
+      if (!terminalProgress) throw new Error('Catalog sync stream ended before completion');
+      if (mfCatalogSyncRef.current.generation !== generation) return;
+      await Promise.all([
+        fetchScannedMatches(false),
+        fetchFreshMfMarkets(false),
+        showAllAfter ? loadAllCatalogMarkets() : Promise.resolve(),
+      ]);
+      setMfLastSync({ finishedAt: new Date().toISOString() });
+    } catch (error) {
+      if (controller.signal.aborted || mfCatalogSyncRef.current.generation !== generation) return;
+      setMfError(error instanceof Error ? error.message : 'Catalog sync failed');
+    } finally {
+      if (mfCatalogSyncRef.current.generation === generation) {
+        mfCatalogSyncRef.current.controller = null;
+        setMfSyncing(false);
+        setMfLoading(false);
+      }
+    }
+  }, [fetchScannedMatches, fetchFreshMfMarkets, loadAllCatalogMarkets]);
+
+  useEffect(() => () => {
+    mfCatalogSyncRef.current.generation += 1;
+    mfCatalogSyncRef.current.controller?.abort();
+    mfCatalogSyncRef.current.controller = null;
+  }, []);
+
+  /** Fetch all direct-API catalog markets after a progress-streamed refresh. */
+  const fetchAllMfMarkets = useCallback(() => {
+    void runCatalogSync(true);
+  }, [runCatalogSync]);
+
+  useEffect(() => {
+    if (viewMode !== 'marketfinder') return;
+    const timer = window.setTimeout(() => { void fetchScannedMatches(false); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [viewMode, fetchScannedMatches]);
 
   // Cmd+Enter quick-save keyboard shortcut
   useEffect(() => {
@@ -1598,6 +1690,9 @@ export default function Home() {
                 savedMarketUrls={savedMarkets.map((m) => ({ kalshi: m.kalshiUrl || '', pm: m.polymarketUrl || '' }))}
                 loading={mfLoading}
                 syncing={mfSyncing}
+                syncProgress={mfSyncProgress}
+                scannedMatches={mfScannedMatches}
+                scannedLoading={mfScannedLoading}
                 error={mfError}
                 lastSync={mfLastSync}
                 savingIds={mfSavingIds}
@@ -1613,23 +1708,8 @@ export default function Home() {
                 onFetch={() => {
                   fetchFreshMfMarkets(true);
                 }}
-                onSync={() => {
-                  setMfSyncing(true);
-                  setMfError("");
-                  fetch("/api/predictionhunt/markets?action=sync", { method: "POST" })
-                    .then((r) => r.json())
-                    .then((d) => {
-                      if (d.success) {
-                        setMfLastSync(d.synced);
-                        // After full sync, refresh with current filters
-                        fetchFreshMfMarkets(false);
-                      } else {
-                        setMfError(d.error || "Sync failed");
-                      }
-                    })
-                    .catch(() => setMfError("Sync request failed"))
-                    .finally(() => setMfSyncing(false));
-                }}
+                onSync={() => { void runCatalogSync(false); }}
+                onLoadScannedMatches={() => { void fetchScannedMatches(true); }}
                 onSaveToH2H={(m) => {
                   if (!m.kalshiUrl || !m.polymarketUrl) return;
                   setMfSavingIds((prev) => new Set(prev).add(m.id));

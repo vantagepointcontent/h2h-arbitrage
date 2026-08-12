@@ -486,7 +486,7 @@ let schedulerRunning = false;
 let lastLifecycleSweepAt = 0; // AUTO-002
 let lastCatalogRefreshAt = 0; // FEAT-101
 const LIFECYCLE_SWEEP_MS = 60 * 60 * 1000; // hourly
-const DEFAULT_CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000; // 6 hours
+const DEFAULT_CATALOG_REFRESH_MS = 60 * 60 * 1000; // hourly
 
 /** Resolve the configured market-catalog refresh interval from settings. */
 async function resolveCatalogRefreshIntervalMs(): Promise<number> {
@@ -505,6 +505,8 @@ async function maybeRefreshCatalog(): Promise<void> {
   try {
     const { refreshMarketCatalog } = await import('./market-catalog');
     const result = await refreshMarketCatalog();
+    const { matchCrossPlatformMarkets } = await import('./cross-platform-matcher');
+    await matchCrossPlatformMarkets();
     lastCatalogRefreshAt = Date.now();
     const total = result.kalshi.upserted + result.polymarket.upserted;
     if (total > 0) {
@@ -520,7 +522,7 @@ async function maybeRefreshCatalog(): Promise<void> {
 /** Start the background scheduler. Idempotent — safe to call multiple times.
  * AUTO-001: ticks every 10 min and fires when discovery.scanIntervalHours
  * (Settings, default 3h) has elapsed since lastScanAt — interval is hot-tunable.
- * FEAT-101: also refreshes market catalog every 6 hours (configurable). */
+ * FEAT-101: also refreshes and matches the market catalog hourly (configurable). */
 export function startScheduler(): void {
   if (schedulerRunning) return;
   schedulerRunning = true;

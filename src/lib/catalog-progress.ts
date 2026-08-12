@@ -82,10 +82,18 @@ export function updateSyncProgress(
     complete: 5,
     error: 99,
   };
+  const requestedStep = patch.step;
+  const requestedIndex = requestedStep === 'error'
+    ? p.stepIndex
+    : requestedStep
+      ? stepOrder[requestedStep]
+      : p.stepIndex;
+  const shouldAdvanceStep = requestedStep === 'error' || requestedIndex >= p.stepIndex;
   const next: SyncProgress = {
     ...p,
     ...patch,
-    stepIndex: patch.step ? stepOrder[patch.step] : p.stepIndex,
+    step: shouldAdvanceStep && requestedStep ? requestedStep : p.step,
+    stepIndex: shouldAdvanceStep ? requestedIndex : p.stepIndex,
   };
   runs.set(runId, next);
   listeners.get(runId)?.forEach((cb) => cb(next));

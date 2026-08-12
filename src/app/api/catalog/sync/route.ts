@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextRequest } from 'next/server';
 import { refreshMarketCatalog } from '@/lib/market-catalog';
 import { matchCrossPlatformMarkets } from '@/lib/cross-platform-matcher';
@@ -6,9 +7,8 @@ import {
   getSyncProgress,
   updateSyncProgress,
   subscribeSyncProgress,
-  SyncProgress,
+  type SyncProgress,
 } from '@/lib/catalog-progress';
-import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,11 +44,12 @@ async function runSync(runId: string) {
       message: `Complete — ${matchResult.verifiedPairs} new markets found`,
       finishedAt: new Date().toISOString(),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     updateSyncProgress(runId, {
       step: 'error',
-      error: err.message || String(err),
-      message: err.message || 'Sync failed',
+      error: message,
+      message: message || 'Sync failed',
     });
   }
 }
@@ -58,15 +59,14 @@ export async function POST(request: NextRequest) {
   const runId = searchParams.get('runId') || randomUUID();
   createSyncRun(runId);
 
-  // Start the work in the background so we can stream immediately.
   void runSync(runId);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       let closed = false;
-      let unsubscribe = () => {};
       let heartbeat: ReturnType<typeof setInterval> | undefined;
+      let unsubscribe = () => {};
 
       const cleanup = () => {
         if (closed) return;
@@ -81,21 +81,18 @@ export async function POST(request: NextRequest) {
           controller.close();
         } catch {}
       };
-      const send = (p: SyncProgress) => {
+      const send = (progress: SyncProgress) => {
         if (closed) return;
         try {
-          controller.enqueue(encoder.encode(sse(p)));
+          controller.enqueue(encoder.encode(sse(progress)));
         } catch {
           close();
           return;
         }
-        if (p.step === 'complete' || p.step === 'error') close();
+        if (progress.step === 'complete' || progress.step === 'error') close();
       };
 
       request.signal.addEventListener('abort', close, { once: true });
-
-      // Heartbeat to keep proxies alive. It is always cleared by close(),
-      // including normal completion and failures, not only client aborts.
       heartbeat = setInterval(() => {
         if (request.signal.aborted || closed) {
           close();
@@ -109,7 +106,6 @@ export async function POST(request: NextRequest) {
       }, 5000);
 
       unsubscribe = subscribeSyncProgress(runId, send);
-      // subscribeSyncProgress synchronously emits the current terminal snapshot.
       if (closed) unsubscribe();
     },
   });
@@ -127,12 +123,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const runId = searchParams.get('runId');
-  if (!runId) {
-    return new Response('Missing runId', { status: 400 });
-  }
+  if (!runId) return new Response('Missing runId', { status: 400 });
   const progress = getSyncProgress(runId);
-  if (!progress) {
-    return new Response('Run not found', { status: 404 });
-  }
+  if (!progress) return new Response('Run not found', { status: 404 });
   return Response.json(progress);
 }

@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
-import { getMatchedPairs, type MatchedPair } from '@/lib/persistence';
-import { DEFAULT_MATCHER_OPTIONS, matchCrossPlatformMarkets, type MatcherOptions } from '@/lib/cross-platform-matcher';
+import {
+  getMatchedPairs,
+  getSavedMarkets,
+  queryMarketCatalog,
+  type MarketCatalogRow,
+  type MatchedPair,
+} from '@/lib/persistence';
+import {
+  DEFAULT_MATCHER_OPTIONS,
+  matchCrossPlatformMarkets,
+  type MatcherOptions,
+} from '@/lib/cross-platform-matcher';
+import { buildUnsavedMarketMatches } from '@/lib/marketfinder-matches';
 import { parseBoundedInteger } from '@/lib/request-query';
 import { parseJsonObject } from '@/lib/request-json';
 
@@ -16,7 +27,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status');
-    const limit = parseBoundedInteger(searchParams.get('limit'), 200, 1, 1000);
+    const limit = parseBoundedInteger(searchParams.get('limit'), 200, 1, 5000);
+    const notSaved = searchParams.get('notSaved') === 'true';
 
     let status: MatchedPair['status'] | MatchedPair['status'][] | undefined;
     if (statusParam) {
@@ -32,9 +44,32 @@ export async function GET(request: NextRequest) {
         : statuses as MatchedPair['status'][];
     }
 
-    const pairs = await getMatchedPairs(status, limit);
+    const pairs = await getMatchedPairs(status, notSaved ? 5000 : limit);
+    if (notSaved) {
+      const loadCatalog = async (platform: 'kalshi' | 'polymarket'): Promise<MarketCatalogRow[]> => {
+        const rows: MarketCatalogRow[] = [];
+        let cursor: number | null = 0;
+        do {
+          const page = await queryMarketCatalog({ platform, includeStale: false, limit: 10000, cursor });
+          rows.push(...page.rows);
+          cursor = page.nextCursor;
+        } while (cursor !== null);
+        return rows;
+      };
+      const [savedMarkets, kalshiCatalog, polymarketCatalog] = await Promise.all([
+        getSavedMarkets(),
+        loadCatalog('kalshi'),
+        loadCatalog('polymarket'),
+      ]);
+      const matches = buildUnsavedMarketMatches(
+        pairs,
+        savedMarkets,
+        [...kalshiCatalog, ...polymarketCatalog],
+      );
+      return NextResponse.json({ matches: matches.slice(0, limit) });
+    }
     return NextResponse.json({ pairs });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }
@@ -81,9 +116,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await matchCrossPlatformMarkets(options);
-
     return NextResponse.json({ result });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }
 }

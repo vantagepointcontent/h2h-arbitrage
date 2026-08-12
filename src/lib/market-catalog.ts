@@ -79,8 +79,11 @@ export async function refreshMarketCatalog(options?: RefreshOptions): Promise<Ca
 
 async function refreshKalshi(options?: RefreshOptions): Promise<CatalogRefreshResult['kalshi']> {
   const start = Date.now();
+  let partial = false;
   options?.onProgress?.({ step: 'fetching_kalshi', message: 'Fetching Kalshi markets...' });
   const fetched = await fetchAllKalshiMarkets({
+    maxPages: 20,
+    onPartial: () => { partial = true; },
     onPage: (count) => options?.onProgress?.({ step: 'fetching_kalshi', kalshiCount: count }),
   });
   options?.onProgress?.({ step: 'fetching_kalshi', kalshiCount: fetched.length, message: `${fetched.length} Kalshi markets fetched` });
@@ -118,7 +121,7 @@ async function refreshKalshi(options?: RefreshOptions): Promise<CatalogRefreshRe
 
   const before = fetchedAt;
   const upserted = await bulkUpsertMarketCatalog(rows);
-  const stale = await markStaleMarketCatalog('kalshi', before);
+  const stale = partial ? 0 : await markStaleMarketCatalog('kalshi', before);
   return { fetched: fetched.length, upserted, stale, durationMs };
 }
 
@@ -142,7 +145,7 @@ async function refreshPolymarket(options?: RefreshOptions): Promise<CatalogRefre
         platform: 'polymarket',
         marketId: m.conditionId,
         title: m.question || m.slug,
-        category: m.groupItemTitle || classification.domain || null,
+        category: classification.domain || m.groupItemTitle || null,
         eventId: m.slug || null,
         eventTitle: m.question || null,
         expiryDate: m.endDate || null,

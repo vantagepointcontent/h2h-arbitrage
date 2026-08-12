@@ -111,7 +111,7 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
   { key: 'display.hideUnmatched', section: 'display', label: 'Hide unmatched by default', description: 'Overview starts with only matched markets visible.', type: 'boolean', default: true },
 
   // ── Market Catalog (FEAT-101) ──
-  { key: 'catalog.refreshIntervalHours', section: 'auto-discovery', label: 'Catalog refresh interval (h)', description: 'Hours between full refreshes of the Kalshi + Polymarket market catalog.', type: 'number', default: 6, min: 1, max: 24, slider: true },
+  { key: 'catalog.refreshIntervalHours', section: 'auto-discovery', label: 'Catalog refresh interval (h)', description: 'Hours between full refreshes of the Kalshi + Polymarket market catalog.', type: 'number', default: 1, min: 1, max: 24, slider: true },
 ];
 
 const SCHEMA_BY_KEY = new Map(SETTINGS_SCHEMA.map((d) => [d.key, d]));

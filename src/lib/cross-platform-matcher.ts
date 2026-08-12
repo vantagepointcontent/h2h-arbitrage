@@ -119,7 +119,8 @@ function jaccardTokens(a: string, b: string): number {
 
 function isBinaryKalshi(market: KalshiMarket | null): boolean {
   if (!market) return false;
-  if (market.status !== 'open') return false;
+  if (market.status !== 'open' && market.status !== 'active') return false;
+  if (market.market_type) return market.market_type === 'binary';
   const title = (market.title || market.yes_sub_title || '').toLowerCase();
   const hasYesNo = Boolean(
     (market.yes_sub_title && market.no_sub_title) ||
@@ -157,7 +158,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 
 async function runWithConcurrency<T, R>(
   items: T[],
-  fn: (item: T) => Promise<R>,
+  fn: (item: T, index: number) => Promise<R>,
   concurrency: number,
 ): Promise<R[]> {
   const results: R[] = [];
@@ -166,7 +167,7 @@ async function runWithConcurrency<T, R>(
   async function worker() {
     while (index < queue.length) {
       const { item, i } = queue[index++];
-      results[i] = await fn(item);
+      results[i] = await fn(item, i);
     }
   }
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
@@ -264,10 +265,20 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   const start = Date.now();
   const errors: string[] = [];
 
-  const kalshiRes = await queryMarketCatalog({ platform: 'kalshi', includeStale: false, limit: 10000 });
-  const pmRes = await queryMarketCatalog({ platform: 'polymarket', includeStale: false, limit: 10000 });
-  const kalshiMarkets = kalshiRes.rows;
-  const pmMarkets = pmRes.rows;
+  const loadCatalog = async (platform: 'kalshi' | 'polymarket'): Promise<MarketCatalogRow[]> => {
+    const rows: MarketCatalogRow[] = [];
+    let cursor: number | null = 0;
+    do {
+      const page = await queryMarketCatalog({ platform, includeStale: false, limit: 10000, cursor });
+      rows.push(...page.rows);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return rows;
+  };
+  const [kalshiMarkets, pmMarkets] = await Promise.all([
+    loadCatalog('kalshi'),
+    loadCatalog('polymarket'),
+  ]);
 
   opts?.onProgress?.({ step: 'matching', message: 'Matching cross-platform pairs...' });
 
