@@ -28,6 +28,10 @@ describe('LogsPanel', () => {
               positive_arb_count: 1,
               total_stake: 100,
               scanned_at: '2026-07-26T12:00:00.000Z',
+              expiry_at: '2026-08-04T09:13:50.769Z',
+              days_to_expiry: 8.884615384,
+              apy_pct: 102.7,
+              apy_unavailable_reason: null,
               raw_result: JSON.stringify({ allArbs: [{ apyPct: 23.4 }] }),
             }],
           }),
@@ -43,6 +47,8 @@ describe('LogsPanel', () => {
     const profitIndex = headers.findIndex((label) => label?.startsWith('Profit'));
     expect(headers[profitIndex + 1]).toBe('APY');
     expect(headers[profitIndex + 1]).not.toContain('x');
+    expect(screen.getByText('+102.70%')).toBeTruthy();
+    expect(screen.queryByText('+23.40%')).toBeNull();
     expect(screen.getByTestId('logs-table-scroll').className).toContain('overflow-x-auto');
     expect(document.querySelector('table')?.className).toContain('min-w-[1050px]');
     expect(document.querySelector('thead th')?.className).toContain('sticky');
@@ -150,6 +156,10 @@ function comparisonLog() {
     positive_arb_count: 1,
     total_stake: 100,
     scanned_at: '2026-08-11T13:42:00.000Z',
+    expiry_at: '2026-08-12T01:42:00.000Z',
+    days_to_expiry: 0.5,
+    apy_pct: 1825,
+    apy_unavailable_reason: null,
     raw_result: JSON.stringify({ allArbs: [{
       artist: 'Outcome A',
       strategy: 'Buy YES Kalshi + NO PM',

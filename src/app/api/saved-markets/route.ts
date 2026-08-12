@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
           kalshiCount: body.scanResult.kalshiCount ?? 0,
           pmCount: body.scanResult.pmCount ?? 0,
           scannedAt: body.scanResult.scannedAt ?? new Date().toISOString(),
+          expiryAt: body.scanResult.expiryAt ?? body.scanResult.expiryDate ?? market.expiryDate ?? null,
           positiveArbCount: body.scanResult.positiveArbCount,
           totalStake: body.scanResult.totalStake,
           raw: body.scanResult.raw,

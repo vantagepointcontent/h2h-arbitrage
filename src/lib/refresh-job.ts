@@ -108,6 +108,7 @@ export async function runRefreshJob(marketIds?: string[]) {
           pmCount: result.pmCount,
           positiveArbCount: result.allArbs.filter((arb) => arb.roiPct > 0).length,
           scannedAt: result.scannedAt,
+          expiryAt: result.expiryDate,
           allArbs: result.allArbs,
           expiryDate: result.expiryDate,
           category: market.category,
