@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status');
-    const limit = parseBoundedInteger(searchParams.get('limit'), 200, 1, 5000);
+    const limit = parseBoundedInteger(searchParams.get('limit'), 200, 1, 1000);
     const notSaved = searchParams.get('notSaved') === 'true';
 
     let status: MatchedPair['status'] | MatchedPair['status'][] | undefined;
