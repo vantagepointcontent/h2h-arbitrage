@@ -303,7 +303,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       try {
         const result = await deps.execute(candidateToInput(scan, item, settings));
         results.push({ outcome: item.outcome, result });
-        if (result.executionResult?.unhedged === true || (result.executed && result.positionPersisted === false)) {
+        if (result.executionResult?.unhedged === true
+          || result.exposureState === 'pending_reconciliation'
+          || (result.executed && result.positionPersisted === false)) {
           await releaseRemaining(index + 1);
           break;
         } else {
@@ -321,6 +323,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     }
 
     const unhedged = results.find((item) => item.result?.executionResult?.unhedged === true);
+    const pendingReconciliation = results.find((item) => item.result?.exposureState === 'pending_reconciliation');
     const untracked = results.find((item) => item.result?.executed === true && item.result.positionPersisted === false);
     const unknownExposure = results.find((item) => item.error);
     const placed = results.filter((item) => item.result?.executed === true);
@@ -331,6 +334,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
 
     if (unhedged) {
       return finish({ state: 'partial_or_unhedged', reasonCode: 'partial_or_unhedged', reason: unhedged.result?.reason ?? 'Placement left partial or unhedged exposure', placementCount: placed.length, attempts: claimed.attempts + reserved.length, details });
+    }
+    if (pendingReconciliation) {
+      return finish({ state: 'partial_or_unhedged', reasonCode: 'fill_reconciliation_pending', reason: pendingReconciliation.result?.reason ?? 'Live order acknowledgement is pending authoritative fill reconciliation', placementCount: placed.length, attempts: claimed.attempts + results.length, details });
     }
     if (untracked) {
       return finish({ state: 'partial_or_unhedged', reasonCode: 'position_persistence_failed', reason: untracked.result?.persistenceError ?? 'Executed exposure was not durably recorded as a position', placementCount: placed.length, attempts: claimed.attempts + results.length, details });

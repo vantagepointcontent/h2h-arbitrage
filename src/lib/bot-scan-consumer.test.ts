@@ -297,6 +297,44 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.deps.releaseOpportunity).not.toHaveBeenCalled();
   });
 
+  it('retains the reservation and stops the batch for a live acknowledgement pending authoritative reconciliation', async () => {
+    const first = candidate();
+    const second = candidate({ outcome: 'B', kalshiTicker: 'KX-B', pmConditionId: 'pm-b' });
+    const pendingLiveAcknowledgement: BotExecutionResult = {
+      executed: false,
+      dryRun: false,
+      reason: 'Production order acknowledgement pending authoritative fill reconciliation for Test Market',
+      executionResult: {
+        success: false,
+        dryRun: false,
+        steps: [],
+        alerts: [],
+        timestamp: '2026-08-11T12:00:10.000Z',
+      } as never,
+      positionPersisted: false,
+      exposureState: 'pending_reconciliation',
+    };
+    const h = harness({
+      scans: [scan({ candidates: [first, second] })],
+      current: [first, second],
+      execute: pendingLiveAcknowledgement,
+    });
+
+    const result = await h.consumer.consume(41, 'scan_api');
+
+    expect(result).toMatchObject({
+      state: 'partial_or_unhedged',
+      reasonCode: 'fill_reconciliation_pending',
+      placementCount: 0,
+    });
+    expect(result.reason).toContain('pending authoritative fill reconciliation');
+    expect(h.deps.execute).toHaveBeenCalledOnce();
+    expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledOnce();
+    expect(h.deps.releaseOpportunity).toHaveBeenCalledTimes(1);
+    expect(h.deps.releaseOpportunity).toHaveBeenCalledWith(second);
+    expect(h.deps.releaseOpportunity).not.toHaveBeenCalledWith(first);
+  });
+
   it('fails closed as possible exposure and retains the reservation when placement throws', async () => {
     const h = harness({ execute: new Error('venue unavailable') });
     const result = await h.consumer.consume(41, 'scan_api');

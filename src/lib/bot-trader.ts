@@ -126,6 +126,8 @@ export interface BotExecutionResult {
   executed: boolean;
   dryRun: boolean;
   reason: string;
+  /** Live venue acknowledgement exists, but the complete fill cohort is not yet authoritative. */
+  exposureState?: 'pending_reconciliation';
   executionRecord?: ExecutionRecord;
   executionResult?: Awaited<ReturnType<typeof executeArb>>;
   positionPersisted?: boolean;
@@ -819,6 +821,7 @@ export async function maybeExecuteBotTrade(
     reason: effectiveDryRun
       ? `Paper trade simulated for ${input.marketTitle}`
       : `Production order acknowledgement pending authoritative fill reconciliation for ${input.marketTitle}`,
+    exposureState: effectiveDryRun ? undefined : 'pending_reconciliation',
     executionRecord,
     executionResult: reportedResult,
     positionPersisted,
