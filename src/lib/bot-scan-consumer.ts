@@ -84,7 +84,7 @@ export interface BotScanConsumerDeps {
   advanceCursor(scanId: number): Promise<void>;
   revalidate(scan: PersistedBotScan): Promise<BotScanCandidate[]>;
   execute(input: BotTradeInput): Promise<BotExecutionResult>;
-  reserveOpportunity?(candidate: BotScanCandidate): Promise<boolean>;
+  reserveOpportunity?(candidate: BotScanCandidate, maxUnitsPerMarket: number): Promise<boolean>;
   releaseOpportunity?(candidate: BotScanCandidate): Promise<void>;
   retainOpportunityForExposure?(candidate: BotScanCandidate): Promise<void>;
   maxScanAgeMs?: number;
@@ -256,7 +256,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
 
     const reserved: BotScanCandidate[] = [];
     for (const item of executable) {
-      if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item))) {
+      if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item, settings.maxUnitsPerMarket ?? 1))) {
         rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved by an in-flight placement' });
         continue;
       }
@@ -598,9 +598,9 @@ async function revalidate(scan: PersistedBotScan): Promise<BotScanCandidate[]> {
     .filter((item): item is BotScanCandidate => item != null);
 }
 
-async function reserveOpportunity(candidate: BotScanCandidate): Promise<boolean> {
+async function reserveOpportunity(candidate: BotScanCandidate, maxUnitsPerMarket: number): Promise<boolean> {
   const { reserveBotMarketPair } = await import('./bot-positions');
-  return reserveBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId);
+  return reserveBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId, maxUnitsPerMarket);
 }
 
 async function releaseOpportunity(candidate: BotScanCandidate): Promise<void> {

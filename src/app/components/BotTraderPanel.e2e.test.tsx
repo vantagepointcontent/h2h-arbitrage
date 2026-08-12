@@ -74,12 +74,19 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
     client.close();
 
     let store = new BotPositionStore(dbUrl);
-    const first = await store.create(position(701) as never);
+    const first = await store.create(position(701, {
+      expectedRoiBps: 449,
+      expectedApyBps: 18_210,
+      unitId: 'execution:701',
+    }) as never);
     const second = await store.create(position(702, {
       buyPriceKalshiCents: 40,
       buyPricePmCents: 50,
       totalCostCents: 905,
       expectedProfitCents: 95,
+      expectedRoiBps: 1_050,
+      expectedApyBps: 42_583,
+      unitId: 'execution:702',
       feesCents: 5,
       kalshiEntryFeeCents: 3,
       pmEntryFeeCents: 2,
@@ -107,6 +114,12 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
     expect(secondRow.className).toContain('bg-[#071a33]');
     expect(within(firstRow).getByLabelText('Execution 701 Buy Cost').textContent).toBe('$9.57');
     expect(within(secondRow).getByLabelText('Execution 702 Buy Cost').textContent).toBe('$9.05');
+    expect(within(firstRow).getByText('execution:701')).toBeTruthy();
+    expect(within(secondRow).getByText('execution:702')).toBeTruthy();
+    expect(within(firstRow).getByText('+4.5%')).toBeTruthy();
+    expect(within(secondRow).getByText('+10.5%')).toBeTruthy();
+    expect(within(firstRow).getByText('182.1%')).toBeTruthy();
+    expect(within(secondRow).getByText('425.8%')).toBeTruthy();
     expect(firstRow.querySelector('[title="2026-08-01T00:00:00.000Z"]')).toBeTruthy();
     expect(secondRow.querySelector('[title="2026-08-01T01:00:00.000Z"]')).toBeTruthy();
     expect(within(firstRow).getByText(/45¢ × 10/)).toBeTruthy();
@@ -141,6 +154,12 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
     const reloadedSecond = screen.getByTestId('execution-702');
     expect(within(reloadedFirst).getByLabelText('Execution 701 Buy Cost').textContent).toBe('$9.57');
     expect(within(reloadedSecond).getByLabelText('Execution 702 Buy Cost').textContent).toBe('$9.05');
+    expect(within(reloadedFirst).getByText('execution:701')).toBeTruthy();
+    expect(within(reloadedSecond).getByText('execution:702')).toBeTruthy();
+    expect(within(reloadedFirst).getByText('+4.5%')).toBeTruthy();
+    expect(within(reloadedSecond).getByText('+10.5%')).toBeTruthy();
+    expect(within(reloadedFirst).getByText('182.1%')).toBeTruthy();
+    expect(within(reloadedSecond).getByText('425.8%')).toBeTruthy();
     expect(within(reloadedFirst).getByLabelText('Execution 701 remaining exposure').textContent).toBe('$4.79');
     expect(within(reloadedSecond).getByLabelText('Execution 702 remaining exposure').textContent).toBe('$0.00');
     expect(within(reloadedFirst).getByText('partially_closed')).toBeTruthy();

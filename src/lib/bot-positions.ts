@@ -30,6 +30,10 @@ export interface BotPosition {
   totalCostCents: number;
   expectedPayoutCents: number;
   expectedProfitCents: number;
+  /** Immutable placement-time snapshots. Null marks a legacy execution. */
+  expectedRoiBps: number | null;
+  expectedApyBps: number | null;
+  unitId: string | null;
   feesCents: number;
   category: string | null;
   pmTheta: number | null;
@@ -274,6 +278,9 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     totalCostCents,
     expectedPayoutCents: Number(row.expected_payout),
     expectedProfitCents: Number(row.expected_profit),
+    expectedRoiBps: row.expected_roi_bps != null ? Number(row.expected_roi_bps) : null,
+    expectedApyBps: row.expected_apy_bps != null ? Number(row.expected_apy_bps) : null,
+    unitId: row.unit_id != null ? String(row.unit_id) : null,
     feesCents,
     category: row.category != null ? String(row.category) : null,
     pmTheta: row.pm_theta != null ? Number(row.pm_theta) : null,
@@ -512,6 +519,9 @@ export class BotPositionStore {
       total_cost: 'INTEGER NOT NULL DEFAULT 0',
       expected_payout: 'INTEGER NOT NULL DEFAULT 0',
       expected_profit: 'INTEGER NOT NULL DEFAULT 0',
+      expected_roi_bps: 'INTEGER',
+      expected_apy_bps: 'INTEGER',
+      unit_id: 'TEXT',
       fees: 'INTEGER NOT NULL DEFAULT 0',
       category: 'TEXT',
       pm_theta: 'REAL',
@@ -539,7 +549,12 @@ export class BotPositionStore {
     };
     for (const [name, definition] of Object.entries(migrations)) {
       if (!existing.has(name)) {
-        await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
+        try {
+          await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
+        } catch (error) {
+          // Two store instances may initialize the same SQLite file concurrently.
+          if (!String(error).includes('duplicate column name')) throw error;
+        }
       }
     }
     await this.client.execute(`UPDATE bot_positions SET
@@ -550,6 +565,13 @@ export class BotPositionStore {
       live_cost = CASE WHEN status = 'open' THEN total_cost ELSE 0 END
       WHERE live_shares_kalshi IS NULL OR live_shares_pm IS NULL
          OR live_principal IS NULL OR live_fees IS NULL OR live_cost IS NULL`);
+    await this.client.execute(`UPDATE bot_positions
+      SET expected_roi_bps = ROUND(expected_profit * 10000.0 / NULLIF(total_cost, 0))
+      WHERE expected_roi_bps IS NULL AND total_cost > 0`);
+    await this.client.execute(`UPDATE bot_positions
+      SET expected_apy_bps = ROUND(expected_roi_bps * 365.0 / NULLIF((julianday(expiry_date) - julianday(opened_at)), 0))
+      WHERE expected_apy_bps IS NULL AND expected_roi_bps IS NOT NULL
+        AND expiry_date IS NOT NULL AND opened_at IS NOT NULL`);
     await this.client.execute(`
       CREATE TABLE IF NOT EXISTS bot_position_reservations (
         pair_key TEXT PRIMARY KEY,
@@ -605,10 +627,11 @@ export class BotPositionStore {
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
           shares_kalshi, shares_pm, live_shares_kalshi, live_shares_pm,
           live_principal, live_fees, live_cost, total_cost, expected_payout, expected_profit,
+          expected_roi_bps, expected_apy_bps, unit_id,
           fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee, status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
-        ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE NOT EXISTS (SELECT 1 FROM bot_positions WHERE execution_id = ?)`,
         args: [
           input.executionId, input.marketId, input.marketTitle, input.kalshiTicker,
@@ -616,7 +639,8 @@ export class BotPositionStore {
           input.buyPriceKalshiCents, input.buyPricePmCents, input.sharesKalshi,
           input.sharesPm, input.sharesKalshi, input.sharesPm, executionPrincipalCents,
           input.feesCents, input.totalCostCents, input.totalCostCents, input.expectedPayoutCents,
-          input.expectedProfitCents, input.feesCents, input.category, input.pmTheta,
+          input.expectedProfitCents, input.expectedRoiBps ?? null, input.expectedApyBps ?? null, input.unitId ?? null,
+          input.feesCents, input.category, input.pmTheta,
           input.kalshiEntryFeeCents, input.pmEntryFeeCents, input.openedAt,
           input.expiryDate, input.buyPriceKalshiCents, input.buyPricePmCents,
           input.expectedPayoutCents, input.expectedProfitCents, initialRoiBps,
@@ -661,7 +685,7 @@ export class BotPositionStore {
     return `${kalshiTicker.trim().toLowerCase()}\u0000${pmConditionId.trim().toLowerCase()}`;
   }
 
-  async reservePair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
+  async reservePair(kalshiTicker: string, pmConditionId: string, maxUnitsPerMarket = 1): Promise<boolean> {
     await this.ensureSchema();
     // Automatic live orders are hard-disabled; a 10-minute lease recovers paper
     // reservations after process crashes while remaining far longer than the
@@ -671,6 +695,13 @@ export class BotPositionStore {
       sql: `DELETE FROM bot_position_reservations WHERE reserved_at < ? AND exposure_at_risk = 0`,
       args: [staleBefore],
     });
+    const active = await this.client.execute({
+      sql: `SELECT COUNT(*) AS count FROM bot_positions
+        WHERE status = 'open' AND (live_shares_kalshi > 0 OR live_shares_pm > 0)
+          AND lower(kalshi_ticker) = lower(?) AND lower(pm_condition_id) = lower(?)`,
+      args: [kalshiTicker, pmConditionId],
+    });
+    if (Number(active.rows[0]?.count ?? 0) >= maxUnitsPerMarket) return false;
     try {
       await this.client.execute({
         sql: `INSERT INTO bot_position_reservations (pair_key, reserved_at) VALUES (?, ?)`,
@@ -934,6 +965,8 @@ export interface BotPositionInput {
   pmQuantity: number;
   executedAt: string;
   expectedProfit: number;
+  expectedRoiPct?: number | null;
+  expectedApyPct?: number | null;
   expiryDate?: string | null;
   selectionMethod?: BotSelectionMethod | null;
   category?: string | null;
@@ -970,6 +1003,9 @@ export async function recordBotPosition(input: BotPositionInput): Promise<void> 
     totalCostCents,
     expectedPayoutCents,
     expectedProfitCents,
+    expectedRoiBps: input.expectedRoiPct == null ? roiBps(expectedProfitCents, totalCostCents) : Math.round(input.expectedRoiPct * 100),
+    expectedApyBps: input.expectedApyPct == null ? null : Math.round(input.expectedApyPct * 100),
+    unitId: `execution:${input.executionId}`,
     feesCents: kalshiEntryFeeCents + pmEntryFeeCents,
     category: input.category,
     pmTheta,
@@ -985,8 +1021,8 @@ export async function hasOpenBotMarketPair(kalshiTicker: string | null, pmCondit
   return store().hasOpenPair(kalshiTicker, pmConditionId);
 }
 
-export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string): Promise<boolean> {
-  return store().reservePair(kalshiTicker, pmConditionId);
+export async function reserveBotMarketPair(kalshiTicker: string, pmConditionId: string, maxUnitsPerMarket = 1): Promise<boolean> {
+  return store().reservePair(kalshiTicker, pmConditionId, maxUnitsPerMarket);
 }
 
 export async function retainBotMarketPairForExposure(kalshiTicker: string, pmConditionId: string): Promise<void> {

@@ -76,6 +76,9 @@ interface BotExecution {
   mode: 'paper' | 'production';
   strategy: string | null;
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
+  expectedRoiBps?: number | null;
+  expectedApyBps?: number | null;
+  unitId?: string | null;
   status: PositionStatus;
   legs: ExecutionLeg[];
   executionPrincipalCents: number;
@@ -227,6 +230,7 @@ interface BotStatus {
   selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
   todayStakeUsd: number;
+  maxUnitsPerMarket?: number;
 }
 
 const EMPTY_ANALYTICS: Analytics = {
@@ -311,6 +315,9 @@ function ExecutionDetailRow({ execution }: { execution: BotExecution }) {
           <span title={new Date(execution.executedAt).toISOString()}>Executed {new Date(execution.executedAt).toLocaleString()}</span>
           <span className="uppercase text-[var(--text-secondary)]">{execution.mode}</span>
           <span>{execution.strategy || 'Strategy unavailable'}</span>
+          <span>Unit <strong>{execution.unitId ?? `execution:${execution.executionId}`}</strong></span>
+          <span>Exp ROI <strong className={execution.expectedRoiBps == null ? 'text-[var(--text-muted)]' : pnlClass(execution.expectedRoiBps)}>{execution.expectedRoiBps == null ? '—' : formatBps(execution.expectedRoiBps, true)}</strong></span>
+          <span>Exp APY <strong className={execution.expectedApyBps == null ? 'text-[var(--text-muted)]' : pnlClass(execution.expectedApyBps)}>{execution.expectedApyBps == null ? '—' : formatBps(execution.expectedApyBps)}</strong></span>
           <span>Buy Cost <strong aria-label={`Execution ${execution.executionId} Buy Cost`} className="tabular-nums">{formatCents(execution.executionBuyCostCents)}</strong> <span className="text-[var(--text-muted)]">({formatCents(execution.executionPrincipalCents)} + {formatCents(execution.executionFeesCents)} fees)</span></span>
           <StatusBadge status={execution.status} />
           <span>Remaining exposure: <strong aria-label={`Execution ${execution.executionId} remaining exposure`} className="tabular-nums">{formatCents(execution.remainingOpenCostCents)}</strong></span>

@@ -32,7 +32,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const kalshiUrl = urls?.kalshiUrl ?? null;
       const polymarketUrl = urls?.polymarketUrl ?? null;
       const executions = market.executions.map((execution) => ({ ...execution, kalshiUrl, polymarketUrl }));
-      return { ...market, kalshiUrl, polymarketUrl, executions, entries: executions };
+      const activeUnits = executions.filter((execution) => execution.status === 'open' || execution.status === 'partially_closed').length;
+      return { ...market, kalshiUrl, polymarketUrl, activeUnits, maxUnitsPerMarket: 3, executions, entries: executions };
     }));
     const positions = markets.flatMap((market) => market.executions);
     return NextResponse.json(

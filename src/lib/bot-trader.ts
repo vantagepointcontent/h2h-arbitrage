@@ -52,6 +52,7 @@ export interface BotSettings {
   /** skip markets expiring sooner than this (days) */
   maxExpiryDays: number;
   maxTradesPerDay: number;
+  maxUnitsPerMarket?: number;
 }
 
 export interface BotTradeEvaluation {
@@ -133,6 +134,7 @@ const DEFAULT_BOT_SETTINGS: BotSettings = {
   minSharesPerLeg: 1,
   maxExpiryDays: 1,
   maxTradesPerDay: 10,
+  maxUnitsPerMarket: 3,
 };
 
 /** MASTER SAFETY GUARD: keep `false` until Victor authorizes auto-live orders. */
@@ -141,7 +143,7 @@ const AUTO_LIVE_ORDERS_AUTHORIZED = false;
 // ─── Settings loading ────────────────────────────────────────────
 
 export async function getBotSettings(): Promise<BotSettings> {
-  const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
+  const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay, maxUnitsPerMarket] = await Promise.all([
     getSetting<boolean>('bot.enabled').catch(() => DEFAULT_BOT_SETTINGS.enabled),
     getSetting<string>('bot.mode').catch(() => DEFAULT_BOT_SETTINGS.mode),
     getSetting<BotSelectionMethod>('bot.selectionMethod').catch(() => DEFAULT_BOT_SETTINGS.selectionMethod),
@@ -151,6 +153,7 @@ export async function getBotSettings(): Promise<BotSettings> {
     getSetting<number>('bot.minSharesPerLeg').catch(() => DEFAULT_BOT_SETTINGS.minSharesPerLeg),
     getSetting<number>('bot.maxExpiryDays').catch(() => DEFAULT_BOT_SETTINGS.maxExpiryDays),
     getSetting<number>('bot.maxTradesPerDay').catch(() => DEFAULT_BOT_SETTINGS.maxTradesPerDay),
+    getSetting<number>('bot.maxUnitsPerMarket').catch(() => DEFAULT_BOT_SETTINGS.maxUnitsPerMarket),
   ]);
 
   return {
@@ -169,6 +172,9 @@ export async function getBotSettings(): Promise<BotSettings> {
     maxTradesPerDay: Number.isFinite(maxTradesPerDay) && maxTradesPerDay >= 1
       ? Math.floor(maxTradesPerDay)
       : DEFAULT_BOT_SETTINGS.maxTradesPerDay,
+    maxUnitsPerMarket: Number.isFinite(maxUnitsPerMarket) && Number(maxUnitsPerMarket) >= 1
+      ? Math.floor(Number(maxUnitsPerMarket))
+      : DEFAULT_BOT_SETTINGS.maxUnitsPerMarket,
   };
 }
 
@@ -648,6 +654,8 @@ export async function maybeExecuteBotTrade(
           pmQuantity: Number(pmQuantity),
           executedAt: executionRecord.timestamp,
           expectedProfit: execReq.estimatedProfit,
+          expectedRoiPct: input.roiPct,
+          expectedApyPct: input.apyPct ?? null,
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,
           category: input.category ?? null,
