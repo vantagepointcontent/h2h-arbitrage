@@ -47,7 +47,7 @@ import {
   FileText,
   PanelLeft,
   Radar,
-  GitMerge,
+
   Settings as SettingsIconLucide,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -65,7 +65,7 @@ const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSugge
   loading: () => <div className="p-4 text-sm text-[var(--text-secondary)]">Loading...</div>,
   ssr: false,
 });
-const CoupleManagementPanel = dynamic(() => import("@/app/components/CoupleManagementPanel"), { ssr: false });
+
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
 const ArbTimingPanel = dynamic(() => import("@/app/components/ArbTimingPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
@@ -248,7 +248,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms" | "couple-management">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -331,7 +331,11 @@ export default function Home() {
           setViewMode("scan");
         }
       } else if (state?.view === "couple-management") {
-        setViewMode("couple-management");
+        window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
+        setViewMode("dashboard");
+        setActiveMarketId(null);
+      } else if (state?.view === "dashboard") {
+        setViewMode("dashboard");
         setActiveMarketId(null);
       } else if (state?.view === "timing") {
         setViewMode("timing");
@@ -524,8 +528,8 @@ export default function Home() {
       } else if (view === "phantoms") {
         setViewMode("phantoms");
       } else if (view === "couple-management") {
-        setViewMode("couple-management");
-        window.history.replaceState({ view: "couple-management" }, "", "/?view=couple-management");
+        window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
+        setViewMode("dashboard");
       } else {
         setViewMode("dashboard");
       }
@@ -1088,11 +1092,6 @@ export default function Home() {
     setViewMode("bottrader");
   };
 
-  const goToCoupleManagement = () => {
-    setCouplingPanelOpen(false);
-    setViewMode("couple-management");
-    window.history.replaceState({ view: "couple-management" }, "", "/?view=couple-management");
-  };
 
   const goToScan = () => {
     setActiveMarketId(null);
@@ -1509,9 +1508,7 @@ export default function Home() {
           <ExecutionModeBadge />
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "couple-management" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Couple Management">
-              <GitMerge className="w-4 h-4" />
-            </button>
+
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
@@ -1557,7 +1554,7 @@ export default function Home() {
           onGoTiming={goToTiming}
           onGoTrades={goToTrades}
           onGoBotTrader={goToBotTrader}
-          onGoCoupleManagement={goToCoupleManagement}
+
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
           sidebarFavoritesOnly={sidebarFavoritesOnly}
@@ -1703,8 +1700,6 @@ export default function Home() {
               <BotTraderPanel />
             ) : viewMode === "phantoms" ? (
               <PhantomsPanel />
-            ) : viewMode === "couple-management" ? (
-              <CoupleManagementPanel />
             ) : (
               <>
                 {!activeMarketId && <BatchScanPanel onComplete={loadSavedMarkets} />}
