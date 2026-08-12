@@ -133,6 +133,23 @@ describe("LiveScanPanel stream recovery", () => {
     expect(stream.close).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps configuration failures retryable instead of leaving the tab running", () => {
+    render(
+      <LiveScanPanel
+        capital={10}
+        savedMarkets={[{ ...market, polymarketUrl: "" }]}
+        initialMarketId={market.id}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start Live Scan" }));
+    act(() => vi.advanceTimersByTime(50));
+
+    expect(screen.getByText("Live scan disconnected — press Start to retry.")).toBeTruthy();
+    expect(screen.getByText("Missing Kalshi or Polymarket URL.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start" })).toBeTruthy();
+    expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
   it("times out initialization instead of remaining on connecting forever", () => {
     const stream = startLiveScan();
     act(() => {

@@ -321,7 +321,16 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
     const tab = tabsRef.current?.find((t) => t.id === tabId);
     const lookupMarketId = tab?.marketId || tabId;
     const market = savedMarkets.find((m) => m.id === lookupMarketId);
-    if (!market) return;
+    if (!market) {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? { ...t, error: "Saved market is no longer available.", running: false, loading: false, status: LIVE_DISCONNECTED_STATUS }
+            : t
+        )
+      );
+      return;
+    }
 
     const kalshiUrl = market.kalshiUrl?.trim();
     const pmUrl = market.polymarketUrl?.trim();
@@ -329,7 +338,7 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
       setTabs((prev) =>
         prev.map((t) =>
           t.id === tabId
-            ? { ...t, error: "Missing Kalshi or Polymarket URL.", loading: false, status: "Error" }
+            ? { ...t, error: "Missing Kalshi or Polymarket URL.", running: false, loading: false, status: LIVE_DISCONNECTED_STATUS }
             : t
         )
       );
