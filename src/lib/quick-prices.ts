@@ -16,6 +16,7 @@ import {
   extractKalshiMatchKey,
   filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets,
+  type KalshiMarket,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from '@/lib/polymarket';
 import { ClobMarket, fetchClobBooks, getClobPricesFromBooks } from '@/lib/polymarket-clob';
@@ -33,6 +34,7 @@ import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarketById } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
+import type { UnmatchedKalshi, UnmatchedPolymarket } from '@/app/lib/page-shared';
 import { resolveMarketDomain } from './market-classification';
 
 const QUICK_KALSHI_TIMEOUT_MS = 5000;
@@ -48,17 +50,37 @@ export interface QuickPricesResult {
   kalshiCount: number;
   pmCount: number;
   matchedCount: number;
+  matchStatus: 'unavailable' | 'confirmed_zero' | 'matched';
+  matchError?: string;
+  matchedPairs: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   kalshiRawCount: number;
   pmRawCount: number;
   pmFilteredCount: number;
   outcomes: UnifiedOutcome[];
-  unmatchedKalshi: any[];
-  unmatchedPolymarket: any[];
+  unmatchedKalshi: UnmatchedKalshi[];
+  unmatchedPolymarket: UnmatchedPolymarket[];
   expired: boolean;
   priceResolved: boolean;
   _ts: number;
   _kalshiFetchedAt: string;
   _pmFetchedAt: string;
+  /** Bounded upstream failures. A non-empty list means cached/partial data is still usable. */
+  platformWarnings: string[];
+}
+
+const KALSHI_TIMEOUT_WARNING = 'Kalshi timed out; showing available Polymarket data and saved market data.';
+const KALSHI_UNAVAILABLE_WARNING = 'Kalshi returned no open markets; showing available Polymarket data and saved market data.';
+const PM_UNAVAILABLE_WARNING = 'Polymarket event is unavailable or no longer open; showing available Kalshi and saved market data.';
+const CLOB_TIMEOUT_WARNING = 'Polymarket order books timed out; showing saved market structure without live Polymarket prices.';
+
+function unavailableQuickPmMarkets(markets: PMMarket[]): PMMarket[] {
+  return markets.map((market) => ({
+    ...market,
+    clobEmpty: true,
+    outcomePrices: '[0,0]',
+    bestAsk: 0,
+    bestBid: 0,
+  }));
 }
 
 function parseStringArray(serialized: string | undefined): string[] {
@@ -153,10 +175,12 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     throw Object.assign(new Error('A valid Polymarket market link is required.'), { status: 400 });
   }
 
-  let [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
-    withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets').catch((e: any) => {
-      if (e.message?.includes('timed out')) throw e;
-      return [] as any[];
+  const platformWarnings: string[] = [];
+  const [kalshiResult, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
+    withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets').catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      platformWarnings.push(message.includes('timed out') ? KALSHI_TIMEOUT_WARNING : KALSHI_UNAVAILABLE_WARNING);
+      return [] as KalshiMarket[];
     }),
     withTimeout(
       isPolymarketMarketUrl(polymarketUrl)
@@ -164,45 +188,58 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
         : fetchPolymarketEvent(pmSlug),
       QUICK_PM_TIMEOUT_MS,
       'Polymarket event',
-    ).catch(() => null),
+    ).catch(() => {
+      platformWarnings.push(PM_UNAVAILABLE_WARNING);
+      return null;
+    }),
     getManualMatches(),
     getDecoupledPairs(),
   ]);
 
-  kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(kalshiUrl));
+  const kalshiMarkets = filterKalshiMarketsToMatch(kalshiResult, extractKalshiMatchKey(kalshiUrl));
 
-  if (!pmEvent) {
-    throw Object.assign(new Error('Polymarket event not found.'), { status: 404 });
+  if (kalshiMarkets.length === 0 && !platformWarnings.some((warning) => warning.startsWith('Kalshi'))) {
+    platformWarnings.push(KALSHI_UNAVAILABLE_WARNING);
+  }
+  if (!pmEvent && !platformWarnings.includes(PM_UNAVAILABLE_WARNING)) {
+    platformWarnings.push(PM_UNAVAILABLE_WARNING);
   }
 
-  const expiryDate = pmEvent.endDate;
+  const expiryDate = pmEvent?.endDate ?? market.expiryDate ?? undefined;
 
-  const rawGroupTitle = pmEvent.markets?.[0]?.groupItemTitle;
-  const scanCategory = resolveMarketDomain(pmEvent.title, rawGroupTitle);
+  const rawGroupTitle = pmEvent?.markets?.[0]?.groupItemTitle;
+  const eventTitle = pmEvent?.title || market.eventTitle;
+  const scanCategory = market.category || resolveMarketDomain(eventTitle, rawGroupTitle);
 
-  const pmRawCount = (pmEvent.markets || []).length;
-  const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
+  const pmRawCount = (pmEvent?.markets || []).length;
+  const pmMarketsRaw = chooseBestPmStructure(pmEvent?.markets || [], kalshiMarkets, eventTitle);
   const pmFilteredCount = pmMarketsRaw.length;
 
   const pmMarkets = await withTimeout(
     enrichQuickPmMarketsWithClobPrices(pmMarketsRaw),
     QUICK_PM_TIMEOUT_MS,
     'CLOB quick prices',
-  );
+  ).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    platformWarnings.push(message.includes('timed out')
+      ? CLOB_TIMEOUT_WARNING
+      : 'Polymarket order books are unavailable; showing saved market structure without live Polymarket prices.');
+    return unavailableQuickPmMarkets(pmMarketsRaw);
+  });
 
   const kalshiRawCount = kalshiMarkets.length;
-  const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, capital, pmEvent.endDate);
-  const matchedOutcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, pmEvent.endDate);
+  const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, eventTitle, capital, expiryDate);
+  const matchedOutcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, expiryDate);
   const splitOutcomes = applyDecoupledPairs(matchedOutcomes as unknown as UnifiedOutcome[], decoupledPairs);
 
   const suspRoi = await getSetting<number>('scanner.suspiciousRoiPct').catch(() => null);
   if (suspRoi != null) setSuspiciousRoiPct(suspRoi);
 
-  const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title, capital).map((o) => ({
+  const withArbitrage = calculateAllArbitrages(splitOutcomes, eventTitle, capital).map((o) => ({
     ...o,
     arbitrage: {
       ...o.arbitrage,
-      apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate),
+      apyPct: computeApy(o.arbitrage.roiPct, expiryDate),
     },
   }));
 
@@ -213,7 +250,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     })),
   );
 
-  const pmClosed = Boolean(pmEvent.closed) && !pmEvent.active;
+  const pmClosed = Boolean(pmEvent?.closed) && !pmEvent?.active;
   let expired = false;
   if (expiryDate) {
     const expiryMs = new Date(expiryDate).getTime();
@@ -225,6 +262,11 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const kalshiCount = withArbitrage.filter((o) => o.kalshi).length;
   const pmCount = withArbitrage.filter((o) => o.polymarket).length;
   const matchedCount = withArbitrage.filter((o) => o.kalshi && o.polymarket).length;
+  const matchedPairs = withArbitrage
+    .filter((o) => o.kalshi && o.polymarket)
+    .map((o) => ({ artist: o.artist, kalshiTicker: o.kalshi!.ticker, pmConditionId: o.polymarket!.conditionId }));
+  const matchError = platformWarnings.length > 0 ? platformWarnings.join(' ') : undefined;
+  const matchStatus = matchError ? 'unavailable' : matchedCount > 0 ? 'matched' : 'confirmed_zero';
 
   const unmatchedKalshi = withArbitrage
     .filter((o) => o.kalshi && !o.polymarket)
@@ -247,15 +289,18 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     }));
 
   return {
-    eventTitle: pmEvent.title,
+    eventTitle,
     category: scanCategory,
     kalshiEventTicker: kalshiTicker,
     pmEventSlug: pmSlug,
-    pmEventId: pmEvent.id,
+    pmEventId: pmEvent?.id,
     expiryDate,
     kalshiCount,
     pmCount,
     matchedCount,
+    matchStatus,
+    matchError,
+    matchedPairs,
     kalshiRawCount,
     pmRawCount,
     pmFilteredCount,
@@ -267,5 +312,6 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     _ts: Date.now(),
     _kalshiFetchedAt: new Date().toISOString(),
     _pmFetchedAt: new Date().toISOString(),
+    platformWarnings,
   };
 }

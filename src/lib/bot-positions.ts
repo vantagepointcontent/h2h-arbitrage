@@ -50,6 +50,19 @@ export interface BotPosition {
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
+  valuationStatus: 'current' | 'stale' | 'unavailable';
+  valuationFailureReason: string | null;
+  valuationFailureAt: string | null;
+  kalshiValuationDepth: number | null;
+  pmValuationDepth: number | null;
+  kalshiExitFeeCents: number | null;
+  pmExitFeeCents: number | null;
+  kalshiLiquidationValueCents: number | null;
+  pmLiquidationValueCents: number | null;
+  kalshiQuoteTimestamp: string | null;
+  pmQuoteTimestamp: string | null;
+  kalshiQuoteSource: string | null;
+  pmQuoteSource: string | null;
   realizedPnlCents: number | null;
   settlementSide: SettlementSide;
   dryRun: boolean;
@@ -67,7 +80,10 @@ export type CreateBotPosition = Omit<BotPosition,
   'unrealizedRoiBps' | 'lastValuationAt' | 'realizedPnlCents' |
   'settlementSide' | 'dryRun' | 'remainingSharesKalshi' | 'remainingSharesPm' |
   'remainingOpenPrincipalCents' | 'remainingOpenFeesCents' | 'remainingOpenCostCents' |
-  'closedAt'
+  'closedAt' | 'valuationStatus' | 'valuationFailureReason' | 'valuationFailureAt' |
+  'kalshiValuationDepth' | 'pmValuationDepth' | 'kalshiExitFeeCents' | 'pmExitFeeCents' |
+  'kalshiLiquidationValueCents' | 'pmLiquidationValueCents' |
+  'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource'
 >;
 
 export type BotExecutionStatus = 'open' | 'partially_closed' | 'closed' | 'settled';
@@ -85,6 +101,10 @@ export interface BotExecutionLeg {
   remainingOpenFeeCents: number;
   currentExecutablePriceCents: number | null;
   currentLiquidationValueCents: number | null;
+  executableDepthUsed: number | null;
+  exitFeeCents: number | null;
+  quoteTimestamp: string | null;
+  quoteSource: string | null;
 }
 
 export type BotExecution = Omit<BotPosition, 'status'> & {
@@ -107,8 +127,13 @@ export interface BotPositionMarket {
   pmConditionId: string | null;
   currentLiveStakeCents: number;
   liveStakeCents: number;
-  currentValueCents: number;
-  unrealizedPnlCents: number;
+  currentValueCents: number | null;
+  unrealizedPnlCents: number | null;
+  valuedExecutionCount: number;
+  unavailableExecutionCount: number;
+  staleExecutionCount: number;
+  oldestStaleValuationAt: string | null;
+  valuedLiveStakeCents: number;
   realizedPnlCents: number;
   totalPnlCents: number;
   status: 'open' | 'closed' | 'settled';
@@ -123,10 +148,27 @@ export interface PositionQuote {
   kalshiNoBidCents: number | null;
   pmYesBidCents: number | null;
   pmNoBidCents: number | null;
+  kalshiHeldBidLevels?: ExecutableBidLevel[];
+  pmHeldBidLevels?: ExecutableBidLevel[];
   observedAt: string;
   expiryDate: string | null;
   kalshiResolved?: boolean;
   pmResolved?: boolean;
+}
+
+export interface ExecutableBidLevel { priceCents: number; quantity: number }
+export interface KalshiBidLevels {
+  yesBidLevels: ExecutableBidLevel[];
+  noBidLevels: ExecutableBidLevel[];
+}
+export interface LegValuationSnapshot {
+  executablePriceCents: number;
+  executableDepthUsed: number;
+  grossProceedsCents: number;
+  exitFeeCents: number;
+  netProceedsCents: number;
+  quoteTimestamp: string;
+  source: 'kalshi_orderbook' | 'polymarket_clob_book';
 }
 
 export interface PositionValuation {
@@ -140,6 +182,7 @@ export interface PositionValuation {
   settledAt: string | null;
   realizedPnlCents: number | null;
   settlementSide: SettlementSide;
+  legs: { kalshi: LegValuationSnapshot; polymarket: LegValuationSnapshot };
 }
 
 interface KalshiSettlementMarket {
@@ -197,10 +240,38 @@ export function calculatePositionValuation(
     throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
   }
 
-  const kalshiExitFeeCents = Math.round(calcKalshiFee(position.remainingSharesKalshi, kalshiPrice / 100) * 100);
-  const pmExitFeeCents = Math.round(calcPolymarketFee(position.remainingSharesPm, pmPrice / 100, position.pmTheta) * 100);
-  const currentValueCents =
-    kalshiPrice * position.remainingSharesKalshi + pmPrice * position.remainingSharesPm - kalshiExitFeeCents - pmExitFeeCents;
+  const liquidate = (venue: 'Kalshi' | 'Polymarket', quantity: number, price: number, levels?: ExecutableBidLevel[]): LegValuationSnapshot => {
+    let remaining = quantity;
+    let gross = 0;
+    let fee = 0;
+    let kalshiFeeNumerator = 0;
+    for (const level of [...(levels ?? [{ priceCents: price, quantity }])].sort((a, b) => b.priceCents - a.priceCents)) {
+      if (!isPriceCents(level.priceCents) || !Number.isFinite(level.quantity) || level.quantity <= 0) continue;
+      const fill = Math.min(remaining, level.quantity);
+      gross += fill * level.priceCents;
+      if (venue === 'Kalshi') {
+        kalshiFeeNumerator += 7 * fill * level.priceCents * (100 - level.priceCents);
+      } else {
+        fee += calcPolymarketFee(fill, level.priceCents / 100, position.pmTheta as number) * 100;
+      }
+      remaining -= fill;
+      if (remaining <= 1e-9) break;
+    }
+    if (remaining > 1e-9) {
+      const available = Math.max(0, quantity - remaining);
+      throw new Error(`Insufficient ${venue} executable depth for bot position ${position.id}: available ${available}, required ${quantity}, shortfall ${remaining}`);
+    }
+    const grossProceedsCents = Math.round(gross);
+    const exitFeeCents = venue === 'Kalshi'
+      ? Math.ceil(kalshiFeeNumerator / 10_000 - 1e-9)
+      : Math.round(fee);
+    return { executablePriceCents: price, executableDepthUsed: quantity, grossProceedsCents, exitFeeCents,
+      netProceedsCents: grossProceedsCents - exitFeeCents, quoteTimestamp: quote.observedAt,
+      source: venue === 'Kalshi' ? 'kalshi_orderbook' : 'polymarket_clob_book' };
+  };
+  const kalshiLeg = liquidate('Kalshi', position.remainingSharesKalshi, kalshiPrice, quote.kalshiHeldBidLevels);
+  const pmLeg = liquidate('Polymarket', position.remainingSharesPm, pmPrice, quote.pmHeldBidLevels);
+  const currentValueCents = kalshiLeg.netProceedsCents + pmLeg.netProceedsCents;
   const unrealizedPnlCents = currentValueCents - position.remainingOpenCostCents;
   const base: PositionValuation = {
     status: 'open',
@@ -213,6 +284,7 @@ export function calculatePositionValuation(
     settledAt: null,
     realizedPnlCents: position.realizedPnlCents,
     settlementSide: null,
+    legs: { kalshi: kalshiLeg, polymarket: pmLeg },
   };
 
   const expiryMs = quote.expiryDate ? Date.parse(quote.expiryDate) : Number.NaN;
@@ -237,6 +309,7 @@ export function calculatePositionValuation(
     settledAt: quote.observedAt,
     realizedPnlCents: (position.realizedPnlCents ?? 0) + settlementPnlCents,
     settlementSide: kalshiPrice === 100 ? 'kalshi' : 'pm',
+    legs: base.legs,
   };
 }
 
@@ -297,6 +370,20 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     unrealizedPnlCents: row.unrealized_pnl != null ? Number(row.unrealized_pnl) : null,
     unrealizedRoiBps: row.unrealized_roi_pct != null ? Number(row.unrealized_roi_pct) : null,
     lastValuationAt: row.last_valuation_at != null ? String(row.last_valuation_at) : null,
+    valuationStatus: row.current_value != null && row.current_price_kalshi != null && row.current_price_pm != null
+      ? (row.valuation_failure_reason != null ? 'stale' : 'current') : 'unavailable',
+    valuationFailureReason: row.valuation_failure_reason != null ? String(row.valuation_failure_reason) : null,
+    valuationFailureAt: row.valuation_failure_at != null ? String(row.valuation_failure_at) : null,
+    kalshiValuationDepth: row.kalshi_valuation_depth != null ? Number(row.kalshi_valuation_depth) : null,
+    pmValuationDepth: row.pm_valuation_depth != null ? Number(row.pm_valuation_depth) : null,
+    kalshiExitFeeCents: row.kalshi_exit_fee != null ? Number(row.kalshi_exit_fee) : null,
+    pmExitFeeCents: row.pm_exit_fee != null ? Number(row.pm_exit_fee) : null,
+    kalshiLiquidationValueCents: row.kalshi_liquidation_value != null ? Number(row.kalshi_liquidation_value) : null,
+    pmLiquidationValueCents: row.pm_liquidation_value != null ? Number(row.pm_liquidation_value) : null,
+    kalshiQuoteTimestamp: row.kalshi_quote_timestamp != null ? String(row.kalshi_quote_timestamp) : null,
+    pmQuoteTimestamp: row.pm_quote_timestamp != null ? String(row.pm_quote_timestamp) : null,
+    kalshiQuoteSource: row.kalshi_quote_source != null ? String(row.kalshi_quote_source) : null,
+    pmQuoteSource: row.pm_quote_source != null ? String(row.pm_quote_source) : null,
     realizedPnlCents: row.realized_pnl != null ? Number(row.realized_pnl) : null,
     settlementSide: row.settlement_side != null ? String(row.settlement_side) as SettlementSide : null,
     dryRun: Boolean(Number(row.dry_run ?? 1)),
@@ -349,7 +436,7 @@ function toExecution(position: BotPosition): BotExecution {
     const originalPrincipalCents = price * originalQuantity;
     const remainingOpenPrincipalCents = prorateCents(originalPrincipalCents, remainingQuantity, originalQuantity);
     const remainingOpenFeeCents = prorateCents(entryFeeCents, remainingQuantity, originalQuantity);
-    const currentLiquidationValueCents = (() => {
+    const calculatedLiquidationValueCents = (() => {
       if (remainingQuantity === 0) return 0;
       if (currentPrice == null) return null;
       if (venue === 'polymarket' && (position.pmTheta == null || !Number.isFinite(position.pmTheta))) return null;
@@ -358,12 +445,19 @@ function toExecution(position: BotPosition): BotExecution {
         : Math.round(calcPolymarketFee(remainingQuantity, currentPrice / 100, position.pmTheta as number) * 100);
       return currentPrice * remainingQuantity - exitFeeCents;
     })();
+    const currentLiquidationValueCents = venue === 'kalshi'
+      ? position.kalshiLiquidationValueCents ?? calculatedLiquidationValueCents
+      : position.pmLiquidationValueCents ?? calculatedLiquidationValueCents;
     return {
       venue, marketRef, side, executionPriceCents: price, originalQuantity,
       originalPrincipalCents, entryFeeCents, remainingOpenQuantity: remainingQuantity,
       remainingOpenPrincipalCents, remainingOpenFeeCents,
       currentExecutablePriceCents: currentPrice,
       currentLiquidationValueCents,
+      executableDepthUsed: venue === 'kalshi' ? position.kalshiValuationDepth : position.pmValuationDepth,
+      exitFeeCents: venue === 'kalshi' ? position.kalshiExitFeeCents : position.pmExitFeeCents,
+      quoteTimestamp: venue === 'kalshi' ? position.kalshiQuoteTimestamp : position.pmQuoteTimestamp,
+      quoteSource: venue === 'kalshi' ? position.kalshiQuoteSource : position.pmQuoteSource,
     };
   };
   const legs = [
@@ -384,8 +478,8 @@ function toExecution(position: BotPosition): BotExecution {
     executionPrincipalCents: kalshiPrincipal + pmPrincipal,
     executionFeesCents: position.feesCents,
     executionBuyCostCents: position.totalCostCents,
-    currentValueCents: status === 'closed' || status === 'settled' ? 0 : (position.currentValueCents ?? 0),
-    unrealizedPnlCents: status === 'closed' || status === 'settled' ? 0 : (position.unrealizedPnlCents ?? 0),
+    currentValueCents: status === 'closed' || status === 'settled' ? 0 : position.currentValueCents,
+    unrealizedPnlCents: status === 'closed' || status === 'settled' ? 0 : position.unrealizedPnlCents,
     legs,
   };
 }
@@ -401,12 +495,20 @@ function groupPositions(rows: BotPosition[]): BotPositionMarket[] {
     const executions = positions.map(toExecution);
     const latest = positions[0];
     const currentLiveStakeCents = executions.reduce((sum, item) => sum + item.remainingOpenCostCents, 0);
-    const currentValueCents = executions.reduce((sum, item) => sum + (item.status === 'open' || item.status === 'partially_closed' ? item.currentValueCents ?? 0 : 0), 0);
+    const valued = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed') && item.currentValueCents != null && item.unrealizedPnlCents != null);
+    const unavailableExecutionCount = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed') && item.currentValueCents == null).length;
+    const stale = valued.filter((item) => item.valuationStatus === 'stale');
+    const oldestStaleValuationAt = stale.reduce<string | null>((oldest, item) =>
+      item.lastValuationAt != null && (oldest == null || item.lastValuationAt < oldest) ? item.lastValuationAt : oldest, null);
+    const valuedLiveStakeCents = valued.reduce((sum, item) => sum + item.remainingOpenCostCents, 0);
+    const currentValueCents = valued.length ? valued.reduce((sum, item) => sum + (item.currentValueCents as number), 0) : null;
     const realizedPnlCents = executions.reduce((sum, item) => sum + (item.realizedPnlCents ?? 0), 0);
     const anyOpen = executions.some((item) => item.status === 'open' || item.status === 'partially_closed');
     const allSettled = executions.every((item) => item.status === 'settled');
     const status: BotPositionMarket['status'] = anyOpen ? 'open' : (allSettled ? 'settled' : 'closed');
-    const unrealizedPnlCents = currentValueCents - currentLiveStakeCents;
+    const unrealizedPnlCents = valued.length
+      ? valued.reduce((sum, item) => sum + (item.unrealizedPnlCents as number), 0)
+      : null;
     return {
       marketKey: key,
       marketId: latest.marketId,
@@ -417,8 +519,13 @@ function groupPositions(rows: BotPosition[]): BotPositionMarket[] {
       liveStakeCents: currentLiveStakeCents,
       currentValueCents,
       unrealizedPnlCents,
+      valuedExecutionCount: valued.length,
+      unavailableExecutionCount,
+      staleExecutionCount: stale.length,
+      oldestStaleValuationAt,
+      valuedLiveStakeCents,
       realizedPnlCents,
-      totalPnlCents: realizedPnlCents + unrealizedPnlCents,
+      totalPnlCents: realizedPnlCents + (unrealizedPnlCents ?? 0),
       status,
       latestExecutionAt: latest.openedAt,
       latestOpenedAt: latest.openedAt,
@@ -490,7 +597,19 @@ export class BotPositionStore {
         resolution_verified_at TEXT,
         resolution_outcome TEXT CHECK (resolution_outcome IN ('yes', 'no') OR resolution_outcome IS NULL),
         resolution_payout INTEGER,
-        resolution_validation_status TEXT NOT NULL DEFAULT 'pending'
+        resolution_validation_status TEXT NOT NULL DEFAULT 'pending',
+        valuation_failure_reason TEXT,
+        valuation_failure_at TEXT,
+        kalshi_valuation_depth REAL,
+        pm_valuation_depth REAL,
+        kalshi_exit_fee INTEGER,
+        pm_exit_fee INTEGER,
+        kalshi_liquidation_value INTEGER,
+        pm_liquidation_value INTEGER,
+        kalshi_quote_timestamp TEXT,
+        pm_quote_timestamp TEXT,
+        kalshi_quote_source TEXT,
+        pm_quote_source TEXT
       )
     `);
     // Idempotent migration for installations that created the table from an
@@ -546,6 +665,18 @@ export class BotPositionStore {
       resolution_outcome: 'TEXT',
       resolution_payout: 'INTEGER',
       resolution_validation_status: "TEXT NOT NULL DEFAULT 'pending'",
+      valuation_failure_reason: 'TEXT',
+      valuation_failure_at: 'TEXT',
+      kalshi_valuation_depth: 'REAL',
+      pm_valuation_depth: 'REAL',
+      kalshi_exit_fee: 'INTEGER',
+      pm_exit_fee: 'INTEGER',
+      kalshi_liquidation_value: 'INTEGER',
+      pm_liquidation_value: 'INTEGER',
+      kalshi_quote_timestamp: 'TEXT',
+      pm_quote_timestamp: 'TEXT',
+      kalshi_quote_source: 'TEXT',
+      pm_quote_source: 'TEXT',
     };
     for (const [name, definition] of Object.entries(migrations)) {
       if (!existing.has(name)) {
@@ -919,8 +1050,16 @@ export class BotPositionStore {
         live_cost = CASE WHEN ? THEN 0 ELSE live_cost END,
         last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
-        resolution_payout = ?, resolution_validation_status = ?
-        WHERE id = ? AND status = 'open'`,
+        resolution_payout = ?, resolution_validation_status = ?,
+        kalshi_valuation_depth = ?, pm_valuation_depth = ?,
+        kalshi_exit_fee = ?, pm_exit_fee = ?,
+        kalshi_liquidation_value = ?, pm_liquidation_value = ?,
+        kalshi_quote_timestamp = ?, pm_quote_timestamp = ?,
+        kalshi_quote_source = ?, pm_quote_source = ?,
+        valuation_failure_reason = NULL, valuation_failure_at = NULL
+        WHERE id = ? AND status = 'open'
+          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)
+          AND (valuation_failure_at IS NULL OR valuation_failure_at <= ?)`,
       args: [
         valuation.status, valuation.currentPriceKalshiCents,
         valuation.currentPricePmCents, settled ? 0 : valuation.currentValueCents,
@@ -932,8 +1071,25 @@ export class BotPositionStore {
         valuation.status === 'settled' ? valuation.settledAt : null,
         valuation.status === 'settled' ? (valuation.currentPriceKalshiCents === 100 ? 'yes' : 'no') : null,
         valuation.status === 'settled' ? valuation.currentValueCents : null,
-        valuation.status === 'settled' ? 'verified' : 'pending', id,
+        valuation.status === 'settled' ? 'verified' : 'pending',
+        valuation.legs.kalshi.executableDepthUsed, valuation.legs.polymarket.executableDepthUsed,
+        valuation.legs.kalshi.exitFeeCents, valuation.legs.polymarket.exitFeeCents,
+        valuation.legs.kalshi.netProceedsCents, valuation.legs.polymarket.netProceedsCents,
+        valuation.legs.kalshi.quoteTimestamp, valuation.legs.polymarket.quoteTimestamp,
+        valuation.legs.kalshi.source, valuation.legs.polymarket.source,
+        id, valuation.lastValuationAt, valuation.lastValuationAt,
       ],
+    });
+  }
+
+  async recordValuationFailure(id: number, reason: string, failedAt: string): Promise<void> {
+    await this.ensureSchema();
+    await this.client.execute({
+      sql: `UPDATE bot_positions SET valuation_failure_reason = ?, valuation_failure_at = ?
+        WHERE id = ? AND status = 'open'
+          AND (last_valuation_at IS NULL OR last_valuation_at < ?)
+          AND (valuation_failure_at IS NULL OR valuation_failure_at <= ?)`,
+      args: [reason, failedAt, id, failedAt, failedAt],
     });
   }
 
@@ -1166,39 +1322,114 @@ export async function getBotPositionAnalytics(options: {
   };
 }
 
+type KalshiOrderbookPayload = {
+  orderbook_fp?: { yes_dollars?: [string, string][]; no_dollars?: [string, string][] };
+  orderbook?: { yes_dollars_fp?: [string, string][]; no_dollars_fp?: [string, string][] };
+};
+
+export async function fetchKalshiBidLevels(ticker: string, dependencies?: {
+  fetchImpl?: typeof fetch;
+  makeHeaders?: (method: string, path: string) => Record<string, string>;
+}): Promise<KalshiBidLevels> {
+  const encodedTicker = encodeURIComponent(ticker);
+  const kalshiPath = `/trade-api/v2/markets/${encodedTicker}/orderbook`;
+  const [{ makeKalshiAuthHeaders }, { rateLimiters }] = await Promise.all([
+    import('./kalshi-auth'),
+    import('./rate-limiter'),
+  ]);
+  const fetchImpl = dependencies?.fetchImpl ?? fetch;
+  const makeHeaders = dependencies?.makeHeaders ?? makeKalshiAuthHeaders;
+  const response = await rateLimiters.kalshi.execute(() => fetchImpl(
+    `https://external-api.kalshi.com${kalshiPath}`,
+    {
+      headers: makeHeaders('GET', kalshiPath),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    },
+  ));
+  if (!response.ok) throw new Error(`Kalshi order book unavailable (HTTP ${response.status})`);
+  const payload = await response.json() as KalshiOrderbookPayload;
+  const parse = (levels: [string, string][] | undefined): ExecutableBidLevel[] => (levels ?? []).flatMap(([price, quantity]) => {
+    if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(price) || !/^\d+(?:\.\d+)?$/.test(quantity)) return [];
+    const priceCents = Math.round(Number(price) * 100);
+    const parsedQuantity = Number(quantity);
+    return isPriceCents(priceCents) && Number.isFinite(parsedQuantity) && parsedQuantity > 0
+      ? [{ priceCents, quantity: parsedQuantity }] : [];
+  });
+  return {
+    yesBidLevels: parse(payload.orderbook_fp?.yes_dollars ?? payload.orderbook?.yes_dollars_fp),
+    noBidLevels: parse(payload.orderbook_fp?.no_dollars ?? payload.orderbook?.no_dollars_fp),
+  };
+}
+
 export async function pollOpenBotPositions(dependencies?: {
+  positionStore?: Pick<BotPositionStore, 'listAllOpen' | 'updateValuation' | 'recordValuationFailure'>;
   fetchKalshi?: (ticker: string) => Promise<{
     yes_bid_dollars?: string;
     no_bid_dollars?: string;
+    yes_bid_size_fp?: string;
+    no_bid_size_fp?: string;
     close_time?: string;
     status?: string;
     settlement_value_dollars?: string;
   } | null>;
-  fetchPmBids?: (conditionId: string) => Promise<{ yesBidCents: number | null; noBidCents: number | null; resolved: boolean } | null>;
+  fetchKalshiBids?: (ticker: string) => Promise<KalshiBidLevels>;
+  fetchPmBids?: (conditionId: string) => Promise<{
+    yesBidCents: number | null; noBidCents: number | null; resolved: boolean;
+    yesBidLevels?: ExecutableBidLevel[]; noBidLevels?: ExecutableBidLevel[];
+  } | null>;
   observedAt?: string;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
-  const [{ fetchKalshiMarket }, { fetchClobMarket, getClobBidPrices }] = await Promise.all([
+  const [{ fetchKalshiMarketFast }, { fetchClobBook, fetchClobMarket, getClobBidPrices }, { getSavedMarketById }] = await Promise.all([
     import('./kalshi'),
     import('./polymarket-clob'),
+    import('./persistence'),
   ]);
-  const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarket;
+  const fetchKalshi = dependencies?.fetchKalshi ?? fetchKalshiMarketFast;
+  const fetchKalshiBids = dependencies?.fetchKalshiBids
+    ?? (dependencies?.fetchKalshi ? null : fetchKalshiBidLevels);
   const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
     const market = await fetchClobMarket(conditionId);
-    return market ? getClobBidPrices(market) : null;
+    if (market) {
+      const yesToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
+      const noToken = market.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+      const [prices, yesBook, noBook] = await Promise.all([
+        getClobBidPrices(market),
+        yesToken ? fetchClobBook(yesToken.token_id) : null,
+        noToken ? fetchClobBook(noToken.token_id) : null,
+      ]);
+      const levels = (book: Awaited<ReturnType<typeof fetchClobBook>>): ExecutableBidLevel[] =>
+        (book?.bids ?? []).flatMap(({ price, size }) =>
+          /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(price) && /^\d+(?:\.\d+)?$/.test(size)
+            ? [{ priceCents: Math.round(Number(price) * 100), quantity: Number(size) }] : []);
+      return { ...prices, yesBidLevels: levels(yesBook), noBidLevels: levels(noBook) };
+    }
+    // Legacy rows stored the held token ID rather than the parent condition ID.
+    // A direct token book still provides an authoritative executable sell bid.
+    const book = await fetchClobBook(conditionId);
+    if (!book) return null;
+    const bids = book.bids.flatMap(({ price }) => /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(price) ? [Math.round(Number(price) * 100)] : []);
+    const heldBid = bids.length ? Math.max(...bids) : null;
+    const heldLevels = book.bids.flatMap(({ price, size }) =>
+      /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(price) && /^\d+(?:\.\d+)?$/.test(size)
+        ? [{ priceCents: Math.round(Number(price) * 100), quantity: Number(size) }] : []);
+    return { yesBidCents: heldBid, noBidCents: heldBid, resolved: false, yesBidLevels: heldLevels, noBidLevels: heldLevels };
   });
   const observedAt = dependencies?.observedAt ?? new Date().toISOString();
-  const open = await store().listAllOpen();
+  const positionStore = dependencies?.positionStore ?? store();
+  const open = await positionStore.listAllOpen();
   let updated = 0;
   let settled = 0;
   const errors: Array<{ id: number; error: string }> = [];
 
-  await Promise.all(open.map(async (position) => {
+  const valuate = async (position: BotPosition) => {
     try {
       if (!position.kalshiTicker || !position.pmConditionId) {
         throw new Error('Position is missing venue market identifiers');
       }
-      const [kalshi, pmBids] = await Promise.all([
+      const [kalshi, kalshiBids, pmBids] = await Promise.all([
         fetchKalshi(position.kalshiTicker),
+        fetchKalshiBids?.(position.kalshiTicker) ?? null,
         fetchPmBids(position.pmConditionId),
       ]);
       if (!kalshi || !pmBids) throw new Error('Venue quote unavailable');
@@ -1208,22 +1439,45 @@ export async function pollOpenBotPositions(dependencies?: {
         return isPriceCents(cents) ? cents : null;
       };
       const kalshiResolution = getKalshiResolvedPrices(kalshi);
-      const valuation = calculatePositionValuation(position, {
-        kalshiYesBidCents: kalshiResolution.yesBidCents ?? parseCents(kalshi.yes_bid_dollars),
-        kalshiNoBidCents: kalshiResolution.noBidCents ?? parseCents(kalshi.no_bid_dollars),
+      const saved = position.marketId ? await getSavedMarketById(position.marketId).catch(() => null) : null;
+      const valuationPosition = position.pmTheta == null && saved?.category
+        ? { ...position, pmTheta: getPolymarketTheta(saved.category) }
+        : position;
+      const fallbackBidLevels = (side: BotPositionSide): ExecutableBidLevel[] => {
+        const price = side === 'yes' ? parseCents(kalshi.yes_bid_dollars) : parseCents(kalshi.no_bid_dollars);
+        const rawQuantity = side === 'yes' ? kalshi.yes_bid_size_fp : kalshi.no_bid_size_fp;
+        const quantity = rawQuantity != null && /^\d+(?:\.\d+)?$/.test(rawQuantity) ? Number(rawQuantity) : null;
+        return price != null && quantity != null && quantity > 0 ? [{ priceCents: price, quantity }] : [];
+      };
+      const yesBidLevels = kalshiBids?.yesBidLevels ?? fallbackBidLevels('yes');
+      const noBidLevels = kalshiBids?.noBidLevels ?? fallbackBidLevels('no');
+      const bestBid = (levels: ExecutableBidLevel[]): number | null => levels.length
+        ? Math.max(...levels.map((level) => level.priceCents)) : null;
+      const valuation = calculatePositionValuation(valuationPosition, {
+        kalshiYesBidCents: kalshiResolution.yesBidCents ?? bestBid(yesBidLevels) ?? parseCents(kalshi.yes_bid_dollars),
+        kalshiNoBidCents: kalshiResolution.noBidCents ?? bestBid(noBidLevels) ?? parseCents(kalshi.no_bid_dollars),
         pmYesBidCents: pmBids.yesBidCents,
         pmNoBidCents: pmBids.noBidCents,
+        kalshiHeldBidLevels: kalshiResolution.resolved ? undefined
+          : (position.kalshiSide === 'yes' ? yesBidLevels : noBidLevels),
+        pmHeldBidLevels: position.pmSide === 'yes' ? pmBids.yesBidLevels : pmBids.noBidLevels,
         observedAt,
         expiryDate: kalshi.close_time ?? position.expiryDate,
         kalshiResolved: kalshiResolution.resolved,
         pmResolved: pmBids.resolved,
       });
-      await store().updateValuation(position.id, valuation);
+      await positionStore.updateValuation(position.id, valuation);
       updated += 1;
       if (valuation.status === 'settled') settled += 1;
     } catch (error) {
-      errors.push({ id: position.id, error: error instanceof Error ? error.message : String(error) });
+      const reason = error instanceof Error ? error.message : String(error);
+      await positionStore.recordValuationFailure(position.id, reason, observedAt).catch(() => undefined);
+      errors.push({ id: position.id, error: reason });
     }
-  }));
+  };
+  const concurrency = 8;
+  for (let index = 0; index < open.length; index += concurrency) {
+    await Promise.all(open.slice(index, index + concurrency).map(valuate));
+  }
   return { updated, settled, errors };
 }

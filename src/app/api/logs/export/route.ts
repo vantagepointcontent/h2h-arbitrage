@@ -48,13 +48,16 @@ function buildFilters(searchParams: URLSearchParams) {
   const marketId = searchParams.get('marketId') || undefined;
   const minRoi = parseOptionalFiniteNumber(searchParams.get('minRoi'));
   const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
+  const search = searchParams.get('search') || undefined;
+  const eventType = searchParams.get('eventType') as 'all' | 'scan' | 'arb' | 'system' | null;
+  const arbType = searchParams.get('arbType') as 'all' | 'direct' | 'cross' | 'internal' | null;
   const fromDate = toIsoDate(searchParams.get('fromDate'));
   const toDate = toIsoDate(searchParams.get('toDate'));
   if (fromDate && toDate && fromDate > toDate) {
     throw new Error('fromDate must be before or equal to toDate');
   }
   const maxRows = parseExportLimit(searchParams.get('limit'));
-  return { marketId, minRoi, positiveArbOnly, fromDate, toDate, maxRows };
+  return { marketId, minRoi, positiveArbOnly, fromDate, toDate, search, eventType: eventType ?? undefined, arbType: arbType ?? undefined, maxRows };
 }
 
 function isValidationError(err: unknown): err is Error {
@@ -152,7 +155,7 @@ export async function HEAD(request: NextRequest) {
       status: 200,
       headers: {
         'X-Export-Row-Count': String(count),
-        'X-Export-Max-Rows': String(filters.maxRows),
+        'X-Export-Max-Rows': filters.maxRows === undefined ? 'unlimited' : String(filters.maxRows),
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });

@@ -108,6 +108,8 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
 
     const parent = await screen.findByTestId('market-market:pair-repeat');
     expect(within(parent).getByLabelText('Repeated market fixture live stake').textContent).toBe('$18.62');
+    expect(parent.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(parent);
     const firstRow = screen.getByTestId('execution-701');
     const secondRow = screen.getByTestId('execution-702');
     expect(firstRow.className).toContain('bg-[#071a33]');

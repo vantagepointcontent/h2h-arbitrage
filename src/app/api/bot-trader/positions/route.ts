@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotPositionMarkets } from '@/lib/bot-positions';
+import { getBotPositionMarkets, pollOpenBotPositions } from '@/lib/bot-positions';
 import { clientSafeError } from '@/lib/error-handler';
 import { getMarketUrlsById } from '@/lib/persistence';
+
+let refreshInFlight: Promise<unknown> | null = null;
+let lastRefreshStartedAt = 0;
+function refreshInBackground(): void {
+  if (refreshInFlight || Date.now() - lastRefreshStartedAt < 30_000) return;
+  lastRefreshStartedAt = Date.now();
+  refreshInFlight = pollOpenBotPositions().catch((error) => {
+    console.error('[bot-trader/positions] background valuation failed', error);
+  }).finally(() => { refreshInFlight = null; });
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const params = new URL(request.url).searchParams;
+    if (params.get('refresh') === '1') refreshInBackground();
     const statusParam = params.get('status') ?? 'all';
     if (!['open', 'settled', 'all'].includes(statusParam)) {
       return NextResponse.json({ success: false, error: 'status must be open, settled, or all' }, { status: 400 });

@@ -3,7 +3,7 @@
 
 import { pollOpenBotPositions } from '../src/lib/bot-positions';
 
-const POLL_INTERVAL_MS = 10 * 60 * 1000;
+const POLL_INTERVAL_MS = 2 * 60 * 1000;
 
 async function valuateOnce(): Promise<void> {
   const startedAt = new Date().toISOString();

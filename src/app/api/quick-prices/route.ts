@@ -4,8 +4,19 @@ import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseScanCapital } from '@/lib/scan-request';
 import { scanRateLimiter, getScanClientKey } from '@/lib/scan-rate-limit';
+import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
+import { reconcileSavedMarketMatchSummary } from '@/lib/persistence';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestCorrelationId = request.headers.get(CORRELATION_ID_HEADER) || correlationId.generate();
+  return correlationId.run(requestCorrelationId, async () => {
+    const response = await handlePost(request);
+    response.headers.set(CORRELATION_ID_HEADER, requestCorrelationId);
+    return response;
+  });
+}
+
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const rateLimit = scanRateLimiter.consume(getScanClientKey(request.headers));
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -41,6 +52,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const result: QuickPricesResult = await quickPricesScan(marketId, capital);
+    await reconcileSavedMarketMatchSummary(marketId, {
+      matchedCount: result.matchedCount,
+      matchStatus: result.matchStatus,
+      matchError: result.matchError,
+      matchedPairs: result.matchedPairs,
+      scannedAt: result._pmFetchedAt,
+    });
     return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -48,9 +66,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         'Expires': '0',
       },
     });
-  } catch (err: any) {
-    const msg = clientSafeError(err, 'Unknown error');
-    const status = err?.status || (msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500);
+  } catch (err: unknown) {
+    const errorStatus = typeof err === 'object' && err !== null && 'status' in err
+      && typeof err.status === 'number' ? err.status : null;
+    const errorMessage = err instanceof Error ? err.message : '';
+    const fallback = errorStatus === 404
+      ? 'Saved market not found. It may have been removed; return to Markets and select it again.'
+      : errorStatus === 400 && errorMessage === 'A valid Kalshi market link is required.'
+        ? 'Saved market has an invalid Kalshi link. Return to Markets and update or re-add this saved market.'
+        : errorStatus === 400 && errorMessage === 'A valid Polymarket market link is required.'
+          ? 'Saved market has an invalid Polymarket link. Return to Markets and update or re-add this saved market.'
+          : 'Saved-market price refresh failed';
+    const msg = clientSafeError(err, fallback, { path: '/api/quick-prices' });
+    const status = errorStatus || (msg.includes('timed out') ? 504 : 500);
     return NextResponse.json({ error: msg }, { status });
   }
 }

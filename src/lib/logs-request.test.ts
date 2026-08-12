@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseLogLimit, parseOptionalFiniteNumber } from "./logs-request";
+import { parseExportLimit, parseLogLimit, parseOptionalFiniteNumber } from "./logs-request";
 
 describe("parseLogLimit", () => {
   it("uses the safe default for absent or non-finite input", () => {
-    expect(parseLogLimit(null)).toBe(100);
-    expect(parseLogLimit("NaN")).toBe(100);
-    expect(parseLogLimit("Infinity")).toBe(100);
+    expect(parseLogLimit(null)).toBe(250);
+    expect(parseLogLimit("NaN")).toBe(250);
+    expect(parseLogLimit("Infinity")).toBe(250);
   });
 
   it("bounds and integer-normalizes valid input", () => {
@@ -25,5 +25,13 @@ describe("parseOptionalFiniteNumber", () => {
     for (const value of [null, "", "  ", "NaN", "Infinity", "-Infinity", "not-a-number"]) {
       expect(parseOptionalFiniteNumber(value)).toBeUndefined();
     }
+  });
+});
+
+describe("parseExportLimit", () => {
+  it("leaves complete exports uncapped unless an explicit positive limit is supplied", () => {
+    expect(parseExportLimit(null)).toBeUndefined();
+    expect(parseExportLimit("50001")).toBe(50001);
+    expect(parseExportLimit("0")).toBeUndefined();
   });
 });

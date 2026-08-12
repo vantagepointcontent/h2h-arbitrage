@@ -2,11 +2,6 @@
   "paused": false,
   "scanRecords": [
     {
-      "category": "sports",
-      "lastScannedAt": "2026-07-12T20:34:48.765Z",
-      "marketsAdded": 0
-    },
-    {
       "category": "politics",
       "lastScannedAt": "2026-07-12T23:44:55.291Z",
       "marketsAdded": 0
@@ -250,9 +245,14 @@
       "category": "politics",
       "lastScannedAt": "2026-08-07T23:32:53.777Z",
       "marketsAdded": 0
+    },
+    {
+      "category": "politics",
+      "lastScannedAt": "2026-08-12T15:51:07.469Z",
+      "marketsAdded": 0
     }
   ],
-  "lastScanAt": "2026-08-07T23:32:53.777Z",
+  "lastScanAt": "2026-08-12T15:51:07.469Z",
   "totalMarketsAdded": 0,
   "pendingReviews": []
 }

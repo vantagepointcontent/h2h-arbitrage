@@ -357,6 +357,9 @@ export async function POST(request: NextRequest) {
     const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
     const pmCount = withArbitrage.filter(o => o.polymarket).length;
     const matchedCount = withArbitrage.filter(o => o.kalshi && o.polymarket).length;
+    const matchedPairs = withArbitrage
+      .filter(o => o.kalshi && o.polymarket)
+      .map(o => ({ artist: o.artist, kalshiTicker: o.kalshi!.ticker, pmConditionId: o.polymarket!.conditionId }));
 
     // Unmatched for the manual-matching UI
     const unmatchedKalshi = withArbitrage
@@ -410,6 +413,8 @@ export async function POST(request: NextRequest) {
           arbType: bestNetArb ? (bestNetArb.arbitrage as any).arbType ?? null : null,
           outcomeCount: withArbitrage.length,
           matchedCount,
+          matchStatus: matchedCount > 0 ? 'matched' as const : 'confirmed_zero' as const,
+          matchedPairs,
           kalshiCount,
           pmCount,
           scannedAt: new Date().toISOString(),

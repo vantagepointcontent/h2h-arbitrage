@@ -188,6 +188,9 @@ describe('BotTraderPanel', () => {
 
     const parent = await screen.findByTestId('market-market:market-1');
     expect(within(parent).getByText('$96.40')).toBeTruthy();
+    expect(parent.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('execution-501')).toBeNull();
+    fireEvent.click(parent);
     const first = screen.getByTestId('execution-501');
     const second = screen.getByTestId('execution-502');
     expect(within(first).getByLabelText('Execution 501 Buy Cost').textContent).toBe('$96.40');
@@ -200,6 +203,27 @@ describe('BotTraderPanel', () => {
     expect(within(second).getByLabelText('Execution 502 remaining exposure').textContent).toBe('$0.00');
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Trump 2026' }));
     expect(screen.queryByTestId('execution-501')).toBeNull();
+  });
+
+  it('warns about stale child valuations on the collapsed market summary', async () => {
+    const staleMarket = {
+      ...repeatedMarket,
+      staleExecutionCount: 2,
+      oldestStaleValuationAt: '2026-08-08T15:00:00.000Z',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, markets: [staleMarket] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+
+    const parent = await screen.findByTestId('market-market:market-1');
+    expect(parent.getAttribute('aria-expanded')).toBe('false');
+    expect(within(parent).getByText(/2 stale · oldest quote/i)).toBeTruthy();
   });
 
   it('updates only the parent live total on refetch while preserving execution identities and buy costs', async () => {
@@ -218,6 +242,7 @@ describe('BotTraderPanel', () => {
     }));
 
     render(<BotTraderPanel />);
+    fireEvent.click(await screen.findByTestId('market-market:market-1'));
     await screen.findByTestId('execution-501');
     closed = true;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
@@ -225,6 +250,22 @@ describe('BotTraderPanel', () => {
     await waitFor(() => expect(within(screen.getByTestId('market-market:market-1')).getByLabelText('Trump 2026 live stake').textContent).toBe('$0.00'));
     expect(within(screen.getByTestId('execution-501')).getByLabelText('Execution 501 Buy Cost').textContent).toBe('$96.40');
     expect(within(screen.getByTestId('execution-502')).getByLabelText('Execution 502 Buy Cost').textContent).toBe('$94.70');
+  });
+
+  it('requests an on-demand valuation refresh from the explicit refresh control', async () => {
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+    await screen.findByText('Trump 2026');
+
+    const fetchMock = vi.mocked(fetch);
+    const callsBeforeClick = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeClick));
+    expect(fetchMock.mock.calls.slice(callsBeforeClick)
+      .map(([input]) => String(input))
+      .filter((url) => url.includes('/api/bot-trader/positions')))
+      .toEqual(['/api/bot-trader/positions?status=all&refresh=1']);
   });
 
   it('keeps the legacy single-entry response readable and makes Buy Cost fee-inclusive', async () => {
@@ -257,6 +298,51 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
   });
 
+  it('starts grouped markets collapsed and toggles the summary row with Enter and Space', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, markets: [repeatedMarket] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+
+    const row = await screen.findByTestId('market-market:market-1');
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('execution-501')).toBeNull();
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(row.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('execution-501')).toBeTruthy();
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('execution-501')).toBeNull();
+  });
+
+  it('keeps title-link clicks separate from row expansion', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics });
+      if (url.includes('/positions')) return response({ success: true, markets: [repeatedMarket] });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<BotTraderPanel />);
+
+    const row = await screen.findByTestId('market-market:market-1');
+    const title = screen.getByRole('link', { name: 'Open Trump 2026 market' });
+    expect(title.className).toContain('focus-visible:ring-2');
+    fireEvent.click(title);
+
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('execution-501')).toBeNull();
+  });
+
   it('composes selection-method and paper/production analytics filters', async () => {
     stubInitialFetch();
     render(<BotTraderPanel />);
@@ -267,6 +353,30 @@ describe('BotTraderPanel', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Analytics trading mode' }), { target: { value: 'production' } });
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes('/api/bot-trader/analytics?method=apy&mode=production'))).toBe(true));
     expect(screen.getByText('No performance data for this filter.')).toBeTruthy();
+  });
+
+  it('uses the EdgeFinder shell for compact analytics, P&L KPIs, and position controls', async () => {
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+    await screen.findByText('Trump 2026');
+
+    const performance = screen.getByRole('region', { name: 'Performance analytics' });
+    expect(performance.className).toContain('rounded-xl');
+    expect(within(performance).getByText('Daily fee-net P&L')).toBeTruthy();
+    expect(within(performance).getByText('Showing available daily observations')).toBeTruthy();
+    expect(within(performance).getByRole('button', { name: 'roi overlay series' }).className).not.toContain('bg-[var(--status-info)]');
+    expect(within(performance).getByText('APY has no observations for this period.')).toBeTruthy();
+
+    const pnlSummary = screen.getByRole('region', { name: 'P&L summary' });
+    expect(pnlSummary.className).toContain('rounded-xl');
+    expect(within(pnlSummary).getByText('Unrealized').getAttribute('title')).toMatch(/open positions/i);
+    expect(within(pnlSummary).getByText('Realized').getAttribute('title')).toMatch(/settled/i);
+
+    const positionHeader = screen.getByTestId('positions-toolbar');
+    expect(within(positionHeader).getByText('1 market')).toBeTruthy();
+    expect(within(positionHeader).getByRole('group', { name: 'Position status filter' })).toBeTruthy();
+    expect(within(positionHeader).getByRole('button', { name: 'all' }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(positionHeader).getByRole('button', { name: 'Sort ascending' }).className).toContain('focus-visible:ring-2');
   });
 
   it('ignores stale refresh responses after a newer filter request completes', async () => {

@@ -34,6 +34,126 @@ export const SIDEBAR_OPEN_KEY = "h2h-sidebar-open";
 export const DEFAULT_MARKET_EXPIRY_FILTER = "all" as const;
 export const DEFAULT_SHOW_ARB_ONLY = false;
 
+export type QuickPricesLoadingMode = "foreground" | "background";
+
+export interface QuickPricesRequestToken {
+  controller: AbortController;
+  marketId: string;
+  sequence: number;
+  mode: QuickPricesLoadingMode;
+  displacedMode: QuickPricesLoadingMode | null;
+}
+
+/** Owns the single quick-price request allowed to mutate the active market view. */
+export function createQuickPricesRequestOwner() {
+  let current: QuickPricesRequestToken | null = null;
+  let sequence = 0;
+
+  return {
+    begin(marketId: string, mode: QuickPricesLoadingMode = "foreground"): QuickPricesRequestToken {
+      const displacedMode = current?.mode ?? null;
+      current?.controller.abort();
+      current = {
+        controller: new AbortController(),
+        marketId,
+        sequence: ++sequence,
+        mode,
+        displacedMode,
+      };
+      return current;
+    },
+    owns(token: QuickPricesRequestToken, activeMarketId: string | null): boolean {
+      return current === token && !token.controller.signal.aborted && token.marketId === activeMarketId;
+    },
+    finish(token: QuickPricesRequestToken): boolean {
+      if (current !== token) return false;
+      current = null;
+      return true;
+    },
+    cancel(): QuickPricesLoadingMode | null {
+      const cancelledMode = current?.mode ?? null;
+      current?.controller.abort();
+      current = null;
+      return cancelledMode;
+    },
+  };
+}
+
+export interface SavedMarketHydrationToken {
+  controller: AbortController;
+  marketId: string;
+  sequence: number;
+}
+
+/** Owns saved-market cache/look-up hydration before a price request begins. */
+export function createSavedMarketHydrationOwner() {
+  let current: SavedMarketHydrationToken | null = null;
+  let sequence = 0;
+
+  return {
+    begin(marketId: string): SavedMarketHydrationToken {
+      current?.controller.abort();
+      current = {
+        controller: new AbortController(),
+        marketId,
+        sequence: ++sequence,
+      };
+      return current;
+    },
+    owns(token: SavedMarketHydrationToken, activeMarketId: string | null): boolean {
+      return current === token && !token.controller.signal.aborted && token.marketId === activeMarketId;
+    },
+    finish(token: SavedMarketHydrationToken): boolean {
+      if (current !== token) return false;
+      current = null;
+      return true;
+    },
+    cancel(): void {
+      current?.controller.abort();
+      current = null;
+    },
+  };
+}
+
+interface SavedMarketPopNavigationActions {
+  setViewMode: (viewMode: "scan") => void;
+  setActiveMarketId: (marketId: string) => void;
+  startRefresh: () => void;
+}
+
+/** Restore saved-market route identity before starting work on browser pop navigation. */
+export function restoreSavedMarketPopNavigation(
+  marketId: string,
+  actions: SavedMarketPopNavigationActions,
+): void {
+  actions.setViewMode("scan");
+  actions.setActiveMarketId(marketId);
+  actions.startRefresh();
+}
+
+interface ScanLinkInput {
+  kalshiUrl: string;
+  polymarketUrl: string;
+  platformLinks: Array<{ platform?: string | null; url: string }>;
+  savedMarketId: string | null;
+}
+
+/** Saved-market scans must never inherit unrelated links from the manual form. */
+export function buildScanLinkPayload(input: ScanLinkInput):
+  | { kalshiUrl: string; polymarketUrl: string }
+  | { platformLinks: Array<{ platform: string; url: string }> } {
+  if (input.savedMarketId) {
+    return { kalshiUrl: input.kalshiUrl, polymarketUrl: input.polymarketUrl };
+  }
+
+  const platformLinks = input.platformLinks
+    .filter((link) => link.url)
+    .map(({ platform, url }) => ({ platform: platform ?? "", url }));
+  return platformLinks.length > 0
+    ? { platformLinks }
+    : { kalshiUrl: input.kalshiUrl, polymarketUrl: input.polymarketUrl };
+}
+
 // ─── Typed accessors ───
 export const getStoredMfCategories = (): string[] => getStored<string[]>(MF_CATEGORIES_KEY, []);
 export const persistMfCategories = (cats: string[]): void => persist(MF_CATEGORIES_KEY, cats);
@@ -149,7 +269,10 @@ export interface LastScanResult {
   matchedCount: number;
   kalshiCount: number;
   pmCount: number;
-  scannedAt: string;
+  scannedAt: string | null;
+  matchStatus?: 'not_scanned' | 'refreshing' | 'unavailable' | 'confirmed_zero' | 'matched';
+  matchError?: string;
+  matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   pmClosed?: boolean; // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean; // BUG-05b: at least one outcome at 99/1 extremes
   allArbs?: {
@@ -193,10 +316,15 @@ export interface SavedMarket {
     bestRoiPct: number;
     bestProfit: number;
     strategy: string;
-    scannedAt: string;
+    scannedAt: string | null;
+    matchStatus?: LastScanResult['matchStatus'];
+    matchError?: string;
+    matchedPairs?: LastScanResult['matchedPairs'];
     kalshiCount?: number;
     pmCount?: number;
     matchedCount?: number;
+    pmClosed?: boolean;
+    priceResolved?: boolean;
     allArbs?: {
       artist: string;
       roiPct: number;
@@ -222,6 +350,7 @@ export interface ScanResult {
   clobMissCount?: number;
   expired?: boolean;
   noPrices?: boolean;
+  platformWarnings?: string[];
   outcomes: UnifiedOutcome[];
   unmatchedKalshi: UnmatchedKalshi[];
   unmatchedPolymarket: UnmatchedPolymarket[];
@@ -330,6 +459,28 @@ export function formatRelativeTime(iso?: string | null): string {
 export function isMatched(m: SavedMarket): boolean {
   if (m.liveResult && m.liveResult.allArbs && m.liveResult.allArbs.length > 0) return true;
   return (m.lastScanResult?.matchedCount ?? 0) > 0;
+}
+
+export function getCanonicalMatchState(market: SavedMarket): {
+  status: NonNullable<LastScanResult['matchStatus']>;
+  count: number;
+  error?: string;
+} {
+  const scan = market.liveResult ?? market.lastScanResult;
+  if (!scan || !scan.scannedAt || scan.strategy === 'Not scanned') {
+    return { status: 'not_scanned', count: 0 };
+  }
+  const count = scan.matchedPairs?.length ?? scan.matchedCount ?? 0;
+  const status = scan.matchStatus ?? (count > 0 ? 'matched' : 'confirmed_zero');
+  return { status, count, error: scan.matchError };
+}
+
+export function formatCanonicalMatchState(market: SavedMarket): string {
+  const state = getCanonicalMatchState(market);
+  if (state.status === 'not_scanned') return 'Not scanned';
+  if (state.status === 'refreshing') return state.count > 0 ? `${state.count} matched · Refreshing` : 'Refreshing';
+  if (state.status === 'unavailable') return `Unavailable${state.error ? `: ${state.error}` : ''}`;
+  return `${state.count} matched`;
 }
 
 /** BUG-05b: Check if prices are at resolution extremes (one side >=99%, other <=1%).

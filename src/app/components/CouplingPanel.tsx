@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link2, Unlink, X, Plus, Check, Loader2, ChevronRight } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -21,6 +21,11 @@ interface AvailableMarket {
   platform: "kalshi" | "polymarket";
 }
 
+interface CanonicalKalshiMarket {
+  ticker: string;
+  title: string;
+}
+
 interface DecoupledPair {
   id: string;
   kalshiTicker: string;
@@ -32,6 +37,9 @@ interface DecoupledPair {
 interface CouplingPanelProps {
   open: boolean;
   onClose: () => void;
+  marketScopeKey: string;
+  kalshiUrl?: string;
+  polymarketUrl?: string;
   outcomes: any[];
   unmatchedKalshi: any[];
   unmatchedPolymarket: any[];
@@ -49,6 +57,9 @@ interface CouplingPanelProps {
 export default function CouplingPanel({
   open,
   onClose,
+  marketScopeKey,
+  kalshiUrl,
+  polymarketUrl,
   outcomes,
   unmatchedKalshi,
   unmatchedPolymarket,
@@ -67,6 +78,71 @@ export default function CouplingPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [newKalshi, setNewKalshi] = useState<string | null>(null);
   const [newPm, setNewPm] = useState<string | null>(null);
+  const [canonicalKalshi, setCanonicalKalshi] = useState<CanonicalKalshiMarket[]>([]);
+  const [kalshiOptionsStatus, setKalshiOptionsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [kalshiOptionsError, setKalshiOptionsError] = useState("");
+
+  // BUG-130: load canonical event-scoped outcomes rather than relying only on
+  // scan-unmatched rows. Reset for every market/scan to prevent stale options.
+  useEffect(() => {
+    // This is an intentional scope boundary reset before the next async load.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCanonicalKalshi([]);
+    setKalshiOptionsError("");
+    setNewKalshi(null);
+    setNewPm(null);
+    setEditKalshi(null);
+    setEditPm(null);
+
+    if (!open) {
+      setKalshiOptionsStatus("idle");
+      return;
+    }
+    if (!kalshiUrl) {
+      setKalshiOptionsStatus("error");
+      setKalshiOptionsError("Kalshi event URL is unavailable for this saved market.");
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadCanonicalKalshi = async () => {
+      setKalshiOptionsStatus("loading");
+      try {
+        const params = new URLSearchParams({ kalshiUrl });
+        if (polymarketUrl) params.set("pmUrl", polymarketUrl);
+        const response = await fetch(`/api/all-markets?${params.toString()}`, {
+          headers: { "Cache-Control": "no-cache" },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Kalshi outcomes request failed (${response.status})`);
+        }
+        const data = await response.json() as { kalshi?: CanonicalKalshiMarket[] };
+        const deduped = new Map<string, CanonicalKalshiMarket>();
+        for (const market of data.kalshi ?? []) {
+          if (!market?.ticker) continue;
+          const identity = market.ticker.trim().toUpperCase();
+          if (!deduped.has(identity)) {
+            deduped.set(identity, {
+              ticker: market.ticker,
+              title: market.title || market.ticker,
+            });
+          }
+        }
+        const markets = Array.from(deduped.values());
+        setCanonicalKalshi(markets);
+        setKalshiOptionsStatus(markets.length > 0 ? "ready" : "empty");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setCanonicalKalshi([]);
+        setKalshiOptionsStatus("error");
+        setKalshiOptionsError(error instanceof Error ? error.message : "Unable to load Kalshi outcomes.");
+      }
+    };
+    loadCanonicalKalshi();
+    return () => controller.abort();
+  }, [open, marketScopeKey, kalshiUrl, polymarketUrl]);
 
   // Build coupled pairs from outcomes
   const coupledPairs: CoupledPair[] = (outcomes || [])
@@ -85,12 +161,33 @@ export default function CouplingPanel({
       };
     });
 
-  // Build available markets
-  const availableKalshi: AvailableMarket[] = (unmatchedKalshi || []).map((k: any) => ({
-    ticker: k.ticker,
-    title: k.title || k.artist || k.ticker,
-    platform: "kalshi" as const,
-  }));
+  // Merge only by canonical ticker identity. Same-title outcomes with distinct
+  // ticker IDs are valid separate brackets and must remain selectable.
+  const availableKalshi: AvailableMarket[] = useMemo(() => {
+    const byTicker = new Map<string, AvailableMarket>();
+    for (const market of canonicalKalshi) {
+      byTicker.set(market.ticker.trim().toUpperCase(), {
+        ticker: market.ticker,
+        title: market.title || market.ticker,
+        platform: "kalshi",
+      });
+    }
+    // Keep scan rows as a loading fallback and merge scan-only outcomes.
+    for (const market of unmatchedKalshi || []) {
+      if (!market?.ticker) continue;
+      const identity = market.ticker.trim().toUpperCase();
+      if (!byTicker.has(identity)) {
+        byTicker.set(identity, {
+          ticker: market.ticker,
+          title: market.title || market.artist || market.ticker,
+          platform: "kalshi",
+        });
+      }
+    }
+    return Array.from(byTicker.values());
+  }, [canonicalKalshi, unmatchedKalshi]);
+
+  const kalshiOptionLabel = (market: AvailableMarket) => `${market.title} · ${market.ticker}`;
 
   const availablePm: AvailableMarket[] = (unmatchedPolymarket || []).map((p: any) => ({
     conditionId: p.conditionId,
@@ -315,14 +412,17 @@ export default function CouplingPanel({
                               Kalshi market:
                             </label>
                             <select
+                              aria-label="Kalshi market"
                               value={editKalshi || ""}
                               onChange={(e) => setEditKalshi(e.target.value)}
                               className="w-full px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
                             >
-                              <option value="">Select Kalshi market...</option>
+                              <option value="">
+                                {kalshiOptionsStatus === "loading" ? "Loading Kalshi outcomes..." : "Select Kalshi market..."}
+                              </option>
                               {availableKalshi.map(k => (
                                 <option key={k.ticker} value={k.ticker}>
-                                  {k.title}
+                                  {kalshiOptionLabel(k)}
                                 </option>
                               ))}
                             </select>
@@ -334,6 +434,7 @@ export default function CouplingPanel({
                               Polymarket market:
                             </label>
                             <select
+                              aria-label="Polymarket market"
                               value={editPm || ""}
                               onChange={(e) => setEditPm(e.target.value)}
                               className="w-full px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
@@ -476,7 +577,20 @@ export default function CouplingPanel({
           {/* ── Add New Coupling Tab ── */}
           {activeTab === "add" && (
             <div className="space-y-3">
-              {availableKalshi.length === 0 || availablePm.length === 0 ? (
+              {kalshiOptionsStatus === "loading" ? (
+                <div role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-[#8A9BA8]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading all Kalshi outcomes for this event…
+                </div>
+              ) : kalshiOptionsStatus === "error" ? (
+                <div role="alert" className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 p-3 text-sm text-[#ef4444]">
+                  Unable to load Kalshi outcomes: {kalshiOptionsError}
+                </div>
+              ) : kalshiOptionsStatus === "empty" ? (
+                <div role="status" className="rounded-lg border border-[#182533] bg-[#0E1621] p-3 text-center text-sm text-[#8A9BA8]">
+                  No eligible Kalshi outcomes were found for this event URL.
+                </div>
+              ) : availableKalshi.length === 0 || availablePm.length === 0 ? (
                 <div className="text-center py-8 text-sm text-[#8A9BA8]">
                   Need at least one unmatched market on each platform to create a new coupling.
                 </div>
@@ -493,6 +607,7 @@ export default function CouplingPanel({
                       Kalshi market:
                     </label>
                     <select
+                      aria-label="Kalshi market"
                       value={newKalshi || ""}
                       onChange={(e) => setNewKalshi(e.target.value)}
                       className="w-full px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
@@ -500,7 +615,7 @@ export default function CouplingPanel({
                       <option value="">Select Kalshi market...</option>
                       {availableKalshi.map(k => (
                         <option key={k.ticker} value={k.ticker}>
-                          {k.title}
+                          {kalshiOptionLabel(k)}
                         </option>
                       ))}
                     </select>
@@ -513,6 +628,7 @@ export default function CouplingPanel({
                       Polymarket market:
                     </label>
                     <select
+                      aria-label="Polymarket market"
                       value={newPm || ""}
                       onChange={(e) => setNewPm(e.target.value)}
                       className="w-full px-2 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"

@@ -73,6 +73,7 @@ async function initDb(): Promise<void> {
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_scanned_at ON scan_results(scanned_at DESC)`);
   // PERF-P3: partial index for positiveArbOnly logs filter + dashboard top-arbs
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arbs ON scan_results(scanned_at DESC) WHERE positive_arb_count > 0`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arb_type_ts ON scan_results(arb_type, scanned_at DESC)`);
 
   // Market Catalog (FEAT-101): all open markets from Kalshi + Polymarket
   await c.execute(`
@@ -166,6 +167,35 @@ async function initDb(): Promise<void> {
     `ALTER TABLE saved_markets ADD COLUMN platform_links TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
+  }
+
+  // UI-046: a B-tree cannot accelerate LIKE '%term%'. Trigram FTS does,
+  // while preserving case-insensitive contains semantics across all existing
+  // searchable fields and the saved-market title fallback.
+  await c.execute(`CREATE VIRTUAL TABLE IF NOT EXISTS scan_results_search USING fts5(
+    search_text, tokenize='trigram case_sensitive 0'
+  )`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_search_insert AFTER INSERT ON scan_results BEGIN
+    INSERT INTO scan_results_search(rowid, search_text)
+    VALUES (new.id, new.market_id || ' ' || COALESCE(new.market_title, '') || ' ' || new.strategy || ' ' || COALESCE((SELECT event_title FROM saved_markets WHERE id = new.market_id), ''));
+  END`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_search_update AFTER UPDATE OF market_id, market_title, strategy ON scan_results BEGIN
+    DELETE FROM scan_results_search WHERE rowid = old.id;
+    INSERT INTO scan_results_search(rowid, search_text)
+    VALUES (new.id, new.market_id || ' ' || COALESCE(new.market_title, '') || ' ' || new.strategy || ' ' || COALESCE((SELECT event_title FROM saved_markets WHERE id = new.market_id), ''));
+  END`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_search_delete AFTER DELETE ON scan_results BEGIN
+    DELETE FROM scan_results_search WHERE rowid = old.id;
+  END`);
+  const [scanCount, searchCount] = await Promise.all([
+    c.execute(`SELECT COUNT(*) AS cnt FROM scan_results`),
+    c.execute(`SELECT COUNT(*) AS cnt FROM scan_results_search`),
+  ]);
+  if (Number(scanCount.rows[0]?.cnt ?? 0) !== Number(searchCount.rows[0]?.cnt ?? 0)) {
+    await c.execute(`DELETE FROM scan_results_search`);
+    await c.execute(`INSERT INTO scan_results_search(rowid, search_text)
+      SELECT r.id, r.market_id || ' ' || COALESCE(r.market_title, '') || ' ' || r.strategy || ' ' || COALESCE(m.event_title, '')
+      FROM scan_results r LEFT JOIN saved_markets m ON m.id = r.market_id`);
   }
 
   // BUG-128: one-time, idempotent backfill. Prefer expiry embedded in the
@@ -399,46 +429,81 @@ export async function getScanHistory(marketId?: string, limit: number = 20): Pro
  * 10k rows into JS. Excludes the heavy raw_result blob.
  * Returns { rows, total } where total counts all matches (pre-LIMIT).
  */
-export async function queryScanHistory(opts: {
-  marketId?: string;
-  minRoi?: number;
-  positiveArbOnly?: boolean;
-  fromDate?: string;
-  toDate?: string;
-  limit?: number;
-  before?: string; // MF-014: cursor — scanned_at value for pagination
-}): Promise<{ rows: any[]; total: number; uniqueMarkets: number }> {
-  await ensureDb();
-  const c = getClient();
-  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+type ScanHistoryFilters = {
+  marketId?: string; minRoi?: number; positiveArbOnly?: boolean; fromDate?: string; toDate?: string;
+  search?: string; eventType?: 'all' | 'scan' | 'arb' | 'system'; arbType?: 'all' | 'direct' | 'cross' | 'internal';
+};
+type ScanHistorySummary = { totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } };
+type ScanHistoryRow = Record<string, unknown> & { id: number; market_id: string; scanned_at: string };
 
+function scanHistoryWhere(opts: ScanHistoryFilters) {
   let where = ' WHERE 1=1';
   const args: (string | number)[] = [];
   if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
   if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
-  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
+  if (opts.positiveArbOnly) where += ' AND positive_arb_count > 0';
   if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
-  if (opts.before) { where += ' AND scanned_at < ?'; args.push(opts.before); }
+  const search = opts.search?.trim();
+  if (search) {
+    const pattern = `%${search.replace(/([%_\\])/g, '\\$1')}%`;
+    where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\')`;
+    args.push(pattern);
+  }
+  if (opts.eventType === 'arb') where += ' AND positive_arb_count > 0';
+  if (opts.eventType === 'scan') where += ' AND positive_arb_count = 0';
+  if (opts.eventType === 'system') where += ' AND (matched_count = 0 OR kalshi_count = 0 OR pm_count = 0)';
+  if (opts.arbType && opts.arbType !== 'all') {
+    where += ` AND COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = ?`;
+    args.push(opts.arbType);
+  }
+  return { where, args };
+}
+
+/** Diagnostic used by database tests to assert substring search uses FTS. */
+export async function explainScanHistorySearchPlan(search: string): Promise<string[]> {
+  await ensureDb();
+  const pattern = `%${search.trim().replace(/([%_\\])/g, '\\$1')}%`;
+  const result = await getClient().execute({
+    sql: `EXPLAIN QUERY PLAN SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\'`,
+    args: [pattern],
+  });
+  return result.rows.map((row) => String(row.detail ?? ''));
+}
+
+export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: number; before?: { scannedAt: string; id: number } }): Promise<{ rows: ScanHistoryRow[]; total: number; uniqueMarkets: number; summary: ScanHistorySummary }> {
+  await ensureDb();
+  const c = getClient();
+  const limit = Math.min(Math.max(opts.limit ?? 250, 1), 500);
+  const base = scanHistoryWhere(opts);
 
   const countRes = await c.execute({
-    sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets FROM scan_results${where}`,
-    args,
+    sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets, COALESCE(SUM(positive_arb_count), 0) AS total_arbs, COALESCE(AVG(best_roi_pct), 0) AS avg_roi, COALESCE(MAX(best_roi_pct), 0) AS best_roi, COALESCE(SUM(best_profit), 0) AS total_profit,
+      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'direct' THEN 1 ELSE 0 END) AS direct_count,
+      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'cross' THEN 1 ELSE 0 END) AS cross_count,
+      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
+    args: base.args,
   });
-  const countRow = (countRes.rows as any[])[0];
+  const countRow = countRes.rows[0];
   const total = Number(countRow?.cnt ?? 0);
   const uniqueMarkets = Number(countRow?.unique_markets ?? 0);
+  let pageWhere = base.where;
+  const pageArgs = [...base.args];
+  if (opts.before) { pageWhere += ' AND (scanned_at < ? OR (scanned_at = ? AND id < ?))'; pageArgs.push(opts.before.scannedAt, opts.before.scannedAt, opts.before.id); }
 
   const rows = await c.execute({
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at, raw_result,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
-          FROM scan_results${where}
-          ORDER BY scanned_at DESC LIMIT ?`,
-    args: [...args, limit],
+          FROM scan_results${pageWhere}
+          ORDER BY scanned_at DESC, id DESC LIMIT ?`,
+    args: [...pageArgs, limit],
   });
-  return { rows: Array.isArray(rows.rows) ? (rows.rows as any[]) : [], total, uniqueMarkets };
+  return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]) : [], total, uniqueMarkets, summary: {
+    totalArbs: Number(countRow?.total_arbs ?? 0), avgRoi: Number(countRow?.avg_roi ?? 0), bestRoi: Number(countRow?.best_roi ?? 0), totalProfit: Number(countRow?.total_profit ?? 0),
+    arbTypeCounts: { direct: Number(countRow?.direct_count ?? 0), cross: Number(countRow?.cross_count ?? 0), internal: Number(countRow?.internal_count ?? 0) },
+  } };
 }
 
 /**
@@ -448,33 +513,22 @@ export async function queryScanHistory(opts: {
  * 50k+ rows to the client without holding them all in memory. Filters run in
  * SQLite, indexed on scanned_at DESC.
  */
-export async function* queryScanHistoryStream(opts: {
-  marketId?: string;
-  minRoi?: number;
-  positiveArbOnly?: boolean;
-  fromDate?: string;
-  toDate?: string;
+export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
   maxRows?: number;
   chunkSize?: number;
 }): AsyncGenerator<any[], void, unknown> {
   await ensureDb();
   const c = getClient();
-  const maxRows = Math.min(Math.max(opts.maxRows ?? 50000, 1), 50000);
+  const maxRows = opts.maxRows === undefined ? Number.POSITIVE_INFINITY : Math.max(opts.maxRows, 1);
   const chunkSize = Math.min(Math.max(opts.chunkSize ?? 500, 1), 2000);
 
-  let where = ' WHERE 1=1';
-  const args: (string | number)[] = [];
-  if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
-  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
-  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
-  if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
-  if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+  const { where, args } = scanHistoryWhere(opts);
 
   let emitted = 0;
   let lastCursor: { scannedAt: string; id: number } | null = null;
 
   while (emitted < maxRows) {
-    const thisLimit = Math.min(chunkSize, maxRows - emitted);
+    const thisLimit = Number.isFinite(maxRows) ? Math.min(chunkSize, maxRows - emitted) : chunkSize;
     let cursorWhere = where;
     const cursorArgs = [...args];
     if (lastCursor) {
@@ -505,23 +559,11 @@ export async function* queryScanHistoryStream(opts: {
 }
 
 /** UI-035: exact match count for the export row estimate (no blob read). */
-export async function countScanHistory(opts: {
-  marketId?: string;
-  minRoi?: number;
-  positiveArbOnly?: boolean;
-  fromDate?: string;
-  toDate?: string;
-}): Promise<number> {
+export async function countScanHistory(opts: ScanHistoryFilters): Promise<number> {
   await ensureDb();
   const c = getClient();
 
-  let where = ' WHERE 1=1';
-  const args: (string | number)[] = [];
-  if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
-  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
-  if (opts.positiveArbOnly) { where += ' AND positive_arb_count > 0'; }
-  if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
-  if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
+  const { where, args } = scanHistoryWhere(opts);
 
   const countRes = await c.execute({ sql: `SELECT COUNT(*) AS cnt FROM scan_results${where}`, args });
   return Number((countRes.rows as any[])[0]?.cnt ?? 0);
@@ -820,7 +862,10 @@ export interface LastScanResult {
   matchedCount: number;
   kalshiCount: number;
   pmCount: number;
-  scannedAt: string;        // ISO timestamp
+  scannedAt: string | null; // ISO timestamp; null means never authoritatively scanned
+  matchStatus?: 'not_scanned' | 'refreshing' | 'unavailable' | 'confirmed_zero' | 'matched';
+  matchError?: string;
+  matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
@@ -1209,19 +1254,54 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   const c = getClient();
   // AUTO-002: track last time this market had matched outcomes (dead-market detection)
   const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
+  if (result.matchStatus === 'unavailable' || result.matchStatus === 'refreshing') return;
+  const serialized = JSON.stringify(result);
+  const freshnessGuard = `AND (
+    last_scan_result IS NULL OR
+    json_extract(last_scan_result, '$.scannedAt') IS NULL OR
+    ? >= json_extract(last_scan_result, '$.scannedAt')
+  )`;
   if (expiryDate !== undefined) {
     await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-      args: [JSON.stringify(result), expiryDate ?? null, matchedNow, id],
+      sql: `UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ? ${freshnessGuard}`,
+      args: [serialized, expiryDate ?? null, matchedNow, id, result.scannedAt],
     });
   invalidateMarketsCache();
   } else {
     await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-      args: [JSON.stringify(result), matchedNow, id],
+      sql: `UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ? ${freshnessGuard}`,
+      args: [serialized, matchedNow, id, result.scannedAt],
     });
   invalidateMarketsCache();
   }
+  mirrorMarketsToJsonThrottled();
+}
+
+export async function reconcileSavedMarketMatchSummary(
+  id: string,
+  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'scannedAt'>,
+): Promise<void> {
+  if (summary.matchStatus === 'unavailable' || summary.matchStatus === 'refreshing') return;
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const fallback: LastScanResult = {
+    bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: summary.matchedCount,
+    matchedCount: summary.matchedCount, kalshiCount: 0, pmCount: 0,
+    scannedAt: summary.scannedAt, allArbs: [],
+  };
+  await c.execute({
+    sql: `UPDATE saved_markets SET last_scan_result = json_set(
+            COALESCE(last_scan_result, ?), '$.matchedCount', ?, '$.matchStatus', ?,
+            '$.matchError', ?, '$.matchedPairs', json(?), '$.scannedAt', ?
+          ), last_matched_at = CASE WHEN ? > 0 THEN ? ELSE last_matched_at END
+          WHERE id = ? AND (last_scan_result IS NULL OR
+            json_extract(last_scan_result, '$.scannedAt') IS NULL OR
+            ? >= json_extract(last_scan_result, '$.scannedAt'))`,
+    args: [JSON.stringify(fallback), summary.matchedCount, summary.matchStatus ?? null,
+      summary.matchError ?? null, JSON.stringify(summary.matchedPairs ?? []), summary.scannedAt,
+      summary.matchedCount, summary.scannedAt, id, summary.scannedAt],
+  });
+  invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
 }
 

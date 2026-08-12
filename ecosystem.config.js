@@ -114,6 +114,9 @@ module.exports = {
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
+      // Full Kalshi order-book depth is authenticated; load the same local
+      // credentials file as the watcher without duplicating secrets in PM2 config.
+      node_args: '--env-file=.env.local',
 
       restart_delay: 5000,
       max_restarts: Infinity,

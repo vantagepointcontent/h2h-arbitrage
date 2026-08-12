@@ -101,7 +101,8 @@ import {
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
   formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
-  DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY,
+  DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
+  createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -248,7 +249,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "opportunities" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -261,20 +262,41 @@ export default function Home() {
   const kalshiUrlRef = useRef(kalshiUrl);
   const pmUrlRef = useRef(pmUrl);
   const activeMarketIdRef = useRef(activeMarketId);
+  const quickPricesRequestOwnerRef = useRef(createQuickPricesRequestOwner());
+  const savedMarketHydrationOwnerRef = useRef(createSavedMarketHydrationOwner());
   // BUG-036: serialize MarketFinder individual saves to avoid concurrent read-modify-write races
   const mfSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => { savedMarketsRef.current = savedMarkets; }, [savedMarkets]);
   useEffect(() => { kalshiUrlRef.current = kalshiUrl; }, [kalshiUrl]);
   useEffect(() => { pmUrlRef.current = pmUrl; }, [pmUrl]);
-  useEffect(() => { activeMarketIdRef.current = activeMarketId; }, [activeMarketId]);
+  const cancelSavedMarketWork = () => {
+    savedMarketHydrationOwnerRef.current.cancel();
+    const cancelledMode = quickPricesRequestOwnerRef.current.cancel();
+    if (cancelledMode === "foreground") setLoading(false);
+    if (cancelledMode === "background") setBgRefreshing(false);
+  };
+  useEffect(() => {
+    activeMarketIdRef.current = activeMarketId;
+    if (!activeMarketId || viewMode !== "scan") {
+      cancelSavedMarketWork();
+    }
+  }, [activeMarketId, viewMode]);
+  useEffect(() => () => {
+    savedMarketHydrationOwnerRef.current.cancel();
+    quickPricesRequestOwnerRef.current.cancel();
+  }, []);
 
   // Handle browser back/forward via popstate
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
       const state = e.state;
+      if (state?.view !== "scan") cancelSavedMarketWork();
       if (state?.view === "overview") {
         setViewMode("overview");
+        setActiveMarketId(null);
+      } else if (state?.view === "opportunities") {
+        setViewMode("opportunities");
         setActiveMarketId(null);
       } else if (state?.view === "marketfinder") {
         setViewMode("marketfinder");
@@ -283,11 +305,11 @@ export default function Home() {
         if (state?.marketId) {
           const m = savedMarketsRef.current.find((m) => m.id === state.marketId);
           if (m) {
+            savedMarketHydrationOwnerRef.current.cancel();
             setExpandedArtist(null);
             setError("");
             setKalshiUrl(m.kalshiUrl);
             setPmUrl(m.polymarketUrl);
-            setActiveMarketId(m.id);
             setOutcomeFilter("matched");
             kalshiUrlRef.current = m.kalshiUrl;
             pmUrlRef.current = m.polymarketUrl;
@@ -295,22 +317,34 @@ export default function Home() {
             setResult(null);
             previousPricesRef.current = new Map();
             setPriceChanges(new Map());
-            if (!m.eventTitle || !m.kalshiUrl || !m.polymarketUrl) {
-              setError("This market is missing required details and cannot be refreshed. The saved list is unchanged.");
-              return;
-            }
             const popExpiry = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
-            if (!(popExpiry > 0 && popExpiry <= Date.now())) {
-              handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
-            }
+            restoreSavedMarketPopNavigation(m.id, {
+              setViewMode,
+              setActiveMarketId,
+              startRefresh: () => {
+                if (!m.eventTitle || !m.kalshiUrl || !m.polymarketUrl) {
+                  setError("This market is missing required details and cannot be refreshed. The saved list is unchanged.");
+                  return;
+                }
+                if (!(popExpiry > 0 && popExpiry <= Date.now())) {
+                  handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
+                }
+              },
+            });
           } else {
             // Market not in saved_markets — fall back to scan_results for URLs
+            const fallbackMarketId = state.marketId as string;
+            const hydration = savedMarketHydrationOwnerRef.current.begin(fallbackMarketId);
             setViewMode("scan");
             setExpandedArtist(null);
-            setActiveMarketId(state.marketId);
-            fetch(`/api/saved-markets?id=${encodeURIComponent(state.marketId)}`)
+            setActiveMarketId(fallbackMarketId);
+            activeMarketIdRef.current = fallbackMarketId;
+            fetch(`/api/saved-markets?id=${encodeURIComponent(fallbackMarketId)}`, {
+              signal: hydration.controller.signal,
+            })
               .then(r => r.ok ? r.json() : null)
               .then(d => {
+                if (!savedMarketHydrationOwnerRef.current.owns(hydration, activeMarketIdRef.current)) return;
                 const fm = d?.market;
                 if (fm?.kalshiUrl && fm?.polymarketUrl) {
                   setKalshiUrl(fm.kalshiUrl);
@@ -320,12 +354,18 @@ export default function Home() {
                   setResult(null);
                   previousPricesRef.current = new Map();
                   setPriceChanges(new Map());
+                  savedMarketHydrationOwnerRef.current.finish(hydration);
                   handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
                 } else {
+                  savedMarketHydrationOwnerRef.current.finish(hydration);
                   setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
                 }
               })
-              .catch(() => setError("The requested market could not be loaded. Check the connection and try again."));
+              .catch(() => {
+                if (!savedMarketHydrationOwnerRef.current.owns(hydration, activeMarketIdRef.current)) return;
+                savedMarketHydrationOwnerRef.current.finish(hydration);
+                setError("The requested market could not be loaded. Check the connection and try again.");
+              });
           }
         } else {
           setViewMode("scan");
@@ -360,9 +400,13 @@ export default function Home() {
       const params = new URLSearchParams(window.location.search);
       const view = params.get("view");
       const marketId = params.get("id");
+      const routeHydration = view === "scan" && marketId
+        ? savedMarketHydrationOwnerRef.current.begin(marketId)
+        : null;
 
       const initialMarkets = await loadSavedMarkets();
       savedMarketsRef.current = initialMarkets;
+      if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, marketId)) return;
 
       if (view === "scan" && !marketId) {
         // A direct /?view=scan link is the empty manual-link form, not the dashboard.
@@ -398,14 +442,18 @@ export default function Home() {
           const hasPrices = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.kalshiYesAsk !== undefined || (cached!.allArbs![0] as any)?.pmYesPrice !== undefined);
           if (cached && !hasPrices && !isExpired) {
             try {
-              const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`);
+              const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`, {
+                signal: routeHydration?.controller.signal,
+              });
               if (r.ok) {
                 const d = await r.json();
+                if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
                 const full = d.market?.liveResult ?? d.market?.lastScanResult;
                 if (full) cached = full;
               }
             } catch { /* fall back to blob-less cached */ }
           }
+          if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
           if (cached && !isExpired) {
             const cachedResult: ScanResult = {
               eventTitle: m.eventTitle,
@@ -457,7 +505,10 @@ export default function Home() {
           }
           // Background refresh (silent) — skip for expired markets
           if (!isExpired) {
+            if (routeHydration) savedMarketHydrationOwnerRef.current.finish(routeHydration);
             handleQuickPricesRefresh(marketId, true);
+          } else if (routeHydration) {
+            savedMarketHydrationOwnerRef.current.finish(routeHydration);
           }
         } else {
           // Market not in saved_markets (archived/never saved).
@@ -465,24 +516,34 @@ export default function Home() {
           setViewMode("scan");
           setExpandedArtist(null);
           setActiveMarketId(marketId);
+          activeMarketIdRef.current = marketId;
           try {
-            const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(marketId)}`);
+            const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(marketId)}`, {
+              signal: routeHydration?.controller.signal,
+            });
+            if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
             if (r.ok) {
               const d = await r.json();
+              if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
               const fm = d?.market;
               if (fm?.kalshiUrl && fm?.polymarketUrl) {
                 setKalshiUrl(fm.kalshiUrl);
                 setPmUrl(fm.polymarketUrl);
                 kalshiUrlRef.current = fm.kalshiUrl;
                 pmUrlRef.current = fm.polymarketUrl;
+                if (routeHydration) savedMarketHydrationOwnerRef.current.finish(routeHydration);
                 handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
               } else {
+                if (routeHydration) savedMarketHydrationOwnerRef.current.finish(routeHydration);
                 setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
               }
             } else {
+              if (routeHydration) savedMarketHydrationOwnerRef.current.finish(routeHydration);
               setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
             }
           } catch {
+            if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
+            if (routeHydration) savedMarketHydrationOwnerRef.current.finish(routeHydration);
             setError("The requested market could not be loaded. Check the connection and try again.");
           }
         }
@@ -491,6 +552,8 @@ export default function Home() {
         setViewMode("overview");
       } else if (view === "markets") {
         setViewMode("overview");
+      } else if (view === "opportunities") {
+        setViewMode("opportunities");
       } else if (view === "marketfinder") {
         setViewMode("marketfinder");
         window.history.replaceState({ view: "marketfinder" }, "", "/?view=marketfinder");
@@ -546,6 +609,10 @@ export default function Home() {
   }, []);
 
   const handleQuickPricesRefresh = async (marketId: string, silent = false) => {
+    const mode = silent ? "background" : "foreground";
+    const request = quickPricesRequestOwnerRef.current.begin(marketId, mode);
+    if (request.displacedMode === "foreground") setLoading(false);
+    if (request.displacedMode === "background") setBgRefreshing(false);
     if (!silent) {
       setLoading(true);
     } else {
@@ -557,12 +624,14 @@ export default function Home() {
       const res = await fetch("/api/quick-prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: request.controller.signal,
         body: JSON.stringify({
           marketId,
           capital: capitalRef.current,
         }),
       });
       const data = await res.json();
+      if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current)) return;
       if (res.ok) {
         setResult((prev) => {
           if (!prev) return data as ScanResult;
@@ -596,13 +665,38 @@ export default function Home() {
           });
           previousPricesRef.current = prices;
         }
+        const refreshedAt = typeof data._pmFetchedAt === 'string' ? data._pmFetchedAt : scannedAt;
+        setSavedMarkets((previous) => previous.map((market) => market.id === marketId
+          ? {
+              ...market,
+              lastScanResult: {
+                ...(market.lastScanResult ?? {
+                  bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 0,
+                  kalshiCount: 0, pmCount: 0, allArbs: [],
+                }),
+                scannedAt: refreshedAt,
+                matchedCount: data.matchStatus === 'unavailable'
+                  ? market.lastScanResult?.matchedCount ?? 0
+                  : data.matchedCount ?? 0,
+                matchStatus: data.matchStatus === 'unavailable'
+                  ? market.lastScanResult?.matchStatus ?? 'unavailable'
+                  : data.matchStatus,
+                matchError: data.matchError,
+                matchedPairs: data.matchStatus === 'unavailable'
+                  ? market.lastScanResult?.matchedPairs ?? []
+                  : data.matchedPairs ?? [],
+              },
+            }
+          : market));
       } else {
         setError(data.error || "Quick refresh failed");
       }
     } catch (err: any) {
+      if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current)) return;
       setError(err.message || "Network error");
     } finally {
-      if (!silent) setLoading(false);
+      if (!quickPricesRequestOwnerRef.current.finish(request)) return;
+      if (request.mode === "foreground") setLoading(false);
       else setBgRefreshing(false);
     }
   };
@@ -619,6 +713,14 @@ export default function Home() {
   };
 
   const handleScanWithUrls = async (kUrl: string, pUrl: string, silent = false, forceFull = false) => {
+    const scannedMarketId = activeMarketIdRef.current;
+    const requestScope = scannedMarketId ?? "__manual-scan__";
+    const mode = silent ? "background" : "foreground";
+    // Full rescans and quick-price refreshes share one owner. A request may only
+    // commit while the saved market that started it is still active.
+    const request = quickPricesRequestOwnerRef.current.begin(requestScope, mode);
+    if (request.displacedMode === "foreground") setLoading(false);
+    if (request.displacedMode === "background") setBgRefreshing(false);
     if (!silent) {
       setLoading(true);
       setResult(null);
@@ -633,24 +735,26 @@ export default function Home() {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: request.controller.signal,
         body: JSON.stringify({
-          // Manual input uses canonical, per-link platform metadata. Legacy
-          // fields are only for programmatic scans of existing saved markets.
-          ...(platformLinks.some((link) => link.url)
-            ? { platformLinks: platformLinks.filter((link) => link.url).map(({ platform, url }) => ({ platform: platform ?? "", url })) }
-            : { kalshiUrl: kUrl, polymarketUrl: pUrl }),
+          ...buildScanLinkPayload({
+            kalshiUrl: kUrl,
+            polymarketUrl: pUrl,
+            platformLinks,
+            savedMarketId: scannedMarketId,
+          }),
           capital: capital,
           skipAutoMatch: matchMode === "manual",
           force: forceFull,
         }),
       });
       const data = await res.json();
+      if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current ?? "__manual-scan__")) return;
       if (res.ok) {
         setResult(data);
         const scannedAt = new Date().toISOString();
         setLastUpdated(new Date(scannedAt));
         setLastScanTimestamp(scannedAt);
-        const scannedMarketId = activeMarketIdRef.current;
         if (scannedMarketId && Array.isArray(data.outcomes)) {
           const summary = summarizeScanForSidebar(data.outcomes);
           setSavedMarkets((previous) => previous.map((market) => market.id === scannedMarketId
@@ -677,7 +781,7 @@ export default function Home() {
         // HOOKUP-07: record spread point for historical chart (IndexedDB, client-side)
         // Save per-outcome so each row's sparkline shows its own ROI history.
         try {
-          const mid = activeMarketIdRef.current;
+          const mid = scannedMarketId;
           if (mid && Array.isArray(data.outcomes)) {
             const now = Date.now();
             for (const o of data.outcomes) {
@@ -701,9 +805,11 @@ export default function Home() {
         setError(data.error || "Scan failed");
       }
     } catch (err: any) {
+      if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current ?? "__manual-scan__")) return;
       setError(err.message || "Network error");
     } finally {
-      if (!silent) setLoading(false);
+      if (!quickPricesRequestOwnerRef.current.finish(request)) return;
+      if (mode === "foreground") setLoading(false);
       else setBgRefreshing(false);
     }
   };
@@ -909,6 +1015,7 @@ export default function Home() {
       setError("This market cannot be opened because its identifier is missing or malformed.");
       return;
     }
+    const hydration = savedMarketHydrationOwnerRef.current.begin(marketId);
 
     // Keep browser history and React state synchronized: commit the drill-down
     // route first, then update the active market state.
@@ -925,6 +1032,7 @@ export default function Home() {
     setViewMode("scan");
 
     if (!m.eventTitle || !kalshiUrlRef.current || !pmUrlRef.current) {
+      savedMarketHydrationOwnerRef.current.finish(hydration);
       setResult(null);
       setError("This market is missing required details and cannot be refreshed. The saved list is unchanged; return to Markets or retry after the data is repaired.");
       return;
@@ -940,14 +1048,18 @@ export default function Home() {
     const hasFullArbs = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.artist !== undefined);
     if (cached && !hasFullArbs && !isExpired) {
       try {
-        const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`);
+        const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(m.id)}`, {
+          signal: hydration.controller.signal,
+        });
         if (r.ok) {
           const d = await r.json();
+          if (!savedMarketHydrationOwnerRef.current.owns(hydration, activeMarketIdRef.current)) return;
           const full = d.market?.liveResult ?? d.market?.lastScanResult;
           if (full) cached = full;
         }
       } catch { /* fall back to blob-less cached */ }
     }
+    if (!savedMarketHydrationOwnerRef.current.owns(hydration, activeMarketIdRef.current)) return;
     if (cached && !isExpired) {
       const cachedResult: ScanResult = {
         eventTitle: m.eventTitle,
@@ -1016,16 +1128,20 @@ export default function Home() {
 
     // Background refresh (silent) — skip for expired markets (BUG-033)
     if (!isExpired) {
+      savedMarketHydrationOwnerRef.current.finish(hydration);
       if (forceFull) {
         handleScanWithUrls(m.kalshiUrl, m.polymarketUrl, true, true);
       } else {
         handleQuickPricesRefresh(m.id, true);
       }
+    } else {
+      savedMarketHydrationOwnerRef.current.finish(hydration);
     }
   };
 
   // View mode switcher
   const goToMarketFinder = () => {
+    cancelSavedMarketWork();
     setViewMode("marketfinder");
     window.history.replaceState({ view: "marketfinder" }, "", "/?view=marketfinder");
   };
@@ -1053,18 +1169,29 @@ export default function Home() {
   }, []);
 
   const goToOverview = () => {
+    cancelSavedMarketWork();
     setCouplingPanelOpen(false);
-    setViewMode("overview");
     window.history.replaceState({ view: "markets" }, "", "/?view=markets");
+    setViewMode("overview");
+  };
+
+  const goToOpportunities = () => {
+    cancelSavedMarketWork();
+    setCouplingPanelOpen(false);
+    window.history.replaceState({ view: "opportunities" }, "", "/?view=opportunities");
+    setActiveMarketId(null);
+    setViewMode("opportunities");
   };
 
   const goToLogs = () => {
+    cancelSavedMarketWork();
     setCouplingPanelOpen(false);
     setViewMode("logs");
     window.history.replaceState({ view: "logs" }, "", "/?view=logs");
   };
 
   const goToDashboard = () => {
+    cancelSavedMarketWork();
     setCouplingPanelOpen(false);
     setViewMode("dashboard");
     window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
@@ -1072,6 +1199,7 @@ export default function Home() {
 
 
   const goToSettings = () => {
+    cancelSavedMarketWork();
     setCouplingPanelOpen(false);
     setViewMode("settings");
     window.history.replaceState({ view: "settings" }, "", "/?view=settings");
@@ -1079,12 +1207,14 @@ export default function Home() {
 
   // TRADES-001
   const goToTrades = () => {
+    cancelSavedMarketWork();
     setCouplingPanelOpen(false);
     setViewMode("trades");
     window.history.replaceState({ view: "trades" }, "", "/?view=trades");
   };
 
   const goToBotTrader = () => {
+    cancelSavedMarketWork();
     window.history.replaceState({ view: "bottrader" }, "", "/?view=bottrader");
     setCouplingPanelOpen(false);
     setViewMode("bottrader");
@@ -1092,6 +1222,7 @@ export default function Home() {
 
 
   const goToScan = () => {
+    cancelSavedMarketWork();
     setActiveMarketId(null);
     activeMarketIdRef.current = null;
     setResult(null);
@@ -1636,6 +1767,7 @@ export default function Home() {
           scanProgress={scanProgress}
           scanAllError={scanAllError}
           onGoOverview={goToOverview}
+          onGoOpportunities={goToOpportunities}
           onGoScan={goToScan}
           onGoMarketFinder={goToMarketFinder}
           onGoLogs={goToLogs}
@@ -1661,8 +1793,9 @@ export default function Home() {
                 <Loader2 className="h-5 w-5 animate-spin text-[var(--status-positive)]" />
                 Loading workspace...
               </div>
-            ) : viewMode === "overview" ? (
+            ) : viewMode === "overview" || viewMode === "opportunities" ? (
               <OverviewPanel
+                mode={viewMode === "opportunities" ? "opportunities" : "markets"}
                 markets={savedMarkets}
                 loading={overviewLoading}
                 onLoad={() => {
@@ -1940,7 +2073,7 @@ export default function Home() {
                       />
                     )}
 
-                    {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices) && (
+                    {(result.kalshiCount === 0 || result.pmCount === 0 || result.matchedCount === 0 || result.expired || result.noPrices || (result.platformWarnings?.length ?? 0) > 0) && (
                       <div className={`rounded-xl border p-3 flex items-start gap-3 text-sm ${result.expired ? 'border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)]' : 'border-[var(--status-warning)]/30 bg-[var(--status-warning)]/10 text-[var(--status-warning)]'}`}>
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <div className="space-y-1 flex-1">
@@ -1948,6 +2081,7 @@ export default function Home() {
                           <div className="text-xs text-[var(--text-secondary)]">
                             {result.expired && <span className="mr-3">This market has expired. Data is no longer being captured or updated — prices and arbitrage calculations are frozen and no longer valid.</span>}
                             {result.noPrices && <span className="mr-3">No live prices available. Refresh or check the market URLs.</span>}
+                            {result.platformWarnings?.map((warning) => <span key={warning} className="mr-3">{warning}</span>)}
                             {!result.expired && !result.noPrices && result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
                             {!result.expired && !result.noPrices && result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
                             {!result.expired && !result.noPrices && result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
@@ -2313,8 +2447,12 @@ export default function Home() {
 
       {/* Coupling Panel — right-side expandable */}
       <CouplingPanel
+        key={`${activeMarketId ?? "unsaved"}:${lastScanTimestamp ?? "unscanned"}`}
         open={couplingPanelOpen}
         onClose={() => setCouplingPanelOpen(false)}
+        marketScopeKey={`${activeMarketId ?? "unsaved"}:${lastScanTimestamp ?? "unscanned"}`}
+        kalshiUrl={kalshiUrl}
+        polymarketUrl={pmUrl}
         outcomes={result?.outcomes ?? []}
         unmatchedKalshi={result?.unmatchedKalshi ?? []}
         unmatchedPolymarket={result?.unmatchedPolymarket ?? []}

@@ -672,5 +672,301 @@
     "pmTitle": "Canada",
     "id": "1786125651869-98jl4le",
     "createdAt": "2026-08-07T18:00:51.869Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-EAR",
+    "pmConditionId": "0x621bf08d7382d821ce248069d63fb76a0a026d237881506f7d259353b504793f",
+    "kalshiTitle": "Earrings",
+    "pmTitle": "Earrings – Malcom Todd",
+    "id": "1786552211805-1j7sgx7",
+    "createdAt": "2026-08-12T16:30:11.805Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-MANI",
+    "pmConditionId": "0xde9c6c47abc0bd0c64b3be970ff42b5a58cb0841cef3a28de3dba938b2660ccc",
+    "kalshiTitle": "Man I Need",
+    "pmTitle": "Man I Need – Olivia Dean",
+    "id": "1786552216134-kdzhljs",
+    "createdAt": "2026-08-12T16:30:16.134Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-ELL",
+    "pmConditionId": "0xd66b2e80271b404814e968e94691af0be9d89de208eb7a76c79c15df43bf28ad",
+    "kalshiTitle": "Choosin’ Texas",
+    "pmTitle": "Choosin Texas – Ella Langley",
+    "id": "1786552217580-9b2xrm8",
+    "createdAt": "2026-08-12T16:30:17.580Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-DIE",
+    "pmConditionId": "0xba0b86cfd2b0409e868f1c9363578649b8c233b58f69ed0732e3b98af40d33a1",
+    "kalshiTitle": "Die With A Smile",
+    "pmTitle": "Die With A Smile – Lady Gaga & Bruno Mars",
+    "id": "1786552227555-xol7q2e",
+    "createdAt": "2026-08-12T16:30:27.555Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-APT",
+    "pmConditionId": "0x0a2ffa34fd61b49c7d6253689e0f303af368a89e8c44afe9b6b62d93b2948573",
+    "kalshiTitle": "APT.",
+    "pmTitle": "APT. – ROSÉ & Bruno Mars",
+    "id": "1786552236154-50puo6k",
+    "createdAt": "2026-08-12T16:30:36.154Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFYUSA-26-PIN",
+    "pmConditionId": "0x2fcd9f790b9eb3b86fa9fd10921b6d17d8094cb514d29f5f1e78825b4b59aee0",
+    "kalshiTitle": "Stateside",
+    "pmTitle": "Stateside – PinkPantheress & Zara Larsson",
+    "id": "1786552246843-oi3ovco",
+    "createdAt": "2026-08-12T16:30:46.843Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-DRO",
+    "pmConditionId": "0xb0e5307aa57da673a84ccd43b046cad260148f1ca85aa57b46d4b4fd33d989cc",
+    "kalshiTitle": "drop dead",
+    "pmTitle": "Drop Dead – Olivia Rodrigo",
+    "id": "1786552399945-a2kd4p1",
+    "createdAt": "2026-08-12T16:33:19.945Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-BIL",
+    "pmConditionId": "0x80087abfc48a2acfac70a00194346008e28fa9a84220476b24870ae48530881f",
+    "kalshiTitle": "Billie Jean",
+    "pmTitle": "Billie Jean – Michael Jackson",
+    "id": "1786552403682-fjua8ox",
+    "createdAt": "2026-08-12T16:33:23.682Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-STU",
+    "pmConditionId": "0x1e25cd2510bd040271fdf90cdf8c5d485b445ed604079cb9c5fa16dd1da60aa2",
+    "kalshiTitle": "stupid song",
+    "pmTitle": "stupid song – Olivia Rodrigo",
+    "id": "1786552423194-9u79mr6",
+    "createdAt": "2026-08-12T16:33:43.194Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-SWI",
+    "pmConditionId": "0x73066a854eab1030b8e026d2cced5a39dd6169ed36d248f3f4d5d2913eafb19c",
+    "kalshiTitle": "SWIM",
+    "pmTitle": "Swim – BTS",
+    "id": "1786552428413-6a1g7re",
+    "createdAt": "2026-08-12T16:33:48.413Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-OLI",
+    "pmConditionId": "0xb6d2fe3f4b3dc90cce6458e4e4c0a83a4829e57ba9e195ef3907a7af3d434994",
+    "kalshiTitle": "Man I Need",
+    "pmTitle": "Man I Need – Olivia Dean",
+    "id": "1786552430181-lxvf65v",
+    "createdAt": "2026-08-12T16:33:50.181Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-DOM",
+    "pmConditionId": "0x5a8f1b65783facbd54f19ba7f0ed26fb6a90db4bbaf6dea6ff2e985c3339d756",
+    "kalshiTitle": "Babydoll",
+    "pmTitle": "Babydoll – Dominic Fike",
+    "id": "1786552431888-kbu6dgk",
+    "createdAt": "2026-08-12T16:33:51.888Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-END",
+    "pmConditionId": "0xe2e548cb9997dd0c6349f0e4562bbf560f399787a377c1144e70782335afe3cf",
+    "kalshiTitle": "End of",
+    "pmTitle": "End of Beginning – Djo",
+    "id": "1786552433685-wwoqgy8",
+    "createdAt": "2026-08-12T16:33:53.685Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-DIE",
+    "pmConditionId": "0x6a98b0b33b8cecaf157efa3f91efeb7db23d80b8302b5598b6ddb9e960b7298f",
+    "kalshiTitle": "Die With A Smile",
+    "pmTitle": "Die With A Smile – Lady Gaga & Bruno Mars",
+    "id": "1786552446564-w7ag3a6",
+    "createdAt": "2026-08-12T16:34:06.564Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-PIN",
+    "pmConditionId": "0xf0bc176b013d2338eced4911c6db16e14eaa62daee5be953c32f8fd91fb12e02",
+    "kalshiTitle": "Stateside",
+    "pmTitle": "Stateside – PinkPantheress & Zara Larsson",
+    "id": "1786552448160-0rge535",
+    "createdAt": "2026-08-12T16:34:08.160Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-APT",
+    "pmConditionId": "0x8aae26970a4c12e65f45206d006f298868c8d412a17a1a572b6b35b64417614d",
+    "kalshiTitle": "APT.",
+    "pmTitle": "APT. – ROSÉ & Bruno Mars",
+    "id": "1786552456729-lvj6gcw",
+    "createdAt": "2026-08-12T16:34:16.729Z"
+  },
+  {
+    "kalshiTicker": "KXTOPSONGSPOTIFY-26-BEA",
+    "pmConditionId": "0x466e54fd53ef36cea3e3e4edc84e66412b54f71ee654a463e8aca10c10b3a8e1",
+    "kalshiTitle": "Beauty and a",
+    "pmTitle": "Beauty And A Beat – Justin Bieber & Nicki Minaj",
+    "id": "1786552462130-kcgtogm",
+    "createdAt": "2026-08-12T16:34:22.130Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-TOR",
+    "pmConditionId": "0xc28ce947b32874ea66e4e0d531b0858b32c2a21075e85704fc66db90a7d7f086",
+    "kalshiTitle": "Toronto",
+    "pmTitle": "Toronto FC",
+    "id": "1786552532937-053ngqf",
+    "createdAt": "2026-08-12T16:35:32.937Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-POR",
+    "pmConditionId": "0xd784299a136fb828bd64fb71cfb97a13441cc1bc3c0fe6f0c6d05013cd22795d",
+    "kalshiTitle": "Portland",
+    "pmTitle": "Portland Timbers",
+    "id": "1786552535926-y1766pi",
+    "createdAt": "2026-08-12T16:35:35.926Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-PHI",
+    "pmConditionId": "0x453030e67b67b385dd40b3211850a7a451235d8f8ed041589ed387d28252692b",
+    "kalshiTitle": "Philadelphia",
+    "pmTitle": "Philadelphia Union",
+    "id": "1786552537246-7r8mixb",
+    "createdAt": "2026-08-12T16:35:37.246Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-NSH",
+    "pmConditionId": "0xbdb8bebb7a28a35d1a3f87d1340404b664c9bd5d32127ff71664a44ddde5da6b",
+    "kalshiTitle": "Nashville",
+    "pmTitle": "Nashville SC",
+    "id": "1786552538223-9go8h5s",
+    "createdAt": "2026-08-12T16:35:38.223Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-MTL",
+    "pmConditionId": "0xb4c20e4b46aaf7ab65f74179d70de44bbd3734937d05da6e39d722a18f4b3646",
+    "kalshiTitle": "Montréal",
+    "pmTitle": "CF Montréal",
+    "id": "1786552538879-lkw5lbc",
+    "createdAt": "2026-08-12T16:35:38.879Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-DC",
+    "pmConditionId": "0xfc34e75773ed0ca6791db803af9ace2651c04810c3d33daa79ad3ca6e01ea082",
+    "kalshiTitle": "DC",
+    "pmTitle": "D.C. United",
+    "id": "1786552582686-hhperwf",
+    "createdAt": "2026-08-12T16:36:22.686Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-DAL",
+    "pmConditionId": "0xfd400a600d2344802c8d2bd19bd837e94e7dae1d37a1057254442d8a3db0936c",
+    "kalshiTitle": "Dallas",
+    "pmTitle": "FC Dallas",
+    "id": "1786552584166-yj5dv3e",
+    "createdAt": "2026-08-12T16:36:24.166Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-ATX",
+    "pmConditionId": "0x20ab2877f9ce57868952b77327276b849ba052e5114ca724d600984505e3dbed",
+    "kalshiTitle": "Austin",
+    "pmTitle": "Austin FC",
+    "id": "1786552591640-to5b7np",
+    "createdAt": "2026-08-12T16:36:31.640Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-CIN",
+    "pmConditionId": "0xea96140746679016b3b848b6e690b2dba05c1be1bac6db282d94413b2f28d303",
+    "kalshiTitle": "Cincinnati",
+    "pmTitle": "FC Cincinnati",
+    "id": "1786552592765-bve27vp",
+    "createdAt": "2026-08-12T16:36:32.765Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-CLB",
+    "pmConditionId": "0xbbee2a1565cdd53ac3fceee4bdcfee23e9ec63f8222295bd7d08a457a3caa222",
+    "kalshiTitle": "Columbus",
+    "pmTitle": "Columbus Crew",
+    "id": "1786552595828-2jq2lb6",
+    "createdAt": "2026-08-12T16:36:35.828Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-CLT",
+    "pmConditionId": "0xdd40580b22ac93932fdae14c22d6c59a05e02ebf2313ce3eebe60ebf16ad425e",
+    "kalshiTitle": "Charlotte",
+    "pmTitle": "Charlotte FC",
+    "id": "1786552596914-u23z9m5",
+    "createdAt": "2026-08-12T16:36:36.914Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-COL",
+    "pmConditionId": "0xf7b1b44658d158d01922745364ca2734fc4c24ed5f0ba165fde0264eb81b607f",
+    "kalshiTitle": "Colorado",
+    "pmTitle": "Colorado Rapids",
+    "id": "1786552601861-n3leud7",
+    "createdAt": "2026-08-12T16:36:41.861Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-NY",
+    "pmConditionId": "0xc83ebc94c95d2c127a1948e60d5dd517d53c998c23731334c2d17eccfda872e4",
+    "kalshiTitle": "New York RB",
+    "pmTitle": "New York Red Bulls",
+    "id": "1786552614110-xtc7pyb",
+    "createdAt": "2026-08-12T16:36:54.110Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-VAN",
+    "pmConditionId": "0x25bf49c93f524a86fcb640a93ccabec6cd377efb54f4112c2dbf6febc2845442",
+    "kalshiTitle": "Vancouver",
+    "pmTitle": "Vancouver Whitecaps FC",
+    "id": "1786552617029-nexjxds",
+    "createdAt": "2026-08-12T16:36:57.029Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-SEA",
+    "pmConditionId": "0xdf916c5f55ba2f73ca8a92460ec26696cdaf55ff8dd103c8437bdbb4e5ac6890",
+    "kalshiTitle": "Seattle",
+    "pmTitle": "Seattle Sounders FC",
+    "id": "1786552622811-rca2v6h",
+    "createdAt": "2026-08-12T16:37:02.811Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-ORL",
+    "pmConditionId": "0x4a08c641f9dea7e6b8366cc6cef5758e955552051aef4bdc7d5f50c7ae1066b0",
+    "kalshiTitle": "Orlando",
+    "pmTitle": "Orlando City SC",
+    "id": "1786552624562-qttcxhu",
+    "createdAt": "2026-08-12T16:37:04.562Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-ATL",
+    "pmConditionId": "0x4fc98f65d07f52afbf73e4fd3bcf6901f2fa2391a208e22e200e89332934b34f",
+    "kalshiTitle": "Atlanta",
+    "pmTitle": "Atlanta United FC",
+    "id": "1786552643437-13402dl",
+    "createdAt": "2026-08-12T16:37:23.437Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-CHI",
+    "pmConditionId": "0x56a64fe9092457dd13b7a99083695e1d1cd0088b3ae562ceece4ae1911aa3c46",
+    "kalshiTitle": "Chicago",
+    "pmTitle": "Chicago Fire FC",
+    "id": "1786552644133-07mowbs",
+    "createdAt": "2026-08-12T16:37:24.133Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-MIA",
+    "pmConditionId": "0x484d3e1f00df54f5084984da97d330cfc1a898f952d7fe87278944b459864ba9",
+    "kalshiTitle": "Miami",
+    "pmTitle": "Inter Miami CF",
+    "id": "1786552644618-32q2q5b",
+    "createdAt": "2026-08-12T16:37:24.618Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-MIN",
+    "pmConditionId": "0x0c71de9a9203b356c56f6e100a7cd166d5a38cfd0ec726adce6f4e2746b70040",
+    "kalshiTitle": "Minnesota",
+    "pmTitle": "Minnesota United FC",
+    "id": "1786552652030-xjqv9ny",
+    "createdAt": "2026-08-12T16:37:32.030Z"
   }
 ]

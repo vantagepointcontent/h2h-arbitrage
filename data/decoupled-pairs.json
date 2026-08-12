@@ -38,5 +38,29 @@
     "pmTitle": "OpenAI",
     "id": "62e6f646-9393-4539-adf3-30938ac13dd9",
     "decoupledAt": "2026-07-09T14:59:16.428Z"
+  },
+  {
+    "kalshiTicker": "KXSB-27-LAR",
+    "pmConditionId": "0x6c9407f7841e7507ba435d540af237d742674ba05bac48998cf94f4b7ef5d909",
+    "kalshiTitle": "Los Angeles R",
+    "pmTitle": "Los Angeles R",
+    "id": "c47b7325-e54e-4e37-b4e6-87258cb534d0",
+    "decoupledAt": "2026-08-12T17:08:59.143Z"
+  },
+  {
+    "kalshiTicker": "KXSB-27-LAR",
+    "pmConditionId": "0xdb88bf08a8244ff54b020d91853d03655b23eea74ed3ced99be6e6e978b0a3c3",
+    "kalshiTitle": "Los Angeles R",
+    "pmTitle": "Los Angeles R",
+    "id": "9f13adcb-fe3f-4d2d-8712-8cb5eca56c14",
+    "decoupledAt": "2026-08-12T17:09:01.490Z"
+  },
+  {
+    "kalshiTicker": "KXMLSCUP-26-LAG",
+    "pmConditionId": "0xfa4b4e1b72cbe5f2ed5dcdca162b16bc77d1c15575ad16fc03f41cb78d72e0f8",
+    "kalshiTitle": "Los Angeles G",
+    "pmTitle": "Los Angeles G",
+    "id": "2de7852d-ef0e-40cd-a794-580ee089b99e",
+    "decoupledAt": "2026-08-12T17:09:56.649Z"
   }
 ]

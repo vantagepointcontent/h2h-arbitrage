@@ -130,4 +130,44 @@ describe('WS-107 liveResult persistence', () => {
     const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
     expect(got.lastMatchedAt).toBeTruthy();
   });
+
+  it('does not let an older completed scan overwrite a newer canonical match summary', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/order', polymarketUrl: 'https://polymarket.com/event/order',
+      eventTitle: 'Ordering test', category: '', expiryDate: null,
+    });
+    const newer = makeScan({
+      scannedAt: '2026-08-12T19:12:45.296Z', matchedCount: 2, matchStatus: 'matched',
+    });
+    const older = makeScan({
+      scannedAt: '2026-08-12T19:11:45.296Z', matchedCount: 0,
+      matchStatus: 'confirmed_zero', allArbs: [],
+    });
+
+    await persistence.updateSavedMarketScanResult(m.id, newer);
+    await persistence.updateSavedMarketScanResult(m.id, older);
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.lastScanResult).toMatchObject({
+      scannedAt: newer.scannedAt, matchedCount: 2, matchStatus: 'matched',
+    });
+  });
+
+  it('retains the latest confirmed matches when a temporary unavailable result arrives', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/failure', polymarketUrl: 'https://polymarket.com/event/failure',
+      eventTitle: 'Failure retention', category: '', expiryDate: null,
+    });
+    await persistence.updateSavedMarketScanResult(m.id, makeScan({
+      scannedAt: '2026-08-12T19:12:45.296Z', matchedCount: 2, matchStatus: 'matched',
+    }));
+
+    await persistence.updateSavedMarketScanResult(m.id, makeScan({
+      scannedAt: '2026-08-12T19:13:45.296Z', matchedCount: 0,
+      matchStatus: 'unavailable', matchError: 'Polymarket unavailable', allArbs: [],
+    }));
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.lastScanResult).toMatchObject({ matchedCount: 2, matchStatus: 'matched' });
+  });
 });

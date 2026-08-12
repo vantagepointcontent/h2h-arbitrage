@@ -8,7 +8,7 @@ import { parseLogLimit, parseOptionalFiniteNumber } from '@/lib/logs-request';
  *
  * Query params:
  *   marketId   — filter by market ID
- *   limit      — max results (default 100, max 500)
+ *   limit      — max results (default 250, max 500)
  *   minRoi     — only return scans with bestRoiPct >= this value
  *   positiveArbOnly=true — only return scans with positive_arb_count > 0
  *   fromDate   — ISO date string, scans at or after
@@ -25,9 +25,16 @@ export async function GET(request: NextRequest) {
     const positiveArbOnly = searchParams.get('positiveArbOnly') === 'true';
     const fromDate = searchParams.get('fromDate') || undefined;
     const toDate = searchParams.get('toDate') || undefined;
-    const before = searchParams.get('before') || undefined; // MF-014: cursor
+    const search = searchParams.get('search') || undefined;
+    const eventType = searchParams.get('eventType') as 'all' | 'scan' | 'arb' | 'system' | null;
+    const arbType = searchParams.get('arbType') as 'all' | 'direct' | 'cross' | 'internal' | null;
+    const cursor = searchParams.get('before');
+    const [cursorTime, cursorId] = cursor?.split('|') ?? [];
+    const before = cursorTime && Number.isInteger(Number(cursorId))
+      ? { scannedAt: cursorTime, id: Number(cursorId) }
+      : undefined;
 
-    const { rows: results, total, uniqueMarkets } = await queryScanHistory({
+    const { rows: results, total, uniqueMarkets, summary } = await queryScanHistory({
       marketId,
       minRoi,
       positiveArbOnly,
@@ -35,9 +42,13 @@ export async function GET(request: NextRequest) {
       toDate,
       limit,
       before,
+      search,
+      eventType: eventType ?? undefined,
+      arbType: arbType ?? undefined,
     });
 
-    const nextCursor = results.length === limit ? results[results.length - 1].scanned_at : undefined;
+    const last = results[results.length - 1];
+    const nextCursor = results.length === limit ? `${last.scanned_at}|${last.id}` : undefined;
 
     // UI-015: resolve human-readable market names. Prefer the name stored at
     // scan time (market_title), fall back to a live join with saved markets.
@@ -48,14 +59,14 @@ export async function GET(request: NextRequest) {
       nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
       categoryMap = new Map(saved.map((m) => [m.id, m.category ?? '']));
     } catch { /* name/category resolution is best-effort */ }
-    const enriched = results.map((r: any) => ({
+    const enriched = results.map((r) => ({
       ...r,
       market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
       category: categoryMap.get(r.market_id) ?? null,
     }));
 
     return NextResponse.json(
-      { logs: enriched, count: enriched.length, total, uniqueMarkets, nextCursor },
+      { logs: enriched, count: enriched.length, total, uniqueMarkets, summary, nextCursor },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -63,7 +74,7 @@ export async function GET(request: NextRequest) {
         },
       }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
       { error: clientSafeError(err, 'Failed to fetch logs') },
       { status: 500 }

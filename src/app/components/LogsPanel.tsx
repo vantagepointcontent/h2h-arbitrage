@@ -11,8 +11,8 @@ import {
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { classifyArbType, getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import {
   buildHistoricalLegs,
@@ -66,6 +66,9 @@ const EVENT_TYPE_OPTIONS: { key: EventType; label: string }[] = [
 type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "apy" | "positive_arb_count" | "matched_count";
 type SortDir = "asc" | "desc";
 
+const LOG_ROW_HEIGHT = 37;
+const LOG_RENDER_WINDOW = 100;
+
 export default function LogsPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [savedMarkets, setSavedMarkets] = useState<Map<string, { title: string; expiryDate?: string | null }>>(new Map());
@@ -75,9 +78,9 @@ export default function LogsPanel() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [minRoi, setMinRoi] = useState("");
-  const [positiveArbOnly, setPositiveArbOnly] = useState(false);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [positiveArbOnly, setPositiveArbOnly] = useState(true);
+  const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 86_400_000).toISOString());
+  const [toDate, setToDate] = useState(() => new Date().toISOString());
   const [eventType, setEventType] = useState<EventType>("all");
   const [arbTypeFilter, setArbTypeFilter] = useState<ArbTypeFilter>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -85,11 +88,19 @@ export default function LogsPanel() {
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>("scanned_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [tableScrollTop, setTableScrollTop] = useState(0);
 
   // Expand row
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<{ totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } } | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const requestGeneration = useRef(0);
+  const loadingMoreGeneration = useRef<number | null>(null);
 
   // UI-034: unique markets count from SQL COUNT(DISTINCT market_id)
   const [uniqueMarkets, setUniqueMarkets] = useState<number | null>(null);
@@ -98,66 +109,111 @@ export default function LogsPanel() {
   const [exportCount, setExportCount] = useState<number | null>(null);
   const [exportCountLoading, setExportCountLoading] = useState(false);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const updateSearchQuery = useCallback((value: string) => {
+    // Invalidate an in-flight append in the input event, before debounce starts
+    // the replacement query. This also clears the visible append state without
+    // a synchronous state update inside an effect.
+    requestGeneration.current += 1;
+    loadingMoreGeneration.current = null;
+    setLoadingMore(false);
+    setSearchQuery(value);
+  }, []);
+
+  const buildParams = useCallback((before?: string) => {
+    const params = new URLSearchParams();
+    params.set("limit", "250");
+    if (before) params.set("before", before);
+    if (minRoi) params.set("minRoi", minRoi);
+    if (positiveArbOnly) params.set("positiveArbOnly", "true");
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (eventType !== "all") params.set("eventType", eventType);
+    if (arbTypeFilter !== "all") params.set("arbType", arbTypeFilter);
+    return params;
+  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter]);
+
   const fetchLogs = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    loadingMoreGeneration.current = null;
+    setLoadingMore(false);
     setLoading(true);
     setError("");
+    setLoadMoreError("");
     setNextCursor(undefined);
     try {
-      const params = new URLSearchParams();
-      params.set("limit", "100");
-      if (minRoi) params.set("minRoi", minRoi);
-      if (positiveArbOnly) params.set("positiveArbOnly", "true");
-      if (fromDate) params.set("fromDate", fromDate);
-      if (toDate) params.set("toDate", toDate);
-
+      const params = buildParams();
       const res = await fetch(`/api/logs?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
+      if (generation !== requestGeneration.current) return;
+      if (res.ok === false) throw new Error(data.error || "Failed to fetch logs");
       if (data.error) {
         setError(data.error);
       } else {
         setLogs(data.logs || []);
-        setNextCursor(data.nextCursor);
+        setNextCursor((data.logs || []).length >= data.total ? undefined : data.nextCursor);
         setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
+        setTotal(typeof data.total === "number" ? data.total : (data.logs || []).length);
+        setSummary(data.summary ?? null);
       }
     } catch (e: unknown) {
-      setError((e instanceof Error ? e.message : String(e)) || "Failed to fetch logs");
+      if (generation === requestGeneration.current) setError((e instanceof Error ? e.message : String(e)) || "Failed to fetch logs");
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [minRoi, positiveArbOnly, fromDate, toDate]);
+  }, [buildParams]);
 
   const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || loadingMoreGeneration.current !== null) return;
+    const generation = requestGeneration.current;
+    loadingMoreGeneration.current = generation;
     setLoadingMore(true);
+    setLoadMoreError("");
     try {
-      const params = new URLSearchParams();
-      params.set("limit", "100");
-      params.set("before", nextCursor);
-      if (minRoi) params.set("minRoi", minRoi);
-      if (positiveArbOnly) params.set("positiveArbOnly", "true");
-      if (fromDate) params.set("fromDate", fromDate);
-      if (toDate) params.set("toDate", toDate);
-
+      const params = buildParams(nextCursor);
       const res = await fetch(`/api/logs?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
+      if (generation !== requestGeneration.current) return;
+      if (res.ok === false) throw new Error(data.error || "Failed to load more logs");
       if (data.error) {
-        setError(data.error);
+        setLoadMoreError(data.error);
       } else {
-        setLogs(prev => [...prev, ...(data.logs || [])]);
-        setNextCursor(data.nextCursor);
-        setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
+        setLogs(prev => {
+          const ids = new Set(prev.map((row) => row.id));
+          const combined = [...prev, ...(data.logs || []).filter((row: LogEntry) => !ids.has(row.id))];
+          setNextCursor(combined.length >= data.total ? undefined : data.nextCursor);
+          return combined;
+        });
       }
     } catch (e: unknown) {
-      setError((e instanceof Error ? e.message : String(e)) || "Failed to load more logs");
+      if (generation === requestGeneration.current) setLoadMoreError((e instanceof Error ? e.message : String(e)) || "Failed to load more logs");
     } finally {
-      setLoadingMore(false);
+      if (loadingMoreGeneration.current === generation) {
+        loadingMoreGeneration.current = null;
+        if (generation === requestGeneration.current) setLoadingMore(false);
+      }
     }
-  }, [nextCursor, loadingMore, minRoi, positiveArbOnly, fromDate, toDate]);
+  }, [nextCursor, buildParams]);
 
   useEffect(() => {
     const run = async () => { await fetchLogs(); };
     void run();
   }, [fetchLogs]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !nextCursor || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+    }, { rootMargin: "600px 0px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore, nextCursor]);
 
   // Auto-refresh: poll every 15s for real-time log streaming
   useEffect(() => {
@@ -181,42 +237,9 @@ export default function LogsPanel() {
       .catch(() => {});
   }, []);
 
-  // Filter by search query (market_id, market name, or strategy) + event type + arb type
-  const filtered = useMemo(() => {
-    let result = logs;
-    
-    // Event type filter
-    if (eventType !== "all") {
-      result = result.filter((l) => {
-        if (eventType === "arb") return l.positive_arb_count > 0;
-        if (eventType === "scan") return l.positive_arb_count === 0;
-        if (eventType === "system") return l.matched_count === 0 || l.kalshi_count === 0 || l.pm_count === 0;
-        return true;
-      });
-    }
-    
-    // Arb type filter
-    if (arbTypeFilter !== "all") {
-      result = result.filter((l) => classifyArbType(l.strategy) === arbTypeFilter);
-    }
-    
-    if (!searchQuery.trim()) return result;
-    const q = searchQuery.toLowerCase();
-    return result.filter(
-      (l) => {
-        const marketName = l.market_name ?? l.market_title ?? savedMarkets.get(l.market_id)?.title;
-        return (
-          l.market_id?.toLowerCase().includes(q) ||
-          marketName?.toLowerCase().includes(q) ||
-          l.strategy?.toLowerCase().includes(q)
-        );
-      }
-    );
-  }, [logs, searchQuery, savedMarkets, eventType, arbTypeFilter]);
-
   // Sort
   const sorted = useMemo(() => {
-    const arr = [...filtered];
+    const arr = [...logs];
     arr.sort((a, b) => {
       let aVal: string | number = 0;
       let bVal: string | number = 0;
@@ -249,7 +272,15 @@ export default function LogsPanel() {
       return sortDir === "asc" ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
     return arr;
-  }, [filtered, sortKey, sortDir]);
+  }, [logs, sortKey, sortDir]);
+
+  const visibleWindow = useMemo(() => {
+    const maxStart = Math.max(0, sorted.length - LOG_RENDER_WINDOW);
+    const start = Math.min(Math.max(0, Math.floor(tableScrollTop / LOG_ROW_HEIGHT) - 10), maxStart);
+    const end = Math.min(sorted.length, start + LOG_RENDER_WINDOW);
+    return { start, end, rows: sorted.slice(start, end) };
+  }, [sorted, tableScrollTop]);
+
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -267,8 +298,11 @@ export default function LogsPanel() {
     if (positiveArbOnly) params.set("positiveArbOnly", "true");
     if (fromDate) params.set("fromDate", fromDate);
     if (toDate) params.set("toDate", toDate);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (eventType !== "all") params.set("eventType", eventType);
+    if (arbTypeFilter !== "all") params.set("arbType", arbTypeFilter);
     return `/api/logs/export?${params.toString()}`;
-  }, [minRoi, positiveArbOnly, fromDate, toDate]);
+  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter]);
   const tradeExportUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (fromDate) params.set("fromDate", fromDate);
@@ -294,29 +328,28 @@ export default function LogsPanel() {
     return () => { cancelled = true; };
   }, [exportUrl]);
 
-  // UI-035: date-range presets
+  // UI-046: the Today preset is a precise rolling 24-hour window.
   const setDateRange = useCallback((preset: "today" | "7d" | "30d" | "month") => {
     const now = new Date();
-    const iso = (d: Date) => d.toISOString().split("T")[0];
     let from: Date;
-    let to: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let to: Date = now;
     switch (preset) {
       case "today":
-        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        from = new Date(now.getTime() - 86_400_000);
         break;
       case "7d":
-        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+        from = new Date(now.getTime() - 7 * 86_400_000);
         break;
       case "30d":
-        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+        from = new Date(now.getTime() - 30 * 86_400_000);
         break;
       case "month":
         from = new Date(now.getFullYear(), now.getMonth(), 1);
         to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
     }
-    setFromDate(iso(from));
-    setToDate(iso(to));
+    setFromDate(from.toISOString());
+    setToDate(to.toISOString());
   }, []);
 
 
@@ -326,28 +359,10 @@ export default function LogsPanel() {
     return `This will export ${exportCount.toLocaleString()} row${exportCount === 1 ? "" : "s"}`;
   }, [exportCount, exportCountLoading]);
 
-  // Arb type summary counts (from all logs, not filtered)
-  const arbTypeCounts = useMemo(() => {
-    let direct = 0, cross = 0, internal = 0;
-    for (const l of logs) {
-      const t = classifyArbType(l.strategy);
-      if (t === 'direct') direct++;
-      else if (t === 'cross') cross++;
-      else if (t === 'internal') internal++;
-    }
-    return { direct, cross, internal };
-  }, [logs]);
+  const arbTypeCounts = summary?.arbTypeCounts ?? { direct: 0, cross: 0, internal: 0 };
 
   // Stats summary
-  const stats = useMemo(() => {
-    if (!sorted.length) return null;
-    const totalArbs = sorted.reduce((s, l) => s + (l.positive_arb_count ?? 0), 0);
-    const avgRoi = sorted.reduce((s, l) => s + (l.best_roi_pct ?? 0), 0) / sorted.length;
-    const bestRoi = Math.max(...sorted.map((l) => l.best_roi_pct ?? 0));
-    const worstRoi = Math.min(...sorted.map((l) => l.best_roi_pct ?? 0));
-    const totalProfit = sorted.reduce((s, l) => s + (l.best_profit ?? 0), 0);
-    return { totalArbs, avgRoi, bestRoi, worstRoi, totalProfit, count: sorted.length };
-  }, [sorted]);
+  const stats = summary ? { ...summary, count: total } : null;
 
   const fmtPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
   const fmtUsd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -455,13 +470,14 @@ export default function LogsPanel() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {/* Search */}
           <div className="md:col-span-2">
-            <label className="block text-[10px] text-[#8A9BA8] mb-1">Search (market name, ID, or strategy)</label>
+            <label htmlFor="logs-search" className="block text-[10px] text-[#8A9BA8] mb-1">Search (market name, ID, or strategy)</label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A9BA8]" />
               <input
+                id="logs-search"
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => updateSearchQuery(e.target.value)}
                 placeholder="Search..."
                 className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
               />
@@ -485,9 +501,9 @@ export default function LogsPanel() {
           <div>
             <label className="block text-[10px] text-[#8A9BA8] mb-1">From Date</label>
             <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
+              type="datetime-local"
+              value={fromDate.slice(0, 16)}
+              onChange={(e) => setFromDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
               className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
@@ -496,9 +512,9 @@ export default function LogsPanel() {
           <div>
             <label className="block text-[10px] text-[#8A9BA8] mb-1">To Date</label>
             <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
+              type="datetime-local"
+              value={toDate.slice(0, 16)}
+              onChange={(e) => setToDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
               className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
@@ -509,13 +525,14 @@ export default function LogsPanel() {
           <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Preset:</span>
           <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
             {[
-              { key: "today", label: "Today" },
+              { key: "today", label: "Latest 24 hours" },
               { key: "7d", label: "Last 7 days" },
               { key: "30d", label: "Last 30 days" },
               { key: "month", label: "Full month" },
             ].map((opt) => (
               <button
                 key={opt.key}
+                title={opt.key === "today" ? "Latest rolling 24 hours ending now" : undefined}
                 onClick={() => setDateRange(opt.key as "today" | "7d" | "30d" | "month")}
                 className="min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors text-[#8A9BA8] hover:text-[#FFFFFF]"
               >
@@ -604,7 +621,11 @@ export default function LogsPanel() {
             No log entries. Run a scan to generate data.
           </div>
         ) : (
-          <div className="overflow-x-auto" data-testid="logs-table-scroll">
+          <div
+            className="max-h-[70vh] overflow-x-auto overflow-y-auto"
+            data-testid="logs-table-scroll"
+            onScroll={(event) => setTableScrollTop(event.currentTarget.scrollTop)}
+          >
             <table className="w-full min-w-[1050px] text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
@@ -669,30 +690,41 @@ export default function LogsPanel() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((log, i) => (
+                {visibleWindow.start > 0 && (
+                  <tr aria-hidden="true"><td colSpan={14} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                )}
+                {visibleWindow.rows.map((log, i) => (
                   <LogRow key={log.id ?? i} log={log} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
+                {visibleWindow.end < sorted.length && (
+                  <tr aria-hidden="true"><td colSpan={14} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Count + Load More */}
+      {/* Count + infinite-scroll status */}
       {!loading && sorted.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-center gap-2" aria-live="polite">
           <div className="text-xs text-[#A8B8C4]">
-            Showing {sorted.length} of {logs.length} entries
+            Loaded {sorted.length.toLocaleString()} of {total.toLocaleString()} entries
           </div>
-          {nextCursor && (
+          <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
+          {loadingMore && <div className="text-xs text-[#8A9BA8]">Loading more results…</div>}
+          {loadMoreError && (
+            <div className="flex items-center gap-2 text-xs text-[#ef4444]">
+              <span>{loadMoreError}</span>
             <button
               onClick={loadMore}
-              disabled={loadingMore}
               className="px-3 py-1.5 rounded-lg bg-[#182533] border border-[#232E3C] text-xs font-medium text-[#A8B8C4] hover:text-[#FFFFFF] hover:border-[#5DBE81]/30 transition-colors disabled:opacity-50"
             >
-              {loadingMore ? "Loading..." : "Load More"}
+              Retry
             </button>
+            </div>
           )}
+          {!nextCursor && !loadingMore && !loadMoreError && <div className="text-xs text-[#8A9BA8]">End of results</div>}
         </div>
       )}
     </div>
@@ -823,7 +855,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={12} className="px-4 py-3">
+          <td colSpan={14} className="px-4 py-3">
             {rawArbs.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>

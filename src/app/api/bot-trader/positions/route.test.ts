@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
-import { getBotPositionMarkets } from '@/lib/bot-positions';
+import { getBotPositionMarkets, pollOpenBotPositions } from '@/lib/bot-positions';
 
-vi.mock('@/lib/bot-positions', () => ({ getBotPositionMarkets: vi.fn() }));
+vi.mock('@/lib/bot-positions', () => ({ getBotPositionMarkets: vi.fn(), pollOpenBotPositions: vi.fn() }));
 
 describe('GET /api/bot-trader/positions', () => {
-  beforeEach(() => vi.mocked(getBotPositionMarkets).mockReset().mockResolvedValue({
-    marketCount: 0, markets: [], nextCursor: null, positions: [],
-  }));
+  beforeEach(() => {
+    vi.mocked(getBotPositionMarkets).mockReset().mockResolvedValue({
+      marketCount: 0, markets: [], nextCursor: null, positions: [],
+    });
+    vi.mocked(pollOpenBotPositions).mockReset().mockResolvedValue({ updated: 0, settled: 0, errors: [] });
+  });
 
   it('accepts status and bounded integer limit', async () => {
     const response = await GET(new Request('http://localhost/api/bot-trader/positions?status=open&limit=25') as never);
@@ -31,6 +34,20 @@ describe('GET /api/bot-trader/positions', () => {
     const response = await GET(new Request('http://localhost/api/bot-trader/positions?status=settled') as never);
     expect(response.status).toBe(200);
     expect(getBotPositionMarkets).toHaveBeenCalledWith({ status: 'settled', limit: 100, cursor: null });
+  });
+
+  it('starts one deduplicated background refresh for overlapping refresh=1 requests', async () => {
+    let finish: (() => void) | undefined;
+    vi.mocked(pollOpenBotPositions).mockReturnValue(new Promise((resolve) => {
+      finish = () => resolve({ updated: 0, settled: 0, errors: [] });
+    }));
+
+    await Promise.all([
+      GET(new Request('http://localhost/api/bot-trader/positions?refresh=1') as never),
+      GET(new Request('http://localhost/api/bot-trader/positions?refresh=1') as never),
+    ]);
+    expect(pollOpenBotPositions).toHaveBeenCalledTimes(1);
+    finish?.();
   });
 
   it('rejects invalid status and malformed limits', async () => {

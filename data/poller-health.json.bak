@@ -1,85 +1,95 @@
 {
-  "status": "degraded",
+  "status": "aborted",
   "baseUrl": "http://localhost:3000",
   "concurrency": 5,
   "intervalMs": "adaptive",
   "adaptiveEnabled": true,
-  "marketCount": 473,
-  "startedAt": "2026-08-07T23:41:47.144Z",
-  "finishedAt": "2026-08-07T23:42:37.213Z",
-  "durationMs": 50069,
-  "successCount": 27,
-  "failureCount": 13,
-  "skippedCount": 425,
-  "avgScanMs": 5951,
-  "maxScanMs": 34041,
+  "marketCount": 503,
+  "startedAt": "2026-08-12T20:05:14.955Z",
+  "finishedAt": "2026-08-12T20:05:53.701Z",
+  "durationMs": 38746,
+  "successCount": 30,
+  "failureCount": 15,
+  "skippedCount": 447,
+  "avgScanMs": 4035,
+  "maxScanMs": 10487,
   "errors": [
     {
-      "market": "New Mexico Governor Election Winner",
-      "error": "timeout after 16416ms (adaptive)",
-      "durationMs": 16416
-    },
-    {
-      "market": "FL-19 Republican Primary Winner",
-      "error": "timeout after 26199ms (adaptive)",
-      "durationMs": 26199
-    },
-    {
-      "market": "MLB: 2026 American League Champion",
-      "error": "timeout after 34041ms (adaptive)",
-      "durationMs": 34041
-    },
-    {
-      "market": "VA-06 House Election Winner",
+      "market": "WY At-Large House Election Winner",
       "error": "HTTP 429",
-      "durationMs": 8
+      "durationMs": 6
     },
     {
-      "market": "VA-07 House Election Winner",
+      "market": "WI-04 House Election Winner",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 4
     },
     {
-      "market": "WA-08 House Election Winner",
+      "market": "WI-05 House Election Winner",
       "error": "HTTP 429",
-      "durationMs": 11
+      "durationMs": 4
     },
     {
-      "market": "WA-09 House Election Winner",
+      "market": "WI-06 House Election Winner",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 3
     },
     {
-      "market": "WI-01 House Election Winner",
+      "market": "WI-07 House Election Winner",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 3
     },
     {
-      "market": "WI-02 House Election Winner",
+      "market": "Clacton by-election Winner",
       "error": "HTTP 429",
-      "durationMs": 2
-    },
-    {
-      "market": "WI-03 House Election Winner",
-      "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 3
     },
     {
       "market": "Next Prime Minister of Sweden",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 5
     },
     {
       "market": "Sweden Parliamentary Election Winner",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 4
+    },
+    {
+      "market": "Quebec General Election Winner",
+      "error": "HTTP 429",
+      "durationMs": 4
+    },
+    {
+      "market": "Who will be the next Prime Minister of Australia after the next election? ",
+      "error": "HTTP 429",
+      "durationMs": 3
+    },
+    {
+      "market": "Florida Governor Republican Primary Winner",
+      "error": "HTTP 429",
+      "durationMs": 4
     },
     {
       "market": "Big Brother Season 28: 3rd Place",
       "error": "HTTP 429",
-      "durationMs": 2
+      "durationMs": 4
+    },
+    {
+      "market": "Big Brother Season 28: 2nd Place",
+      "error": "HTTP 429",
+      "durationMs": 34
+    },
+    {
+      "market": "Big Brother Season 28 Winner",
+      "error": "HTTP 429",
+      "durationMs": 3
+    },
+    {
+      "market": "What will Trump say this week? (August 10 - August 16)",
+      "error": "HTTP 429",
+      "durationMs": 3
     }
   ],
-  "breakerSkipped": 8,
-  "openBreakers": 8
+  "breakerSkipped": 10,
+  "openBreakers": 10
 }

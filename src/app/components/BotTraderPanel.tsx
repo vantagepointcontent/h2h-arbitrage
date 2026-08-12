@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  BarChart3,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -94,6 +95,9 @@ interface BotExecution {
   closedAt: string | null;
   settledAt: string | null;
   lastValuationAt: string | null;
+  valuationStatus?: 'current' | 'stale' | 'unavailable';
+  valuationFailureReason?: string | null;
+  valuationFailureAt?: string | null;
   kalshiUrl?: string | null;
   polymarketUrl?: string | null;
 }
@@ -107,8 +111,13 @@ interface BotPositionMarket {
   kalshiUrl?: string | null;
   polymarketUrl?: string | null;
   currentLiveStakeCents: number;
-  currentValueCents: number;
-  unrealizedPnlCents: number;
+  currentValueCents: number | null;
+  unrealizedPnlCents: number | null;
+  valuedExecutionCount?: number;
+  unavailableExecutionCount?: number;
+  staleExecutionCount?: number;
+  oldestStaleValuationAt?: string | null;
+  valuedLiveStakeCents?: number;
   realizedPnlCents: number;
   status: PositionStatus;
   latestExecutionAt: string;
@@ -296,6 +305,15 @@ function MetricCard({ label, value, valueClass = '' }: { label: string; value: s
   );
 }
 
+function PnlMetricCard({ label, value, amount, description }: { label: string; value: string; amount: number; description: string }) {
+  return (
+    <div className="min-w-0 border-b border-[var(--border-subtle)] px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <div title={description} className="w-fit cursor-help text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)] underline decoration-dotted decoration-[var(--border-strong)] underline-offset-4">{label}</div>
+      <div className={`mt-1 text-lg font-semibold tabular-nums ${pnlClass(amount)}`}>{value}</div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: PositionStatus }) {
   const styles: Record<PositionStatus, string> = {
     open: 'bg-[var(--status-positive)]/15 text-[var(--status-positive)]',
@@ -321,6 +339,10 @@ function ExecutionDetailRow({ execution }: { execution: BotExecution }) {
           <span>Buy Cost <strong aria-label={`Execution ${execution.executionId} Buy Cost`} className="tabular-nums">{formatCents(execution.executionBuyCostCents)}</strong> <span className="text-[var(--text-muted)]">({formatCents(execution.executionPrincipalCents)} + {formatCents(execution.executionFeesCents)} fees)</span></span>
           <StatusBadge status={execution.status} />
           <span>Remaining exposure: <strong aria-label={`Execution ${execution.executionId} remaining exposure`} className="tabular-nums">{formatCents(execution.remainingOpenCostCents)}</strong></span>
+          <span>Current Value <strong>{execution.currentValueCents == null ? 'Unavailable' : formatCents(execution.currentValueCents)}</strong></span>
+          <span>Unrealized P&amp;L <strong className={execution.unrealizedPnlCents == null ? '' : pnlClass(execution.unrealizedPnlCents)}>{execution.unrealizedPnlCents == null ? 'Unavailable' : formatCents(execution.unrealizedPnlCents, true)}</strong></span>
+          {execution.valuationStatus === 'stale' && <span className="text-[var(--status-warning)]" title={execution.valuationFailureReason ?? undefined}>Stale quote · {execution.valuationFailureAt ? timeAgo(execution.valuationFailureAt) : 'refresh failed'} · {execution.valuationFailureReason}</span>}
+          {execution.valuationStatus === 'unavailable' && <span className="text-[var(--status-warning)]" title={execution.valuationFailureReason ?? undefined}>Unavailable · {execution.valuationFailureReason ?? 'No successful executable quote'}</span>}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-[var(--text-secondary)]">
           {execution.legs.map((leg) => (
@@ -354,7 +376,7 @@ export default function BotTraderPanel() {
   const [productionConfirmation, setProductionConfirmation] = useState('');
   const requestIdRef = useRef(0);
 
-  const load = useCallback(async (initial = false) => {
+  const load = useCallback(async (initial = false, refreshValuations = initial) => {
     const requestId = ++requestIdRef.current;
     if (initial) setLoading(true);
     else setRefreshing(true);
@@ -362,7 +384,7 @@ export default function BotTraderPanel() {
     try {
       const [analyticsRes, positionsRes, statusRes] = await Promise.all([
         fetch(`/api/bot-trader/analytics?method=${analyticsMethod}&mode=${analyticsMode}`, { cache: 'no-store' }),
-        fetch(`/api/bot-trader/positions?status=${filter}`, { cache: 'no-store' }),
+        fetch(`/api/bot-trader/positions?status=${filter}&refresh=${refreshValuations ? '1' : '0'}`, { cache: 'no-store' }),
         fetch('/api/bot-trader/status', { cache: 'no-store' }),
       ]);
       const [analyticsData, positionsData, statusData] = await Promise.all([
@@ -400,8 +422,8 @@ export default function BotTraderPanel() {
   const sortedMarkets = useMemo(() => [...markets].sort((a, b) => {
     const values: Record<SortKey, [number, number]> = {
       openedAt: [Date.parse(a.latestExecutionAt), Date.parse(b.latestExecutionAt)],
-      pnl: [a.status === 'open' || a.status === 'partially_closed' ? a.unrealizedPnlCents : a.realizedPnlCents, b.status === 'open' || b.status === 'partially_closed' ? b.unrealizedPnlCents : b.realizedPnlCents],
-      roi: [a.currentLiveStakeCents > 0 ? Math.round(a.unrealizedPnlCents * 10_000 / a.currentLiveStakeCents) : 0, b.currentLiveStakeCents > 0 ? Math.round(b.unrealizedPnlCents * 10_000 / b.currentLiveStakeCents) : 0],
+      pnl: [a.status === 'open' || a.status === 'partially_closed' ? a.unrealizedPnlCents ?? Number.NEGATIVE_INFINITY : a.realizedPnlCents, b.status === 'open' || b.status === 'partially_closed' ? b.unrealizedPnlCents ?? Number.NEGATIVE_INFINITY : b.realizedPnlCents],
+      roi: [(a.valuedLiveStakeCents ?? a.currentLiveStakeCents) > 0 && a.unrealizedPnlCents != null ? Math.round(a.unrealizedPnlCents * 10_000 / (a.valuedLiveStakeCents ?? a.currentLiveStakeCents)) : Number.NEGATIVE_INFINITY, (b.valuedLiveStakeCents ?? b.currentLiveStakeCents) > 0 && b.unrealizedPnlCents != null ? Math.round(b.unrealizedPnlCents * 10_000 / (b.valuedLiveStakeCents ?? b.currentLiveStakeCents)) : Number.NEGATIVE_INFINITY],
     };
     const [left, right] = values[sortKey];
     return sortDirection === 'asc' ? left - right : right - left;
@@ -481,7 +503,7 @@ export default function BotTraderPanel() {
     <section className="space-y-3" aria-label="BotTrader Analytics">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]"><Bot className="h-5 w-5 text-[var(--status-positive)]" /> BotTrader Analytics</h2>
-        <button onClick={() => void load(false)} disabled={refreshing} className="min-h-11 min-w-11 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50" aria-label="Refresh BotTrader analytics"><RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
+        <button onClick={() => void load(false, true)} disabled={refreshing} className="min-h-11 min-w-11 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50" aria-label="Refresh BotTrader analytics"><RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
       </div>
 
       {error && <div role="alert" className="rounded-lg border border-[var(--status-negative)]/40 bg-[var(--status-negative)]/10 px-3 py-2 text-xs text-[var(--status-negative)]">{error}</div>}
@@ -524,41 +546,28 @@ export default function BotTraderPanel() {
         <MetricCard label="Win Rate" value={formatBps(analytics.settledPositions.winRateBps)} />
       </div>
 
-      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Performance by selection method</div><div className="text-[10px] text-[var(--text-secondary)]">Fee-net values. Legacy attribution is kept separate.</div></div>
-          <div className="flex flex-wrap gap-2"><div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Analytics method filter">{(['all', 'roi', 'apy', 'hybrid'] as const).map((value) => <button key={value} onClick={() => setAnalyticsMethod(value)} aria-pressed={analyticsMethod === value} className={`min-h-11 rounded-md px-3 text-xs uppercase ${analyticsMethod === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{value}</button>)}</div><label className="text-xs text-[var(--text-secondary)]">Mode <select aria-label="Analytics trading mode" value={analyticsMode} onChange={(event) => setAnalyticsMode(event.target.value as AnalyticsMode)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="all">All</option><option value="paper">Paper</option><option value="production">Production</option></select></label></div>
+      <section aria-label="Performance analytics" className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+          <div className="flex gap-2.5"><BarChart3 className="mt-0.5 h-4 w-4 text-[var(--status-positive)]" /><div><h3 className="text-sm font-semibold text-[var(--text-primary)]">Performance analytics</h3><p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">Daily fee-net P&amp;L · {analyticsMethod.toUpperCase()} selection · {analyticsMode === 'all' ? 'paper + production' : analyticsMode}</p></div></div>
+          <div className="flex flex-wrap items-center gap-2"><div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Analytics method filter">{(['all', 'roi', 'apy', 'hybrid'] as const).map((value) => <button key={value} onClick={() => setAnalyticsMethod(value)} aria-pressed={analyticsMethod === value} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2.5 text-[11px] font-semibold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${analyticsMethod === value ? 'bg-[var(--surface-selected)] text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}</div><label className="text-[11px] font-medium text-[var(--text-secondary)]">Mode <select aria-label="Analytics trading mode" value={analyticsMode} onChange={(event) => setAnalyticsMode(event.target.value as AnalyticsMode)} className="ml-1 min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2 text-xs text-[var(--text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"><option value="all">All</option><option value="paper">Paper</option><option value="production">Production</option></select></label></div>
         </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Method comparison">
-          {(['roi', 'apy', 'hybrid', 'legacy'] as const).map((method) => { const item = analytics.perMethod[method] ?? EMPTY_METHOD; const netPnl = item.realizedPnlCents + item.unrealizedPnlCents; return <button type="button" role="listitem" key={method} onClick={() => method !== 'legacy' && setAnalyticsMethod(method)} className={`rounded-lg border p-3 text-left ${analyticsMethod === method ? 'border-[var(--status-positive)]' : 'border-[var(--border-subtle)]'} bg-[var(--surface-workspace)]`} aria-label={`${method} method performance`}><div className="text-xs font-bold uppercase text-[var(--text-primary)]">{method === 'legacy' ? 'Legacy / Unknown' : method}</div><div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-[var(--text-secondary)]"><span>Trades</span><strong className="text-right text-[var(--text-primary)]">{item.tradeCount}</strong><span>Capital</span><strong className="text-right text-[var(--text-primary)]">{formatCents(item.deployedCapitalCents)}</strong><span>Net P&amp;L</span><strong className={`text-right ${pnlClass(netPnl)}`}>{formatCents(netPnl, true)}</strong><span>Win rate</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.winRateBps)}</strong><span>Entry ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.averageEntryRoiBps)}</strong><span>Current ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.currentRoiBps, true)}</strong><span>Selection APY</span><strong className="text-right text-[var(--text-primary)]">{item.averageApyPct == null ? 'No data' : `${ONE_DECIMAL.format(item.averageApyPct)}%`}</strong></div></button>; })}
+        <div className="grid gap-2 border-b border-[var(--border-subtle)] p-3 md:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Method comparison">
+          {(['roi', 'apy', 'hybrid', 'legacy'] as const).map((method) => { const item = analytics.perMethod[method] ?? EMPTY_METHOD; const netPnl = item.realizedPnlCents + item.unrealizedPnlCents; return <button type="button" role="listitem" key={method} onClick={() => method !== 'legacy' && setAnalyticsMethod(method)} className={`flex w-full flex-col !items-stretch !justify-start rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${analyticsMethod === method ? 'border-[var(--status-positive)]/50 bg-[var(--surface-selected)]' : 'border-[var(--border-subtle)] bg-[var(--surface-workspace)] hover:border-[var(--border-strong)]'}`} aria-label={`${method} method performance`}><div className="text-xs font-bold uppercase text-[var(--text-primary)]">{method === 'legacy' ? 'Legacy / Unknown' : method}</div><div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-[var(--text-secondary)]"><span>Trades</span><strong className="text-right text-[var(--text-primary)]">{item.tradeCount}</strong><span>Capital</span><strong className="text-right text-[var(--text-primary)]">{formatCents(item.deployedCapitalCents)}</strong><span>Net P&amp;L</span><strong className={`text-right ${pnlClass(netPnl)}`}>{formatCents(netPnl, true)}</strong><span>Win rate</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.winRateBps)}</strong><span>Entry ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.averageEntryRoiBps)}</strong><span>Current ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.currentRoiBps, true)}</strong><span>Selection APY</span><strong className="text-right text-[var(--text-primary)]">{item.averageApyPct == null ? 'Unavailable' : `${ONE_DECIMAL.format(item.averageApyPct)}%`}</strong></div></button>; })}
         </div>
-        <div className="mt-3" aria-label="Daily fee-net performance chart"><div className="mb-1 text-[10px] font-semibold uppercase text-[var(--text-secondary)]">Daily net P&amp;L · {analyticsMethod.toUpperCase()} · {analyticsMode}</div>{analytics.dailyPnl.length === 0 ? <div className="rounded border border-dashed border-[var(--border-strong)] py-5 text-center text-xs text-[var(--text-secondary)]">No performance data for this filter.</div> : <div className="flex h-28 items-end gap-1 overflow-x-auto">{analytics.dailyPnl.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; const peak = Math.max(...analytics.dailyPnl.map((row) => Math.abs(row.realizedPnlCents + row.unrealizedPnlCents)), 1); const height = Math.max(8, Math.abs(pnl) / peak * 100); return <div key={day.date} className="flex min-w-8 flex-1 flex-col items-center justify-end" title={`${day.date}: ${formatCents(pnl, true)}`}><div className={`w-full rounded-t ${pnl >= 0 ? 'bg-[var(--status-positive)]' : 'bg-[var(--status-negative)]'}`} style={{ height: `${height}%` }} /><span className="mt-1 text-[8px] text-[var(--text-muted)]">{day.date.slice(5)}</span></div>; })}</div>}</div>
-        <div className="mt-3" aria-label="Method overlay chart">
-          <div className="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Overlay method series">
-            <span className="text-[10px] font-semibold uppercase text-[var(--text-secondary)]">Overlay</span>
-            {(['roi', 'apy', 'hybrid'] as const).map((method) => <button type="button" key={method} aria-label={`${method} overlay series`} aria-pressed={overlayMethods[method]} onClick={() => setOverlayMethods((current) => ({ ...current, [method]: !current[method] }))} className={`min-h-9 rounded px-2 text-[10px] font-bold uppercase ${overlayMethods[method] ? 'bg-[var(--status-info)] text-black' : 'border border-[var(--border-strong)] text-[var(--text-secondary)]'}`}>{method}</button>)}
-          </div>
-          <div className="grid gap-2" aria-label="Daily P&L overlay series">
-            {(['roi', 'apy', 'hybrid'] as const).filter((method) => overlayMethods[method]).map((method) => { const series = analytics.dailyPnlByMethod?.[method] ?? []; const peak = Math.max(...series.map((day) => Math.abs(day.realizedPnlCents + day.unrealizedPnlCents)), 1); return <div key={method} className="grid grid-cols-[4rem_1fr] items-center gap-2"><span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">{method}</span><div className="flex h-12 items-end gap-1" aria-label={`${method} daily net P&L series`}>{series.length === 0 ? <span className="self-center text-[10px] text-[var(--text-muted)]">No data</span> : series.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; return <div key={day.date} className={`min-w-3 flex-1 rounded-t ${pnl >= 0 ? 'bg-[var(--status-positive)]' : 'bg-[var(--status-negative)]'}`} style={{ height: `${Math.max(6, Math.abs(pnl) / peak * 100)}%` }} title={`${method.toUpperCase()} ${day.date}: ${formatCents(pnl, true)}`} />; })}</div></div>; })}
-          </div>
-        </div>
-      </div>
+        <div className="grid gap-3 p-3 lg:grid-cols-2"><div aria-label="Daily fee-net performance chart" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3"><div className="text-xs font-semibold text-[var(--text-primary)]">Daily fee-net P&amp;L</div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Showing available daily observations</div>{analytics.dailyPnl.length === 0 ? <div className="mt-3 flex min-h-20 items-center justify-center rounded-lg border border-dashed border-[var(--border-strong)] px-4 text-center text-xs text-[var(--text-secondary)]">No performance data for this filter.</div> : <div className="mt-3 flex h-24 items-end gap-1 overflow-x-auto border-b border-[var(--border-strong)]">{analytics.dailyPnl.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; const peak = Math.max(...analytics.dailyPnl.map((row) => Math.abs(row.realizedPnlCents + row.unrealizedPnlCents)), 1); return <div key={day.date} className="flex min-w-9 flex-1 flex-col items-center justify-end" title={`${day.date}: ${formatCents(pnl, true)} · ${day.trades} trades`}><div className={`w-full max-w-12 rounded-t ${pnl > 0 ? 'bg-[var(--status-positive)]/80' : pnl < 0 ? 'bg-[var(--status-negative)]/80' : 'bg-[var(--text-muted)]/60'}`} style={{ height: `${Math.max(8, Math.abs(pnl) / peak * 72)}px` }} /><span className="mt-1 text-[9px] text-[var(--text-secondary)]">{day.date.slice(5)}</span></div>; })}</div>}</div><div aria-label="Method overlay chart" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="text-xs font-semibold text-[var(--text-primary)]">Method comparison</div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Daily net P&amp;L by ranking source</div></div><div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Overlay method series">{(['roi', 'apy', 'hybrid'] as const).map((method) => <button type="button" key={method} aria-label={`${method} overlay series`} aria-pressed={overlayMethods[method]} onClick={() => setOverlayMethods((current) => ({ ...current, [method]: !current[method] }))} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2 text-[10px] font-bold uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${overlayMethods[method] ? 'bg-[var(--surface-selected)] text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'}`}>{method}</button>)}</div></div><div className="mt-3 grid gap-2" aria-label="Daily P&L overlay series">{(['roi', 'apy', 'hybrid'] as const).filter((method) => overlayMethods[method]).map((method) => { const series = analytics.dailyPnlByMethod?.[method] ?? []; const peak = Math.max(...series.map((day) => Math.abs(day.realizedPnlCents + day.unrealizedPnlCents)), 1); return <div key={method} className="grid min-h-10 grid-cols-[3.5rem_1fr] items-center gap-2 rounded-md border border-[var(--border-subtle)] px-2 py-1.5"><span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">{method}</span>{series.length === 0 ? <span className="text-[10px] text-[var(--text-secondary)]">{method.toUpperCase()} has no observations for this period.</span> : <div className="flex h-7 items-end gap-1 border-b border-[var(--border-strong)]" aria-label={`${method} daily net P&L series`}>{series.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; return <div key={day.date} className={`min-w-2 flex-1 rounded-t ${pnl > 0 ? 'bg-[var(--status-positive)]/75' : pnl < 0 ? 'bg-[var(--status-negative)]/75' : 'bg-[var(--text-muted)]/60'}`} style={{ height: `${Math.max(4, Math.abs(pnl) / peak * 24)}px` }} title={`${method.toUpperCase()} ${day.date}: ${formatCents(pnl, true)} · ${day.trades} trades`} />; })}</div>}</div>; })}</div></div></div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <MetricCard label="Unrealized" value={formatCents(unrealized, true)} valueClass={pnlClass(unrealized)} />
-        <MetricCard label="Realized" value={formatCents(realized, true)} valueClass={pnlClass(realized)} />
-        <MetricCard label="Total P&L" value={formatCents(totalPnl, true)} valueClass={pnlClass(totalPnl)} />
-      </div>
+      <section aria-label="P&L summary" className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]"><div className="border-b border-[var(--border-subtle)] px-4 py-2"><h3 className="text-xs font-semibold text-[var(--text-primary)]">Portfolio P&amp;L</h3><p className="text-[10px] text-[var(--text-secondary)]">Fee-net performance at the latest available valuations</p></div><div className="grid sm:grid-cols-3"><PnlMetricCard label="Unrealized" value={formatCents(unrealized, true)} amount={unrealized} description="Current fee-net profit or loss on open positions using the latest available valuations." /><PnlMetricCard label="Realized" value={formatCents(realized, true)} amount={realized} description="Fee-net profit or loss locked in by settled or closed positions." /><PnlMetricCard label="Total P&L" value={formatCents(totalPnl, true)} amount={totalPnl} description="Combined realized and unrealized fee-net profit or loss." /></div></section>
 
-      <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
-              {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
+        <div data-testid="positions-toolbar" className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+          <div><div className="flex items-center gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">Positions</h3><span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{INTEGER.format(sortedMarkets.length)} {sortedMarkets.length === 1 ? 'market' : 'markets'}</span></div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Position status filter">
+              {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} aria-pressed={filter === value} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2.5 text-xs capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${filter === value ? 'bg-[var(--surface-selected)] font-medium text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
             </div>
-            <label className="text-xs text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
-            <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
+            <label className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2 text-xs text-[var(--text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
+            <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
           </div>
         </div>
 
@@ -567,25 +576,39 @@ export default function BotTraderPanel() {
             <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand execution history" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Durable executions in this market" className="px-2 py-2 text-center font-medium">Executions</th><th title="Current open exposure only" className="px-2 py-2 text-left font-medium">Exposure</th><th title="Cumulative fee-inclusive cost of open exposure" className="px-2 py-2 text-right font-medium">Live Stake</th><th title="Current market value of remaining open exposure" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return on remaining open cost" className="px-2 py-2 text-right font-medium">ROI</th><th title="Market state" className="px-2 py-2 text-center font-medium">Status</th><th title="Most recent execution" className="px-2 py-2 text-right font-medium">Latest</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedMarkets.map((market) => {
-                const showExecutions = executionVisibility[market.marketKey] ?? market.executions.length > 1;
+                const expansionKey = market.marketId ?? market.marketKey;
+                const showExecutions = executionVisibility[expansionKey] ?? false;
                 const pnl = market.status === 'open' || market.status === 'partially_closed' ? market.unrealizedPnlCents : market.realizedPnlCents;
-                const roiBps = market.currentLiveStakeCents > 0 ? Math.round(market.unrealizedPnlCents * 10_000 / market.currentLiveStakeCents) : 0;
+                const valuedStake = market.valuedLiveStakeCents ?? market.currentLiveStakeCents;
+                const roiBps = valuedStake > 0 && market.unrealizedPnlCents != null ? Math.round(market.unrealizedPnlCents * 10_000 / valuedStake) : null;
                 const firstExecution = market.executions[0];
                 const kalshiLeg = firstExecution?.legs.find((leg) => leg.venue === 'kalshi');
                 const pmLeg = firstExecution?.legs.find((leg) => leg.venue === 'polymarket');
                 const kalshiUrl = market.kalshiUrl ?? firstExecution?.kalshiUrl;
                 const polymarketUrl = market.polymarketUrl ?? firstExecution?.polymarketUrl;
-                const toggle = () => setExecutionVisibility((current) => ({ ...current, [market.marketKey]: !showExecutions }));
+                const toggle = () => setExecutionVisibility((current) => ({ ...current, [expansionKey]: !(current[expansionKey] ?? false) }));
                 return <Fragment key={market.marketKey}>
-                  <tr data-testid={`market-${market.marketKey}`} onClick={toggle} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={showExecutions}>
+                  <tr
+                    data-testid={`market-${market.marketKey}`}
+                    tabIndex={0}
+                    onClick={toggle}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+                      event.preventDefault();
+                      toggle();
+                    }}
+                    className="cursor-pointer hover:bg-[var(--border-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)]"
+                    aria-expanded={showExecutions}
+                    aria-label={`${market.marketTitle}, ${showExecutions ? 'expanded' : 'collapsed'}. Press Enter or Space to ${showExecutions ? 'collapse' : 'expand'} executions.`}
+                  >
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); toggle(); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${showExecutions ? 'Collapse' : 'Expand'} ${market.marketTitle}`}>{showExecutions ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={market.marketTitle}>{market.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(market.marketId)}`} aria-label={`Open ${market.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{market.marketTitle}</a> : <span className="block truncate">{market.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{kalshiUrl && <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${(kalshiLeg?.side ?? 'yes').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {(kalshiLeg?.side ?? 'yes').toUpperCase()}</a>}{polymarketUrl && <a href={polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${(pmLeg?.side ?? 'no').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {(pmLeg?.side ?? 'no').toUpperCase()}</a>}{!kalshiUrl && !polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}</div></td>
+                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={market.marketTitle}>{market.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(market.marketId)}`} aria-label={`Open ${market.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate rounded-sm underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)]">{market.marketTitle}</a> : <span className="block truncate">{market.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{kalshiUrl && <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${(kalshiLeg?.side ?? 'yes').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {(kalshiLeg?.side ?? 'yes').toUpperCase()}</a>}{polymarketUrl && <a href={polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${(pmLeg?.side ?? 'no').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {(pmLeg?.side ?? 'no').toUpperCase()}</a>}{!kalshiUrl && !polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}</div></td>
                     <td className="px-2 py-2 text-center tabular-nums">{INTEGER.format(market.executions.length)}</td>
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">Open execution cost</td>
                     <td aria-label={`${market.marketTitle} live stake`} className="px-2 py-2 text-right tabular-nums">{formatCents(market.currentLiveStakeCents)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(market.currentValueCents)}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnlClass(pnl)}`}>{formatCents(pnl, true)}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${pnlClass(roiBps)}`}>{formatBps(roiBps, true)}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{market.currentValueCents == null ? <span title="No complete executable quote is stored">Unavailable</span> : formatCents(market.currentValueCents)}{(market.unavailableExecutionCount ?? 0) > 0 && <div className="text-[9px] text-[var(--status-warning)]">{market.unavailableExecutionCount} unavailable</div>}{(market.staleExecutionCount ?? 0) > 0 && <div className="text-[9px] text-[var(--status-warning)]" title="Some execution values use retained quotes after refresh failures">{market.staleExecutionCount} stale · oldest quote {market.oldestStaleValuationAt ? timeAgo(market.oldestStaleValuationAt) : 'age unavailable'}</div>}</td>
+                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? '' : pnlClass(pnl)}`}>{pnl == null ? 'Unavailable' : formatCents(pnl, true)}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null ? '' : pnlClass(roiBps)}`}>{roiBps == null ? 'Unavailable' : formatBps(roiBps, true)}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge status={market.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(market.latestExecutionAt).toLocaleString()}>{timeAgo(market.latestExecutionAt)}</td>
                   </tr>

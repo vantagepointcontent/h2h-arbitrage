@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
-import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired } from "@/app/lib/page-shared";
+import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
@@ -30,6 +30,7 @@ function OverviewPanelInner({
   timeUntilExpiry,
   formatExpiry,
   onSelectMarket,
+  mode = "markets",
 }: {
   markets: SavedMarket[];
   loading: boolean;
@@ -48,6 +49,7 @@ function OverviewPanelInner({
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
   onSelectMarket: (m: SavedMarket) => void;
+  mode?: "markets" | "opportunities";
 }) {
   // Auto-load on mount only — prevents infinite loop if parent re-creates callback
   useEffect(() => { onLoad(); }, []);
@@ -63,7 +65,7 @@ function OverviewPanelInner({
       case "roi": return (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) === 0;
       case "apy": return getMarketApy(m) === 0;
       case "profit": return (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0) === 0;
-      case "matched": return (m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0) === 0;
+      case "matched": return getCanonicalMatchState(m).status === 'not_scanned';
       case "arbs": {
         const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
         const cnt = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
@@ -110,8 +112,8 @@ function OverviewPanelInner({
       return mul * (pa - pb);
     }
     if (sort === "matched") {
-      const ma = a.liveResult?.matchedCount ?? a.lastScanResult?.matchedCount ?? 0;
-      const mb = b.liveResult?.matchedCount ?? b.lastScanResult?.matchedCount ?? 0;
+      const ma = getCanonicalMatchState(a).count;
+      const mb = getCanonicalMatchState(b).count;
       return mul * (ma - mb);
     }
     if (sort === "arbs") {
@@ -231,20 +233,33 @@ function OverviewPanelInner({
       }));
   })), [markets]);
 
+  if (mode === "opportunities") {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight">Opportunity Queue</h2>
+        </div>
+        {opportunityModels.length > 0 ? (
+          <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)]">
+            <OpportunityQueue
+              opportunities={opportunityModels}
+              onPrepare={(opportunity) => {
+                const market = markets.find((item) => item.id === opportunity.marketId);
+                if (market) onSelectMarket(market);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--surface-panel)] p-8 text-center text-sm text-[var(--text-secondary)]">
+            No actionable opportunities right now.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {opportunityModels.length > 0 && (
-        <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)]">
-          <OpportunityQueue
-            opportunities={opportunityModels}
-            onPrepare={(opportunity) => {
-              const market = markets.find((item) => item.id === opportunity.marketId);
-              if (market) onSelectMarket(market);
-            }}
-          />
-        </div>
-      )}
-
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
@@ -379,7 +394,7 @@ function OverviewPanelInner({
             const apy = getMarketApy(m);
             const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
             const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
-            const matchedCount = m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0;
+            const matchedLabel = formatCanonicalMatchState(m);
             const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
             const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
             return (
@@ -399,7 +414,7 @@ function OverviewPanelInner({
                   <div className="text-[var(--text-secondary)]">Expiry</div>
                   <div className="text-[var(--text-primary)] text-right">{formatExpiry(m.expiryDate)}</div>
                   <div className="text-[var(--text-secondary)]">Matched</div>
-                  <div className="text-[var(--text-secondary)] text-right">{matchedCount > 0 ? matchedCount : "—"}</div>
+                  <div className="text-[var(--text-secondary)] text-right">{matchedLabel}</div>
                   <div className="text-[var(--text-secondary)]">ROI</div>
                   <div className={`text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                     {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
@@ -465,7 +480,7 @@ function OverviewPanelInner({
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
-                const matchedCount = m.liveResult?.matchedCount ?? m.lastScanResult?.matchedCount ?? 0;
+                const matchedLabel = formatCanonicalMatchState(m);
                 const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
                 const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
                 return (
@@ -476,7 +491,7 @@ function OverviewPanelInner({
                   >
                     <td className="px-4 py-3 font-medium text-[var(--text-primary)]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>{m.eventTitle}</td>
                     <td className="px-4 py-3 text-right text-[var(--text-primary)]">{formatExpiry(m.expiryDate)}</td>
-                    <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{matchedCount > 0 ? matchedCount : "—"}</td>
+                    <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{matchedLabel}</td>
                     <td className="px-4 py-3 text-right font-bold text-[var(--status-positive)]">{arbCount > 0 ? arbCount : "—"}</td>
                     <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}

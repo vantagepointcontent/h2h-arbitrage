@@ -53,6 +53,9 @@ export async function GET(request: NextRequest) {
             strategy: ls.strategy ?? '',
             scannedAt: ls.scannedAt ?? null,
             matchedCount: ls.matchedCount ?? 0,
+            matchStatus: ls.matchStatus ?? (ls.scannedAt ? ((ls.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero') : 'not_scanned'),
+            matchError: ls.matchError ?? null,
+            matchedPairs: Array.isArray(ls.matchedPairs) ? ls.matchedPairs : [],
             // Minimal arb objects — only fields sidebar/cached view reads
             allArbs: allArbs.map((a: any) => ({
               artist: a.artist ?? '',
@@ -79,6 +82,10 @@ export async function GET(request: NextRequest) {
           liveResult: m.liveResult ? {
             bestRoiPct: m.liveResult.bestRoiPct ?? 0,
             scannedAt: m.liveResult.scannedAt ?? null,
+            matchedCount: m.liveResult.matchedCount ?? 0,
+            matchStatus: m.liveResult.matchStatus ?? ((m.liveResult.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero'),
+            matchError: m.liveResult.matchError ?? null,
+            matchedPairs: Array.isArray(m.liveResult.matchedPairs) ? m.liveResult.matchedPairs : [],
             allArbs: Array.isArray(m.liveResult.allArbs)
               ? m.liveResult.allArbs.map((a: any) => ({
                   artist: a.artist ?? '',

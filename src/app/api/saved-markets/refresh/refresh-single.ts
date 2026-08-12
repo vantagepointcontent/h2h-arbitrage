@@ -25,6 +25,9 @@ export interface SingleRefreshResult {
   bestProfit: number;
   strategy: string;
   matchedCount: number;
+  matchStatus?: 'not_scanned' | 'unavailable' | 'confirmed_zero' | 'matched';
+  matchError?: string;
+  matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   kalshiCount: number;
   pmCount: number;
   scannedAt: string;
@@ -217,6 +220,9 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
   const pmCount = withArbitrage.filter(o => o.polymarket).length;
   const matchedCount = withArbitrage.filter(o => o.kalshi && o.polymarket).length;
+  const matchedPairs = withArbitrage
+    .filter(o => o.kalshi && o.polymarket)
+    .map(o => ({ artist: o.artist, kalshiTicker: o.kalshi!.ticker, pmConditionId: o.polymarket!.conditionId }));
 
   const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
   // UI-03: Track best net arb (positive OR negative) for display.
@@ -235,6 +241,8 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
     strategy: bestNetArb ? bestNetArb.arbitrage!.strategy : 'No arb',
     matchedCount,
+    matchStatus: matchedCount > 0 ? 'matched' : 'confirmed_zero',
+    matchedPairs,
     kalshiCount,
     pmCount,
     scannedAt: new Date().toISOString(),

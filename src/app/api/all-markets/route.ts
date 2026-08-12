@@ -154,11 +154,31 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch event-scoped markets in parallel
-    const [kalshi, polymarket] = await Promise.all([
-      kalshiUrl ? fetchKalshiEventScoped(kalshiUrl).catch(() => []) : Promise.resolve([] as KalshiMarketLite[]),
-      pmUrl ? fetchPolymarketEventScoped(pmUrl).catch(() => []) : Promise.resolve([] as PolymarketLite[]),
+    // Fetch event-scoped markets in parallel. A requested Kalshi event must not
+    // degrade to an indistinguishable empty list: the manual-coupling UI needs
+    // to tell a genuinely empty event from an upstream load failure.
+    const [kalshiResult, polymarketResult] = await Promise.allSettled([
+      kalshiUrl ? fetchKalshiEventScoped(kalshiUrl) : Promise.resolve([] as KalshiMarketLite[]),
+      pmUrl ? fetchPolymarketEventScoped(pmUrl) : Promise.resolve([] as PolymarketLite[]),
     ]);
+
+    if (kalshiResult.status === 'rejected') {
+      console.error('[api/all-markets GET] Kalshi event load failed', kalshiResult.reason);
+      return NextResponse.json(
+        { error: 'Unable to load Kalshi outcomes for this event.' },
+        {
+          status: 502,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        },
+      );
+    }
+
+    const kalshi = kalshiResult.value;
+    // Preserve the route's existing partial-platform behavior for Polymarket.
+    const polymarket = polymarketResult.status === 'fulfilled' ? polymarketResult.value : [];
 
     const result: AllMarketsResponse = {
       kalshi,
@@ -173,7 +193,7 @@ export async function GET(request: NextRequest) {
         'Pragma': 'no-cache',
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[api/all-markets GET]', err);
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }

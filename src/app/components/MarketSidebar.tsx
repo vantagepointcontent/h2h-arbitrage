@@ -77,6 +77,7 @@ function MarketSidebarInner({
   scanProgress,
   scanAllError,
   onGoOverview,
+  onGoOpportunities,
   onGoScan,
   onGoMarketFinder,
   onGoLogs,
@@ -113,6 +114,7 @@ function MarketSidebarInner({
   scanProgress: { current: number; total: number };
   scanAllError: string;
   onGoOverview: () => void;
+  onGoOpportunities: () => void;
   onGoScan: () => void;
   onGoMarketFinder: () => void;
   onGoLogs: () => void;
@@ -237,6 +239,7 @@ function MarketSidebarInner({
           <div className="space-y-1 sticky top-0 z-10 bg-[var(--surface-panel)] pb-2">
             <NavButton icon={<LayoutDashboard className="w-5 h-5 shrink-0" />} label="Dashboard" active={viewMode === "dashboard"} onClick={onGoDashboard} collapsed={!sidebarOpen} />
             <NavButton icon={<Layers className="w-5 h-5 shrink-0" />} label="Markets" active={viewMode === "overview"} onClick={onGoOverview} collapsed={!sidebarOpen} />
+            <NavButton icon={<Zap className="w-5 h-5 shrink-0" />} label="Opportunity Queue" active={viewMode === "opportunities"} onClick={onGoOpportunities} collapsed={!sidebarOpen} />
             <NavButton icon={<Scan className="w-5 h-5 shrink-0" />} label="Scan" active={viewMode === "scan"} onClick={onGoScan} collapsed={!sidebarOpen} />
             <NavButton icon={<Globe className="w-5 h-5 shrink-0" />} label="MarketFinder" active={viewMode === "marketfinder"} onClick={onGoMarketFinder} collapsed={!sidebarOpen} />
 
