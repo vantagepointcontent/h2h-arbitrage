@@ -5,7 +5,6 @@ import {
   Zap,
   Scan,
   Link2,
-  Activity,
   Clock,
   TrendingUp,
   ExternalLink,
@@ -1513,9 +1512,6 @@ export default function Home() {
             <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "couple-management" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Couple Management">
               <GitMerge className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "live" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Live WebSocket scan">
-              <Activity className="w-4 h-4" />
-            </button>
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
@@ -1853,6 +1849,15 @@ export default function Home() {
                         onDelete={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
                       />;
                     })()}
+
+                    {marketWorkspaceTab === "live" && activeMarketId && (
+                      <LiveScanPanel
+                        key={activeMarketId}
+                        capital={capital}
+                        savedMarkets={savedMarkets}
+                        initialMarketId={activeMarketId}
+                      />
+                    )}
 
                     {/* Inline edit panel */}
                     {editingMarketId && activeMarketId === editingMarketId && (

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ExternalLink, Heart, Link2, Loader2, MoreHorizontal, Pencil, RefreshCw, Scan, Trash2 } from "lucide-react";
 import { selectMarketDecisionMetrics } from "./market-decision-metrics";
 
-export type MarketWorkspaceTab = "opportunities" | "prices" | "depth" | "history" | "matching" | "couplings";
+export type MarketWorkspaceTab = "opportunities" | "prices" | "depth" | "history" | "matching" | "couplings" | "live";
 interface Props {
   market: { id: string; eventTitle?: string; title?: string; category?: string; expiryDate?: string; kalshiUrl: string; polymarketUrl: string };
   outcomes: Array<Record<string, any>>;
@@ -23,7 +23,7 @@ interface Props {
   onCouplings: () => void;
   onDelete: () => void;
 }
-const tabs: Array<[MarketWorkspaceTab, string]> = [["opportunities","Opportunities"],["prices","Market prices"],["depth","Depth"],["history","History"],["matching","Matching"],["couplings","Couplings"]];
+const tabs: Array<[MarketWorkspaceTab, string]> = [["opportunities","Opportunities"],["prices","Market prices"],["depth","Depth"],["history","History"],["matching","Matching"],["couplings","Couplings"],["live","Live WS"]];
 const metricTooltips: Record<string, string> = {
   'Best net ROI': 'Highest net ROI % across all matched outcomes, after deducting trading fees from both platforms',
   'Best net profit': 'Highest expected dollar profit across all matched outcomes, net of fees',

@@ -76,6 +76,7 @@ interface LiveScanResult {
 interface Props {
   capital: number;
   savedMarkets: SavedMarket[];
+  initialMarketId?: string;
 }
 
 /* ── Flash animation helpers ────────────────────────────────────── */
@@ -162,8 +163,8 @@ const MAX_TABS = 8;
 
 /* ── Main component ─────────────────────────────────────────────── */
 
-export default function LiveScanPanel({ capital, savedMarkets }: Props) {
-  const [selectedId, setSelectedId] = useState<string>("");
+export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }: Props) {
+  const [selectedId, setSelectedId] = useState<string>(initialMarketId ?? "");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -216,15 +217,15 @@ export default function LiveScanPanel({ capital, savedMarkets }: Props) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // Cleanup all tabs on unmount
+  // Cleanup all live streams and flash timers on unmount. The ref avoids the
+  // empty-dependency cleanup capturing the initial (empty) tabs array.
   useEffect(() => {
     return () => {
-      tabs.forEach((t) => {
-        t.eventSource?.close();
-        t.flashTimers.forEach((timer) => clearTimeout(timer));
+      tabsRef.current.forEach((tab) => {
+        tab.eventSource?.close();
+        tab.flashTimers.forEach((timer) => clearTimeout(timer));
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopTab = useCallback((tabId: string) => {
