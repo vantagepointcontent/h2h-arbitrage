@@ -475,6 +475,7 @@ export async function POST(request: NextRequest) {
           positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
+          expiryAt: pmEvent.endDate,
           // ARB-01a: persist the best arb's type classification
           arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
           // PERF-P2: raw blob only stored when there are arbs to drill into —

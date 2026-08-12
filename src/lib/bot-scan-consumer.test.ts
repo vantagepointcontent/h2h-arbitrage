@@ -214,6 +214,31 @@ describe('durable BotTrader scan consumer', () => {
     expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'scan_criteria_rejected' });
   });
 
+  it('deterministically accepts exactly 2.00% scan-time ROI and places paper trade', async () => {
+    const h = harness({
+      scans: [scan({ candidates: [candidate({ roiPct: 2.0, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })],
+    });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({ state: 'placed', reasonCode: 'paper_placed' });
+    expect(h.deps.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('deterministically rejects 1.99% scan-time ROI at the boundary', async () => {
+    const h = harness({ scans: [scan({ candidates: [candidate({ roiPct: 1.99, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })] });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'scan_criteria_rejected' });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
+  it('deterministically accepts 2.01% scan-time ROI and places paper trade', async () => {
+    const h = harness({
+      scans: [scan({ candidates: [candidate({ roiPct: 2.01, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })],
+    });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({ state: 'placed', reasonCode: 'paper_placed' });
+    expect(h.deps.execute).toHaveBeenCalledTimes(1);
+  });
+
   it('persists revalidation_rejected when current ROI falls below threshold', async () => {
     const h = harness({ current: [candidate({ roiPct: 1 })] });
     const result = await h.consumer.consume(41, 'scan_api');

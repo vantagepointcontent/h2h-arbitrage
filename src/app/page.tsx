@@ -5,7 +5,6 @@ import {
   Zap,
   Scan,
   Link2,
-  Activity,
   Clock,
   TrendingUp,
   ExternalLink,
@@ -149,10 +148,18 @@ function useSwipeGesture(onLeft: () => void, onRight: () => void) {
  * Populates kalshi and polymarket price fields so the detail view shows
  * cached prices immediately instead of "—" while a background refresh runs.
  */
+type CachedArb = NonNullable<LastScanResult["allArbs"]>[number];
+
+function isCachedArb(value: unknown): value is CachedArb {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { artist?: unknown; strategy?: unknown };
+  return typeof candidate.artist === "string" && typeof candidate.strategy === "string";
+}
+
 function buildCachedResult(
   eventTitle: string,
   expiryDate: string | null | undefined,
-  cached: { kalshiCount?: number; pmCount?: number; matchedCount?: number; scannedAt?: string; allArbs?: any[] },
+  cached: { kalshiCount?: number; pmCount?: number; matchedCount?: number; scannedAt?: string; allArbs?: unknown[] },
 ): ScanResult {
   return {
     eventTitle,
@@ -160,7 +167,9 @@ function buildCachedResult(
     pmCount: cached.pmCount ?? 0,
     matchedCount: cached.matchedCount ?? 0,
     expiryDate: expiryDate ?? undefined,
-    outcomes: (cached.allArbs ?? []).map((a: any): UnifiedOutcome => ({
+    outcomes: (Array.isArray(cached.allArbs) ? cached.allArbs : [])
+      .filter(isCachedArb)
+      .map((a): UnifiedOutcome => ({
       artist: a.artist,
       kalshi: (a.kalshiYesAsk != null || a.kalshiNoAsk != null || a.kalshiYesBid != null) ? {
         ticker: a.kalshiTicker ?? "",
@@ -186,9 +195,9 @@ function buildCachedResult(
         expectedProfit: a.expectedProfit ?? 0,
         roiPct: a.roiPct ?? 0,
         apyPct: a.apyPct ?? a.roiPct ?? 0,
-        buyPlatform: a.buyPlatform ?? null,
+        buyPlatform: a.buyPlatform === "kalshi" || a.buyPlatform === "polymarket" ? a.buyPlatform : null,
         buyPrice: a.buyPrice ?? 0,
-        sellPlatform: a.sellPlatform ?? null,
+        sellPlatform: a.sellPlatform === "kalshi" || a.sellPlatform === "polymarket" ? a.sellPlatform : null,
         sellPrice: a.sellPrice ?? 0,
       },
     })),
@@ -274,6 +283,8 @@ export default function Home() {
         if (state?.marketId) {
           const m = savedMarketsRef.current.find((m) => m.id === state.marketId);
           if (m) {
+            setExpandedArtist(null);
+            setError("");
             setKalshiUrl(m.kalshiUrl);
             setPmUrl(m.polymarketUrl);
             setActiveMarketId(m.id);
@@ -284,6 +295,10 @@ export default function Home() {
             setResult(null);
             previousPricesRef.current = new Map();
             setPriceChanges(new Map());
+            if (!m.eventTitle || !m.kalshiUrl || !m.polymarketUrl) {
+              setError("This market is missing required details and cannot be refreshed. The saved list is unchanged.");
+              return;
+            }
             const popExpiry = m.expiryDate ? new Date(m.expiryDate).getTime() : 0;
             if (!(popExpiry > 0 && popExpiry <= Date.now())) {
               handleScanWithUrls(m.kalshiUrl, m.polymarketUrl);
@@ -291,6 +306,8 @@ export default function Home() {
           } else {
             // Market not in saved_markets — fall back to scan_results for URLs
             setViewMode("scan");
+            setExpandedArtist(null);
+            setActiveMarketId(state.marketId);
             fetch(`/api/saved-markets?id=${encodeURIComponent(state.marketId)}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
@@ -304,9 +321,11 @@ export default function Home() {
                   previousPricesRef.current = new Map();
                   setPriceChanges(new Map());
                   handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
+                } else {
+                  setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
                 }
               })
-              .catch(() => {});
+              .catch(() => setError("The requested market could not be loaded. Check the connection and try again."));
           }
         } else {
           setViewMode("scan");
@@ -346,6 +365,8 @@ export default function Home() {
       } else if (view === "scan" && marketId) {
         const m = (initialMarkets as SavedMarket[]).find((m) => m.id === marketId);
         if (m) {
+          setExpandedArtist(null);
+          setError("");
           setKalshiUrl(m.kalshiUrl);
           setPmUrl(m.polymarketUrl);
           setActiveMarketId(m.id);
@@ -354,6 +375,12 @@ export default function Home() {
           pmUrlRef.current = m.polymarketUrl;
           activeMarketIdRef.current = m.id;
           setViewMode("scan");
+
+          if (!m.eventTitle || !m.kalshiUrl || !m.polymarketUrl) {
+            setResult(null);
+            setError("This market is missing required details and cannot be refreshed. The saved list is unchanged.");
+            return;
+          }
 
           // UI-087/UI-084: show cached data instantly, then silent background refresh
           const isExpired = isMarketExpired(m);
@@ -382,7 +409,9 @@ export default function Home() {
               pmCount: cached.pmCount ?? 0,
               matchedCount: cached.matchedCount ?? 0,
               expiryDate: m.expiryDate ?? undefined,
-              outcomes: (cached.allArbs ?? []).map((a: any) => ({
+              outcomes: (cached.allArbs ?? [])
+                .filter(isCachedArb)
+                .map((a) => ({
                 artist: a.artist,
                 kalshi: a.kalshiTicker ? {
                   ticker: a.kalshiTicker,
@@ -408,9 +437,9 @@ export default function Home() {
                   expectedProfit: a.expectedProfit ?? 0,
                   roiPct: a.roiPct ?? 0,
                   apyPct: a.apyPct ?? a.roiPct ?? 0,
-                  buyPlatform: a.buyPlatform ?? null,
+                  buyPlatform: a.buyPlatform === "kalshi" || a.buyPlatform === "polymarket" ? a.buyPlatform : null,
                   buyPrice: a.buyPrice ?? 0,
-                  sellPlatform: a.sellPlatform ?? null,
+                  sellPlatform: a.sellPlatform === "kalshi" || a.sellPlatform === "polymarket" ? a.sellPlatform : null,
                   sellPrice: a.sellPrice ?? 0,
                 },
               })),
@@ -429,6 +458,8 @@ export default function Home() {
           // Market not in saved_markets (archived/never saved).
           // Fall back to scan_results to find URLs and auto-rescan.
           setViewMode("scan");
+          setExpandedArtist(null);
+          setActiveMarketId(marketId);
           try {
             const r = await fetch(`/api/saved-markets?id=${encodeURIComponent(marketId)}`);
             if (r.ok) {
@@ -440,9 +471,15 @@ export default function Home() {
                 kalshiUrlRef.current = fm.kalshiUrl;
                 pmUrlRef.current = fm.polymarketUrl;
                 handleScanWithUrls(fm.kalshiUrl, fm.polymarketUrl);
+              } else {
+                setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
               }
+            } else {
+              setError("The requested market could not be loaded. It may have been removed or its saved data is incomplete.");
             }
-          } catch { /* market not found anywhere — show empty form */ }
+          } catch {
+            setError("The requested market could not be loaded. Check the connection and try again.");
+          }
         }
       } else if (view === "overview") {
         // Backwards compat: old ?view=overview URLs redirect to Markets (now "overview" viewMode)
@@ -860,16 +897,32 @@ export default function Home() {
   // Navigate to market detail
   const loadMarket = async (m: SavedMarket, options?: { forceFull?: boolean }) => {
     const forceFull = options?.forceFull ?? false;
-    setKalshiUrl(m.kalshiUrl);
-    setPmUrl(m.polymarketUrl);
-    setActiveMarketId(m.id);
+    const marketId = typeof m?.id === "string" ? m.id.trim() : "";
+    if (!marketId) {
+      setError("This market cannot be opened because its identifier is missing or malformed.");
+      return;
+    }
+
+    // Keep browser history and React state synchronized: commit the drill-down
+    // route first, then update the active market state.
+    window.history.pushState({ view: "scan", marketId }, "", `/?view=scan&id=${encodeURIComponent(marketId)}`);
+    setExpandedArtist(null);
+    setKalshiUrl(typeof m.kalshiUrl === "string" ? m.kalshiUrl : "");
+    setPmUrl(typeof m.polymarketUrl === "string" ? m.polymarketUrl : "");
+    setActiveMarketId(marketId);
     // UI-10: every newly opened saved market starts in the matched-only view.
     setOutcomeFilter("matched");
-    kalshiUrlRef.current = m.kalshiUrl;
-    pmUrlRef.current = m.polymarketUrl;
-    activeMarketIdRef.current = m.id;
+    kalshiUrlRef.current = typeof m.kalshiUrl === "string" ? m.kalshiUrl : "";
+    pmUrlRef.current = typeof m.polymarketUrl === "string" ? m.polymarketUrl : "";
+    activeMarketIdRef.current = marketId;
     setViewMode("scan");
-    window.history.pushState({ view: "scan", marketId: m.id }, "", `/?view=scan&id=${m.id}`);
+
+    if (!m.eventTitle || !kalshiUrlRef.current || !pmUrlRef.current) {
+      setResult(null);
+      setError("This market is missing required details and cannot be refreshed. The saved list is unchanged; return to Markets or retry after the data is repaired.");
+      return;
+    }
+    setError("");
 
     const isExpired = isMarketExpired(m);
 
@@ -896,7 +949,9 @@ export default function Home() {
         pmCount: cached.pmCount ?? 0,
         matchedCount: cached.matchedCount ?? 0,
         expiryDate: m.expiryDate ?? undefined,
-        outcomes: (cached.allArbs ?? []).map((a: any) => ({
+        outcomes: (Array.isArray(cached.allArbs) ? cached.allArbs : [])
+          .filter(isCachedArb)
+          .map((a) => ({
           artist: a.artist,
           kalshi: a.kalshiTicker ? {
             ticker: a.kalshiTicker,
@@ -922,9 +977,9 @@ export default function Home() {
             expectedProfit: a.expectedProfit ?? 0,
             roiPct: a.roiPct ?? 0,
             apyPct: a.apyPct ?? a.roiPct ?? 0,
-            buyPlatform: a.buyPlatform ?? null,
+            buyPlatform: a.buyPlatform === "kalshi" || a.buyPlatform === "polymarket" ? a.buyPlatform : null,
             buyPrice: a.buyPrice ?? 0,
-            sellPlatform: a.sellPlatform ?? null,
+            sellPlatform: a.sellPlatform === "kalshi" || a.sellPlatform === "polymarket" ? a.sellPlatform : null,
             sellPrice: a.sellPrice ?? 0,
           },
         })),
@@ -1457,9 +1512,6 @@ export default function Home() {
             <button onClick={goToCoupleManagement} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "couple-management" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Couple Management">
               <GitMerge className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode("live")} className={`p-2 rounded-lg hover:bg-[var(--border-subtle)] transition-colors ${viewMode === "live" ? "text-[var(--status-positive)] bg-[var(--status-positive)]/10" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`} title="Live WebSocket scan">
-              <Activity className="w-4 h-4" />
-            </button>
             <button onClick={() => setAlertSettingsOpen(true)} className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Alert settings">
               <Bell className="w-4 h-4" />
             </button>
@@ -1747,6 +1799,16 @@ export default function Home() {
                 </div>
                 )}
 
+                {activeMarketId && error && (
+                  <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-[var(--status-warning)]/30 bg-[var(--status-warning)]/10 p-3 text-sm text-[var(--status-warning)]">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <div className="font-semibold">{result ? "Market data warning" : "Market unavailable"}</div>
+                      <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{error}</div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Loading state */}
                 {loading && (
                   <div className="py-20 text-center text-sm text-[var(--text-secondary)]">
@@ -1763,7 +1825,7 @@ export default function Home() {
                       const market = savedMarkets.find((item) => item.id === activeMarketId);
                       if (!market) return null;
                       return <MarketWorkspaceHeader
-                        market={{ ...market, eventTitle: result.eventTitle }}
+                        market={{ ...market, eventTitle: result.eventTitle, expiryDate: market.expiryDate ?? undefined }}
                         outcomes={(result.outcomes ?? []) as Array<Record<string, any>>}
                         scannedAt={lastScanTimestamp ?? lastUpdated?.toISOString()}
                         loading={loading}
@@ -1787,6 +1849,15 @@ export default function Home() {
                         onDelete={() => { if (confirm("Delete this market?")) deleteMarket(activeMarketId); }}
                       />;
                     })()}
+
+                    {marketWorkspaceTab === "live" && activeMarketId && (
+                      <LiveScanPanel
+                        key={activeMarketId}
+                        capital={capital}
+                        savedMarkets={savedMarkets}
+                        initialMarketId={activeMarketId}
+                      />
+                    )}
 
                     {/* Inline edit panel */}
                     {editingMarketId && activeMarketId === editingMarketId && (

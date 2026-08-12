@@ -2,12 +2,13 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
+import { calculateScanApy } from './scan-apy';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
 // ── SQLite (libsql) ──────────────────────────────────────────────
 
-const SQLITE_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
+const SQLITE_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
 
 function getClient() {
@@ -47,7 +48,11 @@ async function initDb(): Promise<void> {
       market_title    TEXT,   -- human-readable market name (BUG-030: prevents raw IDs in Logs)
       kalshi_url      TEXT,   -- source Kalshi URL for re-scanning (not in saved_markets)
       polymarket_url  TEXT,   -- source Polymarket URL for re-scanning
-      arb_type        TEXT    -- ARB-01a: "cross" | "direct" | "internal"
+      arb_type        TEXT,   -- ARB-01a: "cross" | "direct" | "internal"
+      expiry_at       TEXT,   -- expiry timestamp captured by this scan
+      days_to_expiry  REAL,   -- precise fractional TTE captured by this scan
+      apy_pct         REAL,   -- canonical annualized ROI snapshot (%)
+      apy_unavailable_reason TEXT
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -56,6 +61,10 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN kalshi_url TEXT`,
     `ALTER TABLE scan_results ADD COLUMN polymarket_url TEXT`,
     `ALTER TABLE scan_results ADD COLUMN arb_type TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN expiry_at TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN days_to_expiry REAL`,
+    `ALTER TABLE scan_results ADD COLUMN apy_pct REAL`,
+    `ALTER TABLE scan_results ADD COLUMN apy_unavailable_reason TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -158,6 +167,32 @@ async function initDb(): Promise<void> {
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
+
+  // BUG-128: one-time, idempotent backfill. Prefer expiry embedded in the
+  // immutable scan payload, with the saved market's recorded expiry as the
+  // legacy fallback. Always annualize from scanned_at, never from Date.now().
+  const apyBackfill = await c.execute(`
+    SELECT r.id, r.best_roi_pct, r.scanned_at, r.raw_result, m.expiry_date
+    FROM scan_results r
+    LEFT JOIN saved_markets m ON m.id = r.market_id
+    WHERE r.apy_pct IS NULL AND r.apy_unavailable_reason IS NULL
+  `);
+  for (const row of apyBackfill.rows as unknown as Array<Record<string, unknown>>) {
+    let expiryAt = typeof row.expiry_date === 'string' ? row.expiry_date : null;
+    if (typeof row.raw_result === 'string') {
+      try {
+        const raw = JSON.parse(row.raw_result) as { expiryDate?: unknown };
+        if (typeof raw.expiryDate === 'string') expiryAt = raw.expiryDate;
+      } catch { /* malformed payload may still use saved-market expiry */ }
+    }
+    const snapshot = calculateScanApy(Number(row.best_roi_pct), String(row.scanned_at), expiryAt);
+    await c.execute({
+      sql: `UPDATE scan_results
+            SET expiry_at = ?, days_to_expiry = ?, apy_pct = ?, apy_unavailable_reason = ?
+            WHERE id = ? AND apy_pct IS NULL AND apy_unavailable_reason IS NULL`,
+      args: [expiryAt, snapshot.daysToExpiry, snapshot.apyPct, snapshot.unavailableReason, Number(row.id)],
+    });
+  }
   await c.execute(`
     CREATE TABLE IF NOT EXISTS scan_history (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -251,17 +286,21 @@ export async function saveScanResult(
     kalshiUrl?: string;
     polymarketUrl?: string;
     arbType?: 'cross' | 'direct' | 'internal';
+    expiryAt?: string | null;
   },
 ): Promise<{ id: number }> {
   await ensureDb();
   const c = getClient();
+  const scannedAt = result.scannedAt ?? new Date().toISOString();
+  const snapshot = calculateScanApy(result.bestRoiPct, scannedAt, result.expiryAt);
   const row = await c.execute({
     sql: `INSERT INTO scan_results
       (market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
-       kalshi_url, polymarket_url, arb_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       kalshi_url, polymarket_url, arb_type, expiry_at, days_to_expiry,
+       apy_pct, apy_unavailable_reason)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
       result.bestRoiPct ?? 0,
@@ -273,12 +312,16 @@ export async function saveScanResult(
       result.pmCount ?? 0,
       result.positiveArbCount ?? 0,
       result.totalStake ?? 0,
-      result.scannedAt ?? new Date().toISOString(),
+      scannedAt,
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
       result.kalshiUrl ?? null,
       result.polymarketUrl ?? null,
       result.arbType ?? null,
+      result.expiryAt ?? null,
+      snapshot.daysToExpiry,
+      snapshot.apyPct,
+      snapshot.unavailableReason,
     ],
   });
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
@@ -389,7 +432,8 @@ export async function queryScanHistory(opts: {
   const rows = await c.execute({
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
-                 positive_arb_count, total_stake, scanned_at, raw_result
+                 positive_arb_count, total_stake, scanned_at, raw_result,
+                 expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
           FROM scan_results${where}
           ORDER BY scanned_at DESC LIMIT ?`,
     args: [...args, limit],
@@ -441,7 +485,8 @@ export async function* queryScanHistoryStream(opts: {
     const res = await c.execute({
       sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                    outcome_count, matched_count, kalshi_count, pm_count,
-                   positive_arb_count, total_stake, scanned_at
+                   positive_arb_count, total_stake, scanned_at,
+                   expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],

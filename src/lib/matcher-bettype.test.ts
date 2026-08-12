@@ -119,8 +119,8 @@ describe('Bet-type cross-matching prevention', () => {
     const outcomes = matchOutcomes(kalshiMarkets, pmMarkets, 'World Cup', 1000);
     const matched = outcomes.filter((o: any) => o.kalshi && o.polymarket);
     expect(matched.length).toBe(1);
-    expect(matched[0].kalshi.ticker).toBe('KX-WIN-01');
-    expect(matched[0].polymarket.conditionId).toBe('cond-win-brazil');
+    expect(matched[0].kalshi!.ticker).toBe('KX-WIN-01');
+    expect(matched[0].polymarket!.conditionId).toBe('cond-win-brazil');
   });
 });
 

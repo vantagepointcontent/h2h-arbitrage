@@ -14,6 +14,7 @@ const DEFAULT_BOT_SETTINGS = {
   minSharesPerLeg: 1,
   maxExpiryDays: 365,
   maxTradesPerDay: 10,
+  maxUnitsPerMarket: 3,
 };
 
 /**
@@ -23,7 +24,7 @@ const DEFAULT_BOT_SETTINGS = {
  */
 export async function GET() {
   try {
-    const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay] = await Promise.all([
+    const [enabled, mode, selectionMethod, minRoiPct, minApyPct, minDepthUsd, minSharesPerLeg, maxExpiryDays, maxTradesPerDay, maxUnitsPerMarket] = await Promise.all([
       getSetting<boolean>('bot.enabled').catch(() => DEFAULT_BOT_SETTINGS.enabled),
       getSetting<string>('bot.mode').catch(() => DEFAULT_BOT_SETTINGS.mode),
       getSetting<string>('bot.selectionMethod').catch(() => DEFAULT_BOT_SETTINGS.selectionMethod),
@@ -33,6 +34,7 @@ export async function GET() {
       getSetting<number>('bot.minSharesPerLeg').catch(() => DEFAULT_BOT_SETTINGS.minSharesPerLeg),
       getSetting<number>('bot.maxExpiryDays').catch(() => DEFAULT_BOT_SETTINGS.maxExpiryDays),
       getSetting<number>('bot.maxTradesPerDay').catch(() => DEFAULT_BOT_SETTINGS.maxTradesPerDay),
+      getSetting<number>('bot.maxUnitsPerMarket').catch(() => DEFAULT_BOT_SETTINGS.maxUnitsPerMarket),
     ]);
 
     const todayStart = new Date().toISOString().slice(0, 10);
@@ -69,6 +71,7 @@ export async function GET() {
       minSharesPerLeg,
       maxExpiryDays,
       maxTradesPerDay,
+      maxUnitsPerMarket,
       todayCount: todayCount2,
       todayStakeUsd,
       lastTradeAt: lastTrade?.timestamp ?? null,
@@ -104,6 +107,7 @@ export async function GET() {
         minSharesPerLeg: DEFAULT_BOT_SETTINGS.minSharesPerLeg,
         maxExpiryDays: DEFAULT_BOT_SETTINGS.maxExpiryDays,
         maxTradesPerDay: DEFAULT_BOT_SETTINGS.maxTradesPerDay,
+        maxUnitsPerMarket: DEFAULT_BOT_SETTINGS.maxUnitsPerMarket,
         todayCount: 0,
         todayStakeUsd: 0,
         lastTradeAt: null,

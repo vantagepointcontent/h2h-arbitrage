@@ -9,7 +9,7 @@ describe('BUG-108 scan startup state', () => {
     expect(page).toContain('.finally(() => setRouteInitializing(false))');
     expect(page).toContain('routeInitializing ? (');
     expect(page).toContain('Loading workspace...');
-    expect(page.indexOf('routeInitializing ? (')).toBeLessThan(page.indexOf('viewMode === "overview" || viewMode === "opportunities" ? ('));
+    expect(page.indexOf('routeInitializing ? (')).toBeLessThan(page.indexOf('viewMode === "overview" ? ('));
   });
 
   it('logs initialization failures and exposes a readable error', () => {

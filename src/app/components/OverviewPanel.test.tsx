@@ -43,6 +43,23 @@ const props = {
   onSelectMarket: vi.fn(),
 };
 
+describe('OverviewPanel market navigation', () => {
+  it('opens the exact affected market when its title is clicked', () => {
+    const affectedMarket = market(
+      'd782d04f-f297-4c5e-9e02-6ddc3fa8b607',
+      'South Carolina Senate Special Republican Primary: First Round Winner',
+      'Politics',
+    );
+    const onSelectMarket = vi.fn();
+
+    render(<OverviewPanel {...props} onSelectMarket={onSelectMarket} markets={[affectedMarket]} />);
+    fireEvent.click(screen.getByRole('heading', { name: affectedMarket.eventTitle }));
+
+    expect(onSelectMarket).toHaveBeenCalledOnce();
+    expect(onSelectMarket).toHaveBeenCalledWith(affectedMarket);
+  });
+});
+
 describe('OverviewPanel category filter', () => {
   it('lists discovered categories and shows only the selected category', () => {
     render(<OverviewPanel {...props} markets={[

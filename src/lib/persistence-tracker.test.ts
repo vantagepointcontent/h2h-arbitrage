@@ -5,6 +5,7 @@ import type { LiveArbResult } from './live-arb-engine';
 function mkResult(over: Partial<LiveArbResult> = {}): LiveArbResult {
   return {
     artist: 'Outcome A',
+    arbType: 'direct',
     kalshiYesAsk: 0.45,
     kalshiNoAsk: 0.57,
     kalshiYesDepth: 5000,

@@ -41,6 +41,10 @@ interface LogEntry {
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
   category?: string | null;      // resolved from saved_markets (UI-015)
+  expiry_at: string | null;
+  days_to_expiry: number | null;
+  apy_pct: number | null;
+  apy_unavailable_reason: string | null;
 }
 
 type ArbTypeFilter = "all" | ArbType;
@@ -699,14 +703,7 @@ export default function LogsPanel() {
 }
 
 function logApyPct(log: LogEntry): number | null {
-  if (!log.raw_result) return null;
-  try {
-    const arbs = JSON.parse(log.raw_result)?.allArbs ?? [];
-    const values = arbs.map((arb: any) => Number(arb?.apyPct)).filter((value: number) => Number.isFinite(value) && value > 0);
-    return values.length ? Math.max(...values) : null;
-  } catch {
-    return null;
-  }
+  return typeof log.apy_pct === 'number' && Number.isFinite(log.apy_pct) ? log.apy_pct : null;
 }
 
 type ClientCurrentQuote = {
@@ -748,8 +745,13 @@ function LogRow({
 
   const savedMarket = savedMarkets.get(log.market_id);
   const marketName = log.market_name ?? log.market_title ?? savedMarket?.title;
-  const expiry = savedMarket?.expiryDate ? new Date(savedMarket.expiryDate) : null;
-  const minutesToExpiry = expiry ? Math.floor((expiry.getTime() - new Date(log.scanned_at).getTime()) / 60_000) : null;
+  const legacyExpiry = savedMarket?.expiryDate ? Date.parse(savedMarket.expiryDate) : Number.NaN;
+  const legacyScan = Date.parse(log.scanned_at);
+  const minutesToExpiry = typeof log.days_to_expiry === 'number' && Number.isFinite(log.days_to_expiry)
+    ? Math.floor(log.days_to_expiry * 1440)
+    : Number.isFinite(legacyExpiry) && Number.isFinite(legacyScan)
+      ? Math.floor((legacyExpiry - legacyScan) / 60_000)
+      : null;
   const tte = minutesToExpiry == null ? '—' : minutesToExpiry <= 0 ? 'Expired' : minutesToExpiry >= 1440 ? `${Math.floor(minutesToExpiry / 1440)}d ${Math.floor(minutesToExpiry % 1440 / 60)}h` : minutesToExpiry >= 60 ? `${Math.floor(minutesToExpiry / 60)}h ${minutesToExpiry % 60}m` : `${minutesToExpiry}m`;
   const hasMarketName = !!marketName;
 
@@ -803,7 +805,10 @@ function LogRow({
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
-        <td className={`px-3 py-2 text-right text-xs font-mono ${apy ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>{apy ? fmtPct(apy) : "—"}</td>
+        <td
+          className={`px-3 py-2 text-right text-xs font-mono ${apy != null ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
+          title={apy == null ? `APY unavailable: ${log.apy_unavailable_reason ?? 'unknown reason'}` : 'APY captured at scan time'}
+        >{apy != null ? fmtPct(apy) : "Unavailable"}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>

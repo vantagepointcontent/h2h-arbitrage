@@ -56,6 +56,7 @@ interface HotPair {
   pairId: string;
   category?: string;
   title: string;
+  expiryDate?: string | null;
   outcomes: LiveMatchedOutcome[];
   kalshiTickers: Set<string>;
   pmTokens: Set<string>;
@@ -97,7 +98,7 @@ let kalshiDownSince = 0;
 
 // ── Wiring: targets -> subscriptions ────────────────────────────
 
-function rebuildIndexes(hot: WatchTarget[], titles: Map<string, string>) {
+function rebuildIndexes(hot: WatchTarget[], metadata: Map<string, { title: string; expiryDate: string | null }>) {
   hotPairs.clear();
   tickerToPairs.clear();
   tokenToPairs.clear();
@@ -106,7 +107,8 @@ function rebuildIndexes(hot: WatchTarget[], titles: Map<string, string>) {
   for (const t of hot) {
     let p = hotPairs.get(t.pairId);
     if (!p) {
-      p = { pairId: t.pairId, category: t.category, title: titles.get(t.pairId) ?? t.pairId, outcomes: [], kalshiTickers: new Set(), pmTokens: new Set() };
+      const pairMetadata = metadata.get(t.pairId);
+      p = { pairId: t.pairId, category: t.category, title: pairMetadata?.title ?? t.pairId, expiryDate: pairMetadata?.expiryDate ?? null, outcomes: [], kalshiTickers: new Set(), pmTokens: new Set() };
       hotPairs.set(t.pairId, p);
     }
     p.outcomes.push({ artist: t.artist, kalshiTicker: t.kalshiTicker, pmYesTokenId: t.pmYesToken, pmNoTokenId: t.pmNoToken, pmConditionId: t.pmConditionId });
@@ -122,12 +124,15 @@ function rebuildIndexes(hot: WatchTarget[], titles: Map<string, string>) {
   }
 }
 
-async function loadPairTitles(): Promise<Map<string, string>> {
+async function loadPairMetadata(): Promise<Map<string, { title: string; expiryDate: string | null }>> {
   const { createClient } = await import('@libsql/client');
   const c = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
-  const rs = await c.execute(`SELECT id, event_title FROM saved_markets`);
-  const m = new Map<string, string>();
-  for (const r of rs.rows) m.set(String(r.id), String(r.event_title || r.id));
+  const rs = await c.execute(`SELECT id, event_title, expiry_date FROM saved_markets`);
+  const m = new Map<string, { title: string; expiryDate: string | null }>();
+  for (const r of rs.rows) m.set(String(r.id), {
+    title: String(r.event_title || r.id),
+    expiryDate: r.expiry_date == null ? null : String(r.expiry_date),
+  });
   c.close();
   return m;
 }
@@ -186,7 +191,7 @@ function handlePmUpdates(updates: WsPriceUpdate[]): void {
 async function syncSubscriptions(): Promise<void> {
   const tiers = await computeTiers();
   tierStats = tiers.stats;
-  const titles = await loadPairTitles();
+  const metadata = await loadPairMetadata();
 
   // Diff old vs new pair sets for logging
   const newPairIds = new Set(tiers.hotPairIds);
@@ -204,7 +209,7 @@ async function syncSubscriptions(): Promise<void> {
     clearSavedMarketLiveResult(pid).catch(() => {});
   }
 
-  rebuildIndexes(tiers.hot, titles);
+  rebuildIndexes(tiers.hot, metadata);
 
   // WS-105: clear dead-book suppression for ids no longer tracked
   for (const id of [...deadBooks.keys()]) if (!tickerToPairs.has(id) && !tokenToPairs.has(id)) deadBooks.delete(id);
@@ -402,8 +407,9 @@ async function writeLiveResult(
         positiveArbCount: clean.length,
         totalStake: clean.reduce((sum, r) => sum + r.kalshiStake + r.pmStake, 0),
         scannedAt: liveResult.scannedAt,
+        expiryAt: pair?.expiryDate ?? null,
         marketTitle: pair?.title ?? pairId,
-        arbType: best?.arbType,
+        arbType: best?.arbType ?? undefined,
         raw: {
           category: pair?.category,
           allArbs: clean.map((r) => ({

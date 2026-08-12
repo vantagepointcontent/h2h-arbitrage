@@ -5,6 +5,7 @@ import {
   maybeExecuteBotTrade,
   unifiedOutcomeToBotInput,
   getBotSettings,
+  getAuthoritativeMatchedFill,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -17,6 +18,26 @@ vi.mock('./bot-trader-messages', () => ({
   createBotMessage: vi.fn(async () => 1),
   updateBotMessage: vi.fn(async () => undefined),
 }));
+
+describe('getAuthoritativeMatchedFill', () => {
+  it('uses venue-reported matched contracts and fill prices, including matched partial fills', () => {
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.451 },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.497 },
+    })).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
+  });
+
+  it('refuses to invent a position from mismatched, zero, or missing venue fills', () => {
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 1, filledPrice: 0.50 },
+    })).toBeNull();
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 0, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 0, filledPrice: 0.50 },
+    })).toBeNull();
+  });
+});
 
 function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
   return {
@@ -56,6 +77,7 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     pmYesDepth: 60,
     pmNoDepth: 55,
     expiryDate: farFuture,
+    category: 'Politics',
     ...overrides,
   };
 }
@@ -166,6 +188,24 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(makeInput({ roiPct: 1.5 }), baseSettings({ minRoiPct: 2.0 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('ROI');
+  });
+
+  it('accepts exactly 2.00% ROI at the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 2.0 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(true);
+    expect(ev.criteria.roiPct).toBeCloseTo(2.0, 5);
+  });
+
+  it('rejects 1.99% ROI just below the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 1.99 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('ROI');
+  });
+
+  it('accepts 2.01% ROI above the configured minimum', () => {
+    const ev = evaluateBotTrade(makeInput({ roiPct: 2.01 }), baseSettings({ minRoiPct: 2.0 }));
+    expect(ev.shouldTrade).toBe(true);
+    expect(ev.criteria.roiPct).toBeCloseTo(2.01, 5);
   });
 
   it('rejects APY below minimum when APY filter enabled', () => {
@@ -313,7 +353,7 @@ describe('unifiedOutcomeToBotInput', () => {
         lastPrice: 0.50,
         yesAskDepth: '$1.2K',
         noAskDepth: '0',
-      } as any,
+      } as UnifiedOutcome['kalshi'],
     });
     const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
     expect(input.kalshiYesDepth).toBe(1200);
@@ -349,6 +389,15 @@ describe('maybeExecuteBotTrade safety', () => {
       }),
       getExecutionMode: vi.fn().mockResolvedValue('paper'),
     }));
+    vi.doMock('./bot-positions', async (importOriginal) => ({
+      ...(await importOriginal()),
+      fetchAuthoritativeBotFeeConfig: vi.fn().mockResolvedValue({
+        kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000' },
+        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
+        pmTheta: 0.04,
+      }),
+      recordBotPosition: vi.fn().mockResolvedValue(undefined),
+    }));
   });
 
   afterEach(() => {
@@ -356,6 +405,7 @@ describe('maybeExecuteBotTrade safety', () => {
     vi.unstubAllEnvs();
     vi.doUnmock('./persistence');
     vi.doUnmock('./settings');
+    vi.doUnmock('./bot-positions');
   });
 
   it('simulates in paper mode even when production requested', async () => {
@@ -366,6 +416,17 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.positionPersisted).toBe(false);
     expect(result.persistenceError).toContain('Missing authoritative market category');
     expect(result.reason).toContain('Paper');
+  });
+
+  it('fails closed before execution when authoritative fee lookup fails', async () => {
+    const positions = await import('./bot-positions');
+    vi.mocked(positions.fetchAuthoritativeBotFeeConfig).mockRejectedValueOnce(new Error('fee endpoint unavailable'));
+    const persistence = await import('./persistence');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const result = await maybeExecuteBotTrade(makeInput());
+    expect(result.executed).toBe(false);
+    expect(result.reason).toMatch(/fee authority/i);
+    expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
 });
 
