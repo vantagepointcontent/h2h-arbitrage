@@ -314,7 +314,7 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   let autoQueued = 0;
   let pendingReview = 0;
 
-  await runWithConcurrency(toVerify, async (candidate, i) => {
+  await runWithConcurrency(toVerify, async (candidate) => {
     const kTicker = candidate.kalshi.marketId;
     const pSlug = candidate.polymarket.eventId || candidate.polymarket.marketId;
 

@@ -387,7 +387,7 @@ function assertPersistedEntryEconomics(position: BotPosition): void {
     sharesPm: position.sharesPm,
     kalshiFeeMultiplierPpm: position.kalshiEntryFeeMultiplierPpm!,
     pmFeeRateBps: position.pmEntryFeeRateBps!,
-    pmTheta: position.pmTheta,
+    pmTheta: position.pmTheta!,
   });
   if (position.kalshiEntryFeeCents !== expected.kalshiEntryFeeCents
     || position.pmEntryFeeCents !== expected.pmEntryFeeCents

@@ -70,7 +70,7 @@ describe('platform-neutral outcome model', () => {
       artist: 'Example',
       kalshi: { ticker: 'KX-EXAMPLE', yesBid: 0.4, yesAsk: 0.42, noBid: 0.58, noAsk: 0.6, lastPrice: 0.41 },
       polymarket: { marketId: 'pm-example', conditionId: 'condition-example', yesPrice: 0.43, noPrice: 0.57, bestBid: 0.42, bestAsk: 0.43, lastTradePrice: 0.43 },
-      arbitrage: { strategy: 'No arb', arbType: 'direct', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
+      arbitrage: { strategy: 'No arb', arbType: 'direct', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, maxCapital: 0 },
       source: 'auto',
     });
 
@@ -563,8 +563,8 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
   describe('null bestBid/bestAsk handling', () => {
     it('both null → uses Gamma only when CLOB availability is unknown', () => {
       const shape = buildPmArbShape(makePmMarket({
-        bestBid: null,
-        bestAsk: null,
+        bestBid: null as unknown as number,
+        bestAsk: null as unknown as number,
         outcomePrices: '[\"0.42\",\"0.58\"]',
       }));
       // A missing CLOB result is different from a reachable-but-empty CLOB.
@@ -576,7 +576,7 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
 
     it('only bestBid null → derives from bestAsk', () => {
       const shape = buildPmArbShape(makePmMarket({
-        bestBid: null,
+        bestBid: null as unknown as number,
         bestAsk: 0.55,
       }));
       expect(shape.yesPrice).toBe(0.55);
@@ -587,7 +587,7 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
     it('only bestAsk null → derives from bestBid', () => {
       const shape = buildPmArbShape(makePmMarket({
         bestBid: 0.48,
-        bestAsk: null,
+        bestAsk: null as unknown as number,
       }));
       expect(shape.yesPrice).toBeCloseTo(0.52, 6); // 1 - 0.48
       expect(shape.noPrice).toBe(0.48);
@@ -758,13 +758,13 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
       // Simulate what the OLD buggy code would do:
       // Old code: noPrice = 1 - bestBid (without null check)
       // 1 - null = 1 in JS
-      const oldStyleNoPrice = 1 - null; // = 1
+      const oldStyleNoPrice = 1 - (null as unknown as number); // = 1
       expect(oldStyleNoPrice).toBe(1);
 
       // Our fix ensures this never happens
       const shape = buildPmArbShape(makePmMarket({
-        bestBid: null,
-        bestAsk: null,
+        bestBid: null as unknown as number,
+        bestAsk: null as unknown as number,
         outcomePrices: '[\"0.42\",\"0.58\"]',
       }));
       expect(shape.noPrice).toBe(0.58);
@@ -773,7 +773,7 @@ describe('buildPmArbShape — null coercion regression (GEN-1)', () => {
 
     it('bestBid null with valid bestAsk → noPrice derived from bestAsk, not null', () => {
       const shape = buildPmArbShape(makePmMarket({
-        bestBid: null,
+        bestBid: null as unknown as number,
         bestAsk: 0.60,
       }));
       // Old bug: would compute noPrice = 1 - null = 1

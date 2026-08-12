@@ -44,7 +44,7 @@ export interface LiveArbResult {
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
    *  - "internal": same-platform YES+YES (FEAT-016) */
-  arbType: 'cross' | 'direct' | 'internal';
+  arbType: 'cross' | 'direct' | 'internal' | null;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
   /** HOOKUP-03 (FEAT-005): arb-formation signal, attached by persistence-tracker. */
