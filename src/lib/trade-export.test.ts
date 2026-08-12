@@ -8,12 +8,15 @@ describe('trade export', () => {
       success: true, strategy: null, estimatedProfit: 2, source: 'manual' as const,
       kalshiOrder: { ticker: 'K-1', outcome: 'yes', size: 10, price: 0.4 },
       polymarketOrder: { conditionId: 'P-1', outcome: 'no', size: 10, price: 0.5 },
-      result: { kalshiResult: { status: 'filled', filledSize: 9, filledPrice: 0.41, fee: 0.12 } },
+      result: { kalshiResult: {
+        status: 'filled', filledSize: 9, filledPrice: 0.41, fee: 0.12,
+        orderId: 'k-fill-1', timestamp: '2026-08-08T10:00:01.000Z', evidenceSource: 'venue',
+      } },
     };
     expect(executionRows({ ...base, dryRun: true })).toEqual([]);
     const rows = executionRows({ ...base, dryRun: false });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual(['2026-08-08T10:00:00.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
+    expect(rows[0]).toEqual(['2026-08-08T10:00:01.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.at(-1)).toBe('apy');
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.at(-1)).toBe('Legacy/Unknown');
   });
@@ -28,6 +31,25 @@ describe('trade export', () => {
         kalshiResult: { status: 'pending', orderId: 'k-1' },
         polymarketResult: { status: 'pending', orderId: 'pm-1' },
       },
+    })).toEqual([]);
+  });
+
+  it.each([
+    ['timestamp', { timestamp: undefined }],
+    ['fee', { fee: undefined }],
+    ['execution ID', { orderId: undefined }],
+    ['venue provenance', { evidenceSource: undefined }],
+  ])('does not export a filled leg with missing authoritative %s evidence', (_field, omission) => {
+    const leg = {
+      status: 'filled', filledSize: 9, filledPrice: 0.41, fee: 0,
+      orderId: 'k-fill-1', timestamp: '2026-08-08T10:00:01.000Z', evidenceSource: 'venue',
+      ...omission,
+    };
+    expect(executionRows({
+      timestamp: '2026-08-08T10:00:00.000Z', arbId: 'arb-incomplete', marketTitle: 'Incomplete',
+      dryRun: false, success: true, estimatedProfit: 2,
+      kalshiOrder: { ticker: 'K-1', outcome: 'yes', size: 10, price: 0.4 },
+      result: { kalshiResult: leg },
     })).toEqual([]);
   });
 

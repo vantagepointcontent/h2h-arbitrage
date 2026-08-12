@@ -33,17 +33,22 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
     const leg = (rawResult ?? {}) as ExportValueRecord;
     const filledSize = Number(leg.filledSize);
     const filledPrice = Number(leg.filledPrice);
+    const fee = leg.fees ?? leg.fee;
+    const timestamp = typeof leg.timestamp === 'string' ? leg.timestamp : '';
     if (!['filled', 'partial'].includes(String(leg.status))
       || !Number.isFinite(filledSize) || filledSize <= 0
-      || !Number.isFinite(filledPrice) || filledPrice <= 0 || filledPrice > 1) return [];
+      || !Number.isFinite(filledPrice) || filledPrice <= 0 || filledPrice > 1
+      || typeof fee !== 'number' || !Number.isFinite(fee) || fee < 0
+      || typeof leg.orderId !== 'string' || !leg.orderId.trim()
+      || !Number.isFinite(Date.parse(timestamp))
+      || leg.evidenceSource !== 'venue') return [];
     const marketName = String(order.ticker ?? order.marketId ?? order.conditionId ?? '');
     const status = String(leg.status ?? (execution.success ? 'open' : 'failed'));
     return [[
-      new Date(typeof leg.timestamp === 'string' && Number.isFinite(Date.parse(leg.timestamp))
-        ? leg.timestamp : execution.timestamp).toISOString(), platform,
+      new Date(timestamp).toISOString(), platform,
       execution.marketTitle, marketName, String(order.outcome ?? '').toUpperCase(),
       filledSize, filledPrice,
-      finite(leg.fees ?? leg.fee), '', execution.arbId, status,
+      fee, '', execution.arbId, status,
       execution.source === 'bot' ? (execution.selectionMethod ?? 'Legacy/Unknown') : 'Manual',
     ] satisfies TradeExportRow];
   });

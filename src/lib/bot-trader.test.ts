@@ -33,6 +33,17 @@ describe('getAuthoritativeMatchedFill', () => {
     });
   });
 
+  it('does not allow synthetic producer evidence to be relabeled as venue evidence', () => {
+    const evidence = createSyntheticMatchedFillEvidence({
+      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
+      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
+    });
+
+    expect(Reflect.set(evidence, 'source', 'venue')).toBe(false);
+    expect(getAuthoritativeMatchedFill(evidence)?.source).toBe('synthetic');
+    expect(getAuthoritativeMatchedFill({ ...evidence, source: 'venue' } as never)).toBeNull();
+  });
+
   it('refuses incomplete or internally inconsistent evidence', () => {
     expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
       kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },

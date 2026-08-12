@@ -258,19 +258,27 @@ export interface MatchedFillLegEvidence {
 }
 
 const MATCHED_FILL_EVIDENCE = Symbol('BotTraderMatchedFillEvidence');
+const MATCHED_FILL_PROVENANCE = new WeakMap<object, 'venue' | 'synthetic'>();
 
 interface MatchedFillEvidence {
   readonly [MATCHED_FILL_EVIDENCE]: true;
-  source: 'venue' | 'synthetic';
-  kalshi: MatchedFillLegEvidence;
-  polymarket: MatchedFillLegEvidence;
+  readonly source: 'venue' | 'synthetic';
+  readonly kalshi: Readonly<MatchedFillLegEvidence>;
+  readonly polymarket: Readonly<MatchedFillLegEvidence>;
 }
 
 export function createSyntheticMatchedFillEvidence(input: {
   kalshi: MatchedFillLegEvidence;
   polymarket: MatchedFillLegEvidence;
 }): MatchedFillEvidence {
-  return { ...input, source: 'synthetic', [MATCHED_FILL_EVIDENCE]: true };
+  const evidence: MatchedFillEvidence = Object.freeze({
+    source: 'synthetic',
+    kalshi: Object.freeze({ ...input.kalshi }),
+    polymarket: Object.freeze({ ...input.polymarket }),
+    [MATCHED_FILL_EVIDENCE]: true as const,
+  });
+  MATCHED_FILL_PROVENANCE.set(evidence, 'synthetic');
+  return evidence;
 }
 
 export interface AuthoritativeMatchedFill {
@@ -289,6 +297,8 @@ export interface AuthoritativeMatchedFill {
 
 export function getAuthoritativeMatchedFill(evidence?: MatchedFillEvidence): AuthoritativeMatchedFill | null {
   if (!evidence || evidence[MATCHED_FILL_EVIDENCE] !== true) return null;
+  const source = MATCHED_FILL_PROVENANCE.get(evidence);
+  if (!source) return null;
   const { kalshi, polymarket } = evidence;
   if (
     !Number.isSafeInteger(kalshi.contracts) || kalshi.contracts <= 0
@@ -303,7 +313,7 @@ export function getAuthoritativeMatchedFill(evidence?: MatchedFillEvidence): Aut
     || !Number.isFinite(Date.parse(polymarket.executedAt))
   ) return null;
   return {
-    source: evidence.source,
+    source,
     kalshiContracts: kalshi.contracts, pmContracts: polymarket.contracts,
     kalshiPrice: kalshi.price, pmPrice: polymarket.price,
     kalshiFeeCents: kalshi.feeCents, pmFeeCents: polymarket.feeCents,
