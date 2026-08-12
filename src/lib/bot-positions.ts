@@ -572,6 +572,9 @@ export class BotPositionStore {
       SET expected_apy_bps = ROUND(expected_roi_bps * 365.0 / NULLIF((julianday(expiry_date) - julianday(opened_at)), 0))
       WHERE expected_apy_bps IS NULL AND expected_roi_bps IS NOT NULL
         AND expiry_date IS NOT NULL AND opened_at IS NOT NULL`);
+    await this.client.execute(`UPDATE bot_positions
+      SET unit_id = 'execution:' || execution_id
+      WHERE unit_id IS NULL AND execution_id IS NOT NULL`);
     await this.client.execute(`
       CREATE TABLE IF NOT EXISTS bot_position_reservations (
         pair_key TEXT PRIMARY KEY,

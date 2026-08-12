@@ -416,6 +416,7 @@ describe('BotPositionStore', () => {
       executionFeesCents: 7,
       executionBuyCostCents: 957,
       remainingOpenCostCents: 957,
+      unitId: 'execution:7',
       status: 'open',
     });
     expect(page.markets[0].executions[0].legs.reduce((sum, leg) => sum + leg.entryFeeCents, 0)).toBe(7);
