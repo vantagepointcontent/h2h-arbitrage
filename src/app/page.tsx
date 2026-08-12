@@ -67,7 +67,6 @@ const CouplingSuggestions = dynamic(() => import("@/app/components/CouplingSugge
 });
 
 const DashboardPanel = dynamic(() => import("@/app/components/DashboardPanel"), { ssr: false });
-const ArbTimingPanel = dynamic(() => import("@/app/components/ArbTimingPanel"), { ssr: false });
 const LiveScanPanel = dynamic(() => import("@/app/components/LiveScanPanel"), { ssr: false });
 const LogsPanel = dynamic(() => import("@/app/components/LogsPanel"), { ssr: false });
 const SettingsPanel = dynamic(() => import("@/app/components/SettingsPanel"), { ssr: false });
@@ -248,7 +247,7 @@ export default function Home() {
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "timing" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
+  const [viewMode, setViewMode] = useState<"scan" | "overview" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
 
   // Outcome table filter; entering a saved market resets this to matched.
   const [outcomeFilter, setOutcomeFilter] = useState<"all" | "matched" | "arb">("all");
@@ -338,8 +337,9 @@ export default function Home() {
         setViewMode("dashboard");
         setActiveMarketId(null);
       } else if (state?.view === "timing") {
-        setViewMode("timing");
+        setViewMode("dashboard");
         setActiveMarketId(null);
+        window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
       } else if (state?.view === "bottrader") {
         setViewMode("bottrader");
         setActiveMarketId(null);
@@ -516,7 +516,9 @@ export default function Home() {
       } else if (view === "dashboard") {
         setViewMode("dashboard");
       } else if (view === "timing") {
-        setViewMode("timing");
+        // Backwards compatibility for bookmarks to the removed standalone view.
+        setViewMode("dashboard");
+        window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
       } else if (view === "logs") {
         setViewMode("logs");
       } else if (view === "settings") {
@@ -1067,11 +1069,6 @@ export default function Home() {
     window.history.replaceState({ view: "dashboard" }, "", "/?view=dashboard");
   };
 
-  const goToTiming = () => {
-    setCouplingPanelOpen(false);
-    setViewMode("timing");
-    window.history.replaceState({ view: "timing" }, "", "/?view=timing");
-  };
 
   const goToSettings = () => {
     setCouplingPanelOpen(false);
@@ -1551,7 +1548,6 @@ export default function Home() {
           onGoMarketFinder={goToMarketFinder}
           onGoLogs={goToLogs}
           onGoDashboard={goToDashboard}
-          onGoTiming={goToTiming}
           onGoTrades={goToTrades}
           onGoBotTrader={goToBotTrader}
 
@@ -1688,8 +1684,6 @@ export default function Home() {
               <LiveScanPanel capital={capital} savedMarkets={savedMarkets} />
             ) : viewMode === "dashboard" ? (
               <DashboardPanel />
-            ) : viewMode === "timing" ? (
-              <ArbTimingPanel />
             ) : viewMode === "logs" ? (
               <LogsPanel />
             ) : viewMode === "settings" ? (

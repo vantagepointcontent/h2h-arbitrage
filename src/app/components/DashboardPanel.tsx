@@ -16,9 +16,20 @@ import {
   HardDrive,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DecisionCommandCenter } from "./dashboard/DecisionCommandCenter";
+
+const ArbTimingPanel = dynamic(() => import("./ArbTimingPanel"), {
+  loading: () => (
+    <div
+      className="h-80 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]"
+      aria-label="Loading opportunity timing"
+    />
+  ),
+  ssr: false,
+});
 import {
   ResponsiveContainer,
   LineChart,
@@ -612,6 +623,11 @@ export default function DashboardPanel() {
           <div className="text-sm text-[var(--text-secondary)]">Storage data unavailable.</div>
         )}
       </Panel>
+
+      {/* Historical timing is available even when the current dashboard range
+          has no scans. The dynamic import keeps this non-critical request and
+          chunk off the dashboard's initial loading path. */}
+      <ArbTimingPanel />
 
       {!hasData ? (
         <EmptyState message="No scan data yet. Run a scan to populate the dashboard." />
