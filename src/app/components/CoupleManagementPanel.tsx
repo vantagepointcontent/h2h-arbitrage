@@ -17,6 +17,7 @@ import {
   ArrowDown,
   Radar,
 } from "lucide-react";
+import MatchedPairsReview from "./MatchedPairsReview";
 
 interface UncoupledMarket {
   id: string;
@@ -128,6 +129,8 @@ export default function CoupleManagementPanel() {
           </button>
         </div>
       </div>
+
+      <MatchedPairsReview />
 
       {error && (
         <div className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 p-3 text-sm text-[#ef4444]">

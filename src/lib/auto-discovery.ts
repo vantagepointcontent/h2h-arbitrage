@@ -160,9 +160,11 @@ function weightedPick(candidates: string[], yieldCounts?: Map<string, number>, y
 
 /** Normalize market title for matching (same as predictionhunt.ts) */
 export function normalizeTitle(t: string): string {
-  return t.toLowerCase()
-    .replace(/[.,/#!$%\\^&\\*;:{}=_`~()-]/g, '')
-    .replace(/\\s+/g, ' ')
+  return t
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);
 }
@@ -216,6 +218,11 @@ function extractEntities(title: string): string[] {
   const lower = title.toLowerCase();
   const entities: string[] = [];
 
+  // Numbers and dates are explicit, event-defining entities.
+  for (const value of lower.match(/\b\d+(?:\.\d+)?\b/g) ?? []) {
+    entities.push(`number:${value}`);
+  }
+
   // Common political figures
   const persons = ['trump', 'biden', 'newsom', 'vance', 'harris', 'stevez', 'deSantis', 'pace', 'pace'];
   for (const p of persons) {
@@ -241,8 +248,8 @@ function extractEntities(title: string): string[] {
 function scoreEntityMatch(titleA: string, titleB: string): number {
   const entitiesA = extractEntities(titleA);
   const entitiesB = extractEntities(titleB);
-  if (entitiesA.length === 0 && entitiesB.length === 0) return 15; // No entities → moderate default
-  if (entitiesA.length === 0 || entitiesB.length === 0) return 5;
+  if (entitiesA.length === 0 && entitiesB.length === 0) return 0;
+  if (entitiesA.length === 0 || entitiesB.length === 0) return 0;
 
   let common = 0;
   for (const e of entitiesA) {

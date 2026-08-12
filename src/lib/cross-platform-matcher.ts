@@ -2,24 +2,19 @@
 // Input: market_catalog table. Output: matched_pairs table with confidence + URL verification.
 // Victor's requirement: deterministic, verifiable — every stored pair has live URLs.
 
-import { fetchAllPlatformMarkets, PhV2Market } from './predictionhunt';
 import {
+  fetchAllKalshiMarkets,
   fetchKalshiMarket,
   KalshiMarket,
 } from './kalshi';
 import {
+  fetchAllPolymarketMarkets,
   fetchPolymarketMarketAsEvent,
   PMEvent,
+  PMMarket,
   parseOutcomes,
 } from './polymarket';
 import { calculateConfidence, ConfidenceBreakdown, normalizeTitle } from './auto-discovery';
-import {
-  fetchAllKalshiMarkets,
-} from './kalshi';
-import {
-  fetchAllPolymarketMarkets,
-  PMMarket,
-} from './polymarket';
 import {
   MarketCatalogRow,
   MatchedPair,
@@ -93,15 +88,13 @@ function normalizeCategory(cat: string | null | undefined): string {
   return c;
 }
 
-function categoriesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
-  return normalizeCategory(a) === normalizeCategory(b);
-}
 
 function expiryWithinDays(a: string | null, b: string | null, days: number): boolean {
-  if (!a || !b) return true;
+  // Fail closed: without two valid expiries, proximity is not verifiable.
+  if (!a || !b) return false;
   const ta = new Date(a).getTime();
   const tb = new Date(b).getTime();
-  if (isNaN(ta) || isNaN(tb)) return true;
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
   const diffDays = Math.abs(ta - tb) / (24 * 60 * 60 * 1000);
   return diffDays <= days;
 }
@@ -114,6 +107,79 @@ function jaccardTokens(a: string, b: string): number {
   for (const t of setA) if (setB.has(t)) intersection++;
   const union = new Set([...setA, ...setB]).size;
   return union === 0 ? 0 : intersection / union;
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = previous[0];
+    previous[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const above = previous[j];
+      previous[j] = a[i - 1] === b[j - 1]
+        ? diagonal
+        : 1 + Math.min(diagonal, previous[j - 1], above);
+      diagonal = above;
+    }
+  }
+  return previous[b.length];
+}
+
+function namedEntities(title: string): string[] {
+  const excluded = new Set([
+    'a', 'an', 'are', 'can', 'could', 'did', 'do', 'does', 'how', 'is', 'may',
+    'shall', 'should', 'the', 'was', 'were', 'what', 'when', 'where', 'which',
+    'who', 'why', 'will', 'would', 'yes', 'no',
+    'january', 'february', 'march', 'april', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  ]);
+  return [...new Set(
+    (title.match(/\p{Lu}[\p{L}\p{M}'’-]*/gu) ?? [])
+      .map((token) => token.toLowerCase())
+      .filter((token) => !excluded.has(token)),
+  )].sort();
+}
+
+function propositionDirection(title: string): { negated: boolean; comparator: 'up' | 'down' | null } {
+  const normalized = normalizeTitle(title);
+  const tokens = new Set(normalized.split(/\s+/));
+  const negated = ['not', 'never', 'no', 'without'].some((token) => tokens.has(token));
+  const up = ['above', 'over', 'exceed', 'exceeds', 'exceeding', 'greater', 'higher', 'more', 'increase', 'rise', 'win', 'wins'].some((token) => tokens.has(token));
+  const down = ['below', 'under', 'less', 'lower', 'decrease', 'fall', 'lose', 'loses'].some((token) => tokens.has(token));
+  return { negated, comparator: up === down ? null : (up ? 'up' : 'down') };
+}
+
+/** Deterministic title gate applied before the legacy confidence scorer. */
+function titlesHaveVerifiableOverlap(titleA: string, titleB: string): boolean {
+  const a = normalizeTitle(titleA);
+  const b = normalizeTitle(titleB);
+  if (!a || !b) return false;
+
+  const entitiesA = namedEntities(titleA);
+  const entitiesB = namedEntities(titleB);
+  if ((entitiesA.length > 0 || entitiesB.length > 0) && entitiesA.join('|') !== entitiesB.join('|')) {
+    return false;
+  }
+
+  const directionA = propositionDirection(titleA);
+  const directionB = propositionDirection(titleB);
+  if (directionA.negated !== directionB.negated) return false;
+  if (directionA.comparator && directionB.comparator && directionA.comparator !== directionB.comparator) {
+    return false;
+  }
+
+  const numbersA = [...new Set(a.match(/\b\d+(?:\.\d+)?\b/g) ?? [])].sort();
+  const numbersB = [...new Set(b.match(/\b\d+(?:\.\d+)?\b/g) ?? [])].sort();
+  // A date, threshold, score, or count is event-defining. Any mismatch rejects.
+  if ((numbersA.length > 0 || numbersB.length > 0) && numbersA.join('|') !== numbersB.join('|')) {
+    return false;
+  }
+
+  const maxLength = Math.max(a.length, b.length, 1);
+  const editRatio = levenshteinDistance(a, b) / maxLength;
+  const tokenOverlap = jaccardTokens(a, b);
+  return editRatio <= 0.30 || tokenOverlap >= 0.35;
 }
 
 function isBinaryKalshi(market: KalshiMarket | null): boolean {
@@ -131,7 +197,8 @@ function isBinaryKalshi(market: KalshiMarket | null): boolean {
 function isBinaryPolymarket(event: PMEvent | null, slug: string): boolean {
   if (!event || !event.markets || event.markets.length === 0) return false;
   if (!event.active || event.closed) return false;
-  const market = event.markets.find(m => m.slug === slug) || event.markets[0];
+  // Never accept a sibling or fallback market: the exact verified slug must exist.
+  const market = event.markets.find(m => m.slug === slug);
   if (!market || !market.active || market.closed) return false;
   const parsed = parseOutcomes(market);
   const outcomes = parsed.outcomes.map(o => o.toLowerCase());
@@ -228,7 +295,7 @@ export async function refreshMarketCatalog(): Promise<{
       marketId: String(m.conditionId || m.id),
       title: m.question || m.slug || m.conditionId,
       category: null,
-      eventId: null,
+      eventId: m.slug || null,
       eventTitle: m.groupItemTitle || null,
       expiryDate: m.endDate ? String(m.endDate) : null,
       isBinary,
@@ -238,7 +305,7 @@ export async function refreshMarketCatalog(): Promise<{
       noBid: isBinary ? (m.bestBid != null ? 1 - m.bestBid : prices[1] ?? null) : null,
       noAsk: isBinary ? (m.bestAsk != null ? 1 - m.bestAsk : prices[1] ?? null) : null,
       volume24h: m.volumeNum ?? m.volumeClob ?? (m.volume != null ? Number(m.volume) : null),
-      sourceUrl: `https://polymarket.com/market/${m.slug}`,
+      sourceUrl: `https://polymarket.com/event/${m.slug}`,
       fetchedAt: now,
     };
   };
@@ -263,21 +330,47 @@ export async function refreshMarketCatalog(): Promise<{
   return { kalshi: kalshiCount, polymarket: polymarketCount, errors };
 }
 
+async function loadAllCatalogRows(platform: 'kalshi' | 'polymarket'): Promise<MarketCatalogRow[]> {
+  const rows: MarketCatalogRow[] = [];
+  let cursor: number | null = 0;
+  do {
+    const page = await queryMarketCatalog({
+      platform,
+      includeStale: false,
+      limit: 1000,
+      cursor,
+    });
+    rows.push(...page.rows);
+    if (page.nextCursor != null && page.nextCursor <= cursor) {
+      throw new Error(`Catalog pagination did not advance for ${platform}`);
+    }
+    cursor = page.nextCursor;
+  } while (cursor != null);
+  return rows;
+}
+
 export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<MatchRunResult> {
-  const options = { ...DEFAULT_OPTS, ...opts };
+  const options: Required<Omit<MatcherOptions, 'onProgress'>> = {
+    candidateThreshold: opts?.candidateThreshold ?? DEFAULT_OPTS.candidateThreshold,
+    maxVerifications: opts?.maxVerifications ?? DEFAULT_OPTS.maxVerifications,
+    maxExpiryDays: opts?.maxExpiryDays ?? DEFAULT_OPTS.maxExpiryDays,
+    autoQueueThreshold: opts?.autoQueueThreshold ?? DEFAULT_OPTS.autoQueueThreshold,
+    reviewThreshold: opts?.reviewThreshold ?? DEFAULT_OPTS.reviewThreshold,
+  };
   const start = Date.now();
   const errors: string[] = [];
 
-  const kalshiRes = await queryMarketCatalog({ platform: 'kalshi', includeStale: false, limit: 10000 });
-  const pmRes = await queryMarketCatalog({ platform: 'polymarket', includeStale: false, limit: 10000 });
-  const kalshiMarkets = kalshiRes.rows;
-  const pmMarkets = pmRes.rows;
+  const [kalshiMarkets, pmMarkets] = await Promise.all([
+    loadAllCatalogRows('kalshi'),
+    loadAllCatalogRows('polymarket'),
+  ]);
 
   opts?.onProgress?.({ step: 'matching', message: 'Matching cross-platform pairs...' });
 
   // Build inverted index by normalized category to avoid full O(N*M) loop.
   const pmByCategory = new Map<string, MarketCatalogRow[]>();
   for (const p of pmMarkets) {
+    if (!p.isBinary || p.outcomeCount !== 2) continue;
     const cat = normalizeCategory(p.category);
     const list = pmByCategory.get(cat) || [];
     list.push(p);
@@ -286,11 +379,13 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
 
   const candidates: Candidate[] = [];
   for (const k of kalshiMarkets) {
+    if (!k.isBinary || k.outcomeCount !== 2) continue;
     const cat = normalizeCategory(k.category);
     const pmList = pmByCategory.get(cat);
     if (!pmList || pmList.length === 0) continue;
     for (const p of pmList) {
       if (!expiryWithinDays(k.expiryDate, p.expiryDate, options.maxExpiryDays)) continue;
+      if (!titlesHaveVerifiableOverlap(k.title, p.title)) continue;
       const { confidence, breakdown } = calculateConfidence(
         k.title,
         p.title,
@@ -299,13 +394,19 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
         k.expiryDate,
         p.expiryDate,
       );
-      if (confidence < options.candidateThreshold) continue;
+      if (confidence < Math.max(options.candidateThreshold, options.reviewThreshold)) continue;
       candidates.push({ kalshi: k, polymarket: p, confidence, breakdown });
     }
   }
 
   candidates.sort((a, b) => b.confidence - a.confidence);
   const toVerify = candidates.slice(0, options.maxVerifications);
+  const kalshiCandidateCounts = new Map<string, number>();
+  const polymarketCandidateCounts = new Map<string, number>();
+  for (const candidate of candidates) {
+    kalshiCandidateCounts.set(candidate.kalshi.marketId, (kalshiCandidateCounts.get(candidate.kalshi.marketId) ?? 0) + 1);
+    polymarketCandidateCounts.set(candidate.polymarket.marketId, (polymarketCandidateCounts.get(candidate.polymarket.marketId) ?? 0) + 1);
+  }
 
   opts?.onProgress?.({
     step: 'verifying',
@@ -318,7 +419,7 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   let autoQueued = 0;
   let pendingReview = 0;
 
-  await runWithConcurrency(toVerify, async (candidate, i) => {
+  await runWithConcurrency(toVerify, async (candidate) => {
     const kTicker = candidate.kalshi.marketId;
     const pSlug = candidate.polymarket.eventId || candidate.polymarket.marketId;
 
@@ -339,24 +440,45 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
       errors.push(`Kalshi market not binary/open: ${kTicker}`);
       return;
     }
+    if (kMarket.ticker.toLowerCase() !== kTicker.toLowerCase()) {
+      errors.push(`Kalshi verify returned wrong ticker: ${kTicker}`);
+      return;
+    }
+    const liveKalshiTitle = kMarket.title || kMarket.yes_sub_title || '';
+    if (!titlesHaveVerifiableOverlap(candidate.kalshi.title, liveKalshiTitle)) {
+      errors.push(`Kalshi live semantics changed: ${kTicker}`);
+      return;
+    }
     if (!isBinaryPolymarket(pEvent, pSlug || '')) {
       errors.push(`Polymarket event not binary/open: ${pSlug}`);
       return;
     }
+    const livePolymarketMarket = pEvent.markets.find((market) => market.slug === pSlug);
+    if (!livePolymarketMarket || !titlesHaveVerifiableOverlap(candidate.polymarket.title, livePolymarketMarket.question || '')) {
+      errors.push(`Polymarket live semantics changed: ${pSlug}`);
+      return;
+    }
+    if (!titlesHaveVerifiableOverlap(liveKalshiTitle, livePolymarketMarket.question || '')) {
+      errors.push(`Live propositions disagree: ${kTicker}/${pSlug}`);
+      return;
+    }
 
+    const isUnambiguous =
+      kalshiCandidateCounts.get(candidate.kalshi.marketId) === 1 &&
+      polymarketCandidateCounts.get(candidate.polymarket.marketId) === 1;
     const status: MatchedPair['status'] =
-      candidate.confidence >= options.autoQueueThreshold
+      candidate.confidence >= options.autoQueueThreshold && isUnambiguous
         ? 'auto_queued'
         : 'pending_review';
 
     try {
       await upsertMatchedPair({
         kalshiMarketId: kTicker,
-        polymarketMarketId: pSlug || '',
+        polymarketMarketId: candidate.polymarket.marketId,
         kalshiTitle: candidate.kalshi.title,
         polymarketTitle: candidate.polymarket.title,
-        kalshiUrl: candidate.kalshi.sourceUrl,
-        polymarketUrl: candidate.polymarket.sourceUrl,
+        kalshiUrl: buildKalshiUrl(kTicker),
+        polymarketUrl: buildPolymarketUrl(pSlug || ''),
         confidence: candidate.confidence,
         confidenceBreakdown: candidate.breakdown,
         status,
