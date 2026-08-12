@@ -14,7 +14,7 @@ import { formatPrice } from "@/app/lib/page-shared";
 import { MarketDepthCharts } from './MarketDepthCharts';
 import { calculateShareRatio } from '@/lib/share-ratio';
 import { ProfitDistributionPanel } from './ProfitDistributionPanel';
-import type { ProfitDistribution } from '@/lib/profit-distribution';
+import { resolveDistributionStakes, type ProfitDistribution } from '@/lib/profit-distribution';
 
 interface Outcome {
   artist: string;
@@ -26,6 +26,7 @@ interface Outcome {
     apyPct?: number;
     kalshiStake?: number;
     pmStake?: number;
+    maxCapital?: number;
     strategy: string;
     /** True only when every leg has a verified positive ask depth. */
     depthVerified?: boolean;
@@ -91,7 +92,17 @@ function OutcomeTableBodyInner({
   marketExpiryDate,
   scanTime: scanTimeProp,
 }: OutcomeTableBodyProps) {
-  const safeOutcomes = outcomes ?? [];
+  const sourceOutcomes: unknown[] = Array.isArray(outcomes) ? outcomes : [];
+  const safeOutcomes = sourceOutcomes.filter((outcome): outcome is Outcome => {
+    if (!outcome || typeof outcome !== 'object') return false;
+    const candidate = outcome as Partial<Outcome>;
+    return typeof candidate.artist === 'string'
+      && candidate.artist.trim().length > 0
+      && !!candidate.arbitrage
+      && typeof candidate.arbitrage === 'object'
+      && typeof candidate.arbitrage.strategy === 'string';
+  });
+  const hasMalformedOutcomes = !Array.isArray(outcomes) || safeOutcomes.length !== sourceOutcomes.length;
 
   // EXEC-002: manual-execute state — modal + per-row token resolution
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
@@ -222,6 +233,13 @@ function OutcomeTableBodyInner({
   return (
     <>
     <tbody className="divide-y divide-[var(--border-subtle)] tabular-nums">
+      {hasMalformedOutcomes && (
+        <tr>
+          <td colSpan={12} role="alert" className="px-4 py-3 text-xs text-[var(--status-warning)]">
+            Market outcome details are unavailable for one or more stale records. Valid rows remain usable; refresh prices to retry the missing data.
+          </td>
+        </tr>
+      )}
       {displayOutcomes.map((o, idx) => {
         const k = o.kalshi;
         const p = o.polymarket;
@@ -466,19 +484,37 @@ function OutcomeTableBodyInner({
                     const supportsDistribution = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi';
                     const kalshiPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
                     const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.polymarket?.noPrice : o.polymarket?.yesPrice;
+                    const distributionStakes = supportsDistribution
+                      && kalshiPrice != null && kalshiPrice > 0 && kalshiPrice < 1
+                      && pmPrice != null && pmPrice > 0 && pmPrice < 1
+                      ? resolveDistributionStakes({
+                          kalshiStake: o.arbitrage.kalshiStake,
+                          pmStake: o.arbitrage.pmStake,
+                          maxCapital: o.arbitrage.maxCapital,
+                          expectedProfit: o.arbitrage.expectedProfit,
+                          roiPct: o.arbitrage.roiPct,
+                          kalshiPrice,
+                          pmPrice,
+                        })
+                      : null;
                     return <>
                       <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
-                      {supportsDistribution && kalshiPrice && pmPrice && <ProfitDistributionPanel
+                      {distributionStakes && kalshiPrice != null && pmPrice != null && <ProfitDistributionPanel
                         strategy={(o.arbitrage.strategy as 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi')}
                         kalshiPrice={kalshiPrice}
                         pmPrice={pmPrice}
-                        kalshiStake={o.arbitrage.kalshiStake ?? 0}
-                        pmStake={o.arbitrage.pmStake ?? 0}
+                        kalshiStake={distributionStakes.kalshiStake}
+                        pmStake={distributionStakes.pmStake}
                         kalshiWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO'}
                         pmWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES'}
                         formatCurrency={formatCurrency}
                         onChange={(distribution) => setProfitDistributions(previous => ({ ...previous, [o.artist]: distribution }))}
                       />}
+                      {supportsDistribution && !distributionStakes && (
+                        <div role="status" className="mt-3 rounded-lg border border-[var(--status-warning)]/30 bg-[var(--status-warning)]/10 px-3 py-2 text-xs text-[var(--status-warning)]">
+                          Stake sizing is unavailable for this cached market. Refresh prices to load executable sizing; the remaining market details are still available.
+                        </div>
+                      )}
                       {ratio && <div className="mt-2 flex items-center justify-between rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-3 py-2 text-xs">
                         <span className="uppercase tracking-wider text-[var(--text-secondary)]">Hedge share ratio</span>
                         <span className="font-mono font-bold text-[var(--text-primary)]">PM {ratio.display.split(':')[0]} : {ratio.display.split(':')[1]} Kalshi</span>
