@@ -1,95 +1,82 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import type { CouplingTombstone } from './coupling-store';
+import {
+  couplingKey,
+  deleteCoupling,
+  getDeletedCouplings,
+  removeTombstoneById,
+} from './coupling-store';
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'decoupled-pairs.json');
-
-export interface DecoupledPair {
-  id: string;
-  kalshiTicker: string;
-  pmConditionId: string;
-  kalshiTitle: string;
-  pmTitle: string;
-  decoupledAt: string;
-}
-
-async function ensureDir() {
-  const dir = path.dirname(DATA_FILE);
-  try { await fs.mkdir(dir, { recursive: true }); } catch {}
-}
-
-async function writeFileAtomic(pairs: DecoupledPair[]) {
-  await ensureDir();
-  const tmp = `${DATA_FILE}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(pairs, null, 2));
-  await fs.rename(tmp, DATA_FILE);
-}
+export type DecoupledPair = CouplingTombstone;
 
 export async function getDecoupledPairs(): Promise<DecoupledPair[]> {
-  try {
-    await ensureDir();
-    const data = await fs.readFile(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  return getDeletedCouplings();
 }
 
-export async function addDecoupledPair(pair: Omit<DecoupledPair, 'id' | 'decoupledAt'>): Promise<DecoupledPair> {
-  const pairs = await getDecoupledPairs();
-  const exists = pairs.some(p =>
-    p.kalshiTicker === pair.kalshiTicker && p.pmConditionId === pair.pmConditionId
-  );
-  if (exists) throw new Error('Pair already decoupled');
-  const entry: DecoupledPair = {
-    ...pair,
-    id: crypto.randomUUID(),
-    decoupledAt: new Date().toISOString(),
-  };
-  pairs.push(entry);
-  await writeFileAtomic(pairs);
-  return entry;
+export async function addDecoupledPair(
+  pair: Omit<DecoupledPair, 'id' | 'couplingKey' | 'decoupledAt' | 'revision'>,
+): Promise<DecoupledPair> {
+  return deleteCoupling(pair);
 }
 
 export async function removeDecoupledPair(id: string): Promise<boolean> {
-  const pairs = await getDecoupledPairs();
-  const filtered = pairs.filter(p => p.id !== id);
-  if (filtered.length === pairs.length) return false;
-  await writeFileAtomic(filtered);
-  return true;
+  return removeTombstoneById(id);
 }
 
-/**
- * Split any auto-matched pairs that the user has explicitly decoupled.
- * Returns a new array where decoupled pairs are broken into separate
- * Kalshi-only and Polymarket-only outcomes.
- */
+/** Split exact deleted tuples so either market remains eligible for unrelated matches. */
 export function applyDecoupledPairs<T extends {
   kalshi: { ticker: string } | null;
   polymarket: { conditionId: string; marketId?: string } | null;
-  arbitrage: Record<string, any>;
+  arbitrage: Record<string, unknown>;
   artist: string;
 }>(outcomes: T[], decoupledPairs: DecoupledPair[]): T[] {
   if (!decoupledPairs.length) return outcomes;
-  const decoupledSet = new Set(decoupledPairs.map(d => `${d.kalshiTicker}|${d.pmConditionId}`));
+  const deleted = new Set(decoupledPairs.map((pair) => pair.couplingKey));
   const result: T[] = [];
-  for (const o of outcomes) {
-    if (o.kalshi && o.polymarket && decoupledSet.has(`${o.kalshi.ticker}|${o.polymarket.conditionId}`)) {
-      // Split into two separate outcomes
-      const kalshiOnly: T = {
-        ...o,
-        polymarket: null,
-        arbitrage: { ...o.arbitrage, strategy: 'No arb', expectedProfit: 0, roiPct: 0, apyPct: 0, kalshiStake: 0, pmStake: 0 },
-      };
-      const pmOnly: T = {
-        ...o,
-        kalshi: null,
-        artist: o.polymarket!.marketId || o.polymarket!.conditionId,
-        arbitrage: { ...o.arbitrage, strategy: 'No arb', expectedProfit: 0, roiPct: 0, apyPct: 0, kalshiStake: 0, pmStake: 0 },
-      };
-      result.push(kalshiOnly, pmOnly);
+  for (const outcome of outcomes) {
+    if (outcome.kalshi && outcome.polymarket
+      && deleted.has(couplingKey(outcome.kalshi.ticker, outcome.polymarket.conditionId))) {
+      result.push(
+        {
+          ...outcome,
+          polymarket: null,
+          arbitrage: { ...outcome.arbitrage, strategy: 'No arb', expectedProfit: 0, roiPct: 0, apyPct: 0, kalshiStake: 0, pmStake: 0 },
+        },
+        {
+          ...outcome,
+          kalshi: null,
+          artist: outcome.polymarket.marketId || outcome.polymarket.conditionId,
+          arbitrage: { ...outcome.arbitrage, strategy: 'No arb', expectedProfit: 0, roiPct: 0, apyPct: 0, kalshiStake: 0, pmStake: 0 },
+        },
+      );
     } else {
-      result.push(o);
+      result.push(outcome);
     }
   }
   return result;
+}
+
+export function removeDeletedCouplingArbs<T extends {
+  allArbs?: Array<{ kalshiTicker?: string; pmConditionId?: string; roiPct?: number; expectedProfit?: number; strategy?: string }>;
+  bestRoiPct: number;
+  bestProfit: number;
+  strategy: string;
+  matchedCount: number;
+}>(result: T, pairs: DecoupledPair[]): T {
+  if (!result.allArbs?.length || !pairs.length) return result;
+  const deleted = new Set(pairs.map((pair) => pair.couplingKey));
+  const allArbs = result.allArbs.filter((arb) => !arb.kalshiTicker || !arb.pmConditionId
+    || !deleted.has(couplingKey(arb.kalshiTicker, arb.pmConditionId)));
+  if (allArbs.length === result.allArbs.length) return result;
+  const best = allArbs.reduce<typeof allArbs[number] | null>(
+    (current, arb) => !current || Number(arb.roiPct) > Number(current.roiPct) ? arb : current,
+    null,
+  );
+  return {
+    ...result,
+    allArbs,
+    matchedCount: Math.max(0, result.matchedCount - (result.allArbs.length - allArbs.length)),
+    bestRoiPct: best ? Number(best.roiPct) || 0 : 0,
+    bestProfit: best ? Number(best.expectedProfit) || 0 : 0,
+    strategy: best ? String(best.strategy || '') : 'No arb',
+  };
 }

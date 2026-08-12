@@ -14,7 +14,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing or invalid id' }, { status: 400 });
     }
     const ok = await deleteManualMatch(id);
-    return NextResponse.json({ success: ok });
+    return ok
+      ? NextResponse.json({ success: true })
+      : NextResponse.json({ error: 'Manual match not found' }, { status: 404 });
   } catch (err: any) {
     return NextResponse.json({ error: clientSafeError(err) }, { status: 500 });
   }

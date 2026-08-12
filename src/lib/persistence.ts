@@ -2,6 +2,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
+import { ensureCouplingStore, getDeletedCouplings } from './coupling-store';
+import { removeDeletedCouplingArbs } from './decoupled-pairs';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1014,6 +1016,12 @@ let _marketsCache: { data: SavedMarket[]; at: number; includeArchived: boolean }
 const MARKETS_CACHE_TTL_MS = 5_000;
 function invalidateMarketsCache(): void { _marketsCache = null; }
 
+/** Called after coupling-store commits direct saved_markets invalidation. */
+export function notifyCouplingDerivedInvalidation(): void {
+  invalidateMarketsCache();
+  mirrorMarketsToJsonThrottled();
+}
+
 export async function getSavedMarkets(opts?: { includeArchived?: boolean }): Promise<SavedMarket[]> {
   const includeArchived = !!opts?.includeArchived;
   const now = Date.now();
@@ -1157,25 +1165,31 @@ export async function upsertSavedMarket(input: {
 }
 
 export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<void> {
-  // Targeted UPDATE — no read-modify-write of the whole list. This was the
-  // main race: concurrent scans clobbering each other's lastScanResult.
+  // Serialize tombstone check and cache write with coupling deletion.
   await ensureMarketsMigrated();
+  await ensureCouplingStore();
   const c = getClient();
-  // AUTO-002: track last time this market had matched outcomes (dead-market detection)
-  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
-  if (expiryDate !== undefined) {
-    await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-      args: [JSON.stringify(result), expiryDate ?? null, matchedNow, id],
-    });
-  invalidateMarketsCache();
-  } else {
-    await c.execute({
-      sql: 'UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-      args: [JSON.stringify(result), matchedNow, id],
-    });
-  invalidateMarketsCache();
+  const tx = await c.transaction('write');
+  try {
+    result = removeDeletedCouplingArbs(result, await getDeletedCouplings(tx));
+    const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
+    if (expiryDate !== undefined) {
+      await tx.execute({
+        sql: 'UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+        args: [JSON.stringify(result), expiryDate ?? null, matchedNow, id],
+      });
+    } else {
+      await tx.execute({
+        sql: 'UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+        args: [JSON.stringify(result), matchedNow, id],
+      });
+    }
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback().catch(() => {});
+    throw error;
   }
+  invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
 }
 
@@ -1202,12 +1216,21 @@ export const LIVE_RESULT_TTL_MS = parseLiveResultTtlMs(process.env.H2H_LIVE_RESU
  *  (poller input) should stay driven by poller-cadence scans. */
 export async function updateSavedMarketLiveResult(id: string, result: LastScanResult): Promise<void> {
   await ensureMarketsMigrated();
+  await ensureCouplingStore();
   const c = getClient();
-  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
-  await c.execute({
-    sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-    args: [JSON.stringify(result), matchedNow, id],
-  });
+  const tx = await c.transaction('write');
+  try {
+    result = removeDeletedCouplingArbs(result, await getDeletedCouplings(tx));
+    const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
+    await tx.execute({
+      sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+      args: [JSON.stringify(result), matchedNow, id],
+    });
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback().catch(() => {});
+    throw error;
+  }
   invalidateMarketsCache();
 }
 

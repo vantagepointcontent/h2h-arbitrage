@@ -22,6 +22,8 @@ import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
 import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
 import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '@/lib/persistence';
+import { getDecoupledPairs } from '@/lib/decoupled-pairs';
+import { couplingKey } from '@/lib/coupling-store';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
@@ -345,7 +347,9 @@ async function writeLiveResult(
   if (now - last < LIVE_WRITE_MIN_MS) return;
   lastLiveWriteAt.set(pairId, now);
 
-  const clean = positive.filter((r) => !isSuspiciousLive(r));
+  const tombstones = new Set((await getDecoupledPairs()).map((pair) => couplingKey(pair.kalshiTicker, pair.pmConditionId)));
+  const clean = positive.filter((r) => !isSuspiciousLive(r)
+    && (!r.kalshiTicker || !r.pmConditionId || !tombstones.has(couplingKey(r.kalshiTicker, r.pmConditionId))));
   const best = clean.length > 0
     ? clean.reduce((b, r) => (r.roiPct > b.roiPct ? r : b))
     : null;
@@ -372,6 +376,8 @@ async function writeLiveResult(
     }))),
     allArbs: clean.map((r) => ({
       artist: r.artist,
+      kalshiTicker: r.kalshiTicker,
+      pmConditionId: r.pmConditionId,
       roiPct: r.roiPct,
       expectedProfit: r.expectedProfit,
       strategy: r.strategy,

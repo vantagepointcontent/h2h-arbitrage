@@ -15,6 +15,7 @@ import { seedAllBooks } from '@/lib/book-seed';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '@/lib/ws-book-apply';
 import { parseLiveScanCapital } from '@/lib/live-scan-request';
 import logger from '@/lib/logger';
+import { applyDecoupledPairs, getDecoupledPairs } from '@/lib/decoupled-pairs';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,9 +144,19 @@ export async function GET(req: NextRequest) {
           .then((v) => { avgLifespanMin = v; })
           .catch(() => {});
       }
-      function doSendResults() {
+      async function doSendResults() {
         lastSend = Date.now();
-        const outcomes = computeAllLiveArbitrages(session.matchedOutcomes, session.capital, session.category);
+        const tombstones = await getDecoupledPairs();
+        const eligible = applyDecoupledPairs(session.matchedOutcomes.map((outcome) => ({
+          ...outcome,
+          kalshi: { ticker: outcome.kalshiTicker },
+          polymarket: { conditionId: outcome.pmConditionId ?? '', marketId: outcome.pmConditionId },
+          arbitrage: {},
+        })), tombstones).filter((outcome) => outcome.kalshi && outcome.polymarket).map((outcome) => {
+          const { kalshi: _kalshi, polymarket: _polymarket, arbitrage: _arbitrage, ...matched } = outcome;
+          return matched;
+        }) as LiveMatchedOutcome[];
+        const outcomes = computeAllLiveArbitrages(eligible, session.capital, session.category);
         attachPersistenceScores(outcomes, { marketKey: persistKey, avgLifespanMin });
         send({ type: 'result', result: { outcomes, lastUpdate: new Date().toISOString() } });
       }
@@ -154,11 +165,11 @@ export async function GET(req: NextRequest) {
         const elapsed = now - lastSend;
         if (elapsed >= minIntervalMs) {
           if (trailingTimer) { clearTimeout(trailingTimer); trailingTimer = null; }
-          doSendResults();
+          void doSendResults();
         } else if (!trailingTimer) {
           trailingTimer = setTimeout(() => {
             trailingTimer = null;
-            if (!session.closed) doSendResults();
+            if (!session.closed) void doSendResults();
           }, minIntervalMs - elapsed);
         }
       }

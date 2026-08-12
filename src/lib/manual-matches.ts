@@ -21,9 +21,13 @@ async function ensureDir() {
 
 async function writeMatchesAtomic(matches: ManualMatch[]): Promise<void> {
   await ensureDir();
-  const tmpFile = `${DATA_FILE}.tmp`;
+  const tmpFile = `${DATA_FILE}.${process.pid}.${crypto.randomUUID()}.tmp`;
   await fs.writeFile(tmpFile, JSON.stringify(matches, null, 2));
-  await fs.rename(tmpFile, DATA_FILE);
+  try {
+    await fs.rename(tmpFile, DATA_FILE);
+  } finally {
+    await fs.rm(tmpFile, { force: true }).catch(() => {});
+  }
 }
 
 export async function getManualMatches(): Promise<ManualMatch[]> {
@@ -37,6 +41,8 @@ export async function getManualMatches(): Promise<ManualMatch[]> {
 }
 
 export async function addManualMatch(match: Omit<ManualMatch, 'id' | 'createdAt'>): Promise<ManualMatch> {
+  const { restoreCoupling } = await import('./coupling-store');
+  await restoreCoupling(match.kalshiTicker, match.pmConditionId);
   const matches = await getManualMatches();
 
   const exists = matches.some(m =>
@@ -56,8 +62,14 @@ export async function addManualMatch(match: Omit<ManualMatch, 'id' | 'createdAt'
 
 export async function deleteManualMatch(id: string): Promise<boolean> {
   const matches = await getManualMatches();
+  const target = matches.find(m => m.id === id);
+  if (!target) {
+    const { wasDeletedByManualMatchId } = await import('./coupling-store');
+    return wasDeletedByManualMatchId(id);
+  }
   const filtered = matches.filter(m => m.id !== id);
-  if (filtered.length === matches.length) return false;
+  const { deleteCoupling } = await import('./coupling-store');
+  await deleteCoupling({ ...target, manualMatchId: target.id });
   await writeMatchesAtomic(filtered);
   return true;
 }

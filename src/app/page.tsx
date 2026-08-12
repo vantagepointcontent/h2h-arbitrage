@@ -889,9 +889,14 @@ export default function Home() {
 
   const onDeleteMatch = async (id: string) => {
     try {
-      await fetch(`/api/manual-matches/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/manual-matches/${id}`, { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok || body.success !== true) throw new Error(body.error || "Failed to delete coupling");
       await loadManualMatches();
-    } catch { /* ignore */ }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to delete coupling");
+      throw error;
+    }
   };
 
   // Navigate to market detail
@@ -2156,10 +2161,10 @@ export default function Home() {
                           onPair={(kalshiTicker, pmConditionId, kalshiTitle, pmTitle) => {
                             onCreateMatch(kalshiTicker, pmConditionId, kalshiTitle, pmTitle);
                           }}
-                          onUnpair={(matchId) => {
-                            onDeleteMatch(matchId);
+                          onUnpair={async (matchId) => {
+                            await onDeleteMatch(matchId);
                             if (kalshiUrlRef.current && pmUrlRef.current) {
-                              handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+                              await handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
                             }
                           }}
                         />
@@ -2216,10 +2221,10 @@ export default function Home() {
                                   </div>
                                 </div>
                                 <button
-                                  onClick={() => {
-                                    onDeleteMatch(mm.id);
+                                  onClick={async () => {
+                                    await onDeleteMatch(mm.id);
                                     if (kalshiUrlRef.current && pmUrlRef.current) {
-                                      handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
+                                      await handleScanWithUrls(kalshiUrlRef.current, pmUrlRef.current, true);
                                     }
                                   }}
                                   className="p-1.5 rounded-md bg-[var(--status-negative)]/10 hover:bg-[var(--status-negative)]/20 text-[var(--status-negative)] transition-colors"

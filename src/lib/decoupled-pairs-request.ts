@@ -37,7 +37,9 @@ export function parseDecoupledPairCreateRequest(
 }
 
 export function parseDecoupledPairId(value: string | null): string | { error: string } {
-  if (!value || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+  const isUuid = !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  const isCouplingKey = !!value && /^v1:kalshi:[^|]{1,200}\|polymarket:.{1,200}$/i.test(value);
+  if (!value || (!isUuid && !isCouplingKey)) {
     return { error: 'Missing or invalid id query parameter' };
   }
   return value;

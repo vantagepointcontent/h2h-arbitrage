@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseDecoupledPairCreateRequest, parseDecoupledPairId } from './decoupled-pairs-request';
 
 describe('decoupled pair request parsing', () => {
+  it('accepts a canonical coupling key for explicit restore', () => {
+    expect(parseDecoupledPairId('v1:kalshi:KX-TEAM|polymarket:0xabc')).toBe('v1:kalshi:KX-TEAM|polymarket:0xabc');
+  });
   it('accepts and trims a valid create payload', () => {
     expect(parseDecoupledPairCreateRequest({ kalshiTicker: ' KXTEST ', pmConditionId: ' 0xabc ', kalshiTitle: ' K ', pmTitle: ' P ' }))
       .toEqual({ kalshiTicker: 'KXTEST', pmConditionId: '0xabc', kalshiTitle: 'K', pmTitle: 'P' });
