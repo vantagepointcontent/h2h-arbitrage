@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { createClient, type Client } from '@libsql/client';
-import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import { calcKalshiFee, calcPolymarketFee } from './matcher';
 import { normalizeKalshiResolution } from './settlement-resolution';
 import type { DashboardRange } from './dashboard-request';
 
@@ -391,7 +391,8 @@ function assertCurrentFeeAuthority(position: BotPosition, observedAt: string): v
     || !Number.isFinite(pmFeeMs)) {
     throw new Error(`Missing or malformed authoritative Polymarket fee configuration for bot position ${position.id}`);
   }
-  if (position.pmEntryTokenId == null || position.pmExitTokenId !== position.pmEntryTokenId) {
+  if ((position.pmEntryTokenId == null && position.executionMode !== 'paper')
+    || (position.pmEntryTokenId != null && position.pmExitTokenId !== position.pmEntryTokenId)) {
     throw new Error(`Conflicting Polymarket token fee configuration for bot position ${position.id}`);
   }
   const expectedPmFeeRateBps = Math.round((position.pmTheta ?? Number.NaN) * 10_000);
@@ -498,6 +499,45 @@ function assertPersistedEntryEconomics(position: BotPosition): void {
   }
 }
 
+function isLegacyPaperEntryAuthorityMissing(position: BotPosition): boolean {
+  return position.executionMode === 'paper'
+    && position.kalshiEntryFeeType == null
+    && position.kalshiEntryFeeMultiplierPpm == null
+    && position.kalshiEntryFeeSource == null
+    && position.kalshiEntryFeeObservedAt == null
+    && position.kalshiEntryFeeVersion == null
+    && position.pmEntryTokenId == null
+    && position.pmEntryFeeRateBps == null
+    && position.pmEntryFeeSource == null
+    && position.pmEntryFeeObservedAt == null
+    && position.pmEntryFeeVersion == null;
+}
+
+function assertValuationEntryEconomics(position: BotPosition): void {
+  try {
+    assertPersistedEntryEconomics(position);
+    return;
+  } catch (error) {
+    if (!isLegacyPaperEntryAuthorityMissing(position) || position.pmTheta == null) throw error;
+  }
+  const monetary = [
+    position.buyPriceKalshiCents, position.buyPricePmCents,
+    position.sharesKalshi, position.sharesPm, position.kalshiEntryFeeCents,
+    position.pmEntryFeeCents, position.feesCents, position.totalCostCents,
+    position.expectedPayoutCents, position.expectedProfitCents,
+  ];
+  if (!monetary.every(Number.isSafeInteger)
+    || position.sharesKalshi <= 0 || position.sharesPm <= 0
+    || position.kalshiEntryFeeCents < 0 || position.pmEntryFeeCents < 0
+    || position.feesCents !== position.kalshiEntryFeeCents + position.pmEntryFeeCents
+    || position.totalCostCents !== position.buyPriceKalshiCents * position.sharesKalshi
+      + position.buyPricePmCents * position.sharesPm + position.feesCents
+    || position.expectedPayoutCents !== Math.min(position.sharesKalshi, position.sharesPm) * 100
+    || position.expectedProfitCents !== position.expectedPayoutCents - position.totalCostCents) {
+    throw new Error(`Missing or malformed authoritative entry fee configuration for bot position ${position.id}`);
+  }
+}
+
 function roiBps(pnlCents: number, costCents: number): number {
   if (costCents <= 0) return 0;
   return Math.round((pnlCents * 10_000) / costCents);
@@ -556,7 +596,7 @@ export function calculatePositionValuation(
   position: BotPosition,
   quote: PositionQuote,
 ): PositionValuation {
-  assertPersistedEntryEconomics(position);
+  assertValuationEntryEconomics(position);
   const kalshiPrice = position.kalshiSide === 'yes'
     ? quote.kalshiYesBidCents
     : quote.kalshiNoBidCents;
@@ -1566,6 +1606,7 @@ export class BotPositionStore {
         kalshi_net_proceeds = ?, pm_net_proceeds = ?,
         kalshi_exit_fee = ?, pm_exit_fee = ?,
         unrealized_pnl = ?, unrealized_roi_pct = ?,
+        valuation_failure_reason = NULL, valuation_failure_at = NULL,
         last_valuation_at = ?, settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = ?, resolution_verified_at = ?, resolution_outcome = ?,
         resolution_payout = ?, resolution_validation_status = ?
@@ -1629,12 +1670,14 @@ export class BotPositionStore {
         kalshi_gross_proceeds_microcents = ?, pm_gross_proceeds_microcents = ?,
         kalshi_net_proceeds = ?, pm_net_proceeds = ?,
         kalshi_exit_fee = ?, pm_exit_fee = ?,
-        unrealized_pnl = ?, unrealized_roi_pct = ?, last_valuation_at = ?,
+        unrealized_pnl = ?, unrealized_roi_pct = ?,
+        valuation_failure_reason = NULL, valuation_failure_at = NULL, last_valuation_at = ?,
         settled_at = ?, realized_pnl = ?, settlement_side = ?,
         resolution_source = NULL, resolution_verified_at = NULL,
         resolution_outcome = NULL, resolution_payout = NULL,
         resolution_validation_status = 'pending'
-        WHERE id = ? AND status = 'open' AND pm_entry_token_id = ?
+        WHERE id = ? AND status = 'open'
+          AND (pm_entry_token_id = ? OR (execution_mode = 'paper' AND pm_entry_token_id IS NULL))
           AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
       args: [
         kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
@@ -1651,7 +1694,7 @@ export class BotPositionStore {
     });
   }
 
-  async clearOpenValuation(id: number, attemptedAt: string): Promise<void> {
+  async clearOpenValuation(id: number, attemptedAt: string, reason = 'Valuation unavailable: refresh failed'): Promise<void> {
     await this.ensureSchema();
     await this.client.execute({
       sql: `UPDATE bot_positions SET
@@ -1659,10 +1702,11 @@ export class BotPositionStore {
         kalshi_gross_proceeds_microcents = NULL, pm_gross_proceeds_microcents = NULL,
         kalshi_net_proceeds = NULL, pm_net_proceeds = NULL,
         kalshi_exit_fee = NULL, pm_exit_fee = NULL,
-        unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?
+        unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?,
+        valuation_failure_reason = ?, valuation_failure_at = ?
         WHERE id = ? AND status = 'open'
           AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
-      args: [attemptedAt, id, attemptedAt],
+      args: [attemptedAt, reason, attemptedAt, id, attemptedAt],
     });
   }
 
@@ -1775,7 +1819,7 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
   pmConditionId: string;
   pmTokenId?: string;
   pmSide: BotPositionSide;
-  category: string;
+  category?: string;
   observedAt?: string;
 }, dependencies?: {
   fetchJson?: (url: string) => Promise<Record<string, unknown>>;
@@ -1847,12 +1891,10 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
   if (typeof feeRateBps !== 'number' || !Number.isSafeInteger(feeRateBps) || feeRateBps < 0 || feeRateBps > 10_000) {
     throw new Error('Missing or malformed authoritative Polymarket token fee rate');
   }
-  const pmTheta = getPolymarketTheta(input.category);
-  if (Math.round(pmTheta * 10_000) !== feeRateBps) {
-    throw new Error('Conflicting authoritative Polymarket category and token fee configuration');
-  }
+  // The token endpoint is the current executable fee authority; category
+  // classifications can lag venue fee-policy changes.
+  const pmTheta = feeRateBps / 10_000;
   const observedAt = input.observedAt ?? new Date().toISOString();
-  const thetaSource = `matcher-category-theta:${encodeURIComponent(input.category.trim().toLowerCase())}`;
   return {
     kalshi: {
       feeType,
@@ -1868,9 +1910,9 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
     polymarket: {
       tokenId,
       feeRateBps,
-      source: `https://clob.polymarket.com/fee-rate?token_id=${encodeURIComponent(tokenId)}|${thetaSource}`,
+      source: `https://clob.polymarket.com/fee-rate?token_id=${encodeURIComponent(tokenId)}`,
       observedAt,
-      version: `token-fee-rate:${feeRateBps}|matcher-category-theta-v1:${Math.round(pmTheta * 1_000_000)}`,
+      version: `token-fee-rate:${feeRateBps}`,
     },
     pmTheta,
   };
@@ -2024,7 +2066,7 @@ export interface BotPositionAnalytics {
 
 export interface BotPerformanceSummary {
   positionIds: number[];
-  capital: { deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number };
+  capital: { deployedCents: number | null; currentCents: number; heldToResolutionCents: number; excludedOpenCostCents: number };
   entryCost: { available: number; unavailable: number };
   pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
   valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
@@ -2065,19 +2107,18 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const freshOpen = open.filter((position) => mark(position) === 'fresh');
   const stale = open.filter((position) => mark(position) === 'stale').length;
   const unavailable = open.filter((position) => mark(position) === 'unavailable').length;
-  const allOpenFresh = stale === 0 && unavailable === 0;
   const unavailableEntryCosts = rows.filter((position) => !hasAvailableEntryCost(position)).length;
   const allEntryCostsAvailable = unavailableEntryCosts === 0;
   const realizedCents = total(verifiedSettled.map((position) => position.realizedPnlCents!));
-  const unrealizedCents = allOpenFresh && allEntryCostsAvailable
-    ? total(freshOpen.map((position) => position.currentValueCents! - position.totalCostCents))
-    : null;
+  const valuedOpen = freshOpen.filter(hasAvailableEntryCost);
+  const unrealizedCents = total(valuedOpen.map((position) => position.currentValueCents! - position.totalCostCents));
   const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
   const deployedCents = allEntryCostsAvailable ? total(rows.map((position) => position.totalCostCents)) : null;
-  const currentCents = allOpenFresh && unverifiedSettled.length === 0
-    ? total(freshOpen.map((position) => position.currentValueCents!))
-      + total(verifiedSettled.map((position) => position.resolutionPayoutCents!))
-    : null;
+  const currentCents = total(freshOpen.map((position) => position.currentValueCents!))
+    + total(verifiedSettled.map((position) => position.resolutionPayoutCents!));
+  const valuedCostCents = total(valuedOpen.map((position) => position.totalCostCents))
+    + total(verifiedSettled.map((position) => position.totalCostCents));
+  const excludedOpenCostCents = total(open.filter((position) => mark(position) !== 'fresh').map((position) => position.totalCostCents));
   const oldestFreshMs = freshOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
   const dates = new Map<string, BotPerformanceSummary['entryCohorts'][number] & { incomplete: boolean }>();
   for (const position of rows) {
@@ -2093,8 +2134,6 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       if (mark(position) === 'fresh') {
         point.currentCents! += position.currentValueCents!;
         point.unrealizedCents! += position.currentValueCents! - position.totalCostCents;
-      } else {
-        point.incomplete = true;
       }
     } else if (hasVerifiedTerminalAccounting(position)) {
       point.currentCents! += position.resolutionPayoutCents!;
@@ -2115,13 +2154,14 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       deployedCents,
       currentCents,
       heldToResolutionCents: total(open.map((position) => position.expectedPayoutCents)),
+      excludedOpenCostCents,
     },
     entryCost: { available: rows.length - unavailableEntryCosts, unavailable: unavailableEntryCosts },
     pnl: {
       realizedCents,
       unrealizedCents,
       totalCents,
-      roiBps: totalCents == null || deployedCents == null || deployedCents <= 0 ? null : Math.round(totalCents * 10_000 / deployedCents),
+      roiBps: totalCents == null || valuedCostCents <= 0 ? null : Math.round(totalCents * 10_000 / valuedCostCents),
     },
     valuation: {
       fresh: freshOpen.length,
@@ -2290,6 +2330,7 @@ export async function pollOpenBotPositions(dependencies?: {
   } | null>;
   fetchFeeConfig?: typeof fetchAuthoritativeBotFeeConfig;
   observedAt?: string;
+  positionStore?: BotPositionStore;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
   const [{ fetchKalshiMarket }, { fetchClobMarket, fetchClobBook, extractClobBidPrices }] = await Promise.all([
     import('./kalshi'),
@@ -2379,21 +2420,32 @@ export async function pollOpenBotPositions(dependencies?: {
       observedAt: new Date(Math.min(yesObservedMs, noObservedMs)).toISOString(),
     };
   });
-  const open = await store().listAllOpen();
+  const positionStore = dependencies?.positionStore ?? store();
+  const open = await positionStore.listAllOpen();
+  const valuationAttemptedAt = dependencies?.observedAt ?? new Date().toISOString();
   let updated = 0;
   let settled = 0;
   const errors: Array<{ id: number; error: string }> = [];
 
-  await Promise.all(open.map(async (position) => {
+  const valuatePosition = async (position: BotPosition): Promise<void> => {
     try {
       if (!position.kalshiTicker || !position.pmConditionId) {
         throw new Error('Position is missing venue market identifiers');
       }
-      const [kalshi, pmBids] = await Promise.all([
+      const [kalshiResult, pmResult] = await Promise.allSettled([
         fetchKalshi(position.kalshiTicker),
         fetchPmBids(position.pmConditionId),
       ]);
-      if (!kalshi || !pmBids) throw new Error('Venue quote unavailable');
+      if (kalshiResult.status === 'rejected') {
+        throw new Error(`Kalshi market lookup failed: ${kalshiResult.reason instanceof Error ? kalshiResult.reason.message : String(kalshiResult.reason)}`);
+      }
+      if (pmResult.status === 'rejected') {
+        throw new Error(`Polymarket market lookup failed: ${pmResult.reason instanceof Error ? pmResult.reason.message : String(pmResult.reason)}`);
+      }
+      const kalshi = kalshiResult.value;
+      const pmBids = pmResult.value;
+      if (!kalshi) throw new Error('Kalshi market lookup returned no market');
+      if (!pmBids) throw new Error('Polymarket market lookup returned no market');
       const parseCents = (value: string | undefined): number | null => {
         if (value == null || !/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)) return null;
         const cents = Math.round(Number(value) * 100);
@@ -2437,19 +2489,20 @@ export async function pollOpenBotPositions(dependencies?: {
         : kalshiBids?.noBids ?? [];
       let valuedPosition = position;
       if (!(kalshiResolution.resolved && pmBids.resolved)) {
-        if (!position.category?.trim()) throw new Error('Position is missing authoritative market category');
         const authority = await (dependencies?.fetchFeeConfig ?? fetchAuthoritativeBotFeeConfig)({
           kalshiTicker: position.kalshiTicker,
           pmConditionId: position.pmConditionId,
           pmTokenId: position.pmEntryTokenId ?? undefined,
           pmSide: position.pmSide,
-          category: position.category,
+          category: position.category ?? undefined,
         });
-        if (authority.pmTheta !== position.pmTheta) {
+        const legacyPaperEntry = isLegacyPaperEntryAuthorityMissing(position);
+        if (!legacyPaperEntry && authority.pmTheta !== position.pmTheta) {
           throw new Error('Conflicting persisted and current Polymarket fee theta');
         }
         valuedPosition = {
           ...position,
+          pmTheta: authority.pmTheta,
           kalshiExitFeeType: authority.kalshi.feeType,
           kalshiExitFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
           kalshiExitFeeSource: authority.kalshi.source,
@@ -2478,7 +2531,7 @@ export async function pollOpenBotPositions(dependencies?: {
         pmResolved: pmBids.resolved,
       });
       if (valuedPosition !== position) {
-        await store().updateValuationWithFeeConfig(position.id, valuation, {
+        await positionStore.updateValuationWithFeeConfig(position.id, valuation, {
           feeType: valuedPosition.kalshiExitFeeType!,
           feeMultiplierPpm: valuedPosition.kalshiExitFeeMultiplierPpm!,
           source: valuedPosition.kalshiExitFeeSource!,
@@ -2492,14 +2545,21 @@ export async function pollOpenBotPositions(dependencies?: {
           version: valuedPosition.pmExitFeeVersion!,
         });
       } else {
-        await store().updateValuation(position.id, valuation);
+        await positionStore.updateValuation(position.id, valuation);
       }
       updated += 1;
       if (valuation.status === 'settled') settled += 1;
     } catch (error) {
-      await store().clearOpenValuation(position.id, dependencies?.observedAt ?? new Date().toISOString());
-      errors.push({ id: position.id, error: error instanceof Error ? error.message : String(error) });
+      const reason = error instanceof Error ? error.message : String(error);
+      await positionStore.clearOpenValuation(position.id, valuationAttemptedAt, reason);
+      errors.push({ id: position.id, error: reason });
     }
-  }));
+  };
+  const workers = Array.from({ length: Math.min(8, open.length) }, async (_, workerIndex) => {
+    for (let index = workerIndex; index < open.length; index += 8) {
+      await valuatePosition(open[index]);
+    }
+  });
+  await Promise.all(workers);
   return { updated, settled, errors };
 }

@@ -28,6 +28,14 @@ describe("trading status model", () => {
     expect(items.find((item) => item.id === "risk")).toMatchObject({ value: "1 unhedged · $42.50", tone: "critical" });
   });
 
+  it("discloses BotTrader open exposure excluded from executable valuation", () => {
+    const items = buildTradingStatus({
+      ...base,
+      botAnalytics: { analytics: { openPositions: { count: 5 }, performance: { capital: { excludedOpenCostCents: 287 }, valuation: { stale: 1, unavailable: 2 } } } },
+    });
+    expect(items.find((item) => item.id === "risk")).toMatchObject({ value: "3 unvalued · $2.87", tone: "warning" });
+  });
+
   it("fails closed when status endpoints are unavailable", () => {
     const items = buildTradingStatus({ failed: ["watcher", "execution"] });
     expect(items.find((item) => item.id === "feed")?.tone).toBe("critical");

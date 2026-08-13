@@ -69,6 +69,8 @@ interface BotPosition {
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
+  valuationStatus?: 'current' | 'stale' | 'unavailable';
+  valuationFailureReason?: string | null;
   realizedPnlCents: number | null;
   settlementSide: 'kalshi' | 'pm' | null;
   resolutionPayoutCents?: number | null;
@@ -88,15 +90,16 @@ const VALUATION_STALE_MS = 15 * 60_000;
 
 type OpenMark =
   | { available: true; currentValueCents: number; pnlCents: number; roiBps: number | null }
-  | { available: false; label: 'Unavailable' | 'Stale' };
+  | { available: false; label: string };
 
 function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
   if (position.currentValueCents == null || !position.lastValuationAt) {
-    return { available: false, label: 'Unavailable' };
+    return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: no executable mark has been recorded' };
   }
   const observedAt = Date.parse(position.lastValuationAt);
-  if (!Number.isFinite(observedAt)) return { available: false, label: 'Unavailable' };
-  if (now - observedAt > VALUATION_STALE_MS) return { available: false, label: 'Stale' };
+  if (!Number.isFinite(observedAt)) return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: malformed quote timestamp' };
+  if (position.valuationFailureReason?.trim()) return { available: false, label: position.valuationFailureReason.trim() };
+  if (now - observedAt > VALUATION_STALE_MS) return { available: false, label: 'Stale executable quote' };
   const pnlCents = position.currentValueCents - position.totalCostCents;
   return {
     available: true,
@@ -130,7 +133,7 @@ interface PerformanceAnalytics {
   settledPositions: { count: number; winRateBps: number };
   performance: {
     positionIds: number[];
-    capital: { deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number };
+    capital: { deployedCents: number | null; currentCents: number; heldToResolutionCents: number; excludedOpenCostCents: number };
     entryCost?: { available: number; unavailable: number };
     pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
     valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
@@ -480,7 +483,7 @@ export default function BotTraderPanel() {
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div title="Cumulative fee-inclusive cost of open exposure"><MetricCard label="Deployed" value={performance.capital.deployedCents == null ? 'Unavailable' : formatCents(performance.capital.deployedCents)} valueClass={performance.capital.deployedCents == null ? 'text-[var(--status-warning)]' : ''} /></div>
-        <MetricCard label="Executable value" value={performance.capital.currentCents == null ? 'Unavailable' : formatCents(performance.capital.currentCents)} valueClass={performance.capital.currentCents == null ? 'text-[var(--status-warning)]' : ''} />
+        <MetricCard label="Executable value" value={formatCents(performance.capital.currentCents)} valueClass={performance.capital.excludedOpenCostCents > 0 ? 'text-[var(--status-warning)]' : ''} />
         <MetricCard label="Held to resolution" value={formatCents(performance.capital.heldToResolutionCents)} />
         <div title="Unrealized return on remaining open cost"><MetricCard label="Portfolio ROI" value={performance.pnl.roiBps == null ? 'Unavailable' : formatBps(performance.pnl.roiBps, true)} valueClass={performance.pnl.roiBps == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.roiBps)} /></div>
       </div>
@@ -492,7 +495,7 @@ export default function BotTraderPanel() {
 
       <div className={`rounded-lg border px-3 py-2 text-xs ${quoteIssueCount > 0 ? 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 text-[var(--status-warning)]' : 'border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--text-secondary)]'}`}>
         {quoteIssueCount > 0
-          ? `${performance.valuation.stale} stale executable quote${performance.valuation.stale === 1 ? '' : 's'} · ${performance.valuation.unavailable} unavailable · ${performance.valuation.pendingSettlement} pending settlement verification. Executable value, total P&L, and ROI are suppressed until every position has authoritative valuation state; unrealized P&L also requires fresh executable-depth marks.`
+          ? `${performance.valuation.stale} stale executable quote${performance.valuation.stale === 1 ? '' : 's'} · ${performance.valuation.unavailable} unavailable · ${performance.valuation.pendingSettlement} pending settlement verification. Totals include only valued positions; ${formatCents(performance.capital.excludedOpenCostCents)} of unavailable open buy cost is excluded, never treated as zero.`
           : `Executable quotes fresh for ${performance.valuation.fresh} open position${performance.valuation.fresh === 1 ? '' : 's'}${performance.valuation.asOf ? ` · oldest executable mark ${new Date(performance.valuation.asOf).toLocaleString()}` : ''}.`}
       </div>
 
@@ -559,7 +562,7 @@ export default function BotTraderPanel() {
                   && position.kalshiNetProceedsCents! + position.pmNetProceedsCents! === position.currentValueCents;
                 const liquidationUnavailableLabel = position.status !== 'open'
                   ? 'Not applicable after resolution'
-                  : valueUnavailableLabel ?? (hasLiquidationBreakdown ? null : 'Unavailable');
+                  : valueUnavailableLabel ?? (hasLiquidationBreakdown ? null : 'Valuation unavailable: incomplete executable liquidation evidence');
                 const kalshiNetProceedsCents = hasLiquidationBreakdown
                   ? position.kalshiNetProceedsCents!
                   : null;

@@ -188,8 +188,8 @@ describe('BotTraderPanel', () => {
         totalBotTrades: { paper: 1, production: 0, total: 1 },
         performance: {
           positionIds: [],
-          capital: { deployedCents: 97, currentCents: null, heldToResolutionCents: 100 },
-          pnl: { realizedCents: 0, unrealizedCents: null, totalCents: null, roiBps: null },
+          capital: { deployedCents: 97, currentCents: 0, heldToResolutionCents: 100, excludedOpenCostCents: 97 },
+          pnl: { realizedCents: 0, unrealizedCents: 0, totalCents: 0, roiBps: null },
           valuation: { fresh: 0, stale: 1, unavailable: 0, pendingSettlement: 0, asOf: null },
           entryCohorts: [],
         },
@@ -201,8 +201,9 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     expect(await screen.findByText(/1 stale executable quote/)).toBeTruthy();
-    expect(screen.getByText('Executable value').parentElement?.textContent).toBe('Executable valueUnavailable');
-    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('UnrealizedUnavailable');
+    expect(screen.getByText('Executable value').parentElement?.textContent).toBe('Executable value$0.00');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized$0.00');
+    expect(screen.getByText(/\$0\.97 of unavailable open buy cost is excluded/)).toBeTruthy();
     expect(screen.getByText('No verified BotTrader executions in this range.')).toBeTruthy();
   });
 
@@ -282,9 +283,9 @@ describe('BotTraderPanel', () => {
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
     expect(cells[4]).toBe('$0.97');
-    expect(cells[5]).toBe('Stale');
-    expect(cells[6]).toBe('Stale');
-    expect(cells[7]).toBe('Stale');
+    expect(cells[5]).toBe('Stale executable quote');
+    expect(cells[6]).toBe('Stale executable quote');
+    expect(cells[7]).toBe('Stale executable quote');
   });
 
   it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
@@ -305,9 +306,27 @@ describe('BotTraderPanel', () => {
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
     expect(cells[4]).toBe('$0.00');
-    expect(cells[5]).toBe('Unavailable');
-    expect(cells[6]).toBe('Unavailable');
-    expect(cells[7]).toBe('Unavailable');
+    expect(cells[5]).toBe('Valuation unavailable: no executable mark has been recorded');
+    expect(cells[6]).toBe('Valuation unavailable: no executable mark has been recorded');
+    expect(cells[7]).toBe('Valuation unavailable: no executable mark has been recorded');
+  });
+
+  it('shows the exact per-leg valuation blocker instead of generic Unavailable', async () => {
+    const unavailablePosition = {
+      ...positions[0], currentValueCents: null, lastValuationAt: '2026-08-11T13:45:00.000Z',
+      valuationStatus: 'unavailable',
+      valuationFailureReason: 'Kalshi: insufficient executable depth (0.5 available, 1 required)',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [unavailablePosition] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getAllByText('Kalshi: insufficient executable depth (0.5 available, 1 required)')).toHaveLength(3);
+    expect(screen.getByText('Liquidation breakdown: Kalshi: insufficient executable depth (0.5 available, 1 required)')).toBeTruthy();
   });
 
   it('expands position details from a keyboard-reachable row control', async () => {

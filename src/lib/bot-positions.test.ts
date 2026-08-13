@@ -145,11 +145,11 @@ describe('summarizeBotPerformance', () => {
     ];
 
     const result = summarizeBotPerformance(rows, new Date('2026-08-11T14:00:00.000Z'));
-    expect(result.capital).toEqual({ deployedCents: 2828, currentCents: null, heldToResolutionCents: 2000 });
-    expect(result.pnl).toEqual({ realizedCents: 50, unrealizedCents: null, totalCents: null, roiBps: null });
+    expect(result.capital).toEqual({ deployedCents: 2828, currentCents: 2022, heldToResolutionCents: 2000, excludedOpenCostCents: 900 });
+    expect(result.pnl).toEqual({ realizedCents: 50, unrealizedCents: 44, totalCents: 94, roiBps: 488 });
     expect(result.valuation).toEqual({ fresh: 1, stale: 1, unavailable: 0, pendingSettlement: 0, asOf: '2026-08-11T13:55:00.000Z' });
     expect(result.entryCohorts).toEqual([
-      { date: '2026-08-10', deployedCents: 1878, currentCents: null, heldToResolutionCents: 2000, realizedCents: 0, unrealizedCents: null, trades: 2 },
+      { date: '2026-08-10', deployedCents: 1878, currentCents: 1022, heldToResolutionCents: 2000, realizedCents: 0, unrealizedCents: 44, trades: 2 },
       { date: '2026-08-11', deployedCents: 950, currentCents: 1000, heldToResolutionCents: 0, realizedCents: 50, unrealizedCents: 0, trades: 1 },
     ]);
   });
@@ -161,7 +161,8 @@ describe('summarizeBotPerformance', () => {
     ], new Date('2026-08-11T14:00:00.000Z'));
 
     expect(result.valuation).toMatchObject({ fresh: 0, stale: 0, unavailable: 1, pendingSettlement: 1 });
-    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: null, totalCents: null, roiBps: null });
+    expect(result.capital.excludedOpenCostCents).toBe(978);
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 0, totalCents: null, roiBps: null });
   });
 
   it('accounts for verified closed positions and fails closed on incomplete terminal accounting', () => {
@@ -170,7 +171,7 @@ describe('summarizeBotPerformance', () => {
       openPosition({ id: 2, status: 'settled', totalCostCents: 900, realizedPnlCents: null, resolutionPayoutCents: 1000, resolutionValidationStatus: 'verified' }),
     ]);
 
-    expect(result.capital).toEqual({ deployedCents: 1800, currentCents: null, heldToResolutionCents: 0 });
+    expect(result.capital).toEqual({ deployedCents: 1800, currentCents: 1000, heldToResolutionCents: 0, excludedOpenCostCents: 0 });
     expect(result.pnl).toEqual({ realizedCents: 100, unrealizedCents: 0, totalCents: null, roiBps: null });
     expect(result.valuation.pendingSettlement).toBe(1);
     expect(result.entryCohorts[0]).toMatchObject({ currentCents: null, realizedCents: 100 });
@@ -651,16 +652,16 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
       polymarket: {
         tokenId: 'no-token',
         feeRateBps: 0,
-        source: 'https://clob.polymarket.com/fee-rate?token_id=no-token|matcher-category-theta:geopolitics',
+        source: 'https://clob.polymarket.com/fee-rate?token_id=no-token',
         observedAt: '2026-08-08T12:00:00.000Z',
-        version: 'token-fee-rate:0|matcher-category-theta-v1:0',
+        version: 'token-fee-rate:0',
       },
       pmTheta: 0,
     });
   });
 
-  it('fails closed when token fee authority conflicts with the category theta', async () => {
-    await expect(fetchAuthoritativeBotFeeConfig({
+  it('uses the current token fee rate instead of stale category assumptions', async () => {
+    const result = await fetchAuthoritativeBotFeeConfig({
       kalshiTicker: 'KXTEST-YES',
       pmConditionId: '0xcondition',
       pmSide: 'no',
@@ -674,7 +675,9 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
         return { base_fee: 500 };
       },
       fetchPmMarket: async () => ({ tokens: [{ token_id: 'no-token', outcome: 'No' }] }),
-    })).rejects.toThrow(/conflicting authoritative Polymarket/i);
+    });
+    expect(result.pmTheta).toBe(0.05);
+    expect(result.polymarket).toMatchObject({ feeRateBps: 500, tokenId: 'no-token' });
   });
 });
 
@@ -1171,6 +1174,222 @@ describe('BotPositionStore', () => {
 });
 
 describe('pollOpenBotPositions fail-closed valuation', () => {
+  it('bounds position refresh concurrency so a large ledger cannot overflow venue queues', async () => {
+    let active = 0;
+    let peak = 0;
+    const positions = Array.from({ length: 60 }, (_, index) => openPosition({ id: index + 1 }));
+    const positionStore = {
+      listAllOpen: async () => positions,
+      updateValuationWithFeeConfig: async () => undefined,
+      updateValuation: async () => undefined,
+      clearOpenValuation: async () => undefined,
+    } as unknown as BotPositionStore;
+    const result = await pollOpenBotPositions({
+      positionStore,
+      observedAt: '2026-08-08T12:00:00.000Z',
+      fetchKalshi: async () => {
+        active += 1;
+        peak = Math.max(peak, active);
+        if (active > 8) throw new Error('simulated venue queue overflow');
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active -= 1;
+        return { yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' };
+      },
+      fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+      fetchFeeConfig: async () => ({
+        kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0.04,
+      }),
+    });
+    expect(peak).toBeLessThanOrEqual(8);
+    expect(result).toEqual({ updated: 60, settled: 0, errors: [] });
+  });
+
+  it('persists venue observation time when fee lookup completes later', async () => {
+    const position = openPosition({ id: 1 });
+    let persistedAt: string | null = null;
+    const positionStore = {
+      listAllOpen: async () => [position],
+      updateValuationWithFeeConfig: async (_id: number, valuation: { lastValuationAt: string }) => { persistedAt = valuation.lastValuationAt; },
+      updateValuation: async () => undefined,
+      clearOpenValuation: async () => undefined,
+    } as unknown as BotPositionStore;
+    const result = await pollOpenBotPositions({
+      positionStore, observedAt: '2026-08-08T12:00:10.000Z',
+      fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
+      fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:04.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:03.000Z' }),
+      fetchFeeConfig: async () => ({
+        kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:10.000Z', version: 'v1' },
+        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:10.000Z', version: 'v1' }, pmTheta: 0.04,
+      }),
+    });
+    expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
+    expect(persistedAt).toBe('2026-08-08T12:00:03.000Z');
+  });
+
+  it('values an identifier-present legacy paper position from executable books and persisted buy cost', async () => {
+    const previousCwd = process.cwd();
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-valuation-'));
+    try {
+      process.chdir(dir);
+      await mkdir(path.join(dir, 'data'));
+      const dbUrl = `file:${path.join(dir, 'data', 'edgefinder.db')}`;
+      const client = createClient({ url: dbUrl });
+      await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL, source TEXT)`);
+      await client.execute(`INSERT INTO executions (id, dry_run, source) VALUES (7, 1, 'bot')`);
+      client.close();
+      const store = new BotPositionStore(dbUrl);
+      const created = await store.create({
+        ...openPosition(), id: undefined, dryRun: undefined, executionMode: 'paper',
+        kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+        pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      } as never);
+      const legacy = createClient({ url: dbUrl });
+      await legacy.execute({
+        sql: `UPDATE bot_positions SET
+          kalshi_entry_fee_type = NULL, kalshi_entry_fee_multiplier_ppm = NULL,
+          kalshi_entry_fee_source = NULL, kalshi_entry_fee_observed_at = NULL,
+          kalshi_entry_fee_version = NULL, pm_entry_token_id = NULL,
+          pm_entry_fee_rate_bps = NULL, pm_entry_fee_source = NULL,
+          pm_entry_fee_observed_at = NULL, pm_entry_fee_version = NULL
+          WHERE id = ?`,
+        args: [created.id],
+      });
+      legacy.close();
+      store.close();
+
+      await expect(pollOpenBotPositions({
+        positionStore: new BotPositionStore(dbUrl),
+        observedAt: '2026-08-08T12:00:00.000Z',
+        fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
+        fetchKalshiBids: async () => ({
+          yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }],
+          observedAt: '2026-08-08T12:00:00.000Z',
+        }),
+        fetchPmBids: async () => ({
+          yesBidCents: 42, noBidCents: 57,
+          yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }],
+          resolved: false, observedAt: '2026-08-08T12:00:00.000Z',
+        }),
+        fetchFeeConfig: async () => ({
+          kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+          polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+          pmTheta: 0.04,
+        }),
+      })).resolves.toEqual({ updated: 1, settled: 0, errors: [] });
+
+      const read = new BotPositionStore(dbUrl);
+      const [valued] = await read.list({ status: 'open' });
+      expect(valued.currentValueCents).toBe(1022);
+      expect(valued.unrealizedPnlCents).toBe(44);
+      expect(valued.valuationFailureReason).toBeNull();
+      expect(valued.pmExitTokenId).toBe('pm-no-token');
+      read.close();
+    } finally {
+      process.chdir(previousCwd);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses current token fee authority for legacy paper liquidation without rewriting persisted entry economics', async () => {
+    const previousCwd = process.cwd();
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-token-fee-'));
+    try {
+      process.chdir(dir);
+      await mkdir(path.join(dir, 'data'));
+      const dbUrl = `file:${path.join(dir, 'data', 'edgefinder.db')}`;
+      const client = createClient({ url: dbUrl });
+      await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL, source TEXT)`);
+      await client.execute(`INSERT INTO executions (id, dry_run, source) VALUES (7, 1, 'bot')`);
+      client.close();
+      const store = new BotPositionStore(dbUrl);
+      const created = await store.create({
+        ...openPosition(), id: undefined, dryRun: undefined, executionMode: 'paper',
+        kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+        pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      } as never);
+      const legacy = createClient({ url: dbUrl });
+      await legacy.execute({
+        sql: `UPDATE bot_positions SET kalshi_entry_fee_type = NULL, kalshi_entry_fee_multiplier_ppm = NULL,
+          kalshi_entry_fee_source = NULL, kalshi_entry_fee_observed_at = NULL, kalshi_entry_fee_version = NULL,
+          pm_entry_token_id = NULL, pm_entry_fee_rate_bps = NULL, pm_entry_fee_source = NULL,
+          pm_entry_fee_observed_at = NULL, pm_entry_fee_version = NULL, category = NULL WHERE id = ?`,
+        args: [created.id],
+      });
+      legacy.close();
+      store.close();
+      const result = await pollOpenBotPositions({
+        positionStore: new BotPositionStore(dbUrl), observedAt: '2026-08-08T12:00:00.000Z',
+        fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
+        fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
+        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+        fetchFeeConfig: async () => ({
+          kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+          polymarket: { tokenId: 'pm-no-token', feeRateBps: 0, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0,
+        }),
+      });
+      expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
+      const read = new BotPositionStore(dbUrl);
+      const [valued] = await read.list({ status: 'open' });
+      expect(valued.currentValueCents).toBe(1032);
+      expect(valued.pmTheta).toBe(0.04);
+      expect(valued.pmExitFeeRateBps).toBe(0);
+      read.close();
+    } finally {
+      process.chdir(previousCwd);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('persists a specific per-leg reason without letting one failed position block another', async () => {
+    const previousCwd = process.cwd();
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-failure-reason-'));
+    try {
+      process.chdir(dir);
+      await mkdir(path.join(dir, 'data'));
+      const dbUrl = `file:${path.join(dir, 'data', 'edgefinder.db')}`;
+      const client = createClient({ url: dbUrl });
+      await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL, source TEXT)`);
+      await client.execute(`INSERT INTO executions (id, dry_run, source) VALUES (7, 1, 'bot'), (8, 1, 'bot')`);
+      client.close();
+      const store = new BotPositionStore(dbUrl);
+      const initial = {
+        kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+        pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      };
+      const first = await store.create({ ...openPosition(), ...initial, id: undefined, dryRun: undefined } as never);
+      const second = await store.create({ ...openPosition({ executionId: 8, kalshiTicker: 'KXSECOND' }), ...initial, id: undefined, dryRun: undefined } as never);
+      store.close();
+
+      const result = await pollOpenBotPositions({
+        positionStore: new BotPositionStore(dbUrl),
+        observedAt: '2026-08-08T12:00:00.000Z',
+        fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
+        fetchKalshiBids: async (ticker) => ({
+          yesBids: [{ priceCents: 48, size: ticker === 'KXSECOND' ? 10 : 0.5 }],
+          noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z',
+        }),
+        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+        fetchFeeConfig: async () => ({
+          kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+          polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0.04,
+        }),
+      });
+      expect(result.updated).toBe(1);
+      expect(result.errors).toEqual([{ id: first.id, error: expect.stringMatching(/insufficient.*Kalshi/i) }]);
+      const read = new BotPositionStore(dbUrl);
+      const rows = await read.list({ status: 'open' });
+      expect(rows.find((row) => row.id === first.id)?.valuationFailureReason).toMatch(/insufficient.*Kalshi/i);
+      expect(rows.find((row) => row.id === second.id)?.currentValueCents).not.toBeNull();
+      read.close();
+    } finally {
+      process.chdir(previousCwd);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('clears prior marks at each malformed, shallow, or stale depth observation timestamp', async () => {
     const previousCwd = process.cwd();
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-poller-'));

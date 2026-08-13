@@ -22,7 +22,7 @@ export function TradingStatusRail() {
   const [payload, setPayload] = useState<Record<string, unknown>>({});
   const [failed, setFailed] = useState<string[]>(["loading"]);
   const [selected, setSelected] = useState<RailItem | null>(null);
-  const [clock, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +32,7 @@ export function TradingStatusRail() {
         ["execution", "/api/execute"],
         ["positions", "/api/positions"],
         ["executions", "/api/executions?limit=200"],
+        ["botAnalytics", "/api/bot-trader/analytics?method=all&mode=paper&range=all"],
       ] as const;
       const settled = await Promise.allSettled(requests.map(([, url]) => readJson(url)));
       if (cancelled) return;
@@ -58,6 +59,7 @@ export function TradingStatusRail() {
     execution: payload.execution as Parameters<typeof buildTradingStatus>[0]["execution"],
     positions: payload.positions as Parameters<typeof buildTradingStatus>[0]["positions"],
     executions: payload.executions as Parameters<typeof buildTradingStatus>[0]["executions"],
+    botAnalytics: payload.botAnalytics as Parameters<typeof buildTradingStatus>[0]["botAnalytics"],
     failed,
   }), [clock, failed, payload]);
 

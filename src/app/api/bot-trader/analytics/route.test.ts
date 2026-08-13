@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import { getBotPositionAnalytics } from '@/lib/bot-positions';
 import { NextRequest } from 'next/server';
+import { getMarketUrlsById } from '@/lib/persistence';
 
 vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn() }));
+vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
 
 describe('GET /api/bot-trader/analytics', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getMarketUrlsById).mockResolvedValue(null);
+  });
   it('returns aggregated bot position analytics without caching', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({
       totalBotTrades: { paper: 2, production: 1, total: 3 },
@@ -33,6 +38,7 @@ describe('GET /api/bot-trader/analytics', () => {
         worstTrade: null,
         dailyPnl: [],
         timeStats: { tradesPerDayBps: 0, averageHoldSeconds: 0 },
+        positions: [],
       },
     });
   });
@@ -47,6 +53,20 @@ describe('GET /api/bot-trader/analytics', () => {
     const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics?range=forever'));
     expect(response.status).toBe(400);
     expect(getBotPositionAnalytics).not.toHaveBeenCalled();
+  });
+
+  it('enriches identifier-present analytics positions with persisted venue links', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({
+      positions: [{ id: 1, marketId: 'market-1' }, { id: 2, marketId: 'market-1' }],
+    } as never);
+    vi.mocked(getMarketUrlsById).mockResolvedValue({ kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' });
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+    expect(getMarketUrlsById).toHaveBeenCalledTimes(1);
+    expect(body.analytics.positions).toEqual([
+      { id: 1, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' },
+      { id: 2, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' },
+    ]);
   });
 
   it('returns an actionable retry message when the analytics store is unavailable', async () => {
