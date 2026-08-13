@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionResult, OrderResult } from './auto-execute';
-import { getBotPerformanceEvidence, persistBotPerformanceExecution } from './bot-trader';
+import { getBotPerformanceEvidence, liveEvidenceToBotPositionFill, persistBotPerformanceExecution } from './bot-trader';
 
 function order(
   platform: 'kalshi' | 'polymarket',
@@ -33,6 +33,10 @@ function liveResult(overrides: Partial<ExecutionResult> = {}): ExecutionResult {
         chargedFeeCents: 2,
         executionId: 'kalshi-fill-123',
         venueTimestamp: '2026-08-12T10:00:00.000Z',
+        fills: [
+          { executionId: 'kalshi-fill-122', quantity: 1, price: 0.36, chargedFeeCents: 1, venueTimestamp: '2026-08-12T09:59:59.000Z' },
+          { executionId: 'kalshi-fill-123', quantity: 2, price: 0.375, chargedFeeCents: 1, venueTimestamp: '2026-08-12T10:00:00.000Z' },
+        ],
       },
     }),
     polymarketResult: order('polymarket', {
@@ -43,6 +47,10 @@ function liveResult(overrides: Partial<ExecutionResult> = {}): ExecutionResult {
         chargedFeeCents: 4,
         executionId: 'pm-fill-456',
         venueTimestamp: '2026-08-12T10:00:01.000Z',
+        fills: [
+          { executionId: 'pm-fill-455', quantity: 1, price: 0.58, chargedFeeCents: 1, venueTimestamp: '2026-08-12T10:00:00.500Z' },
+          { executionId: 'pm-fill-456', quantity: 2, price: 0.595, chargedFeeCents: 3, venueTimestamp: '2026-08-12T10:00:01.000Z' },
+        ],
       },
     }),
     ...overrides,
@@ -51,7 +59,8 @@ function liveResult(overrides: Partial<ExecutionResult> = {}): ExecutionResult {
 
 describe('BotTrader performance evidence gate', () => {
   it('consumes every authoritative live fill value without order-request or normalized-result fallbacks', () => {
-    expect(getBotPerformanceEvidence(liveResult(), false)).toEqual({
+    const evidence = getBotPerformanceEvidence(liveResult(), false);
+    expect(evidence).toEqual({
       kind: 'live',
       kalshi: {
         venue: 'kalshi',
@@ -60,6 +69,10 @@ describe('BotTrader performance evidence gate', () => {
         chargedFeeCents: 2,
         executionId: 'kalshi-fill-123',
         venueTimestamp: '2026-08-12T10:00:00.000Z',
+        fills: [
+          { executionId: 'kalshi-fill-122', quantity: 1, price: 0.36, chargedFeeCents: 1, venueTimestamp: '2026-08-12T09:59:59.000Z' },
+          { executionId: 'kalshi-fill-123', quantity: 2, price: 0.375, chargedFeeCents: 1, venueTimestamp: '2026-08-12T10:00:00.000Z' },
+        ],
       },
       polymarket: {
         venue: 'polymarket',
@@ -68,9 +81,23 @@ describe('BotTrader performance evidence gate', () => {
         chargedFeeCents: 4,
         executionId: 'pm-fill-456',
         venueTimestamp: '2026-08-12T10:00:01.000Z',
+        fills: [
+          { executionId: 'pm-fill-455', quantity: 1, price: 0.58, chargedFeeCents: 1, venueTimestamp: '2026-08-12T10:00:00.500Z' },
+          { executionId: 'pm-fill-456', quantity: 2, price: 0.595, chargedFeeCents: 3, venueTimestamp: '2026-08-12T10:00:01.000Z' },
+        ],
       },
       actualProfit: 0.05,
       contractsMatched: true,
+    });
+    expect(liveEvidenceToBotPositionFill(evidence as Extract<NonNullable<typeof evidence>, { kind: 'live' }>)).toEqual({
+      kalshiContracts: 3,
+      pmContracts: 3,
+      kalshiPrice: 0.37,
+      pmPrice: 0.59,
+      kalshiFills: [{ priceCents: 36, size: 1 }, { priceCents: 37.5, size: 2 }],
+      pmFills: [{ priceCents: 58, size: 1 }, { priceCents: 59.5, size: 2 }],
+      kalshiChargedFeeCents: 2,
+      pmChargedFeeCents: 4,
     });
   });
 

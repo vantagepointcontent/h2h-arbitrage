@@ -17,6 +17,14 @@ import type { OrderResult, ExecutionResult } from './auto-execute';
 
 export type VenueIdentity = 'kalshi' | 'polymarket';
 
+export interface VenueExecutionFill {
+  executionId: string;
+  quantity: number;
+  price: number;
+  chargedFeeCents: number;
+  venueTimestamp: string;
+}
+
 // ── Live Execution Evidence (authoritative) ─────────────────────────
 
 export interface VenueExecutionEvidence {
@@ -40,6 +48,9 @@ export interface VenueExecutionEvidence {
 
   /** Raw venue response payload for audit traceability */
   raw?: unknown;
+
+  /** Every correlated venue fill when the order executed in multiple trades. */
+  fills?: VenueExecutionFill[];
 }
 
 /** A complete authoritative live execution requires evidence from BOTH legs. */
@@ -127,6 +138,31 @@ export function isAuthoritativeVenueEvidence(
 
   // Missing fee means unknown, not zero.
   if (!Number.isSafeInteger(e.chargedFeeCents) || Number(e.chargedFeeCents) < 0) return false;
+
+  if (e.fills != null) {
+    if (!Array.isArray(e.fills) || e.fills.length === 0) return false;
+    let quantity = 0;
+    let gross = 0;
+    let fees = 0;
+    const ids = new Set<string>();
+    for (const rawFill of e.fills) {
+      if (!rawFill || typeof rawFill !== 'object' || Array.isArray(rawFill)) return false;
+      const fill = rawFill as Record<string, unknown>;
+      if (typeof fill.executionId !== 'string' || !fill.executionId.trim() || ids.has(fill.executionId)) return false;
+      if (!Number.isSafeInteger(fill.quantity) || Number(fill.quantity) <= 0) return false;
+      if (typeof fill.price !== 'number' || !Number.isFinite(fill.price) || fill.price <= 0 || fill.price >= 1) return false;
+      if (!Number.isSafeInteger(fill.chargedFeeCents) || Number(fill.chargedFeeCents) < 0) return false;
+      if (typeof fill.venueTimestamp !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(fill.venueTimestamp)
+        || Number.isNaN(Date.parse(fill.venueTimestamp))) return false;
+      ids.add(fill.executionId);
+      quantity += Number(fill.quantity);
+      gross += Number(fill.quantity) * fill.price;
+      fees += Number(fill.chargedFeeCents);
+    }
+    if (quantity !== filledQuantity || fees !== e.chargedFeeCents
+      || Math.abs(gross / quantity - fillPrice) > 1e-12) return false;
+  }
 
   return true;
 }

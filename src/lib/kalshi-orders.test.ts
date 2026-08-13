@@ -110,10 +110,30 @@ describe('parseKalshiFillEvidence', () => {
     }, submittedOrder)).toBeNull();
   });
 
-  it('rejects multiple fills because the shared contract cannot preserve multiple execution IDs', () => {
-    expect(parseKalshiFillEvidence({
-      fills: [completeFill, { ...completeFill, fill_id: 'fill-789', trade_id: 'fill-789' }],
-      cursor: '',
-    }, submittedOrder)).toBeNull();
+  it('aggregates multiple authoritative fills while preserving each execution', () => {
+    const secondFill = {
+      ...completeFill,
+      fill_id: 'fill-789',
+      trade_id: 'fill-789',
+      count_fp: '2.00',
+      yes_price_dollars: '0.44',
+      no_price_dollars: '0.56',
+      fee_cost: '0.02',
+      created_time: '2026-08-12T13:31:45.123Z',
+    };
+    expect(parseKalshiFillEvidence({ fills: [completeFill, secondFill], cursor: '' }, submittedOrder)).toEqual({
+      venue: 'kalshi',
+      filledQuantity: 12,
+      fillPrice: 5.18 / 12,
+      chargedFeeCents: 9,
+      executionId: 'order-123',
+      venueTimestamp: '2026-08-12T13:31:45.123Z',
+      orderId: 'order-123',
+      fills: [
+        { executionId: 'fill-456', quantity: 10, price: 0.43, chargedFeeCents: 7, venueTimestamp: '2026-08-12T13:30:45.123Z' },
+        { executionId: 'fill-789', quantity: 2, price: 0.44, chargedFeeCents: 2, venueTimestamp: '2026-08-12T13:31:45.123Z' },
+      ],
+      raw: [completeFill, secondFill],
+    });
   });
 });

@@ -441,19 +441,18 @@ function assertEntryFeeAuthority(input: CreateBotPosition): void {
     || input.pmExitFeeObservedAt !== input.pmEntryFeeObservedAt) {
     throw new Error('Missing or malformed authoritative initial exit fee configuration');
   }
-  const expected = calculateBotPositionEntryCost({
-    buyPriceKalshiCents: input.buyPriceKalshiCents,
-    buyPricePmCents: input.buyPricePmCents,
-    sharesKalshi: input.sharesKalshi,
-    sharesPm: input.sharesPm,
-    kalshiFeeMultiplierPpm: input.kalshiEntryFeeMultiplierPpm!,
-    pmFeeRateBps: input.pmEntryFeeRateBps!,
-    pmTheta: input.pmTheta!,
-  });
-  if (input.kalshiEntryFeeCents !== expected.kalshiEntryFeeCents
-    || input.pmEntryFeeCents !== expected.pmEntryFeeCents
-    || input.feesCents !== expected.kalshiEntryFeeCents + expected.pmEntryFeeCents
-    || input.totalCostCents !== expected.totalCostCents
+  const grossMicrocents = input.kalshiEntryGrossMicrocents != null && input.pmEntryGrossMicrocents != null
+    ? input.kalshiEntryGrossMicrocents + input.pmEntryGrossMicrocents
+    : (input.buyPriceKalshiCents * input.sharesKalshi + input.buyPricePmCents * input.sharesPm) * Number(FEE_SCALE);
+  if (!Number.isSafeInteger(grossMicrocents) || grossMicrocents < 0) {
+    throw new Error('Malformed authoritative entry gross');
+  }
+  const expectedGrossCents = roundRatio(BigInt(grossMicrocents), FEE_SCALE);
+  const expectedFeesCents = input.kalshiEntryFeeCents + input.pmEntryFeeCents;
+  if (!Number.isSafeInteger(input.kalshiEntryFeeCents) || input.kalshiEntryFeeCents < 0
+    || !Number.isSafeInteger(input.pmEntryFeeCents) || input.pmEntryFeeCents < 0
+    || input.feesCents !== expectedFeesCents
+    || input.totalCostCents !== expectedGrossCents + expectedFeesCents
     || input.expectedPayoutCents !== Math.min(input.sharesKalshi, input.sharesPm) * 100
     || input.expectedProfitCents !== input.expectedPayoutCents - input.totalCostCents) {
     throw new Error('Persisted entry economics conflict with authoritative entry fee configuration');
@@ -481,19 +480,18 @@ function assertPersistedEntryEconomics(position: BotPosition): void {
   if (Math.round((position.pmTheta ?? Number.NaN) * 10_000) !== position.pmEntryFeeRateBps) {
     throw new Error(`Conflicting authoritative entry fee configuration for bot position ${position.id}`);
   }
-  const expected = calculateBotPositionEntryCost({
-    buyPriceKalshiCents: position.buyPriceKalshiCents,
-    buyPricePmCents: position.buyPricePmCents,
-    sharesKalshi: position.sharesKalshi,
-    sharesPm: position.sharesPm,
-    kalshiFeeMultiplierPpm: position.kalshiEntryFeeMultiplierPpm!,
-    pmFeeRateBps: position.pmEntryFeeRateBps!,
-    pmTheta: position.pmTheta!,
-  });
-  if (position.kalshiEntryFeeCents !== expected.kalshiEntryFeeCents
-    || position.pmEntryFeeCents !== expected.pmEntryFeeCents
-    || position.feesCents !== expected.kalshiEntryFeeCents + expected.pmEntryFeeCents
-    || position.totalCostCents !== expected.totalCostCents
+  const grossMicrocents = position.kalshiEntryGrossMicrocents != null && position.pmEntryGrossMicrocents != null
+    ? position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents
+    : (position.buyPriceKalshiCents * position.sharesKalshi + position.buyPricePmCents * position.sharesPm) * Number(FEE_SCALE);
+  if (!Number.isSafeInteger(grossMicrocents) || grossMicrocents < 0) {
+    throw new Error(`Malformed authoritative entry gross for bot position ${position.id}`);
+  }
+  const expectedGrossCents = roundRatio(BigInt(grossMicrocents), FEE_SCALE);
+  const expectedFeesCents = position.kalshiEntryFeeCents + position.pmEntryFeeCents;
+  if (!Number.isSafeInteger(position.kalshiEntryFeeCents) || position.kalshiEntryFeeCents < 0
+    || !Number.isSafeInteger(position.pmEntryFeeCents) || position.pmEntryFeeCents < 0
+    || position.feesCents !== expectedFeesCents
+    || position.totalCostCents !== expectedGrossCents + expectedFeesCents
     || position.expectedPayoutCents !== Math.min(position.sharesKalshi, position.sharesPm) * 100
     || position.expectedProfitCents !== position.expectedPayoutCents - position.totalCostCents) {
     throw new Error(`Persisted entry economics conflict with authoritative fee configuration for bot position ${position.id}`);
@@ -1260,8 +1258,9 @@ export class BotPositionStore {
     if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId, input.executionMode)) {
       throw new Error('An open bot position already exists for this market pair');
     }
-    const executionPrincipalCents = input.buyPriceKalshiCents * input.sharesKalshi
-      + input.buyPricePmCents * input.sharesPm;
+    const executionPrincipalCents = input.kalshiEntryGrossMicrocents != null && input.pmEntryGrossMicrocents != null
+      ? roundRatio(BigInt(input.kalshiEntryGrossMicrocents + input.pmEntryGrossMicrocents), FEE_SCALE)
+      : input.buyPriceKalshiCents * input.sharesKalshi + input.buyPricePmCents * input.sharesPm;
     const expectedRoiBps = input.expectedRoiBps
       ?? roiBps(input.expectedProfitCents, input.totalCostCents);
 
@@ -1717,6 +1716,8 @@ export interface BotPositionInput {
   category?: string | null;
   kalshiFills?: Array<{ priceCents: number; size: number }>;
   pmFills?: Array<{ priceCents: number; size: number }>;
+  kalshiChargedFeeCents?: number;
+  pmChargedFeeCents?: number;
 }
 
 export function calculateBotPositionEntryCost(input: {
@@ -1726,6 +1727,8 @@ export function calculateBotPositionEntryCost(input: {
   sharesPm?: number;
   kalshiFills?: Array<{ priceCents: number; size: number }>;
   pmFills?: Array<{ priceCents: number; size: number }>;
+  kalshiChargedFeeCents?: number;
+  pmChargedFeeCents?: number;
   pmTheta: number;
   kalshiFeeMultiplierPpm: number;
   pmFeeRateBps: number;
@@ -1743,8 +1746,16 @@ export function calculateBotPositionEntryCost(input: {
   }
   const kalshiFills = input.kalshiFills ?? [{ size: input.sharesKalshi!, priceCents: input.buyPriceKalshiCents! }];
   const pmFills = input.pmFills ?? [{ size: input.sharesPm!, priceCents: input.buyPricePmCents! }];
-  const kalshiEntryFeeCents = calculateKalshiFeeCents(kalshiFills, input.kalshiFeeMultiplierPpm);
-  const pmEntryFeeCents = calculatePolymarketFeeCents(pmFills, input.pmFeeRateBps);
+  const calculatedKalshiFeeCents = calculateKalshiFeeCents(kalshiFills, input.kalshiFeeMultiplierPpm);
+  const calculatedPmFeeCents = calculatePolymarketFeeCents(pmFills, input.pmFeeRateBps);
+  if (input.kalshiChargedFeeCents != null && (!Number.isSafeInteger(input.kalshiChargedFeeCents) || input.kalshiChargedFeeCents < 0)) {
+    throw new Error('Malformed authoritative Kalshi charged fee');
+  }
+  if (input.pmChargedFeeCents != null && (!Number.isSafeInteger(input.pmChargedFeeCents) || input.pmChargedFeeCents < 0)) {
+    throw new Error('Malformed authoritative Polymarket charged fee');
+  }
+  const kalshiEntryFeeCents = input.kalshiChargedFeeCents ?? calculatedKalshiFeeCents;
+  const pmEntryFeeCents = input.pmChargedFeeCents ?? calculatedPmFeeCents;
   const kalshiGrossEntryMicrocents = calculateGrossProceedsMicrocents(kalshiFills, 'Kalshi');
   const pmGrossEntryMicrocents = calculateGrossProceedsMicrocents(pmFills, 'Polymarket');
   const grossEntryMicrocents = kalshiGrossEntryMicrocents + pmGrossEntryMicrocents;
@@ -1914,6 +1925,8 @@ export async function recordBotPosition(
     sharesPm,
     kalshiFills: input.kalshiFills,
     pmFills: input.pmFills,
+    kalshiChargedFeeCents: input.kalshiChargedFeeCents,
+    pmChargedFeeCents: input.pmChargedFeeCents,
     pmTheta,
     kalshiFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
     pmFeeRateBps: authority.polymarket.feeRateBps,
@@ -2016,8 +2029,8 @@ export interface BotPositionAnalytics {
   timeStats: { tradesPerDayBps: number; averageHoldSeconds: number };
   filter: { method: 'all' | BotSelectionMethod | 'legacy'; mode: 'all' | 'paper' | 'production' };
   perMethod: Record<BotSelectionMethod | 'legacy', {
-    tradeCount: number; deployedCapitalCents: number; realizedPnlCents: number;
-    unrealizedPnlCents: number | null; winRateBps: number; averageEntryRoiBps: number;
+    tradeCount: number; deployedCapitalCents: number | null; realizedPnlCents: number;
+    unrealizedPnlCents: number | null; winRateBps: number; averageEntryRoiBps: number | null;
     currentRoiBps: number | null; averageApyPct: number | null;
   }>;
   performance: BotPerformanceSummary;
@@ -2162,7 +2175,10 @@ export function summarizeBotPositions(rows: BotPosition[], now = new Date()) {
   const totalNumbers = (values: number[]) => values.reduce((total, value) => total + value, 0);
   const closed = rows.filter(hasVerifiedTerminalAccounting);
   const performance = summarizeBotPerformance(rows, now);
-  const deployedCapitalCents = totalNumbers(rows.map((position) => position.totalCostCents));
+  const allEntryCostsAvailable = rows.every(hasAvailableEntryCost);
+  const deployedCapitalCents = allEntryCostsAvailable
+    ? totalNumbers(rows.map((position) => position.totalCostCents))
+    : null;
   const apyValues = rows.flatMap((position) => {
     if (!position.expiryDate) return [];
     const durationDays = (Date.parse(position.expiryDate) - Date.parse(position.openedAt)) / 86_400_000;
@@ -2172,7 +2188,9 @@ export function summarizeBotPositions(rows: BotPosition[], now = new Date()) {
   return {
     tradeCount: rows.length, deployedCapitalCents, realizedPnlCents: performance.pnl.realizedCents, unrealizedPnlCents: performance.pnl.unrealizedCents,
     winRateBps: closed.length === 0 ? 0 : Math.round(closed.filter((position) => (position.realizedPnlCents ?? 0) > 0).length * 10_000 / closed.length),
-    averageEntryRoiBps: rows.length === 0 ? 0 : Math.round(totalNumbers(rows.map((position) => roiBps(position.expectedProfitCents, position.totalCostCents))) / rows.length),
+    averageEntryRoiBps: rows.length === 0 ? 0 : allEntryCostsAvailable
+      ? Math.round(totalNumbers(rows.map((position) => roiBps(position.expectedProfitCents, position.totalCostCents))) / rows.length)
+      : null,
     currentRoiBps: rows.length === 0 ? 0 : performance.pnl.roiBps,
     averageApyPct: apyValues.length === 0 ? null : Math.round(totalNumbers(apyValues) / apyValues.length * 100) / 100,
   };

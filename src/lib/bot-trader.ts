@@ -46,6 +46,7 @@ import {
   buildExecutionEvidence,
   isAnalyticsEligible,
   type ExecutionEvidence,
+  type LiveExecutionEvidence,
 } from './execution-evidence';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -164,6 +165,23 @@ export async function persistBotPerformanceExecution(
 ): Promise<number | null> {
   if (!evidence) return null;
   return persist(record);
+}
+
+export function liveEvidenceToBotPositionFill(evidence: LiveExecutionEvidence) {
+  const fills = (venue: LiveExecutionEvidence['kalshi']) => (venue.fills ?? [{
+    quantity: venue.filledQuantity,
+    price: venue.fillPrice,
+  }]).map((item) => ({ priceCents: Math.round(item.price * 100_000_000) / 1_000_000, size: item.quantity }));
+  return {
+    kalshiContracts: evidence.kalshi.filledQuantity,
+    pmContracts: evidence.polymarket.filledQuantity,
+    kalshiPrice: evidence.kalshi.fillPrice,
+    pmPrice: evidence.polymarket.fillPrice,
+    kalshiFills: fills(evidence.kalshi),
+    pmFills: fills(evidence.polymarket),
+    kalshiChargedFeeCents: evidence.kalshi.chargedFeeCents,
+    pmChargedFeeCents: evidence.polymarket.chargedFeeCents,
+  };
 }
 
 // ─── Defaults ────────────────────────────────────────────────────
@@ -290,7 +308,16 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
 export function getAuthoritativeMatchedFill(result: {
   kalshiResult: Pick<OrderResult, 'filledContracts' | 'filledPrice'>;
   polymarketResult: Pick<OrderResult, 'filledContracts' | 'filledPrice'>;
-}): { kalshiContracts: number; pmContracts: number; kalshiPrice: number; pmPrice: number } | null {
+}): {
+  kalshiContracts: number;
+  pmContracts: number;
+  kalshiPrice: number;
+  pmPrice: number;
+  kalshiFills?: Array<{ priceCents: number; size: number }>;
+  pmFills?: Array<{ priceCents: number; size: number }>;
+  kalshiChargedFeeCents?: number;
+  pmChargedFeeCents?: number;
+} | null {
   const kalshiContracts = result.kalshiResult.filledContracts;
   const pmContracts = result.polymarketResult.filledContracts;
   const kalshiPrice = result.kalshiResult.filledPrice;
@@ -713,12 +740,9 @@ export async function maybeExecuteBotTrade(
   // Record bot position linked to the execution
   if (executionId != null && shouldPersistPerformance) {
     try {
-      const fill = performanceEvidence?.kind === 'live' ? {
-        kalshiContracts: performanceEvidence.kalshi.filledQuantity,
-        pmContracts: performanceEvidence.polymarket.filledQuantity,
-        kalshiPrice: performanceEvidence.kalshi.fillPrice,
-        pmPrice: performanceEvidence.polymarket.fillPrice,
-      } : getAuthoritativeMatchedFill(result);
+      const fill = performanceEvidence?.kind === 'live'
+        ? liveEvidenceToBotPositionFill(performanceEvidence)
+        : getAuthoritativeMatchedFill(result);
       if (entryLegs.kalshiPrice != null && entryLegs.pmPrice != null && fill) {
         await recordBotPosition({
           executionId,
@@ -734,6 +758,12 @@ export async function maybeExecuteBotTrade(
           pmPrice: fill.pmPrice,
           kalshiContracts: fill.kalshiContracts,
           pmContracts: fill.pmContracts,
+          ...(performanceEvidence?.kind === 'live' ? {
+            kalshiFills: fill.kalshiFills,
+            pmFills: fill.pmFills,
+            kalshiChargedFeeCents: fill.kalshiChargedFeeCents,
+            pmChargedFeeCents: fill.pmChargedFeeCents,
+          } : {}),
           expectedProfit: result.actualProfit ?? execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,
           selectionMethod: input.selectionMethod ?? null,

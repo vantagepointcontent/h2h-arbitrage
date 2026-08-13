@@ -108,6 +108,15 @@ describe('summarizeBotPositions', () => {
     expect(summarizeBotPositions([])).toEqual({ tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null });
   });
 
+  it('makes method deployed capital and entry ROI unavailable when any entry cost is unavailable', () => {
+    const result = summarizeBotPositions([
+      openPosition({ totalCostCents: 978 }),
+      openPosition({ id: 2, totalCostCents: 9626, entryCostStatus: 'unavailable' }),
+    ]);
+    expect(result.deployedCapitalCents).toBeNull();
+    expect(result.averageEntryRoiBps).toBeNull();
+  });
+
   it('excludes pending settlement P&L from verified settlement statistics', () => {
     const result = summarizeBotPositions([
       openPosition({ status: 'settled', realizedPnlCents: 200, resolutionValidationStatus: 'pending' }),
@@ -541,6 +550,21 @@ describe('calculatePositionValuation', () => {
 });
 
 describe('calculateBotPositionEntryCost', () => {
+  it('uses venue-reported execution fees exactly once instead of recomputing configured fees', () => {
+    const result = calculateBotPositionEntryCost({
+      kalshiFills: [{ priceCents: 5.5, size: 1 }, { priceCents: 6.5, size: 1 }],
+      pmFills: [{ priceCents: 91.25, size: 1 }, { priceCents: 92.75, size: 1 }],
+      kalshiChargedFeeCents: 7,
+      pmChargedFeeCents: 3,
+      pmTheta: 0.04,
+      kalshiFeeMultiplierPpm: 1_000_000,
+      pmFeeRateBps: 400,
+    });
+    expect(result.kalshiEntryFeeCents).toBe(7);
+    expect(result.pmEntryFeeCents).toBe(3);
+    expect(result.totalCostCents).toBe(206);
+  });
+
   it('reconciles multiple exact fills, fractional-cent gross, Kalshi aggregate rounding, and Polymarket fees', () => {
     const result = calculateBotPositionEntryCost({
       kalshiFills: [{ priceCents: 5.5, size: 1 }, { priceCents: 6.5, size: 1 }],
@@ -736,8 +760,38 @@ describe('BotPositionStore', () => {
       id: undefined,
       executionId: 8,
       executionMode: 'live',
+      kalshiTicker: 'KXTEST-LIVE',
+      pmConditionId: '0xlive',
+      buyPriceKalshiCents: 6,
+      buyPricePmCents: 92,
+      sharesKalshi: 2,
+      sharesPm: 2,
+      totalCostCents: 206,
+      kalshiEntryGrossMicrocents: 12_000_000,
+      pmEntryGrossMicrocents: 184_000_000,
+      entryCostRoundingDeltaMicrocents: 0,
+      kalshiEntryFillCount: 2,
+      pmEntryFillCount: 2,
+      expectedPayoutCents: 200,
+      expectedProfitCents: -6,
+      feesCents: 10,
+      kalshiEntryFeeCents: 7,
+      pmEntryFeeCents: 3,
     } as never);
     expect(live.executionMode).toBe('live');
+    expect(live.remainingOpenPrincipalCents).toBe(196);
+    expect(live.kalshiEntryFillCount).toBe(2);
+    expect(live.pmEntryFillCount).toBe(2);
+    expect(() => calculatePositionValuation(live, {
+      kalshiYesBidCents: 6,
+      kalshiNoBidCents: 94,
+      pmYesBidCents: 8,
+      pmNoBidCents: 92,
+      kalshiYesBids: [{ priceCents: 6, size: 2 }],
+      pmNoBids: [{ priceCents: 92, size: 2 }],
+      observedAt: '2026-08-08T12:00:00.000Z',
+      expiryDate: null,
+    })).not.toThrow();
     await expect(store.create({ ...live, id: undefined } as never)).rejects.toThrow(/open bot position/i);
     await expect(store.create({
       ...created,
