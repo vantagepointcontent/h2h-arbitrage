@@ -52,6 +52,7 @@ const {
   schedulerMetrics,
 } = await import('./poll-scheduler.mjs');
 const { acquireMarketLease } = await import('./poll-lease.mjs');
+const { updateSchedulerState } = await import('./poll-state.mjs');
 POLL_CONCURRENCY = parseBoundedNumber(process.env.H2H_POLL_CONCURRENCY, 5, 1, 20, true);
 SCAN_TIMEOUT_MS = parseBoundedNumber(process.env.H2H_SCAN_TIMEOUT_MS, 60_000, 5_000, 300_000, true);
 FRESHNESS_SLA_MS = parseBoundedNumber(
@@ -158,12 +159,29 @@ function loadSchedulerState() {
   }
 }
 
-async function saveSchedulerState() {
-  const snapshot = JSON.parse(JSON.stringify(schedulerState));
+async function saveMarketSchedulerState(marketId) {
+  const snapshot = JSON.parse(JSON.stringify(schedulerState[marketId]));
   schedulerWriteQueue = schedulerWriteQueue
     .catch(() => {})
-    .then(() => writeJsonAtomic(SCHEDULER_FILE, snapshot));
-  await schedulerWriteQueue;
+    .then(() => updateSchedulerState(SCHEDULER_FILE, persisted => {
+      persisted[marketId] = snapshot;
+    }));
+  schedulerState = await schedulerWriteQueue;
+}
+
+async function reconcileSchedulerState(markets) {
+  let manualSuccessIds = new Set();
+  schedulerWriteQueue = schedulerWriteQueue
+    .catch(() => {})
+    .then(() => updateSchedulerState(SCHEDULER_FILE, persisted => {
+      manualSuccessIds = new Set(markets
+        .filter(market => hasNewerSuccessfulMarketScan(market, persisted[market.id]))
+        .map(market => market.id));
+      const reconciled = buildSchedulerState(markets, persisted, Date.now(), FRESHNESS_SLA_MS);
+      for (const market of markets) persisted[market.id] = reconciled[market.id];
+    }));
+  schedulerState = await schedulerWriteQueue;
+  return manualSuccessIds;
 }
 
 function loadBreakerState() {
@@ -370,6 +388,13 @@ async function scanMarket(market) {
     }
     const result = await res.json();
     clearTimeout(timer);
+    if (result?.fullScanPersisted !== true) {
+      return {
+        ok: false,
+        durationMs: Date.now() - started,
+        error: 'Scan API returned without a persisted full-scan result',
+      };
+    }
     return { ok: true, durationMs: Date.now() - started, result };
   } catch (e) {
     clearTimeout(timer);
@@ -558,10 +583,8 @@ async function pollOnce() {
   // Persisted oldest-due-first scheduling replaces array-order scans. A
   // restart recovers interrupted entries as due, and failures back off without
   // letting the same prefix monopolize every cycle.
-  const manualSuccessIds = new Set(markets
-    .filter(market => hasNewerSuccessfulMarketScan(market, schedulerState[market.id]))
-    .map(market => market.id));
-  schedulerState = buildSchedulerState(markets, schedulerState, Date.now(), FRESHNESS_SLA_MS);
+  const manualSuccessIds = await reconcileSchedulerState(markets);
+  const cooldownAdjustedIds = [];
   for (const market of markets) {
     if (manualSuccessIds.has(market.id)) {
       resetBreakerAfterExternalSuccess(scanStats.get(market.id));
@@ -569,14 +592,14 @@ async function pollOnce() {
     const cooldownUntil = scanStats.get(market.id)?.cooldownUntil;
     if (cooldownUntil > Date.now() && cooldownUntil > Date.parse(schedulerState[market.id].nextDueAt)) {
       schedulerState[market.id].nextDueAt = new Date(cooldownUntil).toISOString();
+      cooldownAdjustedIds.push(market.id);
     }
   }
+  for (const marketId of cooldownAdjustedIds) await saveMarketSchedulerState(marketId);
   const dueMarkets = selectDueMarkets(markets, schedulerState, Date.now(), markets.length);
   health.skippedCount = markets.length - dueMarkets.length;
   health.freshnessSlaMs = FRESHNESS_SLA_MS;
   health.queue = schedulerMetrics(markets, schedulerState, Date.now(), FRESHNESS_SLA_MS);
-  await saveSchedulerState();
-
   if (dueMarkets.length === 0) {
     console.log(`[${new Date().toISOString()}] No markets due for refresh (${markets.length} total, all within interval). Sleeping ${Math.round(POLL_WAKE_MS / 1000)}s...`);
     health.status = 'idle';
@@ -605,7 +628,7 @@ async function pollOnce() {
     let scan = null;
     try {
       markAttemptStarted(schedulerState[market.id], Date.now(), lease);
-      await saveSchedulerState();
+      await saveMarketSchedulerState(market.id);
       scan = await scanMarket(market);
       scanDurations.push(scan.durationMs || 0);
 
@@ -618,7 +641,7 @@ async function pollOnce() {
           error: scan.error || 'Scan completed but durable saved-market publication failed',
           retryAt: breakerRetryAt,
         }, Date.now(), FRESHNESS_SLA_MS);
-        await saveSchedulerState();
+        await saveMarketSchedulerState(market.id);
         const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
         health.errors.push(err);
         console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
@@ -629,7 +652,7 @@ async function pollOnce() {
       recordScanOutcome(market.id, true, scan.durationMs);
       const requestedInterval = adaptiveEnabled ? getAdaptiveIntervalMs(market, adaptiveConfig) : FRESHNESS_SLA_MS;
       completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, requestedInterval);
-      await saveSchedulerState();
+      await saveMarketSchedulerState(market.id);
       const { best, all } = applyScanResultToMarket(market, scan.result);
       const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
       const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';

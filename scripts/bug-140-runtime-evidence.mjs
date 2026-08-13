@@ -28,7 +28,9 @@ const attempts = new Map();
 const active = new Set();
 let maxConcurrency = 0;
 let duplicateConcurrentScans = false;
+let duplicateAttemptFencedAtServer = false;
 let abandonedWorkerMode = false;
+let crossProcessMergeMode = false;
 const server = http.createServer((request, response) => {
   if (request.url === '/api/settings') return void response.end(JSON.stringify({ settings: [] }));
   if (request.url !== '/api/scan?skipManual=1') return void response.end('{}');
@@ -39,7 +41,11 @@ const server = http.createServer((request, response) => {
     const payload = JSON.parse(body);
     const id = payload.kalshiUrl.split('/').at(-1);
     requests.push({ id, payload });
-    if (active.has(id)) duplicateConcurrentScans = true;
+    if (active.has(id)) {
+      duplicateAttemptFencedAtServer = true;
+      response.writeHead(409, { 'content-type': 'application/json', 'retry-after': '1' });
+      return void response.end(JSON.stringify({ error: 'A full scan for this saved market is already in progress.' }));
+    }
     active.add(id);
     maxConcurrency = Math.max(maxConcurrency, active.size);
     const count = (attempts.get(id) || 0) + 1;
@@ -50,7 +56,8 @@ const server = http.createServer((request, response) => {
       response.end(JSON.stringify(result));
     };
     if (id === '0') return void finish(503, { error: 'injected repeated platform failure' });
-    if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 1_000);
+    if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 7_000);
+    if (crossProcessMergeMode && (id === '20' || id === '21')) return void setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 500);
     if (id === '1' && count === 1) return void setTimeout(() => finish(200, { fullScanPersisted: true }), 5_500);
     setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 20);
   });
@@ -150,6 +157,7 @@ try {
   }
   afterFirstScheduler['market-02'].inProgress = true;
   await writeFile(files.scheduler, JSON.stringify(afterFirstScheduler));
+  await new Promise(resolve => setTimeout(resolve, 5_200));
   const firstRequestCount = requests.length;
   const second = await runPoller(env);
   const secondHealth = JSON.parse(await readFile(files.health, 'utf8'));
@@ -181,6 +189,30 @@ try {
   await overlapOwner.completed;
   assert.equal(attempts.get('23') || 0, beforeOverlapRequests + 1, 'rolling restart must not duplicate same-market request');
   assert.equal(duplicateConcurrentScans, false);
+  await waitFor(() => !active.has('23'));
+
+  // Two overlapping production pollers complete different markets. Their
+  // per-market durable updates must merge instead of replacing the whole file
+  // from stale process-local snapshots.
+  crossProcessMergeMode = true;
+  const mergeMarkets = [markets[20], markets[21]];
+  const mergeScheduler = Object.fromEntries(mergeMarkets.map(market => [market.id, {
+    lastAttemptAt: null, lastSuccessAt: null, nextDueAt: new Date(Date.now() - 1_000).toISOString(),
+    inProgress: false, failureReason: null, retryCount: 0, freshnessSlaMs: SLA_MS,
+  }]));
+  await rm(env.H2H_SAVED_MARKET_LEASE_DIRECTORY, { recursive: true, force: true });
+  await writeFile(files.saved, JSON.stringify(mergeMarkets));
+  await writeFile(files.scheduler, JSON.stringify(mergeScheduler));
+  const mergeOwnerA = startPoller({ ...env, H2H_POLL_CONCURRENCY: '1' });
+  await waitFor(() => active.has('20') || active.has('21'));
+  const mergeOwnerB = startPoller({ ...env, H2H_POLL_CONCURRENCY: '1' });
+  await Promise.all([mergeOwnerA.completed, mergeOwnerB.completed]);
+  const afterMergeScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
+  assert(afterMergeScheduler['market-20'].lastSuccessAt, 'first overlapping completion must survive');
+  assert(afterMergeScheduler['market-21'].lastSuccessAt, 'second overlapping completion must survive');
+  assert.equal(afterMergeScheduler['market-20'].inProgress, false);
+  assert.equal(afterMergeScheduler['market-21'].inProgress, false);
+  crossProcessMergeMode = false;
 
   // Kill a production poller with a request in flight. A successor launched
   // during the live lease must skip it; after bounded expiry another successor
@@ -202,8 +234,16 @@ try {
   await abandonedRun.completed.catch(() => null);
   const fencedSuccessor = await runPoller(env);
   assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 1, 'live abandoned lease must fence successor');
+  await new Promise(resolve => setTimeout(resolve, 5_200));
+  const expiredLeasePeer = await runPoller(env);
+  assert.equal(duplicateConcurrentScans, false, 'server fence must prevent duplicate execution after poller lease expiry');
+  assert.equal(duplicateAttemptFencedAtServer, true, 'expired poller lease must reach the live server-side execution fence');
   await waitFor(() => !active.has('23'));
-  await new Promise(resolve => setTimeout(resolve, 4_200));
+  const afterServerFenceScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
+  afterServerFenceScheduler['market-23'].nextDueAt = new Date(Date.now() - 1_000).toISOString();
+  await writeFile(files.scheduler, JSON.stringify(afterServerFenceScheduler));
+  abandonedWorkerMode = false;
+  await new Promise(resolve => setTimeout(resolve, 5_200));
   const reclaimedRun = await runPoller(env);
   const afterReclaimScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
   assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 2, 'expired lease must be reclaimed');
@@ -217,7 +257,7 @@ try {
 
   process.stdout.write(`${JSON.stringify({
     candidate: 'BUG-140 production poller lifecycle',
-    processRuns: 7,
+    processRuns: 10,
     marketCount: markets.length,
     freshnessSlaMs: SLA_MS,
     cycles: [firstHealth.queue, secondHealth.queue],
@@ -234,7 +274,9 @@ try {
       duplicateConcurrentScans,
       maxObservedConcurrency: maxConcurrency,
       abandonedOwnerKilled: true,
+      crossProcessSchedulerUpdatesMerged: Boolean(afterMergeScheduler['market-20'].lastSuccessAt && afterMergeScheduler['market-21'].lastSuccessAt),
       liveLeaseFencedSuccessor: Boolean(fencedSuccessor.stdout),
+      expiredLeaseFencedAtServer: Boolean(expiredLeasePeer.stdout && duplicateAttemptFencedAtServer),
       abandonedLeaseReclaimed: Boolean(reclaimedRun.stdout && afterReclaimScheduler['market-23'].lastSuccessAt),
     },
     requestScope: {

@@ -30,6 +30,11 @@ import { resolveMarketDomain } from '@/lib/market-classification';
 import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 import { withSqliteBusyRetry } from '@/lib/sqlite-write-retry';
 import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
+import {
+  acquireSavedMarketScanLock,
+  releaseSavedMarketScanLock,
+  type SavedMarketScanLock,
+} from '@/lib/saved-market-scan-lock';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -38,6 +43,8 @@ const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'tr
 export async function executeFullScan(request: NextRequest) {
   let savedMarketId: string | null = null;
   let publicationGeneration: number | null = null;
+  let fullScanPersisted = false;
+  let scanLock: SavedMarketScanLock | null = null;
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -81,6 +88,23 @@ export async function executeFullScan(request: NextRequest) {
     // order overlapping scans that resolve within the same clock tick.
     const savedMarket = await findSavedMarketByUrls(kalshiUrl!, polymarketUrl!);
     savedMarketId = savedMarket?.id ?? null;
+    if (savedMarketId) {
+      const acquisition = await acquireSavedMarketScanLock(savedMarketId);
+      if (acquisition.status === 'busy') {
+        return NextResponse.json(
+          {
+            error: 'A full scan for this saved market is already in progress. Retry after it completes.',
+            reason: acquisition.reason,
+            detail: acquisition.detail,
+          },
+          {
+            status: 409,
+            headers: { 'Retry-After': String(Math.max(1, Math.ceil(acquisition.retryAfterMs / 1_000))) },
+          },
+        );
+      }
+      scanLock = acquisition.lock;
+    }
     publicationGeneration = savedMarket
       ? await reserveSavedMarketPublication(savedMarket.id, 'scan')
       : null;
@@ -487,7 +511,8 @@ export async function executeFullScan(request: NextRequest) {
         };
         // Keep the scan's writes ordered. Concurrent transactions here used to
         // contend with each other before watcher/poller traffic was considered.
-        await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
+        const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
+        if (!published) throw new Error('Saved-market publication was superseded before persistence');
         await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
           withArbitrage,
           { kalshi: scanObservedAt, polymarket: scanObservedAt },
@@ -565,6 +590,7 @@ export async function executeFullScan(request: NextRequest) {
             logger.trackError(err, { service: 'telegram-alerts', context: 'scan batch' });
           });
         }
+        fullScanPersisted = true;
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
@@ -606,6 +632,7 @@ export async function executeFullScan(request: NextRequest) {
       _ts: Date.now(),
       _kalshiFetchedAt: new Date().toISOString(),
       _pmFetchedAt: new Date().toISOString(),
+      fullScanPersisted,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -631,5 +658,7 @@ export async function executeFullScan(request: NextRequest) {
       { error: msg },
       { status }
     );
+  } finally {
+    if (scanLock) await releaseSavedMarketScanLock(scanLock).catch(() => {});
   }
 }

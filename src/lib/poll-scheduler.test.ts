@@ -10,7 +10,8 @@ import {
   schedulerMetrics,
 } from '../../scripts/poll-scheduler.mjs';
 import { acquireMarketLease } from '../../scripts/poll-lease.mjs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { updateSchedulerState } from '../../scripts/poll-state.mjs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -25,6 +26,33 @@ const market = (id: string, scannedAt: string | null = null): Market => ({
 });
 
 describe('saved-market fair scheduler', () => {
+  it('merges concurrent per-market scheduler updates without losing completed state', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-test-'));
+    const stateFile = path.join(directory, 'scheduler.json');
+    try {
+      await writeFile(stateFile, JSON.stringify({
+        a: { inProgress: true, lastSuccessAt: null },
+        b: { inProgress: true, lastSuccessAt: null },
+      }));
+
+      await Promise.all([
+        updateSchedulerState(stateFile, state => {
+          state.a = { inProgress: false, lastSuccessAt: '2026-08-13T20:00:01.000Z' };
+        }),
+        updateSchedulerState(stateFile, state => {
+          state.b = { inProgress: false, lastSuccessAt: '2026-08-13T20:00:02.000Z' };
+        }),
+      ]);
+
+      expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({
+        a: { inProgress: false, lastSuccessAt: '2026-08-13T20:00:01.000Z' },
+        b: { inProgress: false, lastSuccessAt: '2026-08-13T20:00:02.000Z' },
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('fences a live owner and reclaims its abandoned lease after expiry', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-test-'));
     try {
