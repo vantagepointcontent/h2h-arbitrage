@@ -321,8 +321,36 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText('0xabc')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
-    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000¢ exact fill');
-    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.970000');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000000¢ exact fill');
+    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
+  });
+
+  it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {
+    const precisePosition = {
+      ...positions[0],
+      kalshiEntryGrossMicrocents: 5_123_456,
+      pmEntryGrossMicrocents: 92_234_567,
+      kalshiEntryFeeCents: 1,
+      pmEntryFeeCents: 0,
+      entryCostRoundingDeltaMicrocents: 641_977,
+      totalCostCents: 99,
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [precisePosition] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('5.123456¢ exact fill · $0.05123456 gross');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.06123456 net leg cost');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('92.234567¢ exact fill · $0.92234567 gross');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('$0.00000000 execution fee · $0.92234567 net leg cost');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Currency rounding delta: $0.00641977');
+    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.99000000');
   });
 
   it('shows a specific unavailable Buy Cost reason for legacy paper positions and never displays zero', async () => {

@@ -148,11 +148,12 @@ const RANGE_OPTIONS: Array<{ key: PerformanceRange; label: string }> = [
 
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 });
-const EXACT_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6, maximumFractionDigits: 6 });
+const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 8 });
+const EXACT_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 8, maximumFractionDigits: 8 });
 const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const EXACT_CENTS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
 
 function formatCents(cents: number, signed = false): string {
   const value = cents / 100;
@@ -180,7 +181,7 @@ function formatExactMicrocents(microcents: number): string {
 }
 
 function formatExactEntryPrice(grossMicrocents: number, quantity: number): string {
-  return `${THREE_DECIMAL.format(grossMicrocents / 1_000_000 / quantity)}¢`;
+  return `${EXACT_CENTS.format(grossMicrocents / 1_000_000 / quantity)}¢`;
 }
 
 function formatVwapCents(grossProceedsMicrocents: number, quantity: number): string {
@@ -589,15 +590,15 @@ export default function BotTraderPanel() {
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} exact fill · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
-                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.kalshiEntryFeeCents ?? 0)} execution fee · <strong className="text-[var(--text-primary)]">{formatMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} exact fill · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
-                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.pmEntryFeeCents ?? 0)} execution fee · <strong className="text-[var(--text-primary)]">{formatMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                           </div>
                           <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>
-                          <div className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Full-precision gross plus both execution fees is rounded once to ledger cents.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Summary prices round each leg to cents and may not add to the rounded total.</div>
+                          <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Full-precision gross plus both execution fees is rounded once to ledger cents.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Summary prices round each leg to cents and may not add to the rounded total.</div>
                         </div>
                       )}
                       {liquidationUnavailableLabel ? (
