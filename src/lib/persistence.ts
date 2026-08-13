@@ -449,6 +449,7 @@ export async function getScanHistory(marketId?: string, limit: number = 20): Pro
 type ScanHistoryFilters = {
   marketId?: string; minRoi?: number; positiveArbOnly?: boolean; fromDate?: string; toDate?: string;
   search?: string; eventType?: 'all' | 'scan' | 'arb' | 'system'; arbType?: 'all' | 'direct' | 'cross' | 'internal';
+  maxTteDays?: 30 | 90 | 180;
 };
 type ScanHistorySummary = { totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } };
 type ScanHistoryRow = Record<string, unknown> & { id: number; market_id: string; scanned_at: string };
@@ -459,6 +460,10 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
   if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
   if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
   if (opts.positiveArbOnly) where += ' AND positive_arb_count > 0';
+  if (opts.maxTteDays !== undefined) {
+    where += ' AND days_to_expiry >= 0 AND days_to_expiry < ?';
+    args.push(opts.maxTteDays);
+  }
   if (opts.fromDate) { where += ' AND scanned_at >= ?'; args.push(new Date(opts.fromDate).toISOString()); }
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
   const search = opts.search?.trim();

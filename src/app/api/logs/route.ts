@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
-import { parseLogLimit, parseOptionalFiniteNumber } from '@/lib/logs-request';
+import { parseLogLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
 
 /**
  * GET /api/logs
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const eventType = searchParams.get('eventType') as 'all' | 'scan' | 'arb' | 'system' | null;
     const arbType = searchParams.get('arbType') as 'all' | 'direct' | 'cross' | 'internal' | null;
+    const maxTteDays = parseTteMaxDays(searchParams.get('maxTteDays'));
     const cursor = searchParams.get('before');
     const [cursorTime, cursorId] = cursor?.split('|') ?? [];
     const before = cursorTime && Number.isInteger(Number(cursorId))
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
       search,
       eventType: eventType ?? undefined,
       arbType: arbType ?? undefined,
+      maxTteDays,
     });
 
     const last = results[results.length - 1];

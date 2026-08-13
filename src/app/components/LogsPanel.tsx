@@ -55,12 +55,20 @@ const ARB_TYPE_FILTER_OPTIONS: { key: ArbTypeFilter; label: string }[] = [
 ];
 
 type EventType = "all" | "scan" | "arb" | "system";
+type TteFilter = "all" | 30 | 90 | 180;
 
 const EVENT_TYPE_OPTIONS: { key: EventType; label: string }[] = [
   { key: "all", label: "All" },
   { key: "scan", label: "Scan" },
   { key: "arb", label: "Arb" },
   { key: "system", label: "System" },
+];
+
+const TTE_FILTER_OPTIONS: { key: TteFilter; label: string; ariaLabel: string }[] = [
+  { key: 30, label: "<30d", ariaLabel: "TTE under 30 days" },
+  { key: 90, label: "<90d", ariaLabel: "TTE under 90 days" },
+  { key: 180, label: "<180d", ariaLabel: "TTE under 180 days" },
+  { key: "all", label: "All", ariaLabel: "All TTE" },
 ];
 
 type SortKey = "scanned_at" | "best_roi_pct" | "best_profit" | "apy" | "positive_arb_count" | "matched_count";
@@ -84,6 +92,7 @@ export default function LogsPanel() {
   const [toDate, setToDate] = useState(() => new Date().toISOString());
   const [eventType, setEventType] = useState<EventType>("all");
   const [arbTypeFilter, setArbTypeFilter] = useState<ArbTypeFilter>("all");
+  const [tteFilter, setTteFilter] = useState<TteFilter>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Sort
@@ -144,8 +153,9 @@ export default function LogsPanel() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (eventType !== "all") params.set("eventType", eventType);
     if (arbTypeFilter !== "all") params.set("arbType", arbTypeFilter);
+    if (tteFilter !== "all") params.set("maxTteDays", String(tteFilter));
     return params;
-  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter]);
+  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter, tteFilter]);
 
   const fetchLogs = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -314,8 +324,9 @@ export default function LogsPanel() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (eventType !== "all") params.set("eventType", eventType);
     if (arbTypeFilter !== "all") params.set("arbType", arbTypeFilter);
+    if (tteFilter !== "all") params.set("maxTteDays", String(tteFilter));
     return `/api/logs/export?${params.toString()}`;
-  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter]);
+  }, [minRoi, positiveArbOnly, fromDate, toDate, debouncedSearch, eventType, arbTypeFilter, tteFilter]);
   const tradeExportUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (fromDate) params.set("fromDate", fromDate);
@@ -364,6 +375,20 @@ export default function LogsPanel() {
     invalidatePagination();
     setFromDate(from.toISOString());
     setToDate(to.toISOString());
+  }, [invalidatePagination]);
+
+  const resetFilters = useCallback(() => {
+    const now = new Date();
+    invalidatePagination();
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setMinRoi(0);
+    setPositiveArbOnly(true);
+    setFromDate(new Date(now.getTime() - 86_400_000).toISOString());
+    setToDate(now.toISOString());
+    setEventType("all");
+    setArbTypeFilter("all");
+    setTteFilter("all");
   }, [invalidatePagination]);
 
 
@@ -476,9 +501,18 @@ export default function LogsPanel() {
 
       {/* Filters */}
       <div className="rounded-xl border border-[#182533] bg-[#17212B] p-4 space-y-3">
-        <div className="flex items-center gap-1.5 mb-1">
-          <Filter className="w-4 h-4 text-[#8A9BA8]" />
-          <span className="text-xs font-semibold text-[#8A9BA8] uppercase tracking-wide">Filters</span>
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-4 h-4 text-[#8A9BA8]" />
+            <span className="text-xs font-semibold text-[#8A9BA8] uppercase tracking-wide">Filters</span>
+          </div>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="min-h-11 rounded px-2 text-[10px] font-medium uppercase tracking-wide text-[#8A9BA8] hover:text-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81]"
+          >
+            Reset filters
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -559,30 +593,8 @@ export default function LogsPanel() {
           </div>
         </div>
 
-        {/* Date-range presets */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Preset:</span>
-          <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
-            {[
-              { key: "today", label: "Latest 24 hours" },
-              { key: "7d", label: "Last 7 days" },
-              { key: "30d", label: "Last 30 days" },
-              { key: "month", label: "Full month" },
-            ].map((opt) => (
-              <button
-                key={opt.key}
-                title={opt.key === "today" ? "Latest rolling 24 hours ending now" : undefined}
-                onClick={() => setDateRange(opt.key as "today" | "7d" | "30d" | "month")}
-                className="min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors text-[#8A9BA8] hover:text-[#FFFFFF]"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Toggle + Event Type Filter */}
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Segmented filters */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="logs-segmented-filter-row">
           <label className="flex min-h-11 items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -592,6 +604,27 @@ export default function LogsPanel() {
             />
             <span className="text-xs text-[#8A9BA8]">Positive arb only</span>
           </label>
+          {/* Date-range presets */}
+          <div className="flex max-w-full items-center gap-1.5">
+            <span className="shrink-0 text-[10px] text-[#8A9BA8] uppercase tracking-wide">Preset:</span>
+            <div className="flex max-w-full items-center gap-0.5 overflow-x-auto bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
+              {[
+                { key: "today", label: "Latest 24 hours" },
+                { key: "7d", label: "Last 7 days" },
+                { key: "30d", label: "Last 30 days" },
+                { key: "month", label: "Full month" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  title={opt.key === "today" ? "Latest rolling 24 hours ending now" : undefined}
+                  onClick={() => setDateRange(opt.key as "today" | "7d" | "30d" | "month")}
+                  className="min-h-11 shrink-0 px-2.5 py-1 rounded text-[10px] font-medium transition-colors text-[#8A9BA8] hover:text-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81]"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Event type filter pills */}
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">Type:</span>
@@ -628,6 +661,28 @@ export default function LogsPanel() {
                         : opt.key === "internal"
                         ? "bg-purple-500/20 text-purple-400"
                         : "bg-[#5DBE81]/20 text-[#5DBE81]"
+                      : "text-[#8A9BA8] hover:text-[#FFFFFF]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Cumulative scan-time TTE filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[#8A9BA8] uppercase tracking-wide">TTE:</span>
+            <div className="flex items-center gap-0.5 bg-[#0E1621] rounded-lg p-0.5 border border-[#182533]">
+              {TTE_FILTER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  aria-label={opt.ariaLabel}
+                  aria-pressed={tteFilter === opt.key}
+                  onClick={() => { invalidatePagination(); setTteFilter(opt.key); }}
+                  className={`min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81] ${
+                    tteFilter === opt.key
+                      ? "bg-[#5DBE81]/20 text-[#5DBE81]"
                       : "text-[#8A9BA8] hover:text-[#FFFFFF]"
                   }`}
                 >
@@ -861,13 +916,9 @@ function LogRow({
 
   const savedMarket = savedMarkets.get(log.market_id);
   const marketName = log.market_name ?? log.market_title ?? savedMarket?.title;
-  const legacyExpiry = savedMarket?.expiryDate ? Date.parse(savedMarket.expiryDate) : Number.NaN;
-  const legacyScan = Date.parse(log.scanned_at);
   const minutesToExpiry = typeof log.days_to_expiry === 'number' && Number.isFinite(log.days_to_expiry)
     ? Math.floor(log.days_to_expiry * 1440)
-    : Number.isFinite(legacyExpiry) && Number.isFinite(legacyScan)
-      ? Math.floor((legacyExpiry - legacyScan) / 60_000)
-      : null;
+    : null;
   const tte = minutesToExpiry == null ? '—' : minutesToExpiry <= 0 ? 'Expired' : minutesToExpiry >= 1440 ? `${Math.floor(minutesToExpiry / 1440)}d ${Math.floor(minutesToExpiry % 1440 / 60)}h` : minutesToExpiry >= 60 ? `${Math.floor(minutesToExpiry / 60)}h ${minutesToExpiry % 60}m` : `${minutesToExpiry}m`;
   const hasMarketName = !!marketName;
 

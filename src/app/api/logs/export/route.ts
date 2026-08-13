@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryScanHistoryStream, countScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { classifyArbType } from '@/lib/arb-types';
-import { parseExportLimit, parseOptionalFiniteNumber } from '@/lib/logs-request';
+import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
 
 const headers = [
   'Scan Time',
@@ -51,13 +51,14 @@ function buildFilters(searchParams: URLSearchParams) {
   const search = searchParams.get('search') || undefined;
   const eventType = searchParams.get('eventType') as 'all' | 'scan' | 'arb' | 'system' | null;
   const arbType = searchParams.get('arbType') as 'all' | 'direct' | 'cross' | 'internal' | null;
+  const maxTteDays = parseTteMaxDays(searchParams.get('maxTteDays'));
   const fromDate = toIsoDate(searchParams.get('fromDate'));
   const toDate = toIsoDate(searchParams.get('toDate'));
   if (fromDate && toDate && fromDate > toDate) {
     throw new Error('fromDate must be before or equal to toDate');
   }
   const maxRows = parseExportLimit(searchParams.get('limit'));
-  return { marketId, minRoi, positiveArbOnly, fromDate, toDate, search, eventType: eventType ?? undefined, arbType: arbType ?? undefined, maxRows };
+  return { marketId, minRoi, positiveArbOnly, fromDate, toDate, search, eventType: eventType ?? undefined, arbType: arbType ?? undefined, maxTteDays, maxRows };
 }
 
 function isValidationError(err: unknown): err is Error {

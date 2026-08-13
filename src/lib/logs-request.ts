@@ -27,3 +27,11 @@ export function parseOptionalFiniteNumber(value: string | null): number | undefi
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
+
+export type TteMaxDays = 30 | 90 | 180;
+
+/** Only UI-supported cumulative TTE bounds are accepted; everything else is All. */
+export function parseTteMaxDays(value: string | null): TteMaxDays | undefined {
+  if (value === '30' || value === '90' || value === '180') return Number(value) as TteMaxDays;
+  return undefined;
+}

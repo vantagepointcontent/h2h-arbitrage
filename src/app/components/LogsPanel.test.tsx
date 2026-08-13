@@ -73,6 +73,7 @@ describe('LogsPanel', () => {
     expect(firstParams.get('positiveArbOnly')).toBe('true');
     expect(firstParams.get('fromDate')).toBe('2026-08-11T20:15:30.000Z');
     expect(firstParams.get('toDate')).toBe('2026-08-12T20:15:30.000Z');
+    expect(firstParams.has('maxTteDays')).toBe(false);
     expect(screen.getByLabelText('Positive arb only')).toHaveProperty('checked', true);
     expect(screen.getByRole('button', { name: /Latest 24 hours/ }).getAttribute('title')).toMatch(/rolling 24 hours/i);
     expect(screen.getByText('501')).toBeTruthy();
@@ -84,6 +85,44 @@ describe('LogsPanel', () => {
       const url = String(input);
       return url.startsWith('/api/logs?') && new URL(url, 'http://localhost').searchParams.get('search') === 'MN-01';
     })).toBe(true));
+  });
+
+  it('keeps Preset inline with the filters and applies a single TTE bound to data and export requests', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({
+        logs: [comparisonLog()], total: 1, maxRoiWithoutMin: 10,
+      }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    const row = screen.getByTestId('logs-segmented-filter-row');
+    expect(row.textContent).toContain('Positive arb only');
+    expect(row.textContent).toContain('Preset:');
+    expect(row.textContent).toContain('Type:');
+    expect(row.textContent).toContain('Arb Type:');
+    expect(row.textContent).toContain('TTE:');
+    expect(row.className).toContain('flex-wrap');
+    expect(screen.getByRole('button', { name: 'All TTE' }).getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'TTE under 90 days' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => {
+      const url = String(input);
+      return url.startsWith('/api/logs?') && new URL(url, 'http://localhost').searchParams.get('maxTteDays') === '90';
+    })).toBe(true));
+    expect(screen.getByRole('button', { name: 'TTE under 90 days' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('link', { name: 'Export Scan CSV' }).getAttribute('href')).toContain('maxTteDays=90');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(screen.getByRole('button', { name: 'All TTE' }).getAttribute('aria-pressed')).toBe('true');
+    await waitFor(() => {
+      const dataCalls = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/logs?'));
+      expect(new URL(String(dataCalls.at(-1)?.[0]), 'http://localhost').searchParams.has('maxTteDays')).toBe(false);
+    });
   });
 
   it('loads one 500-row page per distinct user scroll to the new bottom and deduplicates overlaps', async () => {
@@ -181,6 +220,8 @@ describe('LogsPanel', () => {
     ['positive-arb toggle', () => fireEvent.click(screen.getByLabelText('Positive arb only'))],
     ['event type', () => fireEvent.click(screen.getByRole('button', { name: 'Arb' }))],
     ['arb type', () => fireEvent.click(screen.getByRole('button', { name: 'Cross' }))],
+    ['TTE', () => fireEvent.click(screen.getByRole('button', { name: 'TTE under 90 days' }))],
+    ['preset', () => fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }))],
   ])('synchronously invalidates a pending append and resets virtual scroll for %s changes', async (_label, mutateFilter) => {
     let resolveStalePage!: (value: unknown) => void;
     const stalePage = new Promise((resolve) => { resolveStalePage = resolve; });

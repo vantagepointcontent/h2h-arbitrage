@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseExportLimit, parseLogLimit, parseOptionalFiniteNumber } from "./logs-request";
+import { parseExportLimit, parseLogLimit, parseOptionalFiniteNumber, parseTteMaxDays } from "./logs-request";
 
 describe("parseLogLimit", () => {
   it("uses the safe default for absent or non-finite input", () => {
@@ -33,5 +33,19 @@ describe("parseExportLimit", () => {
     expect(parseExportLimit(null)).toBeUndefined();
     expect(parseExportLimit("50001")).toBe(50001);
     expect(parseExportLimit("0")).toBeUndefined();
+  });
+});
+
+describe("parseTteMaxDays", () => {
+  it("accepts only the supported cumulative upper bounds", () => {
+    expect(parseTteMaxDays("30")).toBe(30);
+    expect(parseTteMaxDays("90")).toBe(90);
+    expect(parseTteMaxDays("180")).toBe(180);
+  });
+
+  it("treats All, absent, and arbitrary values as unbounded", () => {
+    for (const value of [null, "", "all", "0", "45", "Infinity"]) {
+      expect(parseTteMaxDays(value)).toBeUndefined();
+    }
   });
 });

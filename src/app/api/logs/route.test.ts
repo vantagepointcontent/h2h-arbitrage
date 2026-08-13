@@ -12,7 +12,7 @@ vi.mock('@/lib/persistence', () => mocks);
 
 import { GET as getLogs } from './route';
 import { GET as getLogDetail } from './[id]/route';
-import { GET as exportLogs } from './export/route';
+import { GET as exportLogs, HEAD as headExportLogs } from './export/route';
 
 const persistedRow = {
   id: 7,
@@ -102,7 +102,7 @@ describe('Logs scan-time APY serialization', () => {
     });
 
     const response = await getLogs(new NextRequest(
-      'http://localhost/api/logs?search=MN-01&eventType=arb&arbType=cross&positiveArbOnly=true&limit=250',
+      'http://localhost/api/logs?search=MN-01&eventType=arb&arbType=cross&positiveArbOnly=true&maxTteDays=90&limit=250',
     ));
     const body = await response.json();
 
@@ -111,6 +111,7 @@ describe('Logs scan-time APY serialization', () => {
       eventType: 'arb',
       arbType: 'cross',
       positiveArbOnly: true,
+      maxTteDays: 90,
       limit: 250,
     }));
     expect(body).toMatchObject({
@@ -145,14 +146,25 @@ describe('Logs scan-time APY serialization', () => {
 
   it('applies search and classification filters to export before streaming', async () => {
     await exportLogs(new NextRequest(
-      'http://localhost/api/logs/export?search=mn-01&eventType=arb&arbType=direct',
+      'http://localhost/api/logs/export?search=mn-01&eventType=arb&arbType=direct&maxTteDays=180',
     ));
 
     expect(mocks.queryScanHistoryStream).toHaveBeenCalledWith(expect.objectContaining({
       search: 'mn-01',
       eventType: 'arb',
       arbType: 'direct',
+      maxTteDays: 180,
     }));
+  });
+
+  it('applies the same TTE filter to the complete export count', async () => {
+    mocks.countScanHistory.mockResolvedValue(123);
+    const response = await headExportLogs(new NextRequest(
+      'http://localhost/api/logs/export?maxTteDays=30',
+    ));
+
+    expect(mocks.countScanHistory).toHaveBeenCalledWith(expect.objectContaining({ maxTteDays: 30 }));
+    expect(response.headers.get('X-Export-Row-Count')).toBe('123');
   });
 
   it('does not impose a 50,000-row cap on complete exports', async () => {
