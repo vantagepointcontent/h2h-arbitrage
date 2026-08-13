@@ -50,7 +50,7 @@ export class ScanRateLimiter {
 export class ScanConcurrencyLimiter {
   private active = 0;
 
-  constructor(private readonly maxConcurrent = 2) {}
+  constructor(private readonly maxConcurrent = 1) {}
 
   tryAcquire(): (() => void) | null {
     if (this.active >= this.maxConcurrent) return null;
@@ -74,5 +74,5 @@ export function getScanClientKey(headers: Headers): string {
 
 export const scanRateLimiter = new ScanRateLimiter();
 export const scanConcurrencyLimiter = new ScanConcurrencyLimiter(
-  Math.max(1, Number(process.env.H2H_SCAN_CONCURRENCY || 2)),
+  Math.max(1, Number(process.env.H2H_SCAN_CONCURRENCY || 1)),
 );
