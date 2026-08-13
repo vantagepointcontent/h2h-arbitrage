@@ -27,6 +27,9 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '3000',
+        // Full per-outcome scan diagnostics overwhelm the event loop under the
+        // poller's normal burst load. Enable only for short local investigations.
+        DEBUG_H2H: '0',
         PREDICTIONHUNT_API_KEY: 'pmx_U46EX9BAvyqxGoq9kinrYIqRt3KTWoWTrOU9B-I8VGQ',
         H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
         NEXT_PUBLIC_H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
