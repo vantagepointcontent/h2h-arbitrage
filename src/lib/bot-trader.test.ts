@@ -80,6 +80,23 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
   };
 }
 
+describe('buildExecutionRequest Polymarket identity', () => {
+  it('places the selected NO leg with its executable token', () => {
+    const request = buildExecutionRequest(makeInput({
+      pmConditionId: 'parent-condition',
+      pmYesTokenId: 'yes-token',
+      pmNoTokenId: 'no-token',
+      strategy: 'Buy YES Kalshi + NO PM',
+    }));
+
+    expect(request?.polymarketOrder).toMatchObject({
+      marketId: 'no-token',
+      conditionId: 'no-token',
+      outcome: 'no',
+    });
+  });
+});
+
 function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome {
   return {
     artist: 'Team A',

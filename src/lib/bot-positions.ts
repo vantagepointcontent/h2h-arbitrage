@@ -1103,6 +1103,24 @@ export class BotPositionStore {
     await this.migrateReservationIdentity();
     await this.client.execute(`CREATE INDEX IF NOT EXISTS idx_bot_positions_status ON bot_positions(status, opened_at DESC)`);
     await this.client.execute(`DROP INDEX IF EXISTS idx_bot_positions_open_pair`);
+    const duplicateOpenPairs = await this.client.execute(`
+      SELECT lower(kalshi_ticker) AS kalshi_ticker,
+             lower(pm_condition_id) AS pm_condition_id,
+             execution_mode,
+             group_concat(id, ',') AS ids
+      FROM bot_positions
+      WHERE status = 'open' AND kalshi_ticker IS NOT NULL AND pm_condition_id IS NOT NULL
+      GROUP BY lower(kalshi_ticker), lower(pm_condition_id), execution_mode
+      HAVING COUNT(*) > 1
+      ORDER BY MIN(id)
+      LIMIT 1
+    `);
+    if (duplicateOpenPairs.rows[0]) {
+      const duplicate = duplicateOpenPairs.rows[0];
+      throw new Error(
+        `Legacy duplicate open bot positions require reconciliation before uniqueness migration: ${String(duplicate.kalshi_ticker)}/${String(duplicate.pm_condition_id)}/${String(duplicate.execution_mode)} ids ${String(duplicate.ids)}`,
+      );
+    }
     await this.client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id), execution_mode) WHERE status = 'open'`);
   }
 
@@ -1273,8 +1291,8 @@ export class BotPositionStore {
     if (await this.hasOpenPair(kalshiTicker, pmConditionId, executionMode)) return false;
     try {
       await this.client.execute({
-        sql: `INSERT INTO bot_position_reservations (pair_key, execution_mode, reserved_at) VALUES (?, ?, ?)`,
-        args: [this.pairKey(kalshiTicker, pmConditionId), executionMode, new Date().toISOString()],
+        sql: `INSERT INTO bot_position_reservations (pair_key, execution_mode, reserved_at, exposure_at_risk) VALUES (?, ?, ?, ?)`,
+        args: [this.pairKey(kalshiTicker, pmConditionId), executionMode, new Date().toISOString(), executionMode === 'live' ? 1 : 0],
       });
       // Close the narrow gap between the precheck and reservation insert: a
       // prior reservation may have committed its position and released while

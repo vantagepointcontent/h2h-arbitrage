@@ -464,8 +464,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
 
   const polymarketOrder: OrderRequest = {
     platform: 'polymarket',
-    marketId: input.pmConditionId,
-    conditionId: input.pmConditionId,
+    marketId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
+    conditionId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
     side: 'buy',
     outcome: legs.pmOutcome,
     size: pmStake,
@@ -633,6 +633,9 @@ export async function maybeExecuteBotTrade(
       pmSide: entryLegs.pmOutcome,
       category: input.category,
     });
+    // Placement and fee authority must bind the exact same executable token.
+    execReq.polymarketOrder.marketId = feeAuthority.polymarket.tokenId;
+    execReq.polymarketOrder.conditionId = feeAuthority.polymarket.tokenId;
   } catch (error) {
     const reason = `Authoritative fee authority unavailable: ${String(error)}`;
     await log('safety-gate', reason, 'failed', { errorReason: reason });

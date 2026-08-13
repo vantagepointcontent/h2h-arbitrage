@@ -845,6 +845,50 @@ describe('BotPositionStore', () => {
     store.close();
   });
 
+  it('makes live reservations non-expiring before any venue placement can occur', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-live-reservation-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    client.close();
+    const store = new BotPositionStore(dbUrl);
+
+    await expect(store.reservePair('KXTEST', '0xabc', 'live')).resolves.toBe(true);
+    const agingClient = createClient({ url: dbUrl });
+    const reservation = await agingClient.execute(`SELECT exposure_at_risk FROM bot_position_reservations`);
+    expect(Number(reservation.rows[0]?.exposure_at_risk)).toBe(1);
+    await agingClient.execute(`UPDATE bot_position_reservations SET reserved_at = '2000-01-01T00:00:00.000Z'`);
+    agingClient.close();
+    store.close();
+
+    const restarted = new BotPositionStore(dbUrl);
+    await expect(restarted.reservePair('kxtest', '0xABC', 'live')).resolves.toBe(false);
+    restarted.close();
+  });
+
+  it('fails legacy open-pair migration with actionable duplicate diagnostics', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-duplicates-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 0), (8, 0)`);
+    await client.execute(`CREATE TABLE bot_positions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, execution_id INTEGER, kalshi_ticker TEXT,
+      pm_condition_id TEXT, status TEXT, execution_mode TEXT
+    )`);
+    await client.execute(`INSERT INTO bot_positions (execution_id, kalshi_ticker, pm_condition_id, status, execution_mode)
+      VALUES (7, 'KXTEST', '0xABC', 'open', 'live'), (8, 'kxtest', '0xabc', 'open', 'live')`);
+    client.close();
+
+    const store = new BotPositionStore(dbUrl);
+    await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).rejects.toThrow(
+      /legacy duplicate open bot positions.*KXTEST.*0xABC.*live.*ids.*1,2/i,
+    );
+    store.close();
+  });
+
   it('migrates legacy reservations to paper without blocking live mode', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-reservation-legacy-'));
     dirs.push(dir);
@@ -869,7 +913,7 @@ describe('BotPositionStore', () => {
     const migrated = createClient({ url: dbUrl });
     const rows = await migrated.execute(`SELECT pair_key, execution_mode, exposure_at_risk FROM bot_position_reservations ORDER BY execution_mode`);
     expect(rows.rows).toMatchObject([
-      { pair_key: 'kxtest', execution_mode: 'live', exposure_at_risk: 0 },
+      { pair_key: 'kxtest', execution_mode: 'live', exposure_at_risk: 1 },
       { pair_key: 'kxtest', execution_mode: 'paper', exposure_at_risk: 1 },
     ]);
     migrated.close();
