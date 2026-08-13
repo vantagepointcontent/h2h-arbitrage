@@ -5,6 +5,7 @@ import {
   isEligibleMarket,
   markAttemptStarted,
   parseBoundedNumber,
+  resetBreakerAfterExternalSuccess,
   selectDueMarkets,
   schedulerMetrics,
 } from '../../scripts/poll-scheduler.mjs';
@@ -108,6 +109,31 @@ describe('saved-market fair scheduler', () => {
 
     expect(state.a.lastSuccessAt).toBe('2026-08-13T19:59:00Z');
     expect(state.a.nextDueAt).toBe('2026-08-13T20:00:00.000Z');
+  });
+
+  it('clears failed retry state when a newer manual full scan succeeds', () => {
+    const now = Date.parse('2026-08-13T20:00:00Z');
+    const state = buildSchedulerState([market('a', '2026-08-13T19:59:00Z')], {
+      a: {
+        lastAttemptAt: '2026-08-13T19:30:00Z',
+        lastSuccessAt: '2026-08-13T18:00:00Z',
+        nextDueAt: '2026-08-13T20:30:00Z',
+        inProgress: false,
+        retryCount: 3,
+        failureReason: 'Kalshi HTTP 503',
+      },
+    }, now, 60_000);
+
+    expect(state.a).toMatchObject({
+      lastSuccessAt: '2026-08-13T19:59:00Z',
+      nextDueAt: '2026-08-13T20:00:00.000Z',
+      failureReason: null,
+      retryCount: 0,
+    });
+
+    const breaker = { avgMs: 4_000, consecFails: 3, trips: 2, cooldownUntil: now + 30 * 60_000 };
+    expect(resetBreakerAfterExternalSuccess(breaker)).toBe(true);
+    expect(breaker).toEqual({ avgMs: 4_000, consecFails: 0, trips: 2, cooldownUntil: 0 });
   });
 
   it('bounds every successful market next-due time by the freshness SLA', () => {

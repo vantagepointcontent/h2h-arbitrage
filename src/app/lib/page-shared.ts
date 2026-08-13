@@ -366,6 +366,41 @@ export interface SavedMarket {
   } | null;
 }
 
+export function getSavedMarketLastSuccessAt(market: SavedMarket): string | null {
+  return market.scheduler?.lastSuccessAt ?? market.lastScanResult?.scannedAt ?? null;
+}
+
+export function applyDurableFullScanToSavedMarket(
+  market: SavedMarket,
+  scan: Pick<ScanResult, 'outcomes' | 'kalshiCount' | 'pmCount' | 'matchedCount'> & { fullScanPersisted?: boolean },
+  scannedAt: string,
+): SavedMarket {
+  const liveResult = {
+    ...summarizeScanForSidebar(scan.outcomes),
+    scannedAt,
+    kalshiCount: scan.kalshiCount,
+    pmCount: scan.pmCount,
+    matchedCount: scan.matchedCount,
+  };
+  if (scan.fullScanPersisted !== true) return { ...market, liveResult };
+  const freshnessSlaMs = market.scheduler?.freshnessSlaMs ?? 60 * 60_000;
+  const scannedAtMs = Date.parse(scannedAt);
+  const nextDueAt = new Date(scannedAtMs + freshnessSlaMs).toISOString();
+  return {
+    ...market,
+    scheduler: {
+      ...market.scheduler,
+      lastSuccessAt: scannedAt,
+      nextDueAt,
+      inProgress: false,
+      failureReason: null,
+      retryCount: 0,
+      freshnessSlaMs,
+    },
+    liveResult,
+  };
+}
+
 export interface ScanResult {
   eventTitle: string;
   kalshiCount: number;

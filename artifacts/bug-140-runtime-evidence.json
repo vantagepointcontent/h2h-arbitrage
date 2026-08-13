@@ -1,0 +1,111 @@
+{
+  "candidate": "BUG-140 saved-market scheduler",
+  "marketCount": 24,
+  "freshnessSlaMs": 300000,
+  "cycles": [
+    {
+      "now": "2026-08-13T20:00:00.000Z",
+      "due": 24,
+      "completed": [
+        "market-02",
+        "market-03",
+        "market-04",
+        "market-05",
+        "market-06",
+        "market-07",
+        "market-08",
+        "market-09",
+        "market-10",
+        "market-11",
+        "market-12",
+        "market-13",
+        "market-14",
+        "market-15",
+        "market-16",
+        "market-17",
+        "market-18",
+        "market-19",
+        "market-20",
+        "market-21",
+        "market-22",
+        "market-23"
+      ],
+      "failed": [
+        "market-00",
+        "market-01"
+      ],
+      "metrics": {
+        "eligibleCount": 24,
+        "dueCount": 0,
+        "overdueCount": 2,
+        "failedCount": 2,
+        "inProgressCount": 0,
+        "oldestSuccessAgeMs": 301000
+      }
+    },
+    {
+      "now": "2026-08-13T20:10:00.000Z",
+      "due": 24,
+      "completed": [
+        "market-01",
+        "market-03",
+        "market-04",
+        "market-05",
+        "market-06",
+        "market-07",
+        "market-08",
+        "market-09",
+        "market-10",
+        "market-11",
+        "market-12",
+        "market-13",
+        "market-14",
+        "market-15",
+        "market-16",
+        "market-17",
+        "market-18",
+        "market-19",
+        "market-20",
+        "market-21",
+        "market-22",
+        "market-23",
+        "market-02"
+      ],
+      "failed": [
+        "market-00"
+      ],
+      "metrics": {
+        "eligibleCount": 24,
+        "dueCount": 0,
+        "overdueCount": 1,
+        "failedCount": 1,
+        "inProgressCount": 0,
+        "oldestSuccessAgeMs": 901000
+      }
+    }
+  ],
+  "restartRecovery": {
+    "interruptedMarket": "market-02",
+    "recoveredDue": true,
+    "duplicateConcurrentScans": false
+  },
+  "requestScope": {
+    "capturedRequestCount": 48,
+    "fields": [
+      "savedMarketId",
+      "kalshiUrl",
+      "polymarketUrl"
+    ],
+    "linkedEventUrlsOnly": true,
+    "sample": {
+      "savedMarketId": "market-02",
+      "kalshiUrl": "https://kalshi.example/events/2",
+      "polymarketUrl": "https://polymarket.example/events/2"
+    }
+  },
+  "fairness": {
+    "repeatedFailureMarket": "market-00",
+    "timeoutMarket": "market-01",
+    "laterFinalEntryCompletedEveryCycle": true
+  }
+}

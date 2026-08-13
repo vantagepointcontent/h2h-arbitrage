@@ -27,6 +27,19 @@ export function isEligibleMarket(market, now = Date.now()) {
   return expiry > now || market.lastScanResult?.priceResolved === false;
 }
 
+export function hasNewerSuccessfulMarketScan(market, previous = {}) {
+  const resultStatus = market.lastScanResult?.matchStatus;
+  if (resultStatus === 'unavailable' || resultStatus === 'refreshing') return false;
+  return timestamp(market.lastScanResult?.scannedAt) > timestamp(previous.lastSuccessAt);
+}
+
+export function resetBreakerAfterExternalSuccess(stats) {
+  if (!stats) return false;
+  stats.consecFails = 0;
+  stats.cooldownUntil = 0;
+  return true;
+}
+
 export function buildSchedulerState(markets, persisted = {}, now = Date.now(), freshnessSlaMs = 60 * 60_000) {
   freshnessSlaMs = positiveFinite(freshnessSlaMs, DEFAULT_FRESHNESS_SLA_MS);
   const state = {};
@@ -43,7 +56,7 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
     const successfulScanAt = timestamp(marketSuccessAt) > timestamp(previous.lastSuccessAt)
       ? marketSuccessAt
       : previous.lastSuccessAt || marketSuccessAt || null;
-    const manualSuccessAdvanced = timestamp(marketSuccessAt) > timestamp(previous.lastSuccessAt);
+    const manualSuccessAdvanced = hasNewerSuccessfulMarketScan(market, previous);
     const recovered = previous.inProgress === true;
     const dueFromSuccess = successfulScanAt ? timestamp(successfulScanAt, now) + freshnessSlaMs : now;
     state[market.id] = {
@@ -52,11 +65,15 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
       nextDueAt: recovered
         ? iso(now)
         : manualSuccessAdvanced
-          ? iso(Math.max(dueFromSuccess, timestamp(previous.nextDueAt, 0)))
+          ? iso(dueFromSuccess)
           : previous.nextDueAt || iso(dueFromSuccess),
       inProgress: false,
-      failureReason: recovered ? 'Scheduled scan interrupted because the worker restarted; retrying now.' : previous.failureReason || null,
-      retryCount: Number.isInteger(previous.retryCount) && previous.retryCount >= 0 ? previous.retryCount : 0,
+      failureReason: recovered
+        ? 'Scheduled scan interrupted because the worker restarted; retrying now.'
+        : manualSuccessAdvanced ? null : previous.failureReason || null,
+      retryCount: manualSuccessAdvanced
+        ? 0
+        : Number.isInteger(previous.retryCount) && previous.retryCount >= 0 ? previous.retryCount : 0,
       freshnessSlaMs,
     };
   }

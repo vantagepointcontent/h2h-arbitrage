@@ -39,9 +39,11 @@ const fs = await import('fs');
 const {
   buildSchedulerState,
   completeAttempt,
+  hasNewerSuccessfulMarketScan,
   isEligibleMarket,
   markAttemptStarted,
   parseBoundedNumber,
+  resetBreakerAfterExternalSuccess,
   selectDueMarkets,
   schedulerMetrics,
 } = await import('./poll-scheduler.mjs');
@@ -549,8 +551,14 @@ async function pollOnce() {
   // Persisted oldest-due-first scheduling replaces array-order scans. A
   // restart recovers interrupted entries as due, and failures back off without
   // letting the same prefix monopolize every cycle.
+  const manualSuccessIds = new Set(markets
+    .filter(market => hasNewerSuccessfulMarketScan(market, schedulerState[market.id]))
+    .map(market => market.id));
   schedulerState = buildSchedulerState(markets, schedulerState, Date.now(), FRESHNESS_SLA_MS);
   for (const market of markets) {
+    if (manualSuccessIds.has(market.id)) {
+      resetBreakerAfterExternalSuccess(scanStats.get(market.id));
+    }
     const cooldownUntil = scanStats.get(market.id)?.cooldownUntil;
     if (cooldownUntil > Date.now() && cooldownUntil > Date.parse(schedulerState[market.id].nextDueAt)) {
       schedulerState[market.id].nextDueAt = new Date(cooldownUntil).toISOString();

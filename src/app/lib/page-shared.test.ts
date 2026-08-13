@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyDurableFullScanToSavedMarket,
   DEFAULT_MARKET_EXPIRY_FILTER,
   DEFAULT_SHOW_ARB_ONLY,
   formatPercent,
   summarizeScanForSidebar,
   getCanonicalMatchState,
   formatCanonicalMatchState,
+  getSavedMarketLastSuccessAt,
   getSavedMarketScheduleView,
   mergeSavedMarketMatchRefresh,
   markSavedMarketMatchRefreshing,
@@ -80,6 +82,58 @@ describe("saved-market scheduler status", () => {
     expect(getSavedMarketScheduleView({ inProgress: true }, null, now, 60 * 60_000).status).toBe("scanning");
     expect(getSavedMarketScheduleView(null, "2026-08-13T18:00:00Z", now, 60 * 60_000).status).toBe("overdue");
     expect(getSavedMarketScheduleView(null, "2026-08-13T19:30:00Z", now, 60 * 60_000).status).toBe("fresh");
+  });
+
+  it("publishes a durable manual full scan immediately and clears stale failure state", () => {
+    const market: SavedMarket = {
+      id: "market-1",
+      eventTitle: "Market 1",
+      kalshiUrl: "https://kalshi.com/markets/market-1",
+      polymarketUrl: "https://polymarket.com/event/market-1",
+      createdAt: "2026-08-13T18:00:00Z",
+      lastScanResult: { bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 0, matchedCount: 0, kalshiCount: 0, pmCount: 0, scannedAt: "2026-08-13T18:00:00Z", allArbs: [] },
+      scheduler: { lastSuccessAt: "2026-08-13T18:00:00Z", failureReason: "Kalshi HTTP 503", retryCount: 3, freshnessSlaMs: 60_000 },
+    };
+    const updated = applyDurableFullScanToSavedMarket(market, {
+      fullScanPersisted: true,
+      outcomes: [outcome(2.5, 1.25)],
+      kalshiCount: 1,
+      pmCount: 1,
+      matchedCount: 1,
+    }, "2026-08-13T19:59:00Z");
+
+    expect(updated.scheduler).toMatchObject({
+      lastSuccessAt: "2026-08-13T19:59:00Z",
+      nextDueAt: "2026-08-13T20:00:00.000Z",
+      inProgress: false,
+      failureReason: null,
+      retryCount: 0,
+    });
+    expect(updated.liveResult).toMatchObject({ bestRoiPct: 2.5, scannedAt: "2026-08-13T19:59:00Z" });
+  });
+
+  it("does not advance full-scan freshness when durable publication is unconfirmed", () => {
+    const market: SavedMarket = {
+      id: "market-1", eventTitle: "Market 1", kalshiUrl: "k", polymarketUrl: "p", createdAt: "2026-08-13T18:00:00Z",
+      scheduler: { lastSuccessAt: "2026-08-13T18:00:00Z", failureReason: "publication failed", retryCount: 1, freshnessSlaMs: 60_000 },
+    };
+    const updated = applyDurableFullScanToSavedMarket(market, {
+      fullScanPersisted: false, outcomes: [outcome(2.5)], kalshiCount: 1, pmCount: 1, matchedCount: 1,
+    }, "2026-08-13T19:59:00Z");
+
+    expect(updated.scheduler).toEqual(market.scheduler);
+    expect(updated.liveResult).toMatchObject({ bestRoiPct: 2.5, scannedAt: "2026-08-13T19:59:00Z" });
+  });
+
+  it("never treats a watcher tick as the last successful full scan", () => {
+    const market = {
+      id: "market-1", eventTitle: "Market 1", kalshiUrl: "k", polymarketUrl: "p", createdAt: "2026-08-13T18:00:00Z",
+      lastScanResult: { bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 0, matchedCount: 0, kalshiCount: 0, pmCount: 0, scannedAt: "2026-08-13T18:30:00Z", allArbs: [] },
+      scheduler: { lastSuccessAt: "2026-08-13T19:00:00Z" },
+      liveResult: { bestRoiPct: 1, bestProfit: 1, strategy: "arb", scannedAt: "2026-08-13T19:59:00Z" },
+    } satisfies SavedMarket;
+
+    expect(getSavedMarketLastSuccessAt(market)).toBe("2026-08-13T19:00:00Z");
   });
 });
 

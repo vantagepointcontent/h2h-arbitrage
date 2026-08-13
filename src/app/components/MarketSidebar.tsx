@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
-import { SavedMarket, formatPercent, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
+import { SavedMarket, formatPercent, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
@@ -50,6 +50,31 @@ export function NavButton({ icon, label, active, onClick, collapsed }: { icon: R
       {icon}
       {label}
     </button>
+  );
+}
+
+export function FullScanStatus({ market, now }: { market: SavedMarket; now?: number }) {
+  const [renderedAt] = useState(() => Date.now());
+  const observedAt = now ?? renderedAt;
+  const lastSuccessfulScanAt = getSavedMarketLastSuccessAt(market);
+  const schedule = getSavedMarketScheduleView(market.scheduler, lastSuccessfulScanAt, observedAt);
+  const f = tickFreshness(lastSuccessfulScanAt, observedAt);
+  const label = schedule.status === 'scanning'
+    ? `Scanning · ${f.label}`
+    : schedule.status === 'failed'
+      ? `Failed · ${f.label}`
+      : schedule.status === 'overdue'
+        ? `Overdue · ${f.label}`
+        : f.label;
+  const color = schedule.status === 'failed' ? 'text-[var(--status-negative)]'
+    : schedule.status === 'scanning' ? 'text-[var(--status-positive)]'
+      : schedule.status === 'overdue' ? 'text-[var(--status-warning)]'
+        : freshnessColor(f.level);
+  return (
+    <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={schedule.reason ?? `Last successful full scan: ${f.label}`}>
+      <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
+      {label}
+    </span>
   );
 }
 
@@ -376,6 +401,7 @@ function MarketSidebarInner({
                   const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                   const apy = computeApy(roi, m.expiryDate);
                   const isActive = activeId === m.id;
+                  const lastSuccessfulScanAt = getSavedMarketLastSuccessAt(m);
                   return (
                     <div
                       key={m.id}
@@ -386,7 +412,7 @@ function MarketSidebarInner({
                       className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
                         isActive ? "bg-[var(--status-positive)]/10 ring-1 ring-[var(--status-positive)]/30" : "hover:bg-[var(--border-subtle)]"
                       }`}
-                      title={`Latest scanned: ${formatTimeAgo(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt)}`}
+                      title={`Last successful full scan: ${formatTimeAgo(lastSuccessfulScanAt)}`}
                     >
                       <button
                         onClick={(e) => {
@@ -404,7 +430,7 @@ function MarketSidebarInner({
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 min-w-0">
-                          <div className="text-xs font-medium text-[var(--text-primary)] truncate" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt })}>{m.eventTitle}</div>
+                          <div className="text-xs font-medium text-[var(--text-primary)] truncate" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt: lastSuccessfulScanAt })}>{m.eventTitle}</div>
                           {hotIds.has(m.id) && (
                             <span
                               className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded-full bg-[var(--status-blocked)]/15 text-[var(--status-blocked)] ring-1 ring-[var(--status-blocked)]/30 uppercase"
@@ -419,30 +445,8 @@ function MarketSidebarInner({
                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--border-subtle)] text-[var(--text-secondary)]">{m.category}</span>
                           )}
                           <span className="text-[9px] text-[var(--text-secondary)]">{timeUntilExpiry(m.expiryDate)}</span>
-                          {(() => {
-                            // Full-scan age is deliberately independent from the
-                            // faster watcher price tick. Scheduler failures and
-                            // attempts never advance the displayed success age.
-                            const schedule = getSavedMarketScheduleView(m.scheduler, m.lastScanResult?.scannedAt);
-                            const f = tickFreshness(m.scheduler?.lastSuccessAt ?? m.lastScanResult?.scannedAt ?? null);
-                            const label = schedule.status === 'scanning'
-                              ? `Scanning · ${f.label}`
-                              : schedule.status === 'failed'
-                                ? `Failed · ${f.label}`
-                                : schedule.status === 'overdue'
-                                  ? `Overdue · ${f.label}`
-                                  : f.label;
-                            const color = schedule.status === 'failed' ? 'text-[var(--status-negative)]'
-                              : schedule.status === 'scanning' ? 'text-[var(--status-positive)]'
-                                : schedule.status === 'overdue' ? 'text-[var(--status-warning)]'
-                                  : freshnessColor(f.level);
-                            return (
-                              <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={schedule.reason ?? `Last successful full scan: ${f.label}`}>
-                                <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
-                                {label}
-                              </span>
-                            );
-                          })()}
+                          {/* Full-scan age deliberately ignores faster watcher price ticks. */}
+                          <FullScanStatus market={m} />
                         </div>
                       </div>
                       <div className="flex items-center shrink-0">
