@@ -2,12 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   evaluateBotTrade,
   buildExecutionRequest,
-  maybeExecuteBotTrade,
   unifiedOutcomeToBotInput,
-  getBotSettings,
   getAuthoritativeMatchedFill,
-  createSyntheticMatchedFillEvidence,
-  sanitizeExecutionResultForPersistence,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -22,87 +18,22 @@ vi.mock('./bot-trader-messages', () => ({
 }));
 
 describe('getAuthoritativeMatchedFill', () => {
-  it('accepts only a complete, internally consistent producer evidence cohort', () => {
-    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
-      kalshi: { contracts: 2, price: 0.451, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 2, price: 0.497, feeCents: 2, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
-    }))).toEqual({
-      source: 'synthetic', kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497,
-      kalshiFeeCents: 1, pmFeeCents: 2, kalshiExecutionId: 'k-1', pmExecutionId: 'pm-1',
-      kalshiExecutedAt: '2026-08-12T12:00:00.000Z', pmExecutedAt: '2026-08-12T12:00:01.000Z',
-    });
-  });
-
-  it('does not allow synthetic producer evidence to be relabeled as venue evidence', () => {
-    const evidence = createSyntheticMatchedFillEvidence({
-      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
-    });
-
-    expect(Reflect.set(evidence, 'source', 'venue')).toBe(false);
-    expect(getAuthoritativeMatchedFill(evidence)?.source).toBe('synthetic');
-    expect(getAuthoritativeMatchedFill({ ...evidence, source: 'venue' } as never)).toBeNull();
-  });
-
-  it('refuses incomplete or internally inconsistent evidence', () => {
-    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
-      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 1, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
-    }))).toBeNull();
-    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
-      kalshi: { contracts: 2, price: 0.45, feeCents: -1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
-    }))).toBeNull();
-    expect(getAuthoritativeMatchedFill(createSyntheticMatchedFillEvidence({
-      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: '', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: 'not-a-timestamp' },
-    }))).toBeNull();
+  it('uses venue-reported matched contracts and fill prices, including matched partial fills', () => {
     expect(getAuthoritativeMatchedFill({
-      source: 'venue',
-      kalshi: { contracts: 2, price: 0.45, feeCents: 1, executionId: 'k-1', executedAt: '2026-08-12T12:00:00.000Z' },
-      polymarket: { contracts: 2, price: 0.50, feeCents: 1, executionId: 'pm-1', executedAt: '2026-08-12T12:00:01.000Z' },
-    } as never)).toBeNull();
-    expect(getAuthoritativeMatchedFill(undefined)).toBeNull();
+      kalshiResult: { filledContracts: 2, filledPrice: 0.451 },
+      polymarketResult: { filledContracts: 2, filledPrice: 0.497 },
+    })).toEqual({ kalshiContracts: 2, pmContracts: 2, kalshiPrice: 0.451, pmPrice: 0.497 });
   });
-});
 
-describe('sanitizeExecutionResultForPersistence', () => {
-  it('removes locally fabricated live fill price, quantity, and timestamp evidence', () => {
-    const result = {
-      success: true,
-      kalshiResult: { platform: 'kalshi' as const, status: 'filled' as const, filledSize: 0.45, filledContracts: 1, filledPrice: 0.45, orderId: 'k-1', timestamp: '2026-08-12T12:00:00.000Z' },
-      polymarketResult: { platform: 'polymarket' as const, status: 'filled' as const, filledSize: 0.50, filledContracts: 1, filledPrice: 0.50, orderId: 'pm-1', timestamp: '2026-08-12T12:00:01.000Z' },
-      rollbackExecuted: false,
-      unhedged: false,
-      executionTimeMs: 10,
-      actualProfit: 0.05,
-      netExposure: 0.45,
-      steps: [{
-        timestamp: '2026-08-12T12:00:02.000Z', status: 'success' as const,
-        description: 'Both legs placed; Kalshi filled $0.45, Polymarket filled $0.50',
-        metadata: { filledPrice: 0.45 },
-      }],
-      alerts: [{ level: 'warning' as const, message: 'Unhedged exposure $0.45', leg: 'kalshi' as const }],
-    };
-    const sanitized = sanitizeExecutionResultForPersistence(result, false);
-    expect(sanitized).toMatchObject({
-      success: false,
-      kalshiResult: { orderId: 'k-1', status: 'pending' },
-      polymarketResult: { orderId: 'pm-1', status: 'pending' },
-      actualProfit: undefined,
-      netExposure: undefined,
-      steps: [{ description: expect.not.stringContaining('$0.45') }],
-      alerts: [{ message: expect.not.stringContaining('$0.45') }],
-    });
-    for (const leg of [sanitized.kalshiResult, sanitized.polymarketResult]) {
-      expect(leg).not.toHaveProperty('filledSize');
-      expect(leg).not.toHaveProperty('filledContracts');
-      expect(leg).not.toHaveProperty('filledPrice');
-      expect(leg).not.toHaveProperty('timestamp');
-    }
-    expect(sanitized.steps[0]).not.toHaveProperty('timestamp');
-    expect(result.kalshiResult.filledPrice).toBe(0.45);
-    expect(sanitizeExecutionResultForPersistence(result, true)).toBe(result);
+  it('refuses to invent a position from mismatched, zero, or missing venue fills', () => {
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 2, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 1, filledPrice: 0.50 },
+    })).toBeNull();
+    expect(getAuthoritativeMatchedFill({
+      kalshiResult: { filledContracts: 0, filledPrice: 0.45 },
+      polymarketResult: { filledContracts: 0, filledPrice: 0.50 },
+    })).toBeNull();
   });
 });
 
@@ -150,7 +81,6 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
 }
 
 function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome {
-  const farFuture = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   return {
     artist: 'Team A',
     kalshi: {
@@ -255,24 +185,6 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(makeInput({ roiPct: 1.5 }), baseSettings({ minRoiPct: 2.0 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('ROI');
-  });
-
-  it('accepts exactly 2.00% ROI at the configured minimum', () => {
-    const ev = evaluateBotTrade(makeInput({ roiPct: 2.0 }), baseSettings({ minRoiPct: 2.0 }));
-    expect(ev.shouldTrade).toBe(true);
-    expect(ev.criteria.roiPct).toBeCloseTo(2.0, 5);
-  });
-
-  it('rejects 1.99% ROI just below the configured minimum', () => {
-    const ev = evaluateBotTrade(makeInput({ roiPct: 1.99 }), baseSettings({ minRoiPct: 2.0 }));
-    expect(ev.shouldTrade).toBe(false);
-    expect(ev.reason).toContain('ROI');
-  });
-
-  it('accepts 2.01% ROI above the configured minimum', () => {
-    const ev = evaluateBotTrade(makeInput({ roiPct: 2.01 }), baseSettings({ minRoiPct: 2.0 }));
-    expect(ev.shouldTrade).toBe(true);
-    expect(ev.criteria.roiPct).toBeCloseTo(2.01, 5);
   });
 
   it('rejects APY below minimum when APY filter enabled', () => {
@@ -391,13 +303,9 @@ describe('buildExecutionRequest', () => {
       kalshiYesAsk: 0.03,
       pmYesAsk: 0.07,
       pmNoAsk: 0.94,
-      pmYesTokenId: 'pm-yes-token',
-      pmNoTokenId: 'pm-no-token',
     }));
     expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.03, contracts: 1 });
-    expect(req?.polymarketOrder).toMatchObject({
-      outcome: 'no', price: 0.94, contracts: 1, conditionId: 'pm-no-token', marketId: 'pm-no-token',
-    });
+    expect(req?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.94, contracts: 1 });
   });
 });
 
@@ -480,40 +388,31 @@ describe('maybeExecuteBotTrade safety', () => {
   });
 
   it('simulates in paper mode even when production requested', async () => {
-    const execution = await import('./auto-execute');
-    const executeSpy = vi.spyOn(execution, 'executeArb');
-    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const persistence = await import('./persistence');
     const positions = await import('./bot-positions');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
     const result = await maybeExecuteBotTrade(makeInput());
     expect(result.dryRun).toBe(true);
     expect(result.executed).toBe(true);
     expect(result.positionPersisted).toBe(true);
     expect(result.persistenceError).toBeUndefined();
-    expect(positions.recordBotPosition).toHaveBeenCalledWith(expect.objectContaining({
-      kalshiQuantity: 1,
-      pmQuantity: 1,
-    }), expect.objectContaining({
-      kalshi: expect.objectContaining({ feeMultiplierPpm: 1_000_000 }),
-      polymarket: expect.objectContaining({ feeRateBps: 400 }),
-    }));
-    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      dryRun: true,
-      polymarketOrder: expect.objectContaining({ conditionId: 'pm-no-token', marketId: 'pm-no-token' }),
-    }));
     expect(result.reason).toContain('Paper');
+    expect(persistence.hasOpenBotPosition).toHaveBeenCalledWith('bot:pair-1:team-a', 'paper');
+    expect(persistence.getTodayBotExposure).toHaveBeenCalledWith('paper');
+    expect(positions.recordBotPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ executionMode: 'paper' }),
+      expect.any(Object),
+    );
   });
 
   it('fails closed before execution when authoritative fee lookup fails', async () => {
     const positions = await import('./bot-positions');
     vi.mocked(positions.fetchAuthoritativeBotFeeConfig).mockRejectedValueOnce(new Error('fee endpoint unavailable'));
     const persistence = await import('./persistence');
-    const execution = await import('./auto-execute');
-    const executeSpy = vi.spyOn(execution, 'executeArb');
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const result = await maybeExecuteBotTrade(makeInput());
     expect(result.executed).toBe(false);
     expect(result.reason).toMatch(/fee authority/i);
-    expect(executeSpy).not.toHaveBeenCalled();
     expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
 });

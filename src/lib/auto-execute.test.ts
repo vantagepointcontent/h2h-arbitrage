@@ -6,6 +6,7 @@ import {
   shouldSimulateExecution,
   areFilledContractsMatched,
   isCompleteClose,
+  mapKalshiOrderResult,
   type ExecutionRequest,
   type SafetyLimits,
   type OrderRequest,
@@ -234,6 +235,49 @@ describe('executeArb', () => {
     const result = await executeArb(req);
     expect(result.kalshiResult.orderId).toMatch(/^dry-run-/);
     expect(result.polymarketResult.orderId).toMatch(/^dry-run-/);
+  });
+});
+
+describe('mapKalshiOrderResult', () => {
+  it('maps complete venue evidence exactly, including price improvement and charged fee', () => {
+    expect(mapKalshiOrderResult({
+      orderId: 'order-123', status: 'executed', filledCount: 10, remainingCount: 0,
+      evidence: {
+        venue: 'kalshi', filledQuantity: 10, fillPrice: 0.43, chargedFeeCents: 7,
+        executionId: 'fill-456', venueTimestamp: '2026-08-12T13:30:45Z', orderId: 'order-123',
+      },
+      raw: {},
+    })).toMatchObject({
+      platform: 'kalshi', status: 'filled', filledContracts: 10, filledPrice: 0.43,
+      chargedFeeCents: 7, executionId: 'fill-456', venueTimestamp: '2026-08-12T13:30:45Z',
+      timestamp: '2026-08-12T13:30:45Z', orderId: 'order-123',
+      venueEvidence: {
+        venue: 'kalshi', filledQuantity: 10, fillPrice: 0.43, chargedFeeCents: 7,
+        executionId: 'fill-456', venueTimestamp: '2026-08-12T13:30:45Z',
+      },
+    });
+  });
+
+  it('maps correlated partial-fill evidence while preserving the venue quantity', () => {
+    expect(mapKalshiOrderResult({
+      orderId: 'order-partial', status: 'resting', filledCount: 3, remainingCount: 7,
+      evidence: {
+        venue: 'kalshi', filledQuantity: 3, fillPrice: 0.41, chargedFeeCents: 2,
+        executionId: 'fill-partial', venueTimestamp: '2026-08-12T13:31:00Z', orderId: 'order-partial',
+      },
+      raw: {},
+    })).toMatchObject({
+      status: 'partial', filledContracts: 3, filledPrice: 0.41, executionId: 'fill-partial',
+    });
+  });
+
+  it('never fills inferred price, fee, ID, or timestamp when evidence is unavailable', () => {
+    expect(mapKalshiOrderResult({
+      orderId: 'order-123', status: 'executed', filledCount: 10, remainingCount: 0, raw: {},
+    })).toEqual({
+      platform: 'kalshi', status: 'partial', filledContracts: 10, orderId: 'order-123',
+      timestamp: '', error: 'Kalshi reported a fill without complete correlated venue evidence',
+    });
   });
 });
 

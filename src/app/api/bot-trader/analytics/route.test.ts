@@ -18,9 +18,9 @@ describe('GET /api/bot-trader/analytics', () => {
       dailyPnl: [],
       timeStats: { tradesPerDayBps: 0, averageHoldSeconds: 0 },
     } as never);
-    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics?method=roi&mode=paper'));
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics?method=roi&mode=paper&range=7d'));
     expect(response.status).toBe(200);
-    expect(getBotPositionAnalytics).toHaveBeenCalledWith({ method: 'roi', mode: 'paper' });
+    expect(getBotPositionAnalytics).toHaveBeenCalledWith({ method: 'roi', mode: 'paper', range: '7d' });
     expect(response.headers.get('cache-control')).toContain('no-store');
     await expect(response.json()).resolves.toEqual({
       success: true,
@@ -39,6 +39,12 @@ describe('GET /api/bot-trader/analytics', () => {
 
   it('rejects invalid method or mode filters', async () => {
     const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics?method=guessed&mode=mixed'));
+    expect(response.status).toBe(400);
+    expect(getBotPositionAnalytics).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid dashboard range filters', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics?range=forever'));
     expect(response.status).toBe(400);
     expect(getBotPositionAnalytics).not.toHaveBeenCalled();
   });

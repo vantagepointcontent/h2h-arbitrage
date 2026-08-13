@@ -1,20 +1,23 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  BarChart3,
   Bot,
   ChevronDown,
   ChevronRight,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
 
-type PositionStatus = 'open' | 'partially_closed' | 'settled' | 'closed';
+type PositionStatus = 'open' | 'settled' | 'closed';
 type PositionFilter = 'all' | 'open' | 'settled';
+type PositionModeFilter = 'paper' | 'production';
+type PerformanceMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
+type PerformanceRange = 'today' | '7d' | '30d' | '90d' | 'all';
 type SortKey = 'openedAt' | 'pnl' | 'roi';
 type SortDirection = 'asc' | 'desc';
 
@@ -45,193 +48,63 @@ interface BotPosition {
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
   currentValueCents: number | null;
+  kalshiGrossProceedsMicrocents: number | null;
+  pmGrossProceedsMicrocents: number | null;
+  kalshiNetProceedsCents: number | null;
+  pmNetProceedsCents: number | null;
+  kalshiExitFeeCents: number | null;
+  pmExitFeeCents: number | null;
+  kalshiExitFeeType: 'quadratic' | null;
+  kalshiExitFeeMultiplierPpm: number | null;
+  pmExitFeeRateBps: number | null;
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
   realizedPnlCents: number | null;
   settlementSide: 'kalshi' | 'pm' | null;
+  resolutionPayoutCents?: number | null;
+  resolutionValidationStatus?: 'pending' | 'verified' | 'invalid';
   dryRun: boolean;
   selectionMethod: 'roi' | 'apy' | 'hybrid' | null;
 }
 
-interface ExecutionLeg {
-  venue: 'kalshi' | 'polymarket';
-  marketRef: string | null;
-  side: 'yes' | 'no';
-  executionPriceCents: number;
-  originalQuantity: number;
-  originalPrincipalCents: number;
-  entryFeeCents: number;
-  remainingOpenQuantity: number;
-  remainingOpenPrincipalCents: number;
-  remainingOpenFeeCents: number;
-  currentExecutablePriceCents: number | null;
-  currentLiquidationValueCents: number | null;
+export function positionRoiBps(position: Pick<BotPosition, 'status' | 'totalCostCents' | 'realizedPnlCents' | 'unrealizedRoiBps'>): number | null {
+  if (position.totalCostCents <= 0) return null;
+  if (position.status === 'open') return position.unrealizedRoiBps;
+  if (position.realizedPnlCents == null) return null;
+  return Math.round((position.realizedPnlCents * 10_000) / position.totalCostCents);
 }
 
-interface BotExecution {
-  entryId: number;
-  executionId: number;
-  tradeId?: string;
-  executedAt: string;
-  mode: 'paper' | 'production';
-  strategy: string | null;
-  selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
-  expectedRoiBps?: number | null;
-  expectedApyBps?: number | null;
-  unitId?: string | null;
-  status: PositionStatus;
-  legs: ExecutionLeg[];
-  executionPrincipalCents: number;
-  executionFeesCents: number;
-  executionBuyCostCents: number;
-  remainingOpenPrincipalCents: number;
-  remainingOpenFeesCents: number;
-  remainingOpenCostCents: number;
-  currentValueCents: number;
-  unrealizedPnlCents: number;
-  realizedPnlCents: number;
-  openedAt: string;
-  closedAt: string | null;
-  settledAt: string | null;
-  lastValuationAt: string | null;
-  valuationStatus?: 'current' | 'stale' | 'unavailable';
-  valuationFailureReason?: string | null;
-  valuationFailureAt?: string | null;
-  kalshiUrl?: string | null;
-  polymarketUrl?: string | null;
-}
+const VALUATION_STALE_MS = 15 * 60_000;
 
-interface BotPositionMarket {
-  marketKey: string;
-  marketId: string | null;
-  marketTitle: string;
-  kalshiTicker: string | null;
-  pmConditionId: string | null;
-  kalshiUrl?: string | null;
-  polymarketUrl?: string | null;
-  currentLiveStakeCents: number;
-  currentValueCents: number | null;
-  unrealizedPnlCents: number | null;
-  valuedExecutionCount?: number;
-  unavailableExecutionCount?: number;
-  staleExecutionCount?: number;
-  oldestStaleValuationAt?: string | null;
-  valuedLiveStakeCents?: number;
-  realizedPnlCents: number;
-  status: PositionStatus;
-  latestExecutionAt: string;
-  executions: BotExecution[];
-}
+type OpenMark =
+  | { available: true; currentValueCents: number; pnlCents: number; roiBps: number | null }
+  | { available: false; label: 'Unavailable' | 'Stale' };
 
-export function positionRoiBps(position: Pick<BotPosition, 'status' | 'totalCostCents' | 'realizedPnlCents' | 'unrealizedRoiBps'>): number {
-  if (position.status === 'open') return position.unrealizedRoiBps ?? 0;
-  if (position.totalCostCents <= 0) return 0;
-  return Math.round(((position.realizedPnlCents ?? 0) * 10_000) / position.totalCostCents);
-}
-
-function legacyExecution(position: BotPosition): BotExecution {
-  const buyCost = position.totalCostCents;
-  const principalCost = Math.max(0, position.totalCostCents - position.feesCents);
-  const isOpen = position.status === 'open';
+function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
+  if (position.currentValueCents == null || !position.lastValuationAt) {
+    return { available: false, label: 'Unavailable' };
+  }
+  const observedAt = Date.parse(position.lastValuationAt);
+  if (!Number.isFinite(observedAt)) return { available: false, label: 'Unavailable' };
+  if (now - observedAt > VALUATION_STALE_MS) return { available: false, label: 'Stale' };
+  const pnlCents = position.currentValueCents - position.totalCostCents;
   return {
-    entryId: position.id,
-    executionId: position.executionId,
-    executedAt: position.openedAt,
-    mode: position.dryRun ? 'paper' : 'production',
-    strategy: position.strategy,
-    selectionMethod: position.selectionMethod,
-    status: position.status,
-    legs: [
-      {
-        venue: 'kalshi', marketRef: position.kalshiTicker, side: position.kalshiSide,
-        executionPriceCents: position.buyPriceKalshiCents, originalQuantity: position.sharesKalshi,
-        originalPrincipalCents: position.buyPriceKalshiCents * position.sharesKalshi,
-        entryFeeCents: 0, remainingOpenQuantity: isOpen ? position.sharesKalshi : 0,
-        remainingOpenPrincipalCents: isOpen ? position.buyPriceKalshiCents * position.sharesKalshi : 0,
-        remainingOpenFeeCents: 0, currentExecutablePriceCents: position.currentPriceKalshiCents,
-        currentLiquidationValueCents: null,
-      },
-      {
-        venue: 'polymarket', marketRef: position.pmConditionId, side: position.pmSide,
-        executionPriceCents: position.buyPricePmCents, originalQuantity: position.sharesPm,
-        originalPrincipalCents: position.buyPricePmCents * position.sharesPm,
-        entryFeeCents: position.feesCents, remainingOpenQuantity: isOpen ? position.sharesPm : 0,
-        remainingOpenPrincipalCents: isOpen ? position.buyPricePmCents * position.sharesPm : 0,
-        remainingOpenFeeCents: isOpen ? position.feesCents : 0,
-        currentExecutablePriceCents: position.currentPricePmCents, currentLiquidationValueCents: null,
-      },
-    ],
-    executionPrincipalCents: principalCost,
-    executionFeesCents: position.feesCents,
-    executionBuyCostCents: buyCost,
-    remainingOpenPrincipalCents: isOpen ? principalCost : 0,
-    remainingOpenFeesCents: isOpen ? position.feesCents : 0,
-    remainingOpenCostCents: isOpen ? buyCost : 0,
-    currentValueCents: position.currentValueCents ?? 0,
-    unrealizedPnlCents: position.unrealizedPnlCents ?? 0,
-    realizedPnlCents: position.realizedPnlCents ?? 0,
-    openedAt: position.openedAt,
-    closedAt: position.status === 'closed' ? position.settledAt : null,
-    settledAt: position.settledAt,
-    lastValuationAt: position.lastValuationAt,
-    kalshiUrl: position.kalshiUrl,
-    polymarketUrl: position.polymarketUrl,
+    available: true,
+    currentValueCents: position.currentValueCents,
+    pnlCents,
+    roiBps: position.totalCostCents > 0 ? Math.round((pnlCents * 10_000) / position.totalCostCents) : null,
   };
 }
 
-type PositionPayload = {
-  markets?: Array<BotPositionMarket & { liveStakeCents?: number; latestOpenedAt?: string; entries?: BotExecution[] }>;
-  positions?: BotPosition[];
-};
-
-export function normalizePositionMarkets(payload: PositionPayload): BotPositionMarket[] {
-  if (Array.isArray(payload.markets)) {
-    return payload.markets.map((market) => ({
-      ...market,
-      currentLiveStakeCents: market.currentLiveStakeCents ?? market.liveStakeCents ?? 0,
-      latestExecutionAt: market.latestExecutionAt ?? market.latestOpenedAt ?? '',
-      executions: market.executions ?? market.entries ?? [],
-    }));
-  }
-  return (payload.positions ?? []).map((position) => {
-    const execution = legacyExecution(position);
-    return {
-      marketKey: `legacy-execution:${position.executionId}`,
-      marketId: position.marketId,
-      marketTitle: position.marketTitle,
-      kalshiTicker: position.kalshiTicker,
-      pmConditionId: position.pmConditionId,
-      kalshiUrl: position.kalshiUrl,
-      polymarketUrl: position.polymarketUrl,
-      currentLiveStakeCents: execution.remainingOpenCostCents,
-      currentValueCents: execution.currentValueCents,
-      unrealizedPnlCents: execution.unrealizedPnlCents,
-      realizedPnlCents: execution.realizedPnlCents,
-      status: execution.status,
-      latestExecutionAt: execution.executedAt,
-      executions: [execution],
-    };
-  });
+function hasVerifiedTerminalAccounting(position: BotPosition): boolean {
+  return position.status !== 'open'
+    && position.resolutionValidationStatus === 'verified'
+    && Number.isSafeInteger(position.resolutionPayoutCents)
+    && Number.isSafeInteger(position.realizedPnlCents)
+    && position.resolutionPayoutCents! - position.totalCostCents === position.realizedPnlCents;
 }
 
-type AnalyticsMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
-type AnalyticsMode = 'all' | 'paper' | 'production';
-interface MethodAnalytics {
-  tradeCount: number; deployedCapitalCents: number; realizedPnlCents: number;
-  unrealizedPnlCents: number; winRateBps: number; averageEntryRoiBps: number;
-  currentRoiBps: number; averageApyPct: number | null;
-}
-interface Analytics {
-  totalBotTrades: { paper: number; production: number; total: number };
-  openPositions: { count: number; unrealizedPnlCents: number };
-  settledPositions: { count: number; realizedPnlCents: number; winRateBps: number };
-  dailyPnl: Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>;
-  dailyPnlByMethod: Record<'roi' | 'apy' | 'hybrid', Array<{ date: string; realizedPnlCents: number; unrealizedPnlCents: number; trades: number }>>;
-  filter: { method: AnalyticsMethod; mode: AnalyticsMode };
-  perMethod: Record<'roi' | 'apy' | 'hybrid' | 'legacy', MethodAnalytics>;
-}
-const EMPTY_METHOD: MethodAnalytics = { tradeCount: 0, deployedCapitalCents: 0, realizedPnlCents: 0, unrealizedPnlCents: 0, winRateBps: 0, averageEntryRoiBps: 0, currentRoiBps: 0, averageApyPct: null };
 
 interface BotStatus {
   enabled: boolean;
@@ -239,22 +112,36 @@ interface BotStatus {
   selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
   todayStakeUsd: number;
-  maxUnitsPerMarket?: number;
 }
 
-const EMPTY_ANALYTICS: Analytics = {
-  totalBotTrades: { paper: 0, production: 0, total: 0 },
-  openPositions: { count: 0, unrealizedPnlCents: 0 },
-  settledPositions: { count: 0, realizedPnlCents: 0, winRateBps: 0 },
-  dailyPnl: [],
-  dailyPnlByMethod: { roi: [], apy: [], hybrid: [] },
-  filter: { method: 'all', mode: 'all' },
-  perMethod: { roi: EMPTY_METHOD, apy: EMPTY_METHOD, hybrid: EMPTY_METHOD, legacy: EMPTY_METHOD },
-};
+interface PerformanceAnalytics {
+  positions: BotPosition[];
+  totalBotTrades: { paper: number; production: number; total: number };
+  openPositions: { count: number };
+  settledPositions: { count: number; winRateBps: number };
+  performance: {
+    positionIds: number[];
+    capital: { deployedCents: number; currentCents: number | null; heldToResolutionCents: number };
+    pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
+    valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
+    entryCohorts: Array<{ date: string; deployedCents: number; currentCents: number | null; heldToResolutionCents: number; realizedCents: number; unrealizedCents: number | null; trades: number }>;
+  };
+}
+
+const RANGE_OPTIONS: Array<{ key: PerformanceRange; label: string }> = [
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: '7 Days' },
+  { key: '30d', label: '30 Days' },
+  { key: '90d', label: '90 Days' },
+  { key: 'all', label: 'All' },
+];
+
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 });
 const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 function formatCents(cents: number, signed = false): string {
   const value = cents / 100;
@@ -271,6 +158,14 @@ function formatBps(bps: number, signed = false): string {
   const value = bps / 100;
   const prefix = signed && value > 0 ? '+' : '';
   return `${prefix}${ONE_DECIMAL.format(value)}%`;
+}
+
+function formatMicrocents(microcents: number): string {
+  return PRECISE_USD.format(microcents / 100_000_000);
+}
+
+function formatVwapCents(grossProceedsMicrocents: number, quantity: number): string {
+  return `${THREE_DECIMAL.format(grossProceedsMicrocents / 1_000_000 / quantity)}¢`;
 }
 
 function pnlClass(value: number): string {
@@ -305,69 +200,28 @@ function MetricCard({ label, value, valueClass = '' }: { label: string; value: s
   );
 }
 
-function PnlMetricCard({ label, value, amount, description }: { label: string; value: string; amount: number; description: string }) {
-  return (
-    <div className="min-w-0 border-b border-[var(--border-subtle)] px-4 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <div title={description} className="w-fit cursor-help text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)] underline decoration-dotted decoration-[var(--border-strong)] underline-offset-4">{label}</div>
-      <div className={`mt-1 text-lg font-semibold tabular-nums ${pnlClass(amount)}`}>{value}</div>
-    </div>
-  );
-}
-
 function StatusBadge({ status }: { status: PositionStatus }) {
   const styles: Record<PositionStatus, string> = {
     open: 'bg-[var(--status-positive)]/15 text-[var(--status-positive)]',
-    partially_closed: 'bg-[var(--status-info)]/15 text-[var(--status-info)]',
     settled: 'bg-[var(--platform-polymarket)]/15 text-[var(--platform-polymarket)]',
     closed: 'bg-[var(--status-negative)]/15 text-[var(--status-negative)]',
   };
   return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>{status}</span>;
 }
 
-function ExecutionDetailRow({ execution }: { execution: BotExecution }) {
-  return (
-    <tr data-testid={`execution-${execution.executionId}`} className="bg-[#071a33] text-[var(--text-primary)]">
-      <td colSpan={10} className="px-10 py-2">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px]">
-          <strong className="font-mono text-[var(--status-info)]">Execution #{execution.executionId}{execution.tradeId ? ` · ${execution.tradeId}` : ''}</strong>
-          <span title={new Date(execution.executedAt).toISOString()}>Executed {new Date(execution.executedAt).toLocaleString()}</span>
-          <span className="uppercase text-[var(--text-secondary)]">{execution.mode}</span>
-          <span>{execution.strategy || 'Strategy unavailable'}</span>
-          <span>Unit <strong>{execution.unitId ?? `execution:${execution.executionId}`}</strong></span>
-          <span>Exp ROI <strong className={execution.expectedRoiBps == null ? 'text-[var(--text-muted)]' : pnlClass(execution.expectedRoiBps)}>{execution.expectedRoiBps == null ? '—' : formatBps(execution.expectedRoiBps, true)}</strong></span>
-          <span>Exp APY <strong className={execution.expectedApyBps == null ? 'text-[var(--text-muted)]' : pnlClass(execution.expectedApyBps)}>{execution.expectedApyBps == null ? '—' : formatBps(execution.expectedApyBps)}</strong></span>
-          <span>Buy Cost <strong aria-label={`Execution ${execution.executionId} Buy Cost`} className="tabular-nums">{formatCents(execution.executionBuyCostCents)}</strong> <span className="text-[var(--text-muted)]">({formatCents(execution.executionPrincipalCents)} + {formatCents(execution.executionFeesCents)} fees)</span></span>
-          <StatusBadge status={execution.status} />
-          <span>Remaining exposure: <strong aria-label={`Execution ${execution.executionId} remaining exposure`} className="tabular-nums">{formatCents(execution.remainingOpenCostCents)}</strong></span>
-          <span>Current Value <strong>{execution.currentValueCents == null ? 'Unavailable' : formatCents(execution.currentValueCents)}</strong></span>
-          <span>Unrealized P&amp;L <strong className={execution.unrealizedPnlCents == null ? '' : pnlClass(execution.unrealizedPnlCents)}>{execution.unrealizedPnlCents == null ? 'Unavailable' : formatCents(execution.unrealizedPnlCents, true)}</strong></span>
-          {execution.valuationStatus === 'stale' && <span className="text-[var(--status-warning)]" title={execution.valuationFailureReason ?? undefined}>Stale quote · {execution.valuationFailureAt ? timeAgo(execution.valuationFailureAt) : 'refresh failed'} · {execution.valuationFailureReason}</span>}
-          {execution.valuationStatus === 'unavailable' && <span className="text-[var(--status-warning)]" title={execution.valuationFailureReason ?? undefined}>Unavailable · {execution.valuationFailureReason ?? 'No successful executable quote'}</span>}
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-[var(--text-secondary)]">
-          {execution.legs.map((leg) => (
-            <span key={`${execution.executionId}-${leg.venue}`}>
-              <strong className="uppercase text-[var(--text-primary)]">{leg.venue}</strong> {leg.side.toUpperCase()} · {INTEGER.format(leg.executionPriceCents)}¢ × {INTEGER.format(leg.originalQuantity)} · fees {formatCents(leg.entryFeeCents)} · open {INTEGER.format(leg.remainingOpenQuantity)} · <span className="font-mono">{leg.marketRef || 'unknown market'}</span>
-            </span>
-          ))}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 export default function BotTraderPanel() {
   const [view, setView] = useState<'analytics' | 'logs' | 'messages'>('analytics');
-  const [analytics, setAnalytics] = useState<Analytics>(EMPTY_ANALYTICS);
-  const [markets, setMarkets] = useState<BotPositionMarket[]>([]);
+
+  const [positions, setPositions] = useState<BotPosition[]>([]);
   const [status, setStatus] = useState<BotStatus | null>(null);
+  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null);
   const [filter, setFilter] = useState<PositionFilter>('all');
-  const [analyticsMethod, setAnalyticsMethod] = useState<AnalyticsMethod>('all');
-  const [analyticsMode, setAnalyticsMode] = useState<AnalyticsMode>('all');
-  const [overlayMethods, setOverlayMethods] = useState<Record<'roi' | 'apy' | 'hybrid', boolean>>({ roi: true, apy: true, hybrid: true });
+  const [modeFilter, setModeFilter] = useState<PositionModeFilter>('paper');
+  const [methodFilter, setMethodFilter] = useState<PerformanceMethod>('all');
+  const [range, setRange] = useState<PerformanceRange>('30d');
   const [sortKey, setSortKey] = useState<SortKey>('openedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [executionVisibility, setExecutionVisibility] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -375,29 +229,25 @@ export default function BotTraderPanel() {
   const [productionConfirmOpen, setProductionConfirmOpen] = useState(false);
   const [productionConfirmation, setProductionConfirmation] = useState('');
   const requestIdRef = useRef(0);
+  const latestLoadRef = useRef<(initial?: boolean) => Promise<void>>(async () => {});
 
-  const load = useCallback(async (initial = false, refreshValuations = initial) => {
+  const load = useCallback(async (initial = false) => {
     const requestId = ++requestIdRef.current;
     if (initial) setLoading(true);
     else setRefreshing(true);
     setError(null);
     try {
-      const [analyticsRes, positionsRes, statusRes] = await Promise.all([
-        fetch(`/api/bot-trader/analytics?method=${analyticsMethod}&mode=${analyticsMode}`, { cache: 'no-store' }),
-        fetch(`/api/bot-trader/positions?status=${filter}&refresh=${refreshValuations ? '1' : '0'}`, { cache: 'no-store' }),
+      const [statusRes, analyticsRes] = await Promise.all([
         fetch('/api/bot-trader/status', { cache: 'no-store' }),
+        fetch(`/api/bot-trader/analytics?method=${methodFilter}&mode=${modeFilter}&range=${range}`, { cache: 'no-store' }),
       ]);
-      const [analyticsData, positionsData, statusData] = await Promise.all([
-        analyticsRes.json(), positionsRes.json(), statusRes.json(),
-      ]);
-      if (!analyticsRes.ok || !analyticsData.success) throw new Error(analyticsData.error || 'Failed to load analytics');
-      if (!positionsRes.ok || !positionsData.success) throw new Error(positionsData.error || 'Failed to load positions');
+      const [statusData, analyticsData] = await Promise.all([statusRes.json(), analyticsRes.json()]);
       if (!statusRes.ok) throw new Error(statusData.error || 'Failed to load bot status');
+      if (!analyticsRes.ok || !analyticsData.success) throw new Error(analyticsData.error || 'Failed to load performance analytics');
       if (requestId !== requestIdRef.current) return;
-      const nextAnalytics = analyticsData.analytics ?? EMPTY_ANALYTICS;
-      setAnalytics({ ...EMPTY_ANALYTICS, ...nextAnalytics, perMethod: { ...EMPTY_ANALYTICS.perMethod, ...(nextAnalytics.perMethod ?? {}) } });
-      setMarkets(normalizePositionMarkets(positionsData));
+      setPositions(analyticsData.analytics.positions ?? []);
       setStatus(statusData);
+      setAnalytics(analyticsData.analytics);
     } catch (cause) {
       if (requestId === requestIdRef.current) {
         setError(cause instanceof Error ? cause.message : 'Failed to load BotTrader analytics');
@@ -408,7 +258,11 @@ export default function BotTraderPanel() {
         setRefreshing(false);
       }
     }
-  }, [analyticsMethod, analyticsMode, filter]);
+  }, [methodFilter, modeFilter, range]);
+
+  useEffect(() => {
+    latestLoadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
     const initialId = window.setTimeout(() => void load(true), 0);
@@ -419,15 +273,42 @@ export default function BotTraderPanel() {
     };
   }, [load]);
 
-  const sortedMarkets = useMemo(() => [...markets].sort((a, b) => {
-    const values: Record<SortKey, [number, number]> = {
-      openedAt: [Date.parse(a.latestExecutionAt), Date.parse(b.latestExecutionAt)],
-      pnl: [a.status === 'open' || a.status === 'partially_closed' ? a.unrealizedPnlCents ?? Number.NEGATIVE_INFINITY : a.realizedPnlCents, b.status === 'open' || b.status === 'partially_closed' ? b.unrealizedPnlCents ?? Number.NEGATIVE_INFINITY : b.realizedPnlCents],
-      roi: [(a.valuedLiveStakeCents ?? a.currentLiveStakeCents) > 0 && a.unrealizedPnlCents != null ? Math.round(a.unrealizedPnlCents * 10_000 / (a.valuedLiveStakeCents ?? a.currentLiveStakeCents)) : Number.NEGATIVE_INFINITY, (b.valuedLiveStakeCents ?? b.currentLiveStakeCents) > 0 && b.unrealizedPnlCents != null ? Math.round(b.unrealizedPnlCents * 10_000 / (b.valuedLiveStakeCents ?? b.currentLiveStakeCents)) : Number.NEGATIVE_INFINITY],
+  const filteredPositions = useMemo(
+    () => {
+      const included = new Set(analytics?.performance.positionIds ?? []);
+      return positions.filter((position) =>
+        included.has(position.id)
+        && (filter === 'all'
+          || (filter === 'open' ? position.status === 'open' : position.status !== 'open')));
+    },
+    [analytics, filter, positions],
+  );
+
+  const sortedPositions = useMemo(() => filteredPositions.slice().sort((a, b) => {
+    const sortablePnl = (position: BotPosition) => {
+      if (position.status !== 'open') {
+        return hasVerifiedTerminalAccounting(position) ? position.realizedPnlCents : null;
+      }
+      const mark = openPositionMark(position);
+      return mark.available ? mark.pnlCents : null;
+    };
+    const sortableRoi = (position: BotPosition) => {
+      if (position.status !== 'open' && !hasVerifiedTerminalAccounting(position)) return null;
+      if (position.status === 'open' && !openPositionMark(position).available) return null;
+      return positionRoiBps(position);
+    };
+    const values: Record<SortKey, [number | null, number | null]> = {
+      openedAt: [Date.parse(a.openedAt), Date.parse(b.openedAt)],
+      pnl: [sortablePnl(a), sortablePnl(b)],
+      roi: [sortableRoi(a), sortableRoi(b)],
     };
     const [left, right] = values[sortKey];
+    if (left == null || right == null) {
+      if (left == null && right == null) return 0;
+      return left == null ? 1 : -1;
+    }
     return sortDirection === 'asc' ? left - right : right - left;
-  }), [markets, sortDirection, sortKey]);
+  }), [filteredPositions, sortDirection, sortKey]);
 
   const changeSort = (next: SortKey) => {
     if (next === sortKey) setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
@@ -455,7 +336,7 @@ export default function BotTraderPanel() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.details?.join('; ') || 'Setting update failed');
-      await load(false);
+      await latestLoadRef.current(false);
     } catch (cause) {
       setStatus(previous);
       setError(cause instanceof Error ? cause.message : 'Setting update failed');
@@ -491,19 +372,35 @@ export default function BotTraderPanel() {
     void saveSetting('bot.selectionMethod', method);
   };
 
-  const unrealized = analytics.openPositions.unrealizedPnlCents;
-  const realized = analytics.settledPositions.realizedPnlCents;
-  const totalPnl = unrealized + realized;
+  const changePerformanceFilter = <T,>(current: T, next: T, change: (value: T) => void) => {
+    if (current === next) return;
+    requestIdRef.current += 1;
+    setAnalytics(null);
+    setLoading(true);
+    change(next);
+  };
 
   if (loading) {
     return <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-[var(--text-secondary)]"><Loader2 className="h-4 w-4 animate-spin" /> Loading BotTrader analytics…</div>;
   }
 
+  if (!analytics) {
+    return <div role="alert" className="flex min-h-64 flex-col items-center justify-center gap-2 text-sm text-[var(--status-negative)]"><AlertTriangle className="h-5 w-5" />{error || 'BotTrader performance is unavailable.'}<button onClick={() => void load(true)} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-3 text-xs">Retry</button></div>;
+  }
+
+  const performance = analytics.performance;
+  const rangeLabel = RANGE_OPTIONS.find((option) => option.key === range)?.label ?? '30 Days';
+  const quoteIssueCount = performance.valuation.stale + performance.valuation.unavailable + performance.valuation.pendingSettlement;
+  const chartData = performance.entryCohorts.map((point) => ({
+    ...point,
+    label: new Date(`${point.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }));
+
   return (
     <section className="space-y-3" aria-label="BotTrader Analytics">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]"><Bot className="h-5 w-5 text-[var(--status-positive)]" /> BotTrader Analytics</h2>
-        <button onClick={() => void load(false, true)} disabled={refreshing} className="min-h-11 min-w-11 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50" aria-label="Refresh BotTrader analytics"><RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
+        <button onClick={() => void load(false)} disabled={refreshing} className="min-h-11 min-w-11 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50" aria-label="Refresh BotTrader analytics"><RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
       </div>
 
       {error && <div role="alert" className="rounded-lg border border-[var(--status-negative)]/40 bg-[var(--status-negative)]/10 px-3 py-2 text-xs text-[var(--status-negative)]">{error}</div>}
@@ -523,6 +420,17 @@ export default function BotTraderPanel() {
 
       {view === 'logs' ? <BotActionLogs selectionMethod={status?.selectionMethod} /> : view === 'messages' ? <BotTraderMessages /> : <div className="space-y-3">
 
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-[var(--text-secondary)]">Mode <select aria-label="Filter position mode" value={modeFilter} onChange={(event) => changePerformanceFilter(modeFilter, event.target.value as PositionModeFilter, setModeFilter)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="paper">Paper</option><option value="production">Live</option></select></label>
+          <label className="text-xs text-[var(--text-secondary)]">Method <select aria-label="Performance method" value={methodFilter} onChange={(event) => changePerformanceFilter(methodFilter, event.target.value as PerformanceMethod, setMethodFilter)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="all">All Bot methods</option><option value="roi">ROI</option><option value="apy">APY</option><option value="hybrid">Hybrid</option><option value="legacy">Legacy / unknown</option></select></label>
+        </div>
+        <div className="flex flex-wrap rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Performance date range">
+          {RANGE_OPTIONS.map((option) => <button key={option.key} aria-label={option.label} disabled={range === option.key} onClick={() => changePerformanceFilter(range, option.key, setRange)} className={`min-h-11 rounded-md px-2.5 text-[10px] font-semibold disabled:cursor-default ${range === option.key ? 'bg-[var(--status-positive)]/20 text-[var(--status-positive)]' : 'text-[var(--text-secondary)]'}`}>{option.label}</button>)}
+        </div>
+        <div className="w-full text-[10px] text-[var(--text-secondary)]">{range === 'today' ? 'Today uses the server-local calendar boundary.' : range === 'all' ? 'All verified BotTrader executions.' : `${rangeLabel} uses the same rolling boundary as Dashboard.`} All amounts include entry and executable exit fees.</div>
+      </div>
+
       {status && (
         <div className={`rounded-lg border px-3 py-3 ${status.enabled ? 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10' : 'border-[var(--border-subtle)] bg-[var(--surface-panel)]'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -540,84 +448,143 @@ export default function BotTraderPanel() {
       )}
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <MetricCard label="Paper Trades" value={INTEGER.format(analytics.totalBotTrades.paper)} />
-        <MetricCard label="Prod Trades" value={INTEGER.format(analytics.totalBotTrades.production)} />
-        <MetricCard label="Open Positions" value={INTEGER.format(analytics.openPositions.count)} />
-        <MetricCard label="Win Rate" value={formatBps(analytics.settledPositions.winRateBps)} />
+        <MetricCard label="Verified trades" value={INTEGER.format(analytics.totalBotTrades.total)} />
+        <MetricCard label="Open positions" value={INTEGER.format(analytics.openPositions.count)} />
+        <MetricCard label="Settled positions" value={INTEGER.format(analytics.settledPositions.count)} />
+        <MetricCard label="Win rate" value={formatBps(analytics.settledPositions.winRateBps)} />
       </div>
 
-      <section aria-label="Performance analytics" className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
-          <div className="flex gap-2.5"><BarChart3 className="mt-0.5 h-4 w-4 text-[var(--status-positive)]" /><div><h3 className="text-sm font-semibold text-[var(--text-primary)]">Performance analytics</h3><p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">Daily fee-net P&amp;L · {analyticsMethod.toUpperCase()} selection · {analyticsMode === 'all' ? 'paper + production' : analyticsMode}</p></div></div>
-          <div className="flex flex-wrap items-center gap-2"><div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Analytics method filter">{(['all', 'roi', 'apy', 'hybrid'] as const).map((value) => <button key={value} onClick={() => setAnalyticsMethod(value)} aria-pressed={analyticsMethod === value} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2.5 text-[11px] font-semibold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${analyticsMethod === value ? 'bg-[var(--surface-selected)] text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}</div><label className="text-[11px] font-medium text-[var(--text-secondary)]">Mode <select aria-label="Analytics trading mode" value={analyticsMode} onChange={(event) => setAnalyticsMode(event.target.value as AnalyticsMode)} className="ml-1 min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2 text-xs text-[var(--text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"><option value="all">All</option><option value="paper">Paper</option><option value="production">Production</option></select></label></div>
-        </div>
-        <div className="grid gap-2 border-b border-[var(--border-subtle)] p-3 md:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Method comparison">
-          {(['roi', 'apy', 'hybrid', 'legacy'] as const).map((method) => { const item = analytics.perMethod[method] ?? EMPTY_METHOD; const netPnl = item.realizedPnlCents + item.unrealizedPnlCents; return <button type="button" role="listitem" key={method} onClick={() => method !== 'legacy' && setAnalyticsMethod(method)} className={`flex w-full flex-col !items-stretch !justify-start rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${analyticsMethod === method ? 'border-[var(--status-positive)]/50 bg-[var(--surface-selected)]' : 'border-[var(--border-subtle)] bg-[var(--surface-workspace)] hover:border-[var(--border-strong)]'}`} aria-label={`${method} method performance`}><div className="text-xs font-bold uppercase text-[var(--text-primary)]">{method === 'legacy' ? 'Legacy / Unknown' : method}</div><div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-[var(--text-secondary)]"><span>Trades</span><strong className="text-right text-[var(--text-primary)]">{item.tradeCount}</strong><span>Capital</span><strong className="text-right text-[var(--text-primary)]">{formatCents(item.deployedCapitalCents)}</strong><span>Net P&amp;L</span><strong className={`text-right ${pnlClass(netPnl)}`}>{formatCents(netPnl, true)}</strong><span>Win rate</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.winRateBps)}</strong><span>Entry ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.averageEntryRoiBps)}</strong><span>Current ROI</span><strong className="text-right text-[var(--text-primary)]">{formatBps(item.currentRoiBps, true)}</strong><span>Selection APY</span><strong className="text-right text-[var(--text-primary)]">{item.averageApyPct == null ? 'Unavailable' : `${ONE_DECIMAL.format(item.averageApyPct)}%`}</strong></div></button>; })}
-        </div>
-        <div className="grid gap-3 p-3 lg:grid-cols-2"><div aria-label="Daily fee-net performance chart" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3"><div className="text-xs font-semibold text-[var(--text-primary)]">Daily fee-net P&amp;L</div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Showing available daily observations</div>{analytics.dailyPnl.length === 0 ? <div className="mt-3 flex min-h-20 items-center justify-center rounded-lg border border-dashed border-[var(--border-strong)] px-4 text-center text-xs text-[var(--text-secondary)]">No performance data for this filter.</div> : <div className="mt-3 flex h-24 items-end gap-1 overflow-x-auto border-b border-[var(--border-strong)]">{analytics.dailyPnl.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; const peak = Math.max(...analytics.dailyPnl.map((row) => Math.abs(row.realizedPnlCents + row.unrealizedPnlCents)), 1); return <div key={day.date} className="flex min-w-9 flex-1 flex-col items-center justify-end" title={`${day.date}: ${formatCents(pnl, true)} · ${day.trades} trades`}><div className={`w-full max-w-12 rounded-t ${pnl > 0 ? 'bg-[var(--status-positive)]/80' : pnl < 0 ? 'bg-[var(--status-negative)]/80' : 'bg-[var(--text-muted)]/60'}`} style={{ height: `${Math.max(8, Math.abs(pnl) / peak * 72)}px` }} /><span className="mt-1 text-[9px] text-[var(--text-secondary)]">{day.date.slice(5)}</span></div>; })}</div>}</div><div aria-label="Method overlay chart" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="text-xs font-semibold text-[var(--text-primary)]">Method comparison</div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Daily net P&amp;L by ranking source</div></div><div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Overlay method series">{(['roi', 'apy', 'hybrid'] as const).map((method) => <button type="button" key={method} aria-label={`${method} overlay series`} aria-pressed={overlayMethods[method]} onClick={() => setOverlayMethods((current) => ({ ...current, [method]: !current[method] }))} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2 text-[10px] font-bold uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${overlayMethods[method] ? 'bg-[var(--surface-selected)] text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'}`}>{method}</button>)}</div></div><div className="mt-3 grid gap-2" aria-label="Daily P&L overlay series">{(['roi', 'apy', 'hybrid'] as const).filter((method) => overlayMethods[method]).map((method) => { const series = analytics.dailyPnlByMethod?.[method] ?? []; const peak = Math.max(...series.map((day) => Math.abs(day.realizedPnlCents + day.unrealizedPnlCents)), 1); return <div key={method} className="grid min-h-10 grid-cols-[3.5rem_1fr] items-center gap-2 rounded-md border border-[var(--border-subtle)] px-2 py-1.5"><span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">{method}</span>{series.length === 0 ? <span className="text-[10px] text-[var(--text-secondary)]">{method.toUpperCase()} has no observations for this period.</span> : <div className="flex h-7 items-end gap-1 border-b border-[var(--border-strong)]" aria-label={`${method} daily net P&L series`}>{series.map((day) => { const pnl = day.realizedPnlCents + day.unrealizedPnlCents; return <div key={day.date} className={`min-w-2 flex-1 rounded-t ${pnl > 0 ? 'bg-[var(--status-positive)]/75' : pnl < 0 ? 'bg-[var(--status-negative)]/75' : 'bg-[var(--text-muted)]/60'}`} style={{ height: `${Math.max(4, Math.abs(pnl) / peak * 24)}px` }} title={`${method.toUpperCase()} ${day.date}: ${formatCents(pnl, true)} · ${day.trades} trades`} />; })}</div>}</div>; })}</div></div></div>
-      </section>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div title="Cumulative fee-inclusive cost of open exposure"><MetricCard label="Deployed" value={formatCents(performance.capital.deployedCents)} /></div>
+        <MetricCard label="Executable value" value={performance.capital.currentCents == null ? 'Unavailable' : formatCents(performance.capital.currentCents)} valueClass={performance.capital.currentCents == null ? 'text-[var(--status-warning)]' : ''} />
+        <MetricCard label="Held to resolution" value={formatCents(performance.capital.heldToResolutionCents)} />
+        <div title="Unrealized return on remaining open cost"><MetricCard label="Portfolio ROI" value={performance.pnl.roiBps == null ? 'Unavailable' : formatBps(performance.pnl.roiBps, true)} valueClass={performance.pnl.roiBps == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.roiBps)} /></div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <MetricCard label="Unrealized" value={performance.pnl.unrealizedCents == null ? 'Unavailable' : formatCents(performance.pnl.unrealizedCents, true)} valueClass={performance.pnl.unrealizedCents == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.unrealizedCents)} />
+        <MetricCard label="Realized" value={formatCents(performance.pnl.realizedCents, true)} valueClass={pnlClass(performance.pnl.realizedCents)} />
+        <MetricCard label="Total P&L" value={performance.pnl.totalCents == null ? 'Unavailable' : formatCents(performance.pnl.totalCents, true)} valueClass={performance.pnl.totalCents == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.totalCents)} />
+      </div>
 
-      <section aria-label="P&L summary" className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]"><div className="border-b border-[var(--border-subtle)] px-4 py-2"><h3 className="text-xs font-semibold text-[var(--text-primary)]">Portfolio P&amp;L</h3><p className="text-[10px] text-[var(--text-secondary)]">Fee-net performance at the latest available valuations</p></div><div className="grid sm:grid-cols-3"><PnlMetricCard label="Unrealized" value={formatCents(unrealized, true)} amount={unrealized} description="Current fee-net profit or loss on open positions using the latest available valuations." /><PnlMetricCard label="Realized" value={formatCents(realized, true)} amount={realized} description="Fee-net profit or loss locked in by settled or closed positions." /><PnlMetricCard label="Total P&L" value={formatCents(totalPnl, true)} amount={totalPnl} description="Combined realized and unrealized fee-net profit or loss." /></div></section>
+      <div className={`rounded-lg border px-3 py-2 text-xs ${quoteIssueCount > 0 ? 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 text-[var(--status-warning)]' : 'border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--text-secondary)]'}`}>
+        {quoteIssueCount > 0
+          ? `${performance.valuation.stale} stale executable quote${performance.valuation.stale === 1 ? '' : 's'} · ${performance.valuation.unavailable} unavailable · ${performance.valuation.pendingSettlement} pending settlement verification. Executable value, total P&L, and ROI are suppressed until every position has authoritative valuation state; unrealized P&L also requires fresh executable-depth marks.`
+          : `Executable quotes fresh for ${performance.valuation.fresh} open position${performance.valuation.fresh === 1 ? '' : 's'}${performance.valuation.asOf ? ` · oldest executable mark ${new Date(performance.valuation.asOf).toLocaleString()}` : ''}.`}
+      </div>
 
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
-        <div data-testid="positions-toolbar" className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
-          <div><div className="flex items-center gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">Positions</h3><span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{INTEGER.format(sortedMarkets.length)} {sortedMarkets.length === 1 ? 'market' : 'markets'}</span></div><div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-0.5" role="group" aria-label="Position status filter">
-              {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} aria-pressed={filter === value} className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-2.5 text-xs capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${filter === value ? 'bg-[var(--surface-selected)] font-medium text-[var(--status-positive)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
+        <div className="mb-2 flex items-center justify-between"><div><div className="text-sm font-semibold">Current performance by entry date</div><div className="text-[10px] text-[var(--text-secondary)]">Cohorts use each position&apos;s latest authoritative value; this is not historical portfolio performance.</div></div><div className="text-[10px] text-[var(--text-secondary)]">{rangeLabel} · verified {modeFilter === 'paper' ? 'paper' : 'live'} executions</div></div>
+        {chartData.length === 0 ? <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No verified BotTrader executions in this range.</div> : <div role="img" aria-label="BotTrader current performance by entry date chart" className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={(value: number) => formatCents(value)} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Bar dataKey="deployedCents" name="Deployed" fill="var(--text-secondary)" />
+              <Bar dataKey="currentCents" name="Executable value" fill="var(--status-info)" />
+              <Bar dataKey="heldToResolutionCents" name="Held to resolution" fill="var(--platform-polymarket)" />
+              <Bar dataKey="realizedCents" name="Realized P&L" fill="var(--status-positive)" />
+              <Bar dataKey="unrealizedCents" name="Unrealized P&L" fill="var(--status-warning)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>}
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
+              {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
             </div>
-            <label className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2 text-xs text-[var(--text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
-            <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-8 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-2.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
+            <label className="text-xs text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
+            <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
           </div>
         </div>
 
         <div className="overflow-x-auto" data-testid="bot-positions-scroll">
           <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand execution history" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Durable executions in this market" className="px-2 py-2 text-center font-medium">Executions</th><th title="Current open exposure only" className="px-2 py-2 text-left font-medium">Exposure</th><th title="Cumulative fee-inclusive cost of open exposure" className="px-2 py-2 text-right font-medium">Live Stake</th><th title="Current market value of remaining open exposure" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return on remaining open cost" className="px-2 py-2 text-right font-medium">ROI</th><th title="Market state" className="px-2 py-2 text-center font-medium">Status</th><th title="Most recent execution" className="px-2 py-2 text-right font-medium">Latest</th></tr></thead>
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
-              {sortedMarkets.map((market) => {
-                const expansionKey = market.marketId ?? market.marketKey;
-                const showExecutions = executionVisibility[expansionKey] ?? false;
-                const pnl = market.status === 'open' || market.status === 'partially_closed' ? market.unrealizedPnlCents : market.realizedPnlCents;
-                const valuedStake = market.valuedLiveStakeCents ?? market.currentLiveStakeCents;
-                const roiBps = valuedStake > 0 && market.unrealizedPnlCents != null ? Math.round(market.unrealizedPnlCents * 10_000 / valuedStake) : null;
-                const firstExecution = market.executions[0];
-                const kalshiLeg = firstExecution?.legs.find((leg) => leg.venue === 'kalshi');
-                const pmLeg = firstExecution?.legs.find((leg) => leg.venue === 'polymarket');
-                const kalshiUrl = market.kalshiUrl ?? firstExecution?.kalshiUrl;
-                const polymarketUrl = market.polymarketUrl ?? firstExecution?.polymarketUrl;
-                const toggle = () => setExecutionVisibility((current) => ({ ...current, [expansionKey]: !(current[expansionKey] ?? false) }));
-                return <Fragment key={market.marketKey}>
-                  <tr
-                    data-testid={`market-${market.marketKey}`}
-                    tabIndex={0}
-                    onClick={toggle}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-                      event.preventDefault();
-                      toggle();
-                    }}
-                    className="cursor-pointer hover:bg-[var(--border-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)]"
-                    aria-expanded={showExecutions}
-                    aria-label={`${market.marketTitle}, ${showExecutions ? 'expanded' : 'collapsed'}. Press Enter or Space to ${showExecutions ? 'collapse' : 'expand'} executions.`}
-                  >
-                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); toggle(); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${showExecutions ? 'Collapse' : 'Expand'} ${market.marketTitle}`}>{showExecutions ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={market.marketTitle}>{market.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(market.marketId)}`} aria-label={`Open ${market.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate rounded-sm underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)]">{market.marketTitle}</a> : <span className="block truncate">{market.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{kalshiUrl && <a href={kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${(kalshiLeg?.side ?? 'yes').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {(kalshiLeg?.side ?? 'yes').toUpperCase()}</a>}{polymarketUrl && <a href={polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${(pmLeg?.side ?? 'no').toUpperCase()} market for ${market.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {(pmLeg?.side ?? 'no').toUpperCase()}</a>}{!kalshiUrl && !polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}</div></td>
-                    <td className="px-2 py-2 text-center tabular-nums">{INTEGER.format(market.executions.length)}</td>
-                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">Open execution cost</td>
-                    <td aria-label={`${market.marketTitle} live stake`} className="px-2 py-2 text-right tabular-nums">{formatCents(market.currentLiveStakeCents)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{market.currentValueCents == null ? <span title="No complete executable quote is stored">Unavailable</span> : formatCents(market.currentValueCents)}{(market.unavailableExecutionCount ?? 0) > 0 && <div className="text-[9px] text-[var(--status-warning)]">{market.unavailableExecutionCount} unavailable</div>}{(market.staleExecutionCount ?? 0) > 0 && <div className="text-[9px] text-[var(--status-warning)]" title="Some execution values use retained quotes after refresh failures">{market.staleExecutionCount} stale · oldest quote {market.oldestStaleValuationAt ? timeAgo(market.oldestStaleValuationAt) : 'age unavailable'}</div>}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? '' : pnlClass(pnl)}`}>{pnl == null ? 'Unavailable' : formatCents(pnl, true)}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null ? '' : pnlClass(roiBps)}`}>{roiBps == null ? 'Unavailable' : formatBps(roiBps, true)}</td>
-                    <td className="px-2 py-2 text-center"><StatusBadge status={market.status} /></td>
-                    <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(market.latestExecutionAt).toLocaleString()}>{timeAgo(market.latestExecutionAt)}</td>
-                  </tr>
-                  {showExecutions && market.executions.map((execution) => <ExecutionDetailRow key={`execution-${execution.executionId}`} execution={execution} />)}
-                </Fragment>;
+              {sortedPositions.map((position) => {
+                const isExpanded = expanded.has(position.id);
+                const openMark = position.status === 'open' ? openPositionMark(position) : null;
+                const pnl = position.status === 'open' ? (openMark?.available ? openMark.pnlCents : null) : position.realizedPnlCents;
+                const roiBps = position.status === 'open'
+                  ? (openMark?.available ? openMark.roiBps : null)
+                  : hasVerifiedTerminalAccounting(position) ? positionRoiBps(position) : null;
+                const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
+                const settlementUnavailableLabel = position.status !== 'open' && !hasVerifiedTerminalAccounting(position) ? 'Pending verification' : null;
+                const valueUnavailableLabel = openUnavailableLabel ?? settlementUnavailableLabel;
+                const hasLiquidationBreakdown = valueUnavailableLabel == null
+                  && position.currentValueCents != null
+                  && Number.isSafeInteger(position.kalshiGrossProceedsMicrocents)
+                  && Number.isSafeInteger(position.pmGrossProceedsMicrocents)
+                  && Number.isSafeInteger(position.kalshiNetProceedsCents)
+                  && Number.isSafeInteger(position.pmNetProceedsCents)
+                  && Number.isSafeInteger(position.kalshiExitFeeCents)
+                  && Number.isSafeInteger(position.pmExitFeeCents)
+                  && position.sharesKalshi > 0
+                  && position.sharesPm > 0
+                  && position.kalshiExitFeeType === 'quadratic'
+                  && Number.isSafeInteger(position.kalshiExitFeeMultiplierPpm)
+                  && Number.isSafeInteger(position.pmExitFeeRateBps)
+                  && position.kalshiNetProceedsCents! + position.pmNetProceedsCents! === position.currentValueCents;
+                const liquidationUnavailableLabel = position.status !== 'open'
+                  ? 'Not applicable after resolution'
+                  : valueUnavailableLabel ?? (hasLiquidationBreakdown ? null : 'Unavailable');
+                const kalshiNetProceedsCents = hasLiquidationBreakdown
+                  ? position.kalshiNetProceedsCents!
+                  : null;
+                const pmNetProceedsCents = hasLiquidationBreakdown
+                  ? position.pmNetProceedsCents!
+                  : null;
+                return [
+                  <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
+                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
+                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>
+                    <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
+                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(position.totalCostCents)}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel ? 'text-[var(--status-warning)]' : ''}`}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? formatCents(openMark.currentValueCents) : formatCents(position.resolutionPayoutCents!))}</td>
+                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
+                    <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
+                  </tr>,
+                  isExpanded && <tr key={`detail-${position.id}`}>
+                    <td colSpan={10} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
+                        <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
+                      </div>
+                      {liquidationUnavailableLabel ? (
+                        <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Liquidation breakdown: {liquidationUnavailableLabel}</div>
+                      ) : (
+                        <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
+                          <div data-testid="kalshi-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()}</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} held · {formatVwapCents(position.kalshiGrossProceedsMicrocents!, position.sharesKalshi)} VWAP · {formatMicrocents(position.kalshiGrossProceedsMicrocents!)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.kalshiExitFeeCents!)} fee ({position.kalshiExitFeeType}, ×{(position.kalshiExitFeeMultiplierPpm! / 1_000_000).toFixed(6)}) · <strong className="text-[var(--text-primary)]">{formatCents(kalshiNetProceedsCents!)} net</strong></div>
+                          </div>
+                          <div data-testid="polymarket-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()}</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} held · {formatVwapCents(position.pmGrossProceedsMicrocents!, position.sharesPm)} VWAP · {formatMicrocents(position.pmGrossProceedsMicrocents!)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.pmExitFeeCents!)} fee ({(position.pmExitFeeRateBps! / 100).toFixed(2)}%) · <strong className="text-[var(--text-primary)]">{formatCents(pmNetProceedsCents!)} net</strong></div>
+                          </div>
+                          <div data-testid="combined-net-proceeds" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Combined net proceeds</span><span className="tabular-nums">{formatCents(kalshiNetProceedsCents! + pmNetProceedsCents!)}</span></div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>,
+                ];
               })}
             </tbody>
           </table>
-          {sortedMarkets.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No {filter === 'all' ? '' : `${filter} `}BotTrader positions.</div>}
+          {sortedPositions.length === 0 && <div className="py-10 text-center text-sm text-[var(--text-secondary)]">No {filter === 'all' ? '' : `${filter} `}verified BotTrader positions for these filters.</div>}
         </div>
       </div>
 

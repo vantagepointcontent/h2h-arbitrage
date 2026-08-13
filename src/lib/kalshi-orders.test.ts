@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseKalshiCount } from './kalshi-orders';
+import { parseKalshiCount, parseKalshiFillEvidence } from './kalshi-orders';
 
 describe('parseKalshiCount', () => {
   it('preserves missing cumulative fills as unknown', () => {
@@ -21,5 +21,99 @@ describe('parseKalshiCount', () => {
   it('fails closed for malformed or negative counts', () => {
     expect(parseKalshiCount('bad')).toBeUndefined();
     expect(parseKalshiCount(-1)).toBeUndefined();
+  });
+});
+
+describe('parseKalshiFillEvidence', () => {
+  const submittedOrder = {
+    orderId: 'order-123',
+    ticker: 'KXTEST-26',
+    outcomeSide: 'yes' as const,
+  };
+
+  const completeFill = {
+    fill_id: 'fill-456',
+    trade_id: 'fill-456',
+    order_id: 'order-123',
+    ticker: 'KXTEST-26',
+    market_ticker: 'KXTEST-26',
+    outcome_side: 'yes',
+    count_fp: '10.00',
+    yes_price_dollars: '0.43',
+    no_price_dollars: '0.57',
+    fee_cost: '0.07',
+    created_time: '2026-08-12T13:30:45.123Z',
+  };
+
+  it('maps exact venue values for an authoritative complete fill', () => {
+    expect(parseKalshiFillEvidence({ fills: [completeFill], cursor: '' }, submittedOrder)).toEqual({
+      venue: 'kalshi',
+      filledQuantity: 10,
+      fillPrice: 0.43,
+      chargedFeeCents: 7,
+      executionId: 'fill-456',
+      venueTimestamp: '2026-08-12T13:30:45.123Z',
+      orderId: 'order-123',
+      raw: completeFill,
+    });
+  });
+
+  it('maps an authoritative partial fill without substituting requested values', () => {
+    const partial = {
+      ...completeFill,
+      fill_id: 'fill-partial',
+      trade_id: 'fill-partial',
+      count_fp: '3.00',
+      yes_price_dollars: '0.41',
+      fee_cost: '0.02',
+      created_time: '2026-08-12T13:31:00Z',
+    };
+
+    expect(parseKalshiFillEvidence({ fills: [partial], cursor: '' }, submittedOrder)).toMatchObject({
+      filledQuantity: 3,
+      fillPrice: 0.41,
+      chargedFeeCents: 2,
+      executionId: 'fill-partial',
+      venueTimestamp: '2026-08-12T13:31:00Z',
+    });
+  });
+
+  it.each([
+    ['missing fills', { cursor: '' }],
+    ['malformed fills', { fills: {}, cursor: '' }],
+    ['missing fill ID', { fills: [{ ...completeFill, fill_id: undefined, trade_id: undefined }], cursor: '' }],
+    ['missing quantity', { fills: [{ ...completeFill, count_fp: undefined }], cursor: '' }],
+    ['malformed price', { fills: [{ ...completeFill, yes_price_dollars: 'not-a-price' }], cursor: '' }],
+    ['sub-cent price', { fills: [{ ...completeFill, yes_price_dollars: '0.431' }], cursor: '' }],
+    ['missing charged fee', { fills: [{ ...completeFill, fee_cost: undefined }], cursor: '' }],
+    ['sub-cent charged fee', { fills: [{ ...completeFill, fee_cost: '0.001' }], cursor: '' }],
+    ['local/zoneless timestamp', { fills: [{ ...completeFill, created_time: '2026-08-12T13:30:45' }], cursor: '' }],
+  ])('fails closed for %s', (_label, response) => {
+    expect(parseKalshiFillEvidence(response, submittedOrder)).toBeNull();
+  });
+
+  it('rejects evidence unrelated to the submitted order', () => {
+    expect(parseKalshiFillEvidence({
+      fills: [{ ...completeFill, order_id: 'other-order' }],
+      cursor: '',
+    }, submittedOrder)).toBeNull();
+  });
+
+  it.each([
+    ['ticker', { ticker: 'OTHER', market_ticker: 'OTHER' }],
+    ['outcome side', { outcome_side: 'no' }],
+    ['execution identity', { fill_id: 'one-id', trade_id: 'another-id' }],
+  ])('rejects contradictory %s evidence', (_label, changes) => {
+    expect(parseKalshiFillEvidence({
+      fills: [{ ...completeFill, ...changes }],
+      cursor: '',
+    }, submittedOrder)).toBeNull();
+  });
+
+  it('rejects multiple fills because the shared contract cannot preserve multiple execution IDs', () => {
+    expect(parseKalshiFillEvidence({
+      fills: [completeFill, { ...completeFill, fill_id: 'fill-789', trade_id: 'fill-789' }],
+      cursor: '',
+    }, submittedOrder)).toBeNull();
   });
 });

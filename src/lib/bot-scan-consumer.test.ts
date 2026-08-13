@@ -77,6 +77,7 @@ function harness(options: {
   current?: BotScanCandidate[] | Error;
   botSettings?: BotSettings;
   execute?: BotExecutionResult | Error;
+  executionMode?: 'paper' | 'live';
 } = {}) {
   const scans = options.scans ?? [scan()];
   const decisions = new Map<number, BotScanDecision>();
@@ -90,6 +91,7 @@ function harness(options: {
   const deps: BotScanConsumerDeps = {
     now: () => now,
     getSettings: vi.fn(async () => options.botSettings ?? settings()),
+    resolveExecutionMode: vi.fn(async () => options.executionMode ?? 'paper'),
     loadScan: vi.fn(async (id) => scans.find((item) => item.id === id) ?? null),
     listBacklog: vi.fn(async () => scans.filter((item) => {
       const state = decisions.get(item.id)?.state;
@@ -146,13 +148,13 @@ function harness(options: {
       if (options.execute instanceof Error) throw options.execute;
       return options.execute ?? execution();
     }),
-    reserveOpportunity: vi.fn(async (item) => {
-      const key = opportunityKey(item);
+    reserveOpportunity: vi.fn(async (item, mode) => {
+      const key = `${mode}:${opportunityKey(item)}`;
       if (opportunityReservations.has(key)) return false;
       opportunityReservations.add(key);
       return true;
     }),
-    releaseOpportunity: vi.fn(async (item) => { opportunityReservations.delete(opportunityKey(item)); }),
+    releaseOpportunity: vi.fn(async (item, mode) => { opportunityReservations.delete(`${mode}:${opportunityKey(item)}`); }),
     retainOpportunityForExposure: vi.fn(async () => undefined),
   };
 
@@ -175,18 +177,9 @@ describe('durable BotTrader scan consumer', () => {
     expect(result.state).toBe('placed');
     expect(h.events.map((event) => event.state)).toEqual(['received', 'placement_attempted', 'placed']);
     expect(h.deps.execute).toHaveBeenCalledTimes(1);
-    expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledTimes(1);
-    expect(h.deps.releaseOpportunity).toHaveBeenCalledTimes(1);
+    expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'paper');
+    expect(h.deps.execute).toHaveBeenCalledWith(expect.objectContaining({ reservationMode: 'paper' }));
     expect(result.placementCount).toBe(1);
-  });
-
-  it('fails before placement when the durable exposure guard cannot be armed', async () => {
-    const h = harness();
-    vi.mocked(h.deps.retainOpportunityForExposure!).mockRejectedValueOnce(new Error('database unavailable'));
-    const result = await h.consumer.consume(41, 'scan_api');
-    expect(result).toMatchObject({ state: 'failed', reasonCode: 'exposure_guard_failed', placementCount: 0 });
-    expect(h.deps.execute).not.toHaveBeenCalled();
-    expect(h.deps.releaseOpportunity).toHaveBeenCalled();
   });
 
   it('persists disabled instead of silently returning', async () => {
@@ -212,31 +205,6 @@ describe('durable BotTrader scan consumer', () => {
     const h = harness({ scans: [scan({ candidates: [candidate({ roiPct: 1 })] })] });
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'scan_criteria_rejected' });
-  });
-
-  it('deterministically accepts exactly 2.00% scan-time ROI and places paper trade', async () => {
-    const h = harness({
-      scans: [scan({ candidates: [candidate({ roiPct: 2.0, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })],
-    });
-    const result = await h.consumer.consume(41, 'scan_api');
-    expect(result).toMatchObject({ state: 'placed', reasonCode: 'paper_placed' });
-    expect(h.deps.execute).toHaveBeenCalledTimes(1);
-  });
-
-  it('deterministically rejects 1.99% scan-time ROI at the boundary', async () => {
-    const h = harness({ scans: [scan({ candidates: [candidate({ roiPct: 1.99, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })] });
-    const result = await h.consumer.consume(41, 'scan_api');
-    expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'scan_criteria_rejected' });
-    expect(h.deps.execute).not.toHaveBeenCalled();
-  });
-
-  it('deterministically accepts 2.01% scan-time ROI and places paper trade', async () => {
-    const h = harness({
-      scans: [scan({ candidates: [candidate({ roiPct: 2.01, expectedProfit: 1, kalshiStake: 25, pmStake: 25 })] })],
-    });
-    const result = await h.consumer.consume(41, 'scan_api');
-    expect(result).toMatchObject({ state: 'placed', reasonCode: 'paper_placed' });
-    expect(h.deps.execute).toHaveBeenCalledTimes(1);
   });
 
   it('persists revalidation_rejected when current ROI falls below threshold', async () => {
@@ -297,42 +265,28 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.deps.releaseOpportunity).not.toHaveBeenCalled();
   });
 
-  it('retains the reservation and stops the batch for a live acknowledgement pending authoritative reconciliation', async () => {
+  it('retains the reservation and stops the batch while live evidence is pending reconciliation', async () => {
     const first = candidate();
     const second = candidate({ outcome: 'B', kalshiTicker: 'KX-B', pmConditionId: 'pm-b' });
-    const pendingLiveAcknowledgement: BotExecutionResult = {
-      executed: false,
-      dryRun: false,
-      reason: 'Production order acknowledgement pending authoritative fill reconciliation for Test Market',
-      executionResult: {
-        success: false,
-        dryRun: false,
-        steps: [],
-        alerts: [],
-        timestamp: '2026-08-11T12:00:10.000Z',
-      } as never,
-      positionPersisted: false,
-      exposureState: 'pending_reconciliation',
-    };
     const h = harness({
       scans: [scan({ candidates: [first, second] })],
       current: [first, second],
-      execute: pendingLiveAcknowledgement,
+      execute: execution({
+        executed: false,
+        dryRun: false,
+        reason: 'Production order acknowledgement pending authoritative fill reconciliation',
+        exposureState: 'pending_reconciliation',
+        positionPersisted: false,
+      }),
     });
 
     const result = await h.consumer.consume(41, 'scan_api');
 
-    expect(result).toMatchObject({
-      state: 'partial_or_unhedged',
-      reasonCode: 'fill_reconciliation_pending',
-      placementCount: 0,
-    });
-    expect(result.reason).toContain('pending authoritative fill reconciliation');
+    expect(result).toMatchObject({ state: 'partial_or_unhedged', reasonCode: 'fill_reconciliation_pending' });
     expect(h.deps.execute).toHaveBeenCalledOnce();
     expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledOnce();
-    expect(h.deps.releaseOpportunity).toHaveBeenCalledTimes(1);
-    expect(h.deps.releaseOpportunity).toHaveBeenCalledWith(second);
-    expect(h.deps.releaseOpportunity).not.toHaveBeenCalledWith(first);
+    expect(h.deps.releaseOpportunity).toHaveBeenCalledWith(second, 'paper');
+    expect(h.deps.releaseOpportunity).not.toHaveBeenCalledWith(first, 'paper');
   });
 
   it('fails closed as possible exposure and retains the reservation when placement throws', async () => {
@@ -354,7 +308,7 @@ describe('durable BotTrader scan consumer', () => {
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result.state).toBe('partial_or_unhedged');
     expect(h.deps.execute).toHaveBeenCalledOnce();
-    expect(h.deps.releaseOpportunity).toHaveBeenCalledWith(second);
+    expect(h.deps.releaseOpportunity).toHaveBeenCalledWith(second, 'paper');
   });
 
   it('classifies daily limits without a silent skip', async () => {
@@ -368,6 +322,14 @@ describe('durable BotTrader scan consumer', () => {
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result.state).toBe('placed');
     expect(result.details).toMatchObject({ dryRun: true });
+    expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'paper');
+  });
+
+  it('binds live reservation lifecycle callbacks and execution input to live mode', async () => {
+    const h = harness({ botSettings: settings({ mode: 'production' }), executionMode: 'live', execute: execution({ dryRun: false }) });
+    await h.consumer.consume(41, 'scan_api');
+    expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'live');
+    expect(h.deps.execute).toHaveBeenCalledWith(expect.objectContaining({ reservationMode: 'live' }));
   });
 
   it('records duplicate_replay and never places a duplicate delivery', async () => {

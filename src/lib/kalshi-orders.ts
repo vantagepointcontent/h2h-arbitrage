@@ -10,6 +10,7 @@
  */
 import { makeKalshiAuthHeaders } from './kalshi-auth';
 import logger from './logger';
+import type { VenueExecutionEvidence } from './execution-evidence';
 
 // Trading (portfolio) endpoints live on the elections host — the
 // external-api host used for market data does not accept authed
@@ -32,13 +33,120 @@ export interface KalshiOrderResponse {
   /** Undefined means Kalshi omitted the authoritative cumulative fill count. */
   filledCount: number | undefined;
   remainingCount: number | undefined;
+  evidence?: KalshiFillEvidence;
   raw: unknown;
+}
+
+export interface KalshiFillEvidence extends VenueExecutionEvidence {
+  venue: 'kalshi';
+  orderId: string;
+  chargedFeeCents: number;
+}
+
+export interface SubmittedKalshiOrder {
+  orderId: string;
+  ticker: string;
+  outcomeSide: 'yes' | 'no';
 }
 
 export function parseKalshiCount(value: unknown): number | undefined {
   if (value === null || value === undefined || value === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function parseExactCents(value: unknown): number | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const text = String(value);
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) return null;
+  const [whole, fraction = ''] = text.split('.');
+  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+function isVenueTimestamp(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    && !Number.isNaN(Date.parse(value));
+}
+
+export function parseKalshiFillEvidence(
+  response: unknown,
+  submitted: SubmittedKalshiOrder,
+): KalshiFillEvidence | null {
+  if (!response || typeof response !== 'object') return null;
+  const fills = (response as Record<string, unknown>).fills;
+  if (!Array.isArray(fills) || fills.length !== 1) return null;
+  const raw = fills[0];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const fill = raw as Record<string, unknown>;
+
+  const fillId = nonEmptyString(fill.fill_id);
+  const tradeId = nonEmptyString(fill.trade_id);
+  const orderId = nonEmptyString(fill.order_id);
+  const ticker = nonEmptyString(fill.ticker);
+  const marketTicker = nonEmptyString(fill.market_ticker);
+  if (!fillId || !tradeId || fillId !== tradeId) return null;
+  if (!orderId || orderId !== submitted.orderId) return null;
+  if (!ticker || !marketTicker || ticker !== marketTicker || ticker !== submitted.ticker) return null;
+  if (fill.outcome_side !== submitted.outcomeSide) return null;
+
+  const filledQuantity = parseKalshiCount(fill.count_fp);
+  if (filledQuantity == null || filledQuantity <= 0) return null;
+  const priceCents = parseExactCents(
+    submitted.outcomeSide === 'yes' ? fill.yes_price_dollars : fill.no_price_dollars,
+  );
+  if (priceCents == null || priceCents <= 0 || priceCents >= 100) return null;
+  const chargedFeeCents = parseExactCents(fill.fee_cost);
+  if (chargedFeeCents == null) return null;
+  if (!isVenueTimestamp(fill.created_time)) return null;
+
+  return {
+    venue: 'kalshi',
+    filledQuantity,
+    fillPrice: priceCents / 100,
+    chargedFeeCents,
+    executionId: fillId,
+    venueTimestamp: fill.created_time,
+    orderId,
+    raw,
+  };
+}
+
+export async function getKalshiFillEvidence(
+  submitted: SubmittedKalshiOrder,
+): Promise<KalshiFillEvidence | null> {
+  const query = new URLSearchParams({ order_id: submitted.orderId }).toString();
+  const path = '/trade-api/v2/portfolio/fills';
+  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/fills?${query}`, {
+    method: 'GET',
+    headers: makeKalshiAuthHeaders('GET', path),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  return parseKalshiFillEvidence(data, submitted);
+}
+
+async function attachFillEvidence(
+  response: KalshiOrderResponse,
+  submitted: Omit<SubmittedKalshiOrder, 'orderId'>,
+): Promise<KalshiOrderResponse> {
+  if (!response.orderId || response.filledCount == null || response.filledCount <= 0) return response;
+  const evidence = await getKalshiFillEvidence({ ...submitted, orderId: response.orderId });
+  return evidence && evidence.filledQuantity === response.filledCount
+    ? { ...response, evidence }
+    : response;
 }
 
 export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrderResponse> {
@@ -65,19 +173,23 @@ export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrde
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = (data as any)?.error?.message || (data as any)?.message || `HTTP ${res.status}`;
+    const payload = asRecord(data);
+    const msg = nonEmptyString(asRecord(payload?.error)?.message)
+      || nonEmptyString(payload?.message)
+      || `HTTP ${res.status}`;
     logger.error('[kalshi-orders] order rejected', { ticker: p.ticker, status: res.status, msg });
     throw new Error(`Kalshi order failed: ${msg}`);
   }
 
-  const order = (data as any)?.order ?? data;
-  return {
-    orderId: order?.order_id ?? '',
-    status: order?.status ?? 'unknown',
-    filledCount: parseKalshiCount(order?.taker_fill_count ?? order?.fill_count),
-    remainingCount: parseKalshiCount(order?.remaining_count),
+  const payload = asRecord(data);
+  const order = asRecord(payload?.order) ?? payload;
+  return attachFillEvidence({
+    orderId: nonEmptyString(order?.order_id) ?? '',
+    status: nonEmptyString(order?.status) ?? 'unknown',
+    filledCount: parseKalshiCount(order?.fill_count_fp ?? order?.taker_fill_count ?? order?.fill_count),
+    remainingCount: parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count),
     raw: data,
-  };
+  }, { ticker: p.ticker, outcomeSide: p.side });
 }
 
 export async function cancelKalshiOrder(orderId: string): Promise<boolean> {
@@ -119,19 +231,23 @@ export async function placeKalshiSellOrder(p: KalshiOrderParams): Promise<Kalshi
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = (data as any)?.error?.message || (data as any)?.message || `HTTP ${res.status}`;
+    const payload = asRecord(data);
+    const msg = nonEmptyString(asRecord(payload?.error)?.message)
+      || nonEmptyString(payload?.message)
+      || `HTTP ${res.status}`;
     logger.error('[kalshi-orders] sell order rejected', { ticker: p.ticker, status: res.status, msg });
     throw new Error(`Kalshi sell order failed: ${msg}`);
   }
 
-  const order = (data as any)?.order ?? data;
-  return {
-    orderId: order?.order_id ?? '',
-    status: order?.status ?? 'unknown',
-    filledCount: parseKalshiCount(order?.taker_fill_count ?? order?.fill_count),
-    remainingCount: parseKalshiCount(order?.remaining_count),
+  const payload = asRecord(data);
+  const order = asRecord(payload?.order) ?? payload;
+  return attachFillEvidence({
+    orderId: nonEmptyString(order?.order_id) ?? '',
+    status: nonEmptyString(order?.status) ?? 'unknown',
+    filledCount: parseKalshiCount(order?.fill_count_fp ?? order?.taker_fill_count ?? order?.fill_count),
+    remainingCount: parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count),
     raw: data,
-  };
+  }, { ticker: p.ticker, outcomeSide: p.side });
 }
 
 /** Poll a single order's status (used to confirm fills after placement). */
@@ -144,13 +260,19 @@ export async function getKalshiOrder(orderId: string): Promise<KalshiOrderRespon
   });
   if (!res.ok) return null;
   const data = await res.json().catch(() => null);
-  const order = (data as any)?.order;
+  const order = asRecord(asRecord(data)?.order);
   if (!order) return null;
-  return {
-    orderId: order.order_id,
-    status: order.status,
-    filledCount: parseKalshiCount(order.taker_fill_count ?? order.fill_count),
-    remainingCount: parseKalshiCount(order.remaining_count),
+  const parsed: KalshiOrderResponse = {
+    orderId: nonEmptyString(order.order_id) ?? '',
+    status: nonEmptyString(order.status) ?? 'unknown',
+    filledCount: parseKalshiCount(order.fill_count_fp ?? order.taker_fill_count ?? order.fill_count),
+    remainingCount: parseKalshiCount(order.remaining_count_fp ?? order.remaining_count),
     raw: data,
   };
+  const ticker = nonEmptyString(order.ticker);
+  const outcomeSide = order.outcome_side === 'yes' || order.outcome_side === 'no'
+    ? order.outcome_side
+    : null;
+  if (!ticker || !outcomeSide) return parsed;
+  return attachFillEvidence(parsed, { ticker, outcomeSide });
 }

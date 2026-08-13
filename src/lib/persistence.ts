@@ -1570,7 +1570,7 @@ export async function getExecutionByArbId(arbId: string): Promise<ExecutionRecor
 }
 
 /** FEAT-040: sum of bot trade exposure for today (UTC). */
-export async function getTodayBotExposure(): Promise<number> {
+export async function getTodayBotExposure(executionMode?: 'paper' | 'live'): Promise<number> {
   await ensureExecutionsTable();
   const c = getClient();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -1583,19 +1583,21 @@ export async function getTodayBotExposure(): Promise<number> {
         WHEN polymarket_order IS NOT NULL THEN COALESCE(json_extract(polymarket_order, '$.size'), 0)
         ELSE 0
       END
-    ), 0) AS total FROM executions WHERE source = 'bot' AND timestamp >= ? AND timestamp < ?`,
-    args: [`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
+    ), 0) AS total FROM executions WHERE source = 'bot' ${executionMode ? 'AND dry_run = ?' : ''} AND timestamp >= ? AND timestamp < ?`,
+    args: executionMode
+      ? [executionMode === 'paper' ? 1 : 0, `${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`]
+      : [`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
   });
   return Number((res.rows as any[])[0]?.total ?? 0);
 }
 
 /** FEAT-040: check whether a bot trade already exists for this market/outcome pair. */
-export async function hasOpenBotPosition(arbId: string): Promise<boolean> {
+export async function hasOpenBotPosition(arbId: string, executionMode: 'paper' | 'live'): Promise<boolean> {
   await ensureExecutionsTable();
   const c = getClient();
   const res = await c.execute({
-    sql: `SELECT COUNT(*) AS cnt FROM executions WHERE arb_id = ? AND source = 'bot' AND success = 1`,
-    args: [arbId],
+    sql: `SELECT COUNT(*) AS cnt FROM executions WHERE arb_id = ? AND source = 'bot' AND success = 1 AND dry_run = ?`,
+    args: [arbId, executionMode === 'paper' ? 1 : 0],
   });
   return Number((res.rows as any[])[0]?.cnt ?? 0) > 0;
 }

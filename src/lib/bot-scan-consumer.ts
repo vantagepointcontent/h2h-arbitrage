@@ -1,6 +1,7 @@
 import { createClient } from '@libsql/client';
 import path from 'path';
-import { evaluateBotTrade, getBotSettings, maybeExecuteBotTrade, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
+import { evaluateBotTrade, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
+import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
@@ -75,6 +76,7 @@ type DecisionUpdate = Pick<BotScanDecision, 'state' | 'reasonCode' | 'reason'> &
 export interface BotScanConsumerDeps {
   now(): Date;
   getSettings(): Promise<BotSettings>;
+  resolveExecutionMode(settings: BotSettings): Promise<BotPositionExecutionMode>;
   loadScan(scanId: number): Promise<PersistedBotScan | null>;
   listBacklog(limit: number): Promise<PersistedBotScan[]>;
   acquire(scan: PersistedBotScan, source: BotScanSource): Promise<BotScanDecision | null>;
@@ -84,9 +86,9 @@ export interface BotScanConsumerDeps {
   advanceCursor(scanId: number): Promise<void>;
   revalidate(scan: PersistedBotScan): Promise<BotScanCandidate[]>;
   execute(input: BotTradeInput): Promise<BotExecutionResult>;
-  reserveOpportunity?(candidate: BotScanCandidate, maxUnitsPerMarket: number): Promise<boolean>;
-  releaseOpportunity?(candidate: BotScanCandidate): Promise<void>;
-  retainOpportunityForExposure?(candidate: BotScanCandidate): Promise<void>;
+  reserveOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<boolean>;
+  releaseOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void>;
+  retainOpportunityForExposure?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void>;
   maxScanAgeMs?: number;
 }
 
@@ -117,7 +119,7 @@ function validFees(fees: BotScanFees | null): fees is BotScanFees {
   return fees != null && finite(fees.kalshiFee) && fees.kalshiFee >= 0 && finite(fees.pmFee) && fees.pmFee >= 0;
 }
 
-function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settings: BotSettings): BotTradeInput {
+function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settings: BotSettings, reservationMode?: BotPositionExecutionMode): BotTradeInput {
   return {
     pairId: scan.marketId,
     marketTitle: scan.marketTitle,
@@ -141,6 +143,7 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     expiryDate: item.expiryDate ?? null,
     category: item.category,
     selectionMethod: settings.selectionMethod,
+    reservationMode,
   };
 }
 
@@ -189,6 +192,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     if (!settings.enabled) {
       return finish(rejection('disabled', 'bot_disabled', 'BotTrader was disabled when this persisted scan was consumed'));
     }
+    const executionMode = await deps.resolveExecutionMode(settings);
 
     const scannedAtMs = Date.parse(scan.scannedAt);
     const ageMs = deps.now().getTime() - scannedAtMs;
@@ -256,8 +260,8 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
 
     const reserved: BotScanCandidate[] = [];
     for (const item of executable) {
-      if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item, settings.maxUnitsPerMarket ?? 1))) {
-        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved by an in-flight placement' });
+      if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item, executionMode))) {
+        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved or have an open BotTrader position' });
         continue;
       }
       reserved.push(item);
@@ -277,46 +281,36 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const results: Array<{ outcome: string; result?: BotExecutionResult; error?: string }> = [];
     const releaseRemaining = async (startIndex: number) => {
       for (const pending of reserved.slice(startIndex)) {
-        await deps.releaseOpportunity?.(pending).catch((error) => {
+        await deps.releaseOpportunity?.(pending, executionMode).catch((error) => {
           logger.warn('[bot-scan-consumer] failed to release unattempted opportunity reservation', { error: String(error) });
         });
       }
     };
     for (let index = 0; index < reserved.length; index++) {
       const item = reserved[index];
-      if (deps.retainOpportunityForExposure) {
-        try {
-          await deps.retainOpportunityForExposure(item);
-        } catch (error) {
-          await deps.releaseOpportunity?.(item).catch(() => undefined);
-          await releaseRemaining(index + 1);
-          return finish({
-            state: 'failed',
-            reasonCode: 'exposure_guard_failed',
-            reason: `Failed to arm exposure guard before placement: ${String(error)}`,
-            placementCount: 0,
-            attempts: claimed.attempts + index,
-            details: { rejections },
-          });
-        }
-      }
       try {
-        const result = await deps.execute(candidateToInput(scan, item, settings));
+        const result = await deps.execute(candidateToInput(scan, item, settings, executionMode));
         results.push({ outcome: item.outcome, result });
         if (result.executionResult?.unhedged === true
           || result.exposureState === 'pending_reconciliation'
           || (result.executed && result.positionPersisted === false)) {
+          await deps.retainOpportunityForExposure?.(item, executionMode).catch((error) => {
+            logger.error('[bot-scan-consumer] failed to retain reservation for unhedged exposure', { error: String(error) });
+          });
           await releaseRemaining(index + 1);
           break;
-        } else {
-          await deps.releaseOpportunity?.(item).catch((error) => {
-            logger.warn('[bot-scan-consumer] failed to release completed opportunity reservation', { error: String(error) });
+        } else if (!result.executed) {
+          await deps.releaseOpportunity?.(item, executionMode).catch((error) => {
+            logger.warn('[bot-scan-consumer] failed to release rejected opportunity reservation', { error: String(error) });
           });
         }
       } catch (error) {
         results.push({ outcome: item.outcome, error: error instanceof Error ? error.message : String(error) });
         // executeArb can throw after one venue accepted an order. Preserve this
         // reservation as possible exposure and stop all further placements.
+        await deps.retainOpportunityForExposure?.(item, executionMode).catch((retainError) => {
+          logger.error('[bot-scan-consumer] failed to retain reservation after unknown execution outcome', { error: String(retainError) });
+        });
         await releaseRemaining(index + 1);
         break;
       }
@@ -604,23 +598,23 @@ async function revalidate(scan: PersistedBotScan): Promise<BotScanCandidate[]> {
     .filter((item): item is BotScanCandidate => item != null);
 }
 
-async function reserveOpportunity(candidate: BotScanCandidate, maxUnitsPerMarket: number): Promise<boolean> {
+async function reserveOpportunity(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<boolean> {
   const { reserveBotMarketPair } = await import('./bot-positions');
-  return reserveBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId, maxUnitsPerMarket);
+  return reserveBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId, executionMode);
 }
 
-async function releaseOpportunity(candidate: BotScanCandidate): Promise<void> {
+async function releaseOpportunity(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void> {
   const { releaseBotMarketPair } = await import('./bot-positions');
-  await releaseBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId);
+  await releaseBotMarketPair(candidate.kalshiTicker, candidate.pmConditionId, executionMode);
 }
 
-async function retainOpportunityForExposure(candidate: BotScanCandidate): Promise<void> {
+async function retainOpportunityForExposure(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void> {
   const { retainBotMarketPairForExposure } = await import('./bot-positions');
-  await retainBotMarketPairForExposure(candidate.kalshiTicker, candidate.pmConditionId);
+  await retainBotMarketPairForExposure(candidate.kalshiTicker, candidate.pmConditionId, executionMode);
 }
 
 const productionDeps: BotScanConsumerDeps = {
-  now: () => new Date(), getSettings: getBotSettings, loadScan, listBacklog, acquire,
+  now: () => new Date(), getSettings: getBotSettings, resolveExecutionMode: resolveBotExecutionMode, loadScan, listBacklog, acquire,
   transition: (id, owner, update) => updateDecision(id, owner, update, false),
   finish: (id, owner, update) => updateDecision(id, owner, update, true),
   recordReplay, advanceCursor, revalidate, execute: maybeExecuteBotTrade,

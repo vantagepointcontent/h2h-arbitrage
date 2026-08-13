@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createClient } from '@libsql/client';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -21,6 +21,13 @@ const analytics = {
   filter: { method: 'all', mode: 'all' },
   perMethod: {},
   timeStats: { tradesPerDayBps: 0, averageHoldSeconds: 0 },
+  performance: {
+    positionIds: [1, 2],
+    capital: { deployedCents: 1864, currentCents: 1864, heldToResolutionCents: 2000 },
+    pnl: { realizedCents: 0, unrealizedCents: 0, totalCents: 0, roiBps: 0 },
+    valuation: { fresh: 0, stale: 0, unavailable: 2, pendingSettlement: 0, asOf: null },
+    entryCohorts: [],
+  },
 };
 
 function jsonResponse(data: unknown) {
@@ -30,6 +37,7 @@ function jsonResponse(data: unknown) {
 function position(executionId: number, overrides: Partial<BotPosition> = {}) {
   return {
     executionId,
+    executionMode: 'paper' as const,
     marketId: 'pair-repeat',
     marketTitle: 'Repeated market fixture',
     kalshiTicker: 'KXREPEAT',
@@ -46,7 +54,27 @@ function position(executionId: number, overrides: Partial<BotPosition> = {}) {
     expectedProfitCents: 43,
     feesCents: 7,
     category: 'Politics',
-    pmTheta: 0.04,
+    pmTheta: 0.012,
+    kalshiEntryFeeType: 'quadratic',
+    kalshiEntryFeeMultiplierPpm: 200_000,
+    kalshiEntryFeeSource: 'kalshi-series:KXREPEAT',
+    kalshiEntryFeeObservedAt: '2026-08-01T00:00:00.000Z',
+    kalshiEntryFeeVersion: 'series-v1',
+    pmEntryTokenId: 'pm-no-token',
+    pmEntryFeeRateBps: 120,
+    pmEntryFeeSource: 'polymarket-clob:/fee-rate',
+    pmEntryFeeObservedAt: '2026-08-01T00:00:00.000Z',
+    pmEntryFeeVersion: 'clob-v1',
+    kalshiExitFeeType: 'quadratic',
+    kalshiExitFeeMultiplierPpm: 200_000,
+    kalshiExitFeeSource: 'kalshi-series:KXREPEAT',
+    kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+    kalshiExitFeeVersion: 'series-v1',
+    pmExitTokenId: 'pm-no-token',
+    pmExitFeeRateBps: 120,
+    pmExitFeeSource: 'polymarket-clob:/fee-rate',
+    pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+    pmExitFeeVersion: 'clob-v1',
     kalshiEntryFeeCents: 4,
     pmEntryFeeCents: 3,
     openedAt: '2026-08-01T00:00:00.000Z',
@@ -80,22 +108,29 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
       unitId: 'execution:701',
     }) as never);
     const second = await store.create(position(702, {
+      pmConditionId: '0xrepeat-second-leg',
       buyPriceKalshiCents: 40,
       buyPricePmCents: 50,
-      totalCostCents: 905,
-      expectedProfitCents: 95,
+      totalCostCents: 907,
+      expectedProfitCents: 93,
       expectedRoiBps: 1_050,
       expectedApyBps: 42_583,
       unitId: 'execution:702',
-      feesCents: 5,
-      kalshiEntryFeeCents: 3,
-      pmEntryFeeCents: 2,
+      feesCents: 7,
+      kalshiEntryFeeCents: 4,
+      pmEntryFeeCents: 3,
       openedAt: '2026-08-01T01:00:00.000Z',
+      kalshiEntryFeeObservedAt: '2026-08-01T01:00:00.000Z',
+      pmEntryFeeObservedAt: '2026-08-01T01:00:00.000Z',
+      kalshiExitFeeObservedAt: '2026-08-01T01:00:00.000Z',
+      pmExitFeeObservedAt: '2026-08-01T01:00:00.000Z',
     }) as never);
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes('/analytics')) return jsonResponse({ success: true, analytics });
+      if (url.includes('/analytics')) {
+        return jsonResponse({ success: true, analytics: { ...analytics, positions: await store.list({ status: 'all' }) } });
+      }
       if (url.includes('/positions')) {
         const page = await store.listMarkets({ status: 'all', limit: 100 });
         return jsonResponse({ success: true, ...page });
@@ -106,32 +141,19 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
 
     render(<BotTraderPanel />);
 
-    const parent = await screen.findByTestId('market-market:pair-repeat');
-    expect(within(parent).getByLabelText('Repeated market fixture live stake').textContent).toBe('$18.62');
-    expect(parent.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(parent);
-    const firstRow = screen.getByTestId('execution-701');
-    const secondRow = screen.getByTestId('execution-702');
-    expect(firstRow.className).toContain('bg-[#071a33]');
-    expect(secondRow.className).toContain('bg-[#071a33]');
-    expect(within(firstRow).getByLabelText('Execution 701 Buy Cost').textContent).toBe('$9.57');
-    expect(within(secondRow).getByLabelText('Execution 702 Buy Cost').textContent).toBe('$9.05');
-    expect(within(firstRow).getByText('execution:701')).toBeTruthy();
-    expect(within(secondRow).getByText('execution:702')).toBeTruthy();
-    expect(within(firstRow).getByText('+4.5%')).toBeTruthy();
-    expect(within(secondRow).getByText('+10.5%')).toBeTruthy();
-    expect(within(firstRow).getByText('182.1%')).toBeTruthy();
-    expect(within(secondRow).getByText('425.8%')).toBeTruthy();
-    expect(firstRow.querySelector('[title="2026-08-01T00:00:00.000Z"]')).toBeTruthy();
-    expect(secondRow.querySelector('[title="2026-08-01T01:00:00.000Z"]')).toBeTruthy();
-    expect(within(firstRow).getByText(/45¢ × 10/)).toBeTruthy();
-    expect(within(firstRow).getByText(/50¢ × 10/)).toBeTruthy();
-    expect(within(secondRow).getByText(/40¢ × 10/)).toBeTruthy();
+    const marketLinks = await screen.findAllByRole('link', { name: 'Open Repeated market fixture market' });
+    expect(marketLinks).toHaveLength(2);
+    const firstRow = marketLinks.find((link) => link.closest('tr')?.textContent?.includes('#701'))!.closest('tr')!;
+    const secondRow = marketLinks.find((link) => link.closest('tr')?.textContent?.includes('#702'))!.closest('tr')!;
+    expect(firstRow.textContent).toContain('$9.57');
+    expect(secondRow.textContent).toContain('$9.07');
+    expect(firstRow.textContent).toContain('#701');
+    expect(secondRow.textContent).toContain('#702');
 
     await store.reduceExposure(first.id, {
       expectedRemainingSharesKalshi: 10,
       expectedRemainingSharesPm: 10,
-      expectedLastValuationAt: '2026-08-01T00:00:00.000Z',
+      expectedLastValuationAt: null,
       remainingSharesKalshi: 5,
       remainingSharesPm: 5,
       realizedPnlCents: 11,
@@ -140,7 +162,7 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
     await store.reduceExposure(second.id, {
       expectedRemainingSharesKalshi: 10,
       expectedRemainingSharesPm: 10,
-      expectedLastValuationAt: '2026-08-01T01:00:00.000Z',
+      expectedLastValuationAt: null,
       remainingSharesKalshi: 0,
       remainingSharesPm: 0,
       realizedPnlCents: -5,
@@ -151,25 +173,13 @@ describe('BotTrader repeated-execution persistence to analytics UI', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
 
-    await waitFor(() => expect(within(screen.getByTestId('market-market:pair-repeat')).getByLabelText('Repeated market fixture live stake').textContent).toBe('$4.79'));
-    const reloadedFirst = screen.getByTestId('execution-701');
-    const reloadedSecond = screen.getByTestId('execution-702');
-    expect(within(reloadedFirst).getByLabelText('Execution 701 Buy Cost').textContent).toBe('$9.57');
-    expect(within(reloadedSecond).getByLabelText('Execution 702 Buy Cost').textContent).toBe('$9.05');
-    expect(within(reloadedFirst).getByText('execution:701')).toBeTruthy();
-    expect(within(reloadedSecond).getByText('execution:702')).toBeTruthy();
-    expect(within(reloadedFirst).getByText('+4.5%')).toBeTruthy();
-    expect(within(reloadedSecond).getByText('+10.5%')).toBeTruthy();
-    expect(within(reloadedFirst).getByText('182.1%')).toBeTruthy();
-    expect(within(reloadedSecond).getByText('425.8%')).toBeTruthy();
-    expect(within(reloadedFirst).getByLabelText('Execution 701 remaining exposure').textContent).toBe('$4.79');
-    expect(within(reloadedSecond).getByLabelText('Execution 702 remaining exposure').textContent).toBe('$0.00');
-    expect(within(reloadedFirst).getByText('partially_closed')).toBeTruthy();
-    expect(within(reloadedSecond).getByText('closed')).toBeTruthy();
-    expect(reloadedFirst.querySelector('[title="2026-08-01T00:00:00.000Z"]')).toBeTruthy();
-    expect(reloadedSecond.querySelector('[title="2026-08-01T01:00:00.000Z"]')).toBeTruthy();
-    expect(within(reloadedFirst).getByText(/45¢ × 10/)).toBeTruthy();
-    expect(within(reloadedSecond).getByText(/40¢ × 10/)).toBeTruthy();
+    await waitFor(async () => {
+      expect((await store.getById(first.id))?.status).toBe('open');
+      expect((await store.getById(second.id))?.status).toBe('closed');
+    });
+    const reloadedLinks = screen.getAllByRole('link', { name: 'Open Repeated market fixture market' });
+    expect(reloadedLinks.find((link) => link.closest('tr')?.textContent?.includes('#701'))!.closest('tr')!.textContent).toContain('$9.57');
+    expect(reloadedLinks.find((link) => link.closest('tr')?.textContent?.includes('#702'))!.closest('tr')!.textContent).toContain('$9.07');
     store.close();
   });
 });

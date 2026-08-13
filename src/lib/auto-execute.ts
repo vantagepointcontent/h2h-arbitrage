@@ -21,6 +21,19 @@
  * - Tick check on first fill: re-verify other leg's price before continuing to wait
  */
 
+import { isAuthoritativeVenueEvidence } from './execution-evidence';
+
+function errorField(error: unknown, field: 'status' | 'code' | 'message'): unknown {
+  return typeof error === 'object' && error !== null && field in error
+    ? (error as Record<string, unknown>)[field]
+    : undefined;
+}
+
+function errorMessage(error: unknown): string {
+  const message = errorField(error, 'message');
+  return typeof message === 'string' ? message : String(error);
+}
+
 // ─── Types ────────────────────────────────────────────────────────
 
 export type OrderType = 'limit' | 'market';
@@ -48,9 +61,17 @@ export interface OrderResult {
   /** Authoritative venue-reported contracts/shares. */
   filledContracts?: number;
   filledPrice?: number;
+  /** Venue-reported charged fee in integer cents. */
+  chargedFeeCents?: number;
+  /** Authoritative venue fill/trade ID, distinct from the submitted order ID. */
+  executionId?: string;
+  /** Venue-provided fill timestamp. */
+  venueTimestamp?: string;
   orderId?: string;
   error?: string;
   timestamp: string;
+  /** Correlated venue evidence; never populated from submitted order values. */
+  venueEvidence?: import('./execution-evidence').VenueExecutionEvidence;
 }
 
 export interface ExecutionRequest {
@@ -212,13 +233,44 @@ function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
 const MAX_RETRIES = 2;
 const RETRY_BACKOFF_MS = 500;
 
+type KalshiOrderAdapterResponse = Awaited<ReturnType<typeof import('./kalshi-orders')['placeKalshiOrder']>>;
+
+export function mapKalshiOrderResult(r: KalshiOrderAdapterResponse): OrderResult {
+  const evidence = r.evidence;
+  if (evidence) {
+    return {
+      platform: 'kalshi',
+      status: r.status === 'executed' ? 'filled' : 'partial',
+      filledSize: evidence.filledQuantity * evidence.fillPrice,
+      filledContracts: evidence.filledQuantity,
+      filledPrice: evidence.fillPrice,
+      chargedFeeCents: evidence.chargedFeeCents,
+      executionId: evidence.executionId,
+      venueTimestamp: evidence.venueTimestamp,
+      orderId: r.orderId,
+      timestamp: evidence.venueTimestamp,
+      venueEvidence: evidence,
+    };
+  }
+  return {
+    platform: 'kalshi',
+    status: r.filledCount != null && r.filledCount > 0 ? 'partial' : 'pending',
+    filledContracts: r.filledCount,
+    orderId: r.orderId,
+    timestamp: '',
+    ...(r.filledCount != null && r.filledCount > 0
+      ? { error: 'Kalshi reported a fill without complete correlated venue evidence' }
+      : {}),
+  };
+}
+
 async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<OrderResult> {
   const { placeKalshiOrder } = await import('./kalshi-orders');
   if (!req.ticker) {
     return { ...emptyResult('kalshi', 'rejected'), error: 'Missing Kalshi ticker' };
   }
 
-  let lastErr: any;
+  let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const priceCents = Math.round(req.price * 100);
@@ -230,56 +282,42 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
         priceCents,
         clientOrderId: `h2h-${arbId}-k${attempt > 0 ? `-r${attempt}` : ''}`.slice(0, 64),
       });
-      const filledContracts = r.filledCount;
-      return {
-        platform: 'kalshi',
-        status: r.status === 'executed' ? 'filled' : filledContracts > 0 ? 'partial' : 'pending',
-        filledSize: filledContracts * req.price,
-        filledContracts,
-        filledPrice: req.price,
-        orderId: r.orderId,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (err: any) {
+      return mapKalshiOrderResult(r);
+    } catch (err: unknown) {
       lastErr = err;
       // Retry on rate limit (429) or transient network errors
-      const isRetryable = err?.status === 429 || err?.code === 'ECONNRESET' || err?.code === 'ETIMEDOUT';
+      const status = errorField(err, 'status');
+      const code = errorField(err, 'code');
+      const isRetryable = status === 429 || code === 'ECONNRESET' || code === 'ETIMEDOUT';
       if (!isRetryable || attempt === MAX_RETRIES) break;
       await sleep(RETRY_BACKOFF_MS * (attempt + 1));
     }
   }
-  return { ...emptyResult('kalshi', 'rejected'), error: lastErr?.message ?? String(lastErr) };
+  return { ...emptyResult('kalshi', 'rejected'), error: errorMessage(lastErr) };
 }
 
 async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
-  const { placePmOrder } = await import('./polymarket-orders');
+  const { mapPmOrderResponse, placePmOrder } = await import('./polymarket-orders');
   if (!req.conditionId) {
     return { ...emptyResult('polymarket', 'rejected'), error: 'Missing Polymarket token ID' };
   }
 
-  let lastErr: any;
+  let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const size = req.contracts ?? (req.size / req.price); // $size → shares
       const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
-      const filledContracts = r.filledContracts;
-      return {
-        platform: 'polymarket',
-        status: r.status === 'matched' && filledContracts != null ? 'filled' : 'pending',
-        filledSize: filledContracts != null ? filledContracts * req.price : 0,
-        filledContracts: filledContracts ?? undefined,
-        filledPrice: req.price,
-        orderId: r.orderId,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (err: any) {
+      return mapPmOrderResponse(r, r.venueEvidence ?? null);
+    } catch (err: unknown) {
       lastErr = err;
-      const isRetryable = err?.status === 429 || err?.code === 'ECONNRESET' || err?.code === 'ETIMEDOUT';
+      const status = errorField(err, 'status');
+      const code = errorField(err, 'code');
+      const isRetryable = status === 429 || code === 'ECONNRESET' || code === 'ETIMEDOUT';
       if (!isRetryable || attempt === MAX_RETRIES) break;
       await sleep(RETRY_BACKOFF_MS * (attempt + 1));
     }
   }
-  return { ...emptyResult('polymarket', 'rejected'), error: lastErr?.message ?? String(lastErr) };
+  return { ...emptyResult('polymarket', 'rejected'), error: errorMessage(lastErr) };
 }
 
 async function cancelLeg(result: OrderResult): Promise<boolean> {
@@ -387,7 +425,7 @@ export function areFilledContractsMatched(
 
 /** Close a filled position by placing a sell order at the fill price.
  *  Returns true if the close succeeded, false if it failed (exposure remains). */
-export function isCompleteClose(requestedContracts: number, filledContracts: number | null): boolean {
+export function isCompleteClose(requestedContracts: number, filledContracts: number | null | undefined): boolean {
   return Number.isFinite(requestedContracts) && requestedContracts > 0 &&
     filledContracts != null && Number.isFinite(filledContracts) &&
     filledContracts + 1e-9 >= requestedContracts;
@@ -456,35 +494,12 @@ async function pollOrder(
       const { getKalshiOrder } = await import('./kalshi-orders');
       const updated = await getKalshiOrder(leg.orderId);
       if (!updated) return leg;
-      return {
-        platform: 'kalshi',
-        status: updated.status === 'executed' ? 'filled' : (updated.status as OrderStatus),
-        filledSize: updated.filledCount * (leg.filledPrice ?? req.price),
-        filledContracts: updated.filledCount,
-        filledPrice: leg.filledPrice ?? req.price,
-        orderId: leg.orderId,
-        timestamp: new Date().toISOString(),
-      };
+      return mapKalshiOrderResult(updated);
     } else {
-      const { getPmOrder } = await import('./polymarket-orders');
+      const { getPmOrder, mapPmOrderResponse } = await import('./polymarket-orders');
       const updated = await getPmOrder(leg.orderId);
       if (!updated) return leg;
-      const filledContracts = updated.filledContracts ?? leg.filledContracts;
-      return {
-        platform: 'polymarket',
-        status: updated.status === 'matched' && updated.filledContracts != null
-          ? 'filled'
-          : updated.filledContracts != null && updated.filledContracts > 0
-            ? 'partial'
-            : 'pending',
-        filledSize: filledContracts != null
-          ? filledContracts * (leg.filledPrice ?? req.price)
-          : leg.filledSize,
-        filledContracts,
-        filledPrice: leg.filledPrice ?? req.price,
-        orderId: leg.orderId,
-        timestamp: new Date().toISOString(),
-      };
+      return mapPmOrderResponse(updated, updated.venueEvidence ?? null);
     }
   } catch {
     return leg; // poll failed, return current state
@@ -872,10 +887,17 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     netExposure = (kalshiResult.filledSize ?? 0) + (polymarketResult.filledSize ?? 0);
   }
 
+  const liveEvidenceComplete = effectiveDryRun || (
+    isAuthoritativeVenueEvidence(kalshiResult.venueEvidence)
+    && kalshiResult.venueEvidence.venue === 'kalshi'
+    && isAuthoritativeVenueEvidence(polymarketResult.venueEvidence)
+    && polymarketResult.venueEvidence.venue === 'polymarket'
+  );
   const success = !rollbackExecuted &&
     kalshiResult.status !== 'rejected' &&
     polymarketResult.status !== 'rejected' &&
-    !unhedged;
+    !unhedged &&
+    liveEvidenceComplete;
 
   const finalStatus: StepStatus = success ? 'success' : (unhedged ? 'failed' : 'partial');
   addStep(finalStatus, `Execution ${success ? 'completed successfully' : 'completed with issues'} — profit $${(actualProfit ?? 0).toFixed(2)}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);

@@ -8,6 +8,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS bot_positions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   execution_id    INTEGER NOT NULL REFERENCES executions(id),
+  execution_mode  TEXT    NOT NULL CHECK (execution_mode IN ('paper', 'live')),
   market_id       TEXT,
   market_title    TEXT    NOT NULL,
   kalshi_ticker   TEXT,
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS bot_positions (
   pm_side         TEXT    NOT NULL CHECK (pm_side IN ('yes', 'no')),
   buy_price_kalshi INTEGER NOT NULL,
   buy_price_pm    INTEGER NOT NULL,
-  shares_kalshi INTEGER NOT NULL,
+  shares_kalshi   INTEGER NOT NULL,
   shares_pm       INTEGER NOT NULL,
   live_shares_kalshi INTEGER NOT NULL,
   live_shares_pm INTEGER NOT NULL,
@@ -55,17 +56,19 @@ CREATE TABLE IF NOT EXISTS bot_positions (
 
 -- Reservation table for pre-execution duplicate prevention
 CREATE TABLE IF NOT EXISTS bot_position_reservations (
-  pair_key        TEXT PRIMARY KEY,
+  pair_key        TEXT    NOT NULL,
+  execution_mode  TEXT    NOT NULL CHECK (execution_mode IN ('paper', 'live')),
   reserved_at     TEXT    NOT NULL,
-  exposure_at_risk INTEGER NOT NULL DEFAULT 0
+  exposure_at_risk INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (pair_key, execution_mode)
 );
 
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_bot_positions_status     ON bot_positions(status, opened_at DESC);
--- One durable position row per successful execution. Repeated executions in
--- the same venue pair are intentionally allowed.
+CREATE INDEX IF NOT EXISTS idx_bot_positions_execution  ON bot_positions(execution_id);
+
+-- Unique index: prevent duplicate open positions for same market pair
 DROP INDEX IF EXISTS idx_bot_positions_open_pair;
--- Execution lookup is non-unique so legacy duplicate rows remain readable. New
--- inserts use one atomic INSERT ... WHERE NOT EXISTS statement.
-DROP INDEX IF EXISTS idx_bot_positions_execution;
-CREATE INDEX IF NOT EXISTS idx_bot_positions_execution ON bot_positions(execution_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair
+  ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id), execution_mode)
+  WHERE status = 'open';
