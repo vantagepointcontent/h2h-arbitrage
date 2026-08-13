@@ -27,6 +27,87 @@ describe('POST /api/quick-prices diagnostics', () => {
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
   });
 
+  it('returns live prices even when the optional publication reservation hits SQLITE_BUSY', async () => {
+    const busy = Object.assign(new Error('SQLITE_BUSY: database is locked'), {
+      name: 'LibsqlError', code: 'SQLITE_BUSY',
+    });
+    mocks.reserveSavedMarketPublication.mockRejectedValue(busy);
+    mocks.quickPricesScan.mockResolvedValue({
+      matchedCount: 1, matchStatus: 'matched', refreshStatus: 'complete', retryable: false,
+      matchedPairs: [{ artist: 'Democratic', kalshiTicker: 'NC14-D', pmConditionId: 'pm-d' }],
+      platformWarnings: [],
+      platformDiagnostics: {
+        kalshi: { status: 'fresh', count: 1 },
+        polymarket: { status: 'fresh', count: 1 },
+      },
+      outcomes: [{ artist: 'Democratic' }],
+      _pmFetchedAt: '2026-08-13T18:30:00.000Z',
+    });
+    const request = new NextRequest('http://localhost/api/quick-prices', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-correlation-id': 'quick-busy-cid' },
+      body: JSON.stringify({ marketId: 'nc-14', capital: 1000 }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocks.quickPricesScan).toHaveBeenCalledWith('nc-14', 1000);
+    expect(body.outcomes).toEqual([{ artist: 'Democratic' }]);
+    expect(body.persistenceWarning).toContain('temporarily unavailable');
+  });
+
+  it('returns a retryable 503 with per-platform reasons when neither linked event refreshes', async () => {
+    mocks.quickPricesScan.mockResolvedValue({
+      matchedCount: 0, matchStatus: 'unavailable', matchedPairs: [],
+      matchError: 'Both linked venues failed.', refreshStatus: 'failed', retryable: true,
+      platformWarnings: ['Kalshi request failed.', 'Polymarket request failed.'],
+      platformDiagnostics: {
+        kalshi: { status: 'failed', count: 0, reason: 'Kalshi request failed.' },
+        polymarket: { status: 'failed', count: 0, reason: 'Polymarket request failed.' },
+      },
+      outcomes: [], _pmFetchedAt: '2026-08-13T18:30:00.000Z',
+    });
+    const request = new NextRequest('http://localhost/api/quick-prices', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ marketId: 'nc-14', capital: 1000 }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    expect(body.retryable).toBe(true);
+    expect(body.platformDiagnostics.kalshi.status).toBe('failed');
+    expect(body.platformDiagnostics.polymarket.reason).toBe('Polymarket request failed.');
+  });
+
+  it('returns partial linked-event data without discarding the successful platform', async () => {
+    mocks.quickPricesScan.mockResolvedValue({
+      matchedCount: 0, matchStatus: 'unavailable', matchedPairs: [],
+      refreshStatus: 'partial', retryable: true, platformWarnings: ['Kalshi request failed.'],
+      platformDiagnostics: {
+        kalshi: { status: 'failed', count: 0, reason: 'Kalshi request failed.' },
+        polymarket: { status: 'fresh', count: 1 },
+      },
+      outcomes: [{ artist: 'Democratic', kalshi: null, polymarket: { yesPrice: 0.2 } }],
+      _pmFetchedAt: '2026-08-13T18:30:00.000Z',
+    });
+    const request = new NextRequest('http://localhost/api/quick-prices', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ marketId: 'nc-14', capital: 1000 }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(body.outcomes[0].polymarket.yesPrice).toBe(0.2);
+    expect(body.platformDiagnostics.kalshi.status).toBe('failed');
+  });
+
   it('atomically reconciles canonical pair ids before returning a successful detail refresh', async () => {
     const result = {
       matchedCount: 2,

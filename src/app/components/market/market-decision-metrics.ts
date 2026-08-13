@@ -1,7 +1,9 @@
 export interface MarketDecisionMetrics { bestNetRoi: number | null; bestNetProfit: number | null; maxExecutableStake: number | null; }
 
 export function selectMarketDecisionMetrics(outcomes: Array<Record<string, any>> = []): MarketDecisionMetrics {
-  const arbs = outcomes.map((outcome) => outcome?.arbitrage).filter(Boolean);
+  const arbs = outcomes
+    .filter((outcome) => !outcome?.kalshiStale && !outcome?.polymarketStale)
+    .map((outcome) => outcome?.arbitrage).filter(Boolean);
   if (!arbs.length) return { bestNetRoi: null, bestNetProfit: null, maxExecutableStake: null };
   const netProfit = (arb: any) => Number(arb?.fees?.worstCaseNetProfit ?? arb?.expectedProfit ?? 0);
   const executable = arbs.filter((arb) => netProfit(arb) > 0 && Number(arb?.roiPct ?? 0) > 0);

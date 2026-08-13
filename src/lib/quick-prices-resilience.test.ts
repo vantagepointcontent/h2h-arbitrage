@@ -93,7 +93,10 @@ beforeEach(() => {
     closed: false,
     markets: [pmMarket],
   });
-  mocks.fetchClobBooks.mockResolvedValue(new Map());
+  mocks.fetchClobBooks.mockResolvedValue(new Map([
+    ['yes-1', { asset_id: 'yes-1', bids: [], asks: [] }],
+    ['no-1', { asset_id: 'no-1', bids: [], asks: [] }],
+  ]));
 });
 
 describe('quickPricesScan bounded platform failures', () => {
@@ -108,6 +111,8 @@ describe('quickPricesScan bounded platform failures', () => {
     expect(result.pmCount).toBe(1);
     expect(result.platformWarnings).toContain('Polymarket order books timed out; showing saved market structure without live Polymarket prices.');
     expect(result.outcomes.find((outcome) => outcome.polymarket)?.polymarket?.yesPrice).toBe(0);
+    expect(result.refreshStatus).toBe('partial');
+    expect(result.platformDiagnostics.polymarket.status).toBe('failed');
   });
 
   it('keeps Polymarket outcomes when Kalshi times out', async () => {
@@ -120,6 +125,9 @@ describe('quickPricesScan bounded platform failures', () => {
     expect(result.kalshiCount).toBe(0);
     expect(result.pmCount).toBe(1);
     expect(result.platformWarnings).toContain('Kalshi timed out; showing available Polymarket data and saved market data.');
+    expect(result.refreshStatus).toBe('partial');
+    expect(result.platformDiagnostics.kalshi.status).toBe('failed');
+    expect(result.platformDiagnostics.polymarket.status).toBe('fresh');
   });
 
   it('keeps Kalshi outcomes when a stale Polymarket identifier returns no event', async () => {
@@ -131,5 +139,31 @@ describe('quickPricesScan bounded platform failures', () => {
     expect(result.kalshiCount).toBe(1);
     expect(result.pmCount).toBe(0);
     expect(result.platformWarnings).toContain('Polymarket event is unavailable or no longer open; showing available Kalshi and saved market data.');
+    expect(result.platformDiagnostics.polymarket.status).toBe('empty');
+  });
+
+  it('distinguishes a genuine linked-event zero from an upstream Kalshi failure', async () => {
+    mocks.fetchKalshiEventMarkets.mockResolvedValue([]);
+
+    const result = await quickPricesScan('saved-1');
+
+    expect(result.platformDiagnostics.kalshi).toEqual({
+      status: 'empty', count: 0, reason: 'Kalshi linked event returned zero open markets.',
+    });
+    expect(result.platformWarnings).toContain('Kalshi linked event returned zero open markets.');
+  });
+
+  it('reports actionable reasons for both linked-platform request failures', async () => {
+    mocks.fetchKalshiEventMarkets.mockRejectedValue(new Error('Kalshi API 503'));
+    mocks.fetchPolymarketEvent.mockRejectedValue(new Error('Gamma API 502'));
+
+    const result = await quickPricesScan('saved-1');
+
+    expect(result.refreshStatus).toBe('failed');
+    expect(result.retryable).toBe(true);
+    expect(result.platformDiagnostics.kalshi).toMatchObject({ status: 'failed', count: 0 });
+    expect(result.platformDiagnostics.kalshi.reason).toContain('Kalshi API 503');
+    expect(result.platformDiagnostics.polymarket).toMatchObject({ status: 'failed', count: 0 });
+    expect(result.platformDiagnostics.polymarket.reason).toContain('Gamma API 502');
   });
 });

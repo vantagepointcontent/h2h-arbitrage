@@ -66,10 +66,19 @@ export interface QuickPricesResult {
   _pmFetchedAt: string;
   /** Bounded upstream failures. A non-empty list means cached/partial data is still usable. */
   platformWarnings: string[];
+  refreshStatus: 'complete' | 'partial' | 'failed';
+  retryable: boolean;
+  platformDiagnostics: Record<'kalshi' | 'polymarket', QuickPricesPlatformDiagnostic>;
+}
+
+export interface QuickPricesPlatformDiagnostic {
+  status: 'fresh' | 'empty' | 'failed';
+  count: number;
+  reason?: string;
 }
 
 const KALSHI_TIMEOUT_WARNING = 'Kalshi timed out; showing available Polymarket data and saved market data.';
-const KALSHI_UNAVAILABLE_WARNING = 'Kalshi returned no open markets; showing available Polymarket data and saved market data.';
+const KALSHI_EMPTY_WARNING = 'Kalshi linked event returned zero open markets.';
 const PM_UNAVAILABLE_WARNING = 'Polymarket event is unavailable or no longer open; showing available Kalshi and saved market data.';
 const CLOB_TIMEOUT_WARNING = 'Polymarket order books timed out; showing saved market structure without live Polymarket prices.';
 
@@ -120,15 +129,16 @@ function quickClobMarket(market: PMMarket): ClobMarket | null {
 /** Enrich Gamma markets with executable CLOB quotes using one batch book call. */
 export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): Promise<PMMarket[]> {
   const clobMarkets = markets.map(quickClobMarket);
-  const tokenIds = clobMarkets.flatMap((clob) => {
-    if (!clob) return [];
-    const isExecutable = (value: unknown): value is number =>
-      typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1;
-    const hasAggregateQuotes = clob.neg_risk !== true &&
-      isExecutable(clob.best_bid) && isExecutable(clob.best_ask);
-    return hasAggregateQuotes ? [] : clob.tokens.map((token) => token.token_id);
-  });
-  const books = await fetchClobBooks(tokenIds);
+  // Prices and displayed depth must come from the same current refresh. Standard
+  // markets may use valid aggregate quotes, but still need token books for
+  // executable best-level depth; fetch every linked market's two token books.
+  const tokenIds = clobMarkets.flatMap((clob) =>
+    clob ? clob.tokens.map((token) => token.token_id) : []);
+  const books = await fetchClobBooks(tokenIds, { throwOnFailure: true, bypassCache: true });
+
+  if (tokenIds.length > 0 && tokenIds.every((tokenId) => books.get(tokenId) == null)) {
+    throw new Error('Polymarket CLOB returned no order books for the linked event');
+  }
 
   return markets.map((market, index) => {
     const clob = clobMarkets[index];
@@ -151,6 +161,8 @@ export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): P
       bestBid: live.bestBid,
       bestAsk: live.bestAsk,
       lastTradePrice: live.lastTradePrice,
+      askDepth: live.yesAskDepth ?? 0,
+      noAskDepth: live.noAskDepth ?? 0,
       neg_risk: clob.neg_risk,
     };
   });
@@ -176,34 +188,37 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   }
 
   const platformWarnings: string[] = [];
-  const [kalshiResult, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
-    withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets').catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      platformWarnings.push(message.includes('timed out') ? KALSHI_TIMEOUT_WARNING : KALSHI_UNAVAILABLE_WARNING);
-      return [] as KalshiMarket[];
-    }),
+  const [kalshiSettled, pmSettled, manualMatches, decoupledPairs] = await Promise.all([
+    withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets')
+      .then((value) => ({ ok: true as const, value }))
+      .catch((error: unknown) => ({ ok: false as const, error })),
     withTimeout(
       isPolymarketMarketUrl(polymarketUrl)
         ? fetchPolymarketMarketAsEvent(pmSlug)
         : fetchPolymarketEvent(pmSlug),
       QUICK_PM_TIMEOUT_MS,
       'Polymarket event',
-    ).catch(() => {
-      platformWarnings.push(PM_UNAVAILABLE_WARNING);
-      return null;
-    }),
+    ).then((value) => ({ ok: true as const, value }))
+      .catch((error: unknown) => ({ ok: false as const, error })),
     getManualMatches(),
     getDecoupledPairs(),
   ]);
 
-  const kalshiMarkets = filterKalshiMarketsToMatch(kalshiResult, extractKalshiMatchKey(kalshiUrl));
+  const kalshiResult = kalshiSettled.ok ? kalshiSettled.value : [] as KalshiMarket[];
+  const pmEvent = pmSettled.ok ? pmSettled.value : null;
+  const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
-  if (kalshiMarkets.length === 0 && !platformWarnings.some((warning) => warning.startsWith('Kalshi'))) {
-    platformWarnings.push(KALSHI_UNAVAILABLE_WARNING);
-  }
-  if (!pmEvent && !platformWarnings.includes(PM_UNAVAILABLE_WARNING)) {
-    platformWarnings.push(PM_UNAVAILABLE_WARNING);
-  }
+  const kalshiMarkets = filterKalshiMarketsToMatch(kalshiResult, extractKalshiMatchKey(kalshiUrl));
+  const kalshiReason = !kalshiSettled.ok
+    ? (errorText(kalshiSettled.error).includes('timed out')
+      ? KALSHI_TIMEOUT_WARNING
+      : `Kalshi linked-event request failed: ${errorText(kalshiSettled.error)}`)
+    : kalshiMarkets.length === 0 ? KALSHI_EMPTY_WARNING : undefined;
+  const pmReason = !pmSettled.ok
+    ? `Polymarket linked-event request failed: ${errorText(pmSettled.error)}`
+    : !pmEvent ? PM_UNAVAILABLE_WARNING : undefined;
+  if (kalshiReason) platformWarnings.push(kalshiReason);
+  if (pmReason) platformWarnings.push(pmReason);
 
   const expiryDate = pmEvent?.endDate ?? market.expiryDate ?? undefined;
 
@@ -215,15 +230,17 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const pmMarketsRaw = chooseBestPmStructure(pmEvent?.markets || [], kalshiMarkets, eventTitle);
   const pmFilteredCount = pmMarketsRaw.length;
 
+  let clobFailureReason: string | undefined;
   const pmMarkets = await withTimeout(
     enrichQuickPmMarketsWithClobPrices(pmMarketsRaw),
     QUICK_PM_TIMEOUT_MS,
     'CLOB quick prices',
   ).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    platformWarnings.push(message.includes('timed out')
+    clobFailureReason = message.includes('timed out')
       ? CLOB_TIMEOUT_WARNING
-      : 'Polymarket order books are unavailable; showing saved market structure without live Polymarket prices.');
+      : `Polymarket order books are unavailable: ${message}`;
+    platformWarnings.push(clobFailureReason);
     return unavailableQuickPmMarkets(pmMarketsRaw);
   });
 
@@ -288,6 +305,19 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
       noPrice: o.polymarket!.noPrice,
     }));
 
+  const platformDiagnostics: QuickPricesResult['platformDiagnostics'] = {
+    kalshi: kalshiReason
+      ? { status: kalshiSettled.ok ? 'empty' : 'failed', count: 0, reason: kalshiReason }
+      : { status: 'fresh', count: kalshiMarkets.length },
+    polymarket: pmReason
+      ? { status: pmSettled.ok ? 'empty' : 'failed', count: 0, reason: pmReason }
+      : clobFailureReason
+        ? { status: 'failed', count: pmMarkets.length, reason: clobFailureReason }
+      : { status: 'fresh', count: pmMarkets.length },
+  };
+  const failedPlatforms = Object.values(platformDiagnostics).filter(({ status }) => status === 'failed').length;
+  const refreshStatus = failedPlatforms === 2 ? 'failed' : failedPlatforms === 1 ? 'partial' : 'complete';
+
   return {
     eventTitle,
     category: scanCategory,
@@ -313,5 +343,8 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     _kalshiFetchedAt: new Date().toISOString(),
     _pmFetchedAt: new Date().toISOString(),
     platformWarnings,
+    refreshStatus,
+    retryable: failedPlatforms > 0,
+    platformDiagnostics,
   };
 }

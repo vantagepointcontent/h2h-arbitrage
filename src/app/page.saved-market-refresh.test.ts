@@ -3,6 +3,7 @@ import {
   buildScanLinkPayload,
   createQuickPricesRequestOwner,
   createSavedMarketHydrationOwner,
+  mergeQuickPricesResult,
   restoreSavedMarketPopNavigation,
 } from './lib/page-shared';
 
@@ -85,6 +86,36 @@ function createSavedMarketViewHarness() {
 }
 
 describe('saved-market quick-price request ownership', () => {
+  it('keeps failed-platform last-known values visibly stale while applying fresh sibling data', () => {
+    const previous = {
+      eventTitle: 'NC-14', kalshiCount: 1, pmCount: 1, matchedCount: 1,
+      outcomes: [{
+        artist: 'Democratic',
+        kalshi: { ticker: 'NC14-D', yesBid: 0.12, yesAsk: 0.13, noBid: 0.86, noAsk: 0.87, lastPrice: 0.13 },
+        polymarket: { marketId: 'p', conditionId: 'p', yesPrice: 0.18, noPrice: 0.83, bestBid: 0.17, bestAsk: 0.18, lastTradePrice: 0.18 },
+        arbitrage: { strategy: 'old', kalshiStake: 100, pmStake: 100, expectedProfit: 9, roiPct: 4.5, buyPlatform: 'kalshi' as const, buyPrice: 0.13, sellPlatform: 'polymarket' as const, sellPrice: 0.83 },
+      }], unmatchedKalshi: [], unmatchedPolymarket: [],
+    };
+    const incoming = {
+      ...previous,
+      kalshiCount: 0,
+      outcomes: [{ ...previous.outcomes[0], kalshi: null, polymarket: { ...previous.outcomes[0].polymarket, yesPrice: 0.2, bestAsk: 0.2 } }],
+      platformDiagnostics: {
+        kalshi: { status: 'failed' as const, count: 0, reason: 'Kalshi API 503' },
+        polymarket: { status: 'fresh' as const, count: 1 },
+      },
+    };
+
+    const merged = mergeQuickPricesResult(previous, incoming);
+
+    expect(merged.outcomes[0].kalshi?.yesAsk).toBe(0.13);
+    expect(merged.outcomes[0].polymarket?.yesPrice).toBe(0.2);
+    expect(merged.outcomes[0].kalshiStale).toBe(true);
+    expect(merged.outcomes[0].polymarketStale).toBe(false);
+    expect(merged.outcomes[0].arbitrage.expectedProfit).toBe(0);
+    expect(merged.outcomes[0].arbitrage.roiPct).toBe(0);
+  });
+
   it('prevents response A from updating market B after rapid selection', () => {
     const owner = createQuickPricesRequestOwner();
     const requestA = owner.begin('market-a');

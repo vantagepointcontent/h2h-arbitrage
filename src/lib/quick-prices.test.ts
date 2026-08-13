@@ -48,9 +48,11 @@ describe('enrichQuickPmMarketsWithClobPrices', () => {
     expect(enriched).toHaveLength(20);
     expect(enriched.every((market) => market.bestAsk === 0.4)).toBe(true);
     expect(enriched.every((market) => JSON.parse(market.outcomePrices)[1] === '0.610000')).toBe(true);
+    expect(enriched.every((market) => market.askDepth === 40)).toBe(true);
+    expect(enriched.every((market) => market.noAskDepth === 61)).toBe(true);
   });
 
-  it('uses Gamma aggregate CLOB quotes for standard markets without a book request', async () => {
+  it('uses Gamma aggregate quotes and refreshes standard-market depth from token books', async () => {
     const market = {
       id: 'pm-standard',
       conditionId: 'condition-standard',
@@ -66,15 +68,68 @@ describe('enrichQuickPmMarketsWithClobPrices', () => {
       negRisk: false,
       clobTokenIds: '["yes-standard","no-standard"]',
     };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([
+      tokenBook('yes-standard', '0.43', '0.45'),
+      tokenBook('no-standard', '0.55', '0.57'),
+    ]), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
 
     const [enriched] = await enrichQuickPmMarketsWithClobPrices([market]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(enriched.bestBid).toBe(0.43);
     expect(enriched.bestAsk).toBe(0.45);
     expect(enriched.outcomePrices).toBe('["0.450000","0.570000"]');
+    expect(enriched.askDepth).toBe(45);
+    expect(enriched.noAskDepth).toBeCloseTo(57, 8);
+  });
+
+  it('pairs standard-market executable prices with the same token-book depth level', async () => {
+    const market = {
+      id: 'pm-standard-lagged', conditionId: 'condition-standard-lagged', question: 'Lagged standard market', slug: 'lagged-standard',
+      outcomes: '["Yes","No"]', outcomePrices: '["0.42","0.58"]', bestBid: 0.4, bestAsk: 0.42,
+      lastTradePrice: 0.41, active: true, closed: false, negRisk: false,
+      clobTokenIds: '["yes-lagged","no-lagged"]',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([
+      tokenBook('yes-lagged', '0.48', '0.50'),
+      tokenBook('no-lagged', '0.49', '0.51'),
+    ]), { status: 200, headers: { 'content-type': 'application/json' } })));
+
+    const [enriched] = await enrichQuickPmMarketsWithClobPrices([market]);
+
+    expect(enriched.bestAsk).toBe(0.5);
+    expect(enriched.askDepth).toBe(50);
+    expect(enriched.outcomePrices).toBe('["0.500000","0.510000"]');
+  });
+
+  it('fails the venue refresh when the CLOB books request fails', async () => {
+    const market = {
+      id: 'pm-books-fail', conditionId: 'condition-books-fail', question: 'Books fail', slug: 'books-fail',
+      outcomes: '["Yes","No"]', outcomePrices: '["0.4","0.6"]', bestBid: 0.39, bestAsk: 0.4,
+      active: true, closed: false, negRisk: false, clobTokenIds: '["yes-books-fail","no-books-fail"]',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })));
+
+    await expect(enrichQuickPmMarketsWithClobPrices([market])).rejects.toThrow('HTTP 503');
+  });
+
+  it('keeps the linked event when only an unrelated outcome book is unavailable', async () => {
+    const markets = [0, 1].map((index) => ({
+      id: `pm-partial-${index}`, conditionId: `condition-partial-${index}`, question: `Partial ${index}`, slug: `partial-${index}`,
+      outcomes: '["Yes","No"]', outcomePrices: '["0.4","0.6"]', bestBid: 0.39, bestAsk: 0.4,
+      active: true, closed: false, negRisk: false,
+      clobTokenIds: JSON.stringify([`yes-partial-${index}`, `no-partial-${index}`]),
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([
+      tokenBook('yes-partial-0', '0.39', '0.4'), tokenBook('no-partial-0', '0.59', '0.6'),
+    ]), { status: 200, headers: { 'content-type': 'application/json' } })));
+
+    const enriched = await enrichQuickPmMarketsWithClobPrices(markets);
+
+    expect(enriched[0].bestAsk).toBe(0.4);
+    expect(enriched[1].askDepth).toBe(0);
+    expect(enriched[1].noAskDepth).toBe(0);
   });
 
   it('falls back to token books when standard aggregate quotes are malformed', async () => {

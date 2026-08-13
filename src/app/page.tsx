@@ -103,7 +103,7 @@ import {
   formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
-  mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
+  mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -639,23 +639,7 @@ export default function Home() {
       if (res.ok) {
         setResult((prev) => {
           if (!prev) return data as ScanResult;
-          // Merge quick-prices outcome updates into the existing result so
-          // UI state (expanded rows, sorting) is not lost.
-          const next = { ...data } as ScanResult;
-          if (prev.outcomes && data.outcomes) {
-            const prevByArtist = new Map(prev.outcomes.map((o: UnifiedOutcome) => [o.artist, o]));
-            next.outcomes = (data.outcomes as UnifiedOutcome[]).map((o: UnifiedOutcome) => {
-              const old = prevByArtist.get(o.artist);
-              if (!old) return o;
-              return {
-                ...old,
-                kalshi: o.kalshi,
-                polymarket: o.polymarket,
-                arbitrage: o.arbitrage,
-              };
-            });
-          }
-          return next;
+          return mergeQuickPricesResult(prev, data as ScanResult);
         });
         const scannedAt = new Date().toISOString();
         setLastUpdated(new Date(scannedAt));
@@ -681,6 +665,11 @@ export default function Home() {
           : market));
       } else {
         setError(data.error || "Quick refresh failed");
+        if (data.platformDiagnostics && Array.isArray(data.outcomes)) {
+          setResult((previous) => previous
+            ? mergeQuickPricesResult(previous, data as ScanResult)
+            : previous);
+        }
         setSavedMarkets((previous) => previous.map((market) => market.id === marketId
           ? mergeSavedMarketMatchRefresh(market, {
               scannedAt: new Date().toISOString(), matchedCount: 0,
@@ -2088,8 +2077,8 @@ export default function Home() {
                             {result.expired && <span className="mr-3">This market has expired. Data is no longer being captured or updated — prices and arbitrage calculations are frozen and no longer valid.</span>}
                             {result.noPrices && <span className="mr-3">No live prices available. Refresh or check the market URLs.</span>}
                             {result.platformWarnings?.map((warning) => <span key={warning} className="mr-3">{warning}</span>)}
-                            {!result.expired && !result.noPrices && result.kalshiCount === 0 && <span className="mr-3">Kalshi returned 0 open markets.</span>}
-                            {!result.expired && !result.noPrices && result.pmCount === 0 && <span className="mr-3">Polymarket returned 0 markets.</span>}
+                            {!result.expired && !result.noPrices && result.kalshiCount === 0 && !result.platformDiagnostics?.kalshi.reason && <span className="mr-3">Kalshi linked event returned zero open markets.</span>}
+                            {!result.expired && !result.noPrices && result.pmCount === 0 && !result.platformDiagnostics?.polymarket.reason && <span className="mr-3">Polymarket linked event returned zero markets.</span>}
                             {!result.expired && !result.noPrices && result.kalshiCount > 0 && result.pmCount > 0 && result.matchedCount === 0 && <span className="mr-3">No matched pairs found. Manual matching may be needed.</span>}
                           </div>
                           {/* UI-17: Red box (expired) — action buttons clickable */}

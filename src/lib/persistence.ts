@@ -157,6 +157,13 @@ async function initDb(): Promise<void> {
   `);
   // AUTO-002: lifecycle columns (archive expired/dead markets)
   for (const ddl of [
+    // BUG-138: CREATE TABLE IF NOT EXISTS does not upgrade pre-OPS-009
+    // databases. Add every post-legacy base column before startup queries use
+    // SELECT *, APY joins, or refresh publication state.
+    `ALTER TABLE saved_markets ADD COLUMN category TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN expiry_date TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE saved_markets ADD COLUMN last_scan_result TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE saved_markets ADD COLUMN archived_at TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN archive_reason TEXT`,

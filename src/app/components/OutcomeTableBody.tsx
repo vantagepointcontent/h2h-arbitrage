@@ -18,6 +18,8 @@ import { resolveDistributionStakes, type ProfitDistribution } from '@/lib/profit
 
 interface Outcome {
   artist: string;
+  kalshiStale?: boolean;
+  polymarketStale?: boolean;
   kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
   polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
   arbitrage: {
@@ -243,7 +245,8 @@ function OutcomeTableBodyInner({
       {displayOutcomes.map((o, idx) => {
         const k = o.kalshi;
         const p = o.polymarket;
-        const hasPrices = !!(k && p && k.yesAsk != null && p.yesPrice != null);
+        const stale = o.kalshiStale || o.polymarketStale;
+        const hasPrices = !!(!stale && k && p && k.yesAsk != null && p.yesPrice != null);
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
         const roiColor = !hasPrices ? "text-[var(--text-secondary)]" : o.arbitrage.roiPct > 0 ? "text-[var(--status-positive)]" : o.arbitrage.roiPct < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]";
         // APY color: gray for non-actionable (no prices, ROI <= 0, or APY <= 0); green only when ROI is positive and APY is positive
@@ -265,6 +268,7 @@ function OutcomeTableBodyInner({
                 <div className="flex items-center gap-1.5" title={buildMarketTooltip({ eventTitle: marketTitle ?? o.artist, expiryDate: marketExpiryDate })}>
                   <span className={`transition-transform text-[var(--text-secondary)] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                   {o.artist}
+                  {stale && <span className="rounded border border-[var(--status-warning)]/40 px-1 py-0.5 text-xs text-[var(--status-warning)]">Stale</span>}
                 </div>
               </td>
               <td className="px-4 py-3 text-right text-[var(--text-primary)]">

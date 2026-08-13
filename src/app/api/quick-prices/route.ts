@@ -33,6 +33,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
 
   let marketId: string | null = null;
   let publicationGeneration: number | null = null;
+  let persistenceWarning: string | undefined;
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) {
@@ -53,29 +54,46 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    publicationGeneration = await reserveSavedMarketPublication(marketId, 'scan');
-    await reconcileSavedMarketMatchSummary(marketId, {
-      matchedCount: 0,
-      matchStatus: 'refreshing',
-      matchError: undefined,
-      matchedPairs: undefined,
-      scannedAt: new Date().toISOString(),
-      publicationGeneration,
-    });
+    try {
+      publicationGeneration = await reserveSavedMarketPublication(marketId, 'scan');
+      await reconcileSavedMarketMatchSummary(marketId, {
+        matchedCount: 0,
+        matchStatus: 'refreshing',
+        matchError: undefined,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
+      });
+    } catch (error: unknown) {
+      const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
+      if (code !== 'SQLITE_BUSY') throw error;
+      persistenceWarning = 'Saved-market status persistence is temporarily unavailable; live linked-event prices were still refreshed.';
+    }
     const result: QuickPricesResult = await quickPricesScan(marketId, capital);
-    await reconcileSavedMarketMatchSummary(marketId, {
-      matchedCount: result.matchedCount,
-      matchStatus: result.matchStatus,
-      matchError: result.matchError,
-      matchedPairs: result.matchedPairs,
-      scannedAt: result._pmFetchedAt,
-      publicationGeneration,
-    });
-    return NextResponse.json(result, {
+    if (publicationGeneration != null) {
+      await reconcileSavedMarketMatchSummary(marketId, {
+        matchedCount: result.matchedCount,
+        matchStatus: result.matchStatus,
+        matchError: result.matchError,
+        matchedPairs: result.matchedPairs,
+        scannedAt: result._pmFetchedAt,
+        publicationGeneration,
+      }).catch((error: unknown) => {
+        persistenceWarning = 'Saved-market status persistence is temporarily unavailable; live linked-event prices were still refreshed.';
+        console.error('[api/quick-prices] result persistence failed', error);
+      });
+    }
+    const status = result.refreshStatus === 'failed' ? 503 : result.refreshStatus === 'partial' ? 207 : 200;
+    const error = result.refreshStatus === 'failed'
+      ? `Linked-event price refresh failed. ${result.platformWarnings.join(' ')}`
+      : undefined;
+    return NextResponse.json({ ...result, error, persistenceWarning }, {
+      status,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        ...(result.retryable ? { 'Retry-After': '5' } : {}),
       },
     });
   } catch (err: unknown) {

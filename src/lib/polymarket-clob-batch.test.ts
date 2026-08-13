@@ -105,6 +105,8 @@ describe('getClobPricesFromBooks', () => {
       bestBid: 0.4,
       bestAsk: 0.42,
       lastTradePrice: 0.42,
+      yesAskDepth: 42,
+      noAskDepth: 59,
     });
   });
 });

@@ -209,6 +209,8 @@ export interface ArbitrageInfo {
 
 export interface UnifiedOutcome {
   artist: string;
+  kalshiStale?: boolean;
+  polymarketStale?: boolean;
   kalshi: {
     ticker: string;
     yesBid: number;
@@ -351,9 +353,58 @@ export interface ScanResult {
   expired?: boolean;
   noPrices?: boolean;
   platformWarnings?: string[];
+  refreshStatus?: 'complete' | 'partial' | 'failed';
+  retryable?: boolean;
+  platformDiagnostics?: Record<'kalshi' | 'polymarket', {
+    status: 'fresh' | 'empty' | 'failed';
+    count: number;
+    reason?: string;
+  }>;
   outcomes: UnifiedOutcome[];
   unmatchedKalshi: UnmatchedKalshi[];
   unmatchedPolymarket: UnmatchedPolymarket[];
+}
+
+/** Merge a scoped quick refresh without promoting last-known failed-venue quotes
+ * to current executable data. Genuine empty results are not retained. */
+export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResult): ScanResult {
+  const kalshiFailed = incoming.platformDiagnostics?.kalshi.status === 'failed';
+  const polymarketFailed = incoming.platformDiagnostics?.polymarket.status === 'failed';
+  const previousByArtist = new Map(previous.outcomes.map((outcome) => [outcome.artist, outcome]));
+  const incomingByArtist = new Map(incoming.outcomes.map((outcome) => [outcome.artist, outcome]));
+  const artists = new Set([...previousByArtist.keys(), ...incomingByArtist.keys()]);
+  const outcomes = [...artists].map((artist) => {
+    const old = previousByArtist.get(artist);
+    const fresh = incomingByArtist.get(artist);
+    if (!old) return fresh!;
+    if (!fresh && !kalshiFailed && !polymarketFailed) return null;
+    const kalshi = kalshiFailed ? old.kalshi : fresh?.kalshi ?? null;
+    const polymarket = polymarketFailed ? old.polymarket : fresh?.polymarket ?? null;
+    const stale = kalshiFailed || polymarketFailed;
+    const arbitrage = stale
+      ? {
+          ...(fresh?.arbitrage ?? old.arbitrage),
+          expectedProfit: 0,
+          roiPct: 0,
+          apyPct: 0,
+          kalshiStake: 0,
+          pmStake: 0,
+          maxCapital: 0,
+          depthVerified: false,
+          strategy: 'Unavailable — stale platform data',
+        }
+      : fresh?.arbitrage ?? old.arbitrage;
+    return {
+      ...old,
+      ...fresh,
+      kalshi,
+      polymarket,
+      arbitrage,
+      kalshiStale: kalshiFailed,
+      polymarketStale: polymarketFailed,
+    };
+  }).filter((outcome): outcome is UnifiedOutcome => outcome !== null);
+  return { ...previous, ...incoming, outcomes };
 }
 
 /* ── Utility helpers ── */

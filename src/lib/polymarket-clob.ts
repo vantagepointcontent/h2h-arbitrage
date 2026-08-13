@@ -222,13 +222,16 @@ export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
  * Fetch multiple token orderbooks with one CLOB request. Cached books are
  * reused and only missing token IDs are sent to the batch endpoint.
  */
-export async function fetchClobBooks(tokenIds: string[]): Promise<Map<string, ClobBook | null>> {
+export async function fetchClobBooks(
+  tokenIds: string[],
+  options?: { throwOnFailure?: boolean; bypassCache?: boolean },
+): Promise<Map<string, ClobBook | null>> {
   const uniqueIds = [...new Set(tokenIds.filter(Boolean))];
   const result = new Map<string, ClobBook | null>();
   const uncached: string[] = [];
 
   for (const tokenId of uniqueIds) {
-    const cached = getCachedBook(tokenId);
+    const cached = options?.bypassCache ? undefined : getCachedBook(tokenId);
     if (cached !== undefined) result.set(tokenId, cached);
     else uncached.push(tokenId);
   }
@@ -252,6 +255,9 @@ export async function fetchClobBooks(tokenIds: string[]): Promise<Map<string, Cl
       }),
     );
 
+    if (!res.ok && options?.throwOnFailure) {
+      throw new Error(`Polymarket CLOB books request failed with HTTP ${res.status}`);
+    }
     const books: unknown = res.ok ? await res.json() : [];
     const byAssetId = new Map<string, ClobBook>();
     const assetIdCounts = new Map<string, number>();
@@ -282,7 +288,8 @@ export async function fetchClobBooks(tokenIds: string[]): Promise<Map<string, Cl
       setCachedBook(tokenId, book);
       result.set(tokenId, book);
     }
-  } catch {
+  } catch (error) {
+    if (options?.throwOnFailure) throw error;
     for (const tokenId of uncached) {
       setCachedBook(tokenId, null);
       result.set(tokenId, null);
@@ -457,6 +464,8 @@ export interface ClobPrices {
   bestBid: number;
   bestAsk: number;
   lastTradePrice: number;
+  yesAskDepth?: number;
+  noAskDepth?: number;
 }
 
 /** Derive executable prices from token books already fetched by the caller. */
@@ -468,21 +477,26 @@ export function getClobPricesFromBooks(
   const clamp = (value: number) => Math.max(0, Math.min(1, value));
   const isExecutablePrice = (value: unknown): value is number =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1;
+  const yesPrices = getBestPriceFromBook(yesBook);
+  const noPrices = getBestPriceFromBook(noBook);
 
   if (clob.neg_risk !== true && isExecutablePrice(clob.best_bid) && isExecutablePrice(clob.best_ask)) {
-    const yesPrice = clamp(clob.best_ask);
-    const noPrice = clamp(1 - clob.best_bid);
+    // Keep executable price and depth on the same token-book level. Gamma's
+    // aggregate quote can lag the book and must not be paired with unrelated
+    // depth for sizing.
+    const yesPrice = yesPrices?.bestAsk && yesPrices.bestAsk > 0 ? clamp(yesPrices.bestAsk) : clamp(clob.best_ask);
+    const noPrice = noPrices?.bestAsk && noPrices.bestAsk > 0 ? clamp(noPrices.bestAsk) : clamp(1 - clob.best_bid);
     return {
       yesPrice,
       noPrice,
-      bestBid: clamp(clob.best_bid),
+      bestBid: yesPrices?.bestBid && yesPrices.bestBid > 0 ? clamp(yesPrices.bestBid) : clamp(clob.best_bid),
       bestAsk: yesPrice,
       lastTradePrice: clob.last_trade_price ?? yesPrice,
+      yesAskDepth: bestAskDollarDepth(yesBook),
+      noAskDepth: bestAskDollarDepth(noBook),
     };
   }
 
-  const yesPrices = getBestPriceFromBook(yesBook);
-  const noPrices = getBestPriceFromBook(noBook);
   if (!yesPrices) return null;
 
   const yesPrice = clamp(yesPrices.bestAsk);
@@ -499,6 +513,8 @@ export function getClobPricesFromBooks(
     bestBid: clamp(yesPrices.bestBid),
     bestAsk: yesPrice,
     lastTradePrice: clob.last_trade_price ?? yesPrice,
+    yesAskDepth: bestAskDollarDepth(yesBook),
+    noAskDepth: bestAskDollarDepth(noBook),
   };
 }
 
