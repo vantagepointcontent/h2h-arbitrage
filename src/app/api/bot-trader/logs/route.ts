@@ -53,8 +53,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'since must be a valid ISO date' }, { status: 400 });
     }
     const cursorParam = params.get('cursor');
-    const cursor = cursorParam ? Number(cursorParam) : undefined;
-    if (cursorParam && (!Number.isInteger(cursor) || (cursor ?? 0) <= 0)) {
+    if (cursorParam != null && !/^[1-9]\d*$/.test(cursorParam)) {
+      return NextResponse.json({ success: false, error: 'cursor must be a positive integer' }, { status: 400 });
+    }
+    const cursor = cursorParam == null ? undefined : Number(cursorParam);
+    if (cursor != null && !Number.isSafeInteger(cursor)) {
       return NextResponse.json({ success: false, error: 'cursor must be a positive integer' }, { status: 400 });
     }
     const qualifiedParam = params.get('qualified');

@@ -26,4 +26,20 @@ describe('GET /api/bot-trader/logs qualified filter', () => {
     expect(response.status).toBe(400);
     expect(getBotActionLogs).not.toHaveBeenCalled();
   });
+
+  it.each(['', '0', '-1', '1.5', '1e3', '9007199254740992'])('rejects a non-canonical or unsafe cursor: %s', async (cursor) => {
+    const response = await GET(new NextRequest(`http://localhost/api/bot-trader/logs?cursor=${cursor}`));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ success: false, error: 'cursor must be a positive integer' });
+    expect(pruneBotActionLogs).not.toHaveBeenCalled();
+    expect(getBotActionLogs).not.toHaveBeenCalled();
+  });
+
+  it('passes a positive safe-integer cursor to persistence', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?cursor=9007199254740991'));
+
+    expect(response.status).toBe(200);
+    expect(getBotActionLogs).toHaveBeenCalledWith(expect.objectContaining({ cursor: Number.MAX_SAFE_INTEGER }));
+  });
 });

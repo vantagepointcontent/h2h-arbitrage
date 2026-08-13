@@ -76,6 +76,7 @@ This review is intentionally one module and one verified change at a time. Runti
 | CR-068 | High | `src/lib/matcher.ts` Gamma best-quote normalization | Fixed | Untyped Gamma `bestBid`, `bestAsk`, and `lastTradePrice` bypassed serialized outcome-price validation; malformed numeric strings could be returned as quote fields and incorrectly select an orderbook branch. Best quotes now require complete finite binary decimals and malformed values behave as unavailable; last trade price fails closed at zero. Regression coverage verifies hexadecimal, trailing-text, and infinite values. |
 | CR-069 | High | `src/lib/market-depth.ts` depth-level decimal parsing | Fixed | Market-depth levels accepted permissive numeric conversion, allowing malformed or non-finite external price/size values into the depth display. Levels now require complete finite decimals, strict binary prices, and positive size; regression coverage rejects malformed values. |
 | CR-070 | Medium | `src/lib/live-arb-engine.ts` live-book staleness configuration | Fixed | A malformed, non-finite, zero, negative, or non-decimal `H2H_BOOK_STALE_MS` could either mark every book immediately stale or disable the stale-book guard. The engine now accepts only complete positive finite decimal durations and falls back to the safe 60-second threshold; regression coverage verifies invalid and valid values. |
+| CR-071 | Low | `src/app/api/bot-trader/logs/route.ts` cursor validation | Fixed | `Number()` accepted scientific notation and integers above `Number.MAX_SAFE_INTEGER` as pagination cursors, allowing ambiguous or rounded IDs into the SQLite query. The route now requires canonical positive decimal digits and a safe integer before pruning or querying; regression coverage rejects blank, fractional, scientific-notation, and unsafe values. |
 
 ## Verification
 
@@ -93,6 +94,7 @@ This review is intentionally one module and one verified change at a time. Runti
 - CR-066 regression: `src/lib/matcher.test.ts` verifies CLOB ask depth ignores hexadecimal, above-par, and trailing-text prices. Full Vitest: 660 passed, 0 failed; production build passed; PM2 health returned `{"status":"ok","savedMarketCount":478}`.
 - CR-067 regression: `src/lib/polymarket.test.ts` and `src/lib/matcher.test.ts` verify malformed, non-decimal, and out-of-range Gamma outcome prices fail closed. Full Vitest: 660 passed, 0 failed; production build passed.
 - CR-068 regression: `src/lib/matcher.test.ts` verifies malformed Gamma best quotes fall back to validated outcome prices and a malformed last-trade value returns zero. Full Vitest: 661 passed, 0 failed; production build passed.
+- CR-071 regression: `src/app/api/bot-trader/logs/route.test.ts` verifies malformed and unsafe cursors return 400 before pruning or querying. Baseline Vitest: 1,131 passed; focused: 6 passed; final full Vitest: 1,135 passed; production build passed. Isolated production runtime returned health 200 and rejected `cursor=1e3` with HTTP 400.
 
 ## Next review module
 
