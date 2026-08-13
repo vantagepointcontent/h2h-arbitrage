@@ -259,7 +259,7 @@ export function CompactStrategyDisplay({ strategy }: { strategy: string }) {
         <span key={i} className="inline-flex items-center gap-1">
           {i > 0 && <span className="text-[#5E6875] text-[10px]">·</span>}
           <PlatformIcon platform={leg.platform} />
-          <span className={`text-[10px] font-medium ${leg.side === 'YES' ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+          <span className="rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-1 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]">
             {leg.side}{breakdown.isCross && leg.outcome ? `(${leg.outcome})` : ''}
           </span>
         </span>

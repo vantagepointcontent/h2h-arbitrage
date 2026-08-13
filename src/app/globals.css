@@ -100,6 +100,11 @@
   --density-row-compact: 2rem;
   --density-row-standard: 2.5rem;
   --density-row-interactive: 2.75rem;
+  --table-header-surface: #121E2B;
+  --table-row-surface: #17212B;
+  --table-row-alternate: rgba(14, 22, 33, 0.32);
+  --table-row-hover: #182533;
+  --table-row-focus: rgba(93, 190, 129, 0.12);
   --space-workspace: 1.5rem;
   --space-panel: 1rem;
   --radius-control: 0.5rem;
@@ -158,6 +163,11 @@
   --platform-polymarket: #5b4fc4;
   --header-bg: #f0e8dc;
   --sidebar-bg: #faf5ec;
+  --table-header-surface: #e8ddd0;
+  --table-row-surface: #f0e8dc;
+  --table-row-alternate: rgba(250, 245, 236, 0.55);
+  --table-row-hover: #e8ddd0;
+  --table-row-focus: rgba(77, 166, 110, 0.12);
 }
 
 /* ─── Smooth theme transitions ─── */

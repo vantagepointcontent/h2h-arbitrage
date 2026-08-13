@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
+import { AlertTriangle, Check, Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
 import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
@@ -10,6 +10,41 @@ import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
 import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
+
+const MARKET_SCAN_STALE_MS = 15 * 60_000;
+
+function MarketFreshness({ scannedAt, refreshing, nowMs }: { scannedAt?: string | null; refreshing: boolean; nowMs: number }) {
+  if (refreshing) {
+    return <span className="inline-flex items-center justify-end gap-1 text-[var(--status-info)]"><Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />Refreshing</span>;
+  }
+  if (!scannedAt) return <span className="text-[var(--text-secondary)]">Not scanned</span>;
+  const scannedMs = Date.parse(scannedAt);
+  const stale = !Number.isFinite(scannedMs) || nowMs - scannedMs > MARKET_SCAN_STALE_MS;
+  const age = formatRelativeTime(scannedAt);
+  if (stale) {
+    return <span className="inline-flex items-center justify-end gap-1 text-[var(--status-warning)]" title="Scan is more than 15 minutes old"><AlertTriangle aria-hidden="true" className="h-3 w-3" />Stale · {age}</span>;
+  }
+  return <span className="inline-flex items-center justify-end gap-1 text-[var(--text-secondary)]"><Check aria-hidden="true" className="h-3 w-3 text-[var(--status-positive)]" />Fresh · {age}</span>;
+}
+
+function MatchState({ market }: { market: SavedMarket }) {
+  const state = getCanonicalMatchState(market);
+  const label = formatCanonicalMatchState(market);
+  const tone = state.status === "refreshing"
+    ? "border-[var(--status-info)]/30 bg-[var(--status-info)]/10 text-[var(--status-info)]"
+    : state.status === "unavailable"
+      ? "border-[var(--status-warning)]/30 bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
+      : state.status === "matched"
+        ? "border-[var(--border-strong)] bg-[var(--surface-hover)] text-[var(--text-primary)]"
+        : "border-[var(--border-subtle)] bg-[var(--surface-workspace)] text-[var(--text-secondary)]";
+  return (
+    <span className={`inline-flex max-w-40 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${tone}`} title={label}>
+      {state.status === "refreshing" && <Loader2 aria-hidden="true" className="h-2.5 w-2.5 shrink-0 animate-spin" />}
+      {state.status === "unavailable" && <AlertTriangle aria-hidden="true" className="h-2.5 w-2.5 shrink-0" />}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 /* ── Overview Panel ── */
 function OverviewPanelInner({
@@ -53,6 +88,7 @@ function OverviewPanelInner({
 }) {
   // Auto-load on mount only — prevents infinite loop if parent re-creates callback
   useEffect(() => { onLoad(); }, []);
+  const [renderedAt] = useState(() => Date.now());
 
   const getMarketApy = (m: SavedMarket): number => {
     const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
@@ -162,7 +198,7 @@ function OverviewPanelInner({
     }
     if (expiryFilter === "all") return true;
     if (!m.expiryDate) return false;
-    const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
+    const days = (new Date(m.expiryDate).getTime() - renderedAt) / 86400000;
     if (expiryFilter === "lte7") return days <= 7;
     if (expiryFilter === "lte14") return days <= 14;
     if (expiryFilter === "lte30") return days <= 30;
@@ -173,7 +209,7 @@ function OverviewPanelInner({
     return roi > 0;
   }).sort(sortFn),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [markets, categoryFilter, showExpired, expiryFilter, showArbOnly, sort, sortDir]);
+    [markets, categoryFilter, showExpired, expiryFilter, showArbOnly, sort, sortDir, renderedAt]);
 
   // Aggregate stats (respect current filter)
   const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
@@ -279,9 +315,9 @@ function OverviewPanelInner({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <h2 className="text-xl font-bold tracking-tight">Markets</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0">
           <div className="flex items-center gap-1 bg-[var(--surface-hover)] rounded-lg px-1.5 py-0.5">
             <label htmlFor="market-category-filter" className="sr-only">Category</label>
             <select
@@ -442,9 +478,9 @@ function OverviewPanelInner({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto">
-          <DataTable aria-label="Saved markets overview">
-            <thead className="bg-[var(--surface-panel)] border-b border-[var(--border-subtle)]">
+        <div data-testid="markets-table-scroll" className="overflow-x-auto rounded-xl border border-[var(--border-strong)] bg-[var(--table-row-surface)] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+          <DataTable aria-label="Saved markets overview" className="min-w-[960px] [&_td]:h-10 [&_td]:px-3 [&_td]:py-1.5">
+            <thead className="sticky top-0 z-10 border-b border-[var(--border-strong)] bg-[var(--table-header-surface)] shadow-[0_1px_0_var(--border-strong)]">
               <tr className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">
                 {([
                   { key: "name", label: "Market", align: "left" },
@@ -460,7 +496,7 @@ function OverviewPanelInner({
                   <th
                     key={key}
                     onClick={() => onToggleSort(key)}
-                    className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+                    className={`whitespace-nowrap px-3 py-2 font-semibold cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors ${align === "right" ? "text-right" : "text-left"}`}
                   >
                     <span className={align === "right" ? "inline-flex items-center gap-1 flex-row-reverse" : "inline-flex items-center gap-1"}>
                       {label}
@@ -473,39 +509,53 @@ function OverviewPanelInner({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
+            <tbody>
               {filteredByExpiry.map((m) => {
                 const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                 const apy = getMarketApy(m);
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
-                const matchedLabel = formatCanonicalMatchState(m);
+                const matchState = getCanonicalMatchState(m);
                 const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
                 const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
                 return (
                   <tr
                     key={m.id}
                     onClick={() => onSelectMarket(m)}
-                    className="cursor-pointer hover:bg-[var(--surface-hover)]/50 transition-colors"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelectMarket(m);
+                      }
+                    }}
+                    tabIndex={0}
+                    className="group cursor-pointer bg-[var(--table-row-surface)] transition-[background-color,box-shadow] odd:bg-[var(--table-row-alternate)] hover:bg-[var(--table-row-hover)] focus-visible:bg-[var(--table-row-focus)] focus-visible:outline-none focus-visible:shadow-[inset_3px_0_var(--focus-ring),inset_0_0_0_1px_var(--focus-ring)]"
                   >
-                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>{m.eventTitle}</td>
-                    <td className="px-4 py-3 text-right text-[var(--text-primary)]">{formatExpiry(m.expiryDate)}</td>
-                    <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{matchedLabel}</td>
-                    <td className="px-4 py-3 text-right font-bold text-[var(--status-positive)]">{arbCount > 0 ? arbCount : "—"}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className="max-w-[360px]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-semibold text-[var(--text-primary)]">{m.eventTitle}</span>
+                        {m.category && <span className="shrink-0 rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--text-secondary)]">{m.category}</span>}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap text-right text-[var(--text-secondary)]">{formatExpiry(m.expiryDate)}</td>
+                    <td className="text-right"><MatchState market={m} /></td>
+                    <td className="text-right">
+                      {arbCount > 0 ? <span aria-label={`${arbCount} active arbitrage ${arbCount === 1 ? "opportunity" : "opportunities"}`} className="inline-flex min-w-6 items-center justify-center gap-1 rounded-md border border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 px-1.5 py-0.5 font-bold text-[var(--status-positive)]"><Zap aria-hidden="true" className="h-2.5 w-2.5" />{arbCount}</span> : <span className="text-[var(--text-secondary)]">—</span>}
+                    </td>
+                    <td className={`text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
-                    <td className={`px-4 py-3 text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
                       {apy !== 0 ? (
                         <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
                           {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
                         </ApyValueTooltip>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right text-[var(--text-primary)]">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
-                    <td className="px-4 py-3 text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
-                    <td className="px-4 py-3 text-right text-xs text-[var(--text-secondary)]">{formatRelativeTime(scannedAt)}</td>
+                    <td className={`whitespace-nowrap text-right font-semibold ${profit > 0 ? "text-[var(--status-positive)]" : profit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className="whitespace-nowrap text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
+                    <td className="whitespace-nowrap text-right text-[10px]"><MarketFreshness scannedAt={scannedAt} refreshing={matchState.status === "refreshing"} nowMs={renderedAt} /></td>
                   </tr>
                 );
               })}

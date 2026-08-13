@@ -141,6 +141,54 @@ describe('BUG-133 canonical matched state', () => {
   });
 });
 
+describe('UI-104 Markets table hierarchy', () => {
+  it('keeps the dense table scrollable with a sticky, layered header', () => {
+    render(<OverviewPanel {...props} layout="table" markets={[marketWithOpportunity('active', 'Active market')]} />);
+
+    const scroller = screen.getByTestId('markets-table-scroll');
+    const table = screen.getByRole('table', { name: 'Saved markets overview' });
+    const header = table.querySelector('thead');
+
+    expect(scroller.className).toContain('overflow-x-auto');
+    expect(table.className).toContain('min-w-[960px]');
+    expect(header?.className).toContain('sticky');
+    expect(header?.className).toContain('table-header-surface');
+  });
+
+  it('makes rows keyboard actionable without changing click navigation', () => {
+    const selected = marketWithOpportunity('keyboard', 'Keyboard market');
+    const onSelectMarket = vi.fn();
+    render(<OverviewPanel {...props} layout="table" markets={[selected]} onSelectMarket={onSelectMarket} />);
+
+    const row = screen.getByRole('row', { name: /Keyboard market/ });
+    expect(row.getAttribute('tabindex')).toBe('0');
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onSelectMarket).toHaveBeenCalledWith(selected);
+  });
+
+  it('labels opportunity and freshness states rather than relying on color', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-13T12:30:00.000Z'));
+    const active = marketWithOpportunity('active', 'Active market');
+    active.lastScanResult = { ...active.lastScanResult!, scannedAt: '2026-08-13T12:29:00.000Z' } as SavedMarket['lastScanResult'];
+    const stale = marketWithOpportunity('stale', 'Stale market');
+    stale.lastScanResult = { ...stale.lastScanResult!, scannedAt: '2026-08-13T12:00:00.000Z' } as SavedMarket['lastScanResult'];
+    const refreshing = market('refreshing', 'Refreshing market');
+    refreshing.lastScanResult = {
+      scannedAt: '2026-08-13T12:29:00.000Z', bestRoiPct: 0, bestProfit: 0,
+      strategy: 'No arb', matchedCount: 0, matchStatus: 'refreshing', allArbs: [],
+    } as SavedMarket['lastScanResult'];
+
+    render(<OverviewPanel {...props} layout="table" markets={[active, stale, refreshing]} />);
+
+    expect(screen.getAllByLabelText('1 active arbitrage opportunity')).toHaveLength(2);
+    expect(screen.getByText('Fresh · 1min')).toBeTruthy();
+    expect(screen.getByText('Stale · 30min')).toBeTruthy();
+    expect(screen.getAllByText('Refreshing').length).toBeGreaterThan(0);
+    vi.useRealTimers();
+  });
+});
+
 describe.each([
   ['desktop', 1440],
   ['mobile', 375],
