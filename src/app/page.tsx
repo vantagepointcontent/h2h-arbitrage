@@ -249,6 +249,7 @@ export default function Home() {
   // Persist sidebar toggle
   useEffect(() => { persistSidebarOpen(sidebarOpen); }, [sidebarOpen]);
   const [activeMarketId, setActiveMarketId] = useState<string | null>(null);
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
   const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scan" | "overview" | "opportunities" | "marketfinder" | "live" | "dashboard" | "logs" | "settings" | "trades" | "bottrader" | "phantoms">("overview");
 
@@ -271,6 +272,7 @@ export default function Home() {
   useEffect(() => { savedMarketsRef.current = savedMarkets; }, [savedMarkets]);
   useEffect(() => { kalshiUrlRef.current = kalshiUrl; }, [kalshiUrl]);
   useEffect(() => { pmUrlRef.current = pmUrl; }, [pmUrl]);
+  useEffect(() => { setSelectedMarketId(localStorage.getItem("selectedMarketId")); }, []);
   const cancelSavedMarketWork = () => {
     savedMarketHydrationOwnerRef.current.cancel();
     const cancelledMode = quickPricesRequestOwnerRef.current.cancel();
@@ -279,6 +281,10 @@ export default function Home() {
   };
   useEffect(() => {
     activeMarketIdRef.current = activeMarketId;
+    if (activeMarketId) {
+      setSelectedMarketId(activeMarketId);
+      localStorage.setItem("selectedMarketId", activeMarketId);
+    }
     if (!activeMarketId || viewMode !== "scan") {
       cancelSavedMarketWork();
     }
@@ -1811,6 +1817,7 @@ export default function Home() {
                 timeUntilExpiry={timeUntilExpiry}
                 formatExpiry={formatExpiry}
                 onSelectMarket={loadMarket}
+                selectedMarketId={selectedMarketId}
               />
             ) : viewMode === "marketfinder" ? (
               <MarketFinderPanel

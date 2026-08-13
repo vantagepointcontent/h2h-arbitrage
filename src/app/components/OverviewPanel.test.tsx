@@ -166,6 +166,24 @@ describe('UI-104 Markets table hierarchy', () => {
     expect(onSelectMarket).toHaveBeenCalledWith(selected);
   });
 
+  it('exposes and styles the persistently selected market row', () => {
+    const selected = marketWithOpportunity('selected', 'Selected market');
+    render(
+      <OverviewPanel
+        {...props}
+        layout="table"
+        markets={[selected, marketWithOpportunity('other', 'Other market')]}
+        selectedMarketId={selected.id}
+      />,
+    );
+
+    const selectedRow = screen.getByRole('row', { name: /Selected market/ });
+    expect(selectedRow.getAttribute('aria-selected')).toBe('true');
+    expect(selectedRow.className).toContain('table-row-selected');
+    expect(screen.getByText('Selected')).toBeTruthy();
+    expect(screen.getByRole('row', { name: /Other market/ }).getAttribute('aria-selected')).toBe('false');
+  });
+
   it('labels opportunity and freshness states rather than relying on color', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-13T12:30:00.000Z'));
@@ -181,10 +199,34 @@ describe('UI-104 Markets table hierarchy', () => {
 
     render(<OverviewPanel {...props} layout="table" markets={[active, stale, refreshing]} />);
 
-    expect(screen.getAllByLabelText('1 active arbitrage opportunity')).toHaveLength(2);
+    expect(screen.getAllByLabelText('1 active arbitrage opportunity')).toHaveLength(1);
+    expect(screen.getAllByLabelText('1 cached arbitrage opportunity')).toHaveLength(1);
     expect(screen.getByText('Fresh · 1min')).toBeTruthy();
     expect(screen.getByText('Stale · 30min')).toBeTruthy();
     expect(screen.getAllByText('Refreshing').length).toBeGreaterThan(0);
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['stale', '2026-08-13T12:00:00.000Z', 'matched', 'Cached scan'],
+    ['unavailable', '2026-08-13T12:29:00.000Z', 'unavailable', 'Data unavailable'],
+  ] as const)('does not present %s opportunity metrics as current', (_case, scannedAt, matchStatus, provenanceLabel) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-13T12:30:00.000Z'));
+    const affected = marketWithOpportunity(_case, `${_case} metrics`);
+    affected.lastScanResult = {
+      ...affected.lastScanResult!,
+      scannedAt,
+      matchStatus,
+      matchError: matchStatus === 'unavailable' ? 'Venue unavailable' : undefined,
+    } as SavedMarket['lastScanResult'];
+
+    render(<OverviewPanel {...props} layout="table" markets={[affected]} />);
+
+    const row = screen.getByRole('row', { name: new RegExp(`${_case} metrics`, 'i') });
+    expect(row.getAttribute('data-metric-provenance')).toBe(_case);
+    expect(screen.getByText(provenanceLabel)).toBeTruthy();
+    expect(screen.getByLabelText('1 cached arbitrage opportunity').className).not.toContain('status-positive');
     vi.useRealTimers();
   });
 });

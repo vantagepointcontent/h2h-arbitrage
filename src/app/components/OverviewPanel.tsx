@@ -46,6 +46,27 @@ function MatchState({ market }: { market: SavedMarket }) {
   );
 }
 
+type MetricProvenance = "current" | "stale" | "unavailable" | "refreshing";
+
+function getMetricProvenance(market: SavedMarket, scannedAt: string | null | undefined, nowMs: number): MetricProvenance {
+  const matchState = getCanonicalMatchState(market);
+  if (matchState.status === "unavailable") return "unavailable";
+  if (matchState.status === "refreshing") return "refreshing";
+  const scannedMs = scannedAt ? Date.parse(scannedAt) : Number.NaN;
+  return !Number.isFinite(scannedMs) || nowMs - scannedMs > MARKET_SCAN_STALE_MS ? "stale" : "current";
+}
+
+function MetricProvenanceLabel({ provenance }: { provenance: Exclude<MetricProvenance, "current"> }) {
+  const label = provenance === "unavailable" ? "Data unavailable" : provenance === "refreshing" ? "Updating" : "Cached scan";
+  const Icon = provenance === "refreshing" ? Loader2 : AlertTriangle;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--text-secondary)]">
+      <Icon aria-hidden="true" className={`h-2.5 w-2.5 ${provenance === "refreshing" ? "animate-spin" : ""}`} />
+      {label}
+    </span>
+  );
+}
+
 /* ── Overview Panel ── */
 function OverviewPanelInner({
   markets,
@@ -65,6 +86,7 @@ function OverviewPanelInner({
   timeUntilExpiry,
   formatExpiry,
   onSelectMarket,
+  selectedMarketId = null,
   mode = "markets",
 }: {
   markets: SavedMarket[];
@@ -84,6 +106,7 @@ function OverviewPanelInner({
   timeUntilExpiry: (iso?: string | null) => string;
   formatExpiry: (iso?: string | null) => string;
   onSelectMarket: (m: SavedMarket) => void;
+  selectedMarketId?: string | null;
   mode?: "markets" | "opportunities";
 }) {
   // Auto-load on mount only — prevents infinite loop if parent re-creates callback
@@ -519,9 +542,17 @@ function OverviewPanelInner({
                 const matchState = getCanonicalMatchState(m);
                 const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
                 const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
+                const metricProvenance = getMetricProvenance(m, scannedAt, renderedAt);
+                const metricsAreCurrent = metricProvenance === "current";
+                const selected = m.id === selectedMarketId;
+                const metricTone = (value: number) => metricsAreCurrent
+                  ? value > 0 ? "text-[var(--status-positive)]" : value < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"
+                  : "text-[var(--text-secondary)]";
                 return (
                   <tr
                     key={m.id}
+                    aria-selected={selected}
+                    data-metric-provenance={metricProvenance}
                     onClick={() => onSelectMarket(m)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -530,30 +561,32 @@ function OverviewPanelInner({
                       }
                     }}
                     tabIndex={0}
-                    className="group cursor-pointer bg-[var(--table-row-surface)] transition-[background-color,box-shadow] odd:bg-[var(--table-row-alternate)] hover:bg-[var(--table-row-hover)] focus-visible:bg-[var(--table-row-focus)] focus-visible:outline-none focus-visible:shadow-[inset_3px_0_var(--focus-ring),inset_0_0_0_1px_var(--focus-ring)]"
+                    className={`group cursor-pointer bg-[var(--table-row-surface)] transition-[background-color,box-shadow] odd:bg-[var(--table-row-alternate)] hover:bg-[var(--table-row-hover)] focus-visible:bg-[var(--table-row-focus)] focus-visible:outline-none focus-visible:shadow-[inset_3px_0_var(--focus-ring),inset_0_0_0_1px_var(--focus-ring)] ${selected ? "bg-[var(--table-row-selected)] shadow-[inset_3px_0_var(--status-positive)] odd:bg-[var(--table-row-selected)]" : ""}`}
                   >
                     <td className="max-w-[360px]" title={buildMarketTooltip({ eventTitle: m.eventTitle, expiryDate: m.expiryDate, category: m.category, scannedAt })}>
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate font-semibold text-[var(--text-primary)]">{m.eventTitle}</span>
+                        {selected && <span className="shrink-0 rounded border border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]"><Check aria-hidden="true" className="mr-0.5 inline h-2.5 w-2.5 text-[var(--status-positive)]" />Selected</span>}
+                        {metricProvenance !== "current" && <MetricProvenanceLabel provenance={metricProvenance} />}
                         {m.category && <span className="shrink-0 rounded border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--text-secondary)]">{m.category}</span>}
                       </div>
                     </td>
                     <td className="whitespace-nowrap text-right text-[var(--text-secondary)]">{formatExpiry(m.expiryDate)}</td>
                     <td className="text-right"><MatchState market={m} /></td>
                     <td className="text-right">
-                      {arbCount > 0 ? <span aria-label={`${arbCount} active arbitrage ${arbCount === 1 ? "opportunity" : "opportunities"}`} className="inline-flex min-w-6 items-center justify-center gap-1 rounded-md border border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 px-1.5 py-0.5 font-bold text-[var(--status-positive)]"><Zap aria-hidden="true" className="h-2.5 w-2.5" />{arbCount}</span> : <span className="text-[var(--text-secondary)]">—</span>}
+                      {arbCount > 0 ? <span aria-label={`${arbCount} ${metricsAreCurrent ? "active" : "cached"} arbitrage ${arbCount === 1 ? "opportunity" : "opportunities"}`} className={`inline-flex min-w-6 items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 font-bold ${metricsAreCurrent ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]" : "border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[var(--text-secondary)]"}`}><Zap aria-hidden="true" className="h-2.5 w-2.5" />{arbCount}</span> : <span className="text-[var(--text-secondary)]">—</span>}
                     </td>
-                    <td className={`text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className={`text-right font-bold ${metricTone(roi)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
-                    <td className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className={`text-right font-bold ${metricTone(apy)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
                       {apy !== 0 ? (
                         <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
                           {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
                         </ApyValueTooltip>
                       ) : "—"}
                     </td>
-                    <td className={`whitespace-nowrap text-right font-semibold ${profit > 0 ? "text-[var(--status-positive)]" : profit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className={`whitespace-nowrap text-right font-semibold ${metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="whitespace-nowrap text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
                     <td className="whitespace-nowrap text-right text-[10px]"><MarketFreshness scannedAt={scannedAt} refreshing={matchState.status === "refreshing"} nowMs={renderedAt} /></td>
                   </tr>

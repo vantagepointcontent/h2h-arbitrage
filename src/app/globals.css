@@ -105,6 +105,7 @@
   --table-row-alternate: rgba(14, 22, 33, 0.32);
   --table-row-hover: #182533;
   --table-row-focus: rgba(93, 190, 129, 0.12);
+  --table-row-selected: #1B2C34;
   --space-workspace: 1.5rem;
   --space-panel: 1rem;
   --radius-control: 0.5rem;
@@ -168,6 +169,7 @@
   --table-row-alternate: rgba(250, 245, 236, 0.55);
   --table-row-hover: #e8ddd0;
   --table-row-focus: rgba(77, 166, 110, 0.12);
+  --table-row-selected: #e2ecdf;
 }
 
 /* ─── Smooth theme transitions ─── */
