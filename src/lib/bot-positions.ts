@@ -1103,25 +1103,34 @@ export class BotPositionStore {
     await this.migrateReservationIdentity();
     await this.client.execute(`CREATE INDEX IF NOT EXISTS idx_bot_positions_status ON bot_positions(status, opened_at DESC)`);
     await this.client.execute(`DROP INDEX IF EXISTS idx_bot_positions_open_pair`);
-    const duplicateOpenPairs = await this.client.execute(`
-      SELECT lower(kalshi_ticker) AS kalshi_ticker,
-             lower(pm_condition_id) AS pm_condition_id,
-             execution_mode,
-             group_concat(id, ',') AS ids
-      FROM bot_positions
-      WHERE status = 'open' AND kalshi_ticker IS NOT NULL AND pm_condition_id IS NOT NULL
-      GROUP BY lower(kalshi_ticker), lower(pm_condition_id), execution_mode
-      HAVING COUNT(*) > 1
-      ORDER BY MIN(id)
-      LIMIT 1
-    `);
-    if (duplicateOpenPairs.rows[0]) {
-      const duplicate = duplicateOpenPairs.rows[0];
-      throw new Error(
-        `Legacy duplicate open bot positions require reconciliation before uniqueness migration: ${String(duplicate.kalshi_ticker)}/${String(duplicate.pm_condition_id)}/${String(duplicate.execution_mode)} ids ${String(duplicate.ids)}`,
-      );
-    }
-    await this.client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id), execution_mode) WHERE status = 'open'`);
+    // Legacy paper ledgers can already contain duplicate open rows. Keep those
+    // positions readable for reconciliation while preventing the duplicate set
+    // from growing. A partial UNIQUE index cannot be installed until historical
+    // rows are reconciled, and failing schema initialization makes the entire
+    // read-only BotTrader page unavailable.
+    await this.client.execute(`CREATE TRIGGER IF NOT EXISTS bot_positions_open_pair_insert_guard
+      BEFORE INSERT ON bot_positions
+      WHEN NEW.status = 'open' AND NEW.kalshi_ticker IS NOT NULL AND NEW.pm_condition_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM bot_positions
+          WHERE status = 'open' AND execution_mode = NEW.execution_mode
+            AND lower(kalshi_ticker) = lower(NEW.kalshi_ticker)
+            AND lower(pm_condition_id) = lower(NEW.pm_condition_id)
+        )
+      BEGIN SELECT RAISE(ABORT, 'An open bot position already exists for this market pair'); END`);
+    await this.client.execute(`CREATE TRIGGER IF NOT EXISTS bot_positions_open_pair_update_guard
+      BEFORE UPDATE OF status, kalshi_ticker, pm_condition_id, execution_mode ON bot_positions
+      WHEN NEW.status = 'open' AND NEW.kalshi_ticker IS NOT NULL AND NEW.pm_condition_id IS NOT NULL
+        AND (OLD.status IS NOT NEW.status OR OLD.execution_mode IS NOT NEW.execution_mode
+          OR lower(OLD.kalshi_ticker) IS NOT lower(NEW.kalshi_ticker)
+          OR lower(OLD.pm_condition_id) IS NOT lower(NEW.pm_condition_id))
+        AND EXISTS (
+          SELECT 1 FROM bot_positions
+          WHERE id != OLD.id AND status = 'open' AND execution_mode = NEW.execution_mode
+            AND lower(kalshi_ticker) = lower(NEW.kalshi_ticker)
+            AND lower(pm_condition_id) = lower(NEW.pm_condition_id)
+        )
+      BEGIN SELECT RAISE(ABORT, 'An open bot position already exists for this market pair'); END`);
   }
 
   private async migrateReservationIdentity(): Promise<void> {

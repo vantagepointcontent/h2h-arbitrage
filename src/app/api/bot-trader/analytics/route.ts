@@ -23,6 +23,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
     );
   } catch (error) {
-    return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      error: clientSafeError(error, 'BotTrader analytics are temporarily unavailable. Retry in a moment', {
+        path: '/api/bot-trader/analytics',
+      }),
+    }, { status: 503, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   }
 }

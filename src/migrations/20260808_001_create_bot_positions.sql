@@ -67,8 +67,29 @@ CREATE TABLE IF NOT EXISTS bot_position_reservations (
 CREATE INDEX IF NOT EXISTS idx_bot_positions_status     ON bot_positions(status, opened_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bot_positions_execution  ON bot_positions(execution_id);
 
--- Unique index: prevent duplicate open positions for same market pair
+-- Legacy ledgers may already contain duplicate open positions. Preserve them
+-- for reconciliation while preventing the duplicate set from growing.
 DROP INDEX IF EXISTS idx_bot_positions_open_pair;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_positions_open_pair
-  ON bot_positions(lower(kalshi_ticker), lower(pm_condition_id), execution_mode)
-  WHERE status = 'open';
+CREATE TRIGGER IF NOT EXISTS bot_positions_open_pair_insert_guard
+  BEFORE INSERT ON bot_positions
+  WHEN NEW.status = 'open' AND NEW.kalshi_ticker IS NOT NULL AND NEW.pm_condition_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM bot_positions
+      WHERE status = 'open' AND execution_mode = NEW.execution_mode
+        AND lower(kalshi_ticker) = lower(NEW.kalshi_ticker)
+        AND lower(pm_condition_id) = lower(NEW.pm_condition_id)
+    )
+  BEGIN SELECT RAISE(ABORT, 'An open bot position already exists for this market pair'); END;
+CREATE TRIGGER IF NOT EXISTS bot_positions_open_pair_update_guard
+  BEFORE UPDATE OF status, kalshi_ticker, pm_condition_id, execution_mode ON bot_positions
+  WHEN NEW.status = 'open' AND NEW.kalshi_ticker IS NOT NULL AND NEW.pm_condition_id IS NOT NULL
+    AND (OLD.status IS NOT NEW.status OR OLD.execution_mode IS NOT NEW.execution_mode
+      OR lower(OLD.kalshi_ticker) IS NOT lower(NEW.kalshi_ticker)
+      OR lower(OLD.pm_condition_id) IS NOT lower(NEW.pm_condition_id))
+    AND EXISTS (
+      SELECT 1 FROM bot_positions
+      WHERE id != OLD.id AND status = 'open' AND execution_mode = NEW.execution_mode
+        AND lower(kalshi_ticker) = lower(NEW.kalshi_ticker)
+        AND lower(pm_condition_id) = lower(NEW.pm_condition_id)
+    )
+  BEGIN SELECT RAISE(ABORT, 'An open bot position already exists for this market pair'); END;

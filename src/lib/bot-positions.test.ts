@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createClient } from '@libsql/client';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -867,7 +867,7 @@ describe('BotPositionStore', () => {
     restarted.close();
   });
 
-  it('fails legacy open-pair migration with actionable duplicate diagnostics', async () => {
+  it('keeps legacy duplicate positions readable while rejecting another open position for the pair', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-duplicates-'));
     dirs.push(dir);
     const dbUrl = `file:${path.join(dir, 'test.db')}`;
@@ -883,10 +883,50 @@ describe('BotPositionStore', () => {
     client.close();
 
     const store = new BotPositionStore(dbUrl);
-    await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).rejects.toThrow(
-      /legacy duplicate open bot positions.*KXTEST.*0xABC.*live.*ids.*1,2/i,
-    );
+    await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).resolves.toBe(true);
+
+    const migrated = createClient({ url: dbUrl });
+    await migrated.execute(`INSERT INTO executions (id, dry_run) VALUES (9, 0)`);
+    await expect(migrated.execute(`
+      UPDATE bot_positions SET status = 'open' WHERE id = 1
+    `)).resolves.toMatchObject({ rowsAffected: 1 });
+    await migrated.execute(`
+      INSERT INTO bot_positions (execution_id, kalshi_ticker, pm_condition_id, status, execution_mode)
+      VALUES (9, NULL, NULL, 'open', 'live')
+    `);
+    await expect(migrated.execute(`
+      UPDATE bot_positions SET kalshi_ticker = 'KXTEST', pm_condition_id = '0xABC' WHERE execution_id = 9
+    `)).rejects.toThrow(/open bot position already exists/i);
+    await expect(migrated.execute(`
+      INSERT INTO bot_positions (execution_id, kalshi_ticker, pm_condition_id, status, execution_mode)
+      VALUES (9, 'KXTEST', '0xABC', 'open', 'live')
+    `)).rejects.toThrow(/open bot position already exists/i);
+    migrated.close();
     store.close();
+  });
+
+  it('applies the checked-in migration without rejecting legacy duplicate open positions', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-migration-duplicates-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 0), (8, 0), (9, 0)`);
+    await client.execute(`CREATE TABLE bot_positions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, execution_id INTEGER, execution_mode TEXT,
+      kalshi_ticker TEXT, pm_condition_id TEXT, status TEXT, opened_at TEXT
+    )`);
+    await client.execute(`INSERT INTO bot_positions
+      (execution_id, execution_mode, kalshi_ticker, pm_condition_id, status, opened_at)
+      VALUES (7, 'live', 'KXTEST', '0xABC', 'open', ''),
+             (8, 'live', 'kxtest', '0xabc', 'open', '')`);
+
+    const migration = await readFile('src/migrations/20260808_001_create_bot_positions.sql', 'utf8');
+    await expect(client.executeMultiple(migration)).resolves.toBeUndefined();
+    await expect(client.execute(`INSERT INTO bot_positions
+      (execution_id, execution_mode, kalshi_ticker, pm_condition_id, status, opened_at)
+      VALUES (9, 'live', 'KXTEST', '0xABC', 'open', '')`)).rejects.toThrow(/open bot position already exists/i);
+    client.close();
   });
 
   it('migrates legacy reservations to paper without blocking live mode', async () => {

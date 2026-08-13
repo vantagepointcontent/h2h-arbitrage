@@ -48,4 +48,15 @@ describe('GET /api/bot-trader/analytics', () => {
     expect(response.status).toBe(400);
     expect(getBotPositionAnalytics).not.toHaveBeenCalled();
   });
+
+  it('returns an actionable retry message when the analytics store is unavailable', async () => {
+    vi.mocked(getBotPositionAnalytics).mockRejectedValue(new Error('database unavailable'));
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/^BotTrader analytics are temporarily unavailable\. Retry in a moment \(Error, ref: [a-f0-9]{16}\)$/);
+  });
 });
