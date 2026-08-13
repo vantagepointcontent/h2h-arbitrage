@@ -133,7 +133,7 @@ describe('saved-market fair scheduler', () => {
 
     const breaker = { avgMs: 4_000, consecFails: 3, trips: 2, cooldownUntil: now + 30 * 60_000 };
     expect(resetBreakerAfterExternalSuccess(breaker)).toBe(true);
-    expect(breaker).toEqual({ avgMs: 4_000, consecFails: 0, trips: 2, cooldownUntil: 0 });
+    expect(breaker).toEqual({ avgMs: 4_000, consecFails: 0, trips: 0, cooldownUntil: 0 });
   });
 
   it('bounds every successful market next-due time by the freshness SLA', () => {

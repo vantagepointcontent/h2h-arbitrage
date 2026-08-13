@@ -30,10 +30,12 @@ async function refreshScannerSettings() {
     }
   } catch { /* app unreachable — keep current values */ }
 }
-const DATA_FILE = new URL('../data/saved-markets.json', import.meta.url).pathname;
-const HEALTH_FILE = new URL('../data/poller-health.json', import.meta.url).pathname;
-const BREAKER_FILE = new URL('../data/poller-breaker.json', import.meta.url).pathname;
-const SCHEDULER_FILE = new URL('../data/saved-market-scheduler.json', import.meta.url).pathname;
+// Path overrides let runtime verification exercise the production poller
+// against an isolated state directory without touching deployed data.
+const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || new URL('../data/saved-markets.json', import.meta.url).pathname;
+const HEALTH_FILE = process.env.H2H_POLLER_HEALTH_FILE || new URL('../data/poller-health.json', import.meta.url).pathname;
+const BREAKER_FILE = process.env.H2H_POLLER_BREAKER_FILE || new URL('../data/poller-breaker.json', import.meta.url).pathname;
+const SCHEDULER_FILE = process.env.H2H_SAVED_MARKET_SCHEDULER_FILE || new URL('../data/saved-market-scheduler.json', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
 const {
@@ -576,6 +578,10 @@ async function pollOnce() {
     health.finishedAt = new Date().toISOString();
     health.durationMs = Date.now() - cycleStart;
     await writeHealth(health);
+    // A newer durable manual scan resets any persisted breaker. Save that
+    // reconciliation before returning so an immediate restart cannot restore
+    // the stale cooldown and push nextDueAt beyond the freshness SLA.
+    await saveBreakerState();
     return health;
   }
 
@@ -680,6 +686,7 @@ async function run() {
     } catch (e) {
       console.error(`[${new Date().toISOString()}] Poll cycle failed (poller continues):`, e && e.stack ? e.stack : e);
     }
+    if (process.env.H2H_POLLER_RUN_ONCE === '1') return health;
     // Daily DB pruning at midnight
     const today = new Date().toISOString().slice(0, 10);
     if (today !== lastPruneDate) {

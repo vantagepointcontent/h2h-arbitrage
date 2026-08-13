@@ -36,6 +36,7 @@ export function hasNewerSuccessfulMarketScan(market, previous = {}) {
 export function resetBreakerAfterExternalSuccess(stats) {
   if (!stats) return false;
   stats.consecFails = 0;
+  stats.trips = 0;
   stats.cooldownUntil = 0;
   return true;
 }
