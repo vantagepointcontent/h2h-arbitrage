@@ -27,6 +27,7 @@ export interface CanonicalManualMatch {
   kalshiUrl?: string;
   polymarketUrl?: string;
   marketId?: string;
+  orientation?: 'same' | 'inverted';
   createdAt: string;
 }
 
@@ -79,6 +80,7 @@ export async function ensureCouplingStore(executor: CouplingExecutor = getClient
     created_at TEXT NOT NULL,
     UNIQUE(kalshi_ticker, pm_condition_id)
   )`);
+  try { await executor.execute(`ALTER TABLE manual_matches ADD COLUMN orientation TEXT NOT NULL DEFAULT 'same'`); } catch { /* already migrated */ }
   if (executor === getClient()) initialized = true;
 }
 
@@ -262,10 +264,10 @@ export async function mutateManualCoupling(input: {
       const match = input.manualMatch;
       await tx.execute({
         sql: `INSERT INTO manual_matches
-          (id, kalshi_ticker, pm_condition_id, kalshi_title, pm_title, kalshi_url, polymarket_url, market_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, kalshi_ticker, pm_condition_id, kalshi_title, pm_title, kalshi_url, polymarket_url, market_id, created_at, orientation)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [match.id, normalized.kalshiTicker, normalized.pmConditionId, match.kalshiTitle, match.pmTitle,
-          match.kalshiUrl ?? null, match.polymarketUrl ?? null, match.marketId ?? null, match.createdAt],
+          match.kalshiUrl ?? null, match.polymarketUrl ?? null, match.marketId ?? null, match.createdAt, match.orientation ?? 'same'],
       });
     } else {
       await tx.execute({ sql: 'DELETE FROM manual_matches WHERE id = ?', args: [input.manualMatchId] });
@@ -287,7 +289,8 @@ export async function getCanonicalManualMatches(): Promise<CanonicalManualMatch[
     kalshiTitle: String(row.kalshi_title), pmTitle: String(row.pm_title),
     ...(row.kalshi_url ? { kalshiUrl: String(row.kalshi_url) } : {}),
     ...(row.polymarket_url ? { polymarketUrl: String(row.polymarket_url) } : {}),
-    ...(row.market_id ? { marketId: String(row.market_id) } : {}), createdAt: String(row.created_at),
+    ...(row.market_id ? { marketId: String(row.market_id) } : {}),
+    ...(row.orientation === 'inverted' ? { orientation: 'inverted' as const } : {}), createdAt: String(row.created_at),
   }));
 }
 
@@ -310,10 +313,10 @@ export async function importActiveLegacyManualMatches(matches: readonly Canonica
       if (state.rows[0]?.state !== 'active_manual' || String(state.rows[0].manual_match_id) !== match.id) continue;
       await tx.execute({
         sql: `INSERT OR IGNORE INTO manual_matches
-          (id, kalshi_ticker, pm_condition_id, kalshi_title, pm_title, kalshi_url, polymarket_url, market_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, kalshi_ticker, pm_condition_id, kalshi_title, pm_title, kalshi_url, polymarket_url, market_id, created_at, orientation)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [match.id, normalized.kalshiTicker, normalized.pmConditionId, match.kalshiTitle, match.pmTitle,
-          match.kalshiUrl ?? null, match.polymarketUrl ?? null, match.marketId ?? null, match.createdAt],
+          match.kalshiUrl ?? null, match.polymarketUrl ?? null, match.marketId ?? null, match.createdAt, match.orientation ?? 'same'],
       });
     }
     await tx.commit();

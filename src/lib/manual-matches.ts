@@ -12,6 +12,7 @@ export interface ManualMatch {
   kalshiUrl?: string;
   polymarketUrl?: string;
   marketId?: string;
+  orientation?: 'same' | 'inverted';
   createdAt: string;
 }
 

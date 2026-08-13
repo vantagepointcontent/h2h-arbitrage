@@ -975,13 +975,13 @@ export default function Home() {
   };
 
   // Manual match
-  const onCreateMatch = async (kt: string, pcid: string, ktTitle: string, pmTitle: string) => {
+  const onCreateMatch = async (kt: string, pcid: string, ktTitle: string, pmTitle: string, orientation: 'same' | 'inverted' = 'same') => {
     try {
       const res = await fetch("/api/manual-matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle,
+          kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle, orientation,
           marketId: activeMarketIdRef.current ?? undefined,
         }),
       });
@@ -2348,11 +2348,12 @@ export default function Home() {
                             kalshiTitle: mm.kalshiTitle,
                             pmConditionId: mm.pmConditionId,
                             pmTitle: mm.pmTitle,
+                            orientation: mm.orientation,
                           }))}
                           kalshiUrl={kalshiUrl}
                           polymarketUrl={pmUrl}
-                          onPair={(kalshiTicker, pmConditionId, kalshiTitle, pmTitle) => {
-                            onCreateMatch(kalshiTicker, pmConditionId, kalshiTitle, pmTitle);
+                          onPair={(kalshiTicker, pmConditionId, kalshiTitle, pmTitle, orientation) => {
+                            onCreateMatch(kalshiTicker, pmConditionId, kalshiTitle, pmTitle, orientation);
                           }}
                           onUnpair={(matchId) => {
                             onDeleteMatch(matchId);

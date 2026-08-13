@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link2, Unlink, Loader2, ArrowRight, Search, BadgeCheck } from "lucide-react";
+import BundledMatchBuilder from "./BundledMatchBuilder";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ export interface ActiveMatch {
   kalshiTitle: string;
   pmConditionId: string;
   pmTitle: string;
+  orientation?: 'same' | 'inverted';
 }
 
 interface KalshiMarketLite {
@@ -60,7 +62,7 @@ interface ManualMatchPanelProps {
   activeMatches: ActiveMatch[];
   kalshiUrl?: string;
   polymarketUrl?: string;
-  onPair: (kalshiTicker: string, pmConditionId: string, kalshiTitle: string, pmTitle: string) => void;
+  onPair: (kalshiTicker: string, pmConditionId: string, kalshiTitle: string, pmTitle: string, orientation: 'same' | 'inverted') => void;
   onUnpair: (matchId: string) => void;
 }
 
@@ -84,6 +86,8 @@ export default function ManualMatchPanel({
   const [selectedKalshi, setSelectedKalshi] = useState<string | null>(null);
   const [selectedPm, setSelectedPm] = useState<string | null>(null);
   const [pairing, setPairing] = useState(false);
+  const [orientation, setOrientation] = useState<'same' | 'inverted'>('same');
+  const [bundledMode, setBundledMode] = useState(false);
 
   // All-markets browse mode
   const [browseMode, setBrowseMode] = useState(true);
@@ -271,7 +275,7 @@ export default function ManualMatchPanel({
     const p = pmList.find(p => p.conditionId === selectedPm);
     if (!k || !p) return;
     setPairing(true);
-    onPair(k.ticker, p.conditionId, k.title || k.ticker, p.title);
+    onPair(k.ticker, p.conditionId, k.title || k.ticker, p.title, orientation);
     setSelectedKalshi(null);
     setSelectedPm(null);
     setTimeout(() => setPairing(false), 800);
@@ -287,6 +291,9 @@ export default function ManualMatchPanel({
           ({kalshiList.length} Kalshi · {pmList.length} Polymarket)
         </span>
         <div className="flex-1" />
+        <button onClick={() => setBundledMode(value => !value)} className="min-h-11 rounded-md border border-[#5DBE81]/30 px-3 text-[10px] text-[#5DBE81]">
+          {bundledMode ? '1:1 matching' : 'Bundled matching'}
+        </button>
         {/* Browse toggle */}
         <button
           onClick={() => setBrowseMode(b => !b)}
@@ -322,7 +329,7 @@ export default function ManualMatchPanel({
                     <img src="/kalshi-icon.png" alt="Kalshi" className="w-3 h-3 rounded-sm shrink-0" />
                     <span className="text-[#FFFFFF] truncate" title={mm.kalshiTitle}>{mm.kalshiTitle}</span>
                   </div>
-                  <ArrowRight className="w-3 h-3 text-[#5E6875] shrink-0" />
+                  <div className="text-center"><ArrowRight className="w-3 h-3 text-[#5E6875] shrink-0" /><span className="text-[8px] text-[#8A9BA8]">{mm.orientation === 'inverted' ? 'YES↔NO' : 'YES↔YES'}</span></div>
                   <div className="min-w-0 flex items-center gap-1">
                     <img src="/polymarket-icon.png" alt="Polymarket" className="w-3 h-3 rounded-sm shrink-0" />
                     <span className="text-[#FFFFFF] truncate" title={mm.pmTitle}>{mm.pmTitle}</span>
@@ -340,6 +347,8 @@ export default function ManualMatchPanel({
           </div>
         </div>
       )}
+
+      {bundledMode && <div className="p-4"><BundledMatchBuilder kalshiMarkets={kalshiList} polymarketMarkets={pmList} onSaved={() => {}} /></div>}
 
       {/* Two-list pairing interface */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-0">
@@ -485,6 +494,12 @@ export default function ManualMatchPanel({
 
       {/* Selection hint */}
       <div className="px-4 py-2 border-t border-[#182533] bg-[#0E1621]">
+        <label className="mb-2 block text-center text-[10px] text-[#8A9BA8]">Orientation
+          <select aria-label="Coupling orientation" value={orientation} onChange={event => setOrientation(event.target.value as 'same' | 'inverted')} className="ml-2 min-h-11 rounded bg-[#17212B] px-2 text-white">
+            <option value="same">Same proposition</option><option value="inverted">Inverted/negated proposition</option>
+          </select>
+        </label>
+        <div className="mb-2 text-center text-[10px] text-[#8A9BA8]">Kalshi YES ↔ Polymarket {orientation === 'inverted' ? 'NO' : 'YES'} (normalized economic side)</div>
         <div className="text-[10px] text-[#8A9BA8] text-center">
           {canPair
             ? "Click Link to pair selected markets"

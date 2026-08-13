@@ -260,6 +260,7 @@ export interface ManualMatch {
   kalshiTitle: string;
   pmConditionId: string;
   pmTitle: string;
+  orientation?: 'same' | 'inverted';
   createdAt: string;
 }
 

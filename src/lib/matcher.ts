@@ -35,6 +35,13 @@ export interface UnifiedOutcome {
     negRisk?: boolean;
     /** False when prices are indicative only (no executable CLOB asks). */
     isExecutable?: boolean;
+    couplingOrientation?: 'same' | 'inverted';
+    couplingAudit?: {
+      originalYesPrice: number;
+      originalNoPrice: number;
+      originalSide: 'YES';
+      normalizedSide: 'YES' | 'NO';
+    };
   } | null;
   arbitrage: {
     strategy: string;
@@ -126,6 +133,30 @@ export function normalizeOutcomePlatforms(outcome: UnifiedOutcome): UnifiedOutco
     });
   }
   return { ...outcome, platforms };
+}
+
+type PolymarketShape = NonNullable<UnifiedOutcome['polymarket']>;
+
+/** Normalize an explicit proposition mapping exactly once. */
+export function normalizeManualPairPolymarketShape(
+  shape: PolymarketShape,
+  orientation: ManualMatch['orientation'] | undefined,
+): PolymarketShape {
+  if (shape.couplingOrientation || orientation !== 'inverted') return shape;
+  return {
+    ...shape,
+    yesPrice: shape.noPrice,
+    noPrice: shape.yesPrice,
+    bestAsk: shape.noPrice,
+    askDepth: shape.noAskDepth,
+    couplingOrientation: 'inverted',
+    couplingAudit: {
+      originalYesPrice: shape.yesPrice,
+      originalNoPrice: shape.noPrice,
+      originalSide: 'YES',
+      normalizedSide: 'NO',
+    },
+  };
 }
 
 /** Default fee parameters per platform. Polymarket theta varies by category. */
@@ -1444,9 +1475,10 @@ export function applyManualMatches(
 
     // Rebuild PM shape using fresh market data if available
     const pmMarket = pmByConditionId.get(mm.pmConditionId);
-    const pmShape = pmMarket
+    const pmShapeRaw = pmMarket
       ? buildPmArbShape(pmMarket)
       : pmRaw;
+    const pmShape = normalizeManualPairPolymarketShape(pmShapeRaw, mm.orientation);
 
     // Use placeholder - arbitrage will be calculated by caller with depth info
     const noArbResult: UnifiedOutcome['arbitrage'] = { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, arbType: 'direct', maxCapital: 0 };
