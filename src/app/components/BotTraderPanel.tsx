@@ -184,6 +184,10 @@ function formatExactEntryPrice(grossMicrocents: number, quantity: number): strin
   return `${EXACT_CENTS.format(grossMicrocents / 1_000_000 / quantity)}¢`;
 }
 
+function entryPricePrecisionLabel(grossMicrocents: number, quantity: number): string {
+  return grossMicrocents % quantity === 0 ? 'exact fill' : 'rounded VWAP';
+}
+
 function formatVwapCents(grossProceedsMicrocents: number, quantity: number): string {
   return `${THREE_DECIMAL.format(grossProceedsMicrocents / 1_000_000 / quantity)}¢`;
 }
@@ -589,12 +593,12 @@ export default function BotTraderPanel() {
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
-                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} exact fill · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
-                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} exact fill · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                           </div>
                           <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>

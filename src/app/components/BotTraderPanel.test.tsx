@@ -328,8 +328,9 @@ describe('BotTraderPanel', () => {
   it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {
     const precisePosition = {
       ...positions[0],
-      kalshiEntryGrossMicrocents: 5_123_456,
-      pmEntryGrossMicrocents: 92_234_567,
+      sharesKalshi: 3,
+      kalshiEntryGrossMicrocents: 12_345_679,
+      pmEntryGrossMicrocents: 85_012_344,
       kalshiEntryFeeCents: 1,
       pmEntryFeeCents: 0,
       entryCostRoundingDeltaMicrocents: 641_977,
@@ -345,10 +346,11 @@ describe('BotTraderPanel', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
 
-    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('5.123456¢ exact fill · $0.05123456 gross');
-    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.06123456 net leg cost');
-    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('92.234567¢ exact fill · $0.92234567 gross');
-    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('$0.00000000 execution fee · $0.92234567 net leg cost');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('3 units · 4.115226¢ rounded VWAP · $0.12345679 gross');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).not.toContain('exact fill');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.13345679 net leg cost');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('85.012344¢ exact fill · $0.85012344 gross');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('$0.00000000 execution fee · $0.85012344 net leg cost');
     expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Currency rounding delta: $0.00641977');
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.99000000');
   });
