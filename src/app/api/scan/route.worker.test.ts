@@ -3,12 +3,14 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   consume: vi.fn(() => ({ allowed: true, retryAfterSeconds: 0 })),
+  isTrustedScheduledScan: vi.fn(() => false),
   run: vi.fn(),
 }));
 
 vi.mock('@/lib/scan-rate-limit', () => ({
   scanRateLimiter: { consume: mocks.consume },
   getScanClientKey: () => 'test',
+  isTrustedScheduledScan: mocks.isTrustedScheduledScan,
 }));
 vi.mock('@/lib/scan-worker-coordinator', async () => {
   const actual = await vi.importActual<typeof import('@/lib/scan-worker-coordinator')>('@/lib/scan-worker-coordinator');
@@ -33,6 +35,7 @@ describe('POST /api/scan worker boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.consume.mockReturnValue({ allowed: true, retryAfterSeconds: 0 });
+    mocks.isTrustedScheduledScan.mockReturnValue(false);
     mocks.run.mockResolvedValue({ status: 200, headers: { 'content-type': 'application/json' }, body: '{"ok":true}', jobId: 'job-1' });
   });
 
@@ -46,6 +49,13 @@ describe('POST /api/scan worker boundary', () => {
       expect.objectContaining({ body: expect.any(String), url: 'http://localhost/api/scan' }),
       expect.any(AbortSignal),
     );
+  });
+
+  it('lets an authenticated saved-market poller bypass the browser request budget', async () => {
+    mocks.isTrustedScheduledScan.mockReturnValue(true);
+
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.consume).not.toHaveBeenCalled();
   });
 
   it('preserves 503 Retry-After when worker capacity is exhausted', async () => {

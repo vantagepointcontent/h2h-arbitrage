@@ -305,6 +305,33 @@ export interface LastScanResult {
   }[];
 }
 
+export interface SavedMarketScheduleState {
+  lastAttemptAt?: string | null;
+  lastSuccessAt?: string | null;
+  nextDueAt?: string | null;
+  inProgress?: boolean;
+  failureReason?: string | null;
+  retryCount?: number;
+  freshnessSlaMs?: number;
+}
+
+export function getSavedMarketScheduleView(
+  scheduler: SavedMarketScheduleState | null | undefined,
+  lastSuccessfulScanAt: string | null | undefined,
+  now = Date.now(),
+  freshnessSlaMs = scheduler?.freshnessSlaMs ?? 60 * 60_000,
+): { status: 'fresh' | 'scanning' | 'overdue' | 'failed'; ageMs: number | null; reason: string | null } {
+  const successAt = scheduler?.lastSuccessAt ?? lastSuccessfulScanAt;
+  const parsed = successAt ? Date.parse(successAt) : NaN;
+  const ageMs = Number.isFinite(parsed) ? Math.max(0, now - parsed) : null;
+  if (scheduler?.inProgress) return { status: 'scanning', ageMs, reason: null };
+  if (scheduler?.failureReason) return { status: 'failed', ageMs, reason: scheduler.failureReason };
+  if (ageMs === null || ageMs > freshnessSlaMs) {
+    return { status: 'overdue', ageMs, reason: ageMs === null ? 'No successful full scan yet.' : 'Full scan is past the freshness SLA.' };
+  }
+  return { status: 'fresh', ageMs, reason: null };
+}
+
 export interface SavedMarket {
   id: string;
   kalshiUrl: string;
@@ -315,6 +342,7 @@ export interface SavedMarket {
   expiryDate?: string | null;
   favorited?: boolean;
   lastScanResult?: LastScanResult | null;
+  scheduler?: SavedMarketScheduleState | null;
   liveResult?: {
     bestRoiPct: number;
     bestProfit: number;

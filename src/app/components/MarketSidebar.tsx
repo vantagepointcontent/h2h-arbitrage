@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
 import { computeApy } from "@/lib/matcher";
-import { SavedMarket, formatPercent, isMarketExpired } from "@/app/lib/page-shared";
+import { SavedMarket, formatPercent, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
 
@@ -420,13 +420,26 @@ function MarketSidebarInner({
                           )}
                           <span className="text-[9px] text-[var(--text-secondary)]">{timeUntilExpiry(m.expiryDate)}</span>
                           {(() => {
-                            // WS-106: last-tick freshness — prefer live WS result, fall back to poller scan
-                            const f = tickFreshness(m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt ?? null);
-                            if (f.level === 'never') return null;
+                            // Full-scan age is deliberately independent from the
+                            // faster watcher price tick. Scheduler failures and
+                            // attempts never advance the displayed success age.
+                            const schedule = getSavedMarketScheduleView(m.scheduler, m.lastScanResult?.scannedAt);
+                            const f = tickFreshness(m.scheduler?.lastSuccessAt ?? m.lastScanResult?.scannedAt ?? null);
+                            const label = schedule.status === 'scanning'
+                              ? `Scanning · ${f.label}`
+                              : schedule.status === 'failed'
+                                ? `Failed · ${f.label}`
+                                : schedule.status === 'overdue'
+                                  ? `Overdue · ${f.label}`
+                                  : f.label;
+                            const color = schedule.status === 'failed' ? 'text-[var(--status-negative)]'
+                              : schedule.status === 'scanning' ? 'text-[var(--status-positive)]'
+                                : schedule.status === 'overdue' ? 'text-[var(--status-warning)]'
+                                  : freshnessColor(f.level);
                             return (
-                              <span className={`text-[9px] inline-flex items-center gap-0.5 ${freshnessColor(f.level)}`} title={`Last price update: ${f.label}`}>
-                                <span className={`w-1 h-1 rounded-full ${f.level === 'live' ? 'bg-[var(--status-positive)] animate-pulse' : f.level === 'recent' ? 'bg-[var(--text-secondary)]' : f.level === 'stale' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
-                                {f.label}
+                              <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={schedule.reason ?? `Last successful full scan: ${f.label}`}>
+                                <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
+                                {label}
                               </span>
                             );
                           })()}

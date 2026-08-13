@@ -6,6 +6,7 @@ import {
   summarizeScanForSidebar,
   getCanonicalMatchState,
   formatCanonicalMatchState,
+  getSavedMarketScheduleView,
   mergeSavedMarketMatchRefresh,
   markSavedMarketMatchRefreshing,
   type SavedMarket,
@@ -56,6 +57,29 @@ describe("saved-market visibility defaults", () => {
   it("shows all non-expired markets instead of starting behind restrictive filters", () => {
     expect(DEFAULT_MARKET_EXPIRY_FILTER).toBe("all");
     expect(DEFAULT_SHOW_ARB_ONLY).toBe(false);
+  });
+});
+
+describe("saved-market scheduler status", () => {
+  const now = Date.parse("2026-08-13T20:00:00Z");
+
+  it("keeps age tied to last successful full scan while surfacing failures", () => {
+    expect(getSavedMarketScheduleView({
+      lastAttemptAt: "2026-08-13T19:59:00Z",
+      lastSuccessAt: "2026-08-13T18:00:00Z",
+      nextDueAt: "2026-08-13T19:00:00Z",
+      inProgress: false,
+      failureReason: "Polymarket HTTP 503",
+      retryCount: 2,
+    }, "2026-08-13T18:00:00Z", now, 60 * 60_000)).toMatchObject({
+      status: "failed", ageMs: 2 * 60 * 60_000, reason: "Polymarket HTTP 503",
+    });
+  });
+
+  it("distinguishes scanning, overdue, and fresh states", () => {
+    expect(getSavedMarketScheduleView({ inProgress: true }, null, now, 60 * 60_000).status).toBe("scanning");
+    expect(getSavedMarketScheduleView(null, "2026-08-13T18:00:00Z", now, 60 * 60_000).status).toBe("overdue");
+    expect(getSavedMarketScheduleView(null, "2026-08-13T19:30:00Z", now, 60 * 60_000).status).toBe("fresh");
   });
 });
 
