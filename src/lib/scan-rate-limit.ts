@@ -42,6 +42,28 @@ export class ScanRateLimiter {
   }
 }
 
+/**
+ * Process-local admission control for the CPU-heavy full scan route. A rate
+ * limit alone still permits a burst of expensive scans to run concurrently,
+ * starving lightweight health and Logs requests on Node's event loop.
+ */
+export class ScanConcurrencyLimiter {
+  private active = 0;
+
+  constructor(private readonly maxConcurrent = 2) {}
+
+  tryAcquire(): (() => void) | null {
+    if (this.active >= this.maxConcurrent) return null;
+    this.active += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.active = Math.max(0, this.active - 1);
+    };
+  }
+}
+
 export function getScanClientKey(headers: Headers): string {
   const realIp = headers.get('x-real-ip')?.trim();
   if (realIp) return realIp;
@@ -51,3 +73,6 @@ export function getScanClientKey(headers: Headers): string {
 }
 
 export const scanRateLimiter = new ScanRateLimiter();
+export const scanConcurrencyLimiter = new ScanConcurrencyLimiter(
+  Math.max(1, Number(process.env.H2H_SCAN_CONCURRENCY || 2)),
+);

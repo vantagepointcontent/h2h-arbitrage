@@ -27,7 +27,7 @@ import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links'
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
 import { resolveMarketDomain } from '@/lib/market-classification';
-import { getScanClientKey, scanRateLimiter } from '@/lib/scan-rate-limit';
+import { getScanClientKey, scanConcurrencyLimiter, scanRateLimiter } from '@/lib/scan-rate-limit';
 import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
@@ -46,6 +46,14 @@ export async function POST(request: NextRequest) {
           'X-RateLimit-Remaining': '0',
         },
       },
+    );
+  }
+
+  const releaseScanSlot = scanConcurrencyLimiter.tryAcquire();
+  if (!releaseScanSlot) {
+    return NextResponse.json(
+      { error: 'Scanner is at capacity. Please retry shortly.' },
+      { status: 503, headers: { 'Retry-After': '2' } },
     );
   }
 
@@ -638,5 +646,7 @@ export async function POST(request: NextRequest) {
       { error: msg },
       { status }
     );
+  } finally {
+    releaseScanSlot();
   }
 }

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   reserveSavedMarketPublication: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
   consume: vi.fn(() => ({ allowed: true })),
+  tryAcquire: vi.fn(() => (() => undefined) as (() => void) | null),
 }));
 
 vi.mock('@/lib/kalshi', () => ({
@@ -71,6 +72,7 @@ vi.mock('@/lib/scan-links', () => ({
 vi.mock('@/lib/scan-request', () => ({ parseScanCapital: () => 1000 }));
 vi.mock('@/lib/scan-rate-limit', () => ({
   scanRateLimiter: { consume: mocks.consume },
+  scanConcurrencyLimiter: { tryAcquire: mocks.tryAcquire },
   getScanClientKey: () => 'test',
 }));
 vi.mock('@/lib/scan-clob-selection', () => ({ selectMatchedClobConditionIds: () => [] }));
@@ -91,6 +93,18 @@ describe('POST /api/scan saved-market lifecycle', () => {
     mocks.findSavedMarketByUrls.mockResolvedValue({ id: 'tx-07', eventTitle: 'TX-07' });
     mocks.reserveSavedMarketPublication.mockResolvedValue(41);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
+    mocks.tryAcquire.mockReturnValue(() => undefined);
+  });
+
+  it('rejects an excess full scan before persistence or upstream work begins', async () => {
+    mocks.tryAcquire.mockReturnValueOnce(null);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('2');
+    expect(mocks.findSavedMarketByUrls).not.toHaveBeenCalled();
+    expect(mocks.upstream).not.toHaveBeenCalled();
   });
 
   it('publishes refreshing before waiting for upstream market data', async () => {

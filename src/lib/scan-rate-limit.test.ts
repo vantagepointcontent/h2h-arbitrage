@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getScanClientKey, ScanRateLimiter } from './scan-rate-limit';
+import { getScanClientKey, ScanConcurrencyLimiter, ScanRateLimiter } from './scan-rate-limit';
 
 describe('ScanRateLimiter', () => {
   it('allows the configured request budget, then rejects until the window resets', () => {
@@ -28,5 +28,30 @@ describe('getScanClientKey', () => {
     expect(getScanClientKey(new Headers({ 'x-real-ip': '10.0.0.3', 'x-forwarded-for': '198.51.100.2' }))).toBe('10.0.0.3');
     expect(getScanClientKey(new Headers({ 'x-forwarded-for': '198.51.100.2, 10.0.0.1' }))).toBe('198.51.100.2');
     expect(getScanClientKey(new Headers())).toBe('anonymous');
+  });
+});
+
+describe('ScanConcurrencyLimiter', () => {
+  it('rejects excess work until an active scan releases its slot', () => {
+    const limiter = new ScanConcurrencyLimiter(2);
+
+    const first = limiter.tryAcquire();
+    const second = limiter.tryAcquire();
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(limiter.tryAcquire()).toBeNull();
+
+    first?.();
+    expect(limiter.tryAcquire()).not.toBeNull();
+  });
+
+  it('makes release idempotent so a route cannot over-credit capacity', () => {
+    const limiter = new ScanConcurrencyLimiter(1);
+    const release = limiter.tryAcquire();
+
+    release?.();
+    release?.();
+    expect(limiter.tryAcquire()).not.toBeNull();
+    expect(limiter.tryAcquire()).toBeNull();
   });
 });
