@@ -43,6 +43,9 @@ interface LogEntry {
   days_to_expiry: number | null;
   apy_pct: number | null;
   apy_unavailable_reason: string | null;
+  arb_type: ArbType | null;
+  arb_valid: 0 | 1;
+  arb_invalidation_reason: string | null;
 }
 
 type ArbTypeFilter = "all" | ArbType;
@@ -840,6 +843,17 @@ function logApyPct(log: LogEntry): number | null {
   return typeof log.apy_pct === 'number' && Number.isFinite(log.apy_pct) ? log.apy_pct : null;
 }
 
+const ARB_INVALIDATION_REASON_LABELS: Record<string, string> = {
+  legacy_internal_yes_yes_directional_duplication: 'Legacy Internal YES+YES duplicates the same directional exposure.',
+  arb_type_strategy_mismatch: 'Stored arb type does not match the canonical strategy classification.',
+  unrecognized_arbitrage_strategy: 'Strategy does not match a canonical arbitrage classification.',
+};
+
+function arbInvalidationReasonLabel(reason: string | null): string {
+  if (!reason) return 'Classification failed canonical arbitrage validation.';
+  return ARB_INVALIDATION_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
+}
+
 type ClientCurrentQuote = {
   platform: QuotePlatform;
   marketId: string;
@@ -872,7 +886,10 @@ function LogRow({
 }) {
   const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
-  const arbTypeMeta = getArbTypeMeta(log.strategy);
+  const arbIsValid = log.arb_valid !== 0;
+  const arbTypeMeta = arbIsValid
+    ? (log.arb_type ? ARB_TYPES[log.arb_type] : getArbTypeMeta(log.strategy))
+    : null;
   const apy = logApyPct(log);
   // Kept at row scope so collapsing does not discard the brief lazy-fetch cache.
   const [comparisonCache] = useState<ComparisonCache>(() => new Map());
@@ -961,7 +978,17 @@ function LogRow({
         </td>
         <td className="px-3 py-2 text-xs truncate max-w-[200px]" title={log.strategy}><CompactStrategyDisplay strategy={log.strategy} /></td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          {arbTypeMeta ? (
+          {!arbIsValid ? (
+            <div className="max-w-[260px] whitespace-normal" role="status">
+              <span className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
+                <AlertTriangle className="h-3 w-3" />
+                Invalid arb
+              </span>
+              <div className="mt-1 text-[10px] leading-tight text-red-300">
+                {arbInvalidationReasonLabel(log.arb_invalidation_reason)}
+              </div>
+            </div>
+          ) : arbTypeMeta ? (
             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${arbTypeMeta.badgeClass}`}>
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${arbTypeMeta.dotClass}`} />
               {arbTypeMeta.label}

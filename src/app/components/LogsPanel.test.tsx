@@ -11,6 +11,34 @@ afterEach(() => {
 });
 
 describe('LogsPanel', () => {
+  it('shows invalidated legacy classifications and their audit reason instead of the old arb type', async () => {
+    const invalidated = {
+      ...comparisonLog(),
+      id: 558,
+      strategy: 'Same-platform YES+YES Polymarket: Legacy outcome',
+      arb_type: null,
+      arb_valid: 0,
+      arb_invalidation_reason: 'legacy_internal_yes_yes_directional_duplication',
+      positive_arb_count: 0,
+      best_roi_pct: 0,
+      best_profit: 0,
+    };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) {
+        return Promise.resolve({ ok: true, json: async () => ({ logs: [invalidated], total: 1 }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+
+    await waitFor(() => expect(screen.getByText('Invalid arb')).toBeTruthy());
+    expect(screen.getByText('Legacy Internal YES+YES duplicates the same directional exposure.')).toBeTruthy();
+    expect(screen.queryByText('Internal Arb')).toBeNull();
+  });
+
   it('uses the complete non-ROI-filtered dataset maximum for an accessible ROI slider and clamps on filter changes', async () => {
     let searchMaximum = 12.34;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
