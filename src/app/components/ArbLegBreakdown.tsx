@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { formatPrice } from "@/app/lib/page-shared";
+import { auditArbClassification } from '@/lib/arb-types';
 
 /**
  * UI-14: Cross-arb leg breakdown — shared helpers + LegBreakdown component.
@@ -43,7 +44,7 @@ const ARB_TYPE_META: Record<ArbType, ArbTypeInfo> = {
     type: 'internal',
     label: 'INTERNAL',
     color: '#a855f7',
-    description: 'Internal Arb: Buy YES on BOTH outcomes on the same platform (e.g. PM YES+YES when sum < $1.00).',
+    description: 'Internal Arb: Buy complementary YES + NO contracts on the same verified binary market.',
   },
 };
 
@@ -53,22 +54,14 @@ const ARB_TYPE_META: Record<ArbType, ArbTypeInfo> = {
  * If an explicit `arbType` field is present (ARB-01a), it takes precedence.
  * Otherwise we derive the type from the strategy string pattern:
  *   - "Buy YES both sides: ..."          → cross
- *   - "Same-platform YES+YES ..."        → internal
+ *   - "Same-platform YES+NO ..."         → internal
  *   - "Buy YES Kalshi + NO PM" / reverse → direct
  */
 export function classifyArbType(strategy: string, arbType?: ArbType | null): ArbTypeInfo | null {
   if (!strategy || strategy === 'No arb') return null;
 
-  // Explicit field wins when present
-  if (arbType && ARB_TYPE_META[arbType]) return ARB_TYPE_META[arbType];
-
-  // Derive from strategy string
-  if (/^Buy YES both sides:/.test(strategy)) return ARB_TYPE_META.cross;
-  if (/^Same-platform YES\+YES/.test(strategy)) return ARB_TYPE_META.internal;
-  // "Buy YES Kalshi + NO PM" and "Buy YES PM + NO Kalshi" → direct
-  if (/^Buy YES (Kalshi|PM) \+ NO (Kalshi|PM)$/.test(strategy)) return ARB_TYPE_META.direct;
-
-  return null;
+  const audit = auditArbClassification(strategy, arbType);
+  return audit.valid && audit.canonicalType ? ARB_TYPE_META[audit.canonicalType] : null;
 }
 
 /**
@@ -182,19 +175,20 @@ export function parseArbLegs(
     return { isCross: false, legs, totalCost, grossProfit, fees: totalFees, feeBreakdown: fees ?? null, netProfit };
   }
 
-  // Same-platform YES+YES: "Same-platform YES+YES Kalshi: <A> + <B>"
-  //                         "Same-platform YES+YES Polymarket: <A> + <B>"
-  const samePlatformMatch = strategy.match(/^Same-platform YES\+YES (Kalshi|Polymarket): (.+?) \+ (.+)$/);
+  // Same-platform YES+NO: "Same-platform YES+NO Kalshi: <market>"
+  const samePlatformMatch = strategy.match(/^Same-platform YES\+NO (Kalshi|Polymarket): (.+)$/);
   if (samePlatformMatch) {
-    const [, platform, outcomeA, outcomeB] = samePlatformMatch;
+    const [, platform, market] = samePlatformMatch;
     const plat = platform as 'Kalshi' | 'Polymarket';
     const priceA = plat === 'Kalshi' ? kalshiYesAsk : pmYesPrice;
-    const priceB = plat === 'Kalshi' ? kalshiYesAsk : pmYesPrice; // complement price — not available from current row
-    const stakeA = plat === 'Kalshi' ? kalshiStake : pmStake;
-    const stakeB = null; // complement stake not available from single outcome
+    const priceB = plat === 'Kalshi' ? kalshiNoAsk : pmNoPrice;
+    const totalStake = plat === 'Kalshi' ? kalshiStake : pmStake;
+    const totalPrice = priceA != null && priceB != null ? priceA + priceB : null;
+    const yesStake = totalStake != null && totalPrice != null && totalPrice > 0 ? totalStake * priceA! / totalPrice : null;
+    const noStake = totalStake != null && totalPrice != null && totalPrice > 0 ? totalStake * priceB! / totalPrice : null;
     const legs: ArbLeg[] = [
-      { platform: plat, side: 'YES', outcome: outcomeA, price: priceA ?? null, stake: stakeA ?? null },
-      { platform: plat, side: 'YES', outcome: outcomeB, price: priceB ?? null, stake: stakeB },
+      { platform: plat, side: 'YES', outcome: market, price: priceA ?? null, stake: yesStake },
+      { platform: plat, side: 'NO', outcome: market, price: priceB ?? null, stake: noStake },
     ];
     const totalCost = (priceA != null && priceB != null) ? priceA + priceB : null;
     const grossProfit = totalCost != null ? 1 - totalCost : null;
@@ -230,11 +224,11 @@ export function formatConciseStrategy(strategy: string): { text: string; isCross
   if (strategy === 'Buy YES Kalshi + NO PM') return { text: 'K-YES · PM-NO', isCross: false };
   if (strategy === 'Buy YES PM + NO Kalshi') return { text: 'PM-YES · K-NO', isCross: false };
 
-  const samePlatformMatch = strategy.match(/^Same-platform YES\+YES (Kalshi|Polymarket): (.+?) \+ (.+)$/);
+  const samePlatformMatch = strategy.match(/^Same-platform YES\+NO (Kalshi|Polymarket): (.+)$/);
   if (samePlatformMatch) {
-    const [, platform, a, b] = samePlatformMatch;
+    const [, platform, market] = samePlatformMatch;
     const prefix = platform === 'Kalshi' ? 'K' : 'PM';
-    return { text: `Same: ${prefix}-YES(${a}) + ${prefix}-YES(${b})`, isCross: false };
+    return { text: `Internal: ${prefix}-YES + ${prefix}-NO (${market})`, isCross: false };
   }
 
   return { text: strategy, isCross: false };
@@ -245,12 +239,12 @@ export function formatConciseStrategy(strategy: string): { text: string; isCross
  * Uses parseArbLegs() to extract platform + side from strategy string.
  * Renders: [K icon] YES · [PM icon] NO  (direct)
  *          [K icon] YES(A) · [PM icon] YES(B)  (cross)
- *          [K icon] YES(A) · [K icon] YES(B)  (internal)
+ *          [K icon] YES · [K icon] NO  (internal)
  */
 export function CompactStrategyDisplay({ strategy }: { strategy: string }) {
   if (!strategy || strategy === 'No arb') return <span className="text-[#8A9BA8]">No arb</span>;
 
-  const breakdown = parseArbLegs(strategy, 0, 0, 0, 0);
+  const breakdown = parseArbLegs(strategy, '', 0, 0, 0, 0, 0, 0);
   if (breakdown.legs.length === 0) return <span className="text-[#8A9BA8]">{strategy}</span>;
 
   return (

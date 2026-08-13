@@ -3,6 +3,7 @@ import path from 'path';
 import { evaluateBotTrade, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
 import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
+import { auditArbClassification } from './arb-types';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
 export type BotScanDecisionState =
@@ -433,6 +434,11 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
   if (typeof row.artist !== 'string' || typeof row.strategy !== 'string'
       || !finite(row.roiPct) || !finite(row.expectedProfit)
       || typeof row.kalshiTicker !== 'string' || typeof row.pmConditionId !== 'string') return null;
+  const audit = auditArbClassification(
+    row.strategy,
+    row.arbType === 'direct' || row.arbType === 'cross' || row.arbType === 'internal' ? row.arbType : null,
+  );
+  if (!audit.valid || audit.canonicalType === 'internal') return null;
   return {
     outcome: row.artist,
     strategy: row.strategy,
@@ -485,7 +491,7 @@ async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
   await ensureSchema();
   const db = dbClient();
   try {
-    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ? AND positive_arb_count > 0', args: [scanId] });
+    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ? AND arb_valid = 1 AND positive_arb_count > 0', args: [scanId] });
     const row = result.rows[0] as unknown as Record<string, unknown> | undefined;
     return row ? rowToScan(row) : null;
   } finally { db.close(); }
@@ -498,7 +504,7 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
     const result = await db.execute({
       sql: `SELECT s.* FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id = s.id
-        WHERE s.positive_arb_count > 0 AND (
+        WHERE s.arb_valid = 1 AND s.positive_arb_count > 0 AND (
           d.scan_id IS NULL OR d.state IN ('received','disabled')
           OR (d.state = 'failed' AND d.reason_code = 'revalidation_failed')
         )

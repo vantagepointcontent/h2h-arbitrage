@@ -24,23 +24,16 @@
 
 // ─── Types ────────────────────────────────────────────────────────
 
-/** Arb type classification — derived from strategy string. */
-export type ArbType = 'cross' | 'direct' | 'internal';
+import { auditArbClassification, classifyArbType, type ArbType } from './arb-types';
+export type { ArbType } from './arb-types';
 
 /**
  * Classify an arb type from its strategy string.
  * - "Buy YES both sides" → cross (YES on Kalshi for outcome A + YES on PM for outcome B)
- * - "Same-platform YES+YES" → internal (YES on both outcomes, same platform)
+ * - "Same-platform YES+NO" → internal (complementary sides on one verified binary market)
  * - "Buy YES Kalshi + NO PM" / "Buy YES PM + NO Kalshi" → direct (classic cross-platform)
  * - Everything else (incl. "No arb") → null
  */
-export function classifyArbType(strategy: string): ArbType | null {
-  if (!strategy || strategy === 'No arb') return null;
-  if (strategy.includes('both sides')) return 'cross';
-  if (strategy.startsWith('Same-platform')) return 'internal';
-  if (strategy.startsWith('Buy YES')) return 'direct';
-  return null;
-}
 
 /** Short uppercase tag for display in alerts and UI. */
 export function arbTypeTag(strategy: string): string {
@@ -239,9 +232,8 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     ? `Net: $${arb.fees.worstCaseNetProfit.toFixed(2)}`
     : '';
   const deepLink = buildDeepLink(arb.marketId);
-  const tag = arb.arbType
-    ? `[${arb.arbType.toUpperCase()}]`
-    : arbTypeTag(arb.strategy);
+  const audit = auditArbClassification(arb.strategy, arb.arbType);
+  const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
 
   return [
     `🟢 <b>Arbitrage Found</b> ${tag}`,
@@ -265,9 +257,8 @@ export function formatArbMessage(arb: ArbAlertInput): string {
 export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number): string {
   const delta = arb.roiPct - prevRoi;
   const deepLink = buildDeepLink(arb.marketId);
-  const tag = arb.arbType
-    ? `[${arb.arbType.toUpperCase()}]`
-    : arbTypeTag(arb.strategy);
+  const audit = auditArbClassification(arb.strategy, arb.arbType);
+  const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
 
   return [
     `📈 <b>ARB SPREAD WIDENED</b> ${tag}`,
@@ -290,9 +281,8 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
 export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): string {
   const dropPct = ((prevRoi - arb.roiPct) / Math.abs(prevRoi) * 100);
   const deepLink = buildDeepLink(arb.marketId);
-  const tag = arb.arbType
-    ? `[${arb.arbType.toUpperCase()}]`
-    : arbTypeTag(arb.strategy);
+  const audit = auditArbClassification(arb.strategy, arb.arbType);
+  const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
 
   return [
     `⚠️ <b>ARB VANISHING</b> ${tag}`,
@@ -474,6 +464,10 @@ export async function checkAndSendAlert(
   arb: ArbAlertInput,
   configOverride?: Partial<TelegramAlertConfig>,
 ): Promise<TelegramAlertResult> {
+  const audit = auditArbClassification(arb.strategy, arb.arbType);
+  if (!audit.valid) {
+    return { sent: false, reason: `Invalid arbitrage classification: ${audit.reason}` };
+  }
   const envConfig = await getConfigResolved();
   if (!envConfig) {
     return { sent: false, reason: 'Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)' };

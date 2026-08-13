@@ -257,13 +257,13 @@ describe('evaluateBotTrade', () => {
     expect(ev.criteria.sharesP).toBeCloseTo(1, 3);
   });
 
-  it('rejects same-platform internal arbs (not yet bot-tradeable)', () => {
+  it('rejects legacy invalid same-platform YES+YES strategies explicitly', () => {
     const ev = evaluateBotTrade(
       makeInput({ strategy: 'Same-platform YES+YES Kalshi: A + B' }),
       baseSettings(),
     );
     expect(ev.shouldTrade).toBe(false);
-    expect(ev.reason).toContain('Missing tradeable ask price');
+    expect(ev.reason).toContain('Invalid legacy Internal arb: same-platform YES+YES is directional duplication');
   });
 
   it('rejects unknown strategy text instead of silently buying YES Kalshi + NO PM', () => {

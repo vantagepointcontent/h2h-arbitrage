@@ -999,7 +999,7 @@ export default function DashboardPanel() {
                   const TYPE_META: Record<string, { label: string; color: string; desc: string }> = {
                     cross: { label: 'Cross Arb', color: 'var(--status-info)', desc: 'YES+YES across platforms' },
                     direct: { label: 'Direct Arb', color: 'var(--status-positive)', desc: 'YES+NO same outcome' },
-                    internal: { label: 'Internal Arb', color: 'var(--platform-polymarket)', desc: 'YES+YES same platform' },
+                    internal: { label: 'Internal Arb', color: 'var(--platform-polymarket)', desc: 'YES+NO same binary market' },
                     unknown: { label: 'Unknown', color: 'var(--text-faint)', desc: 'Unclassified' },
                   };
                   const types = ['cross', 'direct', 'internal'];

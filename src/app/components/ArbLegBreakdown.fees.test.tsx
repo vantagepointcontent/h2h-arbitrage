@@ -8,7 +8,7 @@ describe('arb leg fee transparency', () => {
     ['Buy YES Kalshi + NO PM', false],
     ['Buy YES PM + NO Kalshi', false],
     ['Buy YES both sides: Kalshi A + PM B', true],
-    ['Same-platform YES+YES Kalshi: A + B', false],
+    ['Same-platform YES+NO Kalshi: Outcome', false],
   ] as const)('retains per-venue fees and fee-aware net profit for %s', (strategy, isCross) => {
     const result = parseArbLegs(strategy, 'Outcome', 0.45, 0.55, 0.48, 0.52, 50, 50, fees, 3.5);
     expect(result.isCross).toBe(isCross);

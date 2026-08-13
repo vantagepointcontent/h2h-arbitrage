@@ -308,18 +308,18 @@ describe('telegram-alerts', () => {
     it('includes [INTERNAL] tag for same-platform strategy', () => {
       const msg = formatArbMessage({
         ...baseArb,
-        strategy: 'Same-platform YES+YES: Kalshi France + Kalshi Morocco',
+        strategy: 'Same-platform YES+NO Kalshi: France proposition',
       });
       expect(msg).toContain('[INTERNAL]');
     });
 
-    it('uses explicit arbType when provided (overrides strategy)', () => {
+    it('rejects an explicit arbType that conflicts with strategy', () => {
       const msg = formatArbMessage({
         ...baseArb,
         strategy: 'Buy YES Kalshi + NO PM',
         arbType: 'cross',
       });
-      expect(msg).toContain('[CROSS]');
+      expect(msg).not.toContain('[CROSS]');
       expect(msg).not.toContain('[DIRECT]');
     });
 
@@ -343,7 +343,7 @@ describe('telegram-alerts', () => {
 
     it('includes tag in vanishing message', () => {
       const msg = formatVanishingMessage(
-        { ...baseArb, strategy: 'Same-platform YES+YES: Kalshi A + Kalshi B' },
+        { ...baseArb, strategy: 'Same-platform YES+NO Kalshi: A' },
         8.0,
       );
       expect(msg).toContain('[INTERNAL]');

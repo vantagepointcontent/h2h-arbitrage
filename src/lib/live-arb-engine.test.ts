@@ -20,6 +20,7 @@ const outcome = {
   kalshiTicker: 'KX-BUG-096',
   pmYesTokenId: 'pm-yes-bug-096',
   pmNoTokenId: 'pm-no-bug-096',
+  pmBinaryVerified: true,
 };
 
 const complement = {
@@ -27,6 +28,7 @@ const complement = {
   kalshiTicker: 'KX-BUG-101-COMP',
   pmYesTokenId: 'pm-yes-bug-101-comp',
   pmNoTokenId: 'pm-no-bug-101-comp',
+  pmBinaryVerified: true,
 };
 
 describe('parseBookStaleMs', () => {
@@ -96,6 +98,43 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
 });
 
 describe('computeAllLiveArbitrages effective execution quotes', () => {
+  it('classifies same-market YES+NO as Internal and never pairs two YES contracts', () => {
+    orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.30, quantity: 20 }], [{ price: 0.30, quantity: 20 }]);
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 20 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.70, quantity: 20 }]);
+
+    const result = computeAllLiveArbitrages([outcome], 10)[0];
+
+    expect(result.arbType).toBe('internal');
+    expect(result.strategy).toBe('Same-platform YES+NO Kalshi: Example');
+    expect(result.strategy).not.toContain('YES+YES');
+    expect(result.expectedProfit).toBeGreaterThan(0);
+    expect(result.fees?.kalshiFee).toBeGreaterThan(0);
+  });
+
+  it('rejects Polymarket Internal when exact binary settlement was not verified', () => {
+    const unverified = { ...outcome, pmBinaryVerified: false };
+    orderbookState.setBook(unverified.kalshiTicker, [{ price: 0.70, quantity: 20 }], [{ price: 0.70, quantity: 20 }]);
+    orderbookState.setBook(unverified.pmYesTokenId, [{ price: 0.30, quantity: 20 }], []);
+    orderbookState.setBook(unverified.pmNoTokenId, [], [{ price: 0.30, quantity: 20 }]);
+
+    const result = computeAllLiveArbitrages([unverified], 10)[0];
+
+    expect(result.strategy).not.toBe('Same-platform YES+NO Polymarket: Example');
+    expect(result.arbType).not.toBe('internal');
+  });
+
+  it('rejects cross-outcome self-pairing with duplicated venue identifiers', () => {
+    const duplicate = { ...outcome };
+    orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.20, quantity: 20 }], [{ price: 0.90, quantity: 20 }]);
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.20, quantity: 20 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.90, quantity: 20 }]);
+
+    const result = computeAllLiveArbitrages([outcome, duplicate], 10);
+
+    expect(result.every((candidate) => candidate.arbType !== 'cross')).toBe(true);
+  });
+
   it('skips a synthetic Kalshi ask below the REST floor and keeps price/depth paired', () => {
     orderbookState.setBook(outcome.kalshiTicker,
       [{ price: 0.20, quantity: 999 }, { price: 0.42, quantity: 7 }],

@@ -3,6 +3,7 @@ import path from 'path';
 import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
+import { auditArbClassification } from './arb-types';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -52,7 +53,9 @@ async function initDb(): Promise<void> {
       expiry_at       TEXT,   -- expiry timestamp captured by this scan
       days_to_expiry  REAL,   -- precise fractional TTE captured by this scan
       apy_pct         REAL,   -- canonical annualized ROI snapshot (%)
-      apy_unavailable_reason TEXT
+      apy_unavailable_reason TEXT,
+      arb_valid       INTEGER NOT NULL DEFAULT 1,
+      arb_invalidation_reason TEXT
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -65,9 +68,23 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN days_to_expiry REAL`,
     `ALTER TABLE scan_results ADD COLUMN apy_pct REAL`,
     `ALTER TABLE scan_results ADD COLUMN apy_unavailable_reason TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN arb_valid INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE scan_results ADD COLUMN arb_invalidation_reason TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
+  await c.execute(`UPDATE scan_results
+    SET arb_valid = 0,
+        arb_invalidation_reason = 'legacy_internal_yes_yes_directional_duplication',
+        arb_type = NULL,
+        positive_arb_count = 0,
+        best_profit = 0,
+        best_roi_pct = 0,
+        total_stake = 0,
+        apy_pct = 0,
+        apy_unavailable_reason = 'invalid_arb_classification'
+    WHERE strategy LIKE 'Same-platform YES+YES%'
+      AND (arb_valid <> 0 OR arb_invalidation_reason IS NULL)`);
   // Index for fast per-market lookups
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_market_id ON scan_results(market_id)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_scanned_at ON scan_results(scanned_at DESC)`);
@@ -339,36 +356,43 @@ export async function saveScanResult(
   await ensureDb();
   const c = getClient();
   const scannedAt = result.scannedAt ?? new Date().toISOString();
-  const snapshot = calculateScanApy(result.bestRoiPct, scannedAt, result.expiryAt);
+  const audit = auditArbClassification(result.strategy, result.arbType);
+  const financiallyValid = audit.valid && audit.canonicalType !== null;
+  const canonicalRoi = financiallyValid ? (result.bestRoiPct ?? 0) : 0;
+  const snapshot = financiallyValid
+    ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
+    : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
   const row = await c.execute({
     sql: `INSERT INTO scan_results
       (market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
        kalshi_url, polymarket_url, arb_type, expiry_at, days_to_expiry,
-       apy_pct, apy_unavailable_reason)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
-      result.bestRoiPct ?? 0,
-      result.bestProfit ?? 0,
+      canonicalRoi,
+      financiallyValid ? (result.bestProfit ?? 0) : 0,
       result.strategy ?? '',
       result.outcomeCount ?? 0,
       result.matchedCount ?? 0,
       result.kalshiCount ?? 0,
       result.pmCount ?? 0,
-      result.positiveArbCount ?? 0,
-      result.totalStake ?? 0,
+      financiallyValid ? (result.positiveArbCount ?? 0) : 0,
+      financiallyValid ? (result.totalStake ?? 0) : 0,
       scannedAt,
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
       result.kalshiUrl ?? null,
       result.polymarketUrl ?? null,
-      result.arbType ?? null,
+      audit.canonicalType,
       result.expiryAt ?? null,
       snapshot.daysToExpiry,
       snapshot.apyPct,
       snapshot.unavailableReason,
+      financiallyValid ? 1 : 0,
+      audit.reason,
     ],
   });
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
@@ -459,7 +483,7 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
   const args: (string | number)[] = [];
   if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
   if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
-  if (opts.positiveArbOnly) where += ' AND positive_arb_count > 0';
+  if (opts.positiveArbOnly) where += ' AND arb_valid = 1 AND positive_arb_count > 0';
   if (opts.maxTteDays !== undefined) {
     where += ' AND days_to_expiry >= 0 AND days_to_expiry < ?';
     args.push(opts.maxTteDays);
@@ -477,11 +501,11 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
       args.push(`%${literalLike}%`);
     }
   }
-  if (opts.eventType === 'arb') where += ' AND positive_arb_count > 0';
+  if (opts.eventType === 'arb') where += ' AND arb_valid = 1 AND positive_arb_count > 0';
   if (opts.eventType === 'scan') where += ' AND positive_arb_count = 0';
   if (opts.eventType === 'system') where += ' AND (matched_count = 0 OR kalshi_count = 0 OR pm_count = 0)';
   if (opts.arbType && opts.arbType !== 'all') {
-    where += ` AND COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = ?`;
+    where += ` AND arb_valid = 1 AND COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+NO%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = ?`;
     args.push(opts.arbType);
   }
   return { where, args };
@@ -508,9 +532,9 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
   const [countRes, rangeRes] = await Promise.all([
     c.execute({
       sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets, COALESCE(SUM(positive_arb_count), 0) AS total_arbs, COALESCE(AVG(best_roi_pct), 0) AS avg_roi, COALESCE(MAX(best_roi_pct), 0) AS best_roi, COALESCE(SUM(best_profit), 0) AS total_profit,
-        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'direct' THEN 1 ELSE 0 END) AS direct_count,
-        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'cross' THEN 1 ELSE 0 END) AS cross_count,
-        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
+        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'direct' THEN 1 ELSE 0 END) AS direct_count,
+        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'cross' THEN 1 ELSE 0 END) AS cross_count,
+        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
       args: base.args,
     }),
     c.execute({
@@ -529,7 +553,8 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at,
-                 expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
+                 expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
+                 arb_type, arb_valid, arb_invalidation_reason
           FROM scan_results${pageWhere}
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
     args: [...pageArgs, limit],
@@ -587,7 +612,8 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
       sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
-                   expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
+                   expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
+                   arb_type, arb_valid, arb_invalidation_reason
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],
@@ -728,7 +754,7 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
       sql: `SELECT
               CASE
                 WHEN strategy LIKE '%both sides%' THEN 'cross'
-                WHEN strategy LIKE 'Same-platform%' THEN 'internal'
+                WHEN strategy LIKE 'Same-platform YES+NO%' THEN 'internal'
                 WHEN strategy LIKE 'Buy YES%' THEN 'direct'
                 ELSE 'unknown'
               END AS arb_type,
@@ -736,6 +762,7 @@ export async function getDashboardAggregates(since: string | undefined, suspicio
               SUM(best_profit) AS total_profit,
               AVG(best_roi_pct) AS avg_roi
             FROM scan_results ${w}
+              AND arb_valid = 1
               AND positive_arb_count > 0
               AND best_roi_pct <= ?
             GROUP BY arb_type`,
@@ -957,6 +984,7 @@ export interface LastScanResult {
       worstCaseNetProfit: number;
     };
   }[];
+  arbType?: 'cross' | 'direct' | 'internal' | null;
 }
 
 export interface SavedMarket {
@@ -1014,6 +1042,8 @@ function rowToMarket(r: any): SavedMarket {
   try { lastScanResult = r.last_scan_result ? JSON.parse(String(r.last_scan_result)) : null; } catch {}
   let liveResult: LastScanResult | null = null;
   try { liveResult = r.live_result ? JSON.parse(String(r.live_result)) : null; } catch {}
+  lastScanResult = sanitizeSavedArbResult(lastScanResult);
+  liveResult = sanitizeSavedArbResult(liveResult);
   // WS-107: a live result is only trustworthy while the watcher is actively
   // recomputing it. If it's older than the TTL (watcher down, pair left HOT
   // tier), drop it so the UI falls back to the poller's lastScanResult.
@@ -1041,6 +1071,30 @@ function rowToMarket(r: any): SavedMarket {
     archivedAt: r.archived_at != null ? String(r.archived_at) : null,
     archiveReason: r.archive_reason != null ? String(r.archive_reason) : null,
     lastMatchedAt: r.last_matched_at != null ? String(r.last_matched_at) : null,
+  };
+}
+
+function sanitizeSavedArbResult(result: LastScanResult | null): LastScanResult | null {
+  if (!result) return null;
+  const allArbs = (result.allArbs ?? []).filter((candidate) => {
+    const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
+      ? candidate.arbType : null;
+    const audit = auditArbClassification(candidate.strategy, declared);
+    return audit.valid && audit.canonicalType !== null;
+  });
+  const topAudit = auditArbClassification(result.strategy, result.arbType ?? null);
+  if (topAudit.valid && topAudit.canonicalType !== null) return { ...result, allArbs };
+  const best = allArbs.reduce<(typeof allArbs)[number] | null>(
+    (current, candidate) => !current || candidate.roiPct > current.roiPct ? candidate : current,
+    null,
+  );
+  return {
+    ...result,
+    bestRoiPct: best?.roiPct ?? 0,
+    bestProfit: best?.expectedProfit ?? 0,
+    strategy: best?.strategy ?? 'No arb',
+    arbType: best?.arbType === 'cross' || best?.arbType === 'direct' || best?.arbType === 'internal' ? best.arbType : null,
+    allArbs,
   };
 }
 
@@ -1383,6 +1437,7 @@ async function prepareCanonicalMatchResult(
   source: string,
   executor: import('./coupling-store').CouplingExecutor,
 ): Promise<LastScanResult | null> {
+  incoming = sanitizeSavedArbResult(incoming) ?? incoming;
   if (incoming.matchStatus === 'unavailable' || incoming.matchStatus === 'refreshing') {
     return {
       ...(previous ?? incoming),

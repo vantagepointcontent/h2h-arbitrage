@@ -43,7 +43,7 @@ export interface LiveArbResult {
   /** ARB-01a: classification of the arb strategy.
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
-   *  - "internal": same-platform YES+YES (FEAT-016) */
+   *  - "internal": same-platform YES+NO on one verified binary market */
   arbType: 'cross' | 'direct' | 'internal' | null;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
@@ -65,6 +65,8 @@ export interface LiveMatchedOutcome {
   pmYesTokenId: string;
   pmNoTokenId: string;
   pmConditionId?: string;
+  /** Gamma verified exact [Yes, No] outcomes and non-neg-risk settlement. */
+  pmBinaryVerified?: boolean;
 }
 
 export function parseBookStaleMs(value: unknown): number {
@@ -78,7 +80,7 @@ function computeSingleOutcome(
   capital: number,
   category?: string,
 ): LiveArbResult {
-  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId } = outcome;
+  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified } = outcome;
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
@@ -187,6 +189,41 @@ function computeSingleOutcome(
         worstCaseNetProfit: stale ? 0 : candidate.fees.worstCaseNetProfit,
       };
     }
+
+    if (!stale && kalshiTicker && kalshiYesAsk + kalshiNoAsk < 1
+        && kalshiYesDepth > 0 && kalshiNoDepth > 0) {
+      const contracts = Math.min(kalshiYesDepth / kalshiYesAsk, kalshiNoDepth / kalshiNoAsk, capital);
+      const yesStake = contracts * kalshiYesAsk;
+      const noStake = contracts * kalshiNoAsk;
+      const totalFee = calcKalshiFee(contracts, kalshiYesAsk) + calcKalshiFee(contracts, kalshiNoAsk);
+      const netProfit = contracts - yesStake - noStake - totalFee;
+      if (netProfit > 0 && netProfit > expectedProfit) {
+        strategy = `Same-platform YES+NO Kalshi: ${artist}`;
+        roiPct = netProfit / (yesStake + noStake) * 100;
+        expectedProfit = netProfit;
+        kalshiStake = yesStake + noStake;
+        pmStake = 0;
+        fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit };
+      }
+    }
+
+    if (!stale && pmBinaryVerified === true && pmConditionId && pmYesTokenId !== pmNoTokenId
+        && pmYesAsk + pmNoAsk < 1 && pmYesDepth > 0 && pmNoDepth > 0) {
+      const contracts = Math.min(pmYesDepth / pmYesAsk, pmNoDepth / pmNoAsk, capital);
+      const yesStake = contracts * pmYesAsk;
+      const noStake = contracts * pmNoAsk;
+      const theta = getPolymarketTheta(category);
+      const totalFee = calcPolymarketFee(contracts, pmYesAsk, theta) + calcPolymarketFee(contracts, pmNoAsk, theta);
+      const netProfit = contracts - yesStake - noStake - totalFee;
+      if (netProfit > 0 && netProfit > expectedProfit) {
+        strategy = `Same-platform YES+NO Polymarket: ${artist}`;
+        roiPct = netProfit / (yesStake + noStake) * 100;
+        expectedProfit = netProfit;
+        kalshiStake = 0;
+        pmStake = yesStake + noStake;
+        fees = { kalshiFee: 0, pmFee: totalFee, worstCaseNetProfit: netProfit };
+      }
+    }
   }
 
   return {
@@ -215,7 +252,7 @@ function computeSingleOutcome(
     pmNoTokenId,
     pmConditionId,
     category,
-    arbType: 'direct',
+    arbType: strategy.startsWith('Same-platform YES+NO') ? 'internal' : 'direct',
     lastUpdate: new Date().toISOString(),
   };
 }
@@ -231,7 +268,10 @@ export function computeAllLiveArbitrages(
   const results = outcomes.map((o) => computeSingleOutcome(o, capital, category));
 
   // Cross-outcome pass: only for strict binary (exactly 2 outcomes), same rule as manual scan.
-  if (results.length === 2) {
+  if (results.length === 2
+      && outcomes[0]?.artist !== outcomes[1]?.artist
+      && outcomes[0]?.kalshiTicker !== outcomes[1]?.kalshiTicker
+      && outcomes[0]?.pmConditionId !== outcomes[1]?.pmConditionId) {
     for (let i = 0; i < 2; i++) {
       const cur = results[i];
       const comp = results[1 - i];
@@ -278,78 +318,6 @@ export function computeAllLiveArbitrages(
     }
   }
 
-    // Internal arb pass: same-platform YES+YES on strict binary markets.
-    // Mirrors FEAT-016 in matcher.ts (lines 619-719).
-    if (results.length === 2) {
-      for (let i = 0; i < 2; i++) {
-        const cur = results[i];
-        const comp = results[1 - i];
-        if (cur.stale || comp.stale) continue;
-
-        // ── Kalshi same-platform YES+YES ──
-        const kYesA = cur.kalshiYesAsk;
-        const kYesB = comp.kalshiYesAsk;
-        if (kYesA != null && kYesB != null && kYesA > 0 && kYesB > 0 && kYesA + kYesB < 1) {
-          const capKA = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : 0;
-          const capKB = comp.kalshiYesDepth > 0 ? comp.kalshiYesDepth / kYesB : 0;
-          const capped = Math.min(capKA, capKB, capital);
-          const effectiveCapital = capped;
-          if (effectiveCapital > 0) {
-            const stakeA = effectiveCapital * kYesA;
-            const stakeB = effectiveCapital * kYesB;
-            const grossProfit = effectiveCapital - stakeA - stakeB;
-            const contractsA = stakeA / kYesA;
-            const contractsB = stakeB / kYesB;
-            const feeA = calcKalshiFee(contractsA, kYesA);
-            const feeB = calcKalshiFee(contractsB, kYesB);
-            const totalFee = feeA + feeB;
-            const netProfit = grossProfit - totalFee;
-            const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
-            if (netProfit > cur.expectedProfit) {
-              cur.strategy = `Same-platform YES+YES Kalshi: ${cur.artist} + ${comp.artist}`;
-              cur.arbType = 'internal';
-              cur.roiPct = roiPct;
-              cur.expectedProfit = netProfit;
-              cur.kalshiStake = stakeA + stakeB;
-              cur.pmStake = 0;
-              cur.fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit };
-            }
-          }
-        }
-
-        // ── Polymarket same-platform YES+YES ──
-        const pYesA = cur.pmYesAsk;
-        const pYesB = comp.pmYesAsk;
-        if (pYesA != null && pYesB != null && pYesA > 0 && pYesB > 0 && pYesA + pYesB < 1) {
-          const capPA = cur.pmYesDepth > 0 ? cur.pmYesDepth / pYesA : 0;
-          const capPB = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : 0;
-          const capped = Math.min(capPA, capPB, capital);
-          const effectiveCapital = capped;
-          if (effectiveCapital > 0) {
-            const stakeA = effectiveCapital * pYesA;
-            const stakeB = effectiveCapital * pYesB;
-            const grossProfit = effectiveCapital - stakeA - stakeB;
-            const pmTheta = getPolymarketTheta(category);
-            const contractsA = stakeA / pYesA;
-            const contractsB = stakeB / pYesB;
-            const feeA = calcPolymarketFee(contractsA, pYesA, pmTheta);
-            const feeB = calcPolymarketFee(contractsB, pYesB, pmTheta);
-            const totalFee = feeA + feeB;
-            const netProfit = grossProfit - totalFee;
-            const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
-            if (netProfit > cur.expectedProfit) {
-              cur.strategy = `Same-platform YES+YES Polymarket: ${cur.artist} + ${comp.artist}`;
-              cur.arbType = 'internal';
-              cur.roiPct = roiPct;
-              cur.expectedProfit = netProfit;
-              cur.kalshiStake = 0;
-              cur.pmStake = stakeA + stakeB;
-              cur.fees = { kalshiFee: 0, pmFee: totalFee, worstCaseNetProfit: netProfit };
-            }
-          }
-        }
-      }
-    }
 
   return results;
 }

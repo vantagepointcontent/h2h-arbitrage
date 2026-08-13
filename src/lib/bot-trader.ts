@@ -338,6 +338,10 @@ export function evaluateBotTrade(
 ): BotTradeEvaluation {
   const reasons: string[] = [];
 
+  if ((input.strategy || '').toLowerCase().startsWith('same-platform yes+yes')) {
+    reasons.push('Invalid legacy Internal arb: same-platform YES+YES is directional duplication');
+  }
+
   if (!settings.enabled) {
     return {
       shouldTrade: false,

@@ -74,6 +74,26 @@ describe('WS-107 liveResult persistence', () => {
     expect(got.liveResult!.allArbs).toHaveLength(1);
   });
 
+  it('invalidates legacy Internal results before saved-market persistence', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/legacy', polymarketUrl: 'https://polymarket.com/event/legacy',
+      eventTitle: 'Legacy internal', category: 'Politics', expiryDate: null,
+    });
+    await persistence.updateSavedMarketScanResult(m.id, makeScan({
+      strategy: 'Same-platform YES+YES Kalshi: A + B',
+      arbType: 'internal', bestRoiPct: 12, bestProfit: 12,
+      allArbs: [{
+        artist: 'A', roiPct: 12, expectedProfit: 12,
+        strategy: 'Same-platform YES+YES Kalshi: A + B', arbType: 'internal',
+      }],
+    }));
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.lastScanResult).toMatchObject({
+      strategy: 'No arb', arbType: null, bestRoiPct: 0, bestProfit: 0, allArbs: [],
+    });
+  });
+
   it('liveResult write does not touch lastScanResult', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/y', polymarketUrl: 'https://polymarket.com/event/y',

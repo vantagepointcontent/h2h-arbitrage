@@ -1,7 +1,6 @@
 import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
-import { classifyArbType, type ArbType } from './arb-types';
 import { finiteDecimal, finiteMarketPrice } from './market-price';
 
 export interface UnifiedOutcome {
@@ -33,6 +32,8 @@ export interface UnifiedOutcome {
     askDepth?: number;
     noAskDepth?: number;
     negRisk?: boolean;
+    /** Exact [Yes, No] outcome structure was verified from platform data. */
+    binaryVerified?: boolean;
     /** False when prices are indicative only (no executable CLOB asks). */
     isExecutable?: boolean;
     couplingOrientation?: 'same' | 'inverted';
@@ -48,7 +49,7 @@ export interface UnifiedOutcome {
     /** ARB-01a: classification of the arb strategy.
      *  - "direct": regular YES/NO across platforms (within-outcome)
      *  - "cross": cross-outcome YES+YES across platforms
-     *  - "internal": same-platform YES+YES (FEAT-016) */
+     *  - "internal": same-platform YES+NO on one verified binary market */
     arbType: 'cross' | 'direct' | 'internal' | null;
     kalshiStake: number;
     pmStake: number;
@@ -762,8 +763,85 @@ export function calculateBestArbitrageForOutcome(
     maxCapital,
   );
 
+  // BUG-142: an Internal arb is complementary YES + NO on one authoritative
+  // binary contract. Each leg needs positive executable depth and its own fee.
+  const kYes = current.kalshi.yesAsk;
+  const kNo = current.kalshi.noAsk;
+  if (current.kalshi.ticker && kYes > 0 && kNo > 0 && kYes + kNo < 1) {
+    const contracts = Math.min(
+      depthKYes > 0 ? depthKYes / kYes : 0,
+      depthKNo > 0 ? depthKNo / kNo : 0,
+      maxCapital,
+    );
+    if (contracts > 0) {
+      const yesStake = contracts * kYes;
+      const noStake = contracts * kNo;
+      const yesFee = calcKalshiFee(contracts, kYes);
+      const noFee = calcKalshiFee(contracts, kNo);
+      const totalFee = yesFee + noFee;
+      const netProfit = contracts - yesStake - noStake - totalFee;
+      const totalStake = yesStake + noStake;
+      if (netProfit > 0 && netProfit > best.expectedProfit) {
+        best = {
+          strategy: `Same-platform YES+NO Kalshi: ${current.artist}`,
+          arbType: 'internal', kalshiStake: totalStake, pmStake: 0,
+          expectedProfit: netProfit, roiPct: totalStake > 0 ? netProfit / totalStake * 100 : 0,
+          maxCapital: contracts, buyPlatform: 'kalshi', buyPrice: kYes,
+          sellPlatform: 'kalshi', sellPrice: kNo, depthVerified: true,
+          fees: {
+            kalshiFee: totalFee, pmFee: 0,
+            kalshiFeeDetails: `Kalshi YES ${contracts.toFixed(0)} @ $${fmtProbPrice(kYes)} (${formatFee(yesFee)}) + NO ${contracts.toFixed(0)} @ $${fmtProbPrice(kNo)} (${formatFee(noFee)}) = ${formatFee(totalFee)}`,
+            pmFeeDetails: 'Polymarket: not involved',
+            netProfitIfKalshiWins: netProfit, netProfitIfPmWins: netProfit,
+            worstCaseNetProfit: netProfit,
+          },
+        };
+      }
+    }
+  }
+
+  const pYes = current.polymarket.bestAsk;
+  const pNo = current.polymarket.noPrice;
+  if (current.polymarket.binaryVerified === true && current.polymarket.negRisk !== true
+      && current.polymarket.conditionId && pYes > 0 && pNo > 0 && pYes + pNo < 1) {
+    const contracts = Math.min(
+      depthPYes > 0 ? depthPYes / pYes : 0,
+      depthPNo > 0 ? depthPNo / pNo : 0,
+      maxCapital,
+    );
+    if (contracts > 0) {
+      const yesStake = contracts * pYes;
+      const noStake = contracts * pNo;
+      const theta = getPolymarketTheta(category);
+      const yesFee = calcPolymarketFee(contracts, pYes, theta);
+      const noFee = calcPolymarketFee(contracts, pNo, theta);
+      const totalFee = yesFee + noFee;
+      const netProfit = contracts - yesStake - noStake - totalFee;
+      const totalStake = yesStake + noStake;
+      if (netProfit > 0 && netProfit > best.expectedProfit) {
+        best = {
+          strategy: `Same-platform YES+NO Polymarket: ${current.artist}`,
+          arbType: 'internal', kalshiStake: 0, pmStake: totalStake,
+          expectedProfit: netProfit, roiPct: totalStake > 0 ? netProfit / totalStake * 100 : 0,
+          maxCapital: contracts, buyPlatform: 'polymarket', buyPrice: pYes,
+          sellPlatform: 'polymarket', sellPrice: pNo,
+          pmConditionId: current.polymarket.conditionId, depthVerified: true,
+          fees: {
+            kalshiFee: 0, pmFee: totalFee, kalshiFeeDetails: 'Kalshi: not involved',
+            pmFeeDetails: `Polymarket YES ${contracts.toFixed(0)} @ $${fmtProbPrice(pYes)} (${formatFee(yesFee)}) + NO ${contracts.toFixed(0)} @ $${fmtProbPrice(pNo)} (${formatFee(noFee)}) = ${formatFee(totalFee)}`,
+            netProfitIfKalshiWins: netProfit, netProfitIfPmWins: netProfit,
+            worstCaseNetProfit: netProfit,
+          },
+        };
+      }
+    }
+  }
+
   // Cross-outcome: buy YES on both platforms. Only valid for strict binary markets.
-  if (complement?.kalshi && complement?.polymarket) {
+  if (complement?.kalshi && complement?.polymarket
+      && current.artist !== complement.artist
+      && current.kalshi.ticker !== complement.kalshi.ticker
+      && current.polymarket.conditionId !== complement.polymarket.conditionId) {
     const kYesA = current.kalshi.yesAsk;
     const pYesB = complement.polymarket.bestAsk;
     if (kYesA + pYesB < 1) {
@@ -823,114 +901,6 @@ export function calculateBestArbitrageForOutcome(
     }
   }
 
-  // FEAT-016: Same-platform YES+YES arbitrage. On a strict binary market
-  // (exactly 2 mutually exclusive, exhaustive outcomes), buying YES on BOTH
-  // outcomes on the SAME platform guarantees exactly one $1 payout. If the
-  // combined YES ask prices are < $1.00 (after fees), it's a guaranteed profit.
-  // This is distinct from cross-outcome arb (which buys YES on DIFFERENT platforms).
-  if (complement?.kalshi && complement?.polymarket) {
-    // ── Kalshi same-platform YES+YES ──
-    const kYesA = current.kalshi.yesAsk;
-    const kYesB = complement.kalshi.yesAsk;
-    if (kYesA > 0 && kYesB > 0 && kYesA + kYesB < 1) {
-      const depthKA = depthKYes;
-      const depthKB = parseDepth(complement.kalshi.yesAskDepth);
-      const capKA = depthKA > 0 ? depthKA / kYesA : 0;
-      const capKB = depthKB > 0 ? depthKB / kYesB : 0;
-      const capital = Math.min(capKA, capKB, maxCapital);
-      const effectiveCapital = capital;
-      if (effectiveCapital > 0) {
-        const kalshiStakeA = effectiveCapital * kYesA;
-        const kalshiStakeB = effectiveCapital * kYesB;
-        const grossProfit = effectiveCapital - kalshiStakeA - kalshiStakeB;
-        // Kalshi fees: both legs are YES buys, fee = contracts * price * rate
-        const contractsA = kalshiStakeA / kYesA;
-        const contractsB = kalshiStakeB / kYesB;
-        const kalshiFeeA = calcKalshiFee(contractsA, kYesA);
-        const kalshiFeeB = calcKalshiFee(contractsB, kYesB);
-        const totalKalshiFee = kalshiFeeA + kalshiFeeB;
-        const netProfit = grossProfit - totalKalshiFee;
-        const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
-        if (netProfit > best.expectedProfit) {
-          best = {
-            strategy: `Same-platform YES+YES Kalshi: ${current.artist} + ${complement.artist}`,
-            arbType: 'internal',
-            kalshiStake: kalshiStakeA + kalshiStakeB,
-            pmStake: 0,
-            expectedProfit: netProfit,
-            roiPct,
-            maxCapital: effectiveCapital,
-            buyPlatform: 'kalshi',
-            buyPrice: kYesA,
-            sellPlatform: 'kalshi',
-            sellPrice: kYesB,
-            fees: {
-              kalshiFee: totalKalshiFee,
-              pmFee: 0,
-              kalshiFeeDetails: `Kalshi YES A ${contractsA.toFixed(0)} @ $${fmtProbPrice(kYesA)} (${formatFee(kalshiFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${fmtProbPrice(kYesB)} (${formatFee(kalshiFeeB)}) = ${formatFee(totalKalshiFee)}`,
-              pmFeeDetails: 'Polymarket: not involved',
-              netProfitIfKalshiWins: netProfit,
-              netProfitIfPmWins: netProfit,
-              worstCaseNetProfit: netProfit,
-            },
-            depthVerified: true,
-          };
-        }
-      }
-    }
-
-    // ── Polymarket same-platform YES+YES ──
-    const pYesA = current.polymarket.bestAsk;
-    const pYesB = complement.polymarket.bestAsk;
-    if (pYesA > 0 && pYesB > 0 && pYesA + pYesB < 1) {
-      const depthPA = depthPYes;
-      const depthPB = complement.polymarket.askDepth != null && complement.polymarket.askDepth > 0
-        ? complement.polymarket.askDepth : 0;
-      const capPA = depthPA > 0 ? depthPA / pYesA : 0;
-      const capPB = depthPB > 0 ? depthPB / pYesB : 0;
-      const capital = Math.min(capPA, capPB, maxCapital);
-      const effectiveCapital = capital;
-      if (effectiveCapital > 0) {
-        const pmStakeA = effectiveCapital * pYesA;
-        const pmStakeB = effectiveCapital * pYesB;
-        const grossProfit = effectiveCapital - pmStakeA - pmStakeB;
-        // Polymarket fees: both legs are YES buys
-        const pmTheta = getPolymarketTheta(category);
-        const contractsA = pmStakeA / pYesA;
-        const contractsB = pmStakeB / pYesB;
-        const pmFeeA = calcPolymarketFee(contractsA, pYesA, pmTheta);
-        const pmFeeB = calcPolymarketFee(contractsB, pYesB, pmTheta);
-        const totalPmFee = pmFeeA + pmFeeB;
-        const netProfit = grossProfit - totalPmFee;
-        const roiPct = effectiveCapital > 0 ? (netProfit / effectiveCapital) * 100 : 0;
-        if (netProfit > best.expectedProfit) {
-          best = {
-            strategy: `Same-platform YES+YES Polymarket: ${current.artist} + ${complement.artist}`,
-            arbType: 'internal',
-            kalshiStake: 0,
-            pmStake: pmStakeA + pmStakeB,
-            expectedProfit: netProfit,
-            roiPct,
-            maxCapital: effectiveCapital,
-            buyPlatform: 'polymarket',
-            buyPrice: pYesA,
-            sellPlatform: 'polymarket',
-            sellPrice: pYesB,
-            fees: {
-              kalshiFee: 0,
-              pmFee: totalPmFee,
-              kalshiFeeDetails: 'Kalshi: not involved',
-              pmFeeDetails: `Polymarket YES A ${contractsA.toFixed(0)} @ $${fmtProbPrice(pYesA)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeA)}) + YES B ${contractsB.toFixed(0)} @ $${fmtProbPrice(pYesB)} (θ=${pmTheta.toFixed(2)}, ${formatFee(pmFeeB)}) = ${formatFee(totalPmFee)}`,
-              netProfitIfKalshiWins: netProfit,
-              netProfitIfPmWins: netProfit,
-              worstCaseNetProfit: netProfit,
-            },
-            depthVerified: true,
-          };
-        }
-      }
-    }
-  }
 
   // Sanity guard: flag phantom arbs (huge ROI on legs with unknown depth).
   const depthUnknown =
@@ -1092,10 +1062,24 @@ function isBinaryMarket(outcomes: string[]): boolean {
   return (lower.length === 2 && lower.includes('yes') && lower.includes('no'));
 }
 
+function hasVerifiedBinaryTokens(market: PMMarket, outcomes: string[]): boolean {
+  if (!market.conditionId || !isBinaryMarket(outcomes)) return false;
+  try {
+    const tokenIds = JSON.parse(market.clobTokenIds ?? 'null');
+    return Array.isArray(tokenIds)
+      && tokenIds.length === outcomes.length
+      && tokenIds.every((tokenId) => typeof tokenId === 'string' && tokenId.trim() !== '')
+      && new Set(tokenIds).size === tokenIds.length;
+  } catch {
+    return false;
+  }
+}
+
 // --- Helper to build the PM shape used by matching; scan route calculates arbitrage. ---
 export function buildPmArbShape(market: PMMarket) {
-  const { prices } = parseOutcomes(market);
-  const isNegRisk = market.neg_risk === true;
+  const { outcomes, prices } = parseOutcomes(market);
+  const isNegRisk = market.neg_risk === true || market.negRisk === true;
+  const binaryVerified = hasVerifiedBinaryTokens(market, outcomes) && !isNegRisk;
   
   // DEBUG
   const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
@@ -1146,6 +1130,7 @@ export function buildPmArbShape(market: PMMarket) {
       askDepth: 0,
       noAskDepth: 0,
       negRisk: market.neg_risk === true,
+      binaryVerified,
       isExecutable: false,
     } as NonNullable<UnifiedOutcome['polymarket']>;
   }
@@ -1203,6 +1188,7 @@ export function buildPmArbShape(market: PMMarket) {
     askDepth: Number.isFinite(market.askDepth) ? market.askDepth : 0,
     noAskDepth: Number.isFinite(market.noAskDepth) ? market.noAskDepth : 0,
     negRisk: market.neg_risk === true,
+    binaryVerified,
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 

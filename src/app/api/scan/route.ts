@@ -22,6 +22,7 @@ import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
 import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
+import { auditArbClassification } from '@/lib/arb-types';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
@@ -420,7 +421,10 @@ export async function POST(request: NextRequest) {
         // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth)
         // from stats, history, lifecycle, and alerts. They stay visible in the
         // scan payload itself (flagged) so the UI can grey them out.
-        const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
+        const positiveArbs = withArbitrage.filter(o => o.arbitrage
+          && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
+          && o.arbitrage.arbType !== null
+          && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
         const suspiciousCount = withArbitrage.filter(o => o.arbitrage?.suspicious).length;
         if (suspiciousCount > 0) {
           console.log(`[scan] ${market.eventTitle}: ${suspiciousCount} suspicious arb(s) excluded from stats (ROI > threshold with unknown depth)`);
@@ -429,7 +433,10 @@ export async function POST(request: NextRequest) {
         // positiveArbs still used for alerts/lifecycle — we don't want to trigger
         // alerts on negative arbs. netArbs includes the best candidate even when
         // negative, so the UI shows how close a pair is to profitability.
-        const netArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
+        const netArbs = withArbitrage.filter(o => o.arbitrage
+          && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
+          && o.arbitrage.arbType !== null
+          && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
         const bestNetArb = netArbs.length > 0
           ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
@@ -448,7 +455,7 @@ export async function POST(request: NextRequest) {
           kalshiCount,
           pmCount,
           scannedAt: new Date().toISOString(),
-          publicationGeneration,
+          publicationGeneration: publicationGeneration ?? undefined,
           category: scanCategory,
           // UI-013: PM often keeps endDate far in the future even after a market
           // resolves. Persist PM's own closed signal so the UI can treat

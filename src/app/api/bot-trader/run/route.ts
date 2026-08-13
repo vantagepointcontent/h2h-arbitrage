@@ -7,6 +7,7 @@ import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket, type SingleRefreshResult } from '@/app/api/saved-markets/refresh/refresh-single';
 import logger from '@/lib/logger';
 import { processBotScanBacklog } from '@/lib/bot-scan-consumer';
+import { auditArbClassification } from '@/lib/arb-types';
 
 function authorized(request: NextRequest): boolean {
   const token = process.env.H2H_API_TOKEN;
@@ -36,6 +37,7 @@ interface RefreshArbRow {
   pmNoPrice?: number | null;
   pmYesDepth?: number | null;
   pmNoDepth?: number | null;
+  arbType?: 'direct' | 'cross' | 'internal' | null;
 }
 
 function toBotTradeInput(
@@ -83,7 +85,8 @@ function toBotTradeInputs(
     if (parsed) arbs.push(parsed);
   }
   return arbs
-    .filter((arb) => arb.roiPct > 0)
+    .filter((arb) => arb.roiPct > 0 && auditArbClassification(arb.strategy, arb.arbType).valid
+      && auditArbClassification(arb.strategy, arb.arbType).canonicalType !== 'internal')
     .map((arb) => toBotTradeInput(pairId, marketTitle, expiryDate, category, arb));
 }
 
@@ -112,6 +115,7 @@ function parseRefreshArbRow(row: unknown): RefreshArbRow | null {
     pmNoPrice: typeof r.pmNoPrice === 'number' ? r.pmNoPrice : null,
     pmYesDepth: typeof r.pmYesDepth === 'number' ? r.pmYesDepth : null,
     pmNoDepth: typeof r.pmNoDepth === 'number' ? r.pmNoDepth : null,
+    arbType: r.arbType === 'direct' || r.arbType === 'cross' || r.arbType === 'internal' ? r.arbType : null,
   };
 }
 

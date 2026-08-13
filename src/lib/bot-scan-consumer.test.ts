@@ -162,9 +162,21 @@ function harness(options: {
 }
 
 describe('durable BotTrader scan consumer', () => {
+  it.each([
+    ['Same-platform YES+YES Kalshi: A + B', 'internal'],
+    ['Same-platform YES+NO Kalshi: A', 'internal'],
+    ['Buy YES Kalshi + NO PM', 'internal'],
+  ])('fails closed before BotTrader for invalid or unsupported classification %s', (strategy, arbType) => {
+    expect(parseBotScanCandidate({
+      artist: 'A', strategy, arbType, roiPct: 5, expectedProfit: 5,
+      kalshiTicker: 'KX-A', pmConditionId: 'pm-a',
+      fees: { kalshiFee: 0.01, pmFee: 0.01 },
+    })).toBeNull();
+  });
+
   it('never promotes a Polymarket midpoint/yes price into an executable ask', () => {
     const parsed = parseBotScanCandidate({
-      artist: 'A', strategy: 'Buy NO Kalshi + YES PM', roiPct: 5, expectedProfit: 5,
+      artist: 'A', strategy: 'Buy YES PM + NO Kalshi', roiPct: 5, expectedProfit: 5,
       kalshiTicker: 'KX-A', pmConditionId: 'pm-a', pmYesPrice: 0.42,
       fees: { kalshiFee: 0.01, pmFee: 0.01 },
     });

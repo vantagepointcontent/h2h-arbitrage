@@ -58,6 +58,53 @@ describe('Logs FTS persistence', () => {
     ]);
   });
 
+  it('preserves legacy raw evidence but invalidates YES+YES Internal metrics everywhere', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-internal-audit-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const raw = { allArbs: [{ strategy: 'Same-platform YES+YES Kalshi: A + B', expectedProfit: 10 }] };
+    const invalid = await persistence.saveScanResult('legacy-internal', {
+      bestRoiPct: 10, bestProfit: 10, strategy: 'Same-platform YES+YES Kalshi: A + B',
+      arbType: 'internal', outcomeCount: 2, matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      positiveArbCount: 1, totalStake: 90, scannedAt: '2026-08-12T12:00:00.000Z', raw,
+    });
+    await persistence.saveScanResult('valid-internal', {
+      bestRoiPct: 5, bestProfit: 5, strategy: 'Same-platform YES+NO Kalshi: Proposition',
+      arbType: 'internal', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1,
+      positiveArbCount: 1, totalStake: 95, scannedAt: '2026-08-12T12:01:00.000Z',
+    });
+
+    const history = await persistence.queryScanHistory({ positiveArbOnly: true, arbType: 'internal' });
+    expect(history.rows.map((row) => row.market_id)).toEqual(['valid-internal']);
+    expect(history.summary.totalArbs).toBe(1);
+    expect(history.summary.totalProfit).toBe(5);
+    const detail = await persistence.getScanHistoryDetail(invalid.id);
+    expect(JSON.parse(detail?.raw_result ?? '{}')).toEqual(raw);
+    const invalidRows = await persistence.getScanHistory('legacy-internal', 1);
+    expect(invalidRows[0]).toMatchObject({
+      arb_valid: 0,
+      arb_invalidation_reason: 'legacy_internal_yes_yes_directional_duplication',
+      positive_arb_count: 0,
+      best_profit: 0,
+    });
+  });
+
+  it('does not persist positive financial metrics for No arb', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-no-arb-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const saved = await persistence.saveScanResult('no-arb', {
+      bestRoiPct: 99, bestProfit: 99, strategy: 'No arb', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 1,
+      totalStake: 99, scannedAt: '2026-08-12T12:00:00.000Z',
+    });
+
+    const row = (await persistence.queryScanHistory({ limit: 10 })).rows.find((item) => item.id === saved.id);
+    expect(row).toMatchObject({ arb_valid: 0, positive_arb_count: 0, best_profit: 0, best_roi_pct: 0 });
+  });
+
   it('reports the complete non-ROI-filtered maximum when min ROI excludes every row', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-roi-range-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');

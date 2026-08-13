@@ -519,11 +519,21 @@ function makePmMarket(overrides: Partial<any> = {}) {
     active: true,
     closed: false,
     slug: 'test-market',
+    clobTokenIds: '["yes-token","no-token"]',
     ...overrides,
   };
 }
 
 describe('buildPmArbShape — CLOB-empty regression guard (BUG-086b)', () => {
+  it('verifies binary settlement only with exact distinct aligned token identifiers', () => {
+    expect(buildPmArbShape(makePmMarket()).binaryVerified).toBe(true);
+    expect(buildPmArbShape(makePmMarket({ clobTokenIds: undefined })).binaryVerified).toBe(false);
+    expect(buildPmArbShape(makePmMarket({ clobTokenIds: '["same","same"]' })).binaryVerified).toBe(false);
+    expect(buildPmArbShape(makePmMarket({ clobTokenIds: '["yes"]' })).binaryVerified).toBe(false);
+    expect(buildPmArbShape(makePmMarket({ outcomes: '["A","B","C"]', clobTokenIds: '["a","b","c"]' })).binaryVerified).toBe(false);
+    expect(buildPmArbShape(makePmMarket({ negRisk: true })).binaryVerified).toBe(false);
+  });
+
   it('zeros all executable prices when a reachable CLOB has no asks, regardless of Gamma values', () => {
     const shape = buildPmArbShape(makePmMarket({
       clobEmpty: true,
@@ -812,6 +822,116 @@ function makeOutcome(overrides: Partial<any> = {}): any {
 }
 
 describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
+  it('emits Internal only as same-market YES+NO with executable depth and both-leg fees', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      artist: 'Binary proposition',
+      kalshi: {
+        ...base.kalshi,
+        ticker: 'KX-BINARY',
+        yesAsk: 0.30,
+        noAsk: 0.30,
+        yesAskDepth: '300',
+        noAskDepth: '300',
+      },
+      polymarket: {
+        ...base.polymarket,
+        bestAsk: 0.70,
+        yesPrice: 0.70,
+        noPrice: 0.70,
+        askDepth: 700,
+        noAskDepth: 700,
+        binaryVerified: true,
+      },
+    });
+
+    const result = calculateBestArbitrageForOutcome(current, null, 'politics', 100);
+
+    expect(result.arbType).toBe('internal');
+    expect(result.strategy).toBe('Same-platform YES+NO Kalshi: Binary proposition');
+    expect(result.buyPlatform).toBe('kalshi');
+    expect(result.sellPlatform).toBe('kalshi');
+    expect(result.buyPrice).toBe(0.30);
+    expect(result.sellPrice).toBe(0.30);
+    expect(result.depthVerified).toBe(true);
+    expect(result.fees?.kalshiFee).toBeGreaterThan(0);
+    expect(result.expectedProfit).toBeGreaterThan(0);
+  });
+
+  it('rejects Polymarket Internal for neg-risk, non-binary, and unverified outcome structures', () => {
+    const base = makeOutcome();
+    for (const polymarket of [
+      { ...base.polymarket, bestAsk: 0.30, noPrice: 0.30, binaryVerified: false },
+      { ...base.polymarket, bestAsk: 0.30, noPrice: 0.30, binaryVerified: true, negRisk: true },
+      { ...base.polymarket, bestAsk: 0.30, noPrice: 0.30, binaryVerified: undefined },
+    ]) {
+      const current = makeOutcome({
+        kalshi: { ...base.kalshi, yesAsk: 0.70, noAsk: 0.70 },
+        polymarket,
+      });
+      const result = calculateBestArbitrageForOutcome(current, null, 'politics', 100);
+      expect(result.arbType).not.toBe('internal');
+    }
+  });
+
+  it('requires positive executable depth on both Internal legs', () => {
+    const base = makeOutcome();
+    for (const [yesAskDepth, noAskDepth] of [['0', '100'], ['100', '0']]) {
+      const current = makeOutcome({
+        kalshi: { ...base.kalshi, yesAsk: 0.30, noAsk: 0.30, yesAskDepth, noAskDepth },
+        polymarket: { ...base.polymarket, bestAsk: 0.70, noPrice: 0.70 },
+      });
+      const result = calculateBestArbitrageForOutcome(current, null, 'politics', 100);
+      expect(result.arbType).not.toBe('internal');
+    }
+  });
+
+  it('requires positive profit after fees on both Internal legs', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      kalshi: { ...base.kalshi, yesAsk: 0.499, noAsk: 0.499, yesAskDepth: '100', noAskDepth: '100' },
+      polymarket: { ...base.polymarket, bestAsk: 0.70, noPrice: 0.70 },
+    });
+    const result = calculateBestArbitrageForOutcome(current, null, 'politics', 100);
+    expect(result.arbType).not.toBe('internal');
+  });
+
+  it('never emits legacy same-market YES+YES as Internal', () => {
+    const base = makeOutcome();
+    const current = makeOutcome({
+      artist: 'First',
+      kalshi: { ...base.kalshi, ticker: 'KX-FIRST', yesAsk: 0.20, noAsk: 0.90 },
+      polymarket: { ...base.polymarket, conditionId: 'pm-first', bestAsk: 0.20, noPrice: 0.90 },
+    });
+    const complement = makeOutcome({
+      artist: 'Second',
+      kalshi: { ...base.kalshi, ticker: 'KX-SECOND', yesAsk: 0.20, noAsk: 0.90 },
+      polymarket: { ...base.polymarket, conditionId: 'pm-second', bestAsk: 0.20, noPrice: 0.90 },
+    });
+
+    const result = calculateBestArbitrageForOutcome(current, complement, 'politics', 100);
+
+    expect(result.strategy).not.toMatch(/^Same-platform YES\+YES/);
+    if (result.arbType === 'internal') expect(result.strategy).toMatch(/^Same-platform YES\+NO/);
+  });
+
+  it('rejects cross-outcome self-pairing and duplicated platform identifiers', () => {
+    const current = makeOutcome({
+      artist: 'Same',
+      kalshi: { ...makeOutcome().kalshi, ticker: 'KX-SAME', yesAsk: 0.20, noAsk: 0.90 },
+      polymarket: { ...makeOutcome().polymarket, conditionId: 'pm-same', bestAsk: 0.20, noPrice: 0.90 },
+    });
+    const duplicate = makeOutcome({
+      artist: 'Same',
+      kalshi: { ...current.kalshi },
+      polymarket: { ...current.polymarket },
+    });
+
+    const result = calculateBestArbitrageForOutcome(current, duplicate, 'politics', 100);
+
+    expect(result.arbType).not.toBe('cross');
+  });
+
   it('within-outcome gul A wins when cross-outcome is worse', () => {
     const current = makeOutcome();
     // PM NO = 0.20, Kalshi YES = 0.87 → gul A cost 1.07 (no arb)
