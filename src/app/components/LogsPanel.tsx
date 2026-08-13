@@ -79,6 +79,22 @@ type SortDir = "asc" | "desc";
 
 const LOG_ROW_HEIGHT = 37;
 const LOG_RENDER_WINDOW = 100;
+const CURRENT_ROI_BATCH_SIZE = 25;
+
+type CurrentRoiStatus = 'loading' | 'available' | 'stale_quote' | 'unavailable_book' | 'insufficient_depth' | 'missing_links' | 'upstream_failure';
+type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; quotedAt?: string };
+
+function currentRoiStatusLabel(status: CurrentRoiStatus): string {
+  switch (status) {
+    case 'loading': return 'Loading…';
+    case 'stale_quote': return 'Stale quote';
+    case 'unavailable_book': return 'Book unavailable';
+    case 'insufficient_depth': return 'Insufficient depth';
+    case 'missing_links': return 'Missing links';
+    case 'upstream_failure': return 'Upstream failure';
+    case 'available': return 'Available';
+  }
+}
 
 export default function LogsPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -116,6 +132,12 @@ export default function LogsPanel() {
   const lastRequestedCursor = useRef<string | null>(null);
   const lastLoadScrollTop = useRef(-1);
   const tableScrollerRef = useRef<HTMLDivElement | null>(null);
+  const [currentRoiById, setCurrentRoiById] = useState<Map<number, CurrentRoiValuation>>(() => new Map());
+  const currentRoiRequested = useRef(new Set<number>());
+  const currentRoiMounted = useRef(true);
+  const currentRoiGeneration = useRef(0);
+
+  useEffect(() => () => { currentRoiMounted.current = false; }, []);
 
   // UI-034: unique markets count from SQL COUNT(DISTINCT market_id)
   const [uniqueMarkets, setUniqueMarkets] = useState<number | null>(null);
@@ -162,6 +184,9 @@ export default function LogsPanel() {
 
   const fetchLogs = useCallback(async () => {
     const generation = ++requestGeneration.current;
+    currentRoiGeneration.current += 1;
+    currentRoiRequested.current.clear();
+    setCurrentRoiById(new Map());
     loadingMoreGeneration.current = null;
     lastRequestedCursor.current = null;
     lastLoadScrollTop.current = -1;
@@ -306,6 +331,46 @@ export default function LogsPanel() {
     const end = Math.min(sorted.length, start + LOG_RENDER_WINDOW);
     return { start, end, rows: sorted.slice(start, end) };
   }, [sorted, tableScrollTop]);
+
+  useEffect(() => {
+    const ids = visibleWindow.rows.map((row) => row.id).filter((id) => !currentRoiRequested.current.has(id));
+    if (ids.length === 0) return;
+    const generation = currentRoiGeneration.current;
+    ids.forEach((id) => currentRoiRequested.current.add(id));
+    setCurrentRoiById((current) => {
+      const next = new Map(current);
+      ids.forEach((id) => next.set(id, { status: 'loading' }));
+      return next;
+    });
+    const batches = Array.from({ length: Math.ceil(ids.length / CURRENT_ROI_BATCH_SIZE) }, (_, index) => (
+      ids.slice(index * CURRENT_ROI_BATCH_SIZE, (index + 1) * CURRENT_ROI_BATCH_SIZE)
+    ));
+    void Promise.all(batches.map(async (batch) => {
+      const response = await fetch('/api/logs/current-roi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: batch }),
+      });
+      if (!response.ok) throw new Error('Current ROI request failed');
+      const data = await response.json();
+      if (!Array.isArray(data?.valuations)) throw new Error('Invalid current ROI response');
+      return data.valuations as Array<CurrentRoiValuation & { id: number }>;
+    })).then((pages) => {
+      if (!currentRoiMounted.current || generation !== currentRoiGeneration.current) return;
+      setCurrentRoiById((current) => {
+        const next = new Map(current);
+        pages.flat().forEach(({ id, ...valuation }) => next.set(id, valuation));
+        return next;
+      });
+    }).catch(() => {
+      if (!currentRoiMounted.current || generation !== currentRoiGeneration.current) return;
+      setCurrentRoiById((current) => {
+        const next = new Map(current);
+        ids.forEach((id) => next.set(id, { status: 'upstream_failure' }));
+        return next;
+      });
+    });
+  }, [visibleWindow.rows]);
 
 
   const toggleSort = (key: SortKey) => {
@@ -734,7 +799,7 @@ export default function LogsPanel() {
               }
             }}
           >
-            <table className="w-full min-w-[1050px] text-sm">
+            <table className="w-full min-w-[1160px] text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
                   <th className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
@@ -760,6 +825,9 @@ export default function LogsPanel() {
                     onClick={() => toggleSort("best_roi_pct")}
                   >
                     ROI % {sortKey === "best_roi_pct" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />) : null}
+                  </th>
+                  <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    Current ROI %
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
@@ -799,13 +867,13 @@ export default function LogsPanel() {
               </thead>
               <tbody>
                 {visibleWindow.start > 0 && (
-                  <tr aria-hidden="true"><td colSpan={14} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={15} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
                 {visibleWindow.rows.map((log, i) => (
-                  <LogRow key={log.id ?? i} log={log} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
+                  <LogRow key={log.id ?? i} log={log} currentRoi={currentRoiById.get(log.id) ?? { status: 'loading' }} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
                 {visibleWindow.end < sorted.length && (
-                  <tr aria-hidden="true"><td colSpan={14} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={15} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
               </tbody>
             </table>
@@ -869,6 +937,7 @@ type ComparisonCache = Map<string, { quotes: ClientCurrentQuote[]; fetchedAt: nu
 
 function LogRow({
   log,
+  currentRoi,
   expanded,
   onToggle,
   fmtPct,
@@ -877,6 +946,7 @@ function LogRow({
   savedMarkets,
 }: {
   log: LogEntry;
+  currentRoi: CurrentRoiValuation;
   expanded: boolean;
   onToggle: () => void;
   fmtPct: (n: number) => string;
@@ -998,6 +1068,11 @@ function LogRow({
           )}
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
+        <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.strategy ?? currentRoiStatusLabel(currentRoi.status)}>
+          {currentRoi.status === 'available' && typeof currentRoi.roiPct === 'number'
+            ? `${currentRoi.roiPct.toFixed(2)}%`
+            : currentRoiStatusLabel(currentRoi.status)}
+        </td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td
           className={`px-3 py-2 text-right text-xs font-mono ${apy != null ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
@@ -1020,7 +1095,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={14} className="px-4 py-3">
+          <td colSpan={15} className="px-4 py-3">
             {detailState === 'loading' || detailState === 'idle' ? (
               <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
             ) : detailState === 'error' ? (

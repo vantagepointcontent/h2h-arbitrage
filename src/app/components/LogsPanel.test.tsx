@@ -39,6 +39,47 @@ describe('LogsPanel', () => {
     expect(screen.queryByText('Internal Arb')).toBeNull();
   });
 
+  it('shows scan ROI, lazy current executable ROI, and Profit in that order', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
+      if (url === '/api/logs/current-roi') {
+        expect(JSON.parse(String(init?.body))).toEqual({ ids: [91] });
+        return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: -1.234, strategy: 'Buy YES Kalshi + NO PM', quotedAt: '2026-08-13T20:00:00.000Z' }] }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+
+    expect(await screen.findByText('-1.23%')).toBeTruthy();
+    const headers = Array.from(document.querySelectorAll('thead th')).map((header) => header.textContent?.trim());
+    const roiIndex = headers.findIndex((label) => label?.startsWith('ROI %'));
+    expect(headers.slice(roiIndex, roiIndex + 3).map((label) => label?.replace(/[▲▼]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'Profit']);
+    expect(screen.getByText('-1.23%').className).toContain('text-[#8A9BA8]');
+  });
+
+  it.each([
+    ['stale_quote', 'Stale quote'],
+    ['unavailable_book', 'Book unavailable'],
+    ['insufficient_depth', 'Insufficient depth'],
+    ['missing_links', 'Missing links'],
+    ['upstream_failure', 'Upstream failure'],
+  ])('renders current ROI state %s without a fabricated number', async (status, label) => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
+      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status }] }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+    render(createElement(LogsPanel));
+    expect(await screen.findByText(label)).toBeTruthy();
+    expect(screen.queryByText('0.00%', { selector: 'td' })).toBeNull();
+  });
+
   it('uses the complete non-ROI-filtered dataset maximum for an accessible ROI slider and clamps on filter changes', async () => {
     let searchMaximum = 12.34;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -359,7 +400,7 @@ describe('LogsPanel', () => {
     expect(screen.getByText('+102.70%')).toBeTruthy();
     expect(screen.queryByText('+23.40%')).toBeNull();
     expect(screen.getByTestId('logs-table-scroll').className).toContain('overflow-x-auto');
-    expect(document.querySelector('table')?.className).toContain('min-w-[1050px]');
+    expect(document.querySelector('table')?.className).toContain('min-w-[1160px]');
     expect(document.querySelector('thead th')?.className).toContain('sticky');
     expect(document.querySelector('tbody td')?.className).toContain('sticky');
     expect(screen.getByRole('button', { name: 'Refresh' }).className).toContain('min-h-11');

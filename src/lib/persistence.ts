@@ -588,6 +588,31 @@ export async function getScanHistoryDetail(id: number): Promise<{ id: number; ra
   return row ? { id: Number(row.id), raw_result: typeof row.raw_result === 'string' ? row.raw_result : null } : null;
 }
 
+export interface ScanValuationInput {
+  id: number;
+  kalshiUrl: string | null;
+  polymarketUrl: string | null;
+  totalStake: number;
+}
+
+/** Load only the immutable URL pair and capital needed for current Logs valuation. */
+export async function getScanValuationInputs(ids: number[]): Promise<ScanValuationInput[]> {
+  await ensureDb();
+  const uniqueIds = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0).slice(0, 25);
+  if (uniqueIds.length === 0) return [];
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const result = await getClient().execute({
+    sql: `SELECT id, kalshi_url, polymarket_url, total_stake FROM scan_results WHERE id IN (${placeholders})`,
+    args: uniqueIds,
+  });
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    kalshiUrl: typeof row.kalshi_url === 'string' ? row.kalshi_url : null,
+    polymarketUrl: typeof row.polymarket_url === 'string' ? row.polymarket_url : null,
+    totalStake: Number(row.total_stake ?? 0),
+  }));
+}
+
 /**
  * UI-035: chunked, streaming-friendly scan history export.
  *
