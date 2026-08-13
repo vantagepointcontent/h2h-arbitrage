@@ -493,19 +493,26 @@ export async function explainScanHistorySearchPlan(search: string): Promise<stri
   return result.rows.map((row) => String(row.detail ?? ''));
 }
 
-export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: number; before?: { scannedAt: string; id: number } }): Promise<{ rows: ScanHistoryRow[]; total: number; uniqueMarkets: number; summary: ScanHistorySummary }> {
+export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: number; before?: { scannedAt: string; id: number } }): Promise<{ rows: ScanHistoryRow[]; total: number; uniqueMarkets: number; maxRoiWithoutMin: number; summary: ScanHistorySummary }> {
   await ensureDb();
   const c = getClient();
   const limit = Math.min(Math.max(opts.limit ?? 250, 1), 500);
   const base = scanHistoryWhere(opts);
+  const rangeBase = scanHistoryWhere({ ...opts, minRoi: undefined });
 
-  const countRes = await c.execute({
-    sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets, COALESCE(SUM(positive_arb_count), 0) AS total_arbs, COALESCE(AVG(best_roi_pct), 0) AS avg_roi, COALESCE(MAX(best_roi_pct), 0) AS best_roi, COALESCE(SUM(best_profit), 0) AS total_profit,
-      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'direct' THEN 1 ELSE 0 END) AS direct_count,
-      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'cross' THEN 1 ELSE 0 END) AS cross_count,
-      SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
-    args: base.args,
-  });
+  const [countRes, rangeRes] = await Promise.all([
+    c.execute({
+      sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets, COALESCE(SUM(positive_arb_count), 0) AS total_arbs, COALESCE(AVG(best_roi_pct), 0) AS avg_roi, COALESCE(MAX(best_roi_pct), 0) AS best_roi, COALESCE(SUM(best_profit), 0) AS total_profit,
+        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'direct' THEN 1 ELSE 0 END) AS direct_count,
+        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'cross' THEN 1 ELSE 0 END) AS cross_count,
+        SUM(CASE WHEN COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' OR LOWER(strategy) LIKE '%both sides%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+YES%' OR LOWER(strategy) LIKE '%same-platform%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
+      args: base.args,
+    }),
+    c.execute({
+      sql: `SELECT COALESCE(MAX(best_roi_pct), 0) AS max_roi FROM scan_results${rangeBase.where}`,
+      args: rangeBase.args,
+    }),
+  ]);
   const countRow = countRes.rows[0];
   const total = Number(countRow?.cnt ?? 0);
   const uniqueMarkets = Number(countRow?.unique_markets ?? 0);
@@ -522,7 +529,9 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
     args: [...pageArgs, limit],
   });
-  return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]) : [], total, uniqueMarkets, summary: {
+  const rawMaxRoiWithoutMin = Number(rangeRes.rows[0]?.max_roi ?? 0);
+  const maxRoiWithoutMin = Number.isFinite(rawMaxRoiWithoutMin) ? Math.max(0, rawMaxRoiWithoutMin) : 0;
+  return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]) : [], total, uniqueMarkets, maxRoiWithoutMin, summary: {
     totalArbs: Number(countRow?.total_arbs ?? 0), avgRoi: Number(countRow?.avg_roi ?? 0), bestRoi: Number(countRow?.best_roi ?? 0), totalProfit: Number(countRow?.total_profit ?? 0),
     arbTypeCounts: { direct: Number(countRow?.direct_count ?? 0), cross: Number(countRow?.cross_count ?? 0), internal: Number(countRow?.internal_count ?? 0) },
   } };

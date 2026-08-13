@@ -12,6 +12,25 @@ afterEach(() => {
 });
 
 describe('Logs FTS persistence', () => {
+  it('reports the complete non-ROI-filtered maximum when min ROI excludes every row', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-roi-range-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    for (const [marketId, bestRoiPct] of [['low', 2.5], ['high', 8.75]] as const) {
+      await persistence.saveScanResult(marketId, {
+        bestRoiPct, bestProfit: 1, strategy: 'direct', outcomeCount: 1, matchedCount: 1,
+        kalshiCount: 1, pmCount: 1, positiveArbCount: 1, totalStake: 100,
+        scannedAt: '2026-08-12T12:00:00.000Z', marketTitle: `${marketId} ROI market`,
+      });
+    }
+
+    const result = await persistence.queryScanHistory({ minRoi: 99, positiveArbOnly: true });
+
+    expect(result.rows).toHaveLength(0);
+    expect(result.maxRoiWithoutMin).toBe(8.75);
+  });
+
   it('uses the FTS virtual-table index for case-insensitive contains search', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-search-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');

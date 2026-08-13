@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       ? { scannedAt: cursorTime, id: Number(cursorId) }
       : undefined;
 
-    const { rows: results, total, uniqueMarkets, summary } = await queryScanHistory({
+    const { rows: results, total, uniqueMarkets, maxRoiWithoutMin, summary } = await queryScanHistory({
       marketId,
       minRoi,
       positiveArbOnly,
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { logs: enriched, count: enriched.length, total, uniqueMarkets, summary, nextCursor },
+      { logs: enriched, count: enriched.length, total, uniqueMarkets, maxRoiWithoutMin, summary, nextCursor },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

@@ -91,6 +91,7 @@ describe('Logs scan-time APY serialization', () => {
       rows: [persistedRow],
       total: 912,
       uniqueMarkets: 44,
+      maxRoiWithoutMin: 14.25,
       summary: {
         totalArbs: 1200,
         avgRoi: 2.75,
@@ -112,7 +113,12 @@ describe('Logs scan-time APY serialization', () => {
       positiveArbOnly: true,
       limit: 250,
     }));
-    expect(body).toMatchObject({ total: 912, uniqueMarkets: 44, summary: { totalArbs: 1200 } });
+    expect(body).toMatchObject({
+      total: 912,
+      uniqueMarkets: 44,
+      maxRoiWithoutMin: 14.25,
+      summary: { totalArbs: 1200 },
+    });
   });
 
   it('uses a stable timestamp and id cursor without dropping tied rows', async () => {

@@ -11,6 +11,45 @@ afterEach(() => {
 });
 
 describe('LogsPanel', () => {
+  it('uses the complete non-ROI-filtered dataset maximum for an accessible ROI slider and clamps on filter changes', async () => {
+    let searchMaximum = 12.34;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) {
+        const params = new URL(url, 'http://localhost').searchParams;
+        if (params.get('search')) searchMaximum = 3.21;
+        return Promise.resolve({ ok: true, json: async () => ({
+          logs: params.get('minRoi') ? [] : [comparisonLog()],
+          total: params.get('minRoi') ? 0 : 1,
+          maxRoiWithoutMin: searchMaximum,
+        }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    const slider = await screen.findByRole('slider', { name: 'Min ROI %' });
+    expect(slider).toHaveProperty('min', '0');
+    expect(slider).toHaveProperty('max', '12.34');
+    expect(screen.getByText('0.00%', { selector: 'output' })).toBeTruthy();
+
+    fireEvent.change(slider, { target: { value: '9.87' } });
+    expect(screen.getByText('9.87%')).toBeTruthy();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
+      new URL(String(input), 'http://localhost').searchParams.get('minRoi') === '9.87'
+    ))).toBe(true));
+    expect((screen.getByRole('slider', { name: 'Min ROI %' }) as HTMLInputElement).max).toBe('12.34');
+
+    fireEvent.change(screen.getByRole('textbox', { name: /Search/ }), { target: { value: 'narrow' } });
+    await waitFor(() => expect(screen.getByText('3.21%', { selector: 'output' })).toBeTruthy());
+    expect((screen.getByRole('slider', { name: 'Min ROI %' }) as HTMLInputElement).value).toBe('3.21');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset minimum ROI' }));
+    expect(screen.getByText('0.00%', { selector: 'output' })).toBeTruthy();
+  });
+
   it('defaults to rolling 24 hours, positive arbs, 250 rows, and server-side search', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-12T20:15:30.000Z'));
@@ -154,8 +193,8 @@ describe('LogsPanel', () => {
         if (before) return stalePage;
         baseRequests += 1;
         return Promise.resolve({ ok: true, json: async () => baseRequests === 1
-          ? { logs: Array.from({ length: 250 }, (_, index) => makePagedLog(index)), total: 751, nextCursor: 'old-page-2' }
-          : { logs: [replacement], total: 1 } });
+          ? { logs: Array.from({ length: 250 }, (_, index) => makePagedLog(index)), total: 751, nextCursor: 'old-page-2', maxRoiWithoutMin: 10 }
+          : { logs: [replacement], total: 1, maxRoiWithoutMin: 10 } });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });

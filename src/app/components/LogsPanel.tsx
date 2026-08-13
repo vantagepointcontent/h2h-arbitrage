@@ -77,7 +77,8 @@ export default function LogsPanel() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [minRoi, setMinRoi] = useState("");
+  const [minRoi, setMinRoi] = useState(0);
+  const [maxRoi, setMaxRoi] = useState(0);
   const [positiveArbOnly, setPositiveArbOnly] = useState(true);
   const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 86_400_000).toISOString());
   const [toDate, setToDate] = useState(() => new Date().toISOString());
@@ -136,7 +137,7 @@ export default function LogsPanel() {
     const params = new URLSearchParams();
     params.set("limit", before ? "500" : "250");
     if (before) params.set("before", before);
-    if (minRoi) params.set("minRoi", minRoi);
+    if (minRoi > 0) params.set("minRoi", String(minRoi));
     if (positiveArbOnly) params.set("positiveArbOnly", "true");
     if (fromDate) params.set("fromDate", fromDate);
     if (toDate) params.set("toDate", toDate);
@@ -172,6 +173,11 @@ export default function LogsPanel() {
         setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
         setTotal(typeof data.total === "number" ? data.total : (data.logs || []).length);
         setSummary(data.summary ?? null);
+        const nextMaxRoi = typeof data.maxRoiWithoutMin === "number" && Number.isFinite(data.maxRoiWithoutMin)
+          ? Math.max(0, data.maxRoiWithoutMin)
+          : 0;
+        setMaxRoi(nextMaxRoi);
+        setMinRoi((current) => Math.min(current, nextMaxRoi));
       }
     } catch (e: unknown) {
       if (generation === requestGeneration.current) setError((e instanceof Error ? e.message : String(e)) || "Failed to fetch logs");
@@ -301,7 +307,7 @@ export default function LogsPanel() {
   // Build export URL with current filters
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams();
-    if (minRoi) params.set("minRoi", minRoi);
+    if (minRoi > 0) params.set("minRoi", String(minRoi));
     if (positiveArbOnly) params.set("positiveArbOnly", "true");
     if (fromDate) params.set("fromDate", fromDate);
     if (toDate) params.set("toDate", toDate);
@@ -494,16 +500,38 @@ export default function LogsPanel() {
 
           {/* Min ROI */}
           <div>
-            <label htmlFor="logs-min-roi" className="block text-[10px] text-[#8A9BA8] mb-1">Min ROI %</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label htmlFor="logs-min-roi" className="text-[10px] text-[#8A9BA8]">Min ROI %</label>
+              <div className="flex items-center gap-1.5">
+                <output htmlFor="logs-min-roi" className="font-mono text-xs font-semibold text-[#FFFFFF]">{minRoi.toFixed(2)}%</output>
+                {minRoi > 0 && (
+                  <button
+                    type="button"
+                    aria-label="Reset minimum ROI"
+                    onClick={() => { invalidatePagination(); setMinRoi(0); }}
+                    className="rounded px-1 text-[10px] text-[#8A9BA8] hover:text-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81]"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
             <input
               id="logs-min-roi"
-              type="number"
-              step="0.1"
+              type="range"
+              min="0"
+              max={maxRoi}
+              step="0.01"
               value={minRoi}
-              onChange={(e) => { invalidatePagination(); setMinRoi(e.target.value); }}
-              placeholder="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
+              disabled={loading || maxRoi <= 0}
+              aria-valuetext={`${minRoi.toFixed(2)}%`}
+              onChange={(e) => { invalidatePagination(); setMinRoi(Number(e.target.value)); }}
+              className="settings-slider w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81] focus-visible:ring-offset-2 focus-visible:ring-offset-[#17212B] disabled:cursor-not-allowed disabled:opacity-50"
             />
+            <div className="mt-1 flex justify-between font-mono text-[9px] text-[#8A9BA8]" aria-hidden="true">
+              <span>0.00%</span>
+              <span>{maxRoi.toFixed(2)}%</span>
+            </div>
           </div>
 
           {/* From Date */}
