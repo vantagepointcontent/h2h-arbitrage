@@ -16,6 +16,7 @@ import {
   type WatcherHealthPayload,
 } from "@/lib/watcher-status";
 import { ExecutionCredsCard } from "@/app/components/ExecutionCredsCard";
+import { Switch } from "@/components/ui/switch";
 import { usePlatforms } from "@/lib/platforms/usePlatforms";
 import { PlatformIcon } from "@/lib/platforms/PlatformIcon";
 import {
@@ -320,7 +321,11 @@ export default function SettingsPanel() {
             return <div key={platform.id} className="flex items-center gap-3 px-4 py-3">
               <PlatformIcon platform={platform.id} size="md" />
               <div className="min-w-0 flex-1"><div className="text-sm font-medium text-[#FFFFFF]">{platform.name}</div><div className="text-xs text-[#8A9BA8]">{platform.adapterReady ? "Available for scanning" : "Configured for future integration"}</div></div>
-              <button type="button" role="switch" aria-checked={enabled} onClick={() => setPlatformEnabled(current => ({ ...current, [platform.id]: !enabled }))} className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? "bg-[#5DBE81]" : "bg-[#232E3C]"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} /></button>
+              <Switch
+                aria-label={`${platform.name} enabled`}
+                checked={enabled}
+                onCheckedChange={(nextEnabled) => setPlatformEnabled(current => ({ ...current, [platform.id]: nextEnabled }))}
+              />
             </div>;
           })}
         </div>
@@ -354,20 +359,18 @@ export default function SettingsPanel() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {s.type === "boolean" ? (
-                        <button
-                          onClick={() => {
-                            const next = !(val as boolean);
+                        <Switch
+                          aria-label={s.label}
+                          checked={val as boolean}
+                          onCheckedChange={(next) => {
                             if (s.dangerous && next === false) {
                               setConfirmDanger(s.key);
                             } else {
                               setValue(s.key, next);
                             }
                           }}
-                          className={`relative w-11 h-6 shrink-0 rounded-full transition-colors !min-h-0 !p-0 ${val ? "bg-[#5DBE81]" : "bg-[#2A3644]"}`}
                           title={String(val)}
-                        >
-                          <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${val ? "translate-x-[22px]" : "translate-x-0.5"}`} />
-                        </button>
+                        />
                       ) : s.type === "number" && s.slider ? (
                         <div className="flex items-center gap-2 w-56">
                           <input
