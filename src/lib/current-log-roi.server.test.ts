@@ -21,8 +21,8 @@ describe('getCurrentLogRoiBatch', () => {
     vi.clearAllMocks();
     resetCurrentLogRoiStateForTests();
     mocks.getScanValuationInputs.mockResolvedValue([
-      { id: 7, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', totalStake: 100 },
-      { id: 8, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', totalStake: 100 },
+      { id: 7, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', scanCapital: 100, candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'best' }] },
+      { id: 8, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', scanCapital: 100, candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'best' }] },
     ]);
     mocks.resolvePairFromLinks.mockResolvedValue({ matchedOutcomes: [{}], kalshiTickers: ['A'], pmTokenIds: ['Y', 'N'], pmTokenSides: new Map(), category: 'sports' });
     mocks.seedAllBooks.mockResolvedValue(undefined);
@@ -31,9 +31,9 @@ describe('getCurrentLogRoiBatch', () => {
 
   it('returns the highest fee-aware executable result and deduplicates repeated scans', async () => {
     mocks.computeAllLiveArbitrages.mockReturnValue([
-      { strategy: 'lower', roiPct: -2, kalshiStake: 45, pmStake: 50, stale: false },
-      { strategy: 'best', roiPct: 1.2345, kalshiStake: 40, pmStake: 50, stale: false },
-      { strategy: 'unexecutable', roiPct: 50, kalshiStake: 0, pmStake: 0, stale: false },
+      { strategy: 'lower', arbType: 'direct', kalshiTicker: 'B', pmConditionId: 'D', roiPct: -2, kalshiStake: 45, pmStake: 50, stale: false },
+      { strategy: 'best', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 1.2345, kalshiStake: 40, pmStake: 50, stale: false },
+      { strategy: 'unexecutable', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 50, kalshiStake: 0, pmStake: 0, stale: false },
     ]);
 
     const values = await getCurrentLogRoiBatch([7, 8]);
@@ -48,14 +48,94 @@ describe('getCurrentLogRoiBatch', () => {
 
   it('reports missing links and insufficient executable depth explicitly', async () => {
     mocks.getScanValuationInputs.mockResolvedValue([
-      { id: 7, kalshiUrl: null, polymarketUrl: null, totalStake: 100 },
-      { id: 8, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', totalStake: 100 },
+      { id: 7, kalshiUrl: null, polymarketUrl: null, scanCapital: 100, candidates: [] },
+      { id: 8, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', scanCapital: 100, candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'quote only' }] },
     ]);
-    mocks.computeAllLiveArbitrages.mockReturnValue([{ strategy: 'quote only', roiPct: 4, kalshiStake: 0, pmStake: 0, stale: false }]);
+    mocks.computeAllLiveArbitrages.mockReturnValue([{ strategy: 'quote only', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 4, kalshiStake: 0, pmStake: 0, stale: false }]);
 
     await expect(getCurrentLogRoiBatch([7, 8])).resolves.toMatchObject([
       { id: 7, status: 'missing_links' },
       { id: 8, status: 'insufficient_depth' },
     ]);
+  });
+
+  it('keeps different captured strategies separate and uses original scan capital', async () => {
+    mocks.getScanValuationInputs.mockResolvedValue([
+      { id: 7, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', scanCapital: 100, candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'direct-strategy' }] },
+      { id: 8, kalshiUrl: 'https://kalshi.com/markets/a/a/A', polymarketUrl: 'https://polymarket.com/event/a', scanCapital: 100, candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'cross', strategy: 'cross-strategy' }] },
+    ]);
+    mocks.computeAllLiveArbitrages.mockReturnValue([
+      { strategy: 'direct-strategy', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 1, kalshiStake: 40, pmStake: 50, stale: false },
+      { strategy: 'cross-strategy', arbType: 'cross', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 2, kalshiStake: 40, pmStake: 50, stale: false },
+    ]);
+
+    const values = await getCurrentLogRoiBatch([7, 8]);
+
+    expect(values).toMatchObject([{ id: 7, roiPct: 1 }, { id: 8, roiPct: 2 }]);
+    expect(mocks.resolvePairFromLinks).toHaveBeenCalledTimes(2);
+    expect(mocks.resolvePairFromLinks).toHaveBeenNthCalledWith(1, expect.any(Array), 100);
+    expect(mocks.computeAllLiveArbitrages).toHaveBeenNthCalledWith(1, expect.any(Array), 100, 'sports');
+  });
+
+  it('selects a fresh eligible result despite unrelated stale or missing books', async () => {
+    mocks.getScanValuationInputs.mockResolvedValue([{
+      id: 7,
+      kalshiUrl: 'https://kalshi.com/markets/a/a/A',
+      polymarketUrl: 'https://polymarket.com/event/a',
+      scanCapital: 100,
+      candidates: [
+        { kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'best' },
+        { kalshiTicker: 'B', pmConditionId: 'D', arbType: 'direct', strategy: 'other' },
+      ],
+    }]);
+    mocks.computeAllLiveArbitrages.mockReturnValue([
+      { strategy: 'best', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 3, kalshiStake: 40, pmStake: 50, stale: false },
+      { strategy: 'other', arbType: 'direct', kalshiTicker: 'B', pmConditionId: 'D', roiPct: 0, kalshiStake: 0, pmStake: 0, stale: true },
+    ]);
+    mocks.hasBook.mockImplementation((id: string) => id !== 'Y');
+
+    await expect(getCurrentLogRoiBatch([7])).resolves.toMatchObject([
+      { id: 7, status: 'available', roiPct: 3 },
+    ]);
+  });
+
+  it('normalizes equivalent captured Polymarket and live PM strategy labels', async () => {
+    mocks.getScanValuationInputs.mockResolvedValue([{
+      id: 7,
+      kalshiUrl: 'https://kalshi.com/markets/a/a/A',
+      polymarketUrl: 'https://polymarket.com/event/a',
+      scanCapital: 100,
+      candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'cross', strategy: 'Buy YES both sides: Kalshi A + Polymarket B' }],
+    }]);
+    mocks.computeAllLiveArbitrages.mockReturnValue([
+      { strategy: 'Buy YES both sides: Kalshi A + PM B', arbType: 'cross', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 3, kalshiStake: 40, pmStake: 50, stale: false },
+    ]);
+
+    await expect(getCurrentLogRoiBatch([7])).resolves.toMatchObject([{ id: 7, status: 'available', roiPct: 3 }]);
+  });
+
+  it('limits concurrent unique pair resolutions', async () => {
+    let active = 0;
+    let maxActive = 0;
+
+    mocks.getScanValuationInputs.mockResolvedValue(Array.from({ length: 8 }, (_, index) => ({
+      id: index + 1,
+      kalshiUrl: `https://kalshi.com/markets/a/a/A${index}`,
+      polymarketUrl: `https://polymarket.com/event/a${index}`,
+      scanCapital: 100,
+      candidates: [{ kalshiTicker: `A${index}`, pmConditionId: `C${index}`, arbType: 'direct', strategy: 'best' }],
+    })));
+    mocks.resolvePairFromLinks.mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return { matchedOutcomes: [{}], kalshiTickers: ['A'], pmTokenIds: ['Y', 'N'], pmTokenSides: new Map(), category: 'sports' };
+    });
+    mocks.computeAllLiveArbitrages.mockReturnValue([]);
+
+    await getCurrentLogRoiBatch(Array.from({ length: 8 }, (_, index) => index + 1));
+
+    expect(maxActive).toBeLessThanOrEqual(3);
   });
 });

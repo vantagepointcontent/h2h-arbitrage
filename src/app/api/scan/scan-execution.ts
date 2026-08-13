@@ -511,7 +511,7 @@ export async function executeFullScan(request: NextRequest) {
           // PERF-P2: raw blob only stored when there are arbs to drill into —
           // zero-arb scans (vast majority) get NULL, keeping the DB lean.
           raw: (scanResult.allArbs?.length ?? 0) > 0
-            ? { allArbs: scanResult.allArbs, expiryDate: pmEvent.endDate, category: scanCategory }
+            ? { allArbs: scanResult.allArbs, scanCapital: capital, expiryDate: pmEvent.endDate, category: scanCategory }
             : undefined,
           marketTitle: pmEvent.title || market.eventTitle,
           kalshiUrl,

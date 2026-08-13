@@ -592,25 +592,54 @@ export interface ScanValuationInput {
   id: number;
   kalshiUrl: string | null;
   polymarketUrl: string | null;
-  totalStake: number;
+  scanCapital: number | null;
+  candidates: Array<{
+    kalshiTicker: string;
+    pmConditionId: string;
+    strategy: string;
+    arbType: 'cross' | 'direct' | 'internal';
+  }>;
 }
 
-/** Load only the immutable URL pair and capital needed for current Logs valuation. */
+/** Load the immutable URL pair, requested capital, and captured strategy identities. */
 export async function getScanValuationInputs(ids: number[]): Promise<ScanValuationInput[]> {
   await ensureDb();
   const uniqueIds = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0).slice(0, 25);
   if (uniqueIds.length === 0) return [];
   const placeholders = uniqueIds.map(() => '?').join(', ');
   const result = await getClient().execute({
-    sql: `SELECT id, kalshi_url, polymarket_url, total_stake FROM scan_results WHERE id IN (${placeholders})`,
+    sql: `SELECT id, kalshi_url, polymarket_url, raw_result FROM scan_results WHERE id IN (${placeholders})`,
     args: uniqueIds,
   });
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    kalshiUrl: typeof row.kalshi_url === 'string' ? row.kalshi_url : null,
-    polymarketUrl: typeof row.polymarket_url === 'string' ? row.polymarket_url : null,
-    totalStake: Number(row.total_stake ?? 0),
-  }));
+  return result.rows.map((row) => {
+    let raw: Record<string, unknown> = {};
+    try {
+      const parsed = typeof row.raw_result === 'string' ? JSON.parse(row.raw_result) : null;
+      if (parsed && typeof parsed === 'object') raw = parsed as Record<string, unknown>;
+    } catch { /* Invalid historical payloads are explicitly unavailable. */ }
+    const scanCapital = Number(raw.scanCapital);
+    const candidates: ScanValuationInput['candidates'] = Array.isArray(raw.allArbs) ? raw.allArbs.flatMap((candidate): ScanValuationInput['candidates'] => {
+      if (!candidate || typeof candidate !== 'object') return [];
+      const value = candidate as Record<string, unknown>;
+      if (typeof value.kalshiTicker !== 'string' || typeof value.pmConditionId !== 'string'
+        || typeof value.strategy !== 'string'
+        || (value.arbType !== 'cross' && value.arbType !== 'direct' && value.arbType !== 'internal')) return [];
+      const arbType = value.arbType as ScanValuationInput['candidates'][number]['arbType'];
+      return [{
+        kalshiTicker: value.kalshiTicker,
+        pmConditionId: value.pmConditionId,
+        strategy: value.strategy,
+        arbType,
+      }];
+    }) : [];
+    return {
+      id: Number(row.id),
+      kalshiUrl: typeof row.kalshi_url === 'string' ? row.kalshi_url : null,
+      polymarketUrl: typeof row.polymarket_url === 'string' ? row.polymarket_url : null,
+      scanCapital: Number.isFinite(scanCapital) && scanCapital > 0 ? scanCapital : null,
+      candidates,
+    };
+  });
 }
 
 /**

@@ -81,7 +81,7 @@ const LOG_ROW_HEIGHT = 37;
 const LOG_RENDER_WINDOW = 100;
 const CURRENT_ROI_BATCH_SIZE = 25;
 
-type CurrentRoiStatus = 'loading' | 'available' | 'stale_quote' | 'unavailable_book' | 'insufficient_depth' | 'missing_links' | 'upstream_failure';
+type CurrentRoiStatus = 'loading' | 'available' | 'stale_quote' | 'unavailable_book' | 'insufficient_depth' | 'missing_links' | 'missing_identifiers' | 'upstream_failure';
 type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; quotedAt?: string };
 
 function currentRoiStatusLabel(status: CurrentRoiStatus): string {
@@ -91,6 +91,7 @@ function currentRoiStatusLabel(status: CurrentRoiStatus): string {
     case 'unavailable_book': return 'Book unavailable';
     case 'insufficient_depth': return 'Insufficient depth';
     case 'missing_links': return 'Missing links';
+    case 'missing_identifiers': return 'Missing IDs';
     case 'upstream_failure': return 'Upstream failure';
     case 'available': return 'Available';
   }
@@ -345,17 +346,21 @@ export default function LogsPanel() {
     const batches = Array.from({ length: Math.ceil(ids.length / CURRENT_ROI_BATCH_SIZE) }, (_, index) => (
       ids.slice(index * CURRENT_ROI_BATCH_SIZE, (index + 1) * CURRENT_ROI_BATCH_SIZE)
     ));
-    void Promise.all(batches.map(async (batch) => {
-      const response = await fetch('/api/logs/current-roi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: batch }),
-      });
-      if (!response.ok) throw new Error('Current ROI request failed');
-      const data = await response.json();
-      if (!Array.isArray(data?.valuations)) throw new Error('Invalid current ROI response');
-      return data.valuations as Array<CurrentRoiValuation & { id: number }>;
-    })).then((pages) => {
+    void (async () => {
+      const pages: Array<Array<CurrentRoiValuation & { id: number }>> = [];
+      for (const batch of batches) {
+        const response = await fetch('/api/logs/current-roi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: batch }),
+        });
+        if (!response.ok) throw new Error('Current ROI request failed');
+        const data = await response.json();
+        if (!Array.isArray(data?.valuations)) throw new Error('Invalid current ROI response');
+        pages.push(data.valuations as Array<CurrentRoiValuation & { id: number }>);
+      }
+      return pages;
+    })().then((pages) => {
       if (!currentRoiMounted.current || generation !== currentRoiGeneration.current) return;
       setCurrentRoiById((current) => {
         const next = new Map(current);

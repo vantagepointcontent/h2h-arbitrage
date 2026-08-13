@@ -105,6 +105,43 @@ describe('Logs FTS persistence', () => {
     expect(row).toMatchObject({ arb_valid: 0, positive_arb_count: 0, best_profit: 0, best_roi_pct: 0 });
   });
 
+  it('loads immutable current-valuation identity and original scan capital from the captured payload', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-valuation-input-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const saved = await persistence.saveScanResult('valuation-input', {
+      bestRoiPct: 2,
+      bestProfit: 2,
+      strategy: 'Buy YES Kalshi + NO PM',
+      arbType: 'direct',
+      outcomeCount: 2,
+      matchedCount: 2,
+      kalshiCount: 2,
+      pmCount: 2,
+      positiveArbCount: 2,
+      totalStake: 100,
+      scannedAt: '2026-08-13T20:00:00.000Z',
+      kalshiUrl: 'https://kalshi.com/markets/a/a/A',
+      polymarketUrl: 'https://polymarket.com/event/a',
+      raw: { scanCapital: 100, allArbs: [
+        { strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', kalshiTicker: 'A-1', pmConditionId: 'C-1', totalStake: 95 },
+        { strategy: 'Buy YES PM + NO Kalshi', arbType: 'direct', kalshiTicker: 'A-2', pmConditionId: 'C-2', totalStake: 90 },
+      ] },
+    });
+
+    await expect(persistence.getScanValuationInputs([saved.id])).resolves.toEqual([{
+      id: saved.id,
+      kalshiUrl: 'https://kalshi.com/markets/a/a/A',
+      polymarketUrl: 'https://polymarket.com/event/a',
+      scanCapital: 100,
+      candidates: [
+        { strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', kalshiTicker: 'A-1', pmConditionId: 'C-1' },
+        { strategy: 'Buy YES PM + NO Kalshi', arbType: 'direct', kalshiTicker: 'A-2', pmConditionId: 'C-2' },
+      ],
+    }]);
+  });
+
   it('reports the complete non-ROI-filtered maximum when min ROI excludes every row', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-roi-range-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
