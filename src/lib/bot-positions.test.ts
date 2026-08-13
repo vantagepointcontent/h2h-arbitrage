@@ -857,6 +857,52 @@ describe('BotPositionStore', () => {
     store.close();
   });
 
+  it('does not invent authoritative fills from reconciling legacy prices and fee metadata', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-fees-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 1)`);
+    await client.execute(`CREATE TABLE bot_positions (
+      id INTEGER PRIMARY KEY,
+      execution_id INTEGER,
+      buy_price_kalshi INTEGER NOT NULL,
+      buy_price_pm INTEGER NOT NULL,
+      shares_kalshi INTEGER NOT NULL,
+      shares_pm INTEGER NOT NULL,
+      kalshi_entry_fee_type TEXT,
+      kalshi_entry_fee_multiplier_ppm INTEGER,
+      pm_entry_fee_rate_bps INTEGER,
+      kalshi_entry_fee INTEGER NOT NULL,
+      pm_entry_fee INTEGER NOT NULL,
+      fees INTEGER NOT NULL,
+      total_cost INTEGER NOT NULL,
+      entry_cost_status TEXT NOT NULL,
+      entry_cost_failure_reason TEXT
+    )`);
+    await client.execute(`INSERT INTO bot_positions (
+      id, execution_id, buy_price_kalshi, buy_price_pm, shares_kalshi, shares_pm,
+      kalshi_entry_fee_type, kalshi_entry_fee_multiplier_ppm, pm_entry_fee_rate_bps,
+      kalshi_entry_fee, pm_entry_fee, fees, total_cost,
+      entry_cost_status, entry_cost_failure_reason
+    ) VALUES (1, 7, 6, 92, 1, 1, 'quadratic', 1000000, 0, 1, 0, 1, 99,
+      'unavailable', NULL)`);
+    client.close();
+
+    const store = new BotPositionStore(dbUrl);
+    const [legacy] = await store.list({ status: 'all' });
+
+    expect(legacy.entryCostStatus).toBe('unavailable');
+    expect(legacy.entryCostFailureReason).toMatch(/legacy position lacks authoritative entry fill and fee data/i);
+    expect(legacy.kalshiEntryGrossMicrocents).toBeNull();
+    expect(legacy.pmEntryGrossMicrocents).toBeNull();
+    expect(legacy.kalshiEntryFillCount).toBeNull();
+    expect(legacy.pmEntryFillCount).toBeNull();
+    expect(summarizeBotPositions([legacy]).deployedCapitalCents).toBeNull();
+    store.close();
+  });
+
   it('allows paper and live reservations for the same normalized venue pair', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
     dirs.push(dir);

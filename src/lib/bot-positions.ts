@@ -1108,23 +1108,9 @@ export class BotPositionStore {
         await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
       }
     }
-    // The preceding ledger schema retained one authoritative aggregate fill per
-    // leg. Reconcile only rows whose fee components and total already prove the
-    // canonical entry-cost identity; older rows stay explicitly unavailable.
-    await this.client.execute(`
-      UPDATE bot_positions SET
-        entry_cost_status = 'available', entry_cost_failure_reason = NULL,
-        kalshi_entry_gross_microcents = buy_price_kalshi * shares_kalshi * 1000000,
-        pm_entry_gross_microcents = buy_price_pm * shares_pm * 1000000,
-        entry_cost_rounding_delta_microcents = 0,
-        kalshi_entry_fill_count = 1, pm_entry_fill_count = 1
-      WHERE entry_cost_status = 'unavailable'
-        AND kalshi_entry_fee_type = 'quadratic'
-        AND kalshi_entry_fee_multiplier_ppm IS NOT NULL
-        AND pm_entry_fee_rate_bps IS NOT NULL
-        AND fees = kalshi_entry_fee + pm_entry_fee
-        AND total_cost = buy_price_kalshi * shares_kalshi + buy_price_pm * shares_pm + fees
-    `);
+    // Fee configuration and rounded prices do not prove the fills or venue-charged
+    // fees that produced a legacy total. Only the live execution path marks entry
+    // cost available while persisting its authoritative gross/fill evidence.
     await this.client.execute(`
       UPDATE bot_positions SET entry_cost_failure_reason =
         COALESCE(entry_cost_failure_reason, 'Legacy position lacks authoritative entry fill and fee data')
