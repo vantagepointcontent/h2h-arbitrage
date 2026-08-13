@@ -25,6 +25,7 @@ const analytics = {
   performance: {
     positionIds: [1],
     capital: { deployedCents: 97, currentCents: 102, heldToResolutionCents: 100 },
+    entryCost: { available: 1, unavailable: 0 },
     pnl: { realizedCents: 0, unrealizedCents: 5, totalCents: 5, roiBps: 515 },
     valuation: { fresh: 1, stale: 0, unavailable: 0, pendingSettlement: 0, asOf: '2026-08-11T13:40:00.000Z' },
     entryCohorts: [{ date: '2026-08-08', deployedCents: 97, currentCents: 102, heldToResolutionCents: 100, realizedCents: 0, unrealizedCents: 5, trades: 1 }],
@@ -48,6 +49,15 @@ const positions = [{
   sharesKalshi: 1,
   sharesPm: 1,
   totalCostCents: 97,
+  entryCostStatus: 'available',
+  entryCostFailureReason: null,
+  kalshiEntryGrossMicrocents: 45_000_000,
+  pmEntryGrossMicrocents: 52_000_000,
+  kalshiEntryFeeCents: 0,
+  pmEntryFeeCents: 0,
+  entryCostRoundingDeltaMicrocents: 0,
+  kalshiEntryFillCount: 1,
+  pmEntryFillCount: 1,
   expectedPayoutCents: 100,
   expectedProfitCents: 3,
   feesCents: 0,
@@ -310,6 +320,29 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText('KXTRUMP-26')).toBeTruthy();
     expect(screen.getByText('0xabc')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000¢ exact fill');
+    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.970000');
+  });
+
+  it('shows a specific unavailable Buy Cost reason for legacy paper positions and never displays zero', async () => {
+    const legacy = { ...positions[0], entryCostStatus: 'unavailable', entryCostFailureReason: 'Legacy paper position lacks authoritative entry fill and fee data' };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: {
+        ...analytics,
+        positions: [legacy],
+        performance: { ...analytics.performance, positionIds: [1], capital: { ...analytics.performance.capital, deployedCents: null }, entryCost: { available: 0, unavailable: 1 } },
+      } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+    const row = (await screen.findByText('Trump 2026')).closest('tr')!;
+    expect(Array.from(row.querySelectorAll('td'))[4].textContent).toBe('Unavailable');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toBeTruthy();
+    expect(screen.getByText('Deployed').parentElement?.textContent).toBe('DeployedUnavailable');
   });
 
   it('keeps summary cards, chart, and rows on the exact same execution mode population', async () => {

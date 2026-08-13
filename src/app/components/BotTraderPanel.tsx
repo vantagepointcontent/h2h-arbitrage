@@ -38,6 +38,15 @@ interface BotPosition {
   sharesKalshi: number;
   sharesPm: number;
   totalCostCents: number;
+  entryCostStatus?: 'available' | 'unavailable';
+  entryCostFailureReason?: string | null;
+  kalshiEntryGrossMicrocents?: number | null;
+  pmEntryGrossMicrocents?: number | null;
+  kalshiEntryFeeCents?: number;
+  pmEntryFeeCents?: number;
+  entryCostRoundingDeltaMicrocents?: number | null;
+  kalshiEntryFillCount?: number | null;
+  pmEntryFillCount?: number | null;
   expectedPayoutCents: number;
   expectedProfitCents: number;
   feesCents: number;
@@ -121,10 +130,11 @@ interface PerformanceAnalytics {
   settledPositions: { count: number; winRateBps: number };
   performance: {
     positionIds: number[];
-    capital: { deployedCents: number; currentCents: number | null; heldToResolutionCents: number };
+    capital: { deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number };
+    entryCost?: { available: number; unavailable: number };
     pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
     valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
-    entryCohorts: Array<{ date: string; deployedCents: number; currentCents: number | null; heldToResolutionCents: number; realizedCents: number; unrealizedCents: number | null; trades: number }>;
+    entryCohorts: Array<{ date: string; deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number; realizedCents: number; unrealizedCents: number | null; trades: number }>;
   };
 }
 
@@ -139,6 +149,7 @@ const RANGE_OPTIONS: Array<{ key: PerformanceRange; label: string }> = [
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const PRECISE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 });
+const EXACT_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6, maximumFractionDigits: 6 });
 const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -162,6 +173,14 @@ function formatBps(bps: number, signed = false): string {
 
 function formatMicrocents(microcents: number): string {
   return PRECISE_USD.format(microcents / 100_000_000);
+}
+
+function formatExactMicrocents(microcents: number): string {
+  return EXACT_USD.format(microcents / 100_000_000);
+}
+
+function formatExactEntryPrice(grossMicrocents: number, quantity: number): string {
+  return `${THREE_DECIMAL.format(grossMicrocents / 1_000_000 / quantity)}¢`;
 }
 
 function formatVwapCents(grossProceedsMicrocents: number, quantity: number): string {
@@ -455,7 +474,7 @@ export default function BotTraderPanel() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <div title="Cumulative fee-inclusive cost of open exposure"><MetricCard label="Deployed" value={formatCents(performance.capital.deployedCents)} /></div>
+        <div title="Cumulative fee-inclusive cost of open exposure"><MetricCard label="Deployed" value={performance.capital.deployedCents == null ? 'Unavailable' : formatCents(performance.capital.deployedCents)} valueClass={performance.capital.deployedCents == null ? 'text-[var(--status-warning)]' : ''} /></div>
         <MetricCard label="Executable value" value={performance.capital.currentCents == null ? 'Unavailable' : formatCents(performance.capital.currentCents)} valueClass={performance.capital.currentCents == null ? 'text-[var(--status-warning)]' : ''} />
         <MetricCard label="Held to resolution" value={formatCents(performance.capital.heldToResolutionCents)} />
         <div title="Unrealized return on remaining open cost"><MetricCard label="Portfolio ROI" value={performance.pnl.roiBps == null ? 'Unavailable' : formatBps(performance.pnl.roiBps, true)} valueClass={performance.pnl.roiBps == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.roiBps)} /></div>
@@ -509,6 +528,8 @@ export default function BotTraderPanel() {
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedPositions.map((position) => {
                 const isExpanded = expanded.has(position.id);
+                const entryCostAvailable = position.entryCostStatus !== 'unavailable'
+                  && Number.isSafeInteger(position.totalCostCents);
                 const openMark = position.status === 'open' ? openPositionMark(position) : null;
                 const pnl = position.status === 'open' ? (openMark?.available ? openMark.pnlCents : null) : position.realizedPnlCents;
                 const roiBps = position.status === 'open'
@@ -546,7 +567,7 @@ export default function BotTraderPanel() {
                     <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCents(position.totalCostCents)}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel ? 'text-[var(--status-warning)]' : ''}`}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? formatCents(openMark.currentValueCents) : formatCents(position.resolutionPayoutCents!))}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
@@ -561,6 +582,24 @@ export default function BotTraderPanel() {
                         <div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div>
                         <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
                       </div>
+                      {!entryCostAvailable || position.kalshiEntryGrossMicrocents == null || position.pmEntryGrossMicrocents == null ? (
+                        <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Buy Cost unavailable: {position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}</div>
+                      ) : (
+                        <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
+                          <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} exact fill · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.kalshiEntryFeeCents ?? 0)} execution fee · <strong className="text-[var(--text-primary)]">{formatMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
+                          </div>
+                          <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} exact fill · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
+                            <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.pmEntryFeeCents ?? 0)} execution fee · <strong className="text-[var(--text-primary)]">{formatMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
+                          </div>
+                          <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>
+                          <div className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Full-precision gross plus both execution fees is rounded once to ledger cents.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Summary prices round each leg to cents and may not add to the rounded total.</div>
+                        </div>
+                      )}
                       {liquidationUnavailableLabel ? (
                         <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Liquidation breakdown: {liquidationUnavailableLabel}</div>
                       ) : (

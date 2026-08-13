@@ -53,6 +53,13 @@ export interface BotPosition {
   remainingOpenFeesCents: number;
   remainingOpenCostCents: number;
   totalCostCents: number;
+  entryCostStatus?: 'available' | 'unavailable';
+  entryCostFailureReason?: string | null;
+  kalshiEntryGrossMicrocents?: number | null;
+  pmEntryGrossMicrocents?: number | null;
+  entryCostRoundingDeltaMicrocents?: number | null;
+  kalshiEntryFillCount?: number | null;
+  pmEntryFillCount?: number | null;
   expectedPayoutCents: number;
   expectedProfitCents: number;
   expectedRoiBps: number | null;
@@ -136,7 +143,7 @@ export type CreateBotPosition = Omit<BotPosition,
   'kalshiValuationDepth' | 'pmValuationDepth' |
   'kalshiLiquidationValueCents' | 'pmLiquidationValueCents' |
   'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource' |
-  'expectedRoiBps' | 'expectedApyBps' | 'unitId'
+  'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason'
 > & {
   expectedRoiBps?: number | null;
   expectedApyBps?: number | null;
@@ -543,6 +550,10 @@ function calculateGrossProceedsMicrocents(
   return roundRatio(numerator, FEE_SCALE);
 }
 
+function hasAvailableEntryCost(position: Pick<BotPosition, 'entryCostStatus'>): boolean {
+  return position.entryCostStatus !== 'unavailable';
+}
+
 export function calculatePositionValuation(
   position: BotPosition,
   quote: PositionQuote,
@@ -664,6 +675,15 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     remainingOpenFeesCents: row.live_fees != null ? Number(row.live_fees) : (row.status === 'open' ? Number(row.fees ?? 0) : 0),
     remainingOpenCostCents: row.live_cost != null ? Number(row.live_cost) : (row.status === 'open' ? Number(row.total_cost) : 0),
     totalCostCents: Number(row.total_cost),
+    entryCostStatus: row.entry_cost_status === 'available' ? 'available' : 'unavailable',
+    entryCostFailureReason: row.entry_cost_failure_reason != null
+      ? String(row.entry_cost_failure_reason)
+      : row.entry_cost_status === 'available' ? null : 'Legacy position lacks authoritative entry fill and fee data',
+    kalshiEntryGrossMicrocents: row.kalshi_entry_gross_microcents != null ? Number(row.kalshi_entry_gross_microcents) : null,
+    pmEntryGrossMicrocents: row.pm_entry_gross_microcents != null ? Number(row.pm_entry_gross_microcents) : null,
+    entryCostRoundingDeltaMicrocents: row.entry_cost_rounding_delta_microcents != null ? Number(row.entry_cost_rounding_delta_microcents) : null,
+    kalshiEntryFillCount: row.kalshi_entry_fill_count != null ? Number(row.kalshi_entry_fill_count) : null,
+    pmEntryFillCount: row.pm_entry_fill_count != null ? Number(row.pm_entry_fill_count) : null,
     expectedPayoutCents: Number(row.expected_payout),
     expectedProfitCents: Number(row.expected_profit),
     expectedRoiBps: row.expected_roi_bps != null ? Number(row.expected_roi_bps) : null,
@@ -913,6 +933,13 @@ export class BotPositionStore {
         live_fees INTEGER,
         live_cost INTEGER,
         total_cost INTEGER NOT NULL,
+        entry_cost_status TEXT NOT NULL DEFAULT 'unavailable' CHECK (entry_cost_status IN ('available', 'unavailable')),
+        entry_cost_failure_reason TEXT,
+        kalshi_entry_gross_microcents INTEGER,
+        pm_entry_gross_microcents INTEGER,
+        entry_cost_rounding_delta_microcents INTEGER,
+        kalshi_entry_fill_count INTEGER,
+        pm_entry_fill_count INTEGER,
         expected_payout INTEGER NOT NULL,
         expected_profit INTEGER NOT NULL,
         expected_roi_bps INTEGER,
@@ -1005,6 +1032,13 @@ export class BotPositionStore {
       live_fees: 'INTEGER',
       live_cost: 'INTEGER',
       total_cost: 'INTEGER NOT NULL DEFAULT 0',
+      entry_cost_status: "TEXT NOT NULL DEFAULT 'unavailable'",
+      entry_cost_failure_reason: 'TEXT',
+      kalshi_entry_gross_microcents: 'INTEGER',
+      pm_entry_gross_microcents: 'INTEGER',
+      entry_cost_rounding_delta_microcents: 'INTEGER',
+      kalshi_entry_fill_count: 'INTEGER',
+      pm_entry_fill_count: 'INTEGER',
       expected_payout: 'INTEGER NOT NULL DEFAULT 0',
       expected_profit: 'INTEGER NOT NULL DEFAULT 0',
       expected_roi_bps: 'INTEGER',
@@ -1076,6 +1110,28 @@ export class BotPositionStore {
         await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
       }
     }
+    // The preceding ledger schema retained one authoritative aggregate fill per
+    // leg. Reconcile only rows whose fee components and total already prove the
+    // canonical entry-cost identity; older rows stay explicitly unavailable.
+    await this.client.execute(`
+      UPDATE bot_positions SET
+        entry_cost_status = 'available', entry_cost_failure_reason = NULL,
+        kalshi_entry_gross_microcents = buy_price_kalshi * shares_kalshi * 1000000,
+        pm_entry_gross_microcents = buy_price_pm * shares_pm * 1000000,
+        entry_cost_rounding_delta_microcents = 0,
+        kalshi_entry_fill_count = 1, pm_entry_fill_count = 1
+      WHERE entry_cost_status = 'unavailable'
+        AND kalshi_entry_fee_type = 'quadratic'
+        AND kalshi_entry_fee_multiplier_ppm IS NOT NULL
+        AND pm_entry_fee_rate_bps IS NOT NULL
+        AND fees = kalshi_entry_fee + pm_entry_fee
+        AND total_cost = buy_price_kalshi * shares_kalshi + buy_price_pm * shares_pm + fees
+    `);
+    await this.client.execute(`
+      UPDATE bot_positions SET entry_cost_failure_reason =
+        COALESCE(entry_cost_failure_reason, 'Legacy position lacks authoritative entry fill and fee data')
+      WHERE entry_cost_status = 'unavailable'
+    `);
     // Existing positions predate the denormalized execution-mode identity.
     // Backfill from the authoritative execution record; orphaned legacy rows
     // remain paper so they cannot suppress a live position.
@@ -1217,6 +1273,9 @@ export class BotPositionStore {
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
           shares_kalshi, shares_pm, live_shares_kalshi, live_shares_pm,
           live_principal, live_fees, live_cost, total_cost, expected_payout, expected_profit,
+          entry_cost_status, entry_cost_failure_reason, kalshi_entry_gross_microcents,
+          pm_entry_gross_microcents, entry_cost_rounding_delta_microcents,
+          kalshi_entry_fill_count, pm_entry_fill_count,
           expected_roi_bps, expected_apy_bps, unit_id,
           fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee,
           kalshi_entry_fee_type, kalshi_entry_fee_multiplier_ppm, kalshi_entry_fee_source,
@@ -1228,7 +1287,7 @@ export class BotPositionStore {
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
@@ -1238,6 +1297,8 @@ export class BotPositionStore {
           input.sharesPm, input.sharesKalshi, input.sharesPm,
           executionPrincipalCents, input.feesCents, input.totalCostCents,
           input.totalCostCents, input.expectedPayoutCents, input.expectedProfitCents,
+          'available', null, input.kalshiEntryGrossMicrocents ?? null, input.pmEntryGrossMicrocents ?? null,
+          input.entryCostRoundingDeltaMicrocents ?? null, input.kalshiEntryFillCount ?? 1, input.pmEntryFillCount ?? 1,
           expectedRoiBps, input.expectedApyBps ?? null, input.unitId ?? `execution:${input.executionId}`,
           input.feesCents, input.category, input.pmTheta,
           input.kalshiEntryFeeCents, input.pmEntryFeeCents,
@@ -1654,36 +1715,49 @@ export interface BotPositionInput {
   expiryDate?: string | null;
   selectionMethod?: BotSelectionMethod | null;
   category?: string | null;
+  kalshiFills?: Array<{ priceCents: number; size: number }>;
+  pmFills?: Array<{ priceCents: number; size: number }>;
 }
 
 export function calculateBotPositionEntryCost(input: {
-  buyPriceKalshiCents: number;
-  buyPricePmCents: number;
-  sharesKalshi: number;
-  sharesPm: number;
+  buyPriceKalshiCents?: number;
+  buyPricePmCents?: number;
+  sharesKalshi?: number;
+  sharesPm?: number;
+  kalshiFills?: Array<{ priceCents: number; size: number }>;
+  pmFills?: Array<{ priceCents: number; size: number }>;
   pmTheta: number;
   kalshiFeeMultiplierPpm: number;
   pmFeeRateBps: number;
-}): { kalshiEntryFeeCents: number; pmEntryFeeCents: number; totalCostCents: number } {
+}): {
+  kalshiEntryFeeCents: number;
+  pmEntryFeeCents: number;
+  totalCostCents: number;
+  kalshiGrossEntryMicrocents: number;
+  pmGrossEntryMicrocents: number;
+  roundingDeltaMicrocents: number;
+} {
   const expectedPmFeeRateBps = Math.round(input.pmTheta * 10_000);
   if (!Number.isSafeInteger(expectedPmFeeRateBps) || expectedPmFeeRateBps !== input.pmFeeRateBps) {
     throw new Error('Conflicting authoritative Polymarket entry fee configuration');
   }
-  const kalshiEntryFeeCents = calculateKalshiFeeCents(
-    [{ size: input.sharesKalshi, priceCents: input.buyPriceKalshiCents }],
-    input.kalshiFeeMultiplierPpm,
-  );
-  const pmEntryFeeCents = calculatePolymarketFeeCents(
-    [{ size: input.sharesPm, priceCents: input.buyPricePmCents }],
-    input.pmFeeRateBps,
-  );
+  const kalshiFills = input.kalshiFills ?? [{ size: input.sharesKalshi!, priceCents: input.buyPriceKalshiCents! }];
+  const pmFills = input.pmFills ?? [{ size: input.sharesPm!, priceCents: input.buyPricePmCents! }];
+  const kalshiEntryFeeCents = calculateKalshiFeeCents(kalshiFills, input.kalshiFeeMultiplierPpm);
+  const pmEntryFeeCents = calculatePolymarketFeeCents(pmFills, input.pmFeeRateBps);
+  const kalshiGrossEntryMicrocents = calculateGrossProceedsMicrocents(kalshiFills, 'Kalshi');
+  const pmGrossEntryMicrocents = calculateGrossProceedsMicrocents(pmFills, 'Polymarket');
+  const grossEntryMicrocents = kalshiGrossEntryMicrocents + pmGrossEntryMicrocents;
+  const grossEntryCents = roundRatio(BigInt(grossEntryMicrocents), FEE_SCALE);
+  const totalCostCents = grossEntryCents + kalshiEntryFeeCents + pmEntryFeeCents;
   return {
     kalshiEntryFeeCents,
     pmEntryFeeCents,
-    totalCostCents: Math.round(
-      input.sharesKalshi * input.buyPriceKalshiCents
-      + input.sharesPm * input.buyPricePmCents
-    ) + kalshiEntryFeeCents + pmEntryFeeCents,
+    totalCostCents,
+    kalshiGrossEntryMicrocents,
+    pmGrossEntryMicrocents,
+    roundingDeltaMicrocents: totalCostCents * Number(FEE_SCALE)
+      - grossEntryMicrocents - (kalshiEntryFeeCents + pmEntryFeeCents) * Number(FEE_SCALE),
   };
 }
 
@@ -1833,15 +1907,18 @@ export async function recordBotPosition(
   const buyPricePmCents = Math.round(input.pmPrice * 100);
   const sharesKalshi = input.kalshiContracts;
   const sharesPm = input.pmContracts;
-  const { kalshiEntryFeeCents, pmEntryFeeCents, totalCostCents } = calculateBotPositionEntryCost({
+  const entryCost = calculateBotPositionEntryCost({
     buyPriceKalshiCents,
     buyPricePmCents,
     sharesKalshi,
     sharesPm,
+    kalshiFills: input.kalshiFills,
+    pmFills: input.pmFills,
     pmTheta,
     kalshiFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
     pmFeeRateBps: authority.polymarket.feeRateBps,
   });
+  const { kalshiEntryFeeCents, pmEntryFeeCents, totalCostCents } = entryCost;
   const expectedPayoutCents = Math.min(sharesKalshi, sharesPm) * 100;
   const expectedProfitCents = expectedPayoutCents - totalCostCents;
 
@@ -1860,6 +1937,11 @@ export async function recordBotPosition(
     sharesKalshi,
     sharesPm,
     totalCostCents,
+    kalshiEntryGrossMicrocents: entryCost.kalshiGrossEntryMicrocents,
+    pmEntryGrossMicrocents: entryCost.pmGrossEntryMicrocents,
+    entryCostRoundingDeltaMicrocents: entryCost.roundingDeltaMicrocents,
+    kalshiEntryFillCount: input.kalshiFills?.length ?? 1,
+    pmEntryFillCount: input.pmFills?.length ?? 1,
     expectedPayoutCents,
     expectedProfitCents,
     feesCents: kalshiEntryFeeCents + pmEntryFeeCents,
@@ -1943,11 +2025,12 @@ export interface BotPositionAnalytics {
 
 export interface BotPerformanceSummary {
   positionIds: number[];
-  capital: { deployedCents: number; currentCents: number | null; heldToResolutionCents: number };
+  capital: { deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number };
+  entryCost: { available: number; unavailable: number };
   pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
   valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
   entryCohorts: Array<{
-    date: string; deployedCents: number; currentCents: number | null; heldToResolutionCents: number;
+    date: string; deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number;
     realizedCents: number; unrealizedCents: number | null; trades: number;
   }>;
 }
@@ -1984,12 +2067,14 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const stale = open.filter((position) => mark(position) === 'stale').length;
   const unavailable = open.filter((position) => mark(position) === 'unavailable').length;
   const allOpenFresh = stale === 0 && unavailable === 0;
+  const unavailableEntryCosts = rows.filter((position) => !hasAvailableEntryCost(position)).length;
+  const allEntryCostsAvailable = unavailableEntryCosts === 0;
   const realizedCents = total(verifiedSettled.map((position) => position.realizedPnlCents!));
-  const unrealizedCents = allOpenFresh
+  const unrealizedCents = allOpenFresh && allEntryCostsAvailable
     ? total(freshOpen.map((position) => position.currentValueCents! - position.totalCostCents))
     : null;
   const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
-  const deployedCents = total(rows.map((position) => position.totalCostCents));
+  const deployedCents = allEntryCostsAvailable ? total(rows.map((position) => position.totalCostCents)) : null;
   const currentCents = allOpenFresh && unverifiedSettled.length === 0
     ? total(freshOpen.map((position) => position.currentValueCents!))
       + total(verifiedSettled.map((position) => position.resolutionPayoutCents!))
@@ -2000,7 +2085,9 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     const openedAt = new Date(position.openedAt);
     const date = [openedAt.getFullYear(), String(openedAt.getMonth() + 1).padStart(2, '0'), String(openedAt.getDate()).padStart(2, '0')].join('-');
     const point = dates.get(date) ?? { date, deployedCents: 0, currentCents: 0, heldToResolutionCents: 0, realizedCents: 0, unrealizedCents: 0, trades: 0, incomplete: false };
-    point.deployedCents += position.totalCostCents;
+    point.deployedCents = point.deployedCents == null || !hasAvailableEntryCost(position)
+      ? null
+      : point.deployedCents + position.totalCostCents;
     point.trades += 1;
     if (position.status === 'open') {
       point.heldToResolutionCents += position.expectedPayoutCents;
@@ -2030,11 +2117,12 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       currentCents,
       heldToResolutionCents: total(open.map((position) => position.expectedPayoutCents)),
     },
+    entryCost: { available: rows.length - unavailableEntryCosts, unavailable: unavailableEntryCosts },
     pnl: {
       realizedCents,
       unrealizedCents,
       totalCents,
-      roiBps: totalCents == null || deployedCents <= 0 ? null : Math.round(totalCents * 10_000 / deployedCents),
+      roiBps: totalCents == null || deployedCents == null || deployedCents <= 0 ? null : Math.round(totalCents * 10_000 / deployedCents),
     },
     valuation: {
       fresh: freshOpen.length,

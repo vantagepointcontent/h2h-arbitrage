@@ -118,6 +118,16 @@ describe('summarizeBotPositions', () => {
 });
 
 describe('summarizeBotPerformance', () => {
+  it('does not treat a legacy position with unavailable authoritative entry cost as zero deployed capital', () => {
+    const result = summarizeBotPerformance([
+      openPosition({ entryCostStatus: 'unavailable', entryCostFailureReason: 'Legacy position lacks authoritative entry fill breakdown' }),
+    ], new Date('2026-08-11T14:00:00.000Z'));
+
+    expect(result.capital.deployedCents).toBeNull();
+    expect(result.entryCost).toEqual({ available: 0, unavailable: 1 });
+    expect(result.entryCohorts[0].deployedCents).toBeNull();
+  });
+
   it('uses one fee-inclusive population for cards and chart while suppressing stale executable marks', () => {
     const rows = [
       openPosition({ id: 1, openedAt: '2026-08-10T13:00:00.000Z', totalCostCents: 978, currentValueCents: 1022, lastValuationAt: '2026-08-11T13:55:00.000Z', expectedPayoutCents: 1000 }),
@@ -531,6 +541,24 @@ describe('calculatePositionValuation', () => {
 });
 
 describe('calculateBotPositionEntryCost', () => {
+  it('reconciles multiple exact fills, fractional-cent gross, Kalshi aggregate rounding, and Polymarket fees', () => {
+    const result = calculateBotPositionEntryCost({
+      kalshiFills: [{ priceCents: 5.5, size: 1 }, { priceCents: 6.5, size: 1 }],
+      pmFills: [{ priceCents: 91.25, size: 1 }, { priceCents: 92.75, size: 1 }],
+      pmTheta: 0.04,
+      kalshiFeeMultiplierPpm: 1_000_000,
+      pmFeeRateBps: 400,
+    });
+
+    expect(result.kalshiGrossEntryMicrocents).toBe(12_000_000);
+    expect(result.pmGrossEntryMicrocents).toBe(184_000_000);
+    // Kalshi aggregates the two fractional raw fees before one venue ceiling.
+    expect(result.kalshiEntryFeeCents).toBe(1);
+    expect(result.pmEntryFeeCents).toBe(1);
+    expect(result.totalCostCents).toBe(198);
+    expect(result.roundingDeltaMicrocents).toBe(0);
+  });
+
   it('persists Buy Cost as both acquisition legs plus both entry execution fees', () => {
     const result = calculateBotPositionEntryCost({
       buyPriceKalshiCents: 45.1,
@@ -753,6 +781,8 @@ describe('BotPositionStore', () => {
     expect(legacy.pmGrossProceedsMicrocents).toBeNull();
     expect(legacy.kalshiNetProceedsCents).toBeNull();
     expect(legacy.pmNetProceedsCents).toBeNull();
+    expect(legacy.entryCostStatus).toBe('unavailable');
+    expect(legacy.entryCostFailureReason).toMatch(/legacy position lacks authoritative entry fill and fee data/i);
     expect(() => calculatePositionValuation({
       ...legacy,
       sharesKalshi: 1,
