@@ -59,11 +59,15 @@ export async function GET(request: NextRequest) {
       nameMap = new Map(saved.map((m) => [m.id, m.eventTitle]));
       categoryMap = new Map(saved.map((m) => [m.id, m.category ?? '']));
     } catch { /* name/category resolution is best-effort */ }
-    const enriched = results.map((r) => ({
-      ...r,
-      market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
-      category: categoryMap.get(r.market_id) ?? null,
-    }));
+    const enriched = results.map((r) => {
+      const listRow = { ...r };
+      delete listRow.raw_result;
+      return {
+        ...listRow,
+        market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
+        category: categoryMap.get(r.market_id) ?? null,
+      };
+    });
 
     return NextResponse.json(
       { logs: enriched, count: enriched.length, total, uniqueMarkets, summary, nextCursor },

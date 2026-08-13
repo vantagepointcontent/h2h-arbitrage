@@ -25,6 +25,7 @@ import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
+import { reserveWatcherMatchPublication, type WatcherMatchPublication } from '@/lib/watcher-match-publication';
 
 import logger from '@/lib/logger';
 
@@ -274,6 +275,20 @@ async function computePair(pairId: string): Promise<void> {
   const pair = hotPairs.get(pairId);
   if (!pair) return;
 
+  // Capture the generation and exact canonical revision before computation.
+  // A manual mutation during computation then fences this stale result.
+  const shouldWriteLive = Date.now() - (lastLiveWriteAt.get(pairId) ?? 0) >= LIVE_WRITE_MIN_MS;
+  let canonical: WatcherMatchPublication | null = null;
+  if (shouldWriteLive) {
+    lastLiveWriteAt.set(pairId, Date.now());
+    const matchedPairs = pair.outcomes.flatMap((outcome) => outcome.pmConditionId ? [{
+      artist: outcome.artist,
+      kalshiTicker: outcome.kalshiTicker,
+      pmConditionId: outcome.pmConditionId,
+    }] : []);
+    canonical = await reserveWatcherMatchPublication(pairId, matchedPairs);
+  }
+
   const results = computeAllLiveArbitrages(pair.outcomes, WATCH_CAPITAL, pair.category);
 
   // HOOKUP-02 (FEAT-004): attach persistence scores (velocity/depth/history).
@@ -284,8 +299,10 @@ async function computePair(pairId: string): Promise<void> {
 
   // WS-107: persist the live view so ALL UI surfaces (sidebar, Overview,
   // Dashboard) show real-time ROI for HOT markets, not the 5-min poller lag.
-  await writeLiveResult(pairId, results, positive).catch((err) =>
-    logger.warn('[watcher] liveResult write failed', { pairId, err }));
+  if (canonical) {
+    await writeLiveResult(pairId, results, positive, canonical).catch((err) =>
+      logger.warn('[watcher] liveResult write failed', { pairId, err }));
+  }
 
   // Episode lifecycle — second-precision first-seen/closed timestamps.
   // recordArbObservations opens/extends/closes based on the full observation set.
@@ -342,21 +359,14 @@ async function writeLiveResult(
   pairId: string,
   results: LiveArbResult[],
   positive: LiveArbResult[],
+  canonical: WatcherMatchPublication,
 ): Promise<void> {
-  // Per-pair write throttle: computes fire on every WS delta (150ms debounce);
-  // the DB doesn't need more than one write per LIVE_WRITE_MIN_MS per pair.
-  const now = Date.now();
-  const last = lastLiveWriteAt.get(pairId) ?? 0;
-  if (now - last < LIVE_WRITE_MIN_MS) return;
-  lastLiveWriteAt.set(pairId, now);
-
   const clean = positive.filter((r) => !isSuspiciousLive(r));
   const best = clean.length > 0
     ? clean.reduce((b, r) => (r.roiPct > b.roiPct ? r : b))
     : null;
 
-  const matchedCount = results.filter((r) => !r.stale &&
-    r.kalshiYesAsk != null && r.pmYesAsk != null).length;
+  const matchedCount = canonical.matchedPairs.length;
 
   const liveResult: LastScanResult = {
     bestRoiPct: best ? best.roiPct : 0,
@@ -364,9 +374,13 @@ async function writeLiveResult(
     strategy: best ? best.strategy : 'No arb',
     outcomeCount: results.length,
     matchedCount,
+    matchStatus: matchedCount > 0 ? 'matched' : 'confirmed_zero',
+    matchedPairs: canonical.matchedPairs,
+    matchDependencies: canonical.matchDependencies,
     kalshiCount: results.filter((r) => r.kalshiYesAsk != null).length,
     pmCount: results.filter((r) => r.pmYesAsk != null).length,
     scannedAt: new Date().toISOString(),
+    publicationGeneration: canonical.publicationGeneration,
     priceResolved: computePriceResolved(results.map((r) => ({
       kalshi: r.kalshiYesAsk != null && r.kalshiNoAsk != null
         ? { yesAsk: r.kalshiYesAsk, noAsk: r.kalshiNoAsk }
@@ -406,7 +420,7 @@ async function writeLiveResult(
         pmCount: results.filter((r) => r.pmYesAsk != null).length,
         positiveArbCount: clean.length,
         totalStake: clean.reduce((sum, r) => sum + r.kalshiStake + r.pmStake, 0),
-        scannedAt: liveResult.scannedAt,
+        scannedAt: liveResult.scannedAt!,
         expiryAt: pair?.expiryDate ?? null,
         marketTitle: pair?.title ?? pairId,
         arbType: best?.arbType ?? undefined,

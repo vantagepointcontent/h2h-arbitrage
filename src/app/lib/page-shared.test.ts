@@ -4,6 +4,11 @@ import {
   DEFAULT_SHOW_ARB_ONLY,
   formatPercent,
   summarizeScanForSidebar,
+  getCanonicalMatchState,
+  formatCanonicalMatchState,
+  mergeSavedMarketMatchRefresh,
+  markSavedMarketMatchRefreshing,
+  type SavedMarket,
   type UnifiedOutcome,
 } from "./page-shared";
 
@@ -51,5 +56,100 @@ describe("saved-market visibility defaults", () => {
   it("shows all non-expired markets instead of starting behind restrictive filters", () => {
     expect(DEFAULT_MARKET_EXPIRY_FILTER).toBe("all");
     expect(DEFAULT_SHOW_ARB_ONLY).toBe(false);
+  });
+});
+
+describe("BUG-133 canonical saved-market match summaries", () => {
+  const market = (lastScanResult: SavedMarket["lastScanResult"], liveResult?: SavedMarket["liveResult"]): SavedMarket => ({
+    id: "tx-07",
+    kalshiUrl: "https://kalshi.com/markets/kxhouserace/kxhouserace-tx07-26",
+    polymarketUrl: "https://polymarket.com/market/tx-07",
+    eventTitle: "TX-07 House Election Winner",
+    createdAt: "2026-07-02T13:33:16.000Z",
+    lastScanResult,
+    liveResult,
+  });
+
+  it("backfills a legacy TX-07 summary from its authoritative matchedCount when pair ids were not persisted", () => {
+    const saved = market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 8,
+      matchedCount: 2, matchedPairs: [], kalshiCount: 2, pmCount: 8,
+      scannedAt: "2026-08-12T19:49:14.096Z", allArbs: [],
+    });
+
+    expect(getCanonicalMatchState(saved)).toEqual({ status: "matched", count: 2, error: undefined });
+    expect(formatCanonicalMatchState(saved)).toBe("2 matched");
+  });
+
+  it("retains the latest confirmed count while a newer refresh is unavailable", () => {
+    const saved = market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 2,
+      matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      scannedAt: "2026-08-12T19:49:14.096Z", matchStatus: "matched", allArbs: [],
+    }, {
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", matchedCount: 0,
+      scannedAt: "2026-08-12T19:50:14.096Z", matchStatus: "unavailable",
+      matchError: "Polymarket unavailable", allArbs: [],
+    });
+    const state = getCanonicalMatchState(saved);
+
+    expect(state).toEqual({ status: "unavailable", count: 2, error: "Polymarket unavailable" });
+    expect(formatCanonicalMatchState(saved)).toBe("2 matched · Unavailable: Polymarket unavailable");
+  });
+
+  it("ignores an older live watcher summary when the persisted scan is newer", () => {
+    const state = getCanonicalMatchState(market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 2,
+      matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      scannedAt: "2026-08-12T19:50:14.096Z", matchStatus: "matched", allArbs: [],
+    }, {
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", matchedCount: 0,
+      scannedAt: "2026-08-12T19:49:14.096Z", matchStatus: "confirmed_zero", allArbs: [],
+    }));
+
+    expect(state).toMatchObject({ status: "matched", count: 2 });
+  });
+
+  it("uses versioned canonical pair ids over a stale denormalized count after deletion", () => {
+    const state = getCanonicalMatchState(market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 1,
+      matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      scannedAt: "2026-08-12T19:50:14.096Z", matchStatus: "matched",
+      matchedPairs: [{ artist: "Democratic", kalshiTicker: "TX07-D", pmConditionId: "pm-d" }],
+      allArbs: [],
+    }));
+
+    expect(state).toMatchObject({ status: "matched", count: 1 });
+  });
+
+  it("marks loading explicitly without clearing the latest confirmed pairs", () => {
+    const refreshing = markSavedMarketMatchRefreshing(market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 2,
+      matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      scannedAt: "2026-08-12T19:49:14.096Z", matchStatus: "matched", allArbs: [],
+    }));
+
+    expect(getCanonicalMatchState(refreshing)).toMatchObject({ status: "refreshing", count: 2 });
+  });
+
+  it("marks a temporary failure unavailable while retaining confirmed pair ids", () => {
+    const existing = market({
+      bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 2,
+      matchedCount: 2, kalshiCount: 2, pmCount: 2,
+      scannedAt: "2026-08-12T19:49:14.096Z", matchStatus: "matched",
+      matchedPairs: [
+        { artist: "Democratic", kalshiTicker: "TX07-D", pmConditionId: "pm-d" },
+        { artist: "Republican", kalshiTicker: "TX07-R", pmConditionId: "pm-r" },
+      ], allArbs: [],
+    });
+    const merged = mergeSavedMarketMatchRefresh(existing, {
+      matchStatus: "unavailable", matchError: "Polymarket unavailable", matchedCount: 0,
+      matchedPairs: [], scannedAt: "2026-08-12T19:50:14.096Z",
+    });
+
+    expect(merged.lastScanResult).toMatchObject({
+      matchStatus: "unavailable", matchedCount: 2,
+      matchedPairs: existing.lastScanResult?.matchedPairs,
+    });
   });
 });

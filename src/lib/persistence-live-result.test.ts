@@ -168,6 +168,142 @@ describe('WS-107 liveResult persistence', () => {
     }));
 
     const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
-    expect(got.lastScanResult).toMatchObject({ matchedCount: 2, matchStatus: 'matched' });
+    expect(got.lastScanResult).toMatchObject({
+      matchedCount: 2, matchStatus: 'unavailable', matchError: 'Polymarket unavailable',
+    });
+  });
+
+  it('orders equal timestamps by authority so temporary failures cannot replace completed results', async () => {
+    const scannedAt = '2026-08-12T19:14:45.296Z';
+    const unavailable = makeScan({ scannedAt, matchedCount: 0, matchStatus: 'unavailable', matchError: 'slow', allArbs: [] });
+    const matched = makeScan({ scannedAt, matchedCount: 2, matchStatus: 'matched' });
+    const makeMarket = (suffix: string) => persistence.addSavedMarket({
+      kalshiUrl: `https://kalshi.com/markets/${suffix}`, polymarketUrl: `https://polymarket.com/event/${suffix}`,
+      eventTitle: `Equal ordering ${suffix}`, category: '', expiryDate: null,
+    });
+
+    const first = await makeMarket('equal-order');
+    await persistence.updateSavedMarketScanResult(first.id, matched);
+    await persistence.updateSavedMarketScanResult(first.id, unavailable);
+    expect((await persistence.getSavedMarketById(first.id))?.lastScanResult).toMatchObject({ matchStatus: 'matched', matchedCount: 2 });
+
+    const second = await makeMarket('equal-order-reverse');
+    await persistence.updateSavedMarketScanResult(second.id, unavailable);
+    await persistence.updateSavedMarketScanResult(second.id, matched);
+    expect((await persistence.getSavedMarketById(second.id))?.lastScanResult).toMatchObject({ matchStatus: 'matched', matchedCount: 2 });
+  });
+
+  it.each(['scan', 'live'] as const)(
+    'uses producer-reserved generations to order equal-timestamp completed %s results in both arrival orders',
+    async (channel) => {
+      const scannedAt = new Date().toISOString();
+      const publish = channel === 'scan'
+        ? persistence.updateSavedMarketScanResult
+        : persistence.updateSavedMarketLiveResult;
+      const resultFor = (generation: number, status: 'matched' | 'confirmed_zero') => makeScan({
+        scannedAt,
+        publicationGeneration: generation,
+        matchedCount: status === 'matched' ? 1 : 0,
+        matchStatus: status,
+        matchedPairs: status === 'matched'
+          ? [{ artist: 'Democratic', kalshiTicker: 'EQUAL-D', pmConditionId: 'equal-d' }]
+          : [],
+        allArbs: [],
+      });
+      const read = async (id: string) => {
+        const market = await persistence.getSavedMarketById(id);
+        return channel === 'scan' ? market?.lastScanResult : market?.liveResult;
+      };
+
+      for (const arrivalOrder of ['newer-first', 'older-first'] as const) {
+        const suffix = `${channel}-${arrivalOrder}`;
+        const market = await persistence.addSavedMarket({
+          kalshiUrl: `https://kalshi.com/markets/${suffix}`,
+          polymarketUrl: `https://polymarket.com/event/${suffix}`,
+          eventTitle: `Completed ordering ${suffix}`,
+          category: '',
+          expiryDate: null,
+        });
+        const olderGeneration = await persistence.reserveSavedMarketPublication(market.id, channel);
+        const newerGeneration = await persistence.reserveSavedMarketPublication(market.id, channel);
+        const older = resultFor(olderGeneration, 'confirmed_zero');
+        const newer = resultFor(newerGeneration, 'matched');
+
+        if (arrivalOrder === 'newer-first') {
+          await publish(market.id, newer);
+          await publish(market.id, older);
+        } else {
+          await publish(market.id, older);
+          await publish(market.id, newer);
+        }
+
+        expect(await read(market.id)).toMatchObject({
+          publicationGeneration: newerGeneration,
+          matchStatus: 'matched',
+          matchedCount: 1,
+        });
+      }
+    },
+  );
+
+  it('fences a stale response after a newer manual coupling deletion summary', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/manual-delete', polymarketUrl: 'https://polymarket.com/event/manual-delete',
+      eventTitle: 'Manual deletion ordering', category: '', expiryDate: null,
+    });
+    await persistence.reconcileSavedMarketMatchSummary(m.id, {
+      scannedAt: '2026-08-12T19:50:14.096Z', matchedCount: 1, matchStatus: 'matched',
+      matchedPairs: [{ artist: 'Democratic', kalshiTicker: 'TX07-D', pmConditionId: 'pm-d' }],
+    });
+    await persistence.reconcileSavedMarketMatchSummary(m.id, {
+      scannedAt: '2026-08-12T19:49:14.096Z', matchedCount: 2, matchStatus: 'matched',
+      matchedPairs: [
+        { artist: 'Democratic', kalshiTicker: 'TX07-D', pmConditionId: 'pm-d' },
+        { artist: 'Republican', kalshiTicker: 'TX07-R', pmConditionId: 'pm-r' },
+      ],
+    });
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.lastScanResult).toMatchObject({
+      matchedCount: 1, matchStatus: 'matched',
+      matchedPairs: [{ artist: 'Democratic', kalshiTicker: 'TX07-D', pmConditionId: 'pm-d' }],
+    });
+  });
+
+  it('does not let an older live watcher result overwrite a newer live match summary', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/live-order', polymarketUrl: 'https://polymarket.com/event/live-order',
+      eventTitle: 'Live ordering test', category: '', expiryDate: null,
+    });
+    await persistence.updateSavedMarketLiveResult(m.id, makeScan({
+      scannedAt: new Date().toISOString(), matchedCount: 2, matchStatus: 'matched',
+    }));
+    await persistence.updateSavedMarketLiveResult(m.id, makeScan({
+      scannedAt: new Date(Date.now() - 60_000).toISOString(), matchedCount: 0,
+      matchStatus: 'confirmed_zero', allArbs: [],
+    }));
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.liveResult).toMatchObject({ matchedCount: 2, matchStatus: 'matched' });
+  });
+
+  it('does not clear a valid live match summary on temporary watcher unavailability', async () => {
+    const fixtureId = `live-failure-${process.pid}-${Date.now()}`;
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: `https://kalshi.com/markets/${fixtureId}`, polymarketUrl: `https://polymarket.com/event/${fixtureId}`,
+      eventTitle: `Live failure retention ${fixtureId}`, category: '', expiryDate: null,
+    });
+    await persistence.updateSavedMarketLiveResult(m.id, makeScan({
+      scannedAt: new Date().toISOString(), matchedCount: 2, matchStatus: 'matched',
+    }));
+    await persistence.updateSavedMarketLiveResult(m.id, makeScan({
+      scannedAt: new Date().toISOString(), matchedCount: 0,
+      matchStatus: 'unavailable', matchError: 'Kalshi unavailable', allArbs: [],
+    }));
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.liveResult).toMatchObject({
+      matchedCount: 2, matchStatus: 'unavailable', matchError: 'Kalshi unavailable',
+    });
   });
 });

@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   queryScanHistory: vi.fn(),
+  getScanHistoryDetail: vi.fn(),
   queryScanHistoryStream: vi.fn(),
   countScanHistory: vi.fn(),
   getSavedMarkets: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/persistence', () => mocks);
 
 import { GET as getLogs } from './route';
+import { GET as getLogDetail } from './[id]/route';
 import { GET as exportLogs } from './export/route';
 
 const persistedRow = {
@@ -50,6 +52,37 @@ describe('Logs scan-time APY serialization', () => {
       days_to_expiry: 0.5,
       expiry_at: '2026-08-13T00:00:00.000Z',
       apy_unavailable_reason: null,
+    });
+  });
+
+  it('omits heavy raw scan details from paginated list responses', async () => {
+    mocks.queryScanHistory.mockResolvedValue({
+      rows: [{ ...persistedRow, raw_result: '{"allArbs":[{"large":"blob"}]}' }],
+      total: 1,
+      uniqueMarkets: 1,
+    });
+
+    const response = await getLogs(new NextRequest('http://localhost/api/logs'));
+    const body = await response.json();
+
+    expect(body.logs[0]).not.toHaveProperty('raw_result');
+  });
+
+  it('loads one immutable scan detail by numeric id', async () => {
+    mocks.getScanHistoryDetail.mockResolvedValue({
+      id: 7,
+      raw_result: '{"allArbs":[{"roiPct":2.5}]}',
+    });
+
+    const response = await getLogDetail(
+      new NextRequest('http://localhost/api/logs/7'),
+      { params: Promise.resolve({ id: '7' }) },
+    );
+
+    expect(mocks.getScanHistoryDetail).toHaveBeenCalledWith(7);
+    expect(await response.json()).toEqual({
+      id: 7,
+      raw_result: '{"allArbs":[{"roiPct":2.5}]}',
     });
   });
 

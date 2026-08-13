@@ -5,7 +5,7 @@ import { parseJsonObject } from '@/lib/request-json';
 import { parseScanCapital } from '@/lib/scan-request';
 import { scanRateLimiter, getScanClientKey } from '@/lib/scan-rate-limit';
 import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
-import { reconcileSavedMarketMatchSummary } from '@/lib/persistence';
+import { reconcileSavedMarketMatchSummary, reserveSavedMarketPublication } from '@/lib/persistence';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestCorrelationId = request.headers.get(CORRELATION_ID_HEADER) || correlationId.generate();
@@ -31,6 +31,8 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  let marketId: string | null = null;
+  let publicationGeneration: number | null = null;
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) {
@@ -38,7 +40,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     }
     const body = parsed.body;
 
-    const marketId = typeof body.marketId === 'string' ? body.marketId : null;
+    marketId = typeof body.marketId === 'string' ? body.marketId : null;
     if (!marketId) {
       return NextResponse.json({ error: 'Missing marketId.' }, { status: 400 });
     }
@@ -51,6 +53,15 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    publicationGeneration = await reserveSavedMarketPublication(marketId, 'scan');
+    await reconcileSavedMarketMatchSummary(marketId, {
+      matchedCount: 0,
+      matchStatus: 'refreshing',
+      matchError: undefined,
+      matchedPairs: undefined,
+      scannedAt: new Date().toISOString(),
+      publicationGeneration,
+    });
     const result: QuickPricesResult = await quickPricesScan(marketId, capital);
     await reconcileSavedMarketMatchSummary(marketId, {
       matchedCount: result.matchedCount,
@@ -58,6 +69,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       matchError: result.matchError,
       matchedPairs: result.matchedPairs,
       scannedAt: result._pmFetchedAt,
+      publicationGeneration,
     });
     return NextResponse.json(result, {
       headers: {
@@ -79,6 +91,16 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
           : 'Saved-market price refresh failed';
     const msg = clientSafeError(err, fallback, { path: '/api/quick-prices' });
     const status = errorStatus || (msg.includes('timed out') ? 504 : 500);
+    if (marketId && publicationGeneration != null) {
+      await reconcileSavedMarketMatchSummary(marketId, {
+        matchedCount: 0,
+        matchStatus: 'unavailable',
+        matchError: msg,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
+      }).catch(() => {});
+    }
     return NextResponse.json({ error: msg }, { status });
   }
 }

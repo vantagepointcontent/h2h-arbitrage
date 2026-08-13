@@ -15,7 +15,7 @@ import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth,
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
-import { getSavedMarkets, findSavedMarketByUrls, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
+import { findSavedMarketByUrls, reconcileSavedMarketMatchSummary, reserveSavedMarketPublication, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let savedMarketId: string | null = null;
+  let publicationGeneration: number | null = null;
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -85,6 +87,24 @@ export async function POST(request: NextRequest) {
         { error: 'A valid Polymarket market link is required. Expected format: https://polymarket.com/event/{slug} or /sports/{path}' },
         { status: 400 }
       );
+    }
+
+    // Reserve ordering before upstream requests. Completion timestamps cannot
+    // order overlapping scans that resolve within the same clock tick.
+    const savedMarket = await findSavedMarketByUrls(kalshiUrl!, polymarketUrl!);
+    savedMarketId = savedMarket?.id ?? null;
+    publicationGeneration = savedMarket
+      ? await reserveSavedMarketPublication(savedMarket.id, 'scan')
+      : null;
+    if (savedMarketId && publicationGeneration != null) {
+      await reconcileSavedMarketMatchSummary(savedMarketId, {
+        matchedCount: 0,
+        matchStatus: 'refreshing',
+        matchError: undefined,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
+      });
     }
 
     // BUG-05 Sub-Issue 3: Fetch markets from ALL related Kalshi series for the
@@ -154,7 +174,7 @@ export async function POST(request: NextRequest) {
         return [] as any[];
       })(),
       withTimeout(
-        isPolymarketMarketUrl(polymarketUrl)
+        isPolymarketMarketUrl(polymarketUrl!)
           ? fetchPolymarketMarketAsEvent(pmSlug)
           : fetchPolymarketEvent(pmSlug),
         API_TIMEOUT_MS, 'Polymarket event',
@@ -164,9 +184,19 @@ export async function POST(request: NextRequest) {
     ]);
 
     // Filter Kalshi markets to the specific match within a multi-game event
-    kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(kalshiUrl));
+    kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(kalshiUrl!));
 
     if (!pmEvent) {
+      if (savedMarketId && publicationGeneration != null) {
+        await reconcileSavedMarketMatchSummary(savedMarketId, {
+          matchedCount: 0,
+          matchStatus: 'unavailable',
+          matchError: 'Polymarket event not found. The market may have closed or the URL may be incorrect.',
+          matchedPairs: undefined,
+          scannedAt: new Date().toISOString(),
+          publicationGeneration,
+        }).catch(() => {});
+      }
       return NextResponse.json(
         { error: 'Polymarket event not found. The market may have closed or the URL may be incorrect.' },
         { status: 404 }
@@ -385,7 +415,7 @@ export async function POST(request: NextRequest) {
     // ---- UPDATE SAVED MARKET SCAN RESULT ----
     try {
       // PERF-P1: targeted single-market lookup instead of loading all markets
-      const market = await findSavedMarketByUrls(kalshiUrl, polymarketUrl);
+      const market = savedMarket;
       if (market) {
         // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth)
         // from stats, history, lifecycle, and alerts. They stay visible in the
@@ -418,6 +448,7 @@ export async function POST(request: NextRequest) {
           kalshiCount,
           pmCount,
           scannedAt: new Date().toISOString(),
+          publicationGeneration,
           category: scanCategory,
           // UI-013: PM often keeps endDate far in the future even after a market
           // resolves. Persist PM's own closed signal so the UI can treat
@@ -537,6 +568,17 @@ export async function POST(request: NextRequest) {
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
+      if (savedMarketId && publicationGeneration != null) {
+        const matchError = clientSafeError(e, 'Scan result persistence failed', { path: '/api/scan' });
+        await reconcileSavedMarketMatchSummary(savedMarketId, {
+          matchedCount: 0,
+          matchStatus: 'unavailable',
+          matchError,
+          matchedPairs: undefined,
+          scannedAt: new Date().toISOString(),
+          publicationGeneration,
+        }).catch(() => {});
+      }
     }
 
     return NextResponse.json({
@@ -575,6 +617,16 @@ export async function POST(request: NextRequest) {
     logger.trackError(err, { service: 'scan', path: '/api/scan' });
     const msg = clientSafeError(err, 'Unknown error');
     const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
+    if (savedMarketId && publicationGeneration != null) {
+      await reconcileSavedMarketMatchSummary(savedMarketId, {
+        matchedCount: 0,
+        matchStatus: 'unavailable',
+        matchError: msg,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
+      }).catch(() => {});
+    }
     return NextResponse.json(
       { error: msg },
       { status }

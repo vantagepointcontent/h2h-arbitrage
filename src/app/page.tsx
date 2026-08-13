@@ -103,6 +103,7 @@ import {
   formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
+  mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -618,6 +619,9 @@ export default function Home() {
     } else {
       setBgRefreshing(true);
     }
+    setSavedMarkets((previous) => previous.map((market) => market.id === marketId
+      ? markSavedMarketMatchRefreshing(market)
+      : market));
     setError("");
 
     try {
@@ -667,33 +671,32 @@ export default function Home() {
         }
         const refreshedAt = typeof data._pmFetchedAt === 'string' ? data._pmFetchedAt : scannedAt;
         setSavedMarkets((previous) => previous.map((market) => market.id === marketId
-          ? {
-              ...market,
-              lastScanResult: {
-                ...(market.lastScanResult ?? {
-                  bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 0,
-                  kalshiCount: 0, pmCount: 0, allArbs: [],
-                }),
-                scannedAt: refreshedAt,
-                matchedCount: data.matchStatus === 'unavailable'
-                  ? market.lastScanResult?.matchedCount ?? 0
-                  : data.matchedCount ?? 0,
-                matchStatus: data.matchStatus === 'unavailable'
-                  ? market.lastScanResult?.matchStatus ?? 'unavailable'
-                  : data.matchStatus,
-                matchError: data.matchError,
-                matchedPairs: data.matchStatus === 'unavailable'
-                  ? market.lastScanResult?.matchedPairs ?? []
-                  : data.matchedPairs ?? [],
-              },
-            }
+          ? mergeSavedMarketMatchRefresh(market, {
+              scannedAt: refreshedAt,
+              matchedCount: data.matchedCount ?? 0,
+              matchStatus: data.matchStatus,
+              matchError: data.matchError,
+              matchedPairs: data.matchedPairs ?? [],
+            })
           : market));
       } else {
         setError(data.error || "Quick refresh failed");
+        setSavedMarkets((previous) => previous.map((market) => market.id === marketId
+          ? mergeSavedMarketMatchRefresh(market, {
+              scannedAt: new Date().toISOString(), matchedCount: 0,
+              matchStatus: 'unavailable', matchError: data.error || "Quick refresh failed", matchedPairs: [],
+            })
+          : market));
       }
     } catch (err: any) {
       if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current)) return;
       setError(err.message || "Network error");
+      setSavedMarkets((previous) => previous.map((market) => market.id === marketId
+        ? mergeSavedMarketMatchRefresh(market, {
+            scannedAt: new Date().toISOString(), matchedCount: 0,
+            matchStatus: 'unavailable', matchError: err.message || "Network error", matchedPairs: [],
+          })
+        : market));
     } finally {
       if (!quickPricesRequestOwnerRef.current.finish(request)) return;
       if (request.mode === "foreground") setLoading(false);
@@ -988,7 +991,10 @@ export default function Home() {
       const res = await fetch("/api/manual-matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle }),
+        body: JSON.stringify({
+          kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle,
+          marketId: activeMarketIdRef.current ?? undefined,
+        }),
       });
       if (res.ok) {
         await loadManualMatches();
@@ -2473,7 +2479,10 @@ export default function Home() {
           await fetch("/api/manual-matches", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle }),
+            body: JSON.stringify({
+              kalshiTicker: kt, pmConditionId: pcid, kalshiTitle: ktTitle, pmTitle,
+              marketId: activeMarketIdRef.current ?? undefined,
+            }),
           });
           await loadManualMatches();
         }}

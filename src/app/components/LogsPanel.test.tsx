@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import LogsPanel from './LogsPanel';
 
@@ -47,27 +47,18 @@ describe('LogsPanel', () => {
     })).toBe(true));
   });
 
-  it('auto-loads the next cursor page and deduplicates overlapping rows', async () => {
-    let intersectionCallback: IntersectionObserverCallback | undefined;
-    class IntersectionObserverStub {
-      constructor(callback: IntersectionObserverCallback) { intersectionCallback = callback; }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-      takeRecords() { return []; }
-      readonly root = null;
-      readonly rootMargin = '';
-      readonly thresholds = [];
-    }
-    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+  it('loads one 500-row page per distinct user scroll to the new bottom and deduplicates overlaps', async () => {
     const second = { ...comparisonLog(), id: 92, market_id: 'saved-2', market_name: 'Second market' };
+    const third = { ...comparisonLog(), id: 93, market_id: 'saved-3', market_name: 'Third market' };
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) {
         const before = new URL(url, 'http://localhost').searchParams.get('before');
-        return Promise.resolve({ ok: true, json: async () => before
-          ? { logs: [comparisonLog(), second], total: 2 }
-          : { logs: [comparisonLog()], total: 2, nextCursor: '2026-08-11T13:42:00.000Z|91' } });
+        return Promise.resolve({ ok: true, json: async () => before === 'page-2'
+          ? { logs: [comparisonLog(), second], total: 3, nextCursor: 'page-3' }
+          : before === 'page-3'
+            ? { logs: [third], total: 3 }
+            : { logs: [comparisonLog()], total: 3, nextCursor: 'page-2' } });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
@@ -76,26 +67,28 @@ describe('LogsPanel', () => {
 
     render(createElement(LogsPanel));
     await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
-    intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    const scroller = screen.getByTestId('logs-table-scroll');
+    setScrollGeometry(scroller, { scrollTop: 600, scrollHeight: 1000, clientHeight: 400 });
+    fireEvent.scroll(scroller);
     await waitFor(() => expect(screen.getByText('Second market')).toBeTruthy());
+    fireEvent.scroll(scroller);
+    await Promise.resolve();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/logs?'))).toHaveLength(2);
+    expect(screen.queryByText('Third market')).toBeNull();
+
+    setScrollGeometry(scroller, { scrollTop: 1100, scrollHeight: 1500, clientHeight: 400 });
+    fireEvent.scroll(scroller);
+    await waitFor(() => expect(screen.getByText('Third market')).toBeTruthy());
     expect(screen.getAllByText('Comparison market')).toHaveLength(1);
+    const appendLimits = fetchMock.mock.calls
+      .filter(([input]) => new URL(String(input), 'http://localhost').searchParams.has('before'))
+      .map(([input]) => new URL(String(input), 'http://localhost').searchParams.get('limit'));
+    expect(appendLimits).toEqual(['500', '500']);
     expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull();
     expect(screen.getByText('End of results')).toBeTruthy();
   });
 
   it('resets an in-flight append when search changes and can load the replacement page', async () => {
-    let intersectionCallback: IntersectionObserverCallback | undefined;
-    class IntersectionObserverStub {
-      constructor(callback: IntersectionObserverCallback) { intersectionCallback = callback; }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-      takeRecords() { return []; }
-      readonly root = null;
-      readonly rootMargin = '';
-      readonly thresholds = [];
-    }
-    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
     let resolveStalePage!: (value: unknown) => void;
     const stalePage = new Promise((resolve) => { resolveStalePage = resolve; });
     const replacementFirst = { ...comparisonLog(), id: 101, market_name: 'MN-01 first' };
@@ -120,10 +113,9 @@ describe('LogsPanel', () => {
 
     render(createElement(LogsPanel));
     await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
-    await waitFor(() => expect(intersectionCallback).toBeTypeOf('function'));
-    await act(async () => {
-      intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
-    });
+    const scroller = screen.getByTestId('logs-table-scroll');
+    setScrollGeometry(scroller, { scrollTop: 600, scrollHeight: 1000, clientHeight: 400 });
+    fireEvent.scroll(scroller);
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => {
       const url = String(input);
       return url.startsWith('/api/logs?') && new URL(url, 'http://localhost').searchParams.get('before') === 'old|91';
@@ -137,49 +129,82 @@ describe('LogsPanel', () => {
     await Promise.resolve();
     expect(screen.queryByText('stale result')).toBeNull();
 
-    await act(async () => {
-      intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
-    });
+    setScrollGeometry(scroller, { scrollTop: 1100, scrollHeight: 1500, clientHeight: 400 });
+    fireEvent.scroll(scroller);
     await waitFor(() => expect(screen.getByText('MN-01 second')).toBeTruthy());
     expect(screen.getByText('End of results')).toBeTruthy();
   });
 
+  it.each([
+    ['minimum ROI', () => fireEvent.change(screen.getByLabelText('Min ROI %'), { target: { value: '5' } })],
+    ['from date', () => fireEvent.change(screen.getByLabelText('From Date'), { target: { value: '2026-08-10T12:00' } })],
+    ['to date', () => fireEvent.change(screen.getByLabelText('To Date'), { target: { value: '2026-08-12T12:00' } })],
+    ['positive-arb toggle', () => fireEvent.click(screen.getByLabelText('Positive arb only'))],
+    ['event type', () => fireEvent.click(screen.getByRole('button', { name: 'Arb' }))],
+    ['arb type', () => fireEvent.click(screen.getByRole('button', { name: 'Cross' }))],
+  ])('synchronously invalidates a pending append and resets virtual scroll for %s changes', async (_label, mutateFilter) => {
+    let resolveStalePage!: (value: unknown) => void;
+    const stalePage = new Promise((resolve) => { resolveStalePage = resolve; });
+    let baseRequests = 0;
+    const replacement = { ...comparisonLog(), id: 201, market_name: 'replacement page-one row' };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) {
+        const before = new URL(url, 'http://localhost').searchParams.get('before');
+        if (before) return stalePage;
+        baseRequests += 1;
+        return Promise.resolve({ ok: true, json: async () => baseRequests === 1
+          ? { logs: Array.from({ length: 250 }, (_, index) => makePagedLog(index)), total: 751, nextCursor: 'old-page-2' }
+          : { logs: [replacement], total: 1 } });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Loaded 250 of 751 entries')).toBeTruthy());
+    const scroller = screen.getByTestId('logs-table-scroll');
+    setScrollGeometry(scroller, { scrollTop: 8_000, scrollHeight: 9_000, clientHeight: 400 });
+    fireEvent.scroll(scroller);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('before=old-page-2'))).toBe(true));
+
+    mutateFilter();
+    expect(scroller.scrollTop).toBe(0);
+    await waitFor(() => expect(screen.getByText('replacement page-one row')).toBeTruthy());
+    expect(screen.queryByText('Loading more results…')).toBeNull();
+
+    resolveStalePage({ ok: true, json: async () => ({
+      logs: [{ ...comparisonLog(), id: 999, market_name: 'stale non-search result' }], total: 751,
+    }) });
+    await Promise.resolve();
+    expect(screen.queryByText('stale non-search result')).toBeNull();
+  });
+
   it('keeps rendered table rows bounded while accumulating multiple cursor pages', async () => {
-    let intersectionCallback: IntersectionObserverCallback | undefined;
-    class IntersectionObserverStub {
-      constructor(callback: IntersectionObserverCallback) { intersectionCallback = callback; }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-      takeRecords() { return []; }
-      readonly root = null;
-      readonly rootMargin = '';
-      readonly thresholds = [];
-    }
-    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
-    const pages = [0, 250, 500].map((start) => Array.from({ length: 250 }, (_, index) => ({
-      ...comparisonLog(), id: start + index + 1, market_id: `market-${start + index + 1}`,
-      market_name: `Market ${start + index + 1}`,
-      scanned_at: new Date(Date.parse('2026-08-12T12:00:00.000Z') - (start + index) * 1000).toISOString(),
-    })));
+    const pages = [
+      Array.from({ length: 250 }, (_, index) => makePagedLog(index)),
+      Array.from({ length: 500 }, (_, index) => makePagedLog(250 + index)),
+      Array.from({ length: 500 }, (_, index) => makePagedLog(750 + index)),
+    ];
     let page = 0;
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) {
         const current = page++;
-        return Promise.resolve({ ok: true, json: async () => ({ logs: pages[current], total: 750, nextCursor: current < 2 ? `cursor-${current + 1}` : undefined }) });
+        return Promise.resolve({ ok: true, json: async () => ({ logs: pages[current], total: 1250, nextCursor: current < 2 ? `cursor-${current + 1}` : undefined }) });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
     }));
 
     render(createElement(LogsPanel));
-    await waitFor(() => expect(screen.getByText('Loaded 250 of 750 entries')).toBeTruthy());
-    for (const expected of [500, 750]) {
-      await act(async () => {
-        intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
-      });
-      await waitFor(() => expect(screen.getByText(`Loaded ${expected} of 750 entries`)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Loaded 250 of 1,250 entries')).toBeTruthy());
+    const scroller = screen.getByTestId('logs-table-scroll');
+    for (const [index, expected] of [750, 1250].entries()) {
+      setScrollGeometry(scroller, { scrollTop: 600 + index * 500, scrollHeight: 1000 + index * 500, clientHeight: 400 });
+      fireEvent.scroll(scroller);
+      await waitFor(() => expect(screen.getByText(`Loaded ${expected.toLocaleString()} of 1,250 entries`)).toBeTruthy());
     }
 
     expect(document.querySelectorAll('tbody tr').length).toBeLessThanOrEqual(102);
@@ -239,9 +264,11 @@ describe('LogsPanel', () => {
   it('loads exactly two current leg quotes only on expansion and reuses the brief row cache', async () => {
     let resolveCurrent!: (value: unknown) => void;
     const currentResponse = new Promise((resolve) => { resolveCurrent = resolve; });
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, ..._rest: [RequestInit?]) => {
+      void _rest;
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') return Promise.resolve({ ok: true, json: async () => ({ id: 91, raw_result: comparisonRawResult() }) });
       if (url === '/api/logs/current-prices') return currentResponse;
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
@@ -279,12 +306,95 @@ describe('LogsPanel', () => {
     fireEvent.click(document.querySelector('tbody tr')!);
     await waitFor(() => expect(screen.getByText('+$0.05 (+11.90%)')).toBeTruthy());
     expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/logs/current-prices')).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/logs/91')).toHaveLength(1);
+  });
+
+  it('fetches expanded details lazily, caches them across collapse, and retries errors', async () => {
+    let detailAttempts = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') {
+        detailAttempts += 1;
+        if (detailAttempts === 1) return Promise.resolve({ ok: false, json: async () => ({ error: 'detail unavailable' }) });
+        return Promise.resolve({ ok: true, json: async () => ({ id: 91, raw_result: comparisonRawResult() }) });
+      }
+      if (url === '/api/logs/current-prices') return Promise.resolve({ ok: true, json: async () => ({ quotes: [] }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/logs/91')).toBe(false);
+    fireEvent.click(document.querySelector('tbody tr')!);
+    await waitFor(() => expect(screen.getByText('Unable to load scan details.')).toBeTruthy());
+    expect(screen.queryByText('No detailed arb data available for this scan.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry scan details' }));
+    await waitFor(() => expect(screen.getByText('Arbitrage Opportunities (1)')).toBeTruthy());
+    expect(detailAttempts).toBe(2);
+    fireEvent.click(document.querySelector('tbody tr')!);
+    fireEvent.click(document.querySelector('tbody tr')!);
+    await waitFor(() => expect(screen.getByText('Arbitrage Opportunities (1)')).toBeTruthy());
+    expect(detailAttempts).toBe(2);
+  });
+
+  it('settles one pending detail request after collapse and re-expansion', async () => {
+    let resolveDetail!: (value: { ok: boolean; json: () => Promise<{ id: number; raw_result: string }> }) => void;
+    const pendingDetail = new Promise<{ ok: boolean; json: () => Promise<{ id: number; raw_result: string }> }>((resolve) => {
+      resolveDetail = resolve;
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') return pendingDetail;
+      if (url === '/api/logs/current-prices') return Promise.resolve({ ok: true, json: async () => ({ quotes: [] }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    const row = document.querySelector('tbody tr')!;
+    fireEvent.click(row);
+    await waitFor(() => expect(screen.getByText('Loading scan details…')).toBeTruthy());
+    fireEvent.click(row);
+    fireEvent.click(row);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/logs/91')).toHaveLength(1);
+
+    resolveDetail({ ok: true, json: async () => ({ id: 91, raw_result: comparisonRawResult() }) });
+    await waitFor(() => expect(screen.getByText('Arbitrage Opportunities (1)')).toBeTruthy());
+    expect(screen.queryByText('Loading scan details…')).toBeNull();
+  });
+
+  it('caches a successful null detail across collapse and re-expansion', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') return Promise.resolve({ ok: true, json: async () => ({ id: 91, raw_result: null }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    const row = document.querySelector('tbody tr')!;
+    fireEvent.click(row);
+    await waitFor(() => expect(screen.getByText('No detailed arb data available for this scan.')).toBeTruthy());
+    fireEvent.click(row);
+    fireEvent.click(row);
+    await waitFor(() => expect(screen.getByText('No detailed arb data available for this scan.')).toBeTruthy());
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/logs/91')).toHaveLength(1);
   });
 
   it('renders stale and resolved states explicitly without fabricated zero prices', async () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') return Promise.resolve({ ok: true, json: async () => ({ id: 91, raw_result: comparisonRawResult() }) });
       if (url === '/api/logs/current-prices') return Promise.resolve({ ok: true, json: async () => ({ quotes: [
         { platform: 'kalshi', marketId: 'KX-EXACT', outcome: 'yes', status: 'available', priceNow: 0.47, source: 'Executable best ask', quotedAt: '2026-08-11T13:45:00.000Z', stale: true },
         { platform: 'polymarket', marketId: '0xexact', outcome: 'no', status: 'resolved', priceNow: null, source: 'Executable best ask', quotedAt: '2026-08-11T13:45:00.000Z', stale: false },
@@ -305,6 +415,7 @@ describe('LogsPanel', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ json: async () => ({ logs: [comparisonLog()] }) });
+      if (url === '/api/logs/91') return Promise.resolve({ ok: true, json: async () => ({ id: 91, raw_result: comparisonRawResult() }) });
       if (url === '/api/logs/current-prices') return Promise.resolve({ ok: false, status: 429, json: async () => ({ error: 'rate limited' }) });
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
@@ -317,6 +428,22 @@ describe('LogsPanel', () => {
     expect(screen.queryByText('$0.00')).toBeNull();
   });
 });
+
+function setScrollGeometry(element: HTMLElement, geometry: { scrollTop: number; scrollHeight: number; clientHeight: number }) {
+  Object.defineProperties(element, {
+    scrollTop: { configurable: true, writable: true, value: geometry.scrollTop },
+    scrollHeight: { configurable: true, value: geometry.scrollHeight },
+    clientHeight: { configurable: true, value: geometry.clientHeight },
+  });
+}
+
+function makePagedLog(index: number) {
+  return {
+    ...comparisonLog(), id: index + 1, market_id: `market-${index + 1}`,
+    market_name: `Market ${index + 1}`,
+    scanned_at: new Date(Date.parse('2026-08-12T12:00:00.000Z') - index * 1000).toISOString(),
+  };
+}
 
 function comparisonLog() {
   return {
@@ -337,7 +464,11 @@ function comparisonLog() {
     days_to_expiry: 0.5,
     apy_pct: 1825,
     apy_unavailable_reason: null,
-    raw_result: JSON.stringify({ allArbs: [{
+  };
+}
+
+function comparisonRawResult() {
+  return JSON.stringify({ allArbs: [{
       artist: 'Outcome A',
       strategy: 'Buy YES Kalshi + NO PM',
       roiPct: 2.5,
@@ -349,6 +480,5 @@ function comparisonLog() {
       pmYesPrice: 0.61,
       pmNoPrice: 0.4,
       pmBestAsk: 0.61,
-    }] }),
-  };
+  }] });
 }

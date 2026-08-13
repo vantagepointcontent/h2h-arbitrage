@@ -3,10 +3,16 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   quickPricesScan: vi.fn(),
+  reconcileSavedMarketMatchSummary: vi.fn(),
+  reserveSavedMarketPublication: vi.fn(),
   consume: vi.fn(() => ({ allowed: true })),
 }));
 
 vi.mock('@/lib/quick-prices', () => ({ quickPricesScan: mocks.quickPricesScan }));
+vi.mock('@/lib/persistence', () => ({
+  reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
+  reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
+}));
 vi.mock('@/lib/scan-rate-limit', () => ({
   scanRateLimiter: { consume: mocks.consume },
   getScanClientKey: () => 'test',
@@ -15,7 +21,49 @@ vi.mock('@/lib/scan-rate-limit', () => ({
 import { POST } from './route';
 
 describe('POST /api/quick-prices diagnostics', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.reserveSavedMarketPublication.mockResolvedValue(7);
+    mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
+  });
+
+  it('atomically reconciles canonical pair ids before returning a successful detail refresh', async () => {
+    const result = {
+      matchedCount: 2,
+      matchStatus: 'matched',
+      matchedPairs: [
+        { artist: 'Democratic', kalshiTicker: 'TX07-D', pmConditionId: 'pm-d' },
+        { artist: 'Republican', kalshiTicker: 'TX07-R', pmConditionId: 'pm-r' },
+      ],
+      _pmFetchedAt: '2026-08-12T19:49:14.096Z',
+    };
+    mocks.quickPricesScan.mockResolvedValue(result);
+    const request = new NextRequest('http://localhost/api/quick-prices', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ marketId: 'tx-07', capital: 1000 }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(1, 'tx-07', {
+      matchedCount: 0,
+      matchStatus: 'refreshing',
+      matchError: undefined,
+      matchedPairs: undefined,
+      scannedAt: expect.any(String),
+      publicationGeneration: 7,
+    });
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(2, 'tx-07', {
+      matchedCount: 2,
+      matchStatus: 'matched',
+      matchError: undefined,
+      matchedPairs: result.matchedPairs,
+      scannedAt: result._pmFetchedAt,
+      publicationGeneration: 7,
+    });
+  });
 
   it('returns an actionable failure with the request correlation ID', async () => {
     mocks.quickPricesScan.mockRejectedValue(new Error('unexpected internal failure'));
@@ -32,6 +80,14 @@ describe('POST /api/quick-prices diagnostics', () => {
     expect(response.headers.get('x-correlation-id')).toBe('quick-test-cid');
     expect(body.error).toMatch(/^Saved-market price refresh failed \(Error, ref: [a-f0-9]{16}\/quick-test-cid\)$/);
     expect(body.error).not.toContain('Unknown error');
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('saved-1', {
+      matchedCount: 0,
+      matchStatus: 'unavailable',
+      matchError: body.error,
+      matchedPairs: undefined,
+      scannedAt: expect.any(String),
+      publicationGeneration: 7,
+    });
   });
 
   it('returns an actionable missing saved-market response with diagnostics', async () => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, getMarketUrlsById } from '@/lib/persistence';
+import { getSavedMarkets, addSavedMarket, deleteSavedMarket, updateSavedMarket, getMarketUrlsById, reconcileSavedMarketMatchSummaries } from '@/lib/persistence';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const fields = searchParams.get('fields') || 'full';
     const id = searchParams.get('id');
 
+    await reconcileSavedMarketMatchSummaries();
     const markets = await getSavedMarkets();
 
     // Single full market by id — used by loadMarket() for instant-load allArbs

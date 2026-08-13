@@ -163,6 +163,10 @@ async function initDb(): Promise<void> {
     `ALTER TABLE saved_markets ADD COLUMN last_matched_at TEXT`,
     // WS-107: real-time result written by the ws-watcher for HOT pairs
     `ALTER TABLE saved_markets ADD COLUMN live_result TEXT`,
+    // BUG-133: reserve request order before upstream work so equal-time
+    // completions cannot publish in arrival order.
+    `ALTER TABLE saved_markets ADD COLUMN scan_publication_generation INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE saved_markets ADD COLUMN live_publication_generation INTEGER NOT NULL DEFAULT 0`,
     // FEAT-3: retain legacy URL columns during the N-platform migration.
     `ALTER TABLE saved_markets ADD COLUMN platform_links TEXT`,
   ]) {
@@ -186,6 +190,12 @@ async function initDb(): Promise<void> {
   END`);
   await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_search_delete AFTER DELETE ON scan_results BEGIN
     DELETE FROM scan_results_search WHERE rowid = old.id;
+  END`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_search_market_title_update AFTER UPDATE OF event_title ON saved_markets BEGIN
+    DELETE FROM scan_results_search WHERE rowid IN (SELECT id FROM scan_results WHERE market_id = new.id);
+    INSERT INTO scan_results_search(rowid, search_text)
+      SELECT id, market_id || ' ' || COALESCE(market_title, '') || ' ' || strategy || ' ' || COALESCE(new.event_title, '')
+      FROM scan_results WHERE market_id = new.id;
   END`);
   const [scanCount, searchCount] = await Promise.all([
     c.execute(`SELECT COUNT(*) AS cnt FROM scan_results`),
@@ -446,9 +456,14 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
   const search = opts.search?.trim();
   if (search) {
-    const pattern = `%${search.replace(/([%_\\])/g, '\\$1')}%`;
-    where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\')`;
-    args.push(pattern);
+    if (Array.from(search).length >= 3) {
+      where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE scan_results_search MATCH ?)`;
+      args.push(`"${search.replace(/"/g, '""')}"`);
+    } else {
+      const literalLike = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\')`;
+      args.push(`%${literalLike}%`);
+    }
   }
   if (opts.eventType === 'arb') where += ' AND positive_arb_count > 0';
   if (opts.eventType === 'scan') where += ' AND positive_arb_count = 0';
@@ -463,10 +478,10 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
 /** Diagnostic used by database tests to assert substring search uses FTS. */
 export async function explainScanHistorySearchPlan(search: string): Promise<string[]> {
   await ensureDb();
-  const pattern = `%${search.trim().replace(/([%_\\])/g, '\\$1')}%`;
+  const phrase = `"${search.trim().replace(/"/g, '""')}"`;
   const result = await getClient().execute({
-    sql: `EXPLAIN QUERY PLAN SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\'`,
-    args: [pattern],
+    sql: `EXPLAIN QUERY PLAN SELECT rowid FROM scan_results_search WHERE scan_results_search MATCH ?`,
+    args: [phrase],
   });
   return result.rows.map((row) => String(row.detail ?? ''));
 }
@@ -494,7 +509,7 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
   const rows = await c.execute({
     sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
-                 positive_arb_count, total_stake, scanned_at, raw_result,
+                 positive_arb_count, total_stake, scanned_at,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason
           FROM scan_results${pageWhere}
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
@@ -504,6 +519,17 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
     totalArbs: Number(countRow?.total_arbs ?? 0), avgRoi: Number(countRow?.avg_roi ?? 0), bestRoi: Number(countRow?.best_roi ?? 0), totalProfit: Number(countRow?.total_profit ?? 0),
     arbTypeCounts: { direct: Number(countRow?.direct_count ?? 0), cross: Number(countRow?.cross_count ?? 0), internal: Number(countRow?.internal_count ?? 0) },
   } };
+}
+
+/** Load the heavy immutable payload only when a Logs row is expanded. */
+export async function getScanHistoryDetail(id: number): Promise<{ id: number; raw_result: string | null } | null> {
+  await ensureDb();
+  const result = await getClient().execute({
+    sql: 'SELECT id, raw_result FROM scan_results WHERE id = ? LIMIT 1',
+    args: [id],
+  });
+  const row = result.rows[0];
+  return row ? { id: Number(row.id), raw_result: typeof row.raw_result === 'string' ? row.raw_result : null } : null;
 }
 
 /**
@@ -866,6 +892,8 @@ export interface LastScanResult {
   matchStatus?: 'not_scanned' | 'refreshing' | 'unavailable' | 'confirmed_zero' | 'matched';
   matchError?: string;
   matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
+  matchDependencies?: import('./coupling-store').CouplingDependency[];
+  publicationGeneration?: number;
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
@@ -1247,62 +1275,160 @@ export async function upsertSavedMarket(input: {
   return newMarket;
 }
 
+function matchPublicationAuthority(result: LastScanResult): number {
+  return result.matchStatus === 'refreshing' ? 0 : result.matchStatus === 'unavailable' ? 1 : 2;
+}
+
+function isStaleMatchPublication(previous: LastScanResult | null, incoming: LastScanResult): boolean {
+  if (incoming.publicationGeneration != null && previous?.publicationGeneration != null
+    && incoming.publicationGeneration !== previous.publicationGeneration) {
+    return incoming.publicationGeneration < previous.publicationGeneration;
+  }
+  if (!previous?.scannedAt || !incoming.scannedAt) return false;
+  if (incoming.scannedAt !== previous.scannedAt) return incoming.scannedAt < previous.scannedAt;
+  return matchPublicationAuthority(incoming) < matchPublicationAuthority(previous);
+}
+
+export type SavedMarketPublicationChannel = 'scan' | 'live';
+
+/** Reserve a producer generation before network work begins. */
+export async function reserveSavedMarketPublication(
+  id: string,
+  channel: SavedMarketPublicationChannel,
+): Promise<number> {
+  await ensureMarketsMigrated();
+  const column = channel === 'scan' ? 'scan_publication_generation' : 'live_publication_generation';
+  const c = getClient();
+  const tx = await c.transaction('write');
+  try {
+    const updated = await tx.execute({
+      sql: `UPDATE saved_markets SET ${column} = ${column} + 1 WHERE id = ? RETURNING ${column}`,
+      args: [id],
+    });
+    if (!updated.rows[0]) throw new Error(`Saved market ${id} not found while reserving ${channel} publication`);
+    const generation = Number(updated.rows[0][column]);
+    await tx.commit();
+    return generation;
+  } catch (error) {
+    await tx.rollback().catch(() => {});
+    throw error;
+  }
+}
+
 export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<void> {
   // Targeted UPDATE — no read-modify-write of the whole list. This was the
   // main race: concurrent scans clobbering each other's lastScanResult.
   await ensureMarketsMigrated();
   const c = getClient();
-  // AUTO-002: track last time this market had matched outcomes (dead-market detection)
-  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
-  if (result.matchStatus === 'unavailable' || result.matchStatus === 'refreshing') return;
-  const serialized = JSON.stringify(result);
-  const freshnessGuard = `AND (
-    last_scan_result IS NULL OR
-    json_extract(last_scan_result, '$.scannedAt') IS NULL OR
-    ? >= json_extract(last_scan_result, '$.scannedAt')
-  )`;
-  if (expiryDate !== undefined) {
-    await c.execute({
-      sql: `UPDATE saved_markets SET last_scan_result = ?, expiry_date = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ? ${freshnessGuard}`,
-      args: [serialized, expiryDate ?? null, matchedNow, id, result.scannedAt],
+  const tx = await c.transaction('write');
+  try {
+    const current = await tx.execute({
+      sql: 'SELECT last_scan_result, scan_publication_generation FROM saved_markets WHERE id = ?', args: [id],
     });
-  invalidateMarketsCache();
-  } else {
-    await c.execute({
-      sql: `UPDATE saved_markets SET last_scan_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ? ${freshnessGuard}`,
-      args: [serialized, matchedNow, id, result.scannedAt],
+    if (!current.rows[0]) { await tx.rollback(); return; }
+    const previous = current.rows[0].last_scan_result
+      ? JSON.parse(String(current.rows[0].last_scan_result)) as LastScanResult
+      : null;
+    if (result.publicationGeneration != null
+      && result.publicationGeneration !== Number(current.rows[0].scan_publication_generation)) {
+      await tx.rollback();
+      return;
+    }
+    if (isStaleMatchPublication(previous, result)) {
+      await tx.rollback();
+      return;
+    }
+    const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan', tx);
+    if (!prepared) { await tx.rollback(); return; }
+    const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
+    await tx.execute({
+      sql: `UPDATE saved_markets SET last_scan_result = ?,
+              expiry_date = CASE WHEN ? THEN ? ELSE expiry_date END,
+              last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?`,
+      args: [JSON.stringify(prepared), expiryDate !== undefined ? 1 : 0, expiryDate ?? null, matchedNow, id],
     });
-  invalidateMarketsCache();
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback().catch(() => {});
+    throw error;
   }
+  invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
+}
+
+async function prepareCanonicalMatchResult(
+  incoming: LastScanResult,
+  previous: LastScanResult | null,
+  source: string,
+  executor: import('./coupling-store').CouplingExecutor,
+): Promise<LastScanResult | null> {
+  if (incoming.matchStatus === 'unavailable' || incoming.matchStatus === 'refreshing') {
+    return {
+      ...(previous ?? incoming),
+      matchStatus: incoming.matchStatus,
+      matchError: incoming.matchError,
+      scannedAt: incoming.scannedAt,
+      publicationGeneration: incoming.publicationGeneration,
+      matchedCount: previous?.matchedCount ?? incoming.matchedCount,
+      matchedPairs: previous?.matchedPairs ?? incoming.matchedPairs ?? [],
+      matchDependencies: previous?.matchDependencies,
+    };
+  }
+  const pairs = incoming.matchedPairs ?? [];
+  if (pairs.length === 0) {
+    // Legacy producers did not persist stable pair ids. Preserve their count;
+    // new producers that explicitly publish confirmed zero remain true zero.
+    return incoming.matchedCount > 0 && incoming.matchedPairs === undefined
+      ? incoming
+      : { ...incoming, matchedCount: 0, matchedPairs: [], matchDependencies: [] };
+  }
+  const store = await import('./coupling-store');
+  const dependencies = incoming.matchDependencies;
+  if (dependencies) {
+    if (dependencies.length !== pairs.length || !await store.areCouplingDependenciesEligible(dependencies, executor)) return null;
+  } else {
+    const captured = await store.captureCouplingDependenciesWithExecutor(pairs, source, executor);
+    if (captured.length !== pairs.length) return null;
+    return { ...incoming, matchedCount: pairs.length, matchedPairs: pairs, matchDependencies: captured };
+  }
+  return { ...incoming, matchedCount: pairs.length, matchedPairs: pairs, matchDependencies: dependencies };
+}
+
+let matchSummaryBackfillComplete = false;
+
+/** Idempotent restart/list reconciliation for legacy summaries that predate
+ * stable pair identities and coupling revisions. This never invents pairs:
+ * only already-persisted canonical pair ids are versioned. */
+export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
+  if (matchSummaryBackfillComplete) return 0;
+  await ensureMarketsMigrated();
+  const c = getClient();
+  const rows = await c.execute(`SELECT id, last_scan_result FROM saved_markets
+    WHERE archived = 0 AND last_scan_result IS NOT NULL
+      AND json_array_length(COALESCE(json_extract(last_scan_result, '$.matchedPairs'), '[]')) > 0
+      AND json_extract(last_scan_result, '$.matchDependencies') IS NULL`);
+  let reconciled = 0;
+  for (const row of rows.rows) {
+    let result: LastScanResult;
+    try { result = JSON.parse(String(row.last_scan_result)); } catch { continue; }
+    const before = JSON.stringify(result.matchDependencies ?? null);
+    await updateSavedMarketScanResult(String(row.id), result);
+    const updated = await getSavedMarketById(String(row.id));
+    if (JSON.stringify(updated?.lastScanResult?.matchDependencies ?? null) !== before) reconciled++;
+  }
+  matchSummaryBackfillComplete = true;
+  return reconciled;
 }
 
 export async function reconcileSavedMarketMatchSummary(
   id: string,
-  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'scannedAt'>,
+  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>,
 ): Promise<void> {
-  if (summary.matchStatus === 'unavailable' || summary.matchStatus === 'refreshing') return;
-  await ensureMarketsMigrated();
-  const c = getClient();
   const fallback: LastScanResult = {
     bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: summary.matchedCount,
-    matchedCount: summary.matchedCount, kalshiCount: 0, pmCount: 0,
-    scannedAt: summary.scannedAt, allArbs: [],
+    kalshiCount: 0, pmCount: 0, allArbs: [], ...summary,
   };
-  await c.execute({
-    sql: `UPDATE saved_markets SET last_scan_result = json_set(
-            COALESCE(last_scan_result, ?), '$.matchedCount', ?, '$.matchStatus', ?,
-            '$.matchError', ?, '$.matchedPairs', json(?), '$.scannedAt', ?
-          ), last_matched_at = CASE WHEN ? > 0 THEN ? ELSE last_matched_at END
-          WHERE id = ? AND (last_scan_result IS NULL OR
-            json_extract(last_scan_result, '$.scannedAt') IS NULL OR
-            ? >= json_extract(last_scan_result, '$.scannedAt'))`,
-    args: [JSON.stringify(fallback), summary.matchedCount, summary.matchStatus ?? null,
-      summary.matchError ?? null, JSON.stringify(summary.matchedPairs ?? []), summary.scannedAt,
-      summary.matchedCount, summary.scannedAt, id, summary.scannedAt],
-  });
-  invalidateMarketsCache();
-  mirrorMarketsToJsonThrottled();
+  await updateSavedMarketScanResult(id, fallback);
 }
 
 // WS-107: watcher-written real-time result ─────────────────────────
@@ -1329,11 +1455,36 @@ export const LIVE_RESULT_TTL_MS = parseLiveResultTtlMs(process.env.H2H_LIVE_RESU
 export async function updateSavedMarketLiveResult(id: string, result: LastScanResult): Promise<void> {
   await ensureMarketsMigrated();
   const c = getClient();
-  const matchedNow = (result?.matchedCount ?? 0) > 0 ? new Date().toISOString() : null;
-  await c.execute({
-    sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-    args: [JSON.stringify(result), matchedNow, id],
-  });
+  const tx = await c.transaction('write');
+  try {
+    const current = await tx.execute({
+      sql: 'SELECT live_result, live_publication_generation FROM saved_markets WHERE id = ?', args: [id],
+    });
+    if (!current.rows[0]) { await tx.rollback(); return; }
+    const previous = current.rows[0].live_result
+      ? JSON.parse(String(current.rows[0].live_result)) as LastScanResult
+      : null;
+    if (result.publicationGeneration != null
+      && result.publicationGeneration !== Number(current.rows[0].live_publication_generation)) {
+      await tx.rollback();
+      return;
+    }
+    if (isStaleMatchPublication(previous, result)) {
+      await tx.rollback();
+      return;
+    }
+    const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_live', tx);
+    if (!prepared) { await tx.rollback(); return; }
+    const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
+    await tx.execute({
+      sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
+      args: [JSON.stringify(prepared), matchedNow, id],
+    });
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback().catch(() => {});
+    throw error;
+  }
   invalidateMarketsCache();
 }
 

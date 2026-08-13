@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { getSavedMarkets, updateSavedMarketScanResult } from '@/lib/persistence';
+import { getSavedMarkets, reconcileSavedMarketMatchSummary, reserveSavedMarketPublication, updateSavedMarketScanResult } from '@/lib/persistence';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket } from '@/app/api/saved-markets/refresh/refresh-single';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
@@ -93,11 +93,31 @@ export async function runRefreshJob(marketIds?: string[]) {
       newState.currentMarketId = market.id;
       newState.currentMarketTitle = market.eventTitle;
 
+      let publicationGeneration: number | null = null;
       try {
+        publicationGeneration = await reserveSavedMarketPublication(market.id, 'scan');
+        await reconcileSavedMarketMatchSummary(market.id, {
+          matchedCount: 0,
+          matchStatus: 'refreshing',
+          matchError: undefined,
+          matchedPairs: undefined,
+          scannedAt: new Date().toISOString(),
+          publicationGeneration,
+        });
         const result = await refreshSingleMarket(market, manualMatches);
         // A timed-out worker may finish its in-flight network request later.
         // Do not persist that stale result or claim another market.
-        if (cancelled) return;
+        if (cancelled) {
+          await reconcileSavedMarketMatchSummary(market.id, {
+            matchedCount: 0,
+            matchStatus: 'unavailable',
+            matchError: 'Scheduled refresh timed out',
+            matchedPairs: undefined,
+            scannedAt: new Date().toISOString(),
+            publicationGeneration,
+          }).catch(() => {});
+          return;
+        }
         const scanResult = {
           bestRoiPct: result.bestRoiPct,
           bestProfit: result.bestProfit,
@@ -115,14 +135,25 @@ export async function runRefreshJob(marketIds?: string[]) {
           allArbs: result.allArbs,
           expiryDate: result.expiryDate,
           category: market.category,
+          publicationGeneration,
         };
         await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
         await persistAndConsumeBotScan(market.id, scanResult, 'scheduled');
         newState.succeeded++;
       } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        if (publicationGeneration != null) {
+          await reconcileSavedMarketMatchSummary(market.id, {
+            matchedCount: 0,
+            matchStatus: 'unavailable',
+            matchError: cancelled ? 'Scheduled refresh timed out' : message,
+            matchedPairs: undefined,
+            scannedAt: new Date().toISOString(),
+            publicationGeneration,
+          }).catch(() => {});
+        }
         if (cancelled) return;
         newState.failed++;
-        const message = e instanceof Error ? e.message : 'Unknown error';
         newState.errors.push({ id: market.id, title: market.eventTitle, error: message });
         console.error(`[refresh-job] failed ${market.eventTitle}:`, message);
       }

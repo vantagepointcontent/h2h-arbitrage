@@ -35,7 +35,7 @@ interface LogEntry {
   positive_arb_count: number;
   total_stake: number;
   scanned_at: string;
-  raw_result: string | null;
+
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
   category?: string | null;      // resolved from saved_markets (UI-015)
@@ -98,9 +98,11 @@ export default function LogsPanel() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{ totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } } | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const requestGeneration = useRef(0);
   const loadingMoreGeneration = useRef<number | null>(null);
+  const lastRequestedCursor = useRef<string | null>(null);
+  const lastLoadScrollTop = useRef(-1);
+  const tableScrollerRef = useRef<HTMLDivElement | null>(null);
 
   // UI-034: unique markets count from SQL COUNT(DISTINCT market_id)
   const [uniqueMarkets, setUniqueMarkets] = useState<number | null>(null);
@@ -114,19 +116,25 @@ export default function LogsPanel() {
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
-  const updateSearchQuery = useCallback((value: string) => {
-    // Invalidate an in-flight append in the input event, before debounce starts
-    // the replacement query. This also clears the visible append state without
-    // a synchronous state update inside an effect.
+  const invalidatePagination = useCallback(() => {
     requestGeneration.current += 1;
     loadingMoreGeneration.current = null;
+    lastRequestedCursor.current = null;
+    lastLoadScrollTop.current = -1;
     setLoadingMore(false);
-    setSearchQuery(value);
+    setLoadMoreError("");
+    setTableScrollTop(0);
+    if (tableScrollerRef.current) tableScrollerRef.current.scrollTop = 0;
   }, []);
+
+  const updateSearchQuery = useCallback((value: string) => {
+    invalidatePagination();
+    setSearchQuery(value);
+  }, [invalidatePagination]);
 
   const buildParams = useCallback((before?: string) => {
     const params = new URLSearchParams();
-    params.set("limit", "250");
+    params.set("limit", before ? "500" : "250");
     if (before) params.set("before", before);
     if (minRoi) params.set("minRoi", minRoi);
     if (positiveArbOnly) params.set("positiveArbOnly", "true");
@@ -141,6 +149,10 @@ export default function LogsPanel() {
   const fetchLogs = useCallback(async () => {
     const generation = ++requestGeneration.current;
     loadingMoreGeneration.current = null;
+    lastRequestedCursor.current = null;
+    lastLoadScrollTop.current = -1;
+    setTableScrollTop(0);
+    if (tableScrollerRef.current) tableScrollerRef.current.scrollTop = 0;
     setLoadingMore(false);
     setLoading(true);
     setError("");
@@ -169,8 +181,9 @@ export default function LogsPanel() {
   }, [buildParams]);
 
   const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMoreGeneration.current !== null) return;
+    if (!nextCursor || loadingMoreGeneration.current !== null || lastRequestedCursor.current === nextCursor) return;
     const generation = requestGeneration.current;
+    lastRequestedCursor.current = nextCursor;
     loadingMoreGeneration.current = generation;
     setLoadingMore(true);
     setLoadMoreError("");
@@ -181,7 +194,7 @@ export default function LogsPanel() {
       if (generation !== requestGeneration.current) return;
       if (res.ok === false) throw new Error(data.error || "Failed to load more logs");
       if (data.error) {
-        setLoadMoreError(data.error);
+        throw new Error(data.error);
       } else {
         setLogs(prev => {
           const ids = new Set(prev.map((row) => row.id));
@@ -191,7 +204,10 @@ export default function LogsPanel() {
         });
       }
     } catch (e: unknown) {
-      if (generation === requestGeneration.current) setLoadMoreError((e instanceof Error ? e.message : String(e)) || "Failed to load more logs");
+      if (generation === requestGeneration.current) {
+        lastRequestedCursor.current = null;
+        setLoadMoreError((e instanceof Error ? e.message : String(e)) || "Failed to load more logs");
+      }
     } finally {
       if (loadingMoreGeneration.current === generation) {
         loadingMoreGeneration.current = null;
@@ -205,15 +221,6 @@ export default function LogsPanel() {
     void run();
   }, [fetchLogs]);
 
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !nextCursor || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void loadMore();
-    }, { rootMargin: "600px 0px" });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loadMore, nextCursor]);
 
   // Auto-refresh: poll every 15s for real-time log streaming
   useEffect(() => {
@@ -348,9 +355,10 @@ export default function LogsPanel() {
         to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
     }
+    invalidatePagination();
     setFromDate(from.toISOString());
     setToDate(to.toISOString());
-  }, []);
+  }, [invalidatePagination]);
 
 
   const exportEstimateText = useMemo(() => {
@@ -486,12 +494,13 @@ export default function LogsPanel() {
 
           {/* Min ROI */}
           <div>
-            <label className="block text-[10px] text-[#8A9BA8] mb-1">Min ROI %</label>
+            <label htmlFor="logs-min-roi" className="block text-[10px] text-[#8A9BA8] mb-1">Min ROI %</label>
             <input
+              id="logs-min-roi"
               type="number"
               step="0.1"
               value={minRoi}
-              onChange={(e) => setMinRoi(e.target.value)}
+              onChange={(e) => { invalidatePagination(); setMinRoi(e.target.value); }}
               placeholder="0"
               className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] placeholder-[#8A9BA8] focus:outline-none focus:border-[#5DBE81]"
             />
@@ -499,22 +508,24 @@ export default function LogsPanel() {
 
           {/* From Date */}
           <div>
-            <label className="block text-[10px] text-[#8A9BA8] mb-1">From Date</label>
+            <label htmlFor="logs-from-date" className="block text-[10px] text-[#8A9BA8] mb-1">From Date</label>
             <input
+              id="logs-from-date"
               type="datetime-local"
               value={fromDate.slice(0, 16)}
-              onChange={(e) => setFromDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
+              onChange={(e) => { invalidatePagination(); setFromDate(e.target.value ? new Date(e.target.value).toISOString() : ""); }}
               className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
 
           {/* To Date */}
           <div>
-            <label className="block text-[10px] text-[#8A9BA8] mb-1">To Date</label>
+            <label htmlFor="logs-to-date" className="block text-[10px] text-[#8A9BA8] mb-1">To Date</label>
             <input
+              id="logs-to-date"
               type="datetime-local"
               value={toDate.slice(0, 16)}
-              onChange={(e) => setToDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
+              onChange={(e) => { invalidatePagination(); setToDate(e.target.value ? new Date(e.target.value).toISOString() : ""); }}
               className="w-full px-3 py-2 rounded-lg bg-[#0E1621] border border-[#182533] text-sm text-[#FFFFFF] focus:outline-none focus:border-[#5DBE81]"
             />
           </div>
@@ -548,7 +559,7 @@ export default function LogsPanel() {
             <input
               type="checkbox"
               checked={positiveArbOnly}
-              onChange={(e) => setPositiveArbOnly(e.target.checked)}
+              onChange={(e) => { invalidatePagination(); setPositiveArbOnly(e.target.checked); }}
               className="w-4 h-4 accent-[#5DBE81] rounded"
             />
             <span className="text-xs text-[#8A9BA8]">Positive arb only</span>
@@ -560,7 +571,7 @@ export default function LogsPanel() {
               {EVENT_TYPE_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
-                  onClick={() => setEventType(opt.key)}
+                  onClick={() => { invalidatePagination(); setEventType(opt.key); }}
                   className={`min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                     eventType === opt.key
                       ? "bg-[#5DBE81]/20 text-[#5DBE81]"
@@ -579,7 +590,7 @@ export default function LogsPanel() {
               {ARB_TYPE_FILTER_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
-                  onClick={() => setArbTypeFilter(opt.key)}
+                  onClick={() => { invalidatePagination(); setArbTypeFilter(opt.key); }}
                   className={`min-h-11 px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                     arbTypeFilter === opt.key
                       ? opt.key === "direct"
@@ -622,9 +633,20 @@ export default function LogsPanel() {
           </div>
         ) : (
           <div
+            ref={tableScrollerRef}
             className="max-h-[70vh] overflow-x-auto overflow-y-auto"
             data-testid="logs-table-scroll"
-            onScroll={(event) => setTableScrollTop(event.currentTarget.scrollTop)}
+            onScroll={(event) => {
+              const scroller = event.currentTarget;
+              setTableScrollTop(scroller.scrollTop);
+              if (
+                scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 600
+                && scroller.scrollTop > lastLoadScrollTop.current
+              ) {
+                lastLoadScrollTop.current = scroller.scrollTop;
+                void loadMore();
+              }
+            }}
           >
             <table className="w-full min-w-[1050px] text-sm">
               <thead>
@@ -711,7 +733,7 @@ export default function LogsPanel() {
           <div className="text-xs text-[#A8B8C4]">
             Loaded {sorted.length.toLocaleString()} of {total.toLocaleString()} entries
           </div>
-          <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
+
           {loadingMore && <div className="text-xs text-[#8A9BA8]">Loading more results…</div>}
           {loadMoreError && (
             <div className="flex items-center gap-2 text-xs text-[#ef4444]">
@@ -771,6 +793,43 @@ function LogRow({
   const apy = logApyPct(log);
   // Kept at row scope so collapsing does not discard the brief lazy-fetch cache.
   const [comparisonCache] = useState<ComparisonCache>(() => new Map());
+  const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [detailRawResult, setDetailRawResult] = useState<string | null>(null);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const detailRequestController = useRef<AbortController | null>(null);
+  const detailRequestGeneration = useRef(0);
+
+  useEffect(() => () => {
+    detailRequestGeneration.current += 1;
+    detailRequestController.current?.abort();
+    detailRequestController.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!expanded || detailState !== 'idle' || detailRequestController.current) return;
+    const generation = detailRequestGeneration.current + 1;
+    detailRequestGeneration.current = generation;
+    const controller = new AbortController();
+    detailRequestController.current = controller;
+    setDetailState('loading');
+    void fetch(`/api/logs/${log.id}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load scan details');
+        if (detailRequestGeneration.current === generation) {
+          setDetailRawResult(typeof data.raw_result === 'string' ? data.raw_result : null);
+          setDetailState('ready');
+        }
+      })
+      .catch((error: unknown) => {
+        if (detailRequestGeneration.current === generation && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setDetailState('error');
+        }
+      })
+      .finally(() => {
+        if (detailRequestGeneration.current === generation) detailRequestController.current = null;
+      });
+  }, [detailAttempt, detailState, expanded, log.id]);
 
   const savedMarket = savedMarkets.get(log.market_id);
   const marketName = log.market_name ?? log.market_title ?? savedMarket?.title;
@@ -789,11 +848,11 @@ function LogRow({
     window.location.href = `/?view=scan&id=${encodeURIComponent(log.market_id)}`;
   };
 
-  // Parse raw_result for expanded view
+  // Parse the lazily loaded raw_result for expanded view.
   let rawArbs: unknown[] = [];
-  if (expanded && log.raw_result) {
+  if (expanded && detailRawResult) {
     try {
-      const parsed = JSON.parse(log.raw_result) as { allArbs?: unknown[]; arbs?: unknown[] } | null;
+      const parsed = JSON.parse(detailRawResult) as { allArbs?: unknown[]; arbs?: unknown[] } | null;
       rawArbs = parsed?.allArbs ?? parsed?.arbs ?? [];
     } catch {
       // ignore
@@ -856,7 +915,23 @@ function LogRow({
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
           <td colSpan={14} className="px-4 py-3">
-            {rawArbs.length > 0 ? (
+            {detailState === 'loading' || detailState === 'idle' ? (
+              <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
+            ) : detailState === 'error' ? (
+              <div className="flex items-center gap-3 text-xs text-[#ef4444]" role="alert">
+                <span>Unable to load scan details.</span>
+                <button
+                  type="button"
+                  aria-label="Retry scan details"
+                  className="rounded border border-[#ef4444]/40 px-2 py-1 text-[#FFFFFF] hover:bg-[#ef4444]/10"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setDetailState('idle');
+                    setDetailAttempt((attempt) => attempt + 1);
+                  }}
+                >Retry</button>
+              </div>
+            ) : rawArbs.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

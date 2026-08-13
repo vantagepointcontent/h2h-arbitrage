@@ -466,11 +466,26 @@ export function getCanonicalMatchState(market: SavedMarket): {
   count: number;
   error?: string;
 } {
-  const scan = market.liveResult ?? market.lastScanResult;
+  const liveScannedAt = Date.parse(market.liveResult?.scannedAt ?? '');
+  const persistedScannedAt = Date.parse(market.lastScanResult?.scannedAt ?? '');
+  const liveIsCurrent = market.liveResult != null && (
+    !Number.isFinite(persistedScannedAt) ||
+    (Number.isFinite(liveScannedAt) && liveScannedAt >= persistedScannedAt)
+  );
+  const scan = liveIsCurrent ? market.liveResult : market.lastScanResult;
   if (!scan || !scan.scannedAt || scan.strategy === 'Not scanned') {
     return { status: 'not_scanned', count: 0 };
   }
-  const count = scan.matchedPairs?.length ?? scan.matchedCount ?? 0;
+  const pairCount = scan.matchedPairs?.length;
+  const scanCount = pairCount != null && pairCount > 0
+    ? pairCount
+    : scan.matchStatus === 'confirmed_zero'
+      ? 0
+      : scan.matchedCount ?? 0;
+  const retainedCount = scan.matchStatus === 'unavailable' || scan.matchStatus === 'refreshing'
+    ? Math.max(scanCount, market.lastScanResult?.matchedCount ?? 0)
+    : scanCount;
+  const count = retainedCount;
   const status = scan.matchStatus ?? (count > 0 ? 'matched' : 'confirmed_zero');
   return { status, count, error: scan.matchError };
 }
@@ -479,8 +494,46 @@ export function formatCanonicalMatchState(market: SavedMarket): string {
   const state = getCanonicalMatchState(market);
   if (state.status === 'not_scanned') return 'Not scanned';
   if (state.status === 'refreshing') return state.count > 0 ? `${state.count} matched · Refreshing` : 'Refreshing';
-  if (state.status === 'unavailable') return `Unavailable${state.error ? `: ${state.error}` : ''}`;
+  if (state.status === 'unavailable') {
+    const unavailable = `Unavailable${state.error ? `: ${state.error}` : ''}`;
+    return state.count > 0 ? `${state.count} matched · ${unavailable}` : unavailable;
+  }
   return `${state.count} matched`;
+}
+
+type SavedMarketMatchRefresh = Pick<LastScanResult,
+  'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'scannedAt'>;
+
+/** Preserve the last authoritative pair set while exposing refresh/error state. */
+export function mergeSavedMarketMatchRefresh(
+  market: SavedMarket,
+  refresh: SavedMarketMatchRefresh,
+): SavedMarket {
+  const previous = market.lastScanResult;
+  const retainConfirmed = refresh.matchStatus === 'unavailable' || refresh.matchStatus === 'refreshing';
+  return {
+    ...market,
+    lastScanResult: {
+      ...(previous ?? {
+        bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 0,
+        kalshiCount: 0, pmCount: 0, allArbs: [],
+      }),
+      scannedAt: retainConfirmed ? previous?.scannedAt ?? refresh.scannedAt : refresh.scannedAt,
+      matchedCount: retainConfirmed ? previous?.matchedCount ?? 0 : refresh.matchedCount,
+      matchStatus: refresh.matchStatus,
+      matchError: refresh.matchError,
+      matchedPairs: retainConfirmed ? previous?.matchedPairs ?? [] : refresh.matchedPairs ?? [],
+    },
+  };
+}
+
+export function markSavedMarketMatchRefreshing(market: SavedMarket): SavedMarket {
+  return mergeSavedMarketMatchRefresh(market, {
+    matchedCount: market.lastScanResult?.matchedCount ?? 0,
+    matchStatus: 'refreshing',
+    matchedPairs: market.lastScanResult?.matchedPairs ?? [],
+    scannedAt: market.lastScanResult?.scannedAt ?? null,
+  });
 }
 
 /** BUG-05b: Check if prices are at resolution extremes (one side >=99%, other <=1%).

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   writeFile: vi.fn(),
   getSavedMarkets: vi.fn(),
   updateSavedMarketScanResult: vi.fn(),
+  reconcileSavedMarketMatchSummary: vi.fn(),
+  reserveSavedMarketPublication: vi.fn(),
   getManualMatches: vi.fn(),
   refreshSingleMarket: vi.fn(),
   persistAndConsumeBotScan: vi.fn(),
@@ -14,6 +16,8 @@ vi.mock('fs', () => ({ promises: { readFile: mocks.readFile, writeFile: mocks.wr
 vi.mock('@/lib/persistence', () => ({
   getSavedMarkets: mocks.getSavedMarkets,
   updateSavedMarketScanResult: mocks.updateSavedMarketScanResult,
+  reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
+  reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
 }));
 vi.mock('@/lib/manual-matches', () => ({ getManualMatches: mocks.getManualMatches }));
 vi.mock('@/app/api/saved-markets/refresh/refresh-single', () => ({
@@ -37,6 +41,8 @@ beforeEach(() => {
   mocks.getSavedMarkets.mockResolvedValue(markets);
   mocks.getManualMatches.mockResolvedValue([]);
   mocks.updateSavedMarketScanResult.mockResolvedValue(undefined);
+  mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
+  mocks.reserveSavedMarketPublication.mockResolvedValue(11);
   mocks.persistAndConsumeBotScan.mockResolvedValue({ id: 1, decision: null, backlogProcessed: 0 });
 });
 
@@ -63,11 +69,43 @@ describe('refresh job timeout cancellation', () => {
 
     await runRefreshJob();
 
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(1, 'one', {
+      matchedCount: 0,
+      matchStatus: 'refreshing',
+      matchError: undefined,
+      matchedPairs: undefined,
+      scannedAt: expect.any(String),
+      publicationGeneration: 11,
+    });
     expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
       'one',
       expect.objectContaining({ positiveArbCount: 1 }),
       'scheduled',
     );
+    expect(mocks.updateSavedMarketScanResult).toHaveBeenCalledWith(
+      'one',
+      expect.objectContaining({ publicationGeneration: 11 }),
+      null,
+    );
+  });
+
+  it('persists unavailable state and reason after a scheduled refresh failure', async () => {
+    mocks.getSavedMarkets.mockResolvedValue([markets[0]]);
+    mocks.refreshSingleMarket.mockRejectedValue(new Error('Polymarket timed out'));
+
+    await runRefreshJob();
+
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(1, 'one',
+      expect.objectContaining({ matchStatus: 'refreshing', publicationGeneration: 11 }));
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(2, 'one', {
+      matchedCount: 0,
+      matchStatus: 'unavailable',
+      matchError: 'Polymarket timed out',
+      matchedPairs: undefined,
+      scannedAt: expect.any(String),
+      publicationGeneration: 11,
+    });
+    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
   });
 
   it('recovers a persisted running state left behind by a stopped process', async () => {
@@ -120,6 +158,14 @@ describe('refresh job timeout cancellation', () => {
 
     expect(mocks.refreshSingleMarket).toHaveBeenCalledTimes(1);
     expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('one', {
+      matchedCount: 0,
+      matchStatus: 'unavailable',
+      matchError: 'Scheduled refresh timed out',
+      matchedPairs: undefined,
+      scannedAt: expect.any(String),
+      publicationGeneration: 11,
+    });
     const finalState = JSON.parse(mocks.writeFile.mock.calls.at(-1)![1]);
     expect(finalState.running).toBe(false);
     expect(finalState.errors).toEqual(expect.arrayContaining([

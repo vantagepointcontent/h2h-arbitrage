@@ -5,6 +5,7 @@ export interface ManualMatchInput {
   pmTitle: string;
   kalshiUrl?: string;
   polymarketUrl?: string;
+  marketId?: string;
 }
 
 function requiredString(value: unknown, name: string): string | null {
@@ -30,6 +31,7 @@ export function parseManualMatchInput(body: Record<string, unknown>): ManualMatc
       pmTitle: typeof body.pmTitle === 'string' ? body.pmTitle.trim() : '',
       kalshiUrl: optionalString(body.kalshiUrl, 'kalshiUrl'),
       polymarketUrl: optionalString(body.polymarketUrl, 'polymarketUrl'),
+      marketId: optionalString(body.marketId, 'marketId'),
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Invalid manual match input' };
