@@ -3,7 +3,9 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   upstream: vi.fn(),
+  calculateAllArbitrages: vi.fn(() => []),
   findSavedMarketByUrls: vi.fn(),
+  persistAndConsumeBotScan: vi.fn(async () => undefined),
   reserveSavedMarketPublication: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
 }));
@@ -32,7 +34,7 @@ vi.mock('@/lib/polymarket-clob', () => ({
 vi.mock('@/lib/matcher', () => ({
   buildKalshiArbShape: vi.fn(),
   matchOutcomes: () => [],
-  calculateAllArbitrages: () => [],
+  calculateAllArbitrages: mocks.calculateAllArbitrages,
   parseDepth: vi.fn(),
   computeApy: () => 0,
   applyManualMatches: (outcomes: unknown[]) => outcomes,
@@ -51,7 +53,7 @@ vi.mock('@/lib/persistence', () => ({
   updateSavedMarketScanResult: vi.fn(async () => undefined),
   appendScanHistory: vi.fn(async () => undefined),
 }));
-vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: vi.fn(async () => undefined) }));
+vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
 vi.mock('@/lib/arb-lifecycle', () => ({ recordArbObservations: vi.fn(async () => ({ opened: 0, extended: 0, closed: 0 })) }));
 vi.mock('@/lib/telegram-alerts', () => ({ sendBatchAlerts: vi.fn(async () => undefined) }));
 vi.mock('@/lib/scan-shared', () => ({
@@ -142,6 +144,52 @@ describe('POST /api/scan saved-market lifecycle', () => {
     expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith(
       'tx-07',
       expect.objectContaining({ matchStatus: 'unavailable', publicationGeneration: 41 }),
+    );
+  });
+
+  it('persists requested scan capital separately from aggregate candidate stake', async () => {
+    mocks.upstream.mockResolvedValue([]);
+    mocks.calculateAllArbitrages.mockReturnValue([
+      {
+        artist: 'Candidate A',
+        kalshi: { ticker: 'KXTX07-A', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 500, noAskDepth: 500 },
+        polymarket: { conditionId: 'pm-a', yesPrice: 0.42, noPrice: 0.58, askDepth: 500, noAskDepth: 500 },
+        arbitrage: {
+          roiPct: 2,
+          expectedProfit: 2,
+          strategy: 'Buy YES Kalshi + NO PM',
+          arbType: 'direct',
+          kalshiStake: 60,
+          pmStake: 40,
+          fees: { kalshiFee: 0.5, pmFee: 0.5 },
+        },
+      },
+      {
+        artist: 'Candidate B',
+        kalshi: { ticker: 'KXTX07-B', yesAsk: 0.45, noAsk: 0.55, yesAskDepth: 500, noAskDepth: 500 },
+        polymarket: { conditionId: 'pm-b', yesPrice: 0.47, noPrice: 0.53, askDepth: 500, noAskDepth: 500 },
+        arbitrage: {
+          roiPct: 1,
+          expectedProfit: 1,
+          strategy: 'Buy YES Kalshi + NO PM',
+          arbType: 'direct',
+          kalshiStake: 55,
+          pmStake: 45,
+          fees: { kalshiFee: 0.5, pmFee: 0.5 },
+        },
+      },
+    ]);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
+      'tx-07',
+      expect.objectContaining({
+        totalStake: 200,
+        raw: expect.objectContaining({ scanCapital: 1000 }),
+      }),
+      'scan_api',
     );
   });
 });
