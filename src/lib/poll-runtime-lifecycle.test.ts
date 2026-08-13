@@ -13,13 +13,17 @@ describe('BUG-140 production poller lifecycle evidence', () => {
     });
     const report = JSON.parse(stdout);
 
-    expect(report.processRuns).toBe(2);
+    expect(report.processRuns).toBe(7);
     expect(report.restartRecovery).toMatchObject({
       productionPollerSpawnedTwice: true,
       schedulerFileSurvived: true,
       breakerFileSurvived: true,
       staleManualSuccessCooldownRestored: false,
       duplicateConcurrentScans: false,
+      overlappingProcessLifetimes: true,
+      abandonedOwnerKilled: true,
+      liveLeaseFencedSuccessor: true,
+      abandonedLeaseReclaimed: true,
     });
     expect(report.restartRecovery.maxObservedConcurrency).toBeGreaterThan(1);
     expect(report.fairness.laterFinalEntryCompletedEveryCycle).toBe(true);

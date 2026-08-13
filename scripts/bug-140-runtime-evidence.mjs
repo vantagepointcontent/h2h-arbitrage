@@ -28,6 +28,7 @@ const attempts = new Map();
 const active = new Set();
 let maxConcurrency = 0;
 let duplicateConcurrentScans = false;
+let abandonedWorkerMode = false;
 const server = http.createServer((request, response) => {
   if (request.url === '/api/settings') return void response.end(JSON.stringify({ settings: [] }));
   if (request.url !== '/api/scan?skipManual=1') return void response.end('{}');
@@ -49,6 +50,7 @@ const server = http.createServer((request, response) => {
       response.end(JSON.stringify(result));
     };
     if (id === '0') return void finish(503, { error: 'injected repeated platform failure' });
+    if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 1_000);
     if (id === '1' && count === 1) return void setTimeout(() => finish(200, { fullScanPersisted: true }), 5_500);
     setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 20);
   });
@@ -64,6 +66,29 @@ function runPoller(env) {
     child.on('error', reject);
     child.on('exit', code => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`poller exited ${code}: ${stderr}`)));
   });
+}
+
+function startPoller(env) {
+  const child = spawn(process.execPath, ['scripts/poll.mjs'], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const completed = new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('exit', (code, signal) => code === 0
+      ? resolve({ stdout, stderr, signal })
+      : reject(new Error(`poller exited ${code ?? signal}: ${stderr}`)));
+  });
+  return { child, completed };
+}
+
+async function waitFor(predicate, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error('Timed out waiting for runtime evidence condition');
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
 }
 
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -90,11 +115,13 @@ const env = {
   H2H_POLLER_RUN_ONCE: '1',
   H2H_POLL_CONCURRENCY: '4',
   H2H_SCAN_TIMEOUT_MS: '5000',
+  H2H_SCAN_LEASE_GRACE_MS: '100',
   H2H_SAVED_MARKET_FRESHNESS_SLA_MS: String(SLA_MS),
   H2H_SAVED_MARKETS_FILE: files.saved,
   H2H_SAVED_MARKET_SCHEDULER_FILE: files.scheduler,
   H2H_POLLER_BREAKER_FILE: files.breaker,
   H2H_POLLER_HEALTH_FILE: files.health,
+  H2H_SAVED_MARKET_LEASE_DIRECTORY: path.join(dir, 'leases'),
 };
 
 try {
@@ -134,6 +161,54 @@ try {
   assert.equal(afterRestartBreaker[manualMarket.id]?.cooldownUntil ?? 0, 0);
   assert.equal(duplicateConcurrentScans, false);
 
+  // Exercise an actual rolling restart with both production pollers alive.
+  abandonedWorkerMode = true;
+  const overlapMarket = markets[23];
+  const overlapState = {
+    [overlapMarket.id]: {
+      lastAttemptAt: null, lastSuccessAt: null, nextDueAt: new Date(Date.now() - 1_000).toISOString(),
+      inProgress: false, failureReason: null, retryCount: 0, freshnessSlaMs: SLA_MS,
+    },
+  };
+  await rm(env.H2H_SAVED_MARKET_LEASE_DIRECTORY, { recursive: true, force: true });
+  await writeFile(files.saved, JSON.stringify([overlapMarket]));
+  await writeFile(files.scheduler, JSON.stringify(overlapState));
+  const beforeOverlapRequests = attempts.get('23') || 0;
+  const overlapOwner = startPoller(env);
+  await waitFor(() => active.has('23'));
+  const rollingPeer = startPoller(env);
+  const rolling = await rollingPeer.completed;
+  await overlapOwner.completed;
+  assert.equal(attempts.get('23') || 0, beforeOverlapRequests + 1, 'rolling restart must not duplicate same-market request');
+  assert.equal(duplicateConcurrentScans, false);
+
+  // Kill a production poller with a request in flight. A successor launched
+  // during the live lease must skip it; after bounded expiry another successor
+  // reclaims and completes the abandoned market.
+  const reclaimMarket = markets[23];
+  const reclaimScheduler = {
+    [reclaimMarket.id]: {
+      lastAttemptAt: null, lastSuccessAt: null, nextDueAt: new Date(Date.now() - 1_000).toISOString(),
+      inProgress: false, failureReason: null, retryCount: 0, freshnessSlaMs: SLA_MS,
+    },
+  };
+  await rm(env.H2H_SAVED_MARKET_LEASE_DIRECTORY, { recursive: true, force: true });
+  await writeFile(files.saved, JSON.stringify([reclaimMarket]));
+  await writeFile(files.scheduler, JSON.stringify(reclaimScheduler));
+  const beforeReclaimRequests = attempts.get('23') || 0;
+  const abandonedRun = startPoller(env);
+  await waitFor(() => active.has('23'));
+  abandonedRun.child.kill('SIGKILL');
+  await abandonedRun.completed.catch(() => null);
+  const fencedSuccessor = await runPoller(env);
+  assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 1, 'live abandoned lease must fence successor');
+  await waitFor(() => !active.has('23'));
+  await new Promise(resolve => setTimeout(resolve, 4_200));
+  const reclaimedRun = await runPoller(env);
+  const afterReclaimScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
+  assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 2, 'expired lease must be reclaimed');
+  assert(afterReclaimScheduler['market-23'].lastSuccessAt, 'reclaimed market must complete successfully');
+
   for (const { id, payload } of requests) {
     assert.deepEqual(Object.keys(payload).sort(), ['kalshiUrl', 'polymarketUrl']);
     assert.equal(payload.kalshiUrl, `https://kalshi.example/events/${id}`);
@@ -142,7 +217,7 @@ try {
 
   process.stdout.write(`${JSON.stringify({
     candidate: 'BUG-140 production poller lifecycle',
-    processRuns: 2,
+    processRuns: 7,
     marketCount: markets.length,
     freshnessSlaMs: SLA_MS,
     cycles: [firstHealth.queue, secondHealth.queue],
@@ -152,11 +227,15 @@ try {
     ],
     restartRecovery: {
       productionPollerSpawnedTwice: true,
+      overlappingProcessLifetimes: true,
       schedulerFileSurvived: Boolean(afterRestartScheduler['market-02']),
       breakerFileSurvived: true,
       staleManualSuccessCooldownRestored: false,
       duplicateConcurrentScans,
       maxObservedConcurrency: maxConcurrency,
+      abandonedOwnerKilled: true,
+      liveLeaseFencedSuccessor: Boolean(fencedSuccessor.stdout),
+      abandonedLeaseReclaimed: Boolean(reclaimedRun.stdout && afterReclaimScheduler['market-23'].lastSuccessAt),
     },
     requestScope: {
       capturedRequestCount: requests.length,
@@ -169,7 +248,7 @@ try {
       timeoutMarket: 'market-01',
       laterFinalEntryCompletedEveryCycle: true,
     },
-    childOutputCaptured: Boolean(first.stdout && second.stdout),
+    childOutputCaptured: Boolean(first.stdout && rolling.stdout && second.stdout),
   }, null, 2)}\n`);
 } finally {
   server.closeAllConnections();

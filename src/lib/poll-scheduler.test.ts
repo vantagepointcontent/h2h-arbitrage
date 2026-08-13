@@ -9,6 +9,10 @@ import {
   selectDueMarkets,
   schedulerMetrics,
 } from '../../scripts/poll-scheduler.mjs';
+import { acquireMarketLease } from '../../scripts/poll-lease.mjs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 type Market = { id: string; kalshiUrl: string; polymarketUrl: string; eventTitle: string; lastScanResult?: { scannedAt?: string | null; matchStatus?: string } | null };
 
@@ -21,6 +25,21 @@ const market = (id: string, scannedAt: string | null = null): Market => ({
 });
 
 describe('saved-market fair scheduler', () => {
+  it('fences a live owner and reclaims its abandoned lease after expiry', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-test-'));
+    try {
+      const first = await acquireMarketLease(directory, 'market/a', 'owner-1', 80);
+      expect(first).not.toBeNull();
+      expect(await acquireMarketLease(directory, 'market/a', 'owner-2', 80)).toBeNull();
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const recovered = await acquireMarketLease(directory, 'market/a', 'owner-2', 80);
+      expect(recovered).not.toBeNull();
+      expect(recovered?.ownerId).toBe('owner-2');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
   it('bounds invalid numeric environment configuration', () => {
     expect(parseBoundedNumber('NaN', 5, 1, 20)).toBe(5);
     expect(parseBoundedNumber('0', 5, 1, 20)).toBe(5);
@@ -41,16 +60,20 @@ describe('saved-market fair scheduler', () => {
     expect(selectDueMarkets(markets, state, now + 2_000, 2).map(m => m.id)).toEqual(['c', 'd']);
   });
 
-  it('recovers in-progress work immediately after worker restart', () => {
+  it('keeps leased work fenced and recovers it after the bounded lease expires', () => {
     const now = Date.parse('2026-08-13T20:00:00Z');
     const persisted = {
-      a: { lastAttemptAt: new Date(now - 5_000).toISOString(), lastSuccessAt: null, nextDueAt: new Date(now + 60_000).toISOString(), inProgress: true, failureReason: null, retryCount: 0 },
+      a: { lastAttemptAt: new Date(now - 5_000).toISOString(), lastSuccessAt: null, nextDueAt: new Date(now + 60_000).toISOString(), inProgress: true, leaseOwnerId: 'owner-1', leaseExpiresAt: new Date(now + 10_000).toISOString(), failureReason: null, retryCount: 0 },
     };
     const state = buildSchedulerState([market('a')], persisted, now, 60_000);
 
-    expect(state.a.inProgress).toBe(false);
-    expect(state.a.failureReason).toContain('worker restarted');
-    expect(selectDueMarkets([market('a')], state, now, 1).map(m => m.id)).toEqual(['a']);
+    expect(state.a.inProgress).toBe(true);
+    expect(selectDueMarkets([market('a')], state, now, 1)).toEqual([]);
+
+    const recovered = buildSchedulerState([market('a')], state, now + 10_001, 60_000);
+    expect(recovered.a.inProgress).toBe(false);
+    expect(recovered.a.failureReason).toContain('worker restarted');
+    expect(selectDueMarkets([market('a')], recovered, now + 10_001, 1).map(m => m.id)).toEqual(['a']);
   });
 
   it('backs off repeated failures without blocking healthy markets', () => {

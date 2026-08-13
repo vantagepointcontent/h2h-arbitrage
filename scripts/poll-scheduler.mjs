@@ -58,7 +58,9 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
       ? marketSuccessAt
       : previous.lastSuccessAt || marketSuccessAt || null;
     const manualSuccessAdvanced = hasNewerSuccessfulMarketScan(market, previous);
-    const recovered = previous.inProgress === true;
+    const leaseExpiresAt = timestamp(previous.leaseExpiresAt);
+    const leaseActive = previous.inProgress === true && leaseExpiresAt > now;
+    const recovered = previous.inProgress === true && !leaseActive;
     const dueFromSuccess = successfulScanAt ? timestamp(successfulScanAt, now) + freshnessSlaMs : now;
     state[market.id] = {
       lastAttemptAt: previous.lastAttemptAt || null,
@@ -68,7 +70,9 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
         : manualSuccessAdvanced
           ? iso(dueFromSuccess)
           : previous.nextDueAt || iso(dueFromSuccess),
-      inProgress: false,
+      inProgress: leaseActive,
+      leaseOwnerId: leaseActive ? previous.leaseOwnerId || null : null,
+      leaseExpiresAt: leaseActive ? previous.leaseExpiresAt : null,
       failureReason: recovered
         ? 'Scheduled scan interrupted because the worker restarted; retrying now.'
         : manualSuccessAdvanced ? null : previous.failureReason || null,
@@ -98,9 +102,11 @@ export function selectDueMarkets(markets, state, now = Date.now(), limit = marke
     .slice(0, Math.max(0, limit));
 }
 
-export function markAttemptStarted(item, now = Date.now()) {
+export function markAttemptStarted(item, now = Date.now(), lease = null) {
   item.lastAttemptAt = iso(now);
   item.inProgress = true;
+  item.leaseOwnerId = lease?.ownerId || null;
+  item.leaseExpiresAt = lease?.expiresAt || null;
   item.failureReason = null;
 }
 
@@ -108,6 +114,8 @@ export function completeAttempt(item, outcome, now = Date.now(), freshnessSlaMs 
   freshnessSlaMs = positiveFinite(freshnessSlaMs, DEFAULT_FRESHNESS_SLA_MS);
   requestedIntervalMs = positiveFinite(requestedIntervalMs, freshnessSlaMs);
   item.inProgress = false;
+  item.leaseOwnerId = null;
+  item.leaseExpiresAt = null;
   if (outcome.ok) {
     item.lastSuccessAt = iso(now);
     item.failureReason = null;

@@ -1,6 +1,6 @@
 {
   "candidate": "BUG-140 production poller lifecycle",
-  "processRuns": 2,
+  "processRuns": 7,
   "marketCount": 24,
   "freshnessSlaMs": 300000,
   "cycles": [
@@ -10,7 +10,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 305364
+      "oldestSuccessAgeMs": 305180
     },
     {
       "eligibleCount": 25,
@@ -18,7 +18,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 306108
+      "oldestSuccessAgeMs": 305543
     }
   ],
   "outcomes": [
@@ -33,22 +33,26 @@
   ],
   "restartRecovery": {
     "productionPollerSpawnedTwice": true,
+    "overlappingProcessLifetimes": true,
     "schedulerFileSurvived": true,
     "breakerFileSurvived": true,
     "staleManualSuccessCooldownRestored": false,
     "duplicateConcurrentScans": false,
-    "maxObservedConcurrency": 4
+    "maxObservedConcurrency": 5,
+    "abandonedOwnerKilled": true,
+    "liveLeaseFencedSuccessor": true,
+    "abandonedLeaseReclaimed": true
   },
   "requestScope": {
-    "capturedRequestCount": 47,
+    "capturedRequestCount": 50,
     "fields": [
       "kalshiUrl",
       "polymarketUrl"
     ],
     "linkedEventUrlsOnly": true,
     "sample": {
-      "kalshiUrl": "https://kalshi.example/events/2",
-      "polymarketUrl": "https://polymarket.example/events/2"
+      "kalshiUrl": "https://kalshi.example/events/23",
+      "polymarketUrl": "https://polymarket.example/events/23"
     }
   },
   "fairness": {

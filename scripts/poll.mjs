@@ -6,8 +6,9 @@ let POLL_CONCURRENCY;
 let FRESHNESS_SLA_MS;
 // Base wake-up interval. Poller wakes this often to check which markets are due.
 // 60s — gentle, since most markets have 5-30min adaptive intervals.
-const POLL_WAKE_MS = 60000;
+const POLL_WAKE_MS = Math.max(1_000, Number(process.env.H2H_POLL_WAKE_MS) || 60_000);
 let SCAN_TIMEOUT_MS;
+const SCAN_LEASE_GRACE_MS = Math.max(100, Number(process.env.H2H_SCAN_LEASE_GRACE_MS) || 5_000);
 
 // ── SETTINGS-001: hot-reload scanner settings from /api/settings ──────────
 // DB-backed overrides beat env. Refreshed each wake cycle; failures keep
@@ -36,6 +37,7 @@ const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || new URL('../data/saved-m
 const HEALTH_FILE = process.env.H2H_POLLER_HEALTH_FILE || new URL('../data/poller-health.json', import.meta.url).pathname;
 const BREAKER_FILE = process.env.H2H_POLLER_BREAKER_FILE || new URL('../data/poller-breaker.json', import.meta.url).pathname;
 const SCHEDULER_FILE = process.env.H2H_SAVED_MARKET_SCHEDULER_FILE || new URL('../data/saved-market-scheduler.json', import.meta.url).pathname;
+const LEASE_DIRECTORY = process.env.H2H_SAVED_MARKET_LEASE_DIRECTORY || new URL('../data/saved-market-leases', import.meta.url).pathname;
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
 const {
@@ -49,6 +51,7 @@ const {
   selectDueMarkets,
   schedulerMetrics,
 } = await import('./poll-scheduler.mjs');
+const { acquireMarketLease } = await import('./poll-lease.mjs');
 POLL_CONCURRENCY = parseBoundedNumber(process.env.H2H_POLL_CONCURRENCY, 5, 1, 20, true);
 SCAN_TIMEOUT_MS = parseBoundedNumber(process.env.H2H_SCAN_TIMEOUT_MS, 60_000, 5_000, 300_000, true);
 FRESHNESS_SLA_MS = parseBoundedNumber(
@@ -145,6 +148,7 @@ const BREAKER_MAX_COOLDOWN_MS = 60 * 60_000;
 const scanStats = new Map(); // marketId -> { avgMs, consecFails, trips, cooldownUntil }
 let schedulerState = {};
 let schedulerWriteQueue = Promise.resolve();
+const pollerOwnerId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function loadSchedulerState() {
   try {
@@ -369,8 +373,9 @@ async function scanMarket(market) {
     return { ok: true, durationMs: Date.now() - started, result };
   } catch (e) {
     clearTimeout(timer);
-    const msg = e.name === 'AbortError' ? `timeout after ${timeoutMs}ms (adaptive)` : (e.message || String(e));
-    return { ok: false, durationMs: timeoutMs, error: msg };
+    const timedOut = e.name === 'AbortError';
+    const msg = timedOut ? `timeout after ${timeoutMs}ms (adaptive)` : (e.message || String(e));
+    return { ok: false, durationMs: timeoutMs, error: msg, timedOut };
   }
 }
 
@@ -587,50 +592,68 @@ async function pollOnce() {
 
   const scanDurations = [];
   await mapWithConcurrency(dueMarkets, POLL_CONCURRENCY, async (market) => {
-    markAttemptStarted(schedulerState[market.id], Date.now());
-    await saveSchedulerState();
-    const scan = await scanMarket(market);
-    scanDurations.push(scan.durationMs || 0);
-
-    if (!scan.ok || !scan.result || scan.result.fullScanPersisted !== true) {
-      health.failureCount += 1;
-      recordScanOutcome(market.id, false, scan.durationMs);
-      const breakerRetryAt = scanStats.get(market.id)?.cooldownUntil;
-      completeAttempt(schedulerState[market.id], {
-        ok: false,
-        error: scan.error || 'Scan completed but durable saved-market publication failed',
-        retryAt: breakerRetryAt,
-      }, Date.now(), FRESHNESS_SLA_MS);
-      await saveSchedulerState();
-      const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
-      health.errors.push(err);
-      console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
+    // The scheduler JSON is diagnostic state, not a mutual-exclusion primitive.
+    // An atomic per-market filesystem lease fences overlapping PM2 instances;
+    // expiry bounds recovery when an owner dies without running finally.
+    const leaseTtlMs = Math.max(adaptiveTimeoutMs(market.id), SCAN_TIMEOUT_MS) + SCAN_LEASE_GRACE_MS;
+    const lease = await acquireMarketLease(LEASE_DIRECTORY, market.id, pollerOwnerId, leaseTtlMs);
+    if (!lease) {
+      health.skippedCount += 1;
       return;
     }
 
-    health.successCount += 1;
-    recordScanOutcome(market.id, true, scan.durationMs);
-    const requestedInterval = adaptiveEnabled ? getAdaptiveIntervalMs(market, adaptiveConfig) : FRESHNESS_SLA_MS;
-    completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, requestedInterval);
-    await saveSchedulerState();
-    const { best, all } = applyScanResultToMarket(market, scan.result);
-    const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
-    const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';
-    if (best && best.roiPct > 0) {
-      console.log(`[${new Date().toISOString()}] ${market.eventTitle} → Best: ${best.outcome} ${formatRoi(best.roiPct)} | ${all.length} profitable arb(s), +$${profitSum.toFixed(2)} (${scan.durationMs}ms, interval: ${interval})`);
-      // WS-103: flag this pair for HOT-tier promotion in the WS watcher.
-      // Fire-and-forget — promotion is an optimization, never block the scan loop.
-      fetch(`${BASE_URL}/api/watcher/targets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
-        },
-        body: JSON.stringify({ action: 'promote', pairId: market.id }),
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => {});
-    } else {
-      console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
+    let scan = null;
+    try {
+      markAttemptStarted(schedulerState[market.id], Date.now(), lease);
+      await saveSchedulerState();
+      scan = await scanMarket(market);
+      scanDurations.push(scan.durationMs || 0);
+
+      if (!scan.ok || !scan.result || scan.result.fullScanPersisted !== true) {
+        health.failureCount += 1;
+        recordScanOutcome(market.id, false, scan.durationMs);
+        const breakerRetryAt = scanStats.get(market.id)?.cooldownUntil;
+        completeAttempt(schedulerState[market.id], {
+          ok: false,
+          error: scan.error || 'Scan completed but durable saved-market publication failed',
+          retryAt: breakerRetryAt,
+        }, Date.now(), FRESHNESS_SLA_MS);
+        await saveSchedulerState();
+        const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
+        health.errors.push(err);
+        console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
+        return;
+      }
+
+      health.successCount += 1;
+      recordScanOutcome(market.id, true, scan.durationMs);
+      const requestedInterval = adaptiveEnabled ? getAdaptiveIntervalMs(market, adaptiveConfig) : FRESHNESS_SLA_MS;
+      completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, requestedInterval);
+      await saveSchedulerState();
+      const { best, all } = applyScanResultToMarket(market, scan.result);
+      const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
+      const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';
+      if (best && best.roiPct > 0) {
+        console.log(`[${new Date().toISOString()}] ${market.eventTitle} → Best: ${best.outcome} ${formatRoi(best.roiPct)} | ${all.length} profitable arb(s), +$${profitSum.toFixed(2)} (${scan.durationMs}ms, interval: ${interval})`);
+        // WS-103: flag this pair for HOT-tier promotion in the WS watcher.
+        // Fire-and-forget — promotion is an optimization, never block the scan loop.
+        fetch(`${BASE_URL}/api/watcher/targets`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {}),
+          },
+          body: JSON.stringify({ action: 'promote', pairId: market.id }),
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => {});
+      } else {
+        console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
+      }
+    } finally {
+      // Leases expire in place rather than being deleted. Deleting a pathname
+      // after checking its owner has a TOCTOU race with stale-owner recovery:
+      // the old owner could delete a successor's newly-created lease. Keeping
+      // the fence through its short bounded TTL makes ownership monotonic.
     }
   });
 
