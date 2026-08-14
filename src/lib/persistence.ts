@@ -274,21 +274,22 @@ async function initDb(): Promise<void> {
 
 // Lazy-init: first call guarantees the table exists
 let _dbInited = false;
+let _dbInitPromise: Promise<void> | null = null;
 
 /**
  * CORRUPT-001: Startup integrity guard.
- * Runs PRAGMA integrity_check on the SQLite DB. If corrupt, attempts to
+ * Runs SQLite's bounded single-error quick check on the SQLite DB. If corrupt, attempts to
  * restore from the latest good backup in data/backups/ before initDb().
  * Logs to stderr so it shows up in PM2/process logs.
  */
 async function checkAndRestoreDb(): Promise<void> {
   const c = getClient();
   try {
-    const result = await c.execute('PRAGMA integrity_check');
-    const status = (result.rows as any[])[0]?.['integrity_check'] ?? 'ok';
+    const result = await c.execute('PRAGMA quick_check(1)');
+    const status = (result.rows as any[])[0]?.['quick_check'] ?? 'ok';
     if (status === 'ok') return;
 
-    console.error(`[persistence] DB CORRUPT: integrity_check = ${status}. Attempting restore...`);
+    console.error(`[persistence] DB CORRUPT: quick_check = ${status}. Attempting restore...`);
 
     // Find latest backup
     const backupDir = path.join(process.cwd(), 'data', 'backups');
@@ -327,9 +328,17 @@ async function checkAndRestoreDb(): Promise<void> {
 
 async function ensureDb(): Promise<void> {
   if (_dbInited) return;
-  await checkAndRestoreDb();
-  await initDb();
-  _dbInited = true;
+  if (!_dbInitPromise) {
+    _dbInitPromise = (async () => {
+      await checkAndRestoreDb();
+      await initDb();
+      _dbInited = true;
+    })().catch((error) => {
+      _dbInitPromise = null;
+      throw error;
+    });
+  }
+  await _dbInitPromise;
 }
 
 /** Persist a scan result to SQLite. */
