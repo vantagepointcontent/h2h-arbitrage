@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
-import { getSavedMarkets } from '@/lib/persistence';
+import { getSavedMarkets, recoverInterruptedScanPublications } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
+import { getScanWorkerMetrics } from '@/lib/scan-worker-coordinator';
+import { getSqliteContentionMetrics } from '@/lib/sqlite-write-retry';
+
+let recovery: Promise<number> | null = null;
 
 export async function GET() {
   try {
+    recovery ??= recoverInterruptedScanPublications();
+    await recovery;
     const markets = await getSavedMarkets();
     return NextResponse.json({
       status: 'ok',
       savedMarketCount: markets.length,
+      scanWorkers: getScanWorkerMetrics(),
+      sqliteContention: getSqliteContentionMetrics(),
       now: new Date().toISOString(),
     }, {
       headers: {

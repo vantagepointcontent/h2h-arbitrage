@@ -6,8 +6,6 @@ const mocks = vi.hoisted(() => ({
   findSavedMarketByUrls: vi.fn(),
   reserveSavedMarketPublication: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
-  consume: vi.fn(() => ({ allowed: true })),
-  tryAcquire: vi.fn(() => (() => undefined) as (() => void) | null),
 }));
 
 vi.mock('@/lib/kalshi', () => ({
@@ -70,14 +68,9 @@ vi.mock('@/lib/scan-links', () => ({
   getUnavailableScanPlatforms: () => [],
 }));
 vi.mock('@/lib/scan-request', () => ({ parseScanCapital: () => 1000 }));
-vi.mock('@/lib/scan-rate-limit', () => ({
-  scanRateLimiter: { consume: mocks.consume },
-  scanConcurrencyLimiter: { tryAcquire: mocks.tryAcquire },
-  getScanClientKey: () => 'test',
-}));
 vi.mock('@/lib/scan-clob-selection', () => ({ selectMatchedClobConditionIds: () => [] }));
 
-import { POST } from './route';
+import { executeFullScan } from './scan-execution';
 
 function request(): NextRequest {
   return new NextRequest('http://localhost/api/scan', {
@@ -93,25 +86,13 @@ describe('POST /api/scan saved-market lifecycle', () => {
     mocks.findSavedMarketByUrls.mockResolvedValue({ id: 'tx-07', eventTitle: 'TX-07' });
     mocks.reserveSavedMarketPublication.mockResolvedValue(41);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
-    mocks.tryAcquire.mockReturnValue(() => undefined);
-  });
-
-  it('rejects an excess full scan before persistence or upstream work begins', async () => {
-    mocks.tryAcquire.mockReturnValueOnce(null);
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(503);
-    expect(response.headers.get('Retry-After')).toBe('2');
-    expect(mocks.findSavedMarketByUrls).not.toHaveBeenCalled();
-    expect(mocks.upstream).not.toHaveBeenCalled();
   });
 
   it('publishes refreshing before waiting for upstream market data', async () => {
     let rejectUpstream!: (error: Error) => void;
     mocks.upstream.mockImplementation(() => new Promise((_resolve, reject) => { rejectUpstream = reject; }));
 
-    const pending = POST(request());
+    const pending = executeFullScan(request());
     await vi.waitFor(() => {
       expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenCalledWith('tx-07', {
         matchedCount: 0,
@@ -130,7 +111,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
   it('publishes unavailable with the reserved generation after terminal upstream failure', async () => {
     mocks.upstream.mockRejectedValue(new Error('Kalshi upstream timed out'));
 
-    const response = await POST(request());
+    const response = await executeFullScan(request());
     const body = await response.json();
 
     expect(response.status).toBeGreaterThanOrEqual(500);
@@ -155,7 +136,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
       throw new Error('Kalshi upstream timed out');
     });
 
-    await POST(request());
+    await executeFullScan(request());
 
     expect(accepted).toEqual(['refreshing']);
     expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith(

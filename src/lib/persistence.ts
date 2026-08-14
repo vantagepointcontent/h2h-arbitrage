@@ -4,6 +4,7 @@ import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
 import { auditArbClassification } from './arb-types';
+import { withSqliteBusyRetry } from './sqlite-write-retry';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1372,22 +1373,24 @@ export async function reserveSavedMarketPublication(
   channel: SavedMarketPublicationChannel,
 ): Promise<number> {
   await ensureMarketsMigrated();
-  const column = channel === 'scan' ? 'scan_publication_generation' : 'live_publication_generation';
-  const c = getClient();
-  const tx = await c.transaction('write');
-  try {
-    const updated = await tx.execute({
-      sql: `UPDATE saved_markets SET ${column} = ${column} + 1 WHERE id = ? RETURNING ${column}`,
-      args: [id],
-    });
-    if (!updated.rows[0]) throw new Error(`Saved market ${id} not found while reserving ${channel} publication`);
-    const generation = Number(updated.rows[0][column]);
-    await tx.commit();
-    return generation;
-  } catch (error) {
-    await tx.rollback().catch(() => {});
-    throw error;
-  }
+  return withSqliteBusyRetry(async () => {
+    const column = channel === 'scan' ? 'scan_publication_generation' : 'live_publication_generation';
+    const c = getClient();
+    const tx = await c.transaction('write');
+    try {
+      const updated = await tx.execute({
+        sql: `UPDATE saved_markets SET ${column} = ${column} + 1 WHERE id = ? RETURNING ${column}`,
+        args: [id],
+      });
+      if (!updated.rows[0]) throw new Error(`Saved market ${id} not found while reserving ${channel} publication`);
+      const generation = Number(updated.rows[0][column]);
+      await tx.commit();
+      return generation;
+    } catch (error) {
+      await tx.rollback().catch(() => {});
+      throw error;
+    }
+  });
 }
 
 export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<void> {
@@ -1429,6 +1432,31 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   }
   invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
+}
+
+/** Restart recovery for scans whose worker process disappeared after publishing
+ * `refreshing`. A newer generation fences any late publisher. */
+export async function recoverInterruptedScanPublications(staleAfterMs = 120_000): Promise<number> {
+  await ensureMarketsMigrated();
+  const now = new Date().toISOString();
+  const cutoff = new Date(Date.now() - Math.max(1_000, staleAfterMs)).toISOString();
+  const result = await withSqliteBusyRetry(() => getClient().execute({
+    sql: `UPDATE saved_markets
+          SET scan_publication_generation = scan_publication_generation + 1,
+              last_scan_result = json_set(last_scan_result,
+                '$.matchStatus', 'unavailable',
+                '$.matchError', 'Recovered interrupted scan after application restart',
+                '$.scannedAt', ?,
+                '$.publicationGeneration', scan_publication_generation + 1)
+          WHERE json_extract(last_scan_result, '$.matchStatus') = 'refreshing'
+            AND json_extract(last_scan_result, '$.scannedAt') < ?`,
+    args: [now, cutoff],
+  }));
+  if (result.rowsAffected > 0) {
+    invalidateMarketsCache();
+    mirrorMarketsToJsonThrottled();
+  }
+  return result.rowsAffected;
 }
 
 async function prepareCanonicalMatchResult(
@@ -1656,13 +1684,15 @@ async function ensureHistoryMigrated(): Promise<void> {
 export async function appendScanHistory(entry: ScanHistoryEntry): Promise<void> {
   await ensureHistoryMigrated();
   const c = getClient();
-  await c.execute({
-    sql: `INSERT INTO scan_history (scan_timestamp, market_id, total_profit, best_roi_pct, positive_arb_count, matched_count)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [entry.scanTimestamp, entry.marketId, entry.totalProfit ?? 0, entry.bestRoiPct ?? 0, entry.positiveArbCount ?? 0, entry.matchedCount ?? 0],
+  await withSqliteBusyRetry(async () => {
+    await c.execute({
+      sql: `INSERT INTO scan_history (scan_timestamp, market_id, total_profit, best_roi_pct, positive_arb_count, matched_count)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [entry.scanTimestamp, entry.marketId, entry.totalProfit ?? 0, entry.bestRoiPct ?? 0, entry.positiveArbCount ?? 0, entry.matchedCount ?? 0],
+    });
+    // Bounded: keep the most recent 5000 rows (was 500 in JSON — cheap in SQLite)
+    await c.execute(`DELETE FROM scan_history WHERE id NOT IN (SELECT id FROM scan_history ORDER BY scan_timestamp DESC LIMIT 5000)`);
   });
-  // Bounded: keep the most recent 5000 rows (was 500 in JSON — cheap in SQLite)
-  await c.execute(`DELETE FROM scan_history WHERE id NOT IN (SELECT id FROM scan_history ORDER BY scan_timestamp DESC LIMIT 5000)`);
 }
 
 
