@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@libsql/client';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -17,6 +17,8 @@ import {
   type BotPosition,
 } from './bot-positions';
 import { calcKalshiFee, calcPolymarketFee } from './matcher';
+
+afterEach(() => vi.unstubAllGlobals());
 
 function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
   const position: BotPosition = {
@@ -1452,6 +1454,26 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
     expect(result).toEqual({ updated: 60, settled: 0, errors: [] });
   });
 
+  it('reuses persisted exit fee authority instead of refetching it for every valuation', async () => {
+    const feeFetch = vi.fn(async () => { throw new Error('fee authority network should not be called'); });
+    vi.stubGlobal('fetch', feeFetch);
+    const positionStore = {
+      listAllOpen: async () => [openPosition({ id: 1 })],
+      updateValuationWithFeeConfig: async () => undefined,
+      updateValuation: async () => undefined,
+      clearOpenValuation: async () => undefined,
+    } as unknown as BotPositionStore;
+    const result = await pollOpenBotPositions({
+      positionStore,
+      observedAt: '2026-08-08T12:00:00.000Z',
+      fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
+      fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+    });
+    expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
+    expect(feeFetch).not.toHaveBeenCalled();
+  });
+
   it('persists venue observation time when fee lookup completes later', async () => {
     const position = openPosition({ id: 1 });
     let persistedAt: string | null = null;
@@ -1636,7 +1658,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
     }
   });
 
-  it('clears prior marks at each malformed, shallow, or stale depth observation timestamp', async () => {
+  it('preserves prior marks and timestamps when later depth observations fail', async () => {
     const previousCwd = process.cwd();
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-poller-'));
     try {
@@ -1710,20 +1732,21 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         });
         db.close();
       };
-      const expectClearedAt = async (attemptedAt: string) => {
+      const expectPreservedAt = async (attemptedAt: string) => {
         const db = createClient({ url: dbUrl });
         const row = (await db.execute({ sql: 'SELECT * FROM bot_positions WHERE id = ?', args: [created.id] })).rows[0];
         db.close();
-        expect(row.current_price_kalshi).toBeNull();
-        expect(row.current_price_pm).toBeNull();
-        expect(row.current_value).toBeNull();
-        expect(row.kalshi_gross_proceeds_microcents).toBeNull();
-        expect(row.pm_gross_proceeds_microcents).toBeNull();
-        expect(row.kalshi_net_proceeds).toBeNull();
-        expect(row.pm_net_proceeds).toBeNull();
-        expect(row.unrealized_pnl).toBeNull();
-        expect(row.unrealized_roi_pct).toBeNull();
-        expect(row.last_valuation_at).toBe(attemptedAt);
+        expect(row.current_price_kalshi).toBe(48);
+        expect(row.current_price_pm).toBe(57);
+        expect(row.current_value).toBe(1000);
+        expect(row.kalshi_gross_proceeds_microcents).toBe(480000000);
+        expect(row.pm_gross_proceeds_microcents).toBe(570000000);
+        expect(row.kalshi_net_proceeds).toBe(480);
+        expect(row.pm_net_proceeds).toBe(520);
+        expect(row.unrealized_pnl).toBe(50);
+        expect(row.unrealized_roi_pct).toBe(526);
+        expect(row.last_valuation_at).toBeNull();
+        expect(row.valuation_failure_at).toBe(attemptedAt);
       };
 
       await setPriorMark();
@@ -1731,12 +1754,12 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         { priceCents: 48, size: 10 },
         { priceCents: Number.NaN, size: 1 },
       ])).resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
-      await expectClearedAt('2026-08-08T12:00:00.000Z');
+      await expectPreservedAt('2026-08-08T12:00:00.000Z');
 
       await setPriorMark();
       await expect(runAttempt('2026-08-08T12:01:00.000Z', [{ priceCents: 48, size: 9 }]))
         .resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
-      await expectClearedAt('2026-08-08T12:01:00.000Z');
+      await expectPreservedAt('2026-08-08T12:01:00.000Z');
 
       await setPriorMark();
       await expect(runAttempt(
@@ -1744,7 +1767,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         [{ priceCents: 48, size: 10 }],
         '2026-08-08T12:00:00.000Z',
       )).resolves.toMatchObject({ updated: 0, errors: [{ id: created.id }] });
-      await expectClearedAt('2026-08-08T12:02:00.000Z');
+      await expectPreservedAt('2026-08-08T12:02:00.000Z');
 
       let kalshiBookRequested = false;
       let feeAuthorityRequested = false;

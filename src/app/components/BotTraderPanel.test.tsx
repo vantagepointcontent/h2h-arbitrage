@@ -80,7 +80,13 @@ const positions = [{
   pmExitFeeCents: 0,
   kalshiExitFeeType: 'quadratic',
   kalshiExitFeeMultiplierPpm: 1_000_000,
+  kalshiExitFeeSource: 'kalshi-series:KXTEST',
+  kalshiExitFeeObservedAt: '2026-08-11T13:39:00.000Z',
+  kalshiExitFeeVersion: 'quadratic:1000000:v1',
   pmExitFeeRateBps: 400,
+  pmExitFeeSource: 'polymarket-clob:/fee-rate?token_id=held',
+  pmExitFeeObservedAt: '2026-08-11T13:39:00.000Z',
+  pmExitFeeVersion: 'token-fee-rate:400',
   // Deliberately inconsistent legacy fields: the table must derive these from
   // currentValueCents and totalCostCents instead of trusting stale mappings.
   unrealizedPnlCents: 97,
@@ -331,7 +337,7 @@ describe('BotTraderPanel', () => {
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
     expect(cells[4]).toBe('$0.97');
-    expect(cells[5]).toBe('Stale executable quote');
+    expect(cells[5]).toBe('$1.02 · Stale');
     expect(cells[6]).toBe('Stale executable quote');
     expect(cells[7]).toBe('Stale executable quote');
   });
@@ -392,7 +398,9 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
     expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi YES Current PriceSaved$0.47');
     expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket NO Current PriceStale$0.55');
-    expect(screen.getAllByText(/Stored top-price reference only/)).toHaveLength(2);
+    expect(screen.getAllByText(/One-share executable bid/)).toHaveLength(2);
+    expect(screen.getByTestId('kalshi-fee-authority').textContent).toContain('quadratic:1000000:v1');
+    expect(screen.getByTestId('polymarket-fee-authority').textContent).toContain('token-fee-rate:400');
   });
 
   it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {

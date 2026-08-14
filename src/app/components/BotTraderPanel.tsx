@@ -27,6 +27,8 @@ interface StoredPriceSnapshot {
   source: string | null;
   observedAt: string | null;
   ageMs: number | null;
+  executableDepthMicros?: number | null;
+  failureReason?: string | null;
 }
 
 interface BotPosition {
@@ -79,7 +81,13 @@ interface BotPosition {
   pmExitFeeCents: number | null;
   kalshiExitFeeType: 'quadratic' | null;
   kalshiExitFeeMultiplierPpm: number | null;
+  kalshiExitFeeSource?: string | null;
+  kalshiExitFeeObservedAt?: string | null;
+  kalshiExitFeeVersion?: string | null;
   pmExitFeeRateBps: number | null;
+  pmExitFeeSource?: string | null;
+  pmExitFeeObservedAt?: string | null;
+  pmExitFeeVersion?: string | null;
   unrealizedPnlCents: number | null;
   unrealizedRoiBps: number | null;
   lastValuationAt: string | null;
@@ -104,7 +112,7 @@ export function positionRoiBps(position: Pick<BotPosition, 'status' | 'totalCost
 const VALUATION_STALE_MS = 15 * 60_000;
 
 type OpenMark =
-  | { available: true; currentValueCents: number; pnlCents: number; roiBps: number | null }
+  | { available: true; fresh: boolean; warning: string | null; currentValueCents: number; pnlCents: number; roiBps: number | null }
   | { available: false; label: string };
 
 function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
@@ -113,14 +121,16 @@ function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
   }
   const observedAt = Date.parse(position.lastValuationAt);
   if (!Number.isFinite(observedAt)) return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: malformed quote timestamp' };
-  if (position.valuationFailureReason?.trim()) return { available: false, label: position.valuationFailureReason.trim() };
-  if (now - observedAt > VALUATION_STALE_MS) return { available: false, label: 'Stale executable quote' };
+  const warning = position.valuationFailureReason?.trim()
+    || (now - observedAt > VALUATION_STALE_MS ? 'Stale executable quote' : null);
   const openCostCents = Number.isSafeInteger(position.remainingOpenCostCents)
     ? position.remainingOpenCostCents!
     : position.totalCostCents;
   const pnlCents = (position.realizedPnlCents ?? 0) + position.currentValueCents - openCostCents;
   return {
     available: true,
+    fresh: warning == null,
+    warning,
     currentValueCents: position.currentValueCents,
     pnlCents,
     roiBps: openCostCents > 0 ? Math.round((pnlCents * 10_000) / openCostCents) : null,
@@ -557,7 +567,7 @@ export default function BotTraderPanel() {
 
       <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Stored reference prices; executable liquidation value is separate · click a row for leg details</div></div>
+          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Persisted exact-leg executable bids · click a row for provenance and depth</div></div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
               {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
@@ -580,12 +590,13 @@ export default function BotTraderPanel() {
                   : `Buy Cost unavailable: ${position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}`;
                 const openMark = position.status === 'open' ? openPositionMark(position) : null;
                 const pnl = position.status === 'open'
-                  ? (openMark?.available && entryCostAvailable ? openMark.pnlCents : null)
+                  ? (openMark?.available && openMark.fresh && entryCostAvailable ? openMark.pnlCents : null)
                   : entryCostAvailable ? position.realizedPnlCents : null;
                 const roiBps = position.status === 'open'
-                  ? (openMark?.available && entryCostAvailable ? openMark.roiBps : null)
+                  ? (openMark?.available && openMark.fresh && entryCostAvailable ? openMark.roiBps : null)
                   : entryCostAvailable && hasVerifiedTerminalAccounting(position) ? positionRoiBps(position) : null;
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
+                const staleValuationLabel = openMark?.available && !openMark.fresh ? openMark.warning : null;
                 const settlementUnavailableLabel = position.status !== 'open' && !hasVerifiedTerminalAccounting(position) ? 'Pending verification' : null;
                 const valueUnavailableLabel = openUnavailableLabel ?? settlementUnavailableLabel;
                 const kalshiHeld = Number.isSafeInteger(position.remainingSharesKalshi)
@@ -624,9 +635,9 @@ export default function BotTraderPanel() {
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel ? 'text-[var(--status-warning)]' : ''}`}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? formatCents(openMark.currentValueCents) : formatCents(position.resolutionPayoutCents!))}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
+                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? staleValuationLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? staleValuationLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
@@ -673,9 +684,13 @@ export default function BotTraderPanel() {
                             <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
                             <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
-                            <div className="text-[10px] font-medium text-[var(--status-warning)]">Stored top-price reference only; not executable depth for held quantity.</div>
+                            <div className="text-[10px] font-medium text-[var(--text-secondary)]">One-share executable bid · depth {snapshot.executableDepthMicros == null ? 'unavailable' : `${(snapshot.executableDepthMicros / 1_000_000).toFixed(6)} shares`}{snapshot.failureReason ? ` · ${snapshot.failureReason}` : ''}</div>
                           </div>;
                         })}
+                      </div>
+                      <div className="mt-3 grid gap-2 text-[10px] text-[var(--text-secondary)] lg:grid-cols-2" aria-label="Persisted fee authority">
+                        <div data-testid="kalshi-fee-authority" className="rounded border border-[var(--border-subtle)] px-3 py-2"><strong className="text-[var(--text-primary)]">Kalshi fee authority</strong><div className="break-all">{position.kalshiExitFeeSource && position.kalshiExitFeeVersion ? `${position.kalshiExitFeeSource} · ${position.kalshiExitFeeVersion}${position.kalshiExitFeeObservedAt ? ` · observed ${new Date(position.kalshiExitFeeObservedAt).toLocaleString()}` : ''}` : 'Unavailable'}</div></div>
+                        <div data-testid="polymarket-fee-authority" className="rounded border border-[var(--border-subtle)] px-3 py-2"><strong className="text-[var(--text-primary)]">Polymarket fee authority</strong><div className="break-all">{position.pmExitFeeSource && position.pmExitFeeVersion ? `${position.pmExitFeeSource} · ${position.pmExitFeeVersion}${position.pmExitFeeObservedAt ? ` · observed ${new Date(position.pmExitFeeObservedAt).toLocaleString()}` : ''}` : 'Unavailable'}</div></div>
                       </div>
                       {liquidationUnavailableLabel ? (
                         <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Liquidation breakdown: {liquidationUnavailableLabel}</div>

@@ -19,6 +19,8 @@ export interface PersistedPriceSnapshot {
   source: string | null;
   observedAt: string | null;
   ageMs: number | null;
+  executableDepthMicros?: number | null;
+  failureReason?: string | null;
 }
 
 export interface PriceSnapshotInput {
@@ -27,6 +29,8 @@ export interface PriceSnapshotInput {
   side: PriceSnapshotSide;
   tokenId: string | null;
   priceCents: number | null;
+  executableDepthMicros: number | null;
+  failureReason: string | null;
   source: 'saved-market-full-scan' | 'saved-market-quick-refresh';
   observedAt: string;
 }
@@ -68,6 +72,17 @@ async function ensureSchema(): Promise<void> {
         PRIMARY KEY (platform, market_id, side)
       )`);
       await db().execute('CREATE INDEX IF NOT EXISTS idx_platform_price_snapshot_token ON platform_price_snapshots(platform, token_id, side)');
+      const info = await db().execute('PRAGMA table_info(platform_price_snapshots)');
+      const columns = new Set(info.rows.map((row) => String(row.name)));
+      if (!columns.has('executable_depth_micros')) {
+        await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN executable_depth_micros INTEGER');
+      }
+      if (!columns.has('attempted_at')) {
+        await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN attempted_at TEXT');
+      }
+      if (!columns.has('failure_reason')) {
+        await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN failure_reason TEXT');
+      }
     })().catch((error) => {
       schemaReady = null;
       throw error;
@@ -90,6 +105,32 @@ function priceToCents(price: unknown): number | null {
   return Number.isSafeInteger(cents) && cents >= 1 && cents <= 100 ? cents : null;
 }
 
+function depthToMicros(depth: unknown): number | null {
+  const value = typeof depth === 'string' && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(depth)
+    ? Number(depth)
+    : typeof depth === 'number' ? depth : Number.NaN;
+  const micros = Math.round(value * 1_000_000);
+  return Number.isFinite(value) && value >= 0 && Number.isSafeInteger(micros) ? micros : null;
+}
+
+function executableEvidence(
+  platform: PriceSnapshotPlatform,
+  side: PriceSnapshotSide,
+  bid: unknown,
+  depth: unknown,
+): Pick<PriceSnapshotInput, 'priceCents' | 'executableDepthMicros' | 'failureReason'> {
+  const priceCents = priceToCents(bid);
+  const executableDepthMicros = depthToMicros(depth);
+  const label = `${platform === 'kalshi' ? 'Kalshi' : 'Polymarket'} ${side.toUpperCase()}`;
+  let failureReason: string | null = null;
+  if (priceCents == null) failureReason = `${label} executable bid unavailable`;
+  else if (executableDepthMicros == null) failureReason = `${label} executable depth unavailable`;
+  else if (executableDepthMicros < 1_000_000) {
+    failureReason = `${label} executable depth ${executableDepthMicros / 1_000_000} is below one share`;
+  }
+  return { priceCents, executableDepthMicros, failureReason };
+}
+
 function pmTokens(outcome: NonNullable<UnifiedOutcome['polymarket']>): { yes: string | null; no: string | null } {
   return {
     yes: typeof outcome.yesTokenId === 'string' && outcome.yesTokenId.trim() ? outcome.yesTokenId : null,
@@ -108,7 +149,9 @@ export function snapshotInputsFromOutcomes(
       for (const side of ['yes', 'no'] as const) {
         const input: PriceSnapshotInput = {
           platform: 'kalshi', marketId: outcome.kalshi.ticker, side, tokenId: null,
-          priceCents: priceToCents(side === 'yes' ? outcome.kalshi.yesAsk : outcome.kalshi.noAsk),
+          ...executableEvidence('kalshi', side,
+            side === 'yes' ? outcome.kalshi.yesBid : outcome.kalshi.noBid,
+            side === 'yes' ? outcome.kalshi.yesBidDepth : outcome.kalshi.noBidDepth),
           source, observedAt: observedAt.kalshi,
         };
         snapshots.set(currentPriceSnapshotKey(input), input);
@@ -119,8 +162,10 @@ export function snapshotInputsFromOutcomes(
       for (const side of ['yes', 'no'] as const) {
         const input: PriceSnapshotInput = {
           platform: 'polymarket', marketId: outcome.polymarket.conditionId, side, tokenId: tokens[side],
-          priceCents: priceToCents(side === 'yes' ? outcome.polymarket.yesPrice : outcome.polymarket.noPrice),
-          source, observedAt: observedAt.polymarket,
+          ...executableEvidence('polymarket', side,
+            side === 'yes' ? outcome.polymarket.yesBid : outcome.polymarket.noBid,
+            side === 'yes' ? outcome.polymarket.yesBidDepth : outcome.polymarket.noBidDepth),
+          source, observedAt: outcome.polymarket.quoteObservedAt ?? observedAt.polymarket,
         };
         snapshots.set(currentPriceSnapshotKey(input), input);
       }
@@ -136,18 +181,27 @@ export async function persistPlatformPriceSnapshots(inputs: PriceSnapshotInput[]
   for (let offset = 0; offset < valid.length; offset += READ_CHUNK_SIZE) {
     const statements = valid.slice(offset, offset + READ_CHUNK_SIZE).map((input) => ({
       sql: `INSERT INTO platform_price_snapshots
-        (platform, market_id, side, token_id, price_cents, snapshot_status, source, observed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (platform, market_id, side, token_id, price_cents, executable_depth_micros,
+         snapshot_status, source, observed_at, attempted_at, failure_reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(platform, market_id, side) DO UPDATE SET
           token_id = COALESCE(excluded.token_id, platform_price_snapshots.token_id),
-          price_cents = excluded.price_cents,
-          snapshot_status = excluded.snapshot_status,
-          source = excluded.source,
-          observed_at = excluded.observed_at
-        WHERE excluded.observed_at > platform_price_snapshots.observed_at`,
+          price_cents = CASE WHEN excluded.snapshot_status = 'available'
+            THEN excluded.price_cents ELSE platform_price_snapshots.price_cents END,
+          executable_depth_micros = CASE WHEN excluded.snapshot_status = 'available'
+            THEN excluded.executable_depth_micros ELSE platform_price_snapshots.executable_depth_micros END,
+          snapshot_status = CASE WHEN excluded.snapshot_status = 'available'
+            THEN 'available' ELSE platform_price_snapshots.snapshot_status END,
+          source = CASE WHEN excluded.snapshot_status = 'available' THEN excluded.source ELSE platform_price_snapshots.source END,
+          observed_at = CASE WHEN excluded.snapshot_status = 'available' THEN excluded.observed_at ELSE platform_price_snapshots.observed_at END,
+          attempted_at = excluded.attempted_at,
+          failure_reason = excluded.failure_reason
+        WHERE excluded.attempted_at > COALESCE(platform_price_snapshots.attempted_at, platform_price_snapshots.observed_at)`,
       args: [input.platform, normalized(input.marketId), input.side,
-        input.tokenId ? normalized(input.tokenId) : null, input.priceCents,
-        input.priceCents == null ? 'unavailable' : 'available', input.source, input.observedAt],
+        input.tokenId ? normalized(input.tokenId) : null, input.priceCents, input.executableDepthMicros,
+        input.failureReason == null && input.priceCents != null && input.executableDepthMicros != null
+          && input.executableDepthMicros >= 1_000_000 ? 'available' : 'unavailable',
+        input.source, input.observedAt, input.observedAt, input.failureReason],
     }));
     metrics.writeBatches += 1;
     const results = await db().batch(statements, 'write');
@@ -165,10 +219,16 @@ interface SnapshotRow {
   snapshot_status: string;
   source: string;
   observed_at: string;
+  attempted_at: string | null;
+  executable_depth_micros: number | null;
+  failure_reason: string | null;
 }
 
 function unavailable(status: PriceSnapshotStatus): PersistedPriceSnapshot {
-  return { status, priceCents: null, source: null, observedAt: null, ageMs: null };
+  return {
+    status, priceCents: null, source: null, observedAt: null, ageMs: null,
+    executableDepthMicros: null, failureReason: null,
+  };
 }
 
 export async function getPersistedCurrentPriceBatch(
@@ -202,7 +262,8 @@ export async function getPersistedCurrentPriceBatch(
     const marketId = normalized(request.marketId!);
     const tokenId = request.tokenId ? normalized(request.tokenId) : null;
     const candidates = rows.filter((row) => row.platform === request.platform
-      && (normalized(row.market_id) === marketId || (row.token_id != null && normalized(row.token_id) === marketId)));
+      && (normalized(row.market_id) === marketId
+        || (tokenId != null && row.token_id != null && normalized(row.token_id) === tokenId)));
     if (candidates.length === 0) {
       result.set(key, unavailable('never_saved'));
       continue;
@@ -216,13 +277,20 @@ export async function getPersistedCurrentPriceBatch(
     const observedMs = Date.parse(String(exact.observed_at));
     const ageMs = Number.isFinite(observedMs) ? Math.max(0, now - observedMs) : null;
     const priceCents = exact.price_cents == null ? null : Number(exact.price_cents);
-    if (exact.snapshot_status !== 'available' || !Number.isSafeInteger(priceCents) || priceCents! < 1 || priceCents! > 100) {
-      result.set(key, { status: 'unavailable', priceCents: null, source: String(exact.source), observedAt: String(exact.observed_at), ageMs });
+    const executableDepthMicros = exact.executable_depth_micros == null ? null : Number(exact.executable_depth_micros);
+    const failureReason = exact.failure_reason == null ? null : String(exact.failure_reason);
+    if (exact.snapshot_status !== 'available' || !Number.isSafeInteger(priceCents) || priceCents! < 1 || priceCents! > 100
+      || !Number.isSafeInteger(executableDepthMicros) || executableDepthMicros! < 1_000_000) {
+      result.set(key, {
+        status: 'unavailable', priceCents, source: String(exact.source), observedAt: String(exact.observed_at), ageMs,
+        executableDepthMicros, failureReason,
+      });
       continue;
     }
     result.set(key, {
-      status: ageMs != null && ageMs > STALE_AFTER_MS ? 'stale' : 'available',
+      status: failureReason != null || (ageMs != null && ageMs > STALE_AFTER_MS) ? 'stale' : 'available',
       priceCents, source: String(exact.source), observedAt: String(exact.observed_at), ageMs,
+      executableDepthMicros, failureReason,
     });
   }
   return result;

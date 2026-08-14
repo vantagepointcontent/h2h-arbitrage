@@ -202,6 +202,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
           // MF-001: use real CLOB ask-level quantity, never Gamma liquidity.
           askDepth: depth.yesAskDepth,
           noAskDepth: depth.noAskDepth,
+          yesBid: depth.yesBid,
+          noBid: depth.noBid,
+          yesBidDepth: depth.yesBidDepth,
+          noBidDepth: depth.noBidDepth,
           yesMinOrderSize: depth.yesMinOrderSize,
           noMinOrderSize: depth.noMinOrderSize,
           yesTickSize: depth.yesTickSize,

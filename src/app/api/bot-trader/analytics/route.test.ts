@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
-import { getBotPositionAnalytics } from '@/lib/bot-positions';
+import { getBotPositionAnalytics, summarizeBotPerformance } from '@/lib/bot-positions';
 import { NextRequest } from 'next/server';
 import { getMarketUrlsById } from '@/lib/persistence';
 import { getPersistedCurrentPriceBatch } from '@/lib/current-price-snapshots';
 
-vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn() }));
+vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn(), summarizeBotPerformance: vi.fn() }));
 vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
 vi.mock('@/lib/current-price-snapshots', () => ({
   getPersistedCurrentPriceBatch: vi.fn(),
@@ -18,6 +18,9 @@ describe('GET /api/bot-trader/analytics', () => {
     vi.clearAllMocks();
     vi.mocked(getMarketUrlsById).mockResolvedValue(null);
     vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map());
+    vi.mocked(summarizeBotPerformance).mockImplementation(() => ({
+      capital: { currentCents: 99 }, pnl: { unrealizedCents: null },
+    }) as never);
   });
   it('returns aggregated bot position analytics without caching', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({
@@ -105,6 +108,49 @@ describe('GET /api/bot-trader/analytics', () => {
       kalshi: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
       polymarket: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
     });
+  });
+
+  it('derives independent one-share current value from exact persisted executable bids', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({
+      positions: [{
+        id: 9, marketId: 'm9', kalshiTicker: 'KX-9', kalshiSide: 'no',
+        pmConditionId: '0x9', pmEntryTokenId: 'token-yes', pmExitTokenId: 'token-yes', pmSide: 'yes',
+        remainingSharesKalshi: 1, remainingSharesPm: 1, remainingOpenCostCents: 95,
+        status: 'open', entryCostStatus: 'unavailable', currentValueCents: null, unrealizedPnlCents: null,
+      }],
+      performance: { valuation: { fresh: 0, stale: 0, unavailable: 1 } },
+      openPositions: { count: 1, unrealizedPnlCents: null },
+      averageRoi: { atTradeBps: 500, currentBps: null },
+    } as never);
+    vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map([
+      ['kalshi|kx-9|no|', {
+        status: 'available', priceCents: 45, executableDepthMicros: 1_000_000,
+        source: 'saved-market-full-scan', observedAt: '2026-08-14T12:00:00.000Z', ageMs: 1_000, failureReason: null,
+      }],
+      ['polymarket|0x9|yes|token-yes', {
+        status: 'available', priceCents: 54, executableDepthMicros: 2_000_000,
+        source: 'saved-market-quick-refresh', observedAt: '2026-08-14T12:00:01.000Z', ageMs: 0, failureReason: null,
+      }],
+    ]));
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+    expect(body.analytics.positions[0]).toMatchObject({
+      currentPriceKalshiCents: 45,
+      currentPricePmCents: 54,
+      currentValueCents: 99,
+      kalshiLiquidationValueCents: 45,
+      pmLiquidationValueCents: 54,
+      lastValuationAt: '2026-08-14T12:00:00.000Z',
+      valuationStatus: 'current',
+      valuationFailureReason: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+    });
+    expect(summarizeBotPerformance).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 9, currentValueCents: 99, unrealizedPnlCents: null }),
+    ], expect.any(Date));
+    expect(body.analytics.performance).toEqual({ capital: { currentCents: 99 }, pnl: { unrealizedCents: null } });
   });
 
   it('returns an actionable retry message when the analytics store is unavailable', async () => {

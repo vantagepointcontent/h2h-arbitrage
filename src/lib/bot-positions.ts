@@ -485,6 +485,31 @@ function assertCurrentFeeAuthority(position: BotPosition, observedAt: string): v
   if (!Number.isFinite(observedMs)) throw new Error(`Malformed valuation timestamp for bot position ${position.id}`);
 }
 
+function persistedExitFeeAuthority(position: BotPosition, observedAt: string): AuthoritativeBotFeeConfig | null {
+  try {
+    assertCurrentFeeAuthority(position, observedAt);
+  } catch {
+    return null;
+  }
+  return {
+    kalshi: {
+      feeType: position.kalshiExitFeeType!,
+      feeMultiplierPpm: position.kalshiExitFeeMultiplierPpm!,
+      source: position.kalshiExitFeeSource!,
+      observedAt: position.kalshiExitFeeObservedAt!,
+      version: position.kalshiExitFeeVersion!,
+    },
+    polymarket: {
+      tokenId: position.pmExitTokenId!,
+      feeRateBps: position.pmExitFeeRateBps!,
+      source: position.pmExitFeeSource!,
+      observedAt: position.pmExitFeeObservedAt!,
+      version: position.pmExitFeeVersion!,
+    },
+    pmTheta: position.pmTheta!,
+  };
+}
+
 function assertEntryFeeAuthority(input: CreateBotPosition): void {
   const openedMs = Date.parse(input.openedAt);
   const kalshiObservedMs = Date.parse(input.kalshiEntryFeeObservedAt ?? '');
@@ -1882,15 +1907,11 @@ export class BotPositionStore {
     await this.ensureSchema();
     await this.client.execute({
       sql: `UPDATE bot_positions SET
-        current_price_kalshi = NULL, current_price_pm = NULL, current_value = NULL,
-        kalshi_gross_proceeds_microcents = NULL, pm_gross_proceeds_microcents = NULL,
-        kalshi_net_proceeds = NULL, pm_net_proceeds = NULL,
-        kalshi_exit_fee = NULL, pm_exit_fee = NULL,
-        unrealized_pnl = NULL, unrealized_roi_pct = NULL, last_valuation_at = ?,
         valuation_failure_reason = ?, valuation_failure_at = ?
         WHERE id = ? AND status = 'open'
-          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
-      args: [attemptedAt, reason, attemptedAt, id, attemptedAt],
+          AND (last_valuation_at IS NULL OR last_valuation_at <= ?)
+          AND (valuation_failure_at IS NULL OR valuation_failure_at <= ?)`,
+      args: [reason, attemptedAt, id, attemptedAt, attemptedAt],
     });
   }
 
@@ -2104,6 +2125,30 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
     },
     pmTheta,
   };
+}
+
+const FEE_RATE_LIMIT_BACKOFF_MS = 5 * 60_000;
+let feeAuthorityQueue: Promise<void> = Promise.resolve();
+let feeAuthorityBackoffUntilMs = 0;
+
+async function fetchValuationFeeAuthority(
+  input: Parameters<typeof fetchAuthoritativeBotFeeConfig>[0],
+): Promise<AuthoritativeBotFeeConfig> {
+  const operation = feeAuthorityQueue.then(async () => {
+    if (Date.now() < feeAuthorityBackoffUntilMs) {
+      throw new Error(`Authoritative fee lookup is in rate-limit backoff until ${new Date(feeAuthorityBackoffUntilMs).toISOString()}`);
+    }
+    try {
+      return await fetchAuthoritativeBotFeeConfig(input);
+    } catch (error) {
+      if (error instanceof Error && /HTTP 429\b/.test(error.message)) {
+        feeAuthorityBackoffUntilMs = Date.now() + FEE_RATE_LIMIT_BACKOFF_MS;
+      }
+      throw error;
+    }
+  });
+  feeAuthorityQueue = operation.then(() => undefined, () => undefined);
+  return operation;
 }
 
 export async function recordBotPosition(
@@ -2729,14 +2774,18 @@ export async function pollOpenBotPositions(dependencies?: {
         : kalshiBids?.noBids ?? [];
       let valuedPosition = position;
       if (!(kalshiResolution.resolved && pmBids.resolved)) {
-        const authority = await (dependencies?.fetchFeeConfig ?? fetchAuthoritativeBotFeeConfig)({
+        const feeInput = {
           kalshiTicker: position.kalshiTicker,
           pmConditionId: position.pmConditionId,
           pmTokenId: position.pmEntryTokenId ?? position.pmExitTokenId
             ?? (/^\d+$/.test(position.pmConditionId) ? position.pmConditionId : undefined),
           pmSide: position.pmSide,
           category: position.category ?? undefined,
-        });
+        };
+        const authority = dependencies?.fetchFeeConfig
+          ? await dependencies.fetchFeeConfig(feeInput)
+          : persistedExitFeeAuthority(position, quoteObservedAt)
+            ?? await fetchValuationFeeAuthority(feeInput);
         const legacyPaperEntry = isLegacyPaperEntryAuthorityMissing(position);
         if (!legacyPaperEntry && authority.pmTheta !== position.pmTheta) {
           throw new Error('Conflicting persisted and current Polymarket fee theta');

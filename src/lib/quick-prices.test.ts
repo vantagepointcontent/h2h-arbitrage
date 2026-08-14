@@ -50,6 +50,8 @@ describe('enrichQuickPmMarketsWithClobPrices', () => {
     expect(enriched.every((market) => JSON.parse(market.outcomePrices)[1] === '0.610000')).toBe(true);
     expect(enriched.every((market) => market.askDepth === 40)).toBe(true);
     expect(enriched.every((market) => market.noAskDepth === 61)).toBe(true);
+    expect(enriched.every((market) => market.yesBid === 0.39 && market.noBid === 0.6)).toBe(true);
+    expect(enriched.every((market) => market.yesBidDepth === 100 && market.noBidDepth === 100)).toBe(true);
   });
 
   it('uses Gamma aggregate quotes and refreshes standard-market depth from token books', async () => {
@@ -82,6 +84,7 @@ describe('enrichQuickPmMarketsWithClobPrices', () => {
     expect(enriched.outcomePrices).toBe('["0.450000","0.570000"]');
     expect(enriched.askDepth).toBe(45);
     expect(enriched.noAskDepth).toBeCloseTo(57, 8);
+    expect(enriched).toMatchObject({ yesBid: 0.43, noBid: 0.55, yesBidDepth: 100, noBidDepth: 100 });
   });
 
   it('pairs standard-market executable prices with the same token-book depth level', async () => {

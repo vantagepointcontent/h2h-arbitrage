@@ -28,6 +28,12 @@ export interface PMMarket {
   /** Dollar quantity at the live CLOB YES/NO best ask; zero means unknown or unavailable. */
   askDepth?: number;
   noAskDepth?: number;
+  /** Exact token-book sell bids and share depth at those bids. */
+  yesBid?: number;
+  noBid?: number;
+  yesBidDepth?: number;
+  noBidDepth?: number;
+  quoteObservedAt?: string;
   yesMinOrderSize?: number | null;
   noMinOrderSize?: number | null;
   yesTickSize?: number | null;

@@ -35,6 +35,12 @@ export interface UnifiedOutcome {
     noTokenId?: string;
     yesPrice: number;
     noPrice: number;
+    /** Exact token-book sell bids and quantities; never inferred for neg-risk. */
+    yesBid?: number;
+    noBid?: number;
+    yesBidDepth?: number;
+    noBidDepth?: number;
+    quoteObservedAt?: string;
     bestBid: number;
     bestAsk: number;
     lastTradePrice: number;
@@ -1311,6 +1317,11 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
     ...exactTokens,
     yesPrice,
     noPrice,
+    yesBid: market.yesBid,
+    noBid: market.noBid,
+    yesBidDepth: market.yesBidDepth,
+    noBidDepth: market.noBidDepth,
+    quoteObservedAt: market.quoteObservedAt,
     // When no CLOB orderbook, use gamma prices as bestAsk/bestBid so
     // arb calculation doesn't zero them out. These are stale but non-zero.
     bestBid: rawBestBid != null ? rawBestBid : (yesPrice > 0 ? yesPrice * 0.98 : 0),

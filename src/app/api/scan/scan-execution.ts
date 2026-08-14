@@ -309,6 +309,11 @@ export async function executeFullScan(request: NextRequest) {
             // Gamma liquidity is market-wide metadata, not an order-level guarantee.
             askDepth: depth.yesAskDepth,
             noAskDepth: depth.noAskDepth,
+            yesBid: depth.yesBid,
+            noBid: depth.noBid,
+            yesBidDepth: depth.yesBidDepth,
+            noBidDepth: depth.noBidDepth,
+            quoteObservedAt: new Date().toISOString(),
             yesMinOrderSize: depth.yesMinOrderSize,
             noMinOrderSize: depth.noMinOrderSize,
             yesTickSize: depth.yesTickSize,

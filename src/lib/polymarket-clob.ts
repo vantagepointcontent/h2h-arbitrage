@@ -335,6 +335,21 @@ function bestAskDollarDepth(book: ClobBook | null): number {
     .reduce((total, level) => total + level.price * level.size, 0);
 }
 
+function bestBidShareDepth(book: ClobBook | null): { price: number; shares: number } | null {
+  if (!book?.bids?.length) return null;
+  const validBids = book.bids
+    .map(({ price, size }) => ({ price: finiteDecimal(price), size: finiteDecimal(size) }))
+    .filter((level): level is { price: number; size: number } =>
+      level.price !== null && level.price > 0 && level.price <= 1
+      && level.size !== null && level.size > 0);
+  if (!validBids.length) return null;
+  const price = Math.max(...validBids.map((level) => level.price));
+  return {
+    price,
+    shares: validBids.filter((level) => level.price === price).reduce((sum, level) => sum + level.size, 0),
+  };
+}
+
 function positiveBookConstraint(value: unknown): number | null {
   const parsed = finiteDecimal(value);
   return parsed !== null && parsed > 0 ? parsed : null;
@@ -461,6 +476,10 @@ function bookConstraints(yesBook: ClobBook | null, noBook: ClobBook | null): Pic
 export async function getClobAskDepths(clob: ClobMarket): Promise<{
   yesAskDepth: number;
   noAskDepth: number;
+  yesBid: number | null;
+  noBid: number | null;
+  yesBidDepth: number | null;
+  noBidDepth: number | null;
   yesMinOrderSize: number | null;
   noMinOrderSize: number | null;
   yesTickSize: number | null;
@@ -470,6 +489,7 @@ export async function getClobAskDepths(clob: ClobMarket): Promise<{
   const noToken = clob.tokens?.find(token => token.outcome === 'No');
   if (!yesToken || !noToken) return {
     yesAskDepth: 0, noAskDepth: 0,
+    yesBid: null, noBid: null, yesBidDepth: null, noBidDepth: null,
     yesMinOrderSize: null, noMinOrderSize: null,
     yesTickSize: null, noTickSize: null,
   };
@@ -478,9 +498,15 @@ export async function getClobAskDepths(clob: ClobMarket): Promise<{
     fetchClobBook(yesToken.token_id),
     fetchClobBook(noToken.token_id),
   ]);
+  const yesBid = bestBidShareDepth(yesBook);
+  const noBid = bestBidShareDepth(noBook);
   return {
     yesAskDepth: bestAskDollarDepth(yesBook),
     noAskDepth: bestAskDollarDepth(noBook),
+    yesBid: yesBid?.price ?? null,
+    noBid: noBid?.price ?? null,
+    yesBidDepth: yesBid?.shares ?? null,
+    noBidDepth: noBid?.shares ?? null,
     yesMinOrderSize: positiveBookConstraint(yesBook?.min_order_size),
     noMinOrderSize: positiveBookConstraint(noBook?.min_order_size),
     yesTickSize: positiveBookConstraint(yesBook?.tick_size),
@@ -614,6 +640,10 @@ export interface ClobPrices {
   lastTradePrice: number;
   yesAskDepth?: number;
   noAskDepth?: number;
+  yesBid?: number;
+  noBid?: number;
+  yesBidDepth?: number;
+  noBidDepth?: number;
   yesMinOrderSize?: number;
   noMinOrderSize?: number;
   yesTickSize?: number;
@@ -631,6 +661,12 @@ export function getClobPricesFromBooks(
     typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1;
   const yesPrices = getBestPriceFromBook(yesBook);
   const noPrices = getBestPriceFromBook(noBook);
+  const yesBid = bestBidShareDepth(yesBook);
+  const noBid = bestBidShareDepth(noBook);
+  const exactBidEvidence = {
+    ...(yesBid ? { yesBid: yesBid.price, yesBidDepth: yesBid.shares } : {}),
+    ...(noBid ? { noBid: noBid.price, noBidDepth: noBid.shares } : {}),
+  };
 
   if (clob.neg_risk !== true && isExecutablePrice(clob.best_bid) && isExecutablePrice(clob.best_ask)) {
     // Keep executable price and depth on the same token-book level. Gamma's
@@ -646,6 +682,7 @@ export function getClobPricesFromBooks(
       lastTradePrice: clob.last_trade_price ?? yesPrice,
       yesAskDepth: bestAskDollarDepth(yesBook),
       noAskDepth: bestAskDollarDepth(noBook),
+      ...exactBidEvidence,
       ...bookConstraints(yesBook, noBook),
     };
   }
@@ -668,6 +705,7 @@ export function getClobPricesFromBooks(
     lastTradePrice: clob.last_trade_price ?? yesPrice,
     yesAskDepth: bestAskDollarDepth(yesBook),
     noAskDepth: bestAskDollarDepth(noBook),
+    ...exactBidEvidence,
     ...bookConstraints(yesBook, noBook),
   };
 }
