@@ -9,6 +9,7 @@ import {
   type OutcomeContingentApy,
   type SettlementTiming,
 } from './settlement-apy';
+import { isPriceAlignedToTick } from './venue-constraints';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -41,6 +42,14 @@ export interface UnifiedOutcome {
     liquidity?: string;
     askDepth?: number;
     noAskDepth?: number;
+    /** Venue constraints from the exact YES/NO token books. */
+    yesMinOrderSize?: number;
+    noMinOrderSize?: number;
+    yesTickSize?: number;
+    noTickSize?: number;
+    /** Worst consumed marketable limits; VWAP remains in bestAsk/noPrice. */
+    yesLimitPrice?: number;
+    noLimitPrice?: number;
     negRisk?: boolean;
     /** Exact [Yes, No] outcome structure was verified from platform data. */
     binaryVerified?: boolean;
@@ -82,6 +91,10 @@ export interface UnifiedOutcome {
     suspicious?: boolean;
     /** True only when every required orderbook leg has known positive ask depth. */
     depthVerified?: boolean;
+    /** Canonical opportunity sizing is always one contract/share per leg. */
+    requestedContracts?: 1;
+    executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+    executionBlocker?: string;
     /** Fee-adjusted profit per winning platform for the buy side */
     fees?: {
       kalshiFee: number;
@@ -498,10 +511,16 @@ export function calculateArbitrageMax(
   category?: string,
   maxCapital = 1000,
 ): UnifiedOutcome['arbitrage'] {
+  // RES-012 F1: `maxCapital` is retained for API compatibility, but canonical
+  // opportunity economics always request one explicit unit on every leg.
+  void maxCapital;
+  const requestedContracts = 1 as const;
   const kYes = kalshi.yesAsk;
   const kNo = kalshi.noAsk;
   const pYes = pm.bestAsk;
   const pNo = pm.noPrice;
+  const pYesLimit = finiteDecimal(pm.yesLimitPrice) ?? pYes;
+  const pNoLimit = finiteDecimal(pm.noLimitPrice) ?? pNo;
   // A zero, negative, non-finite, or above-par ask is not a tradeable quote.
   // Do not turn malformed/missing upstream prices into an apparent arbitrage.
   const isTradeableAsk = (price: number) => Number.isFinite(price) && price > 0 && price <= 1;
@@ -524,6 +543,7 @@ export function calculateArbitrageMax(
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket';
     sellPrice: number;
+    blocker: string;
   } | null = null;
 
   const considerUnexecutableQuote = (
@@ -532,6 +552,7 @@ export function calculateArbitrageMax(
     pmPrice: number,
     quoteBuyPlatform: 'kalshi' | 'polymarket',
     quoteSellPlatform: 'kalshi' | 'polymarket',
+    blocker: string,
   ) => {
     const quoteCapital = 100;
     const fees = computeArbitrageFees(
@@ -546,6 +567,7 @@ export function calculateArbitrageMax(
         buyPrice: quoteBuyPlatform === 'kalshi' ? kYes : pYes,
         sellPlatform: quoteSellPlatform,
         sellPrice: quoteSellPlatform === 'kalshi' ? kNo : pNo,
+        blocker,
       };
     }
   };
@@ -556,12 +578,26 @@ export function calculateArbitrageMax(
   // negative-spread pairs, showing 0.0% instead of the real number.
   {
     // Strategy 1: Buy YES Kalshi + NO PM
-    if (isTradeableAsk(kYes) && isTradeableAsk(pNo) && (depthKYes <= 0 || depthPNo <= 0)) {
-      considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket');
+
+    const pmMinimum = finiteDecimal(pm.noMinOrderSize);
+    const pmTick = finiteDecimal(pm.noTickSize);
+    const blocker = pmMinimum === null
+      ? 'Polymarket NO minimum order is unavailable'
+      : pmMinimum > requestedContracts
+      ? `Polymarket NO minimum order is ${pmMinimum} shares; requested 1 share`
+      : pmTick === null
+        ? 'Polymarket NO tick size is unavailable'
+        : !isPriceAlignedToTick(pNoLimit, pmTick)
+          ? `Polymarket NO limit price ${pNoLimit} is not aligned to tick size ${pmTick}`
+      : depthKYes < kYes
+        ? `Kalshi YES top-of-book depth ${depthKYes} USD cannot fill requested 1 contract at ${kYes} USD`
+        : depthPNo < pNo
+          ? `Polymarket NO top-of-book depth ${depthPNo} USD cannot fill requested 1 share at ${pNo} USD`
+          : undefined;
+    const capital = blocker == null && isTradeableAsk(kYes) && isTradeableAsk(pNo) ? requestedContracts : 0;
+    if (blocker && isTradeableAsk(kYes) && isTradeableAsk(pNo)) {
+      considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket', blocker);
     }
-    const capK = depthKYes > 0 && isTradeableAsk(kYes) ? depthKYes / kYes : 0;
-    const capP = depthPNo > 0 && isTradeableAsk(pNo) ? depthPNo / pNo : 0;
-    const capital = Math.min(capK, capP, maxCapital);
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
@@ -602,12 +638,26 @@ export function calculateArbitrageMax(
 
   {
     // Strategy 2: Buy YES PM + NO Kalshi
-    if (isTradeableAsk(pYes) && isTradeableAsk(kNo) && (depthPYes <= 0 || depthKNo <= 0)) {
-      considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi');
+
+    const pmMinimum = finiteDecimal(pm.yesMinOrderSize);
+    const pmTick = finiteDecimal(pm.yesTickSize);
+    const blocker = pmMinimum === null
+      ? 'Polymarket YES minimum order is unavailable'
+      : pmMinimum > requestedContracts
+      ? `Polymarket YES minimum order is ${pmMinimum} shares; requested 1 share`
+      : pmTick === null
+        ? 'Polymarket YES tick size is unavailable'
+        : !isPriceAlignedToTick(pYesLimit, pmTick)
+          ? `Polymarket YES limit price ${pYesLimit} is not aligned to tick size ${pmTick}`
+      : depthKNo < kNo
+        ? `Kalshi NO top-of-book depth ${depthKNo} USD cannot fill requested 1 contract at ${kNo} USD`
+        : depthPYes < pYes
+          ? `Polymarket YES top-of-book depth ${depthPYes} USD cannot fill requested 1 share at ${pYes} USD`
+          : undefined;
+    const capital = blocker == null && isTradeableAsk(pYes) && isTradeableAsk(kNo) ? requestedContracts : 0;
+    if (blocker && isTradeableAsk(pYes) && isTradeableAsk(kNo)) {
+      considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi', blocker);
     }
-    const capP = depthPYes > 0 && isTradeableAsk(pYes) ? depthPYes / pYes : 0;
-    const capK = depthKNo > 0 && isTradeableAsk(kNo) ? depthKNo / kNo : 0;
-    const capital = Math.min(capP, capK, maxCapital);
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {
       const fees = computeArbitrageFees(
@@ -657,6 +707,7 @@ export function calculateArbitrageMax(
       buyPrice: number;
       sellPlatform: 'kalshi' | 'polymarket';
       sellPrice: number;
+      blocker: string;
     } | null;
     if (quote) {
       return {
@@ -673,6 +724,9 @@ export function calculateArbitrageMax(
         fees: undefined,
         arbType: 'direct',
         depthVerified: false,
+        requestedContracts,
+        executionStatus: 'non_executable',
+        executionBlocker: quote.blocker,
       };
     }
     return {
@@ -689,6 +743,8 @@ export function calculateArbitrageMax(
       fees: undefined,
       arbType: 'direct',
       depthVerified: false,
+      requestedContracts,
+      executionStatus: 'unavailable',
     };
   }
 
@@ -699,6 +755,7 @@ export function calculateArbitrageMax(
     buyPrice: number;
     sellPlatform: 'kalshi' | 'polymarket';
     sellPrice: number;
+    blocker: string;
   } | null;
   const executableRoiPct = bestCapital > 0 ? (maxProfit / bestCapital) * 100 : 0;
   if (quote && quote.roiPct > executableRoiPct) {
@@ -716,6 +773,9 @@ export function calculateArbitrageMax(
       fees: undefined,
       arbType: 'direct',
       depthVerified: false,
+      requestedContracts,
+      executionStatus: 'non_executable',
+      executionBlocker: quote.blocker,
     };
   }
 
@@ -733,6 +793,8 @@ export function calculateArbitrageMax(
     fees: feeInfo,
     arbType: 'direct',
     depthVerified: true,
+    requestedContracts,
+    executionStatus: 'executable',
   };
 }
 
@@ -742,6 +804,7 @@ export function calculateBestArbitrageForOutcome(
   complement: UnifiedOutcome | null,
   category?: string,
   maxCapital = 1000,
+  crossOutcomeVerified = false,
 ): UnifiedOutcome['arbitrage'] {
   if (!current.kalshi || !current.polymarket) {
     return { strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, apyPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0, maxCapital: 0 };
@@ -783,11 +846,7 @@ export function calculateBestArbitrageForOutcome(
   const kYes = current.kalshi.yesAsk;
   const kNo = current.kalshi.noAsk;
   if (current.kalshi.ticker && kYes > 0 && kNo > 0 && kYes + kNo < 1) {
-    const contracts = Math.min(
-      depthKYes > 0 ? depthKYes / kYes : 0,
-      depthKNo > 0 ? depthKNo / kNo : 0,
-      maxCapital,
-    );
+    const contracts = depthKYes >= kYes && depthKNo >= kNo ? 1 : 0;
     if (contracts > 0) {
       const yesStake = contracts * kYes;
       const noStake = contracts * kNo;
@@ -803,6 +862,7 @@ export function calculateBestArbitrageForOutcome(
           expectedProfit: netProfit, roiPct: totalStake > 0 ? netProfit / totalStake * 100 : 0,
           maxCapital: contracts, buyPlatform: 'kalshi', buyPrice: kYes,
           sellPlatform: 'kalshi', sellPrice: kNo, depthVerified: true,
+          requestedContracts: 1, executionStatus: 'executable',
           fees: {
             kalshiFee: totalFee, pmFee: 0,
             kalshiFeeDetails: `Kalshi YES ${contracts.toFixed(0)} @ $${fmtProbPrice(kYes)} (${formatFee(yesFee)}) + NO ${contracts.toFixed(0)} @ $${fmtProbPrice(kNo)} (${formatFee(noFee)}) = ${formatFee(totalFee)}`,
@@ -819,11 +879,15 @@ export function calculateBestArbitrageForOutcome(
   const pNo = current.polymarket.noPrice;
   if (current.polymarket.binaryVerified === true && current.polymarket.negRisk !== true
       && current.polymarket.conditionId && pYes > 0 && pNo > 0 && pYes + pNo < 1) {
-    const contracts = Math.min(
-      depthPYes > 0 ? depthPYes / pYes : 0,
-      depthPNo > 0 ? depthPNo / pNo : 0,
-      maxCapital,
-    );
+    const yesMinimum = finiteDecimal(current.polymarket.yesMinOrderSize);
+    const noMinimum = finiteDecimal(current.polymarket.noMinOrderSize);
+    const yesTick = finiteDecimal(current.polymarket.yesTickSize);
+    const noTick = finiteDecimal(current.polymarket.noTickSize);
+    const minimumsExecutable = yesMinimum != null && yesMinimum <= 1 && noMinimum != null && noMinimum <= 1;
+    const ticksExecutable = yesTick != null && noTick != null
+      && isPriceAlignedToTick(pYes, yesTick)
+      && isPriceAlignedToTick(pNo, noTick);
+    const contracts = minimumsExecutable && ticksExecutable && depthPYes >= pYes && depthPNo >= pNo ? 1 : 0;
     if (contracts > 0) {
       const yesStake = contracts * pYes;
       const noStake = contracts * pNo;
@@ -841,6 +905,7 @@ export function calculateBestArbitrageForOutcome(
           maxCapital: contracts, buyPlatform: 'polymarket', buyPrice: pYes,
           sellPlatform: 'polymarket', sellPrice: pNo,
           pmConditionId: current.polymarket.conditionId, depthVerified: true,
+          requestedContracts: 1, executionStatus: 'executable',
           fees: {
             kalshiFee: 0, pmFee: totalFee, kalshiFeeDetails: 'Kalshi: not involved',
             pmFeeDetails: `Polymarket YES ${contracts.toFixed(0)} @ $${fmtProbPrice(pYes)} (${formatFee(yesFee)}) + NO ${contracts.toFixed(0)} @ $${fmtProbPrice(pNo)} (${formatFee(noFee)}) = ${formatFee(totalFee)}`,
@@ -853,7 +918,7 @@ export function calculateBestArbitrageForOutcome(
   }
 
   // Cross-outcome: buy YES on both platforms. Only valid for strict binary markets.
-  if (complement?.kalshi && complement?.polymarket
+  if (crossOutcomeVerified && complement?.kalshi && complement?.polymarket
       && current.artist !== complement.artist
       && current.kalshi.ticker !== complement.kalshi.ticker
       && current.polymarket.conditionId !== complement.polymarket.conditionId) {
@@ -861,17 +926,19 @@ export function calculateBestArbitrageForOutcome(
     const pYesB = complement.polymarket.bestAsk;
     if (kYesA + pYesB < 1) {
       const compAskDepth = parseDepth(complement.polymarket.askDepth);
-      const capKA = depthKYes > 0 ? depthKYes / kYesA : 0;
-      const capPB = compAskDepth > 0 ? compAskDepth / pYesB : 0;
+      const capKA = depthKYes >= kYesA ? 1 : 0;
+      const capPB = compAskDepth >= pYesB ? 1 : 0;
       const compKalshiYesDepth = parseDepth(complement.kalshi.yesAskDepth ?? 0);
-      const capKB = compKalshiYesDepth > 0 ? compKalshiYesDepth / complement.kalshi.yesAsk : 0;
-      const capPA = depthPYes > 0 ? depthPYes / current.polymarket.bestAsk : 0;
+      const capKB = compKalshiYesDepth >= complement.kalshi.yesAsk ? 1 : 0;
+      const capPA = depthPYes >= current.polymarket.bestAsk ? 1 : 0;
       // Capital limited by all four legs because we buy YES on both platforms across both outcomes
-      const capital = Math.min(capKA, capPB, capKB, capPA, maxCapital);
+      const pmMinimum = finiteDecimal(complement.polymarket.yesMinOrderSize);
+      const pmTick = finiteDecimal(complement.polymarket.yesTickSize);
+      const pmConstraintsExecutable = pmMinimum != null && pmMinimum <= 1 && pmTick != null
+        && isPriceAlignedToTick(pYesB, pmTick);
+      const capital = pmConstraintsExecutable ? Math.min(capKA, capPB, capKB, capPA, 1) : 0;
       const effectiveCapital = capital;
       if (effectiveCapital > 0) {
-        const grossRoi = 1 - (kYesA + pYesB);
-        const grossProfit = effectiveCapital * grossRoi;
         // Cross-outcome stake: buy YES Kalshi on current, buy YES PM on complement
         const kalshiStake = effectiveCapital * kYesA;
         const pmStake = effectiveCapital * pYesB;
@@ -910,6 +977,8 @@ export function calculateBestArbitrageForOutcome(
               worstCaseNetProfit: fees.worstCaseNetProfit,
             },
             depthVerified: true,
+            requestedContracts: 1,
+            executionStatus: 'executable',
           };
         }
       }
@@ -995,9 +1064,12 @@ export function calculateAllArbitrages(
   outcomes: UnifiedOutcome[],
   category?: string,
   maxCapital = 1000,
+  crossOutcomeGate?: { mutuallyExclusive: boolean; exhaustive: boolean },
 ): UnifiedOutcome[] {
   // Cross-outcome YES+YES is only valid for a strictly binary market: exactly two possible outcomes.
-  const isStrictBinary = outcomes.length === 2;
+  const isStrictBinary = outcomes.length === 2
+    && crossOutcomeGate?.mutuallyExclusive === true
+    && crossOutcomeGate.exhaustive === true;
   const matched = outcomes.filter(o => o.kalshi && o.polymarket);
   const [a, b] = isStrictBinary ? matched : [null, null];
 
@@ -1008,7 +1080,7 @@ export function calculateAllArbitrages(
     }
     return {
       ...o,
-      arbitrage: calculateBestArbitrageForOutcome(o, complement, category, maxCapital),
+      arbitrage: calculateBestArbitrageForOutcome(o, complement, category, maxCapital, isStrictBinary),
     };
   });
 }
@@ -1186,6 +1258,10 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
       liquidity: market.liquidity,
       askDepth: 0,
       noAskDepth: 0,
+      yesMinOrderSize: finiteDecimal(market.yesMinOrderSize) ?? undefined,
+      noMinOrderSize: finiteDecimal(market.noMinOrderSize) ?? undefined,
+      yesTickSize: finiteDecimal(market.yesTickSize) ?? undefined,
+      noTickSize: finiteDecimal(market.noTickSize) ?? undefined,
       negRisk: market.neg_risk === true,
       binaryVerified,
       isExecutable: false,
@@ -1246,6 +1322,10 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
     // can be filled at the current ask. Missing CLOB depth must fail closed.
     askDepth: Number.isFinite(market.askDepth) ? market.askDepth : 0,
     noAskDepth: Number.isFinite(market.noAskDepth) ? market.noAskDepth : 0,
+    yesMinOrderSize: finiteDecimal(market.yesMinOrderSize) ?? undefined,
+    noMinOrderSize: finiteDecimal(market.noMinOrderSize) ?? undefined,
+    yesTickSize: finiteDecimal(market.yesTickSize) ?? undefined,
+    noTickSize: finiteDecimal(market.noTickSize) ?? undefined,
     negRisk: market.neg_risk === true,
     binaryVerified,
     settlementTiming: polymarketSettlementTiming(eventEndDate ?? market.endDate, market.endDate),

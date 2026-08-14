@@ -28,6 +28,10 @@ export interface PMMarket {
   /** Dollar quantity at the live CLOB YES/NO best ask; zero means unknown or unavailable. */
   askDepth?: number;
   noAskDepth?: number;
+  yesMinOrderSize?: number | null;
+  noMinOrderSize?: number | null;
+  yesTickSize?: number | null;
+  noTickSize?: number | null;
 }
 
 export interface PMEvent {

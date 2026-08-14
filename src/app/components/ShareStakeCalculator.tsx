@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { AlertTriangle, Calculator } from 'lucide-react';
 import { calculateShareStake, parseAskLevelDepth, type ShareStakeStrategy } from '@/lib/share-stake-calculator';
 
@@ -19,8 +19,7 @@ interface Props {
 export function ShareStakeCalculator({
   strategy, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category, formatCurrency,
 }: Props) {
-  const [rawShares, setRawShares] = useState('1');
-  const shares = Number(rawShares);
+  const shares = 1;
   const kalshiLabel = strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO';
   const pmLabel = strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES';
   const calculation = useMemo(() => calculateShareStake({
@@ -35,8 +34,7 @@ export function ShareStakeCalculator({
     category,
   }), [strategy, shares, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category]);
 
-  const invalidShares = !Number.isFinite(shares) || shares <= 0;
-  if (!calculation && !invalidShares) return null;
+  if (!calculation) return null;
 
   return (
     <div className="mt-3 rounded-lg border border-[#3A4858] bg-[#121E2B] px-3 py-3">
@@ -51,17 +49,14 @@ export function ShareStakeCalculator({
             min="0.0001"
             step="1"
             inputMode="decimal"
-            value={rawShares}
-            onChange={(event) => setRawShares(event.target.value)}
+            value="1"
+            disabled
             className="w-16 rounded border border-[#3A4858] bg-[#0E1621] px-1.5 py-1 text-right font-mono text-xs text-[#FFFFFF] outline-none focus:border-[#5DBE81]"
           />
         </label>
       </div>
 
-      {invalidShares || !calculation ? (
-        <p className="mt-2 text-[10px] text-[#ef4444]">Enter a positive number of shares.</p>
-      ) : (
-        <>
+      <>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Leg label={kalshiLabel} price={calculation.kalshiPrice} cost={calculation.kalshiCost} available={calculation.kalshiAvailableShares} formatCurrency={formatCurrency} />
             <Leg label={pmLabel} price={calculation.pmPrice} cost={calculation.pmCost} available={calculation.pmAvailableShares} formatCurrency={formatCurrency} />
@@ -82,8 +77,7 @@ export function ShareStakeCalculator({
               </span>
             </div>
           )}
-        </>
-      )}
+      </>
     </div>
   );
 }

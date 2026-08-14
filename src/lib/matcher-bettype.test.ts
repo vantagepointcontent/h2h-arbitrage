@@ -34,6 +34,10 @@ function makePm(overrides: Partial<PMMarket> = {}): PMMarket {
     bestAsk: 0.59,
     lastTradePrice: 0.58,
     groupItemTitle: '',
+    yesMinOrderSize: 1,
+    noMinOrderSize: 1,
+    yesTickSize: 0.01,
+    noTickSize: 0.01,
     volume: '5000',
     ...overrides,
   } as PMMarket;
@@ -146,6 +150,10 @@ describe('calculateArbitrageMax — happy paths', () => {
     bestAsk: 0.59,
     lastTradePrice: 0.58,
     negRisk: false,
+    yesMinOrderSize: 1,
+    noMinOrderSize: 1,
+    yesTickSize: 0.01,
+    noTickSize: 0.01,
   };
 
   it('detects Buy YES Kalshi + NO PM arb when prices sum < 1', () => {

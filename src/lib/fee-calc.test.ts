@@ -31,6 +31,7 @@ describe('Kalshi/Polymarket fees', () => {
     const pm = {
       marketId: 'pm-england',
       conditionId: 'c-england',
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
       yesPrice: 0.69, noPrice: 0.31,
       bestBid: 0.68, bestAsk: 0.69,
       lastTradePrice: 0.69,
@@ -60,6 +61,7 @@ describe('Kalshi/Polymarket fees', () => {
     const pm = {
       marketId: 'pm-test',
       conditionId: 'c-test',
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
       yesPrice: 0.50, noPrice: 0.50,
       bestBid: 0.49, bestAsk: 0.51,
       lastTradePrice: 0.50,
@@ -93,6 +95,7 @@ describe('Kalshi/Polymarket fees', () => {
     const pm = {
       marketId: 'pm-tx18',
       conditionId: 'c-tx18',
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
       yesPrice: 0.06, noPrice: 0.94,
       bestBid: 0.05, bestAsk: 0.06,
       lastTradePrice: 0.06,
@@ -165,6 +168,7 @@ describe('Kalshi/Polymarket fees', () => {
     const pm = {
       marketId: 'pm-tiny',
       conditionId: 'c-tiny',
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.001, noTickSize: 0.001,
       yesPrice: 0.50, noPrice: 0.499,
       bestBid: 0.49, bestAsk: 0.50,
       lastTradePrice: 0.50,

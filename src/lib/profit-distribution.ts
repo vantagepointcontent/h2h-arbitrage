@@ -15,6 +15,7 @@ export interface ProfitDistributionInput {
 }
 
 export interface ProfitDistribution {
+  requestedContracts: 1;
   splitPct: number;
   totalStake: number;
   kalshiStake: number;
@@ -90,25 +91,20 @@ export function calculateProfitDistribution(input: ProfitDistributionInput): Pro
     throw new Error('Profit distribution requires valid prices for both legs');
   }
 
-  const totalStake = baseKalshiStake + basePmStake;
-  if (!(totalStake > 0)) throw new Error('Profit distribution requires a positive total stake');
-
+  // Distribution is a scenario view over the canonical one-share hedge, not
+  // an independent sizing engine. Legacy stake inputs remain API-compatible.
   const splitPct = Math.min(100, Math.max(0, input.splitPct));
-  const balancedKalshiFraction = baseKalshiStake / totalStake;
-  // 50% exactly reproduces the scanner's hedged stake ratio; endpoints are 0% / 100%.
-  const kalshiFraction = splitPct <= 50
-    ? balancedKalshiFraction * (splitPct / 50)
-    : balancedKalshiFraction + (1 - balancedKalshiFraction) * ((splitPct - 50) / 50);
-  const kalshiStake = totalStake * kalshiFraction;
-  const pmStake = totalStake - kalshiStake;
-  const kalshiContracts = kalshiStake / kalshiPrice;
-  const pmContracts = pmStake / pmPrice;
-  // Exchanges accept whole contracts only. Keep the allocation math for the
-  // slider's scenario model, but expose the orderable quantities and cash cost.
-  const kalshiShares = Math.floor(kalshiContracts);
-  const pmShares = Math.floor(pmContracts);
+  void baseKalshiStake;
+  void basePmStake;
+  const kalshiContracts = 1;
+  const pmContracts = 1;
+  const kalshiShares = 1;
+  const pmShares = 1;
   const kalshiOrderCost = kalshiShares * kalshiPrice;
   const pmOrderCost = pmShares * pmPrice;
+  const kalshiStake = kalshiOrderCost;
+  const pmStake = pmOrderCost;
+  const totalStake = kalshiStake + pmStake;
   const kalshiFee = calcKalshiFee(kalshiContracts, kalshiPrice);
   const pmFee = calcPolymarketFee(pmContracts, pmPrice, getPolymarketTheta(input.category));
   const totalFees = kalshiFee + pmFee;
@@ -119,6 +115,7 @@ export function calculateProfitDistribution(input: ProfitDistributionInput): Pro
   const netProfitIfPmWins = pmContracts - totalStake - totalFees;
 
   return {
+    requestedContracts: 1,
     splitPct,
     totalStake,
     kalshiStake,

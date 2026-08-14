@@ -3,7 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { Zap } from 'lucide-react';
 import { ExecutionReadiness } from './ExecutionReadiness';
-import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from './ExecuteArbModal';
+import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
+import { parseDepth } from "@/lib/matcher";
 import { ArbHistoryCell } from './ArbHistoryCell';
 import { ExpandedChart } from './ExpandedChart';
 import { ArbDecayCurve } from './ArbDecayCurve';
@@ -22,7 +23,7 @@ interface Outcome {
   kalshiStale?: boolean;
   polymarketStale?: boolean;
   kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
-  polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
+  polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number; yesMinOrderSize?: number | null; noMinOrderSize?: number | null; yesTickSize?: number | null; noTickSize?: number | null } | null;
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
@@ -157,12 +158,16 @@ function OutcomeTableBodyInner({
         pmStake: executionArb.pmStake ?? 0,
         kalshiYesAsk: o.kalshi.yesAsk ?? null,
         kalshiNoAsk: o.kalshi.noAsk ?? null,
-        kalshiYesAskShares: Number(o.kalshi.yesAskDepth),
-        kalshiNoAskShares: Number(o.kalshi.noAskDepth),
+        kalshiYesAskShares: parseDepth(o.kalshi.yesAskDepth) / (o.kalshi.yesAsk || 1),
+        kalshiNoAskShares: parseDepth(o.kalshi.noAskDepth) / (o.kalshi.noAsk || 1),
         pmYesAsk: o.polymarket.yesPrice ?? null,
         pmNoAsk: o.polymarket.noPrice ?? null,
-        pmYesAskShares: o.polymarket.askDepth,
-        pmNoAskShares: o.polymarket.noAskDepth,
+        pmYesAskShares: (o.polymarket.askDepth ?? 0) / (o.polymarket.yesPrice || 1),
+        pmNoAskShares: (o.polymarket.noAskDepth ?? 0) / (o.polymarket.noPrice || 1),
+        pmYesMinOrderSize: o.polymarket.yesMinOrderSize ?? undefined,
+        pmNoMinOrderSize: o.polymarket.noMinOrderSize ?? undefined,
+        pmYesTickSize: o.polymarket.yesTickSize ?? undefined,
+        pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,

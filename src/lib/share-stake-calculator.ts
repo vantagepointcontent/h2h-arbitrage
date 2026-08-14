@@ -15,6 +15,7 @@ export interface ShareStakeInput {
 }
 
 export interface ShareStakeCalculation {
+  requestedContracts: 1;
   kalshiPrice: number;
   pmPrice: number;
   kalshiCost: number;
@@ -36,7 +37,7 @@ export interface ShareStakeCalculation {
  * fillable order when CLOB ask-level data was not returned.
  */
 export function calculateShareStake(input: ShareStakeInput): ShareStakeCalculation | null {
-  const shares = Number.isFinite(input.shares) && input.shares > 0 ? input.shares : 0;
+  const shares = input.shares === 1 ? 1 : 0;
   const isKalshiYes = input.strategy === 'Buy YES Kalshi + NO PM';
   const kalshiPrice = isKalshiYes ? input.kalshiYesAsk : input.kalshiNoAsk;
   const pmPrice = isKalshiYes ? input.pmNoAsk : input.pmYesAsk;
@@ -60,6 +61,7 @@ export function calculateShareStake(input: ShareStakeInput): ShareStakeCalculati
   const netProfit = fees.worstCaseNetProfit;
 
   return {
+    requestedContracts: 1,
     kalshiPrice,
     pmPrice,
     kalshiCost,

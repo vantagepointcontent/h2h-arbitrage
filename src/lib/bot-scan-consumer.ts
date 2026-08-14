@@ -42,6 +42,10 @@ export interface BotScanCandidate {
   kalshiNoDepth: number;
   pmYesDepth: number;
   pmNoDepth: number;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
   fees: BotScanFees | null;
   expiryDate?: string | null;
   category?: string;
@@ -141,6 +145,10 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     kalshiNoDepth: item.kalshiNoDepth,
     pmYesDepth: item.pmYesDepth,
     pmNoDepth: item.pmNoDepth,
+    pmYesMinOrderSize: item.pmYesMinOrderSize ?? null,
+    pmNoMinOrderSize: item.pmNoMinOrderSize ?? null,
+    pmYesTickSize: item.pmYesTickSize ?? null,
+    pmNoTickSize: item.pmNoTickSize ?? null,
     expiryDate: item.expiryDate ?? null,
     category: item.category,
     selectionMethod: settings.selectionMethod,
@@ -438,7 +446,9 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     row.strategy,
     row.arbType === 'direct' || row.arbType === 'cross' || row.arbType === 'internal' ? row.arbType : null,
   );
-  if (!audit.valid || audit.canonicalType === 'internal') return null;
+  // Persisted cross rows do not carry auditable mutual-exclusivity and
+  // exhaustiveness evidence, so the bot may consume direct rows only.
+  if (!audit.valid || audit.canonicalType !== 'direct') return null;
   return {
     outcome: row.artist,
     strategy: row.strategy,
@@ -458,6 +468,10 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     kalshiNoDepth: parseDepth(row.kalshiNoDepth),
     pmYesDepth: parseDepth(row.pmYesDepth),
     pmNoDepth: parseDepth(row.pmNoDepth),
+    pmYesMinOrderSize: finite(row.pmYesMinOrderSize) ? row.pmYesMinOrderSize as number : null,
+    pmNoMinOrderSize: finite(row.pmNoMinOrderSize) ? row.pmNoMinOrderSize as number : null,
+    pmYesTickSize: finite(row.pmYesTickSize) ? row.pmYesTickSize as number : null,
+    pmNoTickSize: finite(row.pmNoTickSize) ? row.pmNoTickSize as number : null,
     fees: fees && finite(fees.kalshiFee) && finite(pmFee) ? { kalshiFee: fees.kalshiFee, pmFee } : null,
     expiryDate: typeof row.expiryDate === 'string' ? row.expiryDate : expiryDate,
     category: typeof row.category === 'string' ? row.category : category,

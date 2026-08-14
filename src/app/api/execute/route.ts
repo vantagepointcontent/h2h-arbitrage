@@ -17,6 +17,7 @@ import { getExecutionMode, setSettings } from '@/lib/settings';
 import { applyEmergencyStop, executionModeToDryRun } from '@/lib/execution-mode';
 import { persistExecution } from '@/lib/persistence';
 import logger from '@/lib/logger';
+import { fetchClobBook, validateOneShareBookOrder } from '@/lib/polymarket-clob';
 
 /**
  * HOOKUP-04 (FEAT-006): MANUAL trade execution + credential management.
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { status: 403 },
         );
       }
-      const effective: ExecutionRequest = {
+      let effective: ExecutionRequest = {
         ...request,
         dryRun: executionModeToDryRun(mode),
       };
@@ -115,6 +116,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             { status: 403 },
           );
         }
+        const pmTokenId = effective.polymarketOrder.conditionId;
+        const authoritativeBook = pmTokenId ? await fetchClobBook(pmTokenId) : null;
+        const constraint = validateOneShareBookOrder(authoritativeBook, effective.polymarketOrder.price);
+        if (!constraint.valid) {
+          return NextResponse.json(
+            { error: constraint.blocker ?? 'Polymarket one-share constraint validation failed' },
+            { status: 409 },
+          );
+        }
+        effective = {
+          ...effective,
+          kalshiOrder: { ...effective.kalshiOrder, minimumOrderSize: 1, tickSize: 0.01 },
+          polymarketOrder: {
+            ...effective.polymarketOrder,
+            minimumOrderSize: constraint.minimumOrderSize!,
+            tickSize: constraint.tickSize!,
+          },
+        };
       }
 
       logger.info('[execute] MANUAL execution requested', {

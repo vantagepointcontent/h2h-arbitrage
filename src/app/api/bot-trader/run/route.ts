@@ -37,6 +37,10 @@ interface RefreshArbRow {
   pmNoPrice?: number | null;
   pmYesDepth?: number | null;
   pmNoDepth?: number | null;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
   arbType?: 'direct' | 'cross' | 'internal' | null;
 }
 
@@ -67,6 +71,10 @@ function toBotTradeInput(
     kalshiNoDepth: parseDepthValue(arb.kalshiNoDepth),
     pmYesDepth: arb.pmYesDepth ?? 0,
     pmNoDepth: arb.pmNoDepth ?? 0,
+    pmYesMinOrderSize: arb.pmYesMinOrderSize ?? null,
+    pmNoMinOrderSize: arb.pmNoMinOrderSize ?? null,
+    pmYesTickSize: arb.pmYesTickSize ?? null,
+    pmNoTickSize: arb.pmNoTickSize ?? null,
     expiryDate,
     category,
   };
@@ -115,6 +123,10 @@ function parseRefreshArbRow(row: unknown): RefreshArbRow | null {
     pmNoPrice: typeof r.pmNoPrice === 'number' ? r.pmNoPrice : null,
     pmYesDepth: typeof r.pmYesDepth === 'number' ? r.pmYesDepth : null,
     pmNoDepth: typeof r.pmNoDepth === 'number' ? r.pmNoDepth : null,
+    pmYesMinOrderSize: typeof r.pmYesMinOrderSize === 'number' ? r.pmYesMinOrderSize : null,
+    pmNoMinOrderSize: typeof r.pmNoMinOrderSize === 'number' ? r.pmNoMinOrderSize : null,
+    pmYesTickSize: typeof r.pmYesTickSize === 'number' ? r.pmYesTickSize : null,
+    pmNoTickSize: typeof r.pmNoTickSize === 'number' ? r.pmNoTickSize : null,
     arbType: r.arbType === 'direct' || r.arbType === 'cross' || r.arbType === 'internal' ? r.arbType : null,
   };
 }

@@ -183,6 +183,10 @@ export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): P
       lastTradePrice: live.lastTradePrice,
       askDepth: live.yesAskDepth ?? 0,
       noAskDepth: live.noAskDepth ?? 0,
+      yesMinOrderSize: live.yesMinOrderSize ?? null,
+      noMinOrderSize: live.noMinOrderSize ?? null,
+      yesTickSize: live.yesTickSize ?? null,
+      noTickSize: live.noTickSize ?? null,
       neg_risk: clob.neg_risk,
     };
   });

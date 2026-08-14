@@ -23,6 +23,7 @@ import {
   type OrderRequest,
   type OrderResult,
 } from './auto-execute';
+import { isPriceAlignedToTick } from './venue-constraints';
 import { getSetting } from './settings';
 import { executionModeToDryRun } from './execution-mode';
 import {
@@ -125,6 +126,12 @@ export interface BotTradeInput {
   kalshiNoExecutableQuote?: ExecutableBookQuote;
   pmYesExecutableQuote?: ExecutableBookQuote;
   pmNoExecutableQuote?: ExecutableBookQuote;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
+  crossOutcomeMutuallyExclusiveVerified?: boolean;
+  crossOutcomeExhaustiveVerified?: boolean;
   /** Market expiry ISO string */
   expiryDate?: string | null;
   category?: string;
@@ -380,8 +387,25 @@ export function evaluateBotTrade(
 
   const legs = pickLegPrices(input.strategy, input);
   if (!legs.supported) reasons.push(`Unsupported strategy: ${input.strategy || '(empty)'}`);
+  if (input.strategy.startsWith('Buy YES both sides:')
+      && (input.crossOutcomeMutuallyExclusiveVerified !== true || input.crossOutcomeExhaustiveVerified !== true)) {
+    reasons.push('Cross-outcome resolution evidence is unavailable');
+  }
   if (legs.kalshiPrice == null || legs.pmPrice == null) {
     reasons.push('Missing tradeable ask price on one or both legs');
+  }
+  const pmMinimumOrderSize = legs.pmOutcome === 'yes' ? input.pmYesMinOrderSize : input.pmNoMinOrderSize;
+  const pmTickSize = legs.pmOutcome === 'yes' ? input.pmYesTickSize : input.pmNoTickSize;
+  if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order is unavailable`);
+  } else if (pmMinimumOrderSize! > 1) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order is ${pmMinimumOrderSize} shares; requested 1 share`);
+  }
+  if (!Number.isFinite(pmTickSize) || pmTickSize! <= 0) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} tick size is unavailable`);
+  } else if (legs.pmPrice != null
+      && !isPriceAlignedToTick(legs.pmPrice, pmTickSize!)) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} price is not aligned to tick size ${pmTickSize}`);
   }
 
   const { depthKUsd, depthPUsd } = legDepths(legs, input);
@@ -392,16 +416,16 @@ export function evaluateBotTrade(
     ? depthPUsd / legs.pmPrice
     : 0;
 
-  if (sharesK < settings.minSharesPerLeg || sharesP < settings.minSharesPerLeg) {
+  if (sharesK < 1 || sharesP < 1) {
     reasons.push(
-      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (min ${settings.minSharesPerLeg})`,
+      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (requested 1)`,
     );
   }
 
   // Executability is price-relative: N shares at a 24c ask require $0.24 × N,
   // not a fixed $0.50 on every leg. Depth values are best-ask dollar depth.
-  const requiredDepthKUsd = (legs.kalshiPrice ?? 0) * settings.minSharesPerLeg;
-  const requiredDepthPUsd = (legs.pmPrice ?? 0) * settings.minSharesPerLeg;
+  const requiredDepthKUsd = legs.kalshiPrice ?? 0;
+  const requiredDepthPUsd = legs.pmPrice ?? 0;
   if (depthKUsd < requiredDepthKUsd || depthPUsd < requiredDepthPUsd) {
     reasons.push(
       `Insufficient executable depth at quoted ask: Kalshi $${depthKUsd.toFixed(2)} / $${requiredDepthKUsd.toFixed(2)} required; PM $${depthPUsd.toFixed(2)} / $${requiredDepthPUsd.toFixed(2)} required`,
@@ -488,7 +512,15 @@ function safeArbId(pairId: string, outcome: string): string {
 export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
   const legs = pickLegPrices(input.strategy, input);
   if (!legs.supported || legs.kalshiPrice == null || legs.pmPrice == null) return null;
+  if (input.strategy.startsWith('Buy YES both sides:')
+      && (input.crossOutcomeMutuallyExclusiveVerified !== true || input.crossOutcomeExhaustiveVerified !== true)) return null;
   if (!input.kalshiTicker || !input.pmConditionId) return null;
+  const pmMinimumOrderSize = legs.pmOutcome === 'yes'
+    ? input.pmYesMinOrderSize
+    : input.pmNoMinOrderSize;
+  if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0 || pmMinimumOrderSize! > 1) return null;
+  const pmTickSize = legs.pmOutcome === 'yes' ? input.pmYesTickSize : input.pmNoTickSize;
+  if (!Number.isFinite(pmTickSize) || pmTickSize! <= 0) return null;
 
   const sourceShares = Math.min(
     input.kalshiStake > 0 ? input.kalshiStake / legs.kalshiPrice : Infinity,
@@ -506,6 +538,7 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   const pmExecutionPrice = pmQuote.vwapPriceMicroCents / 100_000_000;
   const kalshiLimitPrice = kalshiQuote.limitPriceMicroCents / 100_000_000;
   const pmLimitPrice = pmQuote.limitPriceMicroCents / 100_000_000;
+  if (!isPriceAlignedToTick(pmLimitPrice, pmTickSize!)) return null;
 
   // Depth qualifies the opportunity; it does not size the placement. Each
   // BotTrader placement is one matched share on each selected strategy leg.
@@ -522,6 +555,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
     outcome: legs.kalshiOutcome,
     size: kalshiStake,
     contracts,
+    minimumOrderSize: 1,
+    tickSize: 0.01,
     price: kalshiLimitPrice,
     orderType: 'limit',
     executableQuote: kalshiQuote,
@@ -535,6 +570,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
     outcome: legs.pmOutcome,
     size: pmStake,
     contracts,
+    minimumOrderSize: pmMinimumOrderSize!,
+    tickSize: pmTickSize!,
     price: pmLimitPrice,
     orderType: 'limit',
     executableQuote: pmQuote,
@@ -904,6 +941,10 @@ export function unifiedOutcomeToBotInput(
     kalshiNoDepth: parseDepth(outcome.kalshi?.noAskDepth),
     pmYesDepth: outcome.polymarket?.askDepth ?? 0,
     pmNoDepth: outcome.polymarket?.noAskDepth ?? 0,
+    pmYesMinOrderSize: outcome.polymarket?.yesMinOrderSize ?? null,
+    pmNoMinOrderSize: outcome.polymarket?.noMinOrderSize ?? null,
+    pmYesTickSize: outcome.polymarket?.yesTickSize ?? null,
+    pmNoTickSize: outcome.polymarket?.noTickSize ?? null,
     expiryDate,
   };
 }
@@ -941,6 +982,12 @@ export function liveArbResultToBotInput(
     kalshiNoExecutableQuote: result.kalshiNoExecutableQuote,
     pmYesExecutableQuote: result.pmYesExecutableQuote,
     pmNoExecutableQuote: result.pmNoExecutableQuote,
+    pmYesMinOrderSize: result.pmYesMinOrderSize ?? null,
+    pmNoMinOrderSize: result.pmNoMinOrderSize ?? null,
+    pmYesTickSize: result.pmYesTickSize ?? null,
+    pmNoTickSize: result.pmNoTickSize ?? null,
+    crossOutcomeMutuallyExclusiveVerified: result.crossOutcomeMutuallyExclusiveVerified === true,
+    crossOutcomeExhaustiveVerified: result.crossOutcomeExhaustiveVerified === true,
     expiryDate,
   };
 }

@@ -5,6 +5,7 @@
 import { rateLimiters } from '@/lib/rate-limiter';
 import { finiteDecimal } from '@/lib/market-price';
 import { normalizePolymarketResolution } from './settlement-resolution';
+import { isPriceAlignedToTick } from './venue-constraints';
 
 export interface ClobMarket {
   condition_id: string;
@@ -321,14 +322,89 @@ function bestAskDollarDepth(book: ClobBook | null): number {
     .reduce((total, level) => total + level.price * level.size, 0);
 }
 
+function positiveBookConstraint(value: unknown): number | null {
+  const parsed = finiteDecimal(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+export interface OneShareBookValidation {
+  valid: boolean;
+  minimumOrderSize: number | null;
+  tickSize: number | null;
+  bestAsk: number | null;
+  bestAskShares: number;
+  blocker?: string;
+}
+
+/** Validate a canonical one-share buy against authoritative token-book metadata. */
+export function validateOneShareBookOrder(book: ClobBook | null, limitPrice: number): OneShareBookValidation {
+  const minimumOrderSize = positiveBookConstraint(book?.min_order_size);
+  const tickSize = positiveBookConstraint(book?.tick_size);
+  const asks = (book?.asks ?? [])
+    .map((level) => ({ price: Number(level.price), size: Number(level.size) }))
+    .filter((level) => Number.isFinite(level.price) && level.price > 0 && Number.isFinite(level.size) && level.size > 0);
+  const bestAsk = asks.length > 0 ? Math.min(...asks.map((level) => level.price)) : null;
+  const bestAskShares = bestAsk == null
+    ? 0
+    : asks.filter((level) => Math.abs(level.price - bestAsk) <= 1e-9).reduce((sum, level) => sum + level.size, 0);
+
+  let blocker: string | undefined;
+  if (minimumOrderSize == null) blocker = 'Polymarket minimum order is unavailable';
+  else if (minimumOrderSize > 1) blocker = `Polymarket minimum order is ${minimumOrderSize} shares; requested 1 share`;
+  else if (tickSize == null) blocker = 'Polymarket tick size is unavailable';
+  else if (!isPriceAlignedToTick(limitPrice, tickSize)) {
+    blocker = `Polymarket limit price ${limitPrice} is not aligned to tick size ${tickSize}`;
+  } else if (bestAsk == null) blocker = 'Polymarket best ask is unavailable';
+  else if (limitPrice !== bestAsk) {
+    blocker = `Polymarket limit price ${limitPrice} does not match authoritative best ask ${bestAsk}`;
+  }
+  else if (bestAskShares < 1) blocker = `Polymarket top-of-book depth ${bestAskShares} cannot fill requested 1 share`;
+
+  return {
+    valid: blocker == null,
+    minimumOrderSize,
+    tickSize,
+    bestAsk,
+    bestAskShares,
+    ...(blocker ? { blocker } : {}),
+  };
+}
+
+function bookConstraints(yesBook: ClobBook | null, noBook: ClobBook | null): Pick<
+  ClobPrices,
+  'yesMinOrderSize' | 'noMinOrderSize' | 'yesTickSize' | 'noTickSize'
+> {
+  const yesMinOrderSize = positiveBookConstraint(yesBook?.min_order_size);
+  const noMinOrderSize = positiveBookConstraint(noBook?.min_order_size);
+  const yesTickSize = positiveBookConstraint(yesBook?.tick_size);
+  const noTickSize = positiveBookConstraint(noBook?.tick_size);
+  return {
+    ...(yesMinOrderSize != null ? { yesMinOrderSize } : {}),
+    ...(noMinOrderSize != null ? { noMinOrderSize } : {}),
+    ...(yesTickSize != null ? { yesTickSize } : {}),
+    ...(noTickSize != null ? { noTickSize } : {}),
+  };
+}
+
 /**
  * Fetch executable YES and NO depth from CLOB token books. Unknown, missing,
  * or empty books fail closed as zero; Gamma liquidity is not fillable depth.
  */
-export async function getClobAskDepths(clob: ClobMarket): Promise<{ yesAskDepth: number; noAskDepth: number }> {
+export async function getClobAskDepths(clob: ClobMarket): Promise<{
+  yesAskDepth: number;
+  noAskDepth: number;
+  yesMinOrderSize: number | null;
+  noMinOrderSize: number | null;
+  yesTickSize: number | null;
+  noTickSize: number | null;
+}> {
   const yesToken = clob.tokens?.find(token => token.outcome === 'Yes');
   const noToken = clob.tokens?.find(token => token.outcome === 'No');
-  if (!yesToken || !noToken) return { yesAskDepth: 0, noAskDepth: 0 };
+  if (!yesToken || !noToken) return {
+    yesAskDepth: 0, noAskDepth: 0,
+    yesMinOrderSize: null, noMinOrderSize: null,
+    yesTickSize: null, noTickSize: null,
+  };
 
   const [yesBook, noBook] = await Promise.all([
     fetchClobBook(yesToken.token_id),
@@ -337,6 +413,10 @@ export async function getClobAskDepths(clob: ClobMarket): Promise<{ yesAskDepth:
   return {
     yesAskDepth: bestAskDollarDepth(yesBook),
     noAskDepth: bestAskDollarDepth(noBook),
+    yesMinOrderSize: positiveBookConstraint(yesBook?.min_order_size),
+    noMinOrderSize: positiveBookConstraint(noBook?.min_order_size),
+    yesTickSize: positiveBookConstraint(yesBook?.tick_size),
+    noTickSize: positiveBookConstraint(noBook?.tick_size),
   };
 }
 
@@ -466,6 +546,10 @@ export interface ClobPrices {
   lastTradePrice: number;
   yesAskDepth?: number;
   noAskDepth?: number;
+  yesMinOrderSize?: number;
+  noMinOrderSize?: number;
+  yesTickSize?: number;
+  noTickSize?: number;
 }
 
 /** Derive executable prices from token books already fetched by the caller. */
@@ -494,6 +578,7 @@ export function getClobPricesFromBooks(
       lastTradePrice: clob.last_trade_price ?? yesPrice,
       yesAskDepth: bestAskDollarDepth(yesBook),
       noAskDepth: bestAskDollarDepth(noBook),
+      ...bookConstraints(yesBook, noBook),
     };
   }
 
@@ -515,6 +600,7 @@ export function getClobPricesFromBooks(
     lastTradePrice: clob.last_trade_price ?? yesPrice,
     yesAskDepth: bestAskDollarDepth(yesBook),
     noAskDepth: bestAskDollarDepth(noBook),
+    ...bookConstraints(yesBook, noBook),
   };
 }
 

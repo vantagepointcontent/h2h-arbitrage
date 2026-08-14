@@ -33,6 +33,8 @@ function makeOrder(platform: 'kalshi' | 'polymarket', price: number, size: numbe
     outcome: 'yes',
     size,
     contracts: 1,
+    minimumOrderSize: 1,
+    tickSize: 0.01,
     price,
     orderType: 'limit',
     executableQuote: walkExecutableBook({
@@ -50,8 +52,8 @@ function makeRequest(overrides: Partial<ExecutionRequest> = {}): ExecutionReques
   return {
     arbId: 'arb-test',
     marketTitle: 'Test Market',
-    kalshiOrder: makeOrder('kalshi', 0.45, 100),
-    polymarketOrder: makeOrder('polymarket', 0.50, 100),
+    kalshiOrder: makeOrder('kalshi', 0.45, 0.45),
+    polymarketOrder: makeOrder('polymarket', 0.50, 0.50),
     estimatedProfit: 5.0,
     maxSlippagePct: 2.0,
     timeoutMs: 3000,

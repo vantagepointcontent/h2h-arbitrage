@@ -77,6 +77,10 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     kalshiNoDepth: 60,
     pmYesDepth: 60,
     pmNoDepth: 55,
+    pmYesMinOrderSize: 1,
+    pmNoMinOrderSize: 1,
+    pmYesTickSize: 0.01,
+    pmNoTickSize: 0.01,
     expiryDate: farFuture,
     category: 'Politics',
     ...overrides,
@@ -172,6 +176,10 @@ function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome
       lastTradePrice: 0.54,
       askDepth: 60,
       noAskDepth: 55,
+      yesMinOrderSize: 1,
+      noMinOrderSize: 1,
+      yesTickSize: 0.01,
+      noTickSize: 0.01,
     },
     arbitrage: {
       strategy: 'Buy YES Kalshi + NO PM',
@@ -290,8 +298,8 @@ describe('evaluateBotTrade', () => {
     expect(ev.criteria.sharesP).toBeCloseTo(1, 6);
   });
 
-  it('rejects when shares per leg are below minimum', () => {
-    const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.9, pmNoDepth: 0.9 }), baseSettings({ minSharesPerLeg: 2 }));
+  it('rejects when depth cannot fill the canonical one-share hedge', () => {
+    const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.2, pmNoDepth: 0.2 }), baseSettings({ minSharesPerLeg: 10 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('shares');
   });
@@ -328,6 +336,8 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(
       makeInput({
         strategy: 'Buy YES both sides: Kalshi A + PM B',
+        crossOutcomeMutuallyExclusiveVerified: true,
+        crossOutcomeExhaustiveVerified: true,
         kalshiYesAsk: 0.42,
         pmYesAsk: 0.55,
       }),
@@ -363,6 +373,8 @@ describe('buildExecutionRequest', () => {
   it('immutably carries strategy-selected YES/YES asks into one-share orders', () => {
     const req = buildExecutionRequest(makeInput({
       strategy: 'Buy YES both sides: Kalshi Republican + PM Democratic',
+      crossOutcomeMutuallyExclusiveVerified: true,
+      crossOutcomeExhaustiveVerified: true,
       kalshiYesAsk: 0.40,
       pmYesAsk: 0.52,
       kalshiStake: 40,

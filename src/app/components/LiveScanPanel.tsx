@@ -39,6 +39,13 @@ interface LiveArbOutcome {
   kalshiNoAskShares: number;
   pmYesAskShares: number;
   pmNoAskShares: number;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
+  requestedContracts?: 1;
+  executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+  executionBlocker?: string;
   strategy: string;
   roiPct: number;
   expectedProfit: number;
@@ -1013,7 +1020,7 @@ export default function LiveScanPanel({ capital, savedMarkets, initialMarketId }
                                 {(() => {
                                   if (o.stale || o.roiPct <= 0) return null;
                                   const exec = buildExecutableArb(withScanContext(o), activeTab.marketTitle);
-                                  if (!exec) return null;
+                                  if (!exec || exec.executionStatus !== 'executable') return null;
                                   return (
                                     <span className="flex flex-col items-center">
                                       <span className="text-[8px] uppercase tracking-wider text-[#8A9BA8] mb-0.5">Action</span>

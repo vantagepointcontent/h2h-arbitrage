@@ -98,6 +98,7 @@ describe('calculateArbitrageMax', () => {
     bestBid: 0.49, bestAsk: 0.51,
     lastTradePrice: 0.50,
     volume: '', liquidity: '', askDepth: 5000,
+    yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
   };
 
   it('caps executable capital by known Kalshi and PM ask depth', () => {
@@ -167,11 +168,12 @@ describe('calculateArbitrageMax', () => {
     expect(r.depthVerified).toBe(false);
   });
 
-  it('depth begränsar maxCapital', () => {
+  it('keeps maxCapital at the canonical one-share quantity when depth is executable', () => {
     // Låg depth = låg capital
     const low = calculateArbitrageMax(kalshi, pm, 100, 0, 100, 100);
     const high = calculateArbitrageMax(kalshi, pm, 100_000, 0, 100_000, 100_000);
-    expect(high.maxCapital).toBeGreaterThan(low.maxCapital);
+    expect(low.maxCapital).toBe(1);
+    expect(high.maxCapital).toBe(1);
   });
 });
 
@@ -437,7 +439,7 @@ describe('getClobAskDepths', () => {
 
   it('fails closed when a token is unavailable', async () => {
     const depth = await getClobAskDepths({ condition_id: 'c-missing', tokens: [] } as any);
-    expect(depth).toEqual({ yesAskDepth: 0, noAskDepth: 0 });
+    expect(depth).toMatchObject({ yesAskDepth: 0, noAskDepth: 0 });
   });
 
   it('rejects malformed, above-par, and non-decimal ask levels', async () => {
@@ -458,7 +460,7 @@ describe('getClobAskDepths', () => {
         condition_id: 'c-invalid-depth',
         tokens: [{ token_id: 'yes-invalid-depth', outcome: 'Yes' }, { token_id: 'no-invalid-depth', outcome: 'No' }],
       } as any);
-      expect(depth).toEqual({ yesAskDepth: 0, noAskDepth: 0 });
+      expect(depth).toMatchObject({ yesAskDepth: 0, noAskDepth: 0 });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -815,6 +817,7 @@ function makeOutcome(overrides: Partial<any> = {}): any {
       bestBid: 0.79, bestAsk: 0.81,
       lastTradePrice: 0.80,
       volume: '', liquidity: '', askDepth: 5000, noAskDepth: 1000,
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
     },
     arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
     ...overrides,
@@ -961,7 +964,7 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
       kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.30, noAsk: 0.72 },
       polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
     });
-    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics', 1000, true);
     expect(r.strategy).toContain('both sides');
     expect(r.expectedProfit).toBeGreaterThan(0);
   });
@@ -1010,7 +1013,7 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
       polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, askDepth: '5K' as unknown as number, noAskDepth: 5000 },
     });
 
-    const r = calculateBestArbitrageForOutcome(current, complement, 'politics');
+    const r = calculateBestArbitrageForOutcome(current, complement, 'politics', 1000, true);
 
     expect(r.strategy).toContain('both sides');
     expect(r.maxCapital).toBeGreaterThan(0);
@@ -1076,7 +1079,10 @@ describe('calculateAllArbitrages — cross-outcome guard', () => {
       kalshi: { ...base.kalshi, ticker: 'KXDEM', yesAsk: 0.30, noAsk: 0.72 },
       polymarket: { ...base.polymarket, marketId: 'pm-dem', conditionId: 'c-dem', bestAsk: 0.30, yesPrice: 0.30, noPrice: 0.72, bestBid: 0.28 },
     });
-    const result = calculateAllArbitrages([current, complement], 'politics');
+    const result = calculateAllArbitrages([current, complement], 'politics', 1000, {
+      mutuallyExclusive: true,
+      exhaustive: true,
+    });
     const cross = result.find(o => o.arbitrage.strategy.includes('both sides'));
     expect(cross).toBeDefined();
   });

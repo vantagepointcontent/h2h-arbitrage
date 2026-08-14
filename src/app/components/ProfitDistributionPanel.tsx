@@ -18,23 +18,18 @@ interface Props {
 }
 
 /**
- * A deliberately optional directional-position control. The 50% midpoint exactly
- * mirrors the scanner's matched/equal-payout stakes. Moving away from it preserves
- * total cost while making the user explicitly accept uneven settlement payouts.
+ * Read-only settlement view for the canonical one-share hedge.
  */
 export function ProfitDistributionPanel({
   strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, kalshiWinLabel, pmWinLabel, formatCurrency, onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [splitPct, setSplitPct] = useState(50);
+  const splitPct = 50;
+  void onChange;
   const distribution = useMemo(() => calculateProfitDistribution({
     strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, splitPct,
   }), [strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, splitPct]);
 
-  const updateSplit = (next: number) => {
-    setSplitPct(next);
-    onChange(calculateProfitDistribution({ strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, splitPct: next }));
-  };
 
   return (
     <div className="mt-3 rounded-lg border border-[#3A4858] bg-[#121E2B] overflow-hidden">
@@ -53,7 +48,7 @@ export function ProfitDistributionPanel({
       {open && (
         <div className="border-t border-[#3A4858] px-3 pb-3 pt-3 space-y-3">
           <p className="text-[10px] leading-relaxed text-[#8A9BA8]">
-            Keep total cost fixed while shifting settlement profit between the two outcomes. Fees update from the adjusted contract counts.
+            Canonical scenario: exactly one contract/share on each venue. Quantity and settlement distribution cannot rescale execution.
           </p>
 
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(120px,1.7fr)_minmax(0,1fr)] items-center gap-2">
@@ -68,8 +63,8 @@ export function ProfitDistributionPanel({
               max="100"
               step="1"
               value={splitPct}
-              onChange={(event) => updateSplit(Number(event.target.value))}
-              className="w-full accent-[#facc15] cursor-ew-resize"
+              disabled
+              className="w-full accent-[#facc15]"
             />
             <div className="rounded-md border border-[#3A4858] bg-[#0E1621] px-2 py-1.5 text-center">
               <div className="font-mono text-xs font-bold text-[#FFFFFF]">100%</div>

@@ -16,7 +16,7 @@ describe('ProfitDistributionPanel', () => {
     formatCurrency: (value: number) => `$${value.toFixed(2)}`,
   };
 
-  it('is collapsed by default and emits recalculated stake distribution while dragging', () => {
+  it('is collapsed by default and locks the canonical one-share distribution', () => {
     const onChange = vi.fn();
     render(createElement(ProfitDistributionPanel, { ...props, onChange }));
 
@@ -27,15 +27,11 @@ describe('ProfitDistributionPanel', () => {
     fireEvent.click(toggle);
     const slider = screen.getByLabelText('Profit distribution') as HTMLInputElement;
     expect(slider.value).toBe('50');
-    expect(screen.getAllByText('100 shares', { exact: false })).toHaveLength(2);
+    expect(slider.disabled).toBe(true);
+    expect(screen.getAllByText('1 shares', { exact: false })).toHaveLength(2);
     expect(screen.getByText('PM:Kalshi 1:1')).toBeTruthy();
-    fireEvent.change(slider, { target: { value: '100' } });
-
-    expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0][0]).toMatchObject({ splitPct: 100, totalStake: 95 });
-    expect(onChange.mock.calls[0][0].kalshiStake).toBeCloseTo(95, 8);
-    expect(onChange.mock.calls[0][0].pmStake).toBeCloseTo(0, 8);
-    expect(screen.getByText(/directional split: execute the displayed leg amounts manually/i)).toBeTruthy();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(/exactly one contract\/share on each venue/i)).toBeTruthy();
     expect(screen.getByText('Recalculated fees')).toBeTruthy();
   });
 });

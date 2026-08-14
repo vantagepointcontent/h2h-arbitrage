@@ -7,6 +7,7 @@ import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import type { OutcomeContingentApy } from "@/lib/settlement-apy";
+import { computeApy, parseDepth } from "@/lib/matcher";
 import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
@@ -24,7 +25,7 @@ import {
 interface Outcome {
   artist: string;
   kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
-  polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number } | null;
+  polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number; yesMinOrderSize?: number | null; noMinOrderSize?: number | null; yesTickSize?: number | null; noTickSize?: number | null } | null;
   arbitrage: {
     strategy: string;
     expectedProfit: number;
@@ -196,12 +197,16 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
         pmStake: adjustedPmStake,
         kalshiYesAsk: o.kalshi.yesAsk ?? null,
         kalshiNoAsk: o.kalshi.noAsk ?? null,
-        kalshiYesAskShares: Number(o.kalshi.yesAskDepth),
-        kalshiNoAskShares: Number(o.kalshi.noAskDepth),
+        kalshiYesAskShares: parseDepth(o.kalshi.yesAskDepth) / (o.kalshi.yesAsk || 1),
+        kalshiNoAskShares: parseDepth(o.kalshi.noAskDepth) / (o.kalshi.noAsk || 1),
         pmYesAsk: o.polymarket.yesPrice ?? null,
         pmNoAsk: o.polymarket.noPrice ?? null,
-        pmYesAskShares: o.polymarket.askDepth,
-        pmNoAskShares: o.polymarket.noAskDepth,
+        pmYesAskShares: (o.polymarket.askDepth ?? 0) / (o.polymarket.yesPrice || 1),
+        pmNoAskShares: (o.polymarket.noAskDepth ?? 0) / (o.polymarket.noPrice || 1),
+        pmYesMinOrderSize: o.polymarket.yesMinOrderSize ?? undefined,
+        pmNoMinOrderSize: o.polymarket.noMinOrderSize ?? undefined,
+        pmYesTickSize: o.polymarket.yesTickSize ?? undefined,
+        pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,

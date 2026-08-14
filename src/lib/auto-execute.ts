@@ -24,6 +24,7 @@
 import { isAuthoritativeVenueEvidence } from './execution-evidence';
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 import { orderbookState } from './orderbook-state';
+import { isPriceAlignedToTick } from './venue-constraints';
 
 function errorField(error: unknown, field: 'status' | 'code' | 'message'): unknown {
   return typeof error === 'object' && error !== null && field in error
@@ -52,6 +53,10 @@ export interface OrderRequest {
   size: number;         // dollar amount
   /** Exact requested contract/share units when known by the caller. */
   contracts?: number;
+  /** Explicit venue minimum captured from the exact executable book. */
+  minimumOrderSize?: number;
+  /** Executable price increment captured from the exact venue book. */
+  tickSize?: number;
   price: number;        // limit price (0-1)
   orderType: OrderType;
   /** Exact executable depth quote used for paper/live price parity. */
@@ -177,7 +182,17 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
   }
   for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
     if (leg.contracts !== 1) {
-      errors.push(`${leg.platform} order must request exactly one contract`);
+      errors.push(`${leg.platform} order must request exactly one contract/share`);
+    }
+    if (!Number.isFinite(leg.minimumOrderSize) || leg.minimumOrderSize! <= 0) {
+      errors.push(`${leg.platform} minimum order is unavailable`);
+    } else if (leg.minimumOrderSize! > 1) {
+      errors.push(`${leg.platform} minimum order is ${leg.minimumOrderSize} shares; requested 1 share`);
+    }
+    if (!Number.isFinite(leg.tickSize) || leg.tickSize! <= 0) {
+      errors.push(`${leg.platform} tick size is unavailable`);
+    } else if (!isPriceAlignedToTick(leg.price, leg.tickSize!)) {
+      errors.push(`${leg.platform} limit price is not aligned to tick size ${leg.tickSize}`);
     }
     const limitMicroCents = leg.executableQuote?.limitPriceMicroCents;
     const scaledLimit = leg.price * 100_000_000;
@@ -186,6 +201,10 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
         || Math.abs(scaledLimit - submittedLimitMicroCents) >= 1e-6
         || submittedLimitMicroCents !== limitMicroCents)) {
       errors.push(`${leg.platform} order limit must equal the worst consumed executable level`);
+    }
+    const vwapMicroCents = leg.executableQuote?.vwapPriceMicroCents;
+    if (vwapMicroCents != null && Math.abs(leg.size - (vwapMicroCents / 100_000_000)) > 1e-9) {
+      errors.push(`${leg.platform} one-share notional must equal its walked VWAP`);
     }
   }
 
@@ -335,7 +354,7 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const priceCents = Math.round(req.price * 100);
-      const count = Math.max(1, Math.floor(req.contracts ?? (req.size / req.price))); // $size → contracts
+      const count = req.contracts!;
       const r = await placeKalshiOrder({
         ticker: req.ticker,
         side: req.outcome,
@@ -366,7 +385,7 @@ async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const size = req.contracts ?? (req.size / req.price); // $size → shares
+      const size = req.contracts!;
       const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
       return mapPmOrderResponse(r, r.venueEvidence ?? null);
     } catch (err: unknown) {

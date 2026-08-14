@@ -23,43 +23,41 @@ describe('calculateProfitDistribution', () => {
     category: 'Politics',
   } as const;
 
-  it('keeps the matched balanced stakes and equal scenario profit at 50%', () => {
+  it('uses exactly one contract on both venues', () => {
     const result = calculateProfitDistribution({ ...input, splitPct: 50 });
 
-    expect(result.totalStake).toBeCloseTo(95, 8);
-    expect(result.kalshiStake).toBeCloseTo(45, 8);
-    expect(result.pmStake).toBeCloseTo(50, 8);
+    expect(result.requestedContracts).toBe(1);
+    expect(result.totalStake).toBeCloseTo(0.95, 8);
+    expect(result.kalshiStake).toBeCloseTo(0.45, 8);
+    expect(result.pmStake).toBeCloseTo(0.5, 8);
     expect(result.netProfitIfKalshiWins).toBeCloseTo(result.netProfitIfPmWins, 8);
     expect(result.totalFees).toBeGreaterThan(0);
   });
 
-  it('preserves total stake while moving expected payout toward Kalshi at the right extreme', () => {
+  it('does not let the legacy slider rescale the canonical hedge', () => {
     const center = calculateProfitDistribution({ ...input, splitPct: 50 });
     const right = calculateProfitDistribution({ ...input, splitPct: 100 });
 
     expect(right.totalStake).toBeCloseTo(center.totalStake, 8);
-    expect(right.kalshiStake).toBeCloseTo(right.totalStake, 8);
-    expect(right.pmStake).toBeCloseTo(0, 8);
-    expect(right.netProfitIfKalshiWins).toBeGreaterThan(center.netProfitIfKalshiWins);
-    expect(right.netProfitIfPmWins).toBeLessThan(center.netProfitIfPmWins);
+    expect(right).toMatchObject({ kalshiShares: 1, pmShares: 1 });
+    expect(right.kalshiStake).toBe(center.kalshiStake);
+    expect(right.pmStake).toBe(center.pmStake);
   });
 
-  it('preserves total stake while moving expected payout toward Polymarket at the left extreme', () => {
+  it('keeps the same one-share hedge at the opposite slider extreme', () => {
     const center = calculateProfitDistribution({ ...input, splitPct: 50 });
     const left = calculateProfitDistribution({ ...input, splitPct: 0 });
 
     expect(left.totalStake).toBeCloseTo(center.totalStake, 8);
-    expect(left.kalshiStake).toBeCloseTo(0, 8);
-    expect(left.pmStake).toBeCloseTo(left.totalStake, 8);
-    expect(left.netProfitIfPmWins).toBeGreaterThan(center.netProfitIfPmWins);
-    expect(left.netProfitIfKalshiWins).toBeLessThan(center.netProfitIfKalshiWins);
+    expect(left.kalshiStake).toBe(center.kalshiStake);
+    expect(left.pmStake).toBe(center.pmStake);
   });
 
   it('rejects invalid prices rather than producing fabricated payout figures', () => {
     expect(() => calculateProfitDistribution({ ...input, kalshiPrice: 0, splitPct: 50 })).toThrow('valid prices');
   });
 
-  it('reports whole buyable shares and the lowest PM:Kalshi contract split', () => {
+  it('reports the canonical 1:1 whole-contract ratio', () => {
     const result = calculateProfitDistribution({
       ...input,
       kalshiPrice: 0.55,
@@ -69,11 +67,11 @@ describe('calculateProfitDistribution', () => {
       splitPct: 50,
     });
 
-    expect(result.kalshiShares).toBe(9);
-    expect(result.pmShares).toBe(47);
-    expect(result.pmToKalshiRatio).toEqual({ pm: 47, kalshi: 9, label: '47:9' });
-    expect(result.kalshiOrderCost).toBeCloseTo(4.95, 8);
-    expect(result.pmOrderCost).toBeCloseTo(19.74, 8);
+    expect(result.kalshiShares).toBe(1);
+    expect(result.pmShares).toBe(1);
+    expect(result.pmToKalshiRatio).toEqual({ pm: 1, kalshi: 1, label: '1:1' });
+    expect(result.kalshiOrderCost).toBeCloseTo(0.55, 8);
+    expect(result.pmOrderCost).toBeCloseTo(0.42, 8);
   });
 
   it('reduces a contract ratio by its greatest common divisor', () => {

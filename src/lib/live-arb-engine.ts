@@ -5,6 +5,7 @@ import { orderbookState } from './orderbook-state';
 import { calculateArbitrageMax, computeArbitrageFees, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
 import { finiteDecimal } from './market-price';
 import type { ExecutableBookQuote } from './executable-book';
+import { isPriceAlignedToTick } from './venue-constraints';
 
 export interface LiveArbResult {
   artist: string;
@@ -35,6 +36,13 @@ export interface LiveArbResult {
   kalshiNoAskShares?: number;
   pmYesAskShares?: number;
   pmNoAskShares?: number;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
+  requestedContracts?: 1;
+  executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+  executionBlocker?: string;
   strategy: string;
   roiPct: number;
   expectedProfit: number;
@@ -60,6 +68,8 @@ export interface LiveArbResult {
    *  - "cross": cross-outcome YES+YES across platforms
    *  - "internal": same-platform YES+NO on one verified binary market */
   arbType: 'cross' | 'direct' | 'internal' | null;
+  crossOutcomeMutuallyExclusiveVerified?: boolean;
+  crossOutcomeExhaustiveVerified?: boolean;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating, attached by persistence-tracker. */
   persistence?: import('./persistence-score').PersistenceScore;
   /** HOOKUP-03 (FEAT-005): arb-formation signal, attached by persistence-tracker. */
@@ -82,6 +92,13 @@ export interface LiveMatchedOutcome {
   pmConditionId?: string;
   /** Gamma verified exact [Yes, No] outcomes and non-neg-risk settlement. */
   pmBinaryVerified?: boolean;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
+  /** Explicit event-resolution review; pair count alone is never sufficient. */
+  crossOutcomeMutuallyExclusiveVerified?: boolean;
+  crossOutcomeExhaustiveVerified?: boolean;
 }
 
 export interface CapturedLiveArbIdentity {
@@ -102,7 +119,9 @@ function computeSingleOutcome(
   capital: number,
   category?: string,
 ): LiveArbResult {
-  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified } = outcome;
+  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified,
+    pmYesMinOrderSize, pmNoMinOrderSize, pmYesTickSize, pmNoTickSize,
+    crossOutcomeMutuallyExclusiveVerified, crossOutcomeExhaustiveVerified } = outcome;
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
@@ -120,10 +139,10 @@ function computeSingleOutcome(
   const pmNoBookStale = orderbookState.isDepthStale(pmNoTokenId, STALE_MS);
   const stale = kalshiBookStale || pmYesBookStale || pmNoBookStale;
 
-  const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', capital);
-  const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', capital);
-  const pYes = orderbookState.getWeightedAsk(pmYesTokenId, 'yes', capital);
-  const pNo = orderbookState.getWeightedAsk(pmNoTokenId, 'no', capital);
+  const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', 1);
+  const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', 1);
+  const pYes = orderbookState.getWeightedAsk(pmYesTokenId, 'yes', 1);
+  const pNo = orderbookState.getWeightedAsk(pmNoTokenId, 'no', 1);
   const kalshiYesExecutableQuote = orderbookState.getExecutableQuote(kalshiTicker, 'yes');
   const kalshiNoExecutableQuote = orderbookState.getExecutableQuote(kalshiTicker, 'no');
   const pmYesExecutableQuote = orderbookState.getExecutableQuote(pmYesTokenId, 'yes');
@@ -153,6 +172,10 @@ function computeSingleOutcome(
   const quotePrice = (quote: ExecutableBookQuote): number | null => quote.status === 'executable'
     && quote.vwapPriceMicroCents != null
     ? quote.vwapPriceMicroCents / 100_000_000
+    : null;
+  const quoteLimitPrice = (quote: ExecutableBookQuote): number | null => quote.status === 'executable'
+    && quote.limitPriceMicroCents != null
+    ? quote.limitPriceMicroCents / 100_000_000
     : null;
   const kalshiYesAsk = quotePrice(kalshiYesExecutableQuote)
     ?? kalshiYesLevel?.price
@@ -185,6 +208,8 @@ function computeSingleOutcome(
   let kalshiStake = 0;
   let pmStake = 0;
   let fees: LiveArbResult['fees'] = null;
+  let executionStatus: NonNullable<LiveArbResult['executionStatus']> = 'unavailable';
+  let executionBlocker: string | undefined = 'Tradeable prices are unavailable';
 
   const allAvailable = kalshiYesAsk != null && kalshiNoAsk != null && pmYesAsk != null && pmNoAsk != null;
   const allExecutable = [
@@ -208,7 +233,16 @@ function computeSingleOutcome(
     // book is still fillable; the displayed quote remains for reference.
     const candidate = calculateArbitrageMax(
       { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
-      { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
+      {
+        bestAsk: pmYesAsk,
+        noPrice: pmNoAsk,
+        yesMinOrderSize: pmYesMinOrderSize,
+        noMinOrderSize: pmNoMinOrderSize,
+        yesTickSize: pmYesTickSize,
+        noTickSize: pmNoTickSize,
+        yesLimitPrice: quoteLimitPrice(pmYesExecutableQuote) ?? undefined,
+        noLimitPrice: quoteLimitPrice(pmNoExecutableQuote) ?? undefined,
+      } as any,
       stale ? 0 : kalshiYesDepth,
       stale ? 0 : kalshiNoDepth,
       stale ? 0 : pmYesDepth,
@@ -222,6 +256,29 @@ function computeSingleOutcome(
     expectedProfit = stale ? 0 : candidate.expectedProfit;
     kalshiStake = stale ? 0 : candidate.kalshiStake;
     pmStake = stale ? 0 : candidate.pmStake;
+    executionStatus = stale ? 'unavailable' : candidate.executionStatus ?? 'unavailable';
+    executionBlocker = stale ? 'Required order book is stale' : candidate.executionBlocker;
+    const selectedPmMinimum = candidate.strategy === 'Buy YES Kalshi + NO PM'
+      ? pmNoMinOrderSize
+      : pmYesMinOrderSize;
+    const selectedPmTick = candidate.strategy === 'Buy YES Kalshi + NO PM' ? pmNoTickSize : pmYesTickSize;
+    const selectedPmPrice = candidate.strategy === 'Buy YES Kalshi + NO PM'
+      ? quoteLimitPrice(pmNoExecutableQuote)
+      : quoteLimitPrice(pmYesExecutableQuote);
+    if (!stale && candidate.strategy !== 'No arb' && (!Number.isFinite(selectedPmMinimum) || selectedPmMinimum! <= 0)) {
+      executionStatus = 'non_executable';
+      executionBlocker = 'Polymarket minimum order is unavailable';
+    } else if (!stale && candidate.strategy !== 'No arb' && selectedPmMinimum! > 1) {
+      executionStatus = 'non_executable';
+      executionBlocker = `Polymarket minimum order is ${selectedPmMinimum} shares; requested 1 share`;
+    } else if (!stale && candidate.strategy !== 'No arb' && (!Number.isFinite(selectedPmTick) || selectedPmTick! <= 0)) {
+      executionStatus = 'non_executable';
+      executionBlocker = 'Polymarket tick size is unavailable';
+    } else if (!stale && candidate.strategy !== 'No arb'
+        && !isPriceAlignedToTick(selectedPmPrice!, selectedPmTick!)) {
+      executionStatus = 'non_executable';
+      executionBlocker = `Polymarket limit price ${selectedPmPrice} is not aligned to tick size ${selectedPmTick}`;
+    }
     if (candidate.fees) {
       fees = {
         kalshiFee: stale ? 0 : candidate.fees.kalshiFee,
@@ -231,8 +288,8 @@ function computeSingleOutcome(
     }
 
     if (!stale && kalshiTicker && kalshiYesAsk + kalshiNoAsk < 1
-        && kalshiYesDepth > 0 && kalshiNoDepth > 0) {
-      const contracts = Math.min(kalshiYesDepth / kalshiYesAsk, kalshiNoDepth / kalshiNoAsk, capital);
+        && kalshiYesDepth >= kalshiYesAsk && kalshiNoDepth >= kalshiNoAsk) {
+      const contracts = 1;
       const yesStake = contracts * kalshiYesAsk;
       const noStake = contracts * kalshiNoAsk;
       const totalFee = calcKalshiFee(contracts, kalshiYesAsk) + calcKalshiFee(contracts, kalshiNoAsk);
@@ -244,12 +301,19 @@ function computeSingleOutcome(
         kalshiStake = yesStake + noStake;
         pmStake = 0;
         fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit };
+        executionStatus = 'executable';
+        executionBlocker = undefined;
       }
     }
 
     if (!stale && pmBinaryVerified === true && pmConditionId && pmYesTokenId !== pmNoTokenId
-        && pmYesAsk + pmNoAsk < 1 && pmYesDepth > 0 && pmNoDepth > 0) {
-      const contracts = Math.min(pmYesDepth / pmYesAsk, pmNoDepth / pmNoAsk, capital);
+        && pmYesAsk + pmNoAsk < 1 && pmYesAskShares >= 1 && pmNoAskShares >= 1
+        && pmYesMinOrderSize != null && pmYesMinOrderSize <= 1
+        && pmNoMinOrderSize != null && pmNoMinOrderSize <= 1
+        && pmYesTickSize != null && pmNoTickSize != null
+        && isPriceAlignedToTick(quoteLimitPrice(pmYesExecutableQuote)!, pmYesTickSize)
+        && isPriceAlignedToTick(quoteLimitPrice(pmNoExecutableQuote)!, pmNoTickSize)) {
+      const contracts = 1;
       const yesStake = contracts * pmYesAsk;
       const noStake = contracts * pmNoAsk;
       const theta = getPolymarketTheta(category);
@@ -262,6 +326,8 @@ function computeSingleOutcome(
         kalshiStake = 0;
         pmStake = yesStake + noStake;
         fees = { kalshiFee: 0, pmFee: totalFee, worstCaseNetProfit: netProfit };
+        executionStatus = 'executable';
+        executionBlocker = undefined;
       }
     }
   }
@@ -291,6 +357,13 @@ function computeSingleOutcome(
     kalshiNoAskShares,
     pmYesAskShares,
     pmNoAskShares,
+    pmYesMinOrderSize: pmYesMinOrderSize ?? null,
+    pmNoMinOrderSize: pmNoMinOrderSize ?? null,
+    pmYesTickSize: pmYesTickSize ?? null,
+    pmNoTickSize: pmNoTickSize ?? null,
+    requestedContracts: 1,
+    executionStatus,
+    ...(executionBlocker ? { executionBlocker } : {}),
     strategy,
     roiPct,
     expectedProfit,
@@ -304,6 +377,8 @@ function computeSingleOutcome(
     pmConditionId,
     category,
     arbType: strategy.startsWith('Same-platform YES+NO') ? 'internal' : 'direct',
+    crossOutcomeMutuallyExclusiveVerified,
+    crossOutcomeExhaustiveVerified,
     lastUpdate: new Date().toISOString(),
   };
 }
@@ -311,7 +386,7 @@ function computeSingleOutcome(
 function capturedResult(
   base: LiveArbResult,
   identity: CapturedLiveArbIdentity,
-  values: Pick<LiveArbResult, 'roiPct' | 'expectedProfit' | 'kalshiStake' | 'pmStake' | 'fees' | 'stale' | 'requiredBookIds'>,
+  values: Pick<LiveArbResult, 'roiPct' | 'expectedProfit' | 'kalshiStake' | 'pmStake' | 'fees' | 'stale' | 'requiredBookIds' | 'executionStatus' | 'executionBlocker'>,
 ): LiveArbResult {
   return {
     ...base,
@@ -376,14 +451,19 @@ export function computeCapturedLiveArbitrages(
       if (kalshiPrice == null || pmPrice == null || kalshiPrice <= 0 || pmPrice <= 0) continue;
       const requiredBookStale = current.kalshiBookStale
         || (pmFirst ? current.pmYesBookStale : current.pmNoBookStale);
-      const effectiveCapital = requiredBookStale ? 0 : Math.min(
-        kalshiDepth > 0 ? kalshiDepth / kalshiPrice : 0,
-        pmDepth > 0 ? pmDepth / pmPrice : 0,
-        capital,
-      );
+      const pmMinimum = pmFirst ? current.pmYesMinOrderSize : current.pmNoMinOrderSize;
+      const pmTick = pmFirst ? current.pmYesTickSize : current.pmNoTickSize;
+      const pmQuote = pmFirst ? current.pmYesExecutableQuote : current.pmNoExecutableQuote;
+      const pmLimit = pmQuote?.limitPriceMicroCents == null ? null : pmQuote.limitPriceMicroCents / 100_000_000;
+      const pmConstraintsExecutable = pmMinimum != null && pmMinimum <= 1 && pmTick != null
+        && pmLimit != null && isPriceAlignedToTick(pmLimit, pmTick);
+      const effectiveCapital = requiredBookStale || !pmConstraintsExecutable
+        || kalshiDepth < kalshiPrice || pmDepth < pmPrice ? 0 : 1;
       if (effectiveCapital <= 0) {
         results.push(capturedResult(current, identity, {
           roiPct: 0, expectedProfit: 0, kalshiStake: 0, pmStake: 0, fees: null, stale: Boolean(requiredBookStale),
+          executionStatus: requiredBookStale ? 'unavailable' : 'non_executable',
+          executionBlocker: requiredBookStale ? 'Required order book is stale' : 'Captured direct legs cannot fill one share',
           requiredBookIds: [current.kalshiTicker!, pmFirst ? current.pmYesTokenId! : current.pmNoTokenId!],
         }));
         continue;
@@ -399,6 +479,8 @@ export function computeCapturedLiveArbitrages(
         pmStake,
         fees: { kalshiFee: fees.kalshiFee, pmFee: fees.pmFee, worstCaseNetProfit },
         stale: false,
+        executionStatus: 'executable',
+        executionBlocker: undefined,
         requiredBookIds: [current.kalshiTicker!, pmFirst ? current.pmYesTokenId! : current.pmNoTokenId!],
       }));
       continue;
@@ -411,6 +493,10 @@ export function computeCapturedLiveArbitrages(
       const pmInternalStrategy = `Same-platform YES+YES PM: ${current.artist} + ${companion.artist}`;
       const isCross = identity.arbType === 'cross'
         && identity.pmConditionId === companion.pmConditionId
+        && outcomes.find((outcome) => outcome.kalshiTicker === current.kalshiTicker)?.crossOutcomeMutuallyExclusiveVerified === true
+        && outcomes.find((outcome) => outcome.kalshiTicker === current.kalshiTicker)?.crossOutcomeExhaustiveVerified === true
+        && outcomes.find((outcome) => outcome.kalshiTicker === companion.kalshiTicker)?.crossOutcomeMutuallyExclusiveVerified === true
+        && outcomes.find((outcome) => outcome.kalshiTicker === companion.kalshiTicker)?.crossOutcomeExhaustiveVerified === true
         && strategy === crossStrategy;
       const isKalshiInternal = identity.arbType === 'internal' && strategy === kalshiInternalStrategy;
       const isPmInternal = identity.arbType === 'internal' && strategy === pmInternalStrategy;
@@ -426,14 +512,26 @@ export function computeCapturedLiveArbitrages(
           ? Boolean(current.kalshiBookStale || companion.kalshiBookStale)
           : Boolean(current.pmYesBookStale || companion.pmYesBookStale);
       if (firstPrice == null || secondPrice == null || firstPrice <= 0 || secondPrice <= 0) continue;
-      const effectiveCapital = stale ? 0 : Math.min(
-        firstDepth > 0 ? firstDepth / firstPrice : 0,
-        secondDepth > 0 ? secondDepth / secondPrice : 0,
-        capital,
-      );
+      const firstPmLimit = current.pmYesExecutableQuote?.limitPriceMicroCents == null
+        ? null : current.pmYesExecutableQuote.limitPriceMicroCents / 100_000_000;
+      const secondPmLimit = companion.pmYesExecutableQuote?.limitPriceMicroCents == null
+        ? null : companion.pmYesExecutableQuote.limitPriceMicroCents / 100_000_000;
+      const pmMinimumExecutable = isCross
+        ? companion.pmYesMinOrderSize != null && companion.pmYesMinOrderSize <= 1 && companion.pmYesTickSize != null
+          && secondPmLimit != null && isPriceAlignedToTick(secondPmLimit, companion.pmYesTickSize)
+        : isPmInternal
+          ? current.pmYesMinOrderSize != null && current.pmYesMinOrderSize <= 1 && current.pmYesTickSize != null
+            && firstPmLimit != null && isPriceAlignedToTick(firstPmLimit, current.pmYesTickSize)
+            && companion.pmYesMinOrderSize != null && companion.pmYesMinOrderSize <= 1 && companion.pmYesTickSize != null
+            && secondPmLimit != null && isPriceAlignedToTick(secondPmLimit, companion.pmYesTickSize)
+          : true;
+      const effectiveCapital = stale || !pmMinimumExecutable
+        || firstDepth < firstPrice || secondDepth < secondPrice ? 0 : 1;
       if (effectiveCapital <= 0) {
         results.push(capturedResult(current, identity, {
           roiPct: 0, expectedProfit: 0, kalshiStake: 0, pmStake: 0, fees: null, stale,
+          executionStatus: stale ? 'unavailable' : 'non_executable',
+          executionBlocker: stale ? 'Required order book is stale' : 'Captured strategy legs cannot fill one share or violate venue constraints',
           requiredBookIds: isCross
             ? [current.kalshiTicker!, companion.pmYesTokenId!]
             : isKalshiInternal
@@ -466,6 +564,8 @@ export function computeCapturedLiveArbitrages(
         pmStake: isCross ? secondStake : isPmInternal ? firstStake + secondStake : 0,
         fees: { kalshiFee, pmFee, worstCaseNetProfit: expectedProfit },
         stale: false,
+        executionStatus: 'executable',
+        executionBlocker: undefined,
         requiredBookIds: isCross
           ? [current.kalshiTicker!, companion.pmYesTokenId!]
           : isKalshiInternal
@@ -489,8 +589,11 @@ export function computeAllLiveArbitrages(
 ): LiveArbResult[] {
   const results = outcomes.map((o) => computeSingleOutcome(o, capital, category));
 
-  // Cross-outcome pass: only for strict binary (exactly 2 outcomes), same rule as manual scan.
+  // Cross-outcome pass requires an explicit mutual-exclusivity/exhaustiveness
+  // review. Merely having two rows is not settlement evidence.
   if (results.length === 2
+      && outcomes.every((outcome) => outcome.crossOutcomeMutuallyExclusiveVerified === true
+        && outcome.crossOutcomeExhaustiveVerified === true)
       && outcomes[0]?.artist !== outcomes[1]?.artist
       && outcomes[0]?.kalshiTicker !== outcomes[1]?.kalshiTicker
       && outcomes[0]?.pmConditionId !== outcomes[1]?.pmConditionId) {
@@ -508,8 +611,12 @@ export function computeAllLiveArbitrages(
       // size. It must block execution rather than silently becoming max capital.
       const capK = cur.kalshiYesDepth > 0 ? cur.kalshiYesDepth / kYesA : 0;
       const capP = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : 0;
-      const capped = Math.min(capK, capP, capital);
-      const effectiveCapital = capped;
+      const pmYesLimit = comp.pmYesExecutableQuote?.limitPriceMicroCents == null
+        ? null : comp.pmYesExecutableQuote.limitPriceMicroCents / 100_000_000;
+      const effectiveCapital = capK >= 1 && capP >= 1
+        && comp.pmYesMinOrderSize != null && comp.pmYesMinOrderSize <= 1 && comp.pmYesTickSize != null
+        && pmYesLimit != null && isPriceAlignedToTick(pmYesLimit, comp.pmYesTickSize) ? 1 : 0;
+      if (effectiveCapital === 0) continue;
       const kalshiStake = effectiveCapital * kYesA;
       const pmStake = effectiveCapital * pYesB;
       const fees = computeArbitrageFees(
@@ -535,7 +642,24 @@ export function computeAllLiveArbitrages(
           pmFee: fees.pmFee,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         };
+        cur.requestedContracts = 1;
+        cur.executionStatus = 'executable';
+        cur.executionBlocker = undefined;
         cur.pmConditionId = comp.pmConditionId;
+        cur.pmYesTokenId = comp.pmYesTokenId;
+        cur.pmNoTokenId = comp.pmNoTokenId;
+        cur.pmYesAsk = comp.pmYesAsk;
+        cur.pmNoAsk = comp.pmNoAsk;
+        cur.pmYesDepth = comp.pmYesDepth;
+        cur.pmNoDepth = comp.pmNoDepth;
+        cur.pmYesAskShares = comp.pmYesAskShares;
+        cur.pmNoAskShares = comp.pmNoAskShares;
+        cur.pmYesMinOrderSize = comp.pmYesMinOrderSize;
+        cur.pmNoMinOrderSize = comp.pmNoMinOrderSize;
+        cur.pmYesTickSize = comp.pmYesTickSize;
+        cur.pmNoTickSize = comp.pmNoTickSize;
+        cur.crossOutcomeMutuallyExclusiveVerified = true;
+        cur.crossOutcomeExhaustiveVerified = true;
       }
     }
   }

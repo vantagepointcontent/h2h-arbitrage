@@ -8,6 +8,7 @@ import { Zap, ShieldAlert, X, CheckCircle2, XCircle, Loader2 } from "lucide-reac
 import { formatPrice } from "@/app/lib/page-shared";
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from "@/lib/matcher";
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from "@/lib/executable-book";
+import { isPriceAlignedToTick } from "@/lib/venue-constraints";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -17,7 +18,9 @@ interface ArbLeg {
   side: "buy";
   outcome: "yes" | "no";
   size: number;
-  contracts: number;
+  contracts: 1;
+  minimumOrderSize: number;
+  tickSize: number;
   price: number;
   orderType: "limit";
   executableQuote: ExecutableBookQuote;
@@ -34,6 +37,8 @@ export interface ExecutableArb {
   shares: number;
   /** The active constraint on this 1:1 hedge; shown before any confirmation. */
   limitingConstraint: string;
+  executionStatus: 'executable' | 'non_executable';
+  executionBlocker?: string;
   kalshiOrder: ArbLeg;
   polymarketOrder: ArbLeg;
   /** ISO timestamp when the opportunity was last scanned/detected. */
@@ -64,6 +69,10 @@ export function buildExecutableArb(o: {
   kalshiNoAskShares?: number;
   pmYesAskShares?: number;
   pmNoAskShares?: number;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
   /** Missing or stale books are never safe to execute against. */
   stale?: boolean;
   kalshiTicker?: string;
@@ -83,13 +92,17 @@ export function buildExecutableArb(o: {
   let pmToken: string | undefined;
   let kalshiQuote: ExecutableBookQuote | undefined;
   let pmQuote: ExecutableBookQuote | undefined;
+  let pmMinimumOrderSize: number | null | undefined;
+  let pmTickSize: number | null | undefined;
 
   if (o.strategy === "Buy YES Kalshi + NO PM") {
     kOutcome = "yes"; kPrice = o.kalshiYesAsk; kalshiQuote = o.kalshiYesExecutableQuote;
     pmOutcome = "no"; pmPrice = o.pmNoAsk; pmToken = o.pmNoTokenId; pmQuote = o.pmNoExecutableQuote;
+    pmMinimumOrderSize = o.pmNoMinOrderSize; pmTickSize = o.pmNoTickSize;
   } else if (o.strategy === "Buy YES PM + NO Kalshi") {
     kOutcome = "no"; kPrice = o.kalshiNoAsk; kalshiQuote = o.kalshiNoExecutableQuote;
     pmOutcome = "yes"; pmPrice = o.pmYesAsk; pmToken = o.pmYesTokenId; pmQuote = o.pmYesExecutableQuote;
+    pmMinimumOrderSize = o.pmYesMinOrderSize; pmTickSize = o.pmYesTickSize;
   } else {
     return null; // cross-outcome / No arb — not executable from this button
   }
@@ -106,7 +119,6 @@ export function buildExecutableArb(o: {
 
   const kAvailable = kOutcome === 'yes' ? o.kalshiYesAskShares : o.kalshiNoAskShares;
   const pmAvailable = pmOutcome === 'yes' ? o.pmYesAskShares : o.pmNoAskShares;
-  if (!Number.isFinite(kAvailable) || !Number.isFinite(pmAvailable) || kAvailable! <= 0 || pmAvailable! <= 0) return null;
 
   // Current execution policy is exactly one matched share. The quote itself
   // proves that the full share is available across the walked ladder.
@@ -119,8 +131,21 @@ export function buildExecutableArb(o: {
   const limitingConstraint = constraints.reduce((lowest, constraint) =>
     constraint.value < lowest.value ? constraint : lowest,
   ).label;
-  if (Math.min(...constraints.map((constraint) => constraint.value)) < 1) return null;
   const shares = 1;
+  const executionBlocker = !Number.isFinite(kAvailable) || kAvailable! < shares
+    ? `Kalshi ${kOutcome.toUpperCase()} top-of-book depth cannot fill requested 1 contract`
+    : !Number.isFinite(pmAvailable) || pmAvailable! < shares
+      ? `Polymarket ${pmOutcome.toUpperCase()} top-of-book depth cannot fill requested 1 share`
+      : !Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0
+    ? `Polymarket ${pmOutcome.toUpperCase()} minimum order is unavailable`
+    : pmMinimumOrderSize! > shares
+      ? `Polymarket ${pmOutcome.toUpperCase()} minimum order is ${pmMinimumOrderSize} shares; requested 1 share`
+      : !Number.isFinite(pmTickSize) || pmTickSize! <= 0
+        ? `Polymarket ${pmOutcome.toUpperCase()} tick size is unavailable`
+      : !isPriceAlignedToTick(pmLimit, pmTickSize!)
+        ? `Polymarket ${pmOutcome.toUpperCase()} limit ${pmLimit} is not aligned to tick size ${pmTickSize}`
+        : undefined;
+  const resolvedLimitingConstraint = executionBlocker ?? limitingConstraint;
 
   // The scanner's full-book profit is no longer valid after a top-level depth
   // cap. Reprice the exact whole-share order shown in this modal, net of venue
@@ -141,15 +166,19 @@ export function buildExecutableArb(o: {
     roiPct,
     expectedProfit,
     shares,
-    limitingConstraint,
+    limitingConstraint: resolvedLimitingConstraint,
+    executionStatus: executionBlocker ? 'non_executable' : 'executable',
+    ...(executionBlocker ? { executionBlocker } : {}),
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,
-      side: "buy", outcome: kOutcome, size: kalshiCost, contracts: shares,
+      side: "buy", outcome: kOutcome, size: kalshiCost, contracts: 1,
+      minimumOrderSize: 1, tickSize: 0.01,
       price: kalshiLimit, orderType: "limit", executableQuote: kalshiQuote,
     },
     polymarketOrder: {
       platform: "polymarket", marketId: pmToken, conditionId: pmToken,
-      side: "buy", outcome: pmOutcome, size: pmCost, contracts: shares,
+      side: "buy", outcome: pmOutcome, size: pmCost, contracts: 1,
+      minimumOrderSize: pmMinimumOrderSize ?? 0, tickSize: pmTickSize ?? 0,
       price: pmLimit, orderType: "limit", executableQuote: pmQuote,
     },
     scanTime: o.scanTime,
@@ -269,6 +298,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           )}
 
           {error && <div className="p-2 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs">{error}</div>}
+          {arb.executionBlocker && <div className="p-2 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs">{arb.executionBlocker}</div>}
 
           {result && (
             <div className="rounded-lg bg-[#0E1621] border border-[#182533] divide-y divide-[#182533] text-xs">
@@ -329,7 +359,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           {!result && (
             <button
               onClick={run}
-              disabled={busy || !gates || (!gates.dryRun && gates.killSwitch)}
+              disabled={busy || arb.executionStatus !== 'executable' || !gates || (!gates.dryRun && gates.killSwitch)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
             >
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

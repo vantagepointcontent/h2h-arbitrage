@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchClobBooks,
   getClobPricesFromBooks,
+  validateOneShareBookOrder,
   type ClobBook,
   type ClobMarket,
 } from './polymarket-clob';
@@ -82,6 +83,28 @@ describe('fetchClobBooks', () => {
   });
 });
 
+describe('validateOneShareBookOrder', () => {
+  it('validates minimum, tick, and unsorted top-level depth for one share', () => {
+    const validBook: ClobBook = {
+      bids: [],
+      asks: [{ price: '0.60', size: '10' }, { price: '0.40', size: '1' }],
+      min_order_size: '0.5',
+      tick_size: '0.01',
+    };
+    expect(validateOneShareBookOrder(validBook, 0.4)).toMatchObject({
+      valid: true, minimumOrderSize: 0.5, tickSize: 0.01, bestAsk: 0.4, bestAskShares: 1,
+    });
+    expect(validateOneShareBookOrder({ ...validBook, min_order_size: '5' }, 0.4).blocker)
+      .toBe('Polymarket minimum order is 5 shares; requested 1 share');
+    expect(validateOneShareBookOrder({ ...validBook, asks: [{ price: '0.40', size: '0.9' }] }, 0.4).blocker)
+      .toBe('Polymarket top-of-book depth 0.9 cannot fill requested 1 share');
+    expect(validateOneShareBookOrder(validBook, 0.405).blocker)
+      .toBe('Polymarket limit price 0.405 is not aligned to tick size 0.01');
+    expect(validateOneShareBookOrder(validBook, 0.99).blocker)
+      .toBe('Polymarket limit price 0.99 does not match authoritative best ask 0.4');
+  });
+});
+
 describe('getClobPricesFromBooks', () => {
   it('uses independent token-book asks for neg-risk YES and NO prices', () => {
     const clob: ClobMarket = {
@@ -107,6 +130,35 @@ describe('getClobPricesFromBooks', () => {
       lastTradePrice: 0.42,
       yesAskDepth: 42,
       noAskDepth: 59,
+      yesMinOrderSize: 5,
+      noMinOrderSize: 5,
+      yesTickSize: 0.01,
+      noTickSize: 0.01,
     });
+  });
+
+  it('keeps shuffled explicit token asks and sub-share top depth with constraints', () => {
+    const clob: ClobMarket = {
+      condition_id: 'condition', neg_risk: true,
+      tokens: [{ token_id: 'yes', outcome: 'Yes' }, { token_id: 'no', outcome: 'No' }],
+    };
+    const yesBook: ClobBook = {
+      asset_id: 'yes', bids: [{ price: '0.20', size: '9' }],
+      asks: [{ price: '0.45', size: '10' }, { price: '0.40', size: '0.75' }, { price: '0.40', size: '0.20' }],
+      min_order_size: '5', tick_size: '0.01',
+    };
+    const noBook: ClobBook = {
+      asset_id: 'no', bids: [], asks: [{ price: '0.65', size: '9' }, { price: '0.55', size: '3' }],
+      min_order_size: '5', tick_size: '0.01',
+    };
+
+    const prices = getClobPricesFromBooks(clob, yesBook, noBook);
+    expect(prices).toMatchObject({
+      yesPrice: 0.4, noPrice: 0.55,
+      yesMinOrderSize: 5, noMinOrderSize: 5,
+      yesTickSize: 0.01, noTickSize: 0.01,
+    });
+    expect(prices?.yesAskDepth).toBeCloseTo(0.38, 12);
+    expect(prices?.noAskDepth).toBeCloseTo(1.65, 12);
   });
 });

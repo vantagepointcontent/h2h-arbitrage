@@ -10,6 +10,8 @@ import { getManualMatches } from './manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from './decoupled-pairs';
 import type { MarketLink } from './platforms/types';
 import logger from './logger';
+import { fetchClobBook } from './polymarket-clob';
+import { finiteDecimal } from './market-price';
 
 interface PmToken {
   outcome: string;
@@ -140,6 +142,10 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
   // ── Resolve Polymarket token IDs for ALL matched markets ──
   const conditionIds = [...new Set(matched.map((o) => o.polymarket!.conditionId))];
   const tokenMap = new Map<string, { yes: string; no: string }>();
+  const constraintMap = new Map<string, {
+    yesMinOrderSize: number | null; noMinOrderSize: number | null;
+    yesTickSize: number | null; noTickSize: number | null;
+  }>();
 
   for (const cid of conditionIds) {
     try {
@@ -151,6 +157,20 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
       const no = tokens.find((t) => t.outcome.toLowerCase() === 'no');
       if (yes && no) {
         tokenMap.set(cid, { yes: yes.token_id, no: no.token_id });
+        const [yesBook, noBook] = await Promise.all([
+          fetchClobBook(yes.token_id),
+          fetchClobBook(no.token_id),
+        ]);
+        const positive = (value: unknown) => {
+          const parsed = finiteDecimal(value);
+          return parsed !== null && parsed > 0 ? parsed : null;
+        };
+        constraintMap.set(cid, {
+          yesMinOrderSize: positive(yesBook?.min_order_size),
+          noMinOrderSize: positive(noBook?.min_order_size),
+          yesTickSize: positive(yesBook?.tick_size),
+          noTickSize: positive(noBook?.tick_size),
+        });
       }
     } catch (err) {
       logger.warn('[pair-resolver] failed to fetch CLOB tokens', { cid, err });
@@ -167,6 +187,7 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
     const cid = o.polymarket!.conditionId;
     const tokens = tokenMap.get(cid);
     if (!tokens) continue;
+    const constraints = constraintMap.get(cid);
 
     liveMatched.push({
       artist: o.artist,
@@ -175,6 +196,12 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
       pmYesTokenId: tokens.yes,
       pmNoTokenId: tokens.no,
       pmBinaryVerified: o.polymarket!.binaryVerified === true,
+      // Constraints are execution-authoritative and must come from this resolve.
+      // Never retain prior values after a failed/partial book refresh.
+      pmYesMinOrderSize: constraints?.yesMinOrderSize ?? null,
+      pmNoMinOrderSize: constraints?.noMinOrderSize ?? null,
+      pmYesTickSize: constraints?.yesTickSize ?? null,
+      pmNoTickSize: constraints?.noTickSize ?? null,
     });
     allKalshiTickers.add(o.kalshi!.ticker);
     allPmTokenIds.add(tokens.yes);

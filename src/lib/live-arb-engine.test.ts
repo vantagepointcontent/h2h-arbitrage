@@ -23,6 +23,12 @@ const outcome = {
   pmYesTokenId: 'pm-yes-bug-096',
   pmNoTokenId: 'pm-no-bug-096',
   pmBinaryVerified: true,
+  pmYesMinOrderSize: 1,
+  pmNoMinOrderSize: 1,
+  pmYesTickSize: 0.01,
+  pmNoTickSize: 0.01,
+  crossOutcomeMutuallyExclusiveVerified: true,
+  crossOutcomeExhaustiveVerified: true,
   pmConditionId: 'condition-example',
 };
 
@@ -32,6 +38,12 @@ const complement = {
   pmYesTokenId: 'pm-yes-bug-101-comp',
   pmNoTokenId: 'pm-no-bug-101-comp',
   pmBinaryVerified: true,
+  pmYesMinOrderSize: 1,
+  pmNoMinOrderSize: 1,
+  pmYesTickSize: 0.01,
+  pmNoTickSize: 0.01,
+  crossOutcomeMutuallyExclusiveVerified: true,
+  crossOutcomeExhaustiveVerified: true,
   pmConditionId: 'condition-complement',
 };
 
@@ -168,6 +180,22 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(buildExecutionRequest(liveArbResultToBotInput('pair-1', 'Market', undefined, result))).toBeNull();
   });
 
+  it('blocks Kalshi Internal when dollar depth is below the one-contract price', () => {
+    orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.30, quantity: 0.9 }], [{ price: 0.30, quantity: 0.9 }]);
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 20 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.70, quantity: 20 }]);
+    const result = computeAllLiveArbitrages([outcome], 10)[0];
+    expect(result.strategy).not.toBe('Same-platform YES+NO Kalshi: Example');
+  });
+
+  it('blocks Polymarket Internal when either selected ask is off tick', () => {
+    orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.80, quantity: 20 }], [{ price: 0.80, quantity: 20 }]);
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.305, quantity: 20 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.305, quantity: 20 }]);
+    const result = computeAllLiveArbitrages([outcome], 10)[0];
+    expect(result.strategy).not.toBe('Same-platform YES+NO Polymarket: Example');
+  });
+
   it('classifies same-market YES+NO as Internal and never pairs two YES contracts', () => {
     orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.30, quantity: 20 }], [{ price: 0.30, quantity: 20 }]);
     orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 20 }], []);
@@ -202,6 +230,18 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
 
     const result = computeAllLiveArbitrages([outcome, duplicate], 10);
 
+    expect(result.every((candidate) => candidate.arbType !== 'cross')).toBe(true);
+  });
+
+  it('rejects cross-outcome selection when either explicit resolution fact is absent', () => {
+    const notExhaustive = { ...complement, crossOutcomeExhaustiveVerified: false };
+    orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.20, quantity: 20 }], [{ price: 0.90, quantity: 20 }]);
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.90, quantity: 20 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.20, quantity: 20 }]);
+    orderbookState.setBook(notExhaustive.kalshiTicker, [{ price: 0.90, quantity: 20 }], [{ price: 0.20, quantity: 20 }]);
+    orderbookState.setBook(notExhaustive.pmYesTokenId, [{ price: 0.20, quantity: 20 }], []);
+    orderbookState.setBook(notExhaustive.pmNoTokenId, [], [{ price: 0.90, quantity: 20 }]);
+    const result = computeAllLiveArbitrages([outcome, notExhaustive], 10);
     expect(result.every((candidate) => candidate.arbType !== 'cross')).toBe(true);
   });
 
@@ -247,7 +287,7 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     }]);
 
     expect(captured.fees?.kalshiFee).toBeCloseTo(0.02, 5);
-    expect(captured.fees?.pmFee).toBeCloseTo(0.00743, 5);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.007425, 5);
     expect(captured.roiPct).toBeCloseTo(22.257, 4);
   });
 

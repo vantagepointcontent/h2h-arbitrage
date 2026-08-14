@@ -26,6 +26,10 @@ const baseArb = {
   kalshiNoAskShares: 100,
   pmYesAskShares: 100,
   pmNoAskShares: 100,
+  pmYesMinOrderSize: 1,
+  pmNoMinOrderSize: 1,
+  pmYesTickSize: 0.01,
+  pmNoTickSize: 0.01,
   stale: false,
   kalshiTicker: 'KXEXAMPLE',
   pmYesTokenId: 'pm-yes',
@@ -37,7 +41,7 @@ const baseArb = {
 };
 
 describe('buildExecutableArb', () => {
-  it('carries selected one-share quotes and uses marketable limits', () => {
+  it('requests exactly one venue unit with walked VWAP costs and marketable limits', () => {
     const arb = buildExecutableArb({
       ...baseArb,
       kalshiStake: 50,
@@ -53,9 +57,10 @@ describe('buildExecutableArb', () => {
     expect(arb?.shares).toBe(1);
     expect(arb?.limitingConstraint).toBe('Polymarket live depth');
     expect(arb?.kalshiOrder).toMatchObject({ outcome: 'yes', contracts: 1, price: 0.5, size: 0.5 });
-    expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', contracts: 1, price: 0.7, size: 0.7 });
+    expect(arb?.polymarketOrder).toMatchObject({ outcome: 'no', contracts: 1, price: 0.7, size: 0.7, minimumOrderSize: 1 });
     expect(arb?.kalshiOrder.executableQuote).toBeDefined();
     expect(arb?.polymarketOrder.executableQuote).toBeDefined();
+    expect(arb?.executionStatus).toBe('executable');
     // Full-book scanner profit must never leak into a top-level-depth-capped order.
     expect(arb?.expectedProfit).toBeLessThan(0);
     expect(arb?.expectedProfit).not.toBe(4.8);
@@ -80,9 +85,10 @@ describe('buildExecutableArb', () => {
     expect(arb?.kalshiOrder.size).toBeCloseTo(0.43);
   });
 
-  it('refuses missing, zero, or stale live orderbook data', () => {
-    expect(buildExecutableArb({ ...baseArb, kalshiYesAskShares: 0 }, 'Example market')).toBeNull();
-    expect(buildExecutableArb({ ...baseArb, pmNoAskShares: undefined }, 'Example market')).toBeNull();
+  it('returns exact non-executable blockers for depth and venue minimums', () => {
+    expect(buildExecutableArb({ ...baseArb, kalshiYesAskShares: 0 }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', executionBlocker: expect.stringContaining('Kalshi YES') });
+    expect(buildExecutableArb({ ...baseArb, pmNoAskShares: undefined }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', executionBlocker: expect.stringContaining('Polymarket NO top-of-book') });
+    expect(buildExecutableArb({ ...baseArb, pmNoMinOrderSize: 5 }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', shares: 1, executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share' });
     expect(buildExecutableArb({ ...baseArb, stale: true }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesAsk: 0 }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesExecutableQuote: undefined }, 'Example market')).toBeNull();

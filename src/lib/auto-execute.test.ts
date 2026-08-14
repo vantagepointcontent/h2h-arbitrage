@@ -28,6 +28,8 @@ function makeOrder(
     outcome: 'yes',
     size,
     contracts: 1,
+    minimumOrderSize: 1,
+    tickSize: 0.01,
     price,
     orderType: 'limit',
     executableQuote: price > 0 && price < 1 ? walkExecutableBook({
@@ -43,9 +45,9 @@ function makeOrder(
 
 function makeRequest(
   kalshiPrice = 0.45,
-  kalshiSize = 100,
+  kalshiSize = 0.45,
   pmPrice = 0.50,
-  pmSize = 100,
+  pmSize = 0.50,
   dryRun = true,
   maxSlippagePct = 2.0,
   timeoutMs = 10000,
@@ -91,7 +93,7 @@ function defaultLimits(): SafetyLimits {
 
 describe('validateExecution', () => {
   it('valid inputs pass', () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true, 2.0, 10000);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true, 2.0, 10000);
     const limits = defaultLimits();
     const result = validateExecution(req, limits);
     expect(result.valid).toBe(true);
@@ -99,7 +101,7 @@ describe('validateExecution', () => {
   });
 
   it('invalid prices fail (<= 0)', () => {
-    const req = makeRequest(0, 100, 0.50, 100);
+    const req = makeRequest(0, 0, 0.50, 0.50);
     const limits = defaultLimits();
     const result = validateExecution(req, limits);
     expect(result.valid).toBe(false);
@@ -107,7 +109,7 @@ describe('validateExecution', () => {
   });
 
   it('invalid prices fail (>= 1)', () => {
-    const req = makeRequest(1.0, 100, 0.50, 100);
+    const req = makeRequest(1.0, 1.0, 0.50, 0.50);
     const limits = defaultLimits();
     const result = validateExecution(req, limits);
     expect(result.valid).toBe(false);
@@ -115,7 +117,7 @@ describe('validateExecution', () => {
   });
 
   it('insufficient liquidity (zero size) fails', () => {
-    const req = makeRequest(0.45, 0, 0.50, 100);
+    const req = makeRequest(0.45, 0, 0.50, 0.50);
     const limits = defaultLimits();
     const result = validateExecution(req, limits);
     expect(result.valid).toBe(false);
@@ -123,7 +125,7 @@ describe('validateExecution', () => {
   });
 
   it('slippage too high fails', () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true, 5.0, 10000);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true, 5.0, 10000);
     const limits = defaultLimits();
     const result = validateExecution(req, limits);
     expect(result.valid).toBe(false);
@@ -273,7 +275,7 @@ describe('executeArb', () => {
   });
 
   it('dry-run mode returns simulated success without placing real orders', async () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true, 2.0, 3000);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true, 2.0, 3000);
     const result = await executeArb(req);
     expect(result.kalshiResult.status).toBeOneOf(['filled', 'partial', 'cancelled']);
     expect(result.polymarketResult.status).toBeOneOf(['filled', 'partial', 'cancelled']);
@@ -281,13 +283,13 @@ describe('executeArb', () => {
   }, 15000);
 
   it('executionTimeMs is measured (may be 0 for fast simulation)', async () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true, 2.0, 3000);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true, 2.0, 3000);
     const result = await executeArb(req);
     expect(result.executionTimeMs).toBeGreaterThanOrEqual(0);
   }, 15000);
 
   it('failed validation returns early with error', async () => {
-    const req = makeRequest(0, 100, 0.50, 100, true, 2.0, 10000);
+    const req = makeRequest(0, 0, 0.50, 0.50, true, 2.0, 10000);
     const result = await executeArb(req);
     expect(result.success).toBe(false);
     expect(result.kalshiResult.status).toBe('rejected');
@@ -334,13 +336,10 @@ describe('executeArb', () => {
     )).toEqual({ matched: true, kalshiContracts: 31, polymarketContracts: 31 });
   });
 
-  it('keeps current one-share paper fills quantity-matched', async () => {
+  it('rejects attempts to substitute oversized notionals for the canonical one-share order', async () => {
     const result = await executeArb(makeRequest(0.45, 45, 0.52, 52, true, 2, 1));
-
-    expect(result.rollbackExecuted).toBe(false);
-    expect(result.unhedged).toBe(false);
-    expect(result.kalshiResult.filledContracts).toBe(1);
-    expect(result.polymarketResult.filledContracts).toBe(1);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('one-share notional');
   });
 
   it('requires the venue to confirm the entire requested excess close', () => {
@@ -350,7 +349,7 @@ describe('executeArb', () => {
   });
 
   it('partial fill handling calculates netExposure', async () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true);
     const result = await executeArb(req);
     // In dry-run, fill ratios are 85-100%, so partial fills are possible
     expect(result.netExposure).toBeDefined();
@@ -361,7 +360,7 @@ describe('executeArb', () => {
   });
 
   it('actualProfit is computed from filled amounts', async () => {
-    const req = makeRequest(0.45, 100, 0.50, 100, true);
+    const req = makeRequest(0.45, 0.45, 0.50, 0.50, true);
     const result = await executeArb(req);
     expect(result.actualProfit).toBeDefined();
   });
@@ -448,8 +447,8 @@ describe('single execution authority', () => {
 
   it('paper simulates and live reaches the real-leg branch regardless of H2H_DRY_RUN', () => {
     vi.stubEnv('H2H_DRY_RUN', 'true');
-    expect(shouldSimulateExecution(makeRequest(0.45, 100, 0.50, 100, true))).toBe(true);
-    expect(shouldSimulateExecution(makeRequest(0.45, 100, 0.50, 100, false))).toBe(false);
+    expect(shouldSimulateExecution(makeRequest(0.45, 0.45, 0.50, 0.50, true))).toBe(true);
+    expect(shouldSimulateExecution(makeRequest(0.45, 0.45, 0.50, 0.50, false))).toBe(false);
   });
 });
 

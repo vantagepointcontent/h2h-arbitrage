@@ -309,6 +309,10 @@ export async function executeFullScan(request: NextRequest) {
             // Gamma liquidity is market-wide metadata, not an order-level guarantee.
             askDepth: depth.yesAskDepth,
             noAskDepth: depth.noAskDepth,
+            yesMinOrderSize: depth.yesMinOrderSize,
+            noMinOrderSize: depth.noMinOrderSize,
+            yesTickSize: depth.yesTickSize,
+            noTickSize: depth.noTickSize,
             neg_risk: clob.neg_risk,
           };
         } catch {
@@ -493,6 +497,13 @@ export async function executeFullScan(request: NextRequest) {
             pmBestAsk: selectedPmLeg?.bestAsk,
             pmYesDepth: selectedPmLeg?.askDepth,
             pmNoDepth: selectedPmLeg?.noAskDepth,
+            pmYesMinOrderSize: selectedPmLeg?.yesMinOrderSize ?? null,
+            pmNoMinOrderSize: selectedPmLeg?.noMinOrderSize ?? null,
+            pmYesTickSize: selectedPmLeg?.yesTickSize ?? null,
+            pmNoTickSize: selectedPmLeg?.noTickSize ?? null,
+            requestedContracts: o.arbitrage!.requestedContracts ?? 1,
+            executionStatus: o.arbitrage!.executionStatus ?? 'unavailable',
+            executionBlocker: o.arbitrage!.executionBlocker,
             kalshiStake: o.arbitrage!.kalshiStake,
             pmStake: o.arbitrage!.pmStake,
             apyPct: o.arbitrage!.apyPct,

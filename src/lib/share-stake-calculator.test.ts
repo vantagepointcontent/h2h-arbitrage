@@ -4,7 +4,7 @@ import { calculateShareStake, parseAskLevelDepth } from './share-stake-calculato
 describe('calculateShareStake', () => {
   const base = {
     strategy: 'Buy YES Kalshi + NO PM' as const,
-    shares: 10,
+    shares: 1,
     kalshiYesAsk: 0.45,
     kalshiNoAsk: 0.56,
     pmYesAsk: 0.52,
@@ -18,9 +18,10 @@ describe('calculateShareStake', () => {
     const result = calculateShareStake(base);
 
     expect(result).toMatchObject({
-      kalshiCost: 4.5,
-      pmCost: 5,
-      totalCost: 9.5,
+      requestedContracts: 1,
+      kalshiCost: 0.45,
+      pmCost: 0.5,
+      totalCost: 0.95,
       kalshiAvailableShares: 47,
       pmAvailableShares: 12,
       exceedsKalshiDepth: false,
@@ -29,13 +30,11 @@ describe('calculateShareStake', () => {
     expect(result?.kalshiFee).toBeGreaterThan(0);
     expect(result?.pmFee).toBeGreaterThan(0);
     expect(result?.netProfit).toBeLessThan(0.5); // Fees reduce the apparent $0.50 spread.
-    expect(result?.netProfitPct).toBeCloseTo((result!.netProfit / 9.5) * 100, 10);
+    expect(result?.netProfitPct).toBeCloseTo((result!.netProfit / 0.95) * 100, 10);
   });
 
-  it('flags each leg independently when requested shares exceed executable depth', () => {
-    const result = calculateShareStake({ ...base, shares: 20 });
-    expect(result?.exceedsKalshiDepth).toBe(false);
-    expect(result?.exceedsPmDepth).toBe(true);
+  it('rejects any requested quantity other than the canonical one share', () => {
+    expect(calculateShareStake({ ...base, shares: 20 })).toBeNull();
   });
 
   it('does not treat dollar liquidity or absent data as executable ask depth', () => {

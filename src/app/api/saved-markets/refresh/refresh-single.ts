@@ -202,6 +202,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
           // MF-001: use real CLOB ask-level quantity, never Gamma liquidity.
           askDepth: depth.yesAskDepth,
           noAskDepth: depth.noAskDepth,
+          yesMinOrderSize: depth.yesMinOrderSize,
+          noMinOrderSize: depth.noMinOrderSize,
+          yesTickSize: depth.yesTickSize,
+          noTickSize: depth.noTickSize,
         };
       } catch (e: any) {
         console.warn(`[refresh-single] CLOB timeout for ${market.eventTitle}: ${e.message}`);
@@ -273,6 +277,13 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       pmBestAsk: selectedPmLeg?.bestAsk,
       pmYesDepth: selectedPmLeg?.askDepth,
       pmNoDepth: selectedPmLeg?.noAskDepth,
+      pmYesMinOrderSize: selectedPmLeg?.yesMinOrderSize ?? null,
+      pmNoMinOrderSize: selectedPmLeg?.noMinOrderSize ?? null,
+      pmYesTickSize: selectedPmLeg?.yesTickSize ?? null,
+      pmNoTickSize: selectedPmLeg?.noTickSize ?? null,
+      requestedContracts: o.arbitrage!.requestedContracts ?? 1,
+      executionStatus: o.arbitrage!.executionStatus ?? 'unavailable',
+      executionBlocker: o.arbitrage!.executionBlocker,
       kalshiStake: o.arbitrage!.kalshiStake,
       pmStake: o.arbitrage!.pmStake,
       apyPct: o.arbitrage!.apyPct,

@@ -34,6 +34,10 @@ function makePmShape(overrides?: any): any {
     active: true,
     closed: false,
     liquidityNum: 1000,
+    yesMinOrderSize: 1,
+    noMinOrderSize: 1,
+    yesTickSize: 0.01,
+    noTickSize: 0.01,
     ...overrides,
   };
   return buildPmArbShape(pm);
