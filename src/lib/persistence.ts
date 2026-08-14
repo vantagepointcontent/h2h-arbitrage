@@ -56,7 +56,8 @@ async function initDb(): Promise<void> {
       apy_pct         REAL,   -- canonical annualized ROI snapshot (%)
       apy_unavailable_reason TEXT,
       arb_valid       INTEGER NOT NULL DEFAULT 1,
-      arb_invalidation_reason TEXT
+      arb_invalidation_reason TEXT,
+      scan_status     TEXT    NOT NULL DEFAULT 'completed'
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -71,6 +72,7 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN apy_unavailable_reason TEXT`,
     `ALTER TABLE scan_results ADD COLUMN arb_valid INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE scan_results ADD COLUMN arb_invalidation_reason TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN scan_status TEXT NOT NULL DEFAULT 'completed'`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
