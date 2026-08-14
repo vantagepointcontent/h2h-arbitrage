@@ -1,7 +1,7 @@
 const RETRY_BASE_MS = 30_000;
 const RETRY_MAX_MS = 15 * 60_000;
 const DEFAULT_FRESHNESS_SLA_MS = 60 * 60_000;
-const SLA_CAPACITY_UTILIZATION = 0.8;
+const SLA_CAPACITY_UTILIZATION = 1;
 
 function iso(ms) {
   return new Date(ms).toISOString();

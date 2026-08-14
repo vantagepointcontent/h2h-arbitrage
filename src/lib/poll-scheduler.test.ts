@@ -182,7 +182,7 @@ describe('saved-market fair scheduler', () => {
   });
 
   it('reserves enough bounded concurrency to finish the full queue inside the SLA', () => {
-    expect(minimumConcurrencyForSla(503, 35_000, 60 * 60_000)).toBe(7);
+    expect(minimumConcurrencyForSla(503, 35_000, 60 * 60_000)).toBe(5);
   });
   it('processes later entries after an earlier entry fails instead of retrying it first', () => {
     const now = Date.parse('2026-08-13T20:00:00Z');
