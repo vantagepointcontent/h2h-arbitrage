@@ -232,7 +232,7 @@ function computeSingleOutcome(
     // When stale, we cap deployed capital to 0 because we don't know if the
     // book is still fillable; the displayed quote remains for reference.
     const candidate = calculateArbitrageMax(
-      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
+      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as Parameters<typeof calculateArbitrageMax>[0],
       {
         bestAsk: pmYesAsk,
         noPrice: pmNoAsk,
@@ -242,7 +242,7 @@ function computeSingleOutcome(
         noTickSize: pmNoTickSize,
         yesLimitPrice: quoteLimitPrice(pmYesExecutableQuote) ?? undefined,
         noLimitPrice: quoteLimitPrice(pmNoExecutableQuote) ?? undefined,
-      } as any,
+      } as Parameters<typeof calculateArbitrageMax>[1],
       stale ? 0 : kalshiYesDepth,
       stale ? 0 : kalshiNoDepth,
       stale ? 0 : pmYesDepth,
