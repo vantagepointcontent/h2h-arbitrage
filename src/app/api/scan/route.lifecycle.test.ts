@@ -172,6 +172,15 @@ describe('POST /api/scan saved-market lifecycle', () => {
     expect(mocks.appendScanHistory).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps the primary full scan durable when secondary history persistence fails', async () => {
+    mocks.appendScanHistory.mockRejectedValueOnce(new Error('history persistence unavailable'));
+
+    const response = await executeFullScan(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
+  });
+
   it('keeps a durable full scan successful when secondary bot persistence fails', async () => {
     mocks.persistAndConsumeBotScan.mockRejectedValueOnce(new Error('bot persistence unavailable'));
 

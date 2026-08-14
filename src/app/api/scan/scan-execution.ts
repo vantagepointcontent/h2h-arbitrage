@@ -507,12 +507,18 @@ export async function executeFullScan(request: NextRequest) {
         };
         const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
         if (!published) throw new Error('Saved-market publication was superseded before persistence');
-        await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
-          withArbitrage,
-          { kalshi: scanObservedAt, polymarket: scanObservedAt },
-          'saved-market-full-scan',
-        )));
-        await withSqliteBusyRetry(() => appendScanHistory({
+        fullScanPersisted = true;
+        try {
+          await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
+            withArbitrage,
+            { kalshi: scanObservedAt, polymarket: scanObservedAt },
+            'saved-market-full-scan',
+          )));
+        } catch (snapshotErr) {
+          console.warn('[current-price-snapshots] persistence failed (scan result remains durable):', snapshotErr instanceof Error ? snapshotErr.message : snapshotErr);
+        }
+        try {
+          await withSqliteBusyRetry(() => appendScanHistory({
             scanTimestamp: new Date().toISOString(),
             marketId: market.id,
             totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
@@ -520,12 +526,13 @@ export async function executeFullScan(request: NextRequest) {
             positiveArbCount: positiveArbs.length,
             matchedCount,
           }));
-        fullScanPersisted = true;
+        } catch (historyErr) {
+          console.warn('[scan-history] persistence failed (scan result remains durable):', historyErr instanceof Error ? historyErr.message : historyErr);
+        }
 
         // Bot consumption is secondary to publishing the saved-market result.
-        // Do not hold the global SQLite writer gate while strategy evaluation
-        // runs, and do not turn a durable full scan into an HTTP 500 if the bot
-        // consumer encounters independent contention.
+        // Do not turn a durable full scan into an HTTP 500 if strategy
+        // evaluation encounters independent contention.
         try {
           await withSqliteBusyRetry(() => persistAndConsumeBotScan(market.id, {
           bestRoiPct: scanResult.bestRoiPct,
