@@ -8,7 +8,7 @@ describe('BUG-140 production poller lifecycle evidence', () => {
   it('persists manual-success breaker reset across restart while later linked markets progress', async () => {
     const { stdout } = await execFileAsync(process.execPath, ['scripts/bug-140-runtime-evidence.mjs'], {
       cwd: process.cwd(),
-      timeout: 60_000,
+      timeout: 90_000,
       maxBuffer: 1024 * 1024,
     });
     const report = JSON.parse(stdout);
@@ -36,5 +36,5 @@ describe('BUG-140 production poller lifecycle evidence', () => {
     expect(report.requestScope.linkedEventUrlsOnly).toBe(true);
     expect(report.requestScope.fields).toEqual(['kalshiUrl', 'polymarketUrl']);
     expect(report.cycles).toHaveLength(2);
-  }, 65_000);
+  }, 100_000);
 });

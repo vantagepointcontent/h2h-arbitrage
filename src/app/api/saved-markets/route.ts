@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     const markets = savedMarkets.map(market => {
       const scheduler = schedulerState[market.id] as Record<string, unknown> | undefined;
       const scanAt = market.lastScanResult?.scannedAt;
-      const scanSucceeded = market.lastScanResult?.matchStatus !== 'unavailable'
-        && market.lastScanResult?.matchStatus !== 'refreshing';
+      const scanSucceeded = market.lastScanResult?.matchStatus === 'matched'
+        || market.lastScanResult?.matchStatus === 'confirmed_zero';
       const schedulerSuccessAt = typeof scheduler?.lastSuccessAt === 'string' ? scheduler.lastSuccessAt : null;
       const lastSuccessAt = scanSucceeded && scanAt
         && (!schedulerSuccessAt || Date.parse(scanAt) > Date.parse(schedulerSuccessAt))

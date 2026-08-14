@@ -4,15 +4,19 @@ import {
   completeAttempt,
   isEligibleMarket,
   markAttemptStarted,
+  minimumConcurrencyForSla,
   parseBoundedNumber,
   resetBreakerAfterExternalSuccess,
+  schedulerLeaseCanStart,
+  schedulerLeaseMatches,
   selectDueMarkets,
   schedulerMetrics,
 } from '../../scripts/poll-scheduler.mjs';
-import { acquireMarketLease } from '../../scripts/poll-lease.mjs';
+import { acquireMarketLease, releaseMarketLease } from '../../scripts/poll-lease.mjs';
 import { updateSchedulerState } from '../../scripts/poll-state.mjs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,11 +28,11 @@ const market = (id: string, scannedAt: string | null = null): Market => ({
   eventTitle: `Market ${id}`,
   kalshiUrl: `https://kalshi.com/markets/${id}`,
   polymarketUrl: `https://polymarket.com/event/${id}`,
-  lastScanResult: scannedAt ? { scannedAt } : null,
+  lastScanResult: scannedAt ? { scannedAt, matchStatus: 'matched' } : null,
 });
 
 describe('saved-market fair scheduler', () => {
-  it('reclaims an ownerless lock left by a process death during acquisition', async () => {
+  it('fails closed on an ownerless scheduler lock', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-orphan-test-'));
     const stateFile = path.join(directory, 'scheduler.json');
     try {
@@ -40,15 +44,29 @@ describe('saved-market fair scheduler', () => {
       const [exitCode] = await once(interruptedOwner, 'exit');
       expect(exitCode).toBe(0);
 
-      await updateSchedulerState(stateFile, state => {
+      await expect(updateSchedulerState(stateFile, state => {
         state.recovered = true;
-      });
+      }, { lockWaitMs: 100 })).rejects.toThrow('Timed out acquiring scheduler state lock');
 
-      expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ recovered: true });
+      await expect(readFile(stateFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
   }, 1_000);
+
+  it('preserves corrupt scheduler state instead of replacing it with an empty object', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-corrupt-test-'));
+    const stateFile = path.join(directory, 'scheduler.json');
+    try {
+      await writeFile(stateFile, '{"market-a":');
+      await expect(updateSchedulerState(stateFile, state => {
+        state.recovered = true;
+      })).rejects.toThrow();
+      expect(await readFile(stateFile, 'utf8')).toBe('{"market-a":');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 
   it('merges concurrent per-market scheduler updates without losing completed state', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-test-'));
@@ -92,11 +110,79 @@ describe('saved-market fair scheduler', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it('releases only the exact kernel-lock generation without pathname deletion', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-release-'));
+    try {
+      const first = await acquireMarketLease(directory, 'market/a', 'owner-1', 10_000);
+      expect(first).not.toBeNull();
+      expect(await releaseMarketLease({ token: 'not-the-owner' })).toBe(false);
+      expect(await releaseMarketLease(first)).toBe(true);
+      expect(await releaseMarketLease(first)).toBe(false);
+      expect(await acquireMarketLease(directory, 'market/a', 'owner-2', 10_000)).not.toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when existing lease metadata is malformed', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-malformed-'));
+    try {
+      const leasePath = path.join(directory, createHash('sha256').update('market/a').digest('hex'));
+      await mkdir(leasePath);
+      await writeFile(path.join(leasePath, 'owner.json'), '{"ownerId":');
+      expect(await acquireMarketLease(directory, 'market/a', 'owner-2', 80)).toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('does not upgrade an expired legacy lease directory in place', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-legacy-expired-'));
+    try {
+      const marketId = 'legacy-market';
+      const leasePath = path.join(directory, createHash('sha256').update(marketId).digest('hex'));
+      await mkdir(leasePath);
+      await writeFile(path.join(leasePath, 'owner.json'), JSON.stringify({
+        ownerId: 'legacy-owner',
+        token: 'legacy-token',
+        acquiredAt: '2026-08-13T19:00:00.000Z',
+        expiresAt: '2026-08-13T19:01:00.000Z',
+      }));
+      expect(await acquireMarketLease(
+        directory,
+        marketId,
+        'modern-owner',
+        1_000,
+        Date.parse('2026-08-13T20:00:00Z'),
+      )).toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('elects exactly one successor when many contenders observe an expired lease', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-lease-turnover-'));
+    try {
+      expect(await acquireMarketLease(directory, 'market/a', 'expired-owner', 1)).not.toBeNull();
+      await new Promise(resolve => setTimeout(resolve, 5));
+      const contenders = await Promise.all(Array.from({ length: 20 }, (_, index) =>
+        acquireMarketLease(directory, 'market/a', `owner-${index}`, 1_000)));
+      expect(contenders.filter(Boolean)).toHaveLength(1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('bounds invalid numeric environment configuration', () => {
     expect(parseBoundedNumber('NaN', 5, 1, 20)).toBe(5);
     expect(parseBoundedNumber('0', 5, 1, 20)).toBe(5);
     expect(parseBoundedNumber('999', 5, 1, 20)).toBe(20);
     expect(parseBoundedNumber('7.8', 5, 1, 20, true)).toBe(7);
+  });
+
+  it('reserves enough bounded concurrency to finish the full queue inside the SLA', () => {
+    expect(minimumConcurrencyForSla(503, 35_000, 60 * 60_000)).toBe(7);
   });
   it('processes later entries after an earlier entry fails instead of retrying it first', () => {
     const now = Date.parse('2026-08-13T20:00:00Z');
@@ -126,6 +212,23 @@ describe('saved-market fair scheduler', () => {
     expect(recovered.a.inProgress).toBe(false);
     expect(recovered.a.failureReason).toContain('worker restarted');
     expect(selectDueMarkets([market('a')], recovered, now + 10_001, 1).map(m => m.id)).toEqual(['a']);
+  });
+
+  it('rejects stale terminal writes after a successor claims the scheduler generation', () => {
+    const now = Date.parse('2026-08-13T20:00:00Z');
+    const item = buildSchedulerState([market('a')], {}, now, 60_000).a;
+    const first = { ownerId: 'owner-a', token: 'token-a', expiresAt: new Date(now + 20).toISOString() };
+    const successor = { ownerId: 'owner-b', token: 'token-b', expiresAt: new Date(now + 1_000).toISOString() };
+    const expired = { ownerId: 'expired', token: 'expired-token', expiresAt: new Date(now - 1).toISOString() };
+    expect(schedulerLeaseCanStart(item, expired, now)).toBe(false);
+    markAttemptStarted(item, now, first);
+    expect(schedulerLeaseCanStart(item, first, now + 21)).toBe(false);
+    expect(schedulerLeaseCanStart(item, successor, now + 10)).toBe(false);
+    expect(schedulerLeaseCanStart(item, successor, now + 21)).toBe(true);
+    markAttemptStarted(item, now + 21, successor);
+    expect(schedulerLeaseMatches(item, first.token, now + 21)).toBe(false);
+    expect(schedulerLeaseMatches(item, successor.token, now + 21)).toBe(true);
+    expect(schedulerLeaseMatches(item, successor.token, now + 1_001)).toBe(false);
   });
 
   it('backs off repeated failures without blocking healthy markets', () => {
@@ -174,6 +277,18 @@ describe('saved-market fair scheduler', () => {
     }, now, 60_000);
 
     expect(state.a.lastSuccessAt).toBe('2026-08-13T18:00:00Z');
+  });
+
+  it('does not promote missing or unknown publication status to last success', () => {
+    const now = Date.parse('2026-08-13T20:00:00Z');
+    for (const matchStatus of [undefined, 'legacy_unknown']) {
+      const candidate = market('a', '2026-08-13T19:59:00Z');
+      candidate.lastScanResult!.matchStatus = matchStatus;
+      const state = buildSchedulerState([candidate], {
+        a: { lastSuccessAt: '2026-08-13T18:00:00Z', nextDueAt: '2026-08-13T18:30:00Z' },
+      }, now, 60_000);
+      expect(state.a.lastSuccessAt).toBe('2026-08-13T18:00:00Z');
+    }
   });
 
   it('recognizes a newer successful manual full scan and avoids an immediate duplicate', () => {

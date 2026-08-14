@@ -1,6 +1,7 @@
 const RETRY_BASE_MS = 30_000;
 const RETRY_MAX_MS = 15 * 60_000;
 const DEFAULT_FRESHNESS_SLA_MS = 60 * 60_000;
+const SLA_CAPACITY_UTILIZATION = 0.8;
 
 function iso(ms) {
   return new Date(ms).toISOString();
@@ -22,14 +23,24 @@ export function parseBoundedNumber(value, fallback, minimum, maximum, integer = 
   return integer ? Math.floor(bounded) : bounded;
 }
 
+export function minimumConcurrencyForSla(eligibleCount, timeoutMs, freshnessSlaMs) {
+  if (!Number.isFinite(eligibleCount) || eligibleCount <= 0) return 1;
+  const timeout = positiveFinite(timeoutMs, 60_000);
+  const sla = positiveFinite(freshnessSlaMs, DEFAULT_FRESHNESS_SLA_MS);
+  return Math.max(1, Math.ceil((eligibleCount * timeout) / (sla * SLA_CAPACITY_UTILIZATION)));
+}
+
+function successfulPublication(result) {
+  return result?.matchStatus === 'matched' || result?.matchStatus === 'confirmed_zero';
+}
+
 export function isEligibleMarket(market, now = Date.now()) {
   const expiry = timestamp(market.expiryDate, Infinity);
   return expiry > now || market.lastScanResult?.priceResolved === false;
 }
 
 export function hasNewerSuccessfulMarketScan(market, previous = {}) {
-  const resultStatus = market.lastScanResult?.matchStatus;
-  if (resultStatus === 'unavailable' || resultStatus === 'refreshing') return false;
+  if (!successfulPublication(market.lastScanResult)) return false;
   return timestamp(market.lastScanResult?.scannedAt) > timestamp(previous.lastSuccessAt);
 }
 
@@ -50,8 +61,7 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
     // a full-scan success without changing queue order. Failed /api/scan
     // diagnostics explicitly publish unavailable/refreshing and must not
     // advance freshness.
-    const resultStatus = market.lastScanResult?.matchStatus;
-    const marketSuccessAt = resultStatus !== 'unavailable' && resultStatus !== 'refreshing'
+    const marketSuccessAt = successfulPublication(market.lastScanResult)
       ? market.lastScanResult?.scannedAt || null
       : null;
     const successfulScanAt = timestamp(marketSuccessAt) > timestamp(previous.lastSuccessAt)
@@ -72,6 +82,7 @@ export function buildSchedulerState(markets, persisted = {}, now = Date.now(), f
           : previous.nextDueAt || iso(dueFromSuccess),
       inProgress: leaseActive,
       leaseOwnerId: leaseActive ? previous.leaseOwnerId || null : null,
+      leaseToken: leaseActive ? previous.leaseToken || null : null,
       leaseExpiresAt: leaseActive ? previous.leaseExpiresAt : null,
       failureReason: recovered
         ? 'Scheduled scan interrupted because the worker restarted; retrying now.'
@@ -106,6 +117,7 @@ export function markAttemptStarted(item, now = Date.now(), lease = null) {
   item.lastAttemptAt = iso(now);
   item.inProgress = true;
   item.leaseOwnerId = lease?.ownerId || null;
+  item.leaseToken = lease?.token || null;
   item.leaseExpiresAt = lease?.expiresAt || null;
   item.failureReason = null;
 }
@@ -115,6 +127,7 @@ export function completeAttempt(item, outcome, now = Date.now(), freshnessSlaMs 
   requestedIntervalMs = positiveFinite(requestedIntervalMs, freshnessSlaMs);
   item.inProgress = false;
   item.leaseOwnerId = null;
+  item.leaseToken = null;
   item.leaseExpiresAt = null;
   if (outcome.ok) {
     item.lastSuccessAt = iso(now);
@@ -129,6 +142,22 @@ export function completeAttempt(item, outcome, now = Date.now(), freshnessSlaMs 
   item.failureReason = outcome.error || 'Scheduled scan failed without an error reason.';
   const backoff = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, item.retryCount - 1));
   item.nextDueAt = iso(Math.max(now + backoff, positiveFinite(outcome.retryAt, 0)));
+}
+
+export function schedulerLeaseCanStart(item, lease, now = Date.now()) {
+  if (typeof lease?.token !== 'string' || lease.token.length === 0) return false;
+  if (timestamp(lease.expiresAt) <= now) return false;
+  if (!item?.inProgress) return true;
+  if (item.leaseToken && item.leaseToken === lease?.token) return true;
+  return timestamp(item.leaseExpiresAt) <= now;
+}
+
+export function schedulerLeaseMatches(item, leaseToken, now = Date.now()) {
+  return item?.inProgress === true
+    && typeof leaseToken === 'string'
+    && leaseToken.length > 0
+    && item.leaseToken === leaseToken
+    && timestamp(item.leaseExpiresAt) > now;
 }
 
 export function schedulerMetrics(markets, state, now = Date.now(), freshnessSlaMs = 60 * 60_000) {

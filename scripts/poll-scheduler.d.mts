@@ -11,6 +11,9 @@ export interface SchedulerItem {
   lastSuccessAt: string | null;
   nextDueAt: string;
   inProgress: boolean;
+  leaseOwnerId?: string | null;
+  leaseToken?: string | null;
+  leaseExpiresAt?: string | null;
   failureReason: string | null;
   retryCount: number;
   freshnessSlaMs: number;
@@ -28,10 +31,17 @@ export function isEligibleMarket(market: ScheduledMarket, now?: number): boolean
 export function parseBoundedNumber(
   value: unknown, fallback: number, minimum: number, maximum: number, integer?: boolean,
 ): number;
+export function minimumConcurrencyForSla(
+  eligibleCount: number, timeoutMs: number, freshnessSlaMs: number,
+): number;
 export function selectDueMarkets<T extends ScheduledMarket>(
   markets: T[], state: SchedulerState, now?: number, limit?: number,
 ): T[];
-export function markAttemptStarted(item: SchedulerItem, now?: number): void;
+export function markAttemptStarted(
+  item: SchedulerItem,
+  now?: number,
+  lease?: { ownerId?: string; token?: string; expiresAt?: string } | null,
+): void;
 export function completeAttempt(
   item: SchedulerItem,
   outcome: { ok: boolean; error?: string; retryAt?: number },
@@ -39,6 +49,16 @@ export function completeAttempt(
   freshnessSlaMs?: number,
   requestedIntervalMs?: number,
 ): void;
+export function schedulerLeaseCanStart(
+  item: SchedulerItem | null | undefined,
+  lease: { token?: string; expiresAt?: string } | null | undefined,
+  now?: number,
+): boolean;
+export function schedulerLeaseMatches(
+  item: SchedulerItem | null | undefined,
+  leaseToken: string,
+  now?: number,
+): boolean;
 export function schedulerMetrics(
   markets: ScheduledMarket[], state: SchedulerState, now?: number, freshnessSlaMs?: number,
 ): {

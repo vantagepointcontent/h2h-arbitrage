@@ -91,6 +91,8 @@ function request(): NextRequest {
 describe('POST /api/scan saved-market lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.upstream.mockReset();
+    mocks.upstream.mockResolvedValue([]);
     mocks.acquireSavedMarketScanLock.mockResolvedValue({
       status: 'acquired',
       lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'test' },
@@ -123,11 +125,22 @@ describe('POST /api/scan saved-market lifecycle', () => {
   it('rejects a second full scan while the first saved-market scan is still executing', async () => {
     let resolveUpstream!: (markets: unknown[]) => void;
     mocks.upstream.mockImplementationOnce(() => new Promise(resolve => { resolveUpstream = resolve; }));
+    mocks.acquireSavedMarketScanLock
+      .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'first' },
+      })
+      .mockResolvedValueOnce({
+        status: 'busy',
+        reason: 'owner_live',
+        retryable: true,
+        retryAfterMs: 5_000,
+      });
 
-    const first = POST(request());
+    const first = executeFullScan(request());
     await vi.waitFor(() => expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenCalledTimes(1));
 
-    const duplicate = await POST(request());
+    const duplicate = await executeFullScan(request());
     expect(duplicate.status).toBe(409);
     expect(await duplicate.json()).toMatchObject({
       error: expect.stringContaining('already in progress'),

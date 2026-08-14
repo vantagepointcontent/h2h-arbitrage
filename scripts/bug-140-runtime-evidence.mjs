@@ -7,6 +7,7 @@ import path from 'node:path';
 import { build } from 'esbuild';
 
 const SLA_MS = 5 * 60_000;
+const LEASE_EXPIRY_WAIT_MS = 6_500;
 const markets = Array.from({ length: 24 }, (_, index) => ({
   id: `market-${String(index).padStart(2, '0')}`,
   eventTitle: `Runtime market ${index}`,
@@ -57,7 +58,7 @@ const server = http.createServer((request, response) => {
       response.end(JSON.stringify(result));
     };
     if (id === '0') return void finish(503, { error: 'injected repeated platform failure' });
-    if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 7_000);
+    if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 15_000);
     if (crossProcessMergeMode && id === '20') return void setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 500);
     if (crossProcessMergeMode && id === '21') return void setTimeout(() => finish(503, { error: 'injected overlapping platform failure' }), 500);
     if (id === '1' && count === 1) return void setTimeout(() => finish(200, { fullScanPersisted: true }), 5_500);
@@ -159,7 +160,7 @@ try {
   }
   afterFirstScheduler['market-02'].inProgress = true;
   await writeFile(files.scheduler, JSON.stringify(afterFirstScheduler));
-  await new Promise(resolve => setTimeout(resolve, 5_200));
+  await new Promise(resolve => setTimeout(resolve, LEASE_EXPIRY_WAIT_MS));
   const firstRequestCount = requests.length;
   const second = await runPoller(env);
   const secondHealth = JSON.parse(await readFile(files.health, 'utf8'));
@@ -240,7 +241,7 @@ try {
   await abandonedRun.completed.catch(() => null);
   const fencedSuccessor = await runPoller(env);
   assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 1, 'live abandoned lease must fence successor');
-  await new Promise(resolve => setTimeout(resolve, 5_200));
+  await new Promise(resolve => setTimeout(resolve, LEASE_EXPIRY_WAIT_MS));
   const expiredLeasePeer = await runPoller(env);
   assert.equal(duplicateConcurrentScans, false, 'server fence must prevent duplicate execution after poller lease expiry');
   assert.equal(duplicateAttemptFencedAtServer, true, 'expired poller lease must reach the live server-side execution fence');
@@ -249,7 +250,7 @@ try {
   afterServerFenceScheduler['market-23'].nextDueAt = new Date(Date.now() - 1_000).toISOString();
   await writeFile(files.scheduler, JSON.stringify(afterServerFenceScheduler));
   abandonedWorkerMode = false;
-  await new Promise(resolve => setTimeout(resolve, 5_200));
+  await new Promise(resolve => setTimeout(resolve, LEASE_EXPIRY_WAIT_MS));
   const reclaimedRun = await runPoller(env);
   const afterReclaimScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
   assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 2, 'expired lease must be reclaimed');
@@ -284,10 +285,14 @@ try {
         ownerToken: 'crashed-predecessor',
         ownerPid: process.pid,
         processIdentity: { bootId: 'previous-boot', startTimeTicks: '1' },
+        processInstanceId: '00000000-0000-4000-8000-000000000000',
+        acquiredAt: new Date().toISOString(),
       }));
     }
-    const lock = await lockModule.acquireSavedMarketScanLock(marketId);
-    process.stdout.write(JSON.stringify({ acquired: Boolean(lock) }) + '\n');
+    const acquisition = await lockModule.acquireSavedMarketScanLock(marketId);
+    const acquired = acquisition?.status === 'acquired';
+    const lock = acquired ? acquisition.lock : null;
+    process.stdout.write(JSON.stringify({ acquired }) + '\n');
     if (lock && mode === 'hold') await new Promise(resolve => process.once('message', resolve));
     if (lock) await lockModule.releaseSavedMarketScanLock(lock);
   `;

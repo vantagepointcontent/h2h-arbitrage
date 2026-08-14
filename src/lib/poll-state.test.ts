@@ -21,8 +21,13 @@ const updaterScript = String.raw`
   });
 `;
 
-function spawnUpdater(stateFile: string, key: string, mode = 'update', readyFile = ''): ChildProcess {
+function spawnUpdater(stateFile: string, key: string, mode = 'update', readyFile = '', inspectionFailure = '', lockWaitMs = ''): ChildProcess {
   return spawn(process.execPath, ['--input-type=module', '-e', updaterScript, pollStateModule, stateFile, key, mode, readyFile], {
+    env: {
+      ...process.env,
+      H2H_POLL_STATE_INSPECTION_FAILURE: inspectionFailure,
+      H2H_POLL_STATE_LOCK_WAIT_MS: lockWaitMs,
+    },
     stdio: mode === 'hold' ? ['ignore', 'ignore', 'inherit', 'ipc'] : ['ignore', 'ignore', 'inherit'],
   });
 }
@@ -51,7 +56,7 @@ async function exitWithin(child: ChildProcess, timeoutMs: number): Promise<numbe
 }
 
 describe('poller state mutex process ownership', () => {
-  it('reclaims a stale lock with malformed owner metadata', async () => {
+  it('fails closed on malformed owner metadata', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-malformed-'));
     const stateFile = path.join(directory, 'scheduler.json');
     const lockPath = `${stateFile}.lock`;
@@ -63,9 +68,9 @@ describe('poller state mutex process ownership', () => {
       await utimes(ownerFile, stale, stale);
       await utimes(lockPath, stale, stale);
 
-      const updater = spawnUpdater(stateFile, 'recovered');
-      expect(await exitWithin(updater, 1_000)).toBe(0);
-      expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ recovered: true });
+      const updater = spawnUpdater(stateFile, 'recovered', 'update', '', '', '100');
+      expect(await exitWithin(updater, 1_000)).toBe(1);
+      await expect(readFile(stateFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -84,6 +89,21 @@ describe('poller state mutex process ownership', () => {
         acquiredAt: new Date(Date.now() - 60_000).toISOString(),
       }));
 
+      const updater = spawnUpdater(stateFile, 'recovered');
+      expect(await exitWithin(updater, 1_000)).toBe(0);
+      expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ recovered: true });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates the prior pid-only lock format only when the owner is definitely dead', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-legacy-dead-'));
+    const stateFile = path.join(directory, 'scheduler.json');
+    const lockPath = `${stateFile}.lock`;
+    try {
+      await mkdir(lockPath);
+      await writeFile(path.join(lockPath, 'owner.json'), JSON.stringify({ pid: 2_147_483_647 }));
       const updater = spawnUpdater(stateFile, 'recovered');
       expect(await exitWithin(updater, 1_000)).toBe(0);
       expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ recovered: true });
@@ -115,6 +135,34 @@ describe('poller state mutex process ownership', () => {
       expect((await ownerExit)[0]).toBe(0);
       expect((await contenderExit)[0]).toBe(0);
       expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ owner: true, contender: true });
+    } finally {
+      if (owner?.exitCode === null) owner.kill('SIGKILL');
+      if (contender?.exitCode === null) contender.kill('SIGKILL');
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['EACCES', 'EPERM', 'EIO'])('fails closed when owner inspection fails with %s', async failure => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-indeterminate-'));
+    const stateFile = path.join(directory, 'scheduler.json');
+    const readyFile = path.join(directory, 'ready');
+    let owner: ChildProcess | null = null;
+    let contender: ChildProcess | null = null;
+    try {
+      owner = spawnUpdater(stateFile, 'owner', 'hold', readyFile);
+      const ownerExit = once(owner, 'exit');
+      await waitForFile(readyFile);
+      contender = spawnUpdater(stateFile, 'contender', 'update', '', failure);
+      const contenderExit = once(contender, 'exit');
+
+      expect(await Promise.race([
+        contenderExit.then(() => true),
+        new Promise<false>(resolve => setTimeout(() => resolve(false), 150)),
+      ])).toBe(false);
+
+      owner.send?.('release');
+      expect((await ownerExit)[0]).toBe(0);
+      expect((await contenderExit)[0]).toBe(0);
     } finally {
       if (owner?.exitCode === null) owner.kill('SIGKILL');
       if (contender?.exitCode === null) contender.kill('SIGKILL');

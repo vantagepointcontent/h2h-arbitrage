@@ -78,10 +78,19 @@ describe("saved-market scheduler status", () => {
     });
   });
 
-  it("distinguishes scanning, overdue, and fresh states", () => {
+  it("distinguishes fresh, due, scanning, overdue, and unavailable states", () => {
     expect(getSavedMarketScheduleView({ inProgress: true }, null, now, 60 * 60_000).status).toBe("scanning");
     expect(getSavedMarketScheduleView(null, "2026-08-13T18:00:00Z", now, 60 * 60_000).status).toBe("overdue");
+    expect(getSavedMarketScheduleView({ nextDueAt: "2026-08-13T19:59:00Z" }, "2026-08-13T19:30:00Z", now, 60 * 60_000).status).toBe("due");
     expect(getSavedMarketScheduleView(null, "2026-08-13T19:30:00Z", now, 60 * 60_000).status).toBe("fresh");
+    expect(getSavedMarketScheduleView(null, null, now, 60 * 60_000)).toMatchObject({
+      status: "unavailable", reason: "No successful full scan is available yet.",
+    });
+  });
+
+  it("separates rate limits from other exact failure reasons", () => {
+    expect(getSavedMarketScheduleView({ failureReason: "HTTP 429" }, "2026-08-13T19:30:00Z", now).status).toBe("rate_limited");
+    expect(getSavedMarketScheduleView({ failureReason: "Polymarket HTTP 503" }, "2026-08-13T19:30:00Z", now).status).toBe("failed");
   });
 
   it("publishes a durable manual full scan immediately and clears stale failure state", () => {
@@ -134,6 +143,22 @@ describe("saved-market scheduler status", () => {
     } satisfies SavedMarket;
 
     expect(getSavedMarketLastSuccessAt(market)).toBe("2026-08-13T19:00:00Z");
+  });
+
+  it("does not treat unavailable or unclassified scan timestamps as successful", () => {
+    const base = {
+      id: "market-1", eventTitle: "Market 1", kalshiUrl: "k", polymarketUrl: "p", createdAt: "2026-08-13T18:00:00Z",
+    };
+    for (const matchStatus of ["unavailable", "refreshing", undefined] as const) {
+      const market = {
+        ...base,
+        lastScanResult: {
+          bestRoiPct: 0, bestProfit: 0, strategy: "No arb", outcomeCount: 0, matchedCount: 0,
+          kalshiCount: 0, pmCount: 0, scannedAt: "2026-08-13T19:30:00Z", allArbs: [], matchStatus,
+        },
+      } satisfies SavedMarket;
+      expect(getSavedMarketLastSuccessAt(market)).toBeNull();
+    }
   });
 });
 

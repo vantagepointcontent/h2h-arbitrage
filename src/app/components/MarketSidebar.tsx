@@ -61,18 +61,24 @@ export function FullScanStatus({ market, now }: { market: SavedMarket; now?: num
   const f = tickFreshness(lastSuccessfulScanAt, observedAt);
   const label = schedule.status === 'scanning'
     ? `Scanning · ${f.label}`
+    : schedule.status === 'rate_limited'
+      ? `Rate limited · ${f.label}`
     : schedule.status === 'failed'
       ? `Failed · ${f.label}`
-      : schedule.status === 'overdue'
-        ? `Overdue · ${f.label}`
-        : f.label;
-  const color = schedule.status === 'failed' ? 'text-[var(--status-negative)]'
+    : schedule.status === 'overdue'
+      ? `Overdue · ${f.label}`
+    : schedule.status === 'due'
+      ? `Due · ${f.label}`
+    : schedule.status === 'unavailable'
+      ? 'Unavailable · Never'
+    : f.label;
+  const color = schedule.status === 'failed' || schedule.status === 'unavailable' ? 'text-[var(--status-negative)]'
     : schedule.status === 'scanning' ? 'text-[var(--status-positive)]'
-      : schedule.status === 'overdue' ? 'text-[var(--status-warning)]'
+      : schedule.status === 'overdue' || schedule.status === 'due' || schedule.status === 'rate_limited' ? 'text-[var(--status-warning)]'
         : freshnessColor(f.level);
   return (
     <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={schedule.reason ?? `Last successful full scan: ${f.label}`}>
-      <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
+      <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' || schedule.status === 'due' || schedule.status === 'rate_limited' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
       {label}
     </span>
   );

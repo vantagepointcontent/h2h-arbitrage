@@ -320,14 +320,24 @@ export function getSavedMarketScheduleView(
   lastSuccessfulScanAt: string | null | undefined,
   now = Date.now(),
   freshnessSlaMs = scheduler?.freshnessSlaMs ?? 60 * 60_000,
-): { status: 'fresh' | 'scanning' | 'overdue' | 'failed'; ageMs: number | null; reason: string | null } {
+): { status: 'fresh' | 'due' | 'scanning' | 'failed' | 'rate_limited' | 'overdue' | 'unavailable'; ageMs: number | null; reason: string | null } {
   const successAt = scheduler?.lastSuccessAt ?? lastSuccessfulScanAt;
   const parsed = successAt ? Date.parse(successAt) : NaN;
   const ageMs = Number.isFinite(parsed) ? Math.max(0, now - parsed) : null;
-  if (scheduler?.inProgress) return { status: 'scanning', ageMs, reason: null };
-  if (scheduler?.failureReason) return { status: 'failed', ageMs, reason: scheduler.failureReason };
-  if (ageMs === null || ageMs > freshnessSlaMs) {
-    return { status: 'overdue', ageMs, reason: ageMs === null ? 'No successful full scan yet.' : 'Full scan is past the freshness SLA.' };
+  if (scheduler?.inProgress) return { status: 'scanning', ageMs, reason: 'A recurring full scan is currently running.' };
+  if (scheduler?.failureReason) {
+    const rateLimited = /(?:http\s*429|rate[ -]?limit|too many requests)/i.test(scheduler.failureReason);
+    return {
+      status: rateLimited ? 'rate_limited' : 'failed',
+      ageMs,
+      reason: scheduler.failureReason,
+    };
+  }
+  if (ageMs === null) return { status: 'unavailable', ageMs, reason: 'No successful full scan is available yet.' };
+  if (ageMs > freshnessSlaMs) return { status: 'overdue', ageMs, reason: 'Full scan is past the freshness SLA.' };
+  const nextDueAt = scheduler?.nextDueAt ? Date.parse(scheduler.nextDueAt) : NaN;
+  if (Number.isFinite(nextDueAt) && nextDueAt <= now) {
+    return { status: 'due', ageMs, reason: 'A recurring full scan is due and waiting in the fair queue.' };
   }
   return { status: 'fresh', ageMs, reason: null };
 }
@@ -367,7 +377,11 @@ export interface SavedMarket {
 }
 
 export function getSavedMarketLastSuccessAt(market: SavedMarket): string | null {
-  return market.scheduler?.lastSuccessAt ?? market.lastScanResult?.scannedAt ?? null;
+  if (market.scheduler?.lastSuccessAt) return market.scheduler.lastSuccessAt;
+  const status = market.lastScanResult?.matchStatus;
+  return status === 'matched' || status === 'confirmed_zero'
+    ? market.lastScanResult?.scannedAt ?? null
+    : null;
 }
 
 export function applyDurableFullScanToSavedMarket(

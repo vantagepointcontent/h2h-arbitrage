@@ -2,6 +2,7 @@
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
 const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
+const SCHEDULER_VERSION = 'bug-150-v1';
 let POLL_CONCURRENCY;
 let FRESHNESS_SLA_MS;
 // Base wake-up interval. Poller wakes this often to check which markets are due.
@@ -46,13 +47,17 @@ const {
   hasNewerSuccessfulMarketScan,
   isEligibleMarket,
   markAttemptStarted,
+  minimumConcurrencyForSla,
   parseBoundedNumber,
   resetBreakerAfterExternalSuccess,
+  schedulerLeaseCanStart,
+  schedulerLeaseMatches,
   selectDueMarkets,
   schedulerMetrics,
 } = await import('./poll-scheduler.mjs');
-const { acquireMarketLease } = await import('./poll-lease.mjs');
+const { acquireMarketLease, releaseMarketLease } = await import('./poll-lease.mjs');
 const { updateSchedulerState } = await import('./poll-state.mjs');
+const { readSavedMarketsFailSafe } = await import('./poll-data.mjs');
 POLL_CONCURRENCY = parseBoundedNumber(process.env.H2H_POLL_CONCURRENCY, 5, 1, 20, true);
 SCAN_TIMEOUT_MS = parseBoundedNumber(process.env.H2H_SCAN_TIMEOUT_MS, 60_000, 5_000, 300_000, true);
 FRESHNESS_SLA_MS = parseBoundedNumber(
@@ -160,14 +165,19 @@ function loadSchedulerState() {
   }
 }
 
-async function saveMarketSchedulerState(marketId) {
+async function saveMarketSchedulerState(marketId, guard = null) {
   const snapshot = JSON.parse(JSON.stringify(schedulerState[marketId]));
+  let saved = false;
   schedulerWriteQueue = schedulerWriteQueue
     .catch(() => {})
     .then(() => updateSchedulerState(SCHEDULER_FILE, persisted => {
+      if (guard?.phase === 'start' && !schedulerLeaseCanStart(persisted[marketId], guard.lease, Date.now())) return;
+      if (guard?.phase === 'terminal' && !schedulerLeaseMatches(persisted[marketId], guard.leaseToken)) return;
       persisted[marketId] = snapshot;
+      saved = true;
     }));
   schedulerState = await schedulerWriteQueue;
+  return saved;
 }
 
 async function reconcileSchedulerState(markets) {
@@ -324,12 +334,7 @@ function getAdaptiveIntervalMs(market, config) {
 // ── File I/O ──────────────────────────────────────────────────────────────
 
 async function loadSavedMarkets() {
-  try {
-    const data = JSON.parse(await fs.promises.readFile(DATA_FILE, 'utf-8'));
-    return data || [];
-  } catch {
-    return [];
-  }
+  return readSavedMarketsFailSafe(DATA_FILE);
 }
 
 async function writeJsonAtomic(path, data) {
@@ -504,14 +509,18 @@ function applyScanResultToMarket(market, result) {
   return { best: null, all: [], matchedCount };
 }
 
-async function mapWithConcurrency(items, limit, worker) {
+async function mapWithConcurrency(items, limit, worker, onProgress = null) {
   const results = new Array(items.length);
   let next = 0;
 
   async function runWorker() {
     while (next < items.length) {
       const index = next++;
-      results[index] = await worker(items[index], index);
+      try {
+        results[index] = await worker(items[index], index);
+      } finally {
+        await onProgress?.(index);
+      }
     }
   }
 
@@ -561,6 +570,9 @@ async function pollOnce() {
   const markets = savedMarkets.filter(market => isEligibleMarket(market));
   const health = {
     status: 'running',
+    schedulerVersion: SCHEDULER_VERSION,
+    pollerPid: process.pid,
+    heartbeatAt: startedAt.toISOString(),
     baseUrl: BASE_URL,
     concurrency: POLL_CONCURRENCY,
     intervalMs: adaptiveEnabled ? 'adaptive' : POLL_WAKE_MS * 2,
@@ -577,6 +589,15 @@ async function pollOnce() {
     maxScanMs: 0,
     errors: [],
   };
+  const requiredConcurrency = minimumConcurrencyForSla(markets.length, SCAN_TIMEOUT_MS, FRESHNESS_SLA_MS);
+  health.capacity = {
+    configuredConcurrency: POLL_CONCURRENCY,
+    requiredConcurrency,
+    sufficientForFreshnessSla: POLL_CONCURRENCY >= requiredConcurrency,
+  };
+  if (!health.capacity.sufficientForFreshnessSla) {
+    console.error(`[${new Date().toISOString()}] Poller capacity below freshness SLA: configured=${POLL_CONCURRENCY}, required=${requiredConcurrency}, eligible=${markets.length}`);
+  }
   await writeHealth(health);
 
   if (markets.length === 0) {
@@ -623,7 +644,17 @@ async function pollOnce() {
   }
 
   const scanDurations = [];
-  await mapWithConcurrency(dueMarkets, POLL_CONCURRENCY, async (market) => {
+  let completedDueCount = 0;
+  let heartbeatWrite = Promise.resolve();
+  const heartbeatTimer = setInterval(() => {
+    health.heartbeatAt = new Date().toISOString();
+    health.progress = { completedDueCount, dueCount: dueMarkets.length };
+    const snapshot = { ...health, progress: { ...health.progress } };
+    heartbeatWrite = heartbeatWrite.then(() => writeHealth(snapshot));
+  }, 30_000);
+  heartbeatTimer.unref?.();
+  try {
+    await mapWithConcurrency(dueMarkets, POLL_CONCURRENCY, async (market) => {
     // The scheduler JSON is diagnostic state, not a mutual-exclusion primitive.
     // An atomic per-market filesystem lease fences overlapping PM2 instances;
     // expiry bounds recovery when an owner dies without running finally.
@@ -637,31 +668,46 @@ async function pollOnce() {
     let scan = null;
     try {
       markAttemptStarted(schedulerState[market.id], Date.now(), lease);
-      await saveMarketSchedulerState(market.id);
+      const claimed = await saveMarketSchedulerState(market.id, { phase: 'start', lease });
+      if (!claimed) {
+        health.skippedCount += 1;
+        console.warn(`[${new Date().toISOString()}] Scheduler generation changed before scan start for ${market.eventTitle}; skipping stale lease`);
+        return;
+      }
       scan = await scanMarket(market);
       scanDurations.push(scan.durationMs || 0);
 
       if (!scan.ok || !scan.result || scan.result.fullScanPersisted !== true) {
-        health.failureCount += 1;
-        recordScanOutcome(market.id, false, scan.durationMs);
         const breakerRetryAt = scanStats.get(market.id)?.cooldownUntil;
         completeAttempt(schedulerState[market.id], {
           ok: false,
           error: scan.error || 'Scan completed but durable saved-market publication failed',
           retryAt: breakerRetryAt,
         }, Date.now(), FRESHNESS_SLA_MS);
-        await saveMarketSchedulerState(market.id);
+        const saved = await saveMarketSchedulerState(market.id, { phase: 'terminal', leaseToken: lease.token });
+        if (!saved) {
+          health.skippedCount += 1;
+          console.warn(`[${new Date().toISOString()}] Ignored stale failure completion for ${market.eventTitle}; scheduler lease generation advanced`);
+          return;
+        }
+        health.failureCount += 1;
+        recordScanOutcome(market.id, false, scan.durationMs);
         const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
         health.errors.push(err);
         console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);
         return;
       }
 
-      health.successCount += 1;
-      recordScanOutcome(market.id, true, scan.durationMs);
       const requestedInterval = adaptiveEnabled ? getAdaptiveIntervalMs(market, adaptiveConfig) : FRESHNESS_SLA_MS;
       completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, requestedInterval);
-      await saveMarketSchedulerState(market.id);
+      const saved = await saveMarketSchedulerState(market.id, { phase: 'terminal', leaseToken: lease.token });
+      if (!saved) {
+        health.skippedCount += 1;
+        console.warn(`[${new Date().toISOString()}] Ignored stale success completion for ${market.eventTitle}; scheduler lease generation advanced`);
+        return;
+      }
+      health.successCount += 1;
+      recordScanOutcome(market.id, true, scan.durationMs);
       const { best, all } = applyScanResultToMarket(market, scan.result);
       const profitSum = all.reduce((s, a) => s + a.expectedProfit, 0);
       const interval = adaptiveEnabled ? formatInterval(getAdaptiveIntervalMs(market, adaptiveConfig)) : '?';
@@ -682,12 +728,20 @@ async function pollOnce() {
         console.log(`[${new Date().toISOString()}] ${market.eventTitle} → No positive arb (${scan.durationMs}ms, interval: ${interval})`);
       }
     } finally {
-      // Leases expire in place rather than being deleted. Deleting a pathname
-      // after checking its owner has a TOCTOU race with stale-owner recovery:
-      // the old owner could delete a successor's newly-created lease. Keeping
-      // the fence through its short bounded TTL makes ownership monotonic.
+      // Closing this exact owner's kernel-lock handle cannot remove or release
+      // a successor generation, unlike deleting/renaming a lock pathname.
+      await releaseMarketLease(lease);
     }
-  });
+    }, () => {
+      completedDueCount += 1;
+      health.heartbeatAt = new Date().toISOString();
+      health.progress = { completedDueCount, dueCount: dueMarkets.length };
+    });
+  } finally {
+    clearInterval(heartbeatTimer);
+    health.heartbeatAt = new Date().toISOString();
+    await heartbeatWrite;
+  }
 
   // OPS-009: no JSON write-back. The app persists each scan result itself
   // (via /api/scan → SQLite, mirrored to saved-markets.json). The poller's
@@ -700,6 +754,7 @@ async function pollOnce() {
   health.maxScanMs = scanDurations.length ? Math.max(...scanDurations) : 0;
   health.openBreakers = [...scanStats.values()].filter(s => s.cooldownUntil > Date.now()).length;
   health.queue = schedulerMetrics(markets, schedulerState, Date.now(), FRESHNESS_SLA_MS);
+  health.heartbeatAt = new Date().toISOString();
   await writeHealth(health);
   await saveBreakerState();
 
