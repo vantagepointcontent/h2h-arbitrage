@@ -29,6 +29,7 @@ import { parseJsonObject } from '@/lib/request-json';
 import { resolveMarketDomain } from '@/lib/market-classification';
 import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 import { withSqliteBusyRetry } from '@/lib/sqlite-write-retry';
+import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
 
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
@@ -429,6 +430,7 @@ export async function executeFullScan(request: NextRequest) {
         const bestArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
+        const scanObservedAt = new Date().toISOString();
         const scanResult = {
           bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
           bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
@@ -440,7 +442,7 @@ export async function executeFullScan(request: NextRequest) {
           matchedPairs,
           kalshiCount,
           pmCount,
-          scannedAt: new Date().toISOString(),
+          scannedAt: scanObservedAt,
           publicationGeneration: publicationGeneration ?? undefined,
           category: scanCategory,
           // UI-013: PM often keeps endDate far in the future even after a market
@@ -486,6 +488,11 @@ export async function executeFullScan(request: NextRequest) {
         // Keep the scan's writes ordered. Concurrent transactions here used to
         // contend with each other before watcher/poller traffic was considered.
         await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
+        await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
+          withArbitrage,
+          { kalshi: scanObservedAt, polymarket: scanObservedAt },
+          'saved-market-full-scan',
+        )));
         await appendScanHistory({
             scanTimestamp: new Date().toISOString(),
             marketId: market.id,

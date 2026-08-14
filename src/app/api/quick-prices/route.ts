@@ -6,6 +6,7 @@ import { parseScanCapital } from '@/lib/scan-request';
 import { scanRateLimiter, getScanClientKey } from '@/lib/scan-rate-limit';
 import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
 import { reconcileSavedMarketMatchSummary, reserveSavedMarketPublication } from '@/lib/persistence';
+import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestCorrelationId = request.headers.get(CORRELATION_ID_HEADER) || correlationId.generate();
@@ -70,6 +71,13 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       persistenceWarning = 'Saved-market status persistence is temporarily unavailable; live linked-event prices were still refreshed.';
     }
     const result: QuickPricesResult = await quickPricesScan(marketId, capital);
+    const freshPlatforms = new Set(Object.entries(result.platformDiagnostics ?? {})
+      .filter(([, diagnostic]) => diagnostic.status === 'fresh')
+      .map(([platform]) => platform));
+    await persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(result.outcomes ?? [], {
+      kalshi: result._kalshiFetchedAt,
+      polymarket: result._pmFetchedAt,
+    }, 'saved-market-quick-refresh').filter((snapshot) => freshPlatforms.has(snapshot.platform)));
     if (publicationGeneration != null) {
       await reconcileSavedMarketMatchSummary(marketId, {
         matchedCount: result.matchedCount,

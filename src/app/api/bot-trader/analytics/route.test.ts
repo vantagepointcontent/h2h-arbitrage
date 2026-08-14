@@ -3,14 +3,21 @@ import { GET } from './route';
 import { getBotPositionAnalytics } from '@/lib/bot-positions';
 import { NextRequest } from 'next/server';
 import { getMarketUrlsById } from '@/lib/persistence';
+import { getPersistedCurrentPriceBatch } from '@/lib/current-price-snapshots';
 
 vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn() }));
 vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
+vi.mock('@/lib/current-price-snapshots', () => ({
+  getPersistedCurrentPriceBatch: vi.fn(),
+  currentPriceSnapshotKey: (request: { platform: string; marketId: string | null; side: string; tokenId: string | null }) =>
+    `${request.platform}|${request.marketId?.toLowerCase() ?? ''}|${request.side}|${request.tokenId?.toLowerCase() ?? ''}`,
+}));
 
 describe('GET /api/bot-trader/analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getMarketUrlsById).mockResolvedValue(null);
+    vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map());
   });
   it('returns aggregated bot position analytics without caching', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({
@@ -64,9 +71,40 @@ describe('GET /api/bot-trader/analytics', () => {
     const body = await response.json();
     expect(getMarketUrlsById).toHaveBeenCalledTimes(1);
     expect(body.analytics.positions).toEqual([
-      { id: 1, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' },
-      { id: 2, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' },
+      expect.objectContaining({ id: 1, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' }),
+      expect.objectContaining({ id: 2, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' }),
     ]);
+  });
+
+  it('deduplicates exact legs into one persisted snapshot batch and isolates missing identifiers', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [
+      { id: 1, marketId: 'm1', kalshiTicker: 'KX-1', kalshiSide: 'yes', pmConditionId: '0x1', pmEntryTokenId: 'token-no', pmSide: 'no' },
+      { id: 2, marketId: 'm1', kalshiTicker: 'KX-1', kalshiSide: 'yes', pmConditionId: '0x1', pmEntryTokenId: 'token-no', pmSide: 'no' },
+      { id: 3, marketId: null, kalshiTicker: null, kalshiSide: 'no', pmConditionId: null, pmEntryTokenId: null, pmSide: 'yes' },
+    ] } as never);
+    vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map([
+      ['kalshi|kx-1|yes|', { status: 'available', priceCents: 47, source: 'saved-market-full-scan', observedAt: '2026-08-14T12:00:00.000Z', ageMs: 1000 }],
+      ['polymarket|0x1|no|token-no', { status: 'stale', priceCents: 53, source: 'saved-market-full-scan', observedAt: '2026-08-14T11:00:00.000Z', ageMs: 3_601_000 }],
+    ]));
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+
+    expect(getPersistedCurrentPriceBatch).toHaveBeenCalledTimes(1);
+    expect(getPersistedCurrentPriceBatch).toHaveBeenCalledWith([
+      { platform: 'kalshi', marketId: 'KX-1', side: 'yes', tokenId: null },
+      { platform: 'polymarket', marketId: '0x1', side: 'no', tokenId: 'token-no' },
+      { platform: 'kalshi', marketId: null, side: 'no', tokenId: null },
+      { platform: 'polymarket', marketId: null, side: 'yes', tokenId: null },
+    ]);
+    expect(body.analytics.positions[0].currentPriceSnapshots).toEqual({
+      kalshi: expect.objectContaining({ status: 'available', priceCents: 47 }),
+      polymarket: expect.objectContaining({ status: 'stale', priceCents: 53 }),
+    });
+    expect(body.analytics.positions[2].currentPriceSnapshots).toEqual({
+      kalshi: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
+      polymarket: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
+    });
   });
 
   it('returns an actionable retry message when the analytics store is unavailable', async () => {

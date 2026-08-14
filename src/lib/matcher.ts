@@ -22,6 +22,8 @@ export interface UnifiedOutcome {
   polymarket: {
     marketId: string;
     conditionId: string;
+    yesTokenId?: string;
+    noTokenId?: string;
     yesPrice: number;
     noPrice: number;
     bestBid: number;
@@ -1078,6 +1080,17 @@ function hasVerifiedBinaryTokens(market: PMMarket, outcomes: string[]): boolean 
 // --- Helper to build the PM shape used by matching; scan route calculates arbitrage. ---
 export function buildPmArbShape(market: PMMarket) {
   const { outcomes, prices } = parseOutcomes(market);
+  let tokenIds: string[] = [];
+  try {
+    const parsed = JSON.parse(market.clobTokenIds ?? '[]') as unknown;
+    if (Array.isArray(parsed) && parsed.every((token) => typeof token === 'string')) tokenIds = parsed;
+  } catch { /* missing token metadata remains explicit */ }
+  const yesIndex = outcomes.findIndex((outcome) => outcome.toLowerCase() === 'yes');
+  const noIndex = outcomes.findIndex((outcome) => outcome.toLowerCase() === 'no');
+  const exactTokens = {
+    ...(yesIndex >= 0 && tokenIds[yesIndex] ? { yesTokenId: tokenIds[yesIndex] } : {}),
+    ...(noIndex >= 0 && tokenIds[noIndex] ? { noTokenId: tokenIds[noIndex] } : {}),
+  };
   const isNegRisk = market.neg_risk === true || market.negRisk === true;
   const binaryVerified = hasVerifiedBinaryTokens(market, outcomes) && !isNegRisk;
   
@@ -1120,6 +1133,7 @@ export function buildPmArbShape(market: PMMarket) {
     return {
       marketId: market.id,
       conditionId: market.conditionId,
+      ...exactTokens,
       yesPrice: prices[0] ?? 0,
       noPrice: prices[1] ?? 0,
       bestBid: 0,
@@ -1174,6 +1188,7 @@ export function buildPmArbShape(market: PMMarket) {
   return {
     marketId: market.id,
     conditionId: market.conditionId,
+    ...exactTokens,
     yesPrice,
     noPrice,
     // When no CLOB orderbook, use gamma prices as bestAsk/bestBid so

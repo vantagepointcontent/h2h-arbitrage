@@ -67,6 +67,10 @@ const positions = [{
   settledAt: null,
   currentPriceKalshiCents: 48,
   currentPricePmCents: 54,
+  currentPriceSnapshots: {
+    kalshi: { status: 'available', priceCents: 47, source: 'saved-market-full-scan', observedAt: '2026-08-11T13:39:00.000Z', ageMs: 60_000 },
+    polymarket: { status: 'stale', priceCents: 55, source: 'saved-market-quick-refresh', observedAt: '2026-08-11T12:00:00.000Z', ageMs: 6_000_000 },
+  },
   currentValueCents: 102,
   kalshiGrossProceedsMicrocents: 48_000_000,
   pmGrossProceedsMicrocents: 54_000_000,
@@ -342,6 +346,9 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000000¢ exact fill');
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
+    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi YES Current PriceSaved$0.47');
+    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket NO Current PriceStale$0.55');
+    expect(screen.getAllByText(/Stored top-price reference only/)).toHaveLength(2);
   });
 
   it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {

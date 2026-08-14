@@ -21,6 +21,14 @@ type PerformanceRange = 'today' | '7d' | '30d' | '90d' | 'all';
 type SortKey = 'openedAt' | 'pnl' | 'roi';
 type SortDirection = 'asc' | 'desc';
 
+interface StoredPriceSnapshot {
+  status: 'available' | 'stale' | 'unavailable' | 'missing_identifier' | 'side_mismatch' | 'never_saved';
+  priceCents: number | null;
+  source: string | null;
+  observedAt: string | null;
+  ageMs: number | null;
+}
+
 interface BotPosition {
   id: number;
   executionId: number;
@@ -56,6 +64,7 @@ interface BotPosition {
   settledAt: string | null;
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
+  currentPriceSnapshots?: { kalshi: StoredPriceSnapshot; polymarket: StoredPriceSnapshot };
   currentValueCents: number | null;
   kalshiGrossProceedsMicrocents: number | null;
   pmGrossProceedsMicrocents: number | null;
@@ -209,6 +218,14 @@ function timeAgo(iso: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function snapshotStateLabel(snapshot: StoredPriceSnapshot): string {
+  const labels: Record<StoredPriceSnapshot['status'], string> = {
+    available: 'Saved', stale: 'Stale', unavailable: 'Unavailable',
+    missing_identifier: 'Missing identifier', side_mismatch: 'Side/token mismatch', never_saved: 'Never saved',
+  };
+  return labels[snapshot.status];
 }
 
 function apiHeaders(): Record<string, string> {
@@ -520,7 +537,7 @@ export default function BotTraderPanel() {
 
       <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Live valuation and P&amp;L · click a row for leg details</div></div>
+          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Stored reference prices; executable liquidation value is separate · click a row for leg details</div></div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
               {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
@@ -615,6 +632,21 @@ export default function BotTraderPanel() {
                           <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Full-precision gross plus both execution fees is rounded once to ledger cents.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Summary prices round each leg to cents and may not add to the rounded total.</div>
                         </div>
                       )}
+                      <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2" aria-label="Persisted current price snapshots">
+                        {(['kalshi', 'polymarket'] as const).map((platform) => {
+                          const snapshot = position.currentPriceSnapshots?.[platform] ?? {
+                            status: 'never_saved' as const, priceCents: null, source: null, observedAt: null, ageMs: null,
+                          };
+                          const platformLabel = platform === 'kalshi' ? 'Kalshi' : 'Polymarket';
+                          const side = platform === 'kalshi' ? position.kalshiSide : position.pmSide;
+                          return <div key={platform} data-testid={`${platform}-stored-current-price`} className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
+                            <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
+                            <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
+                            <div className="text-[10px] font-medium text-[var(--status-warning)]">Stored top-price reference only; not executable depth for held quantity.</div>
+                          </div>;
+                        })}
+                      </div>
                       {liquidationUnavailableLabel ? (
                         <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Liquidation breakdown: {liquidationUnavailableLabel}</div>
                       ) : (
