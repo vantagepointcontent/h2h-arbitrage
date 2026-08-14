@@ -5,6 +5,7 @@ import {
   createSavedMarketHydrationOwner,
   mergeQuickPricesResult,
   restoreSavedMarketPopNavigation,
+  selectSavedMarketPriceCache,
 } from './lib/page-shared';
 
 type RefreshState = { loading: boolean; bgRefreshing: boolean };
@@ -86,6 +87,35 @@ function createSavedMarketViewHarness() {
 }
 
 describe('saved-market quick-price request ownership', () => {
+  it('uses the full persisted scan for market prices when the newer watcher result is summary-only', () => {
+    const lastScanResult = {
+      bestRoiPct: 1.5, bestProfit: 3, strategy: 'persisted', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T09:00:00Z',
+      allArbs: [{
+        artist: 'José Ramírez', roiPct: 1.5, expectedProfit: 3, strategy: 'persisted',
+        kalshiTicker: 'KXLEADERMLBSTEALS-26-JRAM', kalshiYesAsk: 0.12, kalshiNoAsk: 0.9,
+        pmConditionId: 'pm-jram', pmYesPrice: 0.1, pmNoPrice: 0.91,
+      }],
+    };
+    const liveResult = {
+      bestRoiPct: 2, bestProfit: 4, strategy: 'watcher', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T09:01:00Z',
+      allArbs: [{ artist: 'José Ramírez', roiPct: 2, expectedProfit: 4, strategy: 'watcher' }],
+    };
+
+    expect(selectSavedMarketPriceCache({ lastScanResult, liveResult })).toBe(lastScanResult);
+  });
+
+  it('does not synthesize an empty price table from a summary-only watcher result', () => {
+    const liveResult = {
+      bestRoiPct: 2, bestProfit: 4, strategy: 'watcher', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T09:01:00Z',
+      allArbs: [{ artist: 'José Ramírez', roiPct: 2, expectedProfit: 4, strategy: 'watcher' }],
+    };
+
+    expect(selectSavedMarketPriceCache({ lastScanResult: null, liveResult })).toBeNull();
+  });
+
   it('keeps failed-platform last-known values visibly stale while applying fresh sibling data', () => {
     const previous = {
       eventTitle: 'NC-14', kalshiCount: 1, pmCount: 1, matchedCount: 1,

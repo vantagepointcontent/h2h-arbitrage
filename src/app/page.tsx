@@ -104,12 +104,14 @@ import {
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
+  selectSavedMarketPriceCache,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
   ManualMatch, LastScanResult, SavedMarket, ScanResult, OverviewSort,
 } from "@/app/lib/page-shared";
 import type { SyncProgress } from "@/lib/catalog-progress";
+import { refreshSavedMarketPrices } from "@/app/actions/quick-prices";
 
 
 /* ── Swipe gesture hook (Home-only) ── */
@@ -440,7 +442,7 @@ export default function Home() {
 
           // UI-087/UI-084: show cached data instantly, then silent background refresh
           const isExpired = isMarketExpired(m);
-          let cached = m.liveResult ?? m.lastScanResult;
+          let cached = selectSavedMarketPriceCache(m);
           // Check if allArbs entries have price fields (not just artist/roi).
           // liveResult.allArbs from the watcher only stores { artist, roiPct,
           // expectedProfit, strategy } — no prices. lastScanResult.allArbs from
@@ -455,7 +457,7 @@ export default function Home() {
               if (r.ok) {
                 const d = await r.json();
                 if (routeHydration && !savedMarketHydrationOwnerRef.current.owns(routeHydration, activeMarketIdRef.current)) return;
-                const full = d.market?.liveResult ?? d.market?.lastScanResult;
+                const full = d.market ? selectSavedMarketPriceCache(d.market) : null;
                 if (full) cached = full;
               }
             } catch { /* fall back to blob-less cached */ }
@@ -631,16 +633,14 @@ export default function Home() {
     setError("");
 
     try {
-      const res = await fetch("/api/quick-prices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: request.controller.signal,
-        body: JSON.stringify({
-          marketId,
-          capital: capitalRef.current,
-        }),
-      });
-      const data = await res.json();
+      const res = await refreshSavedMarketPrices({ marketId, capital: capitalRef.current });
+      const data = res.body as Partial<ScanResult> & {
+        error?: string;
+        _pmFetchedAt?: string;
+        matchStatus?: LastScanResult['matchStatus'];
+        matchError?: string;
+        matchedPairs?: LastScanResult['matchedPairs'];
+      };
       if (!quickPricesRequestOwnerRef.current.owns(request, activeMarketIdRef.current)) return;
       if (res.ok) {
         setResult((prev) => {
@@ -1045,7 +1045,7 @@ export default function Home() {
     // Build cached result from lastScanResult/liveResult to show instantly.
     // Sidebar payload (fields=basic) strips allArbs — fetch the single full
     // market by id (tiny, local) when the blob is missing.
-    let cached = m.liveResult ?? m.lastScanResult;
+    let cached = selectSavedMarketPriceCache(m);
     const hasFullArbs = Array.isArray(cached?.allArbs) && (cached!.allArbs!.length === 0 || (cached!.allArbs![0] as any)?.artist !== undefined);
     if (cached && !hasFullArbs && !isExpired) {
       try {
@@ -1055,7 +1055,7 @@ export default function Home() {
         if (r.ok) {
           const d = await r.json();
           if (!savedMarketHydrationOwnerRef.current.owns(hydration, activeMarketIdRef.current)) return;
-          const full = d.market?.liveResult ?? d.market?.lastScanResult;
+          const full = d.market ? selectSavedMarketPriceCache(d.market) : null;
           if (full) cached = full;
         }
       } catch { /* fall back to blob-less cached */ }

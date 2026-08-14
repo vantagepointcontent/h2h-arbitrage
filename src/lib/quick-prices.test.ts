@@ -109,9 +109,11 @@ describe('enrichQuickPmMarketsWithClobPrices', () => {
       outcomes: '["Yes","No"]', outcomePrices: '["0.4","0.6"]', bestBid: 0.39, bestAsk: 0.4,
       active: true, closed: false, negRisk: false, clobTokenIds: '["yes-books-fail","no-books-fail"]',
     };
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })));
+    const fetchMock = vi.fn(async () => new Response('down', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
 
     await expect(enrichQuickPmMarketsWithClobPrices([market])).rejects.toThrow('HTTP 503');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the linked event when only an unrelated outcome book is unavailable', async () => {
