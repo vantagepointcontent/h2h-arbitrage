@@ -327,10 +327,13 @@ type KalshiOrderAdapterResponse = Awaited<ReturnType<typeof import('./kalshi-ord
 
 export function mapKalshiOrderResult(r: KalshiOrderAdapterResponse): OrderResult {
   const evidence = r.evidence;
+  const normalizedStatus = r.status.toLowerCase();
+  const cancelled = normalizedStatus === 'canceled' || normalizedStatus === 'cancelled';
   if (evidence) {
     return {
       platform: 'kalshi',
-      status: r.status === 'executed' ? 'filled' : 'partial',
+      status: normalizedStatus === 'executed' ? 'filled' : cancelled ? 'cancelled'
+        : normalizedStatus === 'expired' ? 'expired' : 'partial',
       filledSize: evidence.filledQuantity * evidence.fillPrice,
       filledContracts: evidence.filledQuantity,
       filledPrice: evidence.fillPrice,
@@ -342,11 +345,11 @@ export function mapKalshiOrderResult(r: KalshiOrderAdapterResponse): OrderResult
       venueEvidence: evidence,
     };
   }
-  const terminalZero = (r.status === 'canceled' || r.status === 'cancelled' || r.status === 'expired')
+  const terminalZero = (cancelled || normalizedStatus === 'expired')
     && r.filledCount === 0;
   return {
     platform: 'kalshi',
-    status: terminalZero ? (r.status === 'expired' ? 'expired' : 'cancelled')
+    status: terminalZero ? (normalizedStatus === 'expired' ? 'expired' : 'cancelled')
       : r.filledCount != null && r.filledCount > 0 ? 'partial' : 'pending',
     filledContracts: r.filledCount,
     orderId: r.orderId,
@@ -432,19 +435,19 @@ export async function cancelAndVerifyOrder(
   cancel: (result: OrderResult) => Promise<boolean>,
   poll: (result: OrderResult) => Promise<OrderResult>,
   attempts = 3,
-): Promise<{ result: OrderResult; verified: boolean }> {
-  if (isTerminallyVerifiedOrder(result)) return { result, verified: true };
-  if (!await cancel(result)) return { result, verified: false };
+): Promise<{ result: OrderResult; verified: boolean; terminality: 'terminal' | 'live' | 'indeterminate' }> {
+  if (isTerminallyVerifiedOrder(result)) return { result, verified: true, terminality: 'terminal' };
+  if (!await cancel(result)) return { result, verified: false, terminality: 'live' };
   let current = result;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       current = await poll(current);
     } catch {
-      return { result: current, verified: false };
+      return { result: current, verified: false, terminality: 'indeterminate' };
     }
-    if (isTerminallyVerifiedOrder(current)) return { result: current, verified: true };
+    if (isTerminallyVerifiedOrder(current)) return { result: current, verified: true, terminality: 'terminal' };
   }
-  return { result: current, verified: false };
+  return { result: current, verified: false, terminality: 'indeterminate' };
 }
 
 // ─── Tick Check ──────────────────────────────────────────────────
@@ -792,16 +795,31 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     (current.filledContracts ?? 0) >= (prior.filledContracts ?? 0)
       ? { ...current, venue: current.platform }
       : prior;
+  const initialTerminality = (result: OrderResult): 'terminal' | 'live' | 'indeterminate' =>
+    isTerminallyVerifiedOrder(result) ? 'terminal'
+      : result.status === 'pending' || result.status === 'partial' ? 'live' : 'indeterminate';
+  const entryTerminalities: Record<OrderResult['platform'], {
+    terminality: 'terminal' | 'live' | 'indeterminate';
+    source: NonNullable<ExecutionLedgerLeg['terminalitySource']>;
+  }> = {
+    kalshi: { terminality: initialTerminality(kalshiResult), source: 'latest-order-response' },
+    polymarket: { terminality: initialTerminality(polymarketResult), source: 'latest-order-response' },
+  };
   const cancelEntry = async (result: OrderResult, order: OrderRequest) => {
     if (effectiveDryRun) {
-      if (isSettled(result.status)) return { result, verified: true };
-      return { result: { ...result, status: 'cancelled' as const }, verified: true };
+      const cancellation = isSettled(result.status)
+        ? { result, verified: true, terminality: 'terminal' as const }
+        : { result: { ...result, status: 'cancelled' as const }, verified: true, terminality: 'terminal' as const };
+      entryTerminalities[result.platform] = { terminality: cancellation.terminality, source: 'simulation' };
+      return cancellation;
     }
-    return cancelAndVerifyOrder(
+    const cancellation = await cancelAndVerifyOrder(
       result,
       cancelLeg,
       (current) => pollOrder(current, order, false),
     );
+    entryTerminalities[result.platform] = { terminality: cancellation.terminality, source: 'post-cancel-poll' };
+    return cancellation;
   };
   let rollbackExecuted = false;
   let unhedged = false;
@@ -982,18 +1000,10 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     }
     rollbackExecuted = true;
   } else if (kFilled && pFilled) {
-    // Both have fills — compare hedge coverage in contracts, not dollars.
-    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
-    const { kalshiContracts: kFill, polymarketContracts: pFill } = match;
-
-    if (!match.matched) {
-      // Mismatched contracts — cancel both and close the excess contracts.
-      addStep('failed', `Mismatched fills — Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`);
-      alerts.push({
-        level: 'warning',
-        message: `Mismatched fills: Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`,
-        action: 'close excess',
-      });
+    // Any resting remainder can change the hedge after this snapshot. Cancel and
+    // re-poll both entries before comparing final authoritative quantities.
+    let entriesVerified = isTerminallyVerifiedOrder(kalshiResult) && isTerminallyVerifiedOrder(polymarketResult);
+    if (!entriesVerified) {
       const [kalshiCancellation, pmCancellation] = await Promise.all([
         cancelEntry(kalshiResult, req.kalshiOrder),
         cancelEntry(polymarketResult, req.polymarketOrder),
@@ -1002,49 +1012,57 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       polymarketResult = pmCancellation.result;
       ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
       ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
-      const terminalMatch = areFilledContractsMatched(kalshiResult, polymarketResult);
-      if (!kalshiCancellation.verified || !pmCancellation.verified) {
+      entriesVerified = kalshiCancellation.verified && pmCancellation.verified;
+      if (!entriesVerified) {
+        unhedged = true;
+        addStep('failed', 'Matched partial fills could not be terminally verified — exposure requires reconciliation');
+        alerts.push({
+          level: 'error',
+          message: 'Could not terminally verify both entry cancellations — live or indeterminate remainder may still fill',
+          action: 'manual reconciliation required',
+        });
+      }
+    }
+
+    const terminalMatch = areFilledContractsMatched(kalshiResult, polymarketResult);
+    const { kalshiContracts: kFill, polymarketContracts: pFill } = terminalMatch;
+    if (entriesVerified && !terminalMatch.matched) {
+      addStep('failed', `Terminal mismatched fills — Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`);
+      alerts.push({
+        level: 'warning',
+        message: `Terminal mismatched fills: Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`,
+        action: 'close excess',
+      });
+      const terminalExcess = Math.abs(kFill - pFill);
+      const largerLeg = kFill > pFill ? kalshiResult : polymarketResult;
+      const largerReq = kFill > pFill ? req.kalshiOrder : req.polymarketOrder;
+      const excessNotional = terminalExcess * (largerLeg.filledPrice ?? largerReq.price);
+      const close = await autoCloseLeg(
+        { ...largerLeg, filledSize: excessNotional, filledContracts: terminalExcess },
+        largerReq,
+        req.arbId,
+        effectiveDryRun,
+      );
+      closes.push(close);
+      if (!close.complete) {
         unhedged = true;
         alerts.push({
           level: 'error',
-          message: 'Could not terminally verify both entry cancellations — exposure remains unresolved',
+          message: `Failed to terminally verify close of ${terminalExcess.toFixed(4)} excess contracts — unhedged exposure remains`,
           action: 'manual close required',
         });
-      } else if (!terminalMatch.matched) {
-        const terminalExcess = Math.abs(terminalMatch.kalshiContracts - terminalMatch.polymarketContracts);
-        const largerLeg = terminalMatch.kalshiContracts > terminalMatch.polymarketContracts ? kalshiResult : polymarketResult;
-        const largerReq = terminalMatch.kalshiContracts > terminalMatch.polymarketContracts ? req.kalshiOrder : req.polymarketOrder;
-        const excessNotional = terminalExcess * (largerLeg.filledPrice ?? largerReq.price);
-        const close = await autoCloseLeg(
-          { ...largerLeg, filledSize: excessNotional, filledContracts: terminalExcess },
-          largerReq,
-          req.arbId,
-          effectiveDryRun,
-        );
-        closes.push(close);
-        if (!close.complete) {
-          unhedged = true;
-          alerts.push({
-            level: 'error',
-            message: `Failed to terminally verify close of ${terminalExcess.toFixed(4)} excess contracts — unhedged exposure remains`,
-            action: 'manual close required',
-          });
-        } else {
-          addStep('partial', `Terminally verified close of ${terminalExcess.toFixed(4)} excess contracts`);
-        }
+      } else {
+        addStep('partial', `Terminally verified close of ${terminalExcess.toFixed(4)} excess contracts`);
       }
       rollbackExecuted = true;
-    } else {
-      // Both legs have fills and are matched. If either leg is still 'partial'
-      // (not fully filled), surface that as a partial step.
-      const anyPartial = kalshiResult.status === 'partial' || polymarketResult.status === 'partial';
+    } else if (entriesVerified) {
+      const cancelledPartial = kalshiResult.status === 'cancelled' || polymarketResult.status === 'cancelled';
       addStep(
-        anyPartial ? 'partial' : 'success',
-        `Both legs filled and matched — ${kFill.toFixed(4)} contracts per leg` +
-          (anyPartial ? ' (partial fills)' : ''),
+        cancelledPartial ? 'partial' : 'success',
+        `Both entry orders terminal and matched — ${kFill.toFixed(4)} contracts per leg` +
+          (cancelledPartial ? ' (cancelled with partial fills)' : ''),
       );
     }
-    // If matched fills, no rollback needed — both sides hedged
   } else if (!kFilled && !pFilled) {
     // Both pending at timeout — cancel both, no exposure
     addStep('failed', 'Both legs timed out without fills — cancelling both, no exposure');
@@ -1140,8 +1158,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   }
 
   const cashLedger = reconcileExecutionCashLedger({
-    kalshiEntry: ledgerKalshiEntry,
-    polymarketEntry: ledgerPolymarketEntry,
+    kalshiEntry: { ...ledgerKalshiEntry, orderTerminality: entryTerminalities.kalshi.terminality, terminalitySource: entryTerminalities.kalshi.source },
+    polymarketEntry: { ...ledgerPolymarketEntry, orderTerminality: entryTerminalities.polymarket.terminality, terminalitySource: entryTerminalities.polymarket.source },
     closes,
     unhedged,
   });

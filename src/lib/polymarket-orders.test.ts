@@ -102,6 +102,13 @@ describe('mapPmOrderResponse', () => {
     });
   });
 
+  it('preserves a cancelled Polymarket order with an authoritative partial fill as terminal', () => {
+    expect(mapPmOrderResponse({ orderId: 'order-1', status: 'canceled', raw: {} }, evidence)).toMatchObject({
+      status: 'cancelled', filledContracts: 3, filledPrice: 0.43,
+      chargedFeeCents: 2, timestamp: '2026-08-12T20:00:00.000Z', venueEvidence: evidence,
+    });
+  });
+
   it('maps an authoritative complete fill only from the venue evidence', () => {
     expect(mapPmOrderResponse({ orderId: 'order-1', status: 'matched', raw: {} }, evidence)).toMatchObject({
       status: 'filled', filledContracts: 3, filledPrice: 0.43,

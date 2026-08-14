@@ -392,7 +392,7 @@ describe('executeArb', () => {
       pending,
       vi.fn().mockResolvedValue(true),
       vi.fn().mockResolvedValue(cancelled),
-    )).resolves.toEqual({ result: cancelled, verified: true });
+    )).resolves.toEqual({ result: cancelled, verified: true, terminality: 'terminal' });
   });
 
   it('keeps cancellation unresolved when terminal polling fails', async () => {
@@ -402,7 +402,7 @@ describe('executeArb', () => {
       vi.fn().mockResolvedValue(true),
       vi.fn().mockResolvedValue(pending),
       1,
-    )).resolves.toEqual({ result: pending, verified: false });
+    )).resolves.toEqual({ result: pending, verified: false, terminality: 'indeterminate' });
   });
 
   it('partial fill handling calculates netExposure', async () => {
@@ -495,6 +495,17 @@ describe('mapKalshiOrderResult', () => {
     })).toMatchObject({
       status: 'partial', filledContracts: 3, filledPrice: 0.41, executionId: 'fill-partial',
     });
+  });
+
+  it('preserves a cancelled Kalshi order with an authoritative partial fill as terminal', () => {
+    expect(mapKalshiOrderResult({
+      orderId: 'order-cancelled-partial', status: 'canceled', filledCount: 3, remainingCount: 7,
+      evidence: {
+        venue: 'kalshi', filledQuantity: 3, fillPrice: 0.41, chargedFeeCents: 2,
+        executionId: 'fill-before-cancel', venueTimestamp: '2026-08-12T13:31:00Z', orderId: 'order-cancelled-partial',
+      },
+      raw: {},
+    })).toMatchObject({ status: 'cancelled', filledContracts: 3, filledPrice: 0.41 });
   });
 
   it('never fills inferred price, fee, ID, or timestamp when evidence is unavailable', () => {

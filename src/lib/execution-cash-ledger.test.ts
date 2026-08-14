@@ -6,8 +6,8 @@ import {
 
 function matchedInput(overrides: Partial<ExecutionLedgerInput> = {}): ExecutionLedgerInput {
   return {
-    kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7 },
-    polymarketEntry: { venue: 'polymarket', filledContracts: 10, filledPrice: 0.5, chargedFeeCents: 5 },
+    kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7, orderTerminality: 'terminal', terminalitySource: 'venue-order-status' },
+    polymarketEntry: { venue: 'polymarket', filledContracts: 10, filledPrice: 0.5, chargedFeeCents: 5, orderTerminality: 'terminal', terminalitySource: 'venue-order-status' },
     closes: [],
     unhedged: false,
     ...overrides,
@@ -29,16 +29,34 @@ describe('reconcileExecutionCashLedger', () => {
 
   it('reconciles matched partial fills using the filled quantity', () => {
     const ledger = reconcileExecutionCashLedger(matchedInput({
-      kalshiEntry: { venue: 'kalshi', filledContracts: 4, filledPrice: 0.45, chargedFeeCents: 3 },
-      polymarketEntry: { venue: 'polymarket', filledContracts: 4, filledPrice: 0.5, chargedFeeCents: 2 },
+      kalshiEntry: { venue: 'kalshi', filledContracts: 4, filledPrice: 0.45, chargedFeeCents: 3, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
+      polymarketEntry: { venue: 'polymarket', filledContracts: 4, filledPrice: 0.5, chargedFeeCents: 2, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
     }));
-    expect(ledger).toMatchObject({ status: 'reconciled', matchedContracts: 4, grossSpreadCents: 20, netPnlCents: 15 });
+    expect(ledger).toMatchObject({
+      status: 'reconciled', matchedContracts: 4, grossSpreadCents: 20, netPnlCents: 15,
+      entryOrders: [
+        { venue: 'kalshi', terminality: 'terminal', source: 'post-cancel-poll' },
+        { venue: 'polymarket', terminality: 'terminal', source: 'post-cancel-poll' },
+      ],
+    });
+  });
+
+  it('never reconciles matching quantities while an entry remainder is live or indeterminate', () => {
+    for (const orderTerminality of ['live', 'indeterminate'] as const) {
+      const ledger = reconcileExecutionCashLedger(matchedInput({
+        kalshiEntry: { venue: 'kalshi', filledContracts: 4, filledPrice: 0.45, chargedFeeCents: 3, orderTerminality, terminalitySource: 'latest-order-response' },
+        polymarketEntry: { venue: 'polymarket', filledContracts: 4, filledPrice: 0.5, chargedFeeCents: 2, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
+      }));
+      expect(ledger.status).toBe('reconciliation-required');
+      expect(ledger.netPnlCents).toBeNull();
+      expect(ledger.issues).toContain(`entry-order-not-terminal:kalshi:${orderTerminality}`);
+    }
   });
 
   it('reconciles a successful one-leg rollback from entry cash, close proceeds, and both fees', () => {
     const ledger = reconcileExecutionCashLedger({
-      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7 },
-      polymarketEntry: { venue: 'polymarket', filledContracts: 0 },
+      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
+      polymarketEntry: { venue: 'polymarket', filledContracts: 0, orderTerminality: 'terminal', terminalitySource: 'venue-order-status' },
       closes: [{ venue: 'kalshi', requestedContracts: 10, filledContracts: 10, filledPrice: 0.44, chargedFeeCents: 6, complete: true, priceSource: 'venue' }],
       unhedged: false,
     });
@@ -62,8 +80,8 @@ describe('reconcileExecutionCashLedger', () => {
 
   it('keeps the matched core and reconciles a successful excess close for mismatched fills', () => {
     const ledger = reconcileExecutionCashLedger({
-      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7 },
-      polymarketEntry: { venue: 'polymarket', filledContracts: 8, filledPrice: 0.5, chargedFeeCents: 4 },
+      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, chargedFeeCents: 7, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
+      polymarketEntry: { venue: 'polymarket', filledContracts: 8, filledPrice: 0.5, chargedFeeCents: 4, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
       closes: [{ venue: 'kalshi', requestedContracts: 2, filledContracts: 2, filledPrice: 0.44, chargedFeeCents: 1, complete: true, priceSource: 'venue' }],
       unhedged: false,
     });
@@ -72,8 +90,8 @@ describe('reconcileExecutionCashLedger', () => {
 
   it('discloses estimated entry and exit fees when charged amounts are absent', () => {
     const ledger = reconcileExecutionCashLedger({
-      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45 },
-      polymarketEntry: { venue: 'polymarket', filledContracts: 0 },
+      kalshiEntry: { venue: 'kalshi', filledContracts: 10, filledPrice: 0.45, orderTerminality: 'terminal', terminalitySource: 'post-cancel-poll' },
+      polymarketEntry: { venue: 'polymarket', filledContracts: 0, orderTerminality: 'terminal', terminalitySource: 'venue-order-status' },
       closes: [{ venue: 'kalshi', requestedContracts: 10, filledContracts: 10, filledPrice: 0.44, complete: true, priceSource: 'estimated' }],
       unhedged: false,
     });

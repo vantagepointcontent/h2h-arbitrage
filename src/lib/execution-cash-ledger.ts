@@ -15,6 +15,8 @@ export interface ExecutionLedgerLeg {
   filledContracts?: number | null;
   filledPrice?: number | null;
   chargedFeeCents?: number | null;
+  orderTerminality?: 'terminal' | 'live' | 'indeterminate';
+  terminalitySource?: 'venue-order-status' | 'latest-order-response' | 'post-cancel-poll' | 'simulation';
 }
 
 export interface ExecutionLedgerClose extends ExecutionLedgerLeg {
@@ -63,6 +65,11 @@ export interface ExecutionCashLedger {
   estimatedNetPnlCents: number | null;
   feesEstimated: boolean;
   issues: string[];
+  entryOrders: Array<{
+    venue: ExecutionVenue;
+    terminality: 'terminal' | 'live' | 'indeterminate';
+    source: 'venue-order-status' | 'latest-order-response' | 'post-cancel-poll' | 'simulation' | 'missing';
+  }>;
   fees: ExecutionLedgerFee[];
   cashFlows: ExecutionLedgerCashFlow[];
 }
@@ -215,6 +222,12 @@ export function reconcileExecutionCashLedger(input: ExecutionLedgerInput): Execu
     && Math.abs(residualPolymarket - matchedContracts) < 1e-6;
   const closesComplete = input.closes.every((close) => close.complete);
   const feesEstimated = fees.some((fee) => fee.source === 'estimated');
+  const entryOrders: ExecutionCashLedger['entryOrders'] = entries.map((leg) => ({
+    venue: leg.venue,
+    terminality: leg.orderTerminality ?? 'indeterminate',
+    source: leg.terminalitySource ?? 'missing',
+  }));
+  const entriesTerminal = entryOrders.every((entry) => entry.terminality === 'terminal');
   const issues = [
     ...entries
       .filter((leg) => leg.filledContracts == null || !Number.isFinite(leg.filledContracts) || leg.filledContracts < 0)
@@ -231,6 +244,9 @@ export function reconcileExecutionCashLedger(input: ExecutionLedgerInput): Execu
     ...(input.closes.some((close) => close.priceSource === 'estimated' && legQuantity(close) > 0)
       ? ['estimated-exit-proceeds'] : []),
     ...(feesEstimated ? ['estimated-fees'] : []),
+    ...entryOrders
+      .filter((entry) => entry.terminality !== 'terminal')
+      .map((entry) => `entry-order-not-terminal:${entry.venue}:${entry.terminality}`),
     ...(!closesComplete ? ['close-not-terminally-verified'] : []),
     ...(!quantitiesReconciled ? ['quantity-mismatch'] : []),
     ...(input.unhedged ? ['unhedged-exposure'] : []),
@@ -243,7 +259,7 @@ export function reconcileExecutionCashLedger(input: ExecutionLedgerInput): Execu
     ? expectedSettlementCents + exitProceedsCents - entryPrincipalCents
       - totalEntryFeesCents - totalExitFeesCents
     : null;
-  const estimatedNetPnlCents = !input.unhedged && closesComplete && quantitiesReconciled
+  const estimatedNetPnlCents = entriesTerminal && !input.unhedged && closesComplete && quantitiesReconciled
     && entryPrincipalCents != null && exitProceedsCents != null
     ? expectedSettlementCents + exitProceedsCents - entryPrincipalCents
       - totalEntryFeesCents - totalExitFeesCents
@@ -283,6 +299,7 @@ export function reconcileExecutionCashLedger(input: ExecutionLedgerInput): Execu
     estimatedNetPnlCents,
     feesEstimated,
     issues,
+    entryOrders,
     fees,
     cashFlows,
   };

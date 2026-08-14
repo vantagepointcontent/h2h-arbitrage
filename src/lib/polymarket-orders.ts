@@ -110,13 +110,15 @@ export function mapPmOrderResponse(
   response: Pick<PmOrderResponse, 'orderId' | 'status' | 'raw'>,
   evidence: VenueExecutionEvidence | null,
 ): import('./auto-execute').OrderResult {
+  const normalizedStatus = response.status.toLowerCase();
+  const cancelled = normalizedStatus === 'canceled' || normalizedStatus === 'cancelled';
   if (!evidence || evidence.venue !== 'polymarket') {
     const filledContracts = parsePmFilledContracts(response.raw);
-    const terminalZero = (response.status === 'canceled' || response.status === 'cancelled' || response.status === 'expired')
+    const terminalZero = (cancelled || normalizedStatus === 'expired')
       && filledContracts === 0;
     return {
       platform: 'polymarket',
-      status: terminalZero ? (response.status === 'expired' ? 'expired' : 'cancelled') : 'pending',
+      status: terminalZero ? (normalizedStatus === 'expired' ? 'expired' : 'cancelled') : 'pending',
       ...(terminalZero ? { filledContracts: 0 } : {}),
       orderId: response.orderId,
       timestamp: '',
@@ -124,7 +126,8 @@ export function mapPmOrderResponse(
   }
   return {
     platform: 'polymarket',
-    status: response.status === 'matched' ? 'filled' : 'partial',
+    status: normalizedStatus === 'matched' ? 'filled' : cancelled ? 'cancelled'
+      : normalizedStatus === 'expired' ? 'expired' : 'partial',
     filledSize: evidence.filledQuantity * evidence.fillPrice,
     filledContracts: evidence.filledQuantity,
     filledPrice: evidence.fillPrice,
