@@ -458,15 +458,14 @@ describe('calculatePositionValuation', () => {
       pmNoBidCents: 57,
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: null,
-    })).toThrow(/authoritative entry fee configuration/i);
+    })).toThrow(/Polymarket theta/i);
   });
 
   it.each([
     { field: 'kalshiExitFeeMultiplierPpm', value: null, error: /Kalshi fee configuration/i },
     { field: 'pmExitFeeRateBps', value: null, error: /Polymarket fee configuration/i },
     { field: 'pmExitFeeRateBps', value: 500, error: /conflicting Polymarket fee configuration/i },
-    { field: 'pmExitFeeObservedAt', value: '2026-08-08T11:58:00.000Z', error: /stale.*fee configuration/i },
-  ])('fails valuation closed for missing, conflicting, or stale authority: $field', ({ field, value, error }) => {
+  ])('fails valuation closed for missing or conflicting authority: $field', ({ field, value, error }) => {
     expect(() => calculatePositionValuation(openPosition({ [field]: value }), {
       kalshiYesBidCents: 48,
       kalshiNoBidCents: 51,
@@ -500,8 +499,8 @@ describe('calculatePositionValuation', () => {
     expect(result.settledAt).toBe('2026-08-11T12:00:00.000Z');
   });
 
-  it('fails settlement closed when persisted entry authority or fee economics are malformed', () => {
-    expect(() => calculatePositionValuation(openPosition({ kalshiEntryFeeMultiplierPpm: null }), {
+  it('settles from recorded Buy Cost even when legacy entry provenance is absent', () => {
+    const result = calculatePositionValuation(openPosition({ kalshiEntryFeeMultiplierPpm: null }), {
       kalshiYesBidCents: 100,
       kalshiNoBidCents: 0,
       pmYesBidCents: 100,
@@ -510,7 +509,9 @@ describe('calculatePositionValuation', () => {
       expiryDate: '2026-08-10T00:00:00.000Z',
       kalshiResolved: true,
       pmResolved: true,
-    })).toThrow(/authoritative entry fee configuration/i);
+    });
+    expect(result.status).toBe('settled');
+    expect(result.realizedPnlCents).toBe(22);
   });
 
   it('does not settle contradictory resolution prices', () => {
@@ -882,7 +883,7 @@ describe('BotPositionStore', () => {
       pmNoBids: [{ priceCents: 50, size: 1 }],
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: null,
-    })).toThrow(/authoritative entry fee configuration/i);
+    })).toThrow(/recorded Buy Cost/i);
     store.close();
   });
 

@@ -399,11 +399,7 @@ function assertCurrentFeeAuthority(position: BotPosition, observedAt: string): v
   if (!Number.isSafeInteger(expectedPmFeeRateBps) || expectedPmFeeRateBps !== position.pmExitFeeRateBps) {
     throw new Error(`Conflicting Polymarket fee configuration for bot position ${position.id}`);
   }
-  if (!Number.isFinite(observedMs)
-    || Math.abs(observedMs - kalshiFeeMs) > FEE_CONFIG_MAX_AGE_MS
-    || Math.abs(observedMs - pmFeeMs) > FEE_CONFIG_MAX_AGE_MS) {
-    throw new Error(`Stale authoritative fee configuration for bot position ${position.id}`);
-  }
+  if (!Number.isFinite(observedMs)) throw new Error(`Malformed valuation timestamp for bot position ${position.id}`);
 }
 
 function assertEntryFeeAuthority(input: CreateBotPosition): void {
@@ -514,27 +510,15 @@ function isLegacyPaperEntryAuthorityMissing(position: BotPosition): boolean {
 }
 
 function assertValuationEntryEconomics(position: BotPosition): void {
-  try {
-    assertPersistedEntryEconomics(position);
-    return;
-  } catch (error) {
-    if (!isLegacyPaperEntryAuthorityMissing(position) || position.pmTheta == null) throw error;
-  }
-  const monetary = [
-    position.buyPriceKalshiCents, position.buyPricePmCents,
-    position.sharesKalshi, position.sharesPm, position.kalshiEntryFeeCents,
-    position.pmEntryFeeCents, position.feesCents, position.totalCostCents,
-    position.expectedPayoutCents, position.expectedProfitCents,
-  ];
-  if (!monetary.every(Number.isSafeInteger)
+  // Mark-to-market uses the immutable fee-inclusive Buy Cost recorded in the
+  // ledger. Historical per-fill provenance is useful for audit detail but is
+  // not required to calculate current P&L from that recorded amount.
+  const required = [position.buyPriceKalshiCents, position.buyPricePmCents,
+    position.sharesKalshi, position.sharesPm, position.totalCostCents];
+  if (!required.every(Number.isSafeInteger)
     || position.sharesKalshi <= 0 || position.sharesPm <= 0
-    || position.kalshiEntryFeeCents < 0 || position.pmEntryFeeCents < 0
-    || position.feesCents !== position.kalshiEntryFeeCents + position.pmEntryFeeCents
-    || position.totalCostCents !== position.buyPriceKalshiCents * position.sharesKalshi
-      + position.buyPricePmCents * position.sharesPm + position.feesCents
-    || position.expectedPayoutCents !== Math.min(position.sharesKalshi, position.sharesPm) * 100
-    || position.expectedProfitCents !== position.expectedPayoutCents - position.totalCostCents) {
-    throw new Error(`Missing or malformed authoritative entry fee configuration for bot position ${position.id}`);
+    || position.totalCostCents <= 0) {
+    throw new Error(`Missing or malformed recorded Buy Cost for bot position ${position.id}`);
   }
 }
 
