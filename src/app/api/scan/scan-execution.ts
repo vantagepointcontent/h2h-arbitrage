@@ -516,14 +516,14 @@ export async function executeFullScan(request: NextRequest) {
           { kalshi: scanObservedAt, polymarket: scanObservedAt },
           'saved-market-full-scan',
         )));
-        await appendScanHistory({
+        await withSqliteBusyRetry(() => appendScanHistory({
             scanTimestamp: new Date().toISOString(),
             marketId: market.id,
             totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
             bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
             positiveArbCount: positiveArbs.length,
             matchedCount,
-          });
+          }));
         await withSqliteBusyRetry(() => persistAndConsumeBotScan(market.id, {
           bestRoiPct: scanResult.bestRoiPct,
           bestProfit: scanResult.bestProfit,

@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   upstream: vi.fn(),
   calculateAllArbitrages: vi.fn((): unknown[] => []),
+  appendScanHistory: vi.fn(async () => undefined),
   findSavedMarketByUrls: vi.fn(),
   persistAndConsumeBotScan: vi.fn(async () => undefined),
   reserveSavedMarketPublication: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('@/lib/persistence', () => ({
   reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
   reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
   updateSavedMarketScanResult: vi.fn(async () => true),
-  appendScanHistory: vi.fn(async () => undefined),
+  appendScanHistory: mocks.appendScanHistory,
 }));
 vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
 vi.mock('@/lib/arb-lifecycle', () => ({ recordArbObservations: vi.fn(async () => ({ opened: 0, extended: 0, closed: 0 })) }));
@@ -94,6 +95,8 @@ describe('POST /api/scan saved-market lifecycle', () => {
     vi.clearAllMocks();
     mocks.upstream.mockReset();
     mocks.upstream.mockResolvedValue([]);
+    mocks.appendScanHistory.mockReset();
+    mocks.appendScanHistory.mockResolvedValue(undefined);
     mocks.acquireSavedMarketScanLock.mockResolvedValue({
       status: 'acquired',
       lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'test' },
@@ -150,6 +153,19 @@ describe('POST /api/scan saved-market lifecycle', () => {
 
     resolveUpstream([]);
     await first;
+  });
+
+  it('retries scan-history publication when concurrent workers hand off the SQLite writer', async () => {
+    mocks.appendScanHistory
+      .mockRejectedValueOnce(Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }))
+      .mockRejectedValueOnce(Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY_SNAPSHOT' }))
+      .mockResolvedValueOnce(undefined);
+
+    const response = await executeFullScan(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
+    expect(mocks.appendScanHistory).toHaveBeenCalledTimes(3);
   });
 
   it('publishes unavailable with the reserved generation after terminal upstream failure', async () => {
