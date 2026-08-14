@@ -11,6 +11,9 @@ import type { UnifiedOutcome } from './matcher';
 import { walkExecutableBook } from './executable-book';
 import { orderbookState } from './orderbook-state';
 
+const TEST_PM_CONDITION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const TEST_PM_NO_TOKEN_ID = '38424385756462253442221613485727105608987714090195314133724025202573806948368';
+
 vi.mock('./bot-action-log', () => ({
   appendBotActionLog: vi.fn(async () => 1),
 }));
@@ -68,7 +71,7 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     kalshiStake: 45,
     pmStake: 50,
     kalshiTicker: 'KXTEST-A',
-    pmConditionId: 'pm-condition-a',
+    pmConditionId: TEST_PM_CONDITION_ID,
     kalshiYesAsk: 0.45,
     kalshiNoAsk: 0.58,
     pmYesAsk: 0.55,
@@ -129,8 +132,8 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
   }
   // The fee-authority test fixture resolves the selected executable PM token
   // to this ID before building the final order request.
-  orderbookState.removeBook('pm-no-token');
-  orderbookState.setBook('pm-no-token', [], [
+  orderbookState.removeBook(TEST_PM_NO_TOKEN_ID);
+  orderbookState.setBook(TEST_PM_NO_TOKEN_ID, [], [
     { price: input.pmNoAsk!, quantity: quantity(input.pmNoAsk, input.pmNoDepth) },
   ], 0, { tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp });
   return result;
@@ -139,17 +142,36 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
 describe('buildExecutionRequest Polymarket identity', () => {
   it('places the selected NO leg with its executable token', () => {
     const request = buildExecutionRequest(makeInput({
-      pmConditionId: 'parent-condition',
+      pmConditionId: TEST_PM_CONDITION_ID,
       pmYesTokenId: 'yes-token',
-      pmNoTokenId: 'no-token',
+      pmNoTokenId: TEST_PM_NO_TOKEN_ID,
       strategy: 'Buy YES Kalshi + NO PM',
     }));
 
+    expect(request?.pmConditionId).toBe(TEST_PM_CONDITION_ID);
     expect(request?.polymarketOrder).toMatchObject({
-      marketId: 'no-token',
-      conditionId: 'no-token',
+      marketId: TEST_PM_NO_TOKEN_ID,
+      conditionId: TEST_PM_NO_TOKEN_ID,
       outcome: 'no',
     });
+  });
+
+  it('normalizes the canonical parent conditionId before persistence', () => {
+    const request = buildExecutionRequest(makeInput({
+      pmConditionId: `  ${TEST_PM_CONDITION_ID.toUpperCase()}  `,
+      pmNoTokenId: TEST_PM_NO_TOKEN_ID,
+      strategy: 'Buy YES Kalshi + NO PM',
+    }));
+
+    expect(request?.pmConditionId).toBe(TEST_PM_CONDITION_ID);
+  });
+
+  it('rejects a token id supplied in the parent conditionId field', () => {
+    expect(buildExecutionRequest(makeInput({
+      pmConditionId: TEST_PM_NO_TOKEN_ID,
+      pmNoTokenId: TEST_PM_NO_TOKEN_ID,
+      strategy: 'Buy YES Kalshi + NO PM',
+    }))).toBeNull();
   });
 });
 
@@ -461,7 +483,7 @@ describe('maybeExecuteBotTrade safety', () => {
       ...(await importOriginal()),
       fetchAuthoritativeBotFeeConfig: vi.fn().mockResolvedValue({
         kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000' },
-        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
+        polymarket: { tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
         pmTheta: 0.04,
       }),
       recordBotPosition: vi.fn().mockResolvedValue(undefined),
@@ -489,7 +511,7 @@ describe('maybeExecuteBotTrade safety', () => {
       minimumOrderQuantityMicros: 1_000_000,
       depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
     });
-    runtimeState.setBook('pm-no-token', [], [{ price: 0.52, quantity: 1 }], 0, {
+    runtimeState.setBook(TEST_PM_NO_TOKEN_ID, [], [{ price: 0.52, quantity: 1 }], 0, {
       tickSizeCents: 1,
       minimumOrderQuantityMicros: 1_000_000,
       depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
@@ -503,8 +525,14 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(persistence.hasOpenBotPosition).toHaveBeenCalledWith('bot:pair-1:team-a', 'paper');
     expect(persistence.getTodayBotExposure).toHaveBeenCalledWith('paper');
     expect(positions.recordBotPosition).toHaveBeenCalledWith(
-      expect.objectContaining({ executionMode: 'paper' }),
-      expect.any(Object),
+      expect.objectContaining({
+        executionMode: 'paper',
+        pmConditionId: TEST_PM_CONDITION_ID,
+        pmSide: 'no',
+      }),
+      expect.objectContaining({
+        polymarket: expect.objectContaining({ tokenId: TEST_PM_NO_TOKEN_ID }),
+      }),
     );
   });
 

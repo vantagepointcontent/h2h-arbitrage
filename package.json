@@ -13,6 +13,8 @@
     "recover:bot-entry-evidence": "npm run build:recovery && node dist/recover-bot-entry-evidence.mjs",
     "start": "next start",
     "migrate:poll-leases": "node scripts/migrate-poll-leases.mjs",
+    "build:migrate-bot-position-pm-identities": "esbuild scripts/fix-bot-position-pm-identifiers.ts --bundle --platform=node --format=esm --outfile=dist/fix-bot-position-pm-identifiers.mjs --external:@libsql/client",
+    "migrate:bot-position-pm-identities": "npm run build:migrate-bot-position-pm-identities --silent && node dist/fix-bot-position-pm-identifiers.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -617,6 +617,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   if (input.strategy.startsWith('Buy YES both sides:')
       && (input.crossOutcomeMutuallyExclusiveVerified !== true || input.crossOutcomeExhaustiveVerified !== true)) return null;
   if (!input.kalshiTicker || !input.pmConditionId) return null;
+  if (!/^0x[0-9a-f]{64}$/i.test(input.pmConditionId.trim())) return null;
+  const pmConditionId = input.pmConditionId.trim().toLowerCase();
   const pmMinimumOrderSize = legs.pmOutcome === 'yes'
     ? input.pmYesMinOrderSize
     : input.pmNoMinOrderSize;
@@ -666,8 +668,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
 
   const polymarketOrder: OrderRequest = {
     platform: 'polymarket',
-    marketId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
-    conditionId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? input.pmConditionId : input.pmNoTokenId ?? input.pmConditionId,
+    marketId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? pmConditionId : input.pmNoTokenId ?? pmConditionId,
+    conditionId: legs.pmOutcome === 'yes' ? input.pmYesTokenId ?? pmConditionId : input.pmNoTokenId ?? pmConditionId,
     side: 'buy',
     outcome: legs.pmOutcome,
     size: pmStake,
@@ -682,6 +684,9 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   return {
     arbId: safeArbId(input.pairId, input.outcome),
     marketTitle: input.marketTitle,
+    // Keep the canonical parent separate from the selected outcome token used
+    // by the CLOB order. Durable positions and snapshot lookups use this ID.
+    pmConditionId,
     kalshiOrder,
     polymarketOrder,
     estimatedProfit: oneShareNetProfit,
@@ -833,7 +838,7 @@ export async function maybeExecuteBotTrade(
     }
     feeAuthority = await fetchAuthoritativeBotFeeConfig({
       kalshiTicker: input.kalshiTicker,
-      pmConditionId: input.pmConditionId,
+      pmConditionId: execReq.pmConditionId!,
       pmTokenId: entryLegs.pmOutcome === 'yes' ? input.pmYesTokenId ?? undefined : input.pmNoTokenId ?? undefined,
       pmSide: entryLegs.pmOutcome,
       category: input.category,
@@ -935,7 +940,7 @@ export async function maybeExecuteBotTrade(
           pairId: input.pairId,
           marketTitle: input.marketTitle,
           kalshiTicker: input.kalshiTicker ?? null,
-          pmConditionId: input.pmConditionId ?? null,
+          pmConditionId: execReq.pmConditionId ?? null,
           strategy: input.strategy,
           kalshiSide: entryLegs.kalshiOutcome,
           pmSide: entryLegs.pmOutcome,
