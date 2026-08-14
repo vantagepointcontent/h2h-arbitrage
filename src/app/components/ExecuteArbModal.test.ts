@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExecutableArb, getExecutionGateMessage } from './ExecuteArbModal';
+import { buildExecutableArb, getExecutionGateMessage, getExecutionLedgerRows } from './ExecuteArbModal';
 import { walkExecutableBook } from '@/lib/executable-book';
 
 const executableQuote = (priceMicroCents: number, tickSizeMicroCents = 1_000_000) => walkExecutableBook({
@@ -102,5 +102,49 @@ describe('getExecutionGateMessage', () => {
     expect(getExecutionGateMessage(null)).toContain('remains locked');
     expect(getExecutionGateMessage({ killSwitch: true, dryRun: true, credsReady: false })).toContain('simulated two-leg bet');
     expect(getExecutionGateMessage({ killSwitch: true, dryRun: false, credsReady: false })).toContain('Real execution is locked');
+  });
+});
+
+describe('getExecutionLedgerRows', () => {
+  it('labels gross spread separately from fee-inclusive net P&L and discloses estimates', () => {
+    expect(getExecutionLedgerRows({
+      grossSpreadCents: 50, totalEntryFeesCents: 7, totalExitFeesCents: 3,
+      netPnlCents: 40, feesEstimated: true, status: 'reconciled',
+    })).toEqual([
+      { label: 'Actual gross spread', value: '$0.50' },
+      { label: 'Entry fees (estimated)', value: '-$0.07' },
+      { label: 'Exit fees (estimated)', value: '-$0.03' },
+      { label: 'Actual net P&L', value: '$0.40' },
+    ]);
+  });
+
+  it('withholds net P&L while rollback cash remains unreconciled', () => {
+    expect(getExecutionLedgerRows({
+      grossSpreadCents: 0, totalEntryFeesCents: 7, totalExitFeesCents: 0,
+      netPnlCents: null, feesEstimated: false, status: 'reconciliation-required',
+    }).at(-1)).toEqual({ label: 'Actual net P&L', value: 'Reconciliation required' });
+  });
+
+  it('labels charged entry fees separately from estimated exit fees', () => {
+    const rows = getExecutionLedgerRows({
+      grossSpreadCents: 0, totalEntryFeesCents: 7, totalExitFeesCents: 3,
+      netPnlCents: null, feesEstimated: true, status: 'reconciliation-required',
+      fees: [
+        { stage: 'entry', source: 'charged' },
+        { stage: 'exit', source: 'estimated' },
+      ],
+    });
+    expect(rows[1].label).toBe('Entry fees (charged)');
+    expect(rows[2].label).toBe('Exit fees (estimated)');
+  });
+
+  it('discloses estimated net P&L without promoting it to reconciled actual', () => {
+    const rows = getExecutionLedgerRows({
+      grossSpreadCents: 50, totalEntryFeesCents: 7, totalExitFeesCents: 0,
+      netPnlCents: null, estimatedNetPnlCents: 43, feesEstimated: true,
+      status: 'reconciliation-required',
+    });
+    expect(rows).toContainEqual({ label: 'Estimated net P&L (not actual)', value: '$0.43' });
+    expect(rows.at(-1)).toEqual({ label: 'Actual net P&L', value: 'Reconciliation required' });
   });
 });

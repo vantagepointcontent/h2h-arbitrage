@@ -204,6 +204,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
 
       const result = await executeArb(effective);
+      // TRADES-001: durable copy — in-memory auditLog dies on restart
+      await persistExecution({
+        timestamp: new Date().toISOString(),
+        arbId: effective.arbId,
+        marketTitle: effective.marketTitle,
+        dryRun: effective.dryRun,
+        success: result.success,
+        strategy: (effective as ExecutionRequest & { strategy?: string }).strategy ?? null,
+        kalshiOrder: effective.kalshiOrder,
+        polymarketOrder: effective.polymarketOrder,
+        result,
+        estimatedProfit: effective.estimatedProfit,
+        steps: result.steps,
+      });
+      // A terminal response is only publishable after the exact ledger is durable.
       logExecution({
         timestamp: new Date().toISOString(),
         arbId: effective.arbId,
@@ -214,20 +229,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         result,
         estimatedProfit: effective.estimatedProfit,
       });
-      // TRADES-001: durable copy — in-memory auditLog dies on restart
-      await persistExecution({
-        timestamp: new Date().toISOString(),
-        arbId: effective.arbId,
-        marketTitle: effective.marketTitle,
-        dryRun: effective.dryRun,
-        success: result.success,
-        strategy: (effective as any).strategy ?? null,
-        kalshiOrder: effective.kalshiOrder,
-        polymarketOrder: effective.polymarketOrder,
-        result,
-        estimatedProfit: effective.estimatedProfit,
-        steps: result.steps,
-      }).catch((e) => logger.warn('[execute] persistExecution failed', { error: String(e) }));
 
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun, mode });
     }
@@ -286,7 +287,12 @@ async function testKalshiConnection(): Promise<{ ok: boolean; detail: string }> 
     if (res.ok) return { ok: true, detail: `Connected (HTTP ${res.status})` };
     if (res.status === 401 || res.status === 403) {
       const data = await res.json().catch(() => ({}));
-      return { ok: false, detail: `Auth rejected: ${(data as any)?.error?.message ?? res.status}` };
+      const errorMessage = typeof data === 'object' && data !== null
+        && 'error' in data && typeof data.error === 'object' && data.error !== null
+        && 'message' in data.error && typeof data.error.message === 'string'
+        ? data.error.message
+        : String(res.status);
+      return { ok: false, detail: `Auth rejected: ${errorMessage}` };
     }
     return { ok: false, detail: `HTTP ${res.status}` };
   } catch (err) {

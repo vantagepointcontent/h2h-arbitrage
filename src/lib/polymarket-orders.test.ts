@@ -80,6 +80,12 @@ describe('parsePmFillEvidence', () => {
 });
 
 describe('mapPmOrderResponse', () => {
+  it('preserves a terminal zero-fill cancellation for verification', () => {
+    expect(mapPmOrderResponse({
+      orderId: 'order-cancelled', status: 'canceled', raw: { size_matched: '0' },
+    }, null)).toMatchObject({ status: 'cancelled', filledContracts: 0 });
+  });
+
   const evidence = {
     venue: 'polymarket' as const,
     filledQuantity: 3,
@@ -92,7 +98,7 @@ describe('mapPmOrderResponse', () => {
   it('maps an authoritative partial fill without copying submitted values', () => {
     expect(mapPmOrderResponse({ orderId: 'order-1', status: 'live', raw: {} }, evidence)).toMatchObject({
       status: 'partial', filledContracts: 3, filledPrice: 0.43,
-      timestamp: '2026-08-12T20:00:00.000Z', venueEvidence: evidence,
+      chargedFeeCents: 2, timestamp: '2026-08-12T20:00:00.000Z', venueEvidence: evidence,
     });
   });
 

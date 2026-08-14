@@ -25,6 +25,12 @@ import { isAuthoritativeVenueEvidence } from './execution-evidence';
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 import { orderbookState } from './orderbook-state';
 import { isPriceAlignedToTick } from './venue-constraints';
+import {
+  reconcileExecutionCashLedger,
+  type ExecutionCashLedger,
+  type ExecutionLedgerClose,
+  type ExecutionLedgerLeg,
+} from './execution-cash-ledger';
 
 function errorField(error: unknown, field: 'status' | 'code' | 'message'): unknown {
   return typeof error === 'object' && error !== null && field in error
@@ -115,6 +121,8 @@ export interface ExecutionResult {
   kalshiResult: OrderResult;
   polymarketResult: OrderResult;
   actualProfit?: number;
+  /** Integer-cent cash reconciliation; actualProfit is its dollar compatibility projection. */
+  cashLedger?: ExecutionCashLedger;
   netExposure?: number;      // if partial fills, the net dollar exposure
   rollbackExecuted: boolean;
   unhedged: boolean;          // true if auto-close failed and exposure remains
@@ -334,9 +342,12 @@ export function mapKalshiOrderResult(r: KalshiOrderAdapterResponse): OrderResult
       venueEvidence: evidence,
     };
   }
+  const terminalZero = (r.status === 'canceled' || r.status === 'cancelled' || r.status === 'expired')
+    && r.filledCount === 0;
   return {
     platform: 'kalshi',
-    status: r.filledCount != null && r.filledCount > 0 ? 'partial' : 'pending',
+    status: terminalZero ? (r.status === 'expired' ? 'expired' : 'cancelled')
+      : r.filledCount != null && r.filledCount > 0 ? 'partial' : 'pending',
     filledContracts: r.filledCount,
     orderId: r.orderId,
     timestamp: '',
@@ -414,6 +425,26 @@ async function cancelLeg(result: OrderResult): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function cancelAndVerifyOrder(
+  result: OrderResult,
+  cancel: (result: OrderResult) => Promise<boolean>,
+  poll: (result: OrderResult) => Promise<OrderResult>,
+  attempts = 3,
+): Promise<{ result: OrderResult; verified: boolean }> {
+  if (isTerminallyVerifiedOrder(result)) return { result, verified: true };
+  if (!await cancel(result)) return { result, verified: false };
+  let current = result;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      current = await poll(current);
+    } catch {
+      return { result: current, verified: false };
+    }
+    if (isTerminallyVerifiedOrder(current)) return { result: current, verified: true };
+  }
+  return { result: current, verified: false };
 }
 
 // ─── Tick Check ──────────────────────────────────────────────────
@@ -497,7 +528,35 @@ export function areFilledContractsMatched(
 export function isCompleteClose(requestedContracts: number, filledContracts: number | null | undefined): boolean {
   return Number.isFinite(requestedContracts) && requestedContracts > 0 &&
     filledContracts != null && Number.isFinite(filledContracts) &&
-    filledContracts + 1e-9 >= requestedContracts;
+    Math.abs(filledContracts - requestedContracts) < 1e-9;
+}
+
+/** Venue-unit guard: Kalshi contracts are indivisible; PM shares support six decimals. */
+export function isExecutableCloseQuantity(platform: OrderResult['platform'], contracts: number): boolean {
+  if (!Number.isFinite(contracts) || contracts <= 0) return false;
+  if (platform === 'kalshi') return Number.isSafeInteger(contracts);
+  return Number.isSafeInteger(Math.round(contracts * 1_000_000));
+}
+
+export function isTerminallyVerifiedOrder(result: OrderResult): boolean {
+  if (!isSettled(result.status) || result.filledContracts == null
+    || !Number.isFinite(result.filledContracts) || result.filledContracts < 0) return false;
+  if (result.filledContracts === 0) return result.status !== 'filled';
+  return result.filledPrice != null
+    && Number.isFinite(result.filledPrice)
+    && result.filledPrice > 0
+    && result.filledPrice < 1
+    && isAuthoritativeVenueEvidence(result.venueEvidence)
+    && result.venueEvidence.venue === result.platform
+    && Math.abs(result.venueEvidence.filledQuantity - result.filledContracts) < 1e-9;
+}
+
+export function isTerminallyVerifiedClose(requestedContracts: number, result: OrderResult): boolean {
+  return isCompleteClose(requestedContracts, result.filledContracts)
+    && result.status === 'filled'
+    && Number.isSafeInteger(result.chargedFeeCents)
+    && Number(result.chargedFeeCents) >= 0
+    && isTerminallyVerifiedOrder(result);
 }
 
 async function autoCloseLeg(
@@ -505,21 +564,40 @@ async function autoCloseLeg(
   req: OrderRequest,
   arbId: string,
   dryRun: boolean,
-): Promise<boolean> {
-  if (!hasFill(leg) || !leg.orderId) return true; // nothing to close
+): Promise<ExecutionLedgerClose> {
   const contracts = leg.filledContracts;
-  if (contracts == null || !Number.isFinite(contracts) || contracts <= 0) return false;
+  const fallbackPrice = leg.filledPrice ?? req.price;
+  const failed = (filledContracts = 0): ExecutionLedgerClose => ({
+    venue: leg.platform,
+    requestedContracts: contracts ?? 0,
+    filledContracts,
+    filledPrice: fallbackPrice,
+    complete: false,
+    priceSource: 'estimated',
+  });
+  if (!hasFill(leg) || !leg.orderId || contracts == null || !Number.isFinite(contracts) || contracts <= 0) {
+    return failed();
+  }
+  if (!isExecutableCloseQuantity(leg.platform, contracts)) return failed();
 
   if (dryRun) {
     // Simulate: 90% success rate for close
-    return Math.random() > 0.1;
+    const complete = Math.random() > 0.1;
+    return {
+      venue: leg.platform,
+      requestedContracts: contracts,
+      filledContracts: complete ? contracts : 0,
+      filledPrice: fallbackPrice,
+      complete,
+      priceSource: 'estimated',
+    };
   }
 
   try {
     if (leg.platform === 'kalshi') {
       const { placeKalshiSellOrder } = await import('./kalshi-orders');
       const priceCents = Math.round((leg.filledPrice ?? req.price) * 100);
-      const count = Math.max(1, Math.floor(contracts));
+      const count = contracts;
       const r = await placeKalshiSellOrder({
         ticker: req.ticker!,
         side: req.outcome,
@@ -527,18 +605,42 @@ async function autoCloseLeg(
         priceCents,
         clientOrderId: `h2h-close-${arbId}-k`.slice(0, 64),
       });
-      return isCompleteClose(contracts, r.filledCount);
+      const mapped = mapKalshiOrderResult(r);
+      const filledContracts = mapped.filledContracts ?? 0;
+      const complete = isTerminallyVerifiedClose(contracts, mapped);
+      if (!complete && r.orderId) await cancelLeg(mapped);
+      return {
+        venue: 'kalshi',
+        requestedContracts: contracts,
+        filledContracts,
+        filledPrice: mapped.filledPrice ?? fallbackPrice,
+        chargedFeeCents: mapped.chargedFeeCents,
+        complete,
+        priceSource: complete ? 'venue' : 'estimated',
+      };
     } else {
-      const { placePmSellOrder } = await import('./polymarket-orders');
+      const { cancelPmOrder, mapPmOrderResponse, placePmSellOrder } = await import('./polymarket-orders');
       const r = await placePmSellOrder({
         tokenId: req.conditionId!,
         price: leg.filledPrice ?? req.price,
         size: contracts,
       });
-      return isCompleteClose(contracts, r.filledContracts);
+      const mapped = mapPmOrderResponse(r, r.venueEvidence ?? null);
+      const filledContracts = mapped.filledContracts ?? 0;
+      const complete = isTerminallyVerifiedClose(contracts, mapped);
+      if (!complete && r.orderId) await cancelPmOrder(r.orderId);
+      return {
+        venue: 'polymarket',
+        requestedContracts: contracts,
+        filledContracts,
+        filledPrice: mapped.filledPrice ?? fallbackPrice,
+        chargedFeeCents: mapped.chargedFeeCents,
+        complete,
+        priceSource: complete ? 'venue' : 'estimated',
+      };
     }
   } catch {
-    return false; // close failed — exposure remains
+    return failed(); // close failed — exposure remains
   }
 }
 
@@ -683,6 +785,27 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     { kalshiOrderId: kalshiResult.orderId, polymarketOrderId: polymarketResult.orderId },
   );
 
+  let ledgerKalshiEntry: ExecutionLedgerLeg = { ...kalshiResult, venue: 'kalshi' };
+  let ledgerPolymarketEntry: ExecutionLedgerLeg = { ...polymarketResult, venue: 'polymarket' };
+  const closes: ExecutionLedgerClose[] = [];
+  const captureEntry = (current: OrderResult, prior: ExecutionLedgerLeg): ExecutionLedgerLeg =>
+    (current.filledContracts ?? 0) >= (prior.filledContracts ?? 0)
+      ? { ...current, venue: current.platform }
+      : prior;
+  const cancelEntry = async (result: OrderResult, order: OrderRequest) => {
+    if (effectiveDryRun) {
+      if (isSettled(result.status)) return { result, verified: true };
+      return { result: { ...result, status: 'cancelled' as const }, verified: true };
+    }
+    return cancelAndVerifyOrder(
+      result,
+      cancelLeg,
+      (current) => pollOrder(current, order, false),
+    );
+  };
+  let rollbackExecuted = false;
+  let unhedged = false;
+
   // ── Phase 2: Poll loop with tick check ──
   const timeoutMs = req.timeoutMs || limits.orderTimeoutMs || DEFAULT_TIMEOUT_MS;
   const deadline = startTime + timeoutMs;
@@ -703,6 +826,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       pollOrder(kalshiResult, req.kalshiOrder, effectiveDryRun),
       pollOrder(polymarketResult, req.polymarketOrder, effectiveDryRun),
     ]);
+    ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+    ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
 
     // ── Tick check: when one leg fills, verify the other leg's price ──
     if (!tickCheckDone) {
@@ -728,13 +853,19 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
             leg: 'polymarket',
             action: 'cancel + auto-close kalshi',
           });
-          if (!effectiveDryRun) await cancelLeg(polymarketResult);
-          polymarketResult = { ...polymarketResult, status: 'cancelled' };
-          const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
-          if (!closed) {
-            // Will be handled in Phase 3 — mark unhedged there
-          } else {
-            kalshiResult = { ...kalshiResult, status: 'cancelled' };
+          const cancellation = await cancelEntry(polymarketResult, req.polymarketOrder);
+          polymarketResult = cancellation.result;
+          ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+          if (!cancellation.verified) {
+            rollbackExecuted = true;
+            unhedged = true;
+            break;
+          }
+          const close = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
+          closes.push(close);
+          rollbackExecuted = true;
+          if (!close.complete) {
+            unhedged = true;
           }
           break; // exit poll loop — both legs are now settled
         }
@@ -754,13 +885,19 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
             leg: 'kalshi',
             action: 'cancel + auto-close polymarket',
           });
-          if (!effectiveDryRun) await cancelLeg(kalshiResult);
-          kalshiResult = { ...kalshiResult, status: 'cancelled' };
-          const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
-          if (!closed) {
-            // Will be handled in Phase 3
-          } else {
-            polymarketResult = { ...polymarketResult, status: 'cancelled' };
+          const cancellation = await cancelEntry(kalshiResult, req.kalshiOrder);
+          kalshiResult = cancellation.result;
+          ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+          if (!cancellation.verified) {
+            rollbackExecuted = true;
+            unhedged = true;
+            break;
+          }
+          const close = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
+          closes.push(close);
+          rollbackExecuted = true;
+          if (!close.complete) {
+            unhedged = true;
           }
           break;
         }
@@ -769,20 +906,28 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   }
 
   // ── Phase 3: Risk handling — manage partial fills and failures ──
-  let rollbackExecuted = false;
-  let unhedged = false;
+  ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+  ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
 
   const kFailed = kalshiResult.status === 'rejected' || kalshiResult.status === 'cancelled' || kalshiResult.status === 'expired';
   const pFailed = polymarketResult.status === 'rejected' || polymarketResult.status === 'cancelled' || polymarketResult.status === 'expired';
   const kFilled = hasFill(kalshiResult);
   const pFilled = hasFill(polymarketResult);
 
-  if (kFailed && pFailed) {
+  if (rollbackExecuted) {
+    addStep(
+      unhedged ? 'failed' : 'partial',
+      unhedged
+        ? 'Tick-check rollback failed — exposure requires manual reconciliation'
+        : 'Tick-check rollback completed — no additional close submitted',
+    );
+  } else if (kFailed && pFailed) {
     // Both failed — clean failure, no exposure
     addStep('failed', `Both legs failed — Kalshi: ${kalshiResult.status}, Polymarket: ${polymarketResult.status}`);
     if (kFilled || pFilled) {
       // Edge case: both "failed" but one has a residual fill (shouldn't happen but guard)
       alerts.push({ level: 'error', message: 'Both legs failed but residual fill detected — check positions manually' });
+      unhedged = true;
     }
   } else if (kFailed && pFilled) {
     // Kalshi failed, Polymarket filled — auto-close Polymarket
@@ -793,9 +938,14 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       leg: 'kalshi',
       action: 'auto-close polymarket',
     });
-    if (!effectiveDryRun) await cancelLeg(polymarketResult);
-    const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
-    if (!closed) {
+    const cancellation = await cancelEntry(polymarketResult, req.polymarketOrder);
+    polymarketResult = cancellation.result;
+    ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+    const close = cancellation.verified
+      ? await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun)
+      : { venue: 'polymarket' as const, requestedContracts: polymarketResult.filledContracts ?? 0, complete: false, priceSource: 'estimated' as const };
+    closes.push(close);
+    if (!close.complete) {
       unhedged = true;
       alerts.push({
         level: 'error',
@@ -803,8 +953,6 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         leg: 'polymarket',
         action: 'manual close required',
       });
-    } else {
-      polymarketResult = { ...polymarketResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   } else if (pFailed && kFilled) {
@@ -816,18 +964,21 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       leg: 'polymarket',
       action: 'auto-close kalshi',
     });
-    if (!effectiveDryRun) await cancelLeg(kalshiResult);
-    const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
-    if (!closed) {
+    const cancellation = await cancelEntry(kalshiResult, req.kalshiOrder);
+    kalshiResult = cancellation.result;
+    ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+    const close = cancellation.verified
+      ? await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun)
+      : { venue: 'kalshi' as const, requestedContracts: kalshiResult.filledContracts ?? 0, complete: false, priceSource: 'estimated' as const };
+    closes.push(close);
+    if (!close.complete) {
       unhedged = true;
       alerts.push({
         level: 'error',
-        message: `Auto-close FAILED for Kalshi — $${(kalshiResult.filledSize ?? 0).toFixed(2)} unhedged exposure. Close manually.`,
+        message: `Auto-close FAILED — $${(kalshiResult.filledSize ?? 0).toFixed(2)} unhedged Kalshi exposure. Close manually.`,
         leg: 'kalshi',
         action: 'manual close required',
       });
-    } else {
-      kalshiResult = { ...kalshiResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   } else if (kFilled && pFilled) {
@@ -843,41 +994,43 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         message: `Mismatched fills: Kalshi ${kFill.toFixed(4)} contracts vs Polymarket ${pFill.toFixed(4)} — closing excess`,
         action: 'close excess',
       });
-      if (!effectiveDryRun) {
-        await cancelLeg(kalshiResult);
-        await cancelLeg(polymarketResult);
-      }
-      const excessContracts = Math.abs(kFill - pFill);
-      const largerLeg = kFill > pFill ? kalshiResult : polymarketResult;
-      const largerReq = kFill > pFill ? req.kalshiOrder : req.polymarketOrder;
-      const excessNotional = excessContracts * (largerLeg.filledPrice ?? largerReq.price);
-      const closed = await autoCloseLeg(
-        { ...largerLeg, filledSize: excessNotional, filledContracts: excessContracts },
-        largerReq,
-        req.arbId,
-        effectiveDryRun,
-      );
-      if (!closed) {
+      const [kalshiCancellation, pmCancellation] = await Promise.all([
+        cancelEntry(kalshiResult, req.kalshiOrder),
+        cancelEntry(polymarketResult, req.polymarketOrder),
+      ]);
+      kalshiResult = kalshiCancellation.result;
+      polymarketResult = pmCancellation.result;
+      ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+      ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+      const terminalMatch = areFilledContractsMatched(kalshiResult, polymarketResult);
+      if (!kalshiCancellation.verified || !pmCancellation.verified) {
         unhedged = true;
         alerts.push({
           level: 'error',
-          message: `Failed to close ${excessContracts.toFixed(4)} excess contracts — unhedged exposure remains`,
+          message: 'Could not terminally verify both entry cancellations — exposure remains unresolved',
           action: 'manual close required',
         });
-      } else {
-        const matchedContracts = Math.min(kFill, pFill);
-        if (kFill > pFill) {
-          kalshiResult = {
-            ...kalshiResult,
-            filledContracts: matchedContracts,
-            filledSize: matchedContracts * (kalshiResult.filledPrice ?? req.kalshiOrder.price),
-          };
+      } else if (!terminalMatch.matched) {
+        const terminalExcess = Math.abs(terminalMatch.kalshiContracts - terminalMatch.polymarketContracts);
+        const largerLeg = terminalMatch.kalshiContracts > terminalMatch.polymarketContracts ? kalshiResult : polymarketResult;
+        const largerReq = terminalMatch.kalshiContracts > terminalMatch.polymarketContracts ? req.kalshiOrder : req.polymarketOrder;
+        const excessNotional = terminalExcess * (largerLeg.filledPrice ?? largerReq.price);
+        const close = await autoCloseLeg(
+          { ...largerLeg, filledSize: excessNotional, filledContracts: terminalExcess },
+          largerReq,
+          req.arbId,
+          effectiveDryRun,
+        );
+        closes.push(close);
+        if (!close.complete) {
+          unhedged = true;
+          alerts.push({
+            level: 'error',
+            message: `Failed to terminally verify close of ${terminalExcess.toFixed(4)} excess contracts — unhedged exposure remains`,
+            action: 'manual close required',
+          });
         } else {
-          polymarketResult = {
-            ...polymarketResult,
-            filledContracts: matchedContracts,
-            filledSize: matchedContracts * (polymarketResult.filledPrice ?? req.polymarketOrder.price),
-          };
+          addStep('partial', `Terminally verified close of ${terminalExcess.toFixed(4)} excess contracts`);
         }
       }
       rollbackExecuted = true;
@@ -900,12 +1053,15 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       message: 'Both legs timed out without fills — cancelling both, no exposure',
       action: 'cancel both',
     });
-    if (!effectiveDryRun) {
-      await cancelLeg(kalshiResult);
-      await cancelLeg(polymarketResult);
-    }
-    kalshiResult = { ...kalshiResult, status: 'cancelled' };
-    polymarketResult = { ...polymarketResult, status: 'cancelled' };
+    const [kalshiCancellation, pmCancellation] = await Promise.all([
+      cancelEntry(kalshiResult, req.kalshiOrder),
+      cancelEntry(polymarketResult, req.polymarketOrder),
+    ]);
+    kalshiResult = kalshiCancellation.result;
+    polymarketResult = pmCancellation.result;
+    ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+    ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+    if (!kalshiCancellation.verified || !pmCancellation.verified) unhedged = true;
     rollbackExecuted = true;
   } else if (kFilled && !pFilled && !pFailed) {
     // Kalshi filled, Polymarket still pending — cancel PM, auto-close Kalshi
@@ -916,10 +1072,19 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       leg: 'polymarket',
       action: 'auto-close kalshi',
     });
-    if (!effectiveDryRun) await cancelLeg(polymarketResult);
-    polymarketResult = { ...polymarketResult, status: 'cancelled' };
-    const closed = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
-    if (!closed) {
+    const [kalshiCancellation, pmCancellation] = await Promise.all([
+      cancelEntry(kalshiResult, req.kalshiOrder),
+      cancelEntry(polymarketResult, req.polymarketOrder),
+    ]);
+    kalshiResult = kalshiCancellation.result;
+    polymarketResult = pmCancellation.result;
+    ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+    ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+    const close = kalshiCancellation.verified && pmCancellation.verified
+      ? await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun)
+      : { venue: 'kalshi' as const, requestedContracts: kalshiResult.filledContracts ?? 0, complete: false, priceSource: 'estimated' as const };
+    closes.push(close);
+    if (!close.complete) {
       unhedged = true;
       alerts.push({
         level: 'error',
@@ -927,8 +1092,6 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         leg: 'kalshi',
         action: 'manual close required',
       });
-    } else {
-      kalshiResult = { ...kalshiResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   } else if (pFilled && !kFilled && !kFailed) {
@@ -940,10 +1103,19 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       leg: 'kalshi',
       action: 'auto-close polymarket',
     });
-    if (!effectiveDryRun) await cancelLeg(kalshiResult);
-    kalshiResult = { ...kalshiResult, status: 'cancelled' };
-    const closed = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
-    if (!closed) {
+    const [kalshiCancellation, pmCancellation] = await Promise.all([
+      cancelEntry(kalshiResult, req.kalshiOrder),
+      cancelEntry(polymarketResult, req.polymarketOrder),
+    ]);
+    kalshiResult = kalshiCancellation.result;
+    polymarketResult = pmCancellation.result;
+    ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+    ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+    const close = kalshiCancellation.verified && pmCancellation.verified
+      ? await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun)
+      : { venue: 'polymarket' as const, requestedContracts: polymarketResult.filledContracts ?? 0, complete: false, priceSource: 'estimated' as const };
+    closes.push(close);
+    if (!close.complete) {
       unhedged = true;
       alerts.push({
         level: 'error',
@@ -951,28 +1123,35 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
         leg: 'polymarket',
         action: 'manual close required',
       });
-    } else {
-      polymarketResult = { ...polymarketResult, status: 'cancelled' };
     }
     rollbackExecuted = true;
   }
 
-  // ── Calculate actual profit and net exposure ──
-  let actualProfit: number | undefined;
+  // ── Reconcile integer-cent execution cash and net exposure ──
   let netExposure: number | undefined;
 
   if (kalshiResult.filledSize && polymarketResult.filledSize && kalshiResult.filledPrice && polymarketResult.filledPrice) {
-    const match = areFilledContractsMatched(kalshiResult, polymarketResult);
-    const minContracts = Math.min(match.kalshiContracts, match.polymarketContracts);
     const kalshiNotional = kalshiResult.filledSize;
     const pmNotional = polymarketResult.filledSize;
     netExposure = unhedged ? Math.abs(kalshiNotional - pmNotional) : 0;
-
-    const spread = 1 - kalshiResult.filledPrice - polymarketResult.filledPrice;
-    actualProfit = minContracts * spread;
   } else if (unhedged) {
     // One leg filled, other didn't — all of the filled amount is exposure
     netExposure = (kalshiResult.filledSize ?? 0) + (polymarketResult.filledSize ?? 0);
+  }
+
+  const cashLedger = reconcileExecutionCashLedger({
+    kalshiEntry: ledgerKalshiEntry,
+    polymarketEntry: ledgerPolymarketEntry,
+    closes,
+    unhedged,
+  });
+  const actualProfit = cashLedger.netPnlCents == null ? undefined : cashLedger.netPnlCents / 100;
+  if (cashLedger.status !== 'reconciled') {
+    alerts.push({
+      level: unhedged ? 'error' : 'warning',
+      message: `Execution cash ledger requires reconciliation: ${cashLedger.issues.join(', ')}`,
+      action: 'review persisted execution ledger',
+    });
   }
 
   const liveEvidenceComplete = effectiveDryRun || (
@@ -985,16 +1164,18 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     kalshiResult.status !== 'rejected' &&
     polymarketResult.status !== 'rejected' &&
     !unhedged &&
-    liveEvidenceComplete;
+    liveEvidenceComplete &&
+    (effectiveDryRun || cashLedger.status === 'reconciled');
 
   const finalStatus: StepStatus = success ? 'success' : (unhedged ? 'failed' : 'partial');
-  addStep(finalStatus, `Execution ${success ? 'completed successfully' : 'completed with issues'} — profit $${(actualProfit ?? 0).toFixed(2)}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);
+  addStep(finalStatus, `Execution ${success ? 'completed successfully' : 'completed with issues'} — ${cashLedger.status === 'reconciled' ? `net P&L $${(actualProfit ?? 0).toFixed(2)}` : 'P&L reconciliation required'}, gross spread ${cashLedger.grossSpreadCents == null ? 'unknown' : `$${(cashLedger.grossSpreadCents / 100).toFixed(2)}`}, net exposure $${(netExposure ?? 0).toFixed(2)}, time ${Date.now() - startTime}ms`);
 
   return {
     success,
     kalshiResult,
     polymarketResult,
     actualProfit,
+    cashLedger,
     netExposure,
     rollbackExecuted,
     unhedged,

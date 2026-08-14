@@ -30,7 +30,7 @@ export async function GET(
       );
     }
 
-    const result = (record.result ?? {}) as Record<string, any>;
+    const result = (record.result ?? {}) as Record<string, unknown>;
     const steps = (record.steps ?? result.steps ?? []) as Array<{
       timestamp: string;
       status: string;
@@ -50,6 +50,7 @@ export async function GET(
       kalshiResult: result.kalshiResult ?? null,
       polymarketResult: result.polymarketResult ?? null,
       actualProfit: result.actualProfit ?? null,
+      cashLedger: result.cashLedger ?? null,
       netExposure: result.netExposure ?? null,
       rollbackExecuted: result.rollbackExecuted ?? false,
       unhedged: result.unhedged ?? false,

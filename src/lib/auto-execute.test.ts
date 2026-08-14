@@ -6,6 +6,10 @@ import {
   shouldSimulateExecution,
   areFilledContractsMatched,
   isCompleteClose,
+  isExecutableCloseQuantity,
+  isTerminallyVerifiedOrder,
+  isTerminallyVerifiedClose,
+  cancelAndVerifyOrder,
   mapKalshiOrderResult,
   type ExecutionRequest,
   type SafetyLimits,
@@ -342,10 +346,63 @@ describe('executeArb', () => {
     expect(result.error).toContain('one-share notional');
   });
 
+
   it('requires the venue to confirm the entire requested excess close', () => {
     expect(isCompleteClose(8, 8)).toBe(true);
     expect(isCompleteClose(8, 3)).toBe(false);
+    expect(isCompleteClose(8, 9)).toBe(false);
     expect(isCompleteClose(8, null)).toBe(false);
+  });
+
+  it('refuses fractional Kalshi excess rather than rounding it into an over-close', () => {
+    expect(isExecutableCloseQuantity('kalshi', 0.25)).toBe(false);
+    expect(isExecutableCloseQuantity('kalshi', 1.5)).toBe(false);
+    expect(isExecutableCloseQuantity('kalshi', 2)).toBe(true);
+    expect(isExecutableCloseQuantity('polymarket', 0.25)).toBe(true);
+  });
+
+  it('does not treat a cancellation acknowledgement as terminal order verification', () => {
+    expect(isTerminallyVerifiedOrder({
+      platform: 'kalshi', status: 'pending', filledContracts: 0, orderId: 'k-1', timestamp: '',
+    })).toBe(false);
+    expect(isTerminallyVerifiedOrder({
+      platform: 'kalshi', status: 'cancelled', filledContracts: 0, orderId: 'k-1', timestamp: '',
+    })).toBe(true);
+  });
+
+  it('requires terminal authoritative fill evidence before a close is complete', () => {
+    const evidence = {
+      venue: 'kalshi' as const, filledQuantity: 2, fillPrice: 0.44, chargedFeeCents: 1,
+      executionId: 'fill-close', venueTimestamp: '2026-08-14T12:00:00Z',
+    };
+    expect(isTerminallyVerifiedClose(2, {
+      platform: 'kalshi', status: 'partial', filledContracts: 2, filledPrice: 0.44,
+      chargedFeeCents: 1, venueEvidence: evidence, orderId: 'close-1', timestamp: evidence.venueTimestamp,
+    })).toBe(false);
+    expect(isTerminallyVerifiedClose(2, {
+      platform: 'kalshi', status: 'filled', filledContracts: 2, filledPrice: 0.44,
+      chargedFeeCents: 1, venueEvidence: evidence, orderId: 'close-1', timestamp: evidence.venueTimestamp,
+    })).toBe(true);
+  });
+
+  it('verifies cancellation from a terminal poll instead of the cancel acknowledgement', async () => {
+    const pending = { platform: 'kalshi' as const, status: 'pending' as const, filledContracts: 0, orderId: 'k-1', timestamp: '' };
+    const cancelled = { ...pending, status: 'cancelled' as const };
+    await expect(cancelAndVerifyOrder(
+      pending,
+      vi.fn().mockResolvedValue(true),
+      vi.fn().mockResolvedValue(cancelled),
+    )).resolves.toEqual({ result: cancelled, verified: true });
+  });
+
+  it('keeps cancellation unresolved when terminal polling fails', async () => {
+    const pending = { platform: 'kalshi' as const, status: 'pending' as const, filledContracts: 0, orderId: 'k-1', timestamp: '' };
+    await expect(cancelAndVerifyOrder(
+      pending,
+      vi.fn().mockResolvedValue(true),
+      vi.fn().mockResolvedValue(pending),
+      1,
+    )).resolves.toEqual({ result: pending, verified: false });
   });
 
   it('partial fill handling calculates netExposure', async () => {
@@ -359,10 +416,12 @@ describe('executeArb', () => {
     }
   });
 
-  it('actualProfit is computed from filled amounts', async () => {
+  it('returns a fee-inclusive cash ledger and maps actualProfit only from reconciled net P&L', async () => {
     const req = makeRequest(0.45, 0.45, 0.50, 0.50, true);
     const result = await executeArb(req);
-    expect(result.actualProfit).toBeDefined();
+    expect(result.cashLedger).toMatchObject({ version: 1 });
+    expect(result.cashLedger?.grossSpreadCents).not.toBe(result.cashLedger?.netPnlCents);
+    expect(result.actualProfit).toBe(result.cashLedger?.netPnlCents == null ? undefined : result.cashLedger.netPnlCents / 100);
   });
 
   it('dry-run order IDs contain "dry-run" prefix', async () => {
@@ -400,6 +459,12 @@ describe('executeArb', () => {
 });
 
 describe('mapKalshiOrderResult', () => {
+  it('preserves a terminal zero-fill cancellation for verification', () => {
+    expect(mapKalshiOrderResult({
+      orderId: 'order-cancelled', status: 'canceled', filledCount: 0, remainingCount: 10, raw: {},
+    })).toMatchObject({ status: 'cancelled', filledContracts: 0 });
+  });
+
   it('maps complete venue evidence exactly, including price improvement and charged fee', () => {
     expect(mapKalshiOrderResult({
       orderId: 'order-123', status: 'executed', filledCount: 10, remainingCount: 0,

@@ -5,13 +5,14 @@ const mocks = vi.hoisted(() => ({
   getCredentialStatus: vi.fn(),
   getExecutionMode: vi.fn(),
   persistExecution: vi.fn(),
+  logExecution: vi.fn(),
   loggerError: vi.fn(),
 }));
 
 vi.mock('@/lib/auto-execute', () => ({
   executeArb: mocks.executeArb,
   getSafetyLimitsFromEnv: vi.fn(() => ({})),
-  logExecution: vi.fn(),
+  logExecution: mocks.logExecution,
   getAuditLog: vi.fn(() => []),
 }));
 vi.mock('@/lib/execution-creds', () => ({
@@ -272,5 +273,42 @@ describe('POST /api/execute live Polymarket pre-placement validation', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error });
     expect(mocks.executeArb).not.toHaveBeenCalled();
+  });
+});
+
+const cashLedger = {
+  version: 1 as const, status: 'reconciled' as const, matchedContracts: 1,
+  grossSpreadCents: 5, entryPrincipalCents: 95, expectedSettlementCents: 100,
+  exitProceedsCents: 0, totalEntryFeesCents: 2, totalExitFeesCents: 0,
+  netPnlCents: 3, estimatedNetPnlCents: 3, feesEstimated: false, issues: [], fees: [], cashFlows: [],
+};
+
+describe('POST /api/execute cash ledger', () => {
+  beforeEach(() => {
+    mocks.getExecutionMode.mockResolvedValue('paper');
+    mocks.persistExecution.mockResolvedValue(1);
+    mocks.executeArb.mockResolvedValue({
+      success: true, kalshiResult: {}, polymarketResult: {}, actualProfit: 0.03, cashLedger,
+      rollbackExecuted: false, unhedged: false, executionTimeMs: 1, steps: [],
+    });
+  });
+
+  it('returns and persists the exact reconciled ledger', async () => {
+    const response = await POST(executeRequest('no-token') as never);
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.result.cashLedger).toEqual(cashLedger);
+    expect(mocks.persistExecution).toHaveBeenCalledWith(expect.objectContaining({
+      result: expect.objectContaining({ cashLedger }),
+    }));
+  });
+
+  it('does not report terminal execution when the ledger cannot be durably persisted', async () => {
+    mocks.persistExecution.mockRejectedValueOnce(new Error('disk unavailable'));
+    const response = await POST(executeRequest('no-token') as never);
+    const body = await response.json();
+    expect(response.status).toBe(500);
+    expect(body).not.toHaveProperty('result');
+    expect(mocks.logExecution).not.toHaveBeenCalled();
   });
 });

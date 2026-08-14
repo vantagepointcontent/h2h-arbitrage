@@ -204,10 +204,60 @@ export function getExecutionGateMessage(gates: GateInfo | null): string {
   return 'REAL MODE — this will place REAL limit orders on both platforms with REAL money.';
 }
 
+interface LedgerSummary {
+  grossSpreadCents: number | null;
+  totalEntryFeesCents: number;
+  totalExitFeesCents: number;
+  netPnlCents: number | null;
+  estimatedNetPnlCents?: number | null;
+  feesEstimated: boolean;
+  status: 'reconciled' | 'reconciliation-required';
+  fees?: Array<{ stage: 'entry' | 'exit'; source: 'charged' | 'estimated' }>;
+}
+
+interface ExecutionApiResponse {
+  success: boolean;
+  dryRun: boolean;
+  result?: {
+    kalshiResult?: { platform: string; status: string; filledSize?: number; filledPrice?: number; error?: string };
+    polymarketResult?: { platform: string; status: string; filledSize?: number; filledPrice?: number; error?: string };
+    cashLedger?: LedgerSummary;
+    actualProfit?: number;
+    netExposure?: number;
+    rollbackExecuted?: boolean;
+    unhedged?: boolean;
+  };
+}
+
+/** Stable manual-modal projection of the persisted integer-cent ledger. */
+export function getExecutionLedgerRows(ledger: LedgerSummary): Array<{ label: string; value: string }> {
+  const money = (cents: number) => `${cents < 0 ? '-' : ''}$${(Math.abs(cents) / 100).toFixed(2)}`;
+  const feeSource = (stage: 'entry' | 'exit') => {
+    const stageFees = ledger.fees?.filter((fee) => fee.stage === stage) ?? [];
+    if (stageFees.length === 0) return ledger.feesEstimated ? 'estimated' : 'charged';
+    return stageFees.some((fee) => fee.source === 'estimated') ? 'estimated' : 'charged';
+  };
+  return [
+    { label: 'Actual gross spread', value: ledger.grossSpreadCents == null ? 'Unknown' : money(ledger.grossSpreadCents) },
+    { label: `Entry fees (${feeSource('entry')})`, value: money(-ledger.totalEntryFeesCents) },
+    { label: `Exit fees (${feeSource('exit')})`, value: money(-ledger.totalExitFeesCents) },
+    ...(ledger.status !== 'reconciled' && ledger.estimatedNetPnlCents != null ? [{
+      label: 'Estimated net P&L (not actual)',
+      value: money(ledger.estimatedNetPnlCents),
+    }] : []),
+    {
+      label: 'Actual net P&L',
+      value: ledger.status === 'reconciled' && ledger.netPnlCents != null
+        ? money(ledger.netPnlCents)
+        : 'Reconciliation required',
+    },
+  ];
+}
+
 export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose: () => void }) {
   const [gates, setGates] = useState<GateInfo | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ExecutionApiResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -247,8 +297,8 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
       const data = await res.json();
       if (!res.ok) setError(data.error || `HTTP ${res.status}`);
       else setResult(data);
-    } catch (e: any) {
-      setError(e.message || "Network error");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Network error");
     } finally {
       setBusy(false);
     }
@@ -323,12 +373,19 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
                   </div>
                 );
               })}
-              {result.result?.actualProfit != null && (
-                <div className="px-3 py-2 flex justify-between">
-                  <span className="text-[#8A9BA8]">Actual profit</span>
-                  <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
-                </div>
-              )}
+              {result.result?.cashLedger
+                ? getExecutionLedgerRows(result.result.cashLedger).map((row) => (
+                  <div key={row.label} className="px-3 py-2 flex justify-between">
+                    <span className="text-[#8A9BA8]">{row.label}</span>
+                    <span className="font-mono font-bold text-[#5DBE81]">{row.value}</span>
+                  </div>
+                ))
+                : result.result?.actualProfit != null && (
+                  <div className="px-3 py-2 flex justify-between">
+                    <span className="text-[#8A9BA8]">Actual net P&amp;L (legacy)</span>
+                    <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
+                  </div>
+                )}
               {result.result?.netExposure != null && result.result.netExposure > 0 && (
                 <div className="px-3 py-2 flex justify-between">
                   <span className="text-[#8A9BA8]">Net exposure</span>
