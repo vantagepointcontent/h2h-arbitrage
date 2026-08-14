@@ -713,10 +713,16 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     remainingOpenFeesCents: row.live_fees != null ? Number(row.live_fees) : (row.status === 'open' ? Number(row.fees ?? 0) : 0),
     remainingOpenCostCents: row.live_cost != null ? Number(row.live_cost) : (row.status === 'open' ? Number(row.total_cost) : 0),
     totalCostCents: Number(row.total_cost),
-    entryCostStatus: row.entry_cost_status === 'available' ? 'available' : 'unavailable',
-    entryCostFailureReason: row.entry_cost_failure_reason != null
-      ? String(row.entry_cost_failure_reason)
-      : row.entry_cost_status === 'available' ? null : 'Legacy position lacks authoritative entry fill and fee data',
+    // Legacy rows still contain the fee-inclusive amount recorded as paid.
+    // Missing detailed fill provenance does not make that ledger cost unknown.
+    entryCostStatus: Number.isSafeInteger(Number(row.total_cost)) && Number(row.total_cost) > 0
+      ? 'available'
+      : 'unavailable',
+    entryCostFailureReason: Number.isSafeInteger(Number(row.total_cost)) && Number(row.total_cost) > 0
+      ? null
+      : row.entry_cost_failure_reason != null
+        ? String(row.entry_cost_failure_reason)
+        : 'Recorded Buy Cost is missing or invalid',
     kalshiEntryGrossMicrocents: row.kalshi_entry_gross_microcents != null ? Number(row.kalshi_entry_gross_microcents) : null,
     pmEntryGrossMicrocents: row.pm_entry_gross_microcents != null ? Number(row.pm_entry_gross_microcents) : null,
     entryCostRoundingDeltaMicrocents: row.entry_cost_rounding_delta_microcents != null ? Number(row.entry_cost_rounding_delta_microcents) : null,
@@ -1859,12 +1865,16 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
   if (hasOverride && (overrideType == null || overrideMultiplier == null)) {
     throw new Error('Conflicting Kalshi event fee override');
   }
-  const feeType = hasOverride ? overrideType : seriesRecord.fee_type;
+  const upstreamFeeType = hasOverride ? overrideType : seriesRecord.fee_type;
   const feeMultiplier = hasOverride ? overrideMultiplier : seriesRecord.fee_multiplier;
-  if (feeType !== 'quadratic' || typeof feeMultiplier !== 'number' || !Number.isFinite(feeMultiplier)
+  const supportedQuadraticFee = upstreamFeeType === 'quadratic' || upstreamFeeType === 'quadratic_with_maker_fees';
+  if (!supportedQuadraticFee || typeof feeMultiplier !== 'number' || !Number.isFinite(feeMultiplier)
     || feeMultiplier < 0 || feeMultiplier > 10) {
     throw new Error('Missing, malformed, or unsupported authoritative Kalshi fee configuration');
   }
+  // Selling at the best bid is a taker action. Both supported schedules use
+  // the same quadratic taker formula; maker fees do not apply here.
+  const feeType = 'quadratic' as const;
   const feeMultiplierPpm = Math.round(feeMultiplier * 1_000_000);
   if (!Number.isSafeInteger(feeMultiplierPpm)) throw new Error('Malformed authoritative Kalshi fee multiplier');
 
@@ -1903,7 +1913,7 @@ export async function fetchAuthoritativeBotFeeConfig(input: {
         ? `https://external-api.kalshi.com/trade-api/v2/events/${encodeURIComponent(eventTicker)}`
         : `https://external-api.kalshi.com/trade-api/v2/series/${encodeURIComponent(seriesTicker)}`,
       observedAt,
-      version: `${feeType}:${feeMultiplierPpm}:${String(hasOverride
+      version: `${String(upstreamFeeType)}:${feeMultiplierPpm}:${String(hasOverride
         ? eventRecord.last_updated_ts ?? 'upstream-version-unavailable'
         : seriesRecord.last_updated_ts ?? 'upstream-version-unavailable')}`,
     },
@@ -2421,7 +2431,9 @@ export async function pollOpenBotPositions(dependencies?: {
       ...prices,
       yesBids: parseExecutableBidLevels(yesBook.bids, 'Polymarket YES bid'),
       noBids: parseExecutableBidLevels(noBook.bids, 'Polymarket NO bid'),
-      observedAt: new Date(Math.min(yesObservedMs, noObservedMs)).toISOString(),
+      // This is a freshly fetched executable book. The venue timestamps above
+      // are validated as provenance, but fetch completion governs freshness.
+      observedAt: new Date().toISOString(),
     };
   });
   const positionStore = dependencies?.positionStore ?? store();

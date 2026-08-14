@@ -595,8 +595,10 @@ export default function BotTraderPanel() {
                         <div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div>
                         <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
                       </div>
-                      {!entryCostAvailable || position.kalshiEntryGrossMicrocents == null || position.pmEntryGrossMicrocents == null ? (
-                        <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Buy Cost unavailable: {position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}</div>
+                      {!entryCostAvailable ? (
+                        <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Buy Cost unavailable: {position.entryCostFailureReason || 'Recorded Buy Cost is missing or invalid'}</div>
+                      ) : position.kalshiEntryGrossMicrocents == null || position.pmEntryGrossMicrocents == null ? (
+                        <div className="mt-3 rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2 text-xs text-[var(--text-secondary)]"><span className="font-semibold text-[var(--text-primary)]">Recorded Buy Cost: {formatCents(position.totalCostCents)}</span> · Detailed per-leg fill provenance is unavailable for this legacy position.</div>
                       ) : (
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">

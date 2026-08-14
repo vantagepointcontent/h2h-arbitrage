@@ -689,6 +689,22 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
     expect(result.pmTheta).toBe(0.05);
     expect(result.polymarket).toMatchObject({ feeRateBps: 500, tokenId: 'no-token' });
   });
+
+  it('accepts Kalshi quadratic taker fees when the series also supports maker fees', async () => {
+    const result = await fetchAuthoritativeBotFeeConfig({
+      kalshiTicker: 'KXMARMAD-27-ORE', pmConditionId: '0xcondition', pmSide: 'no',
+    }, {
+      fetchJson: async (url) => {
+        if (url.includes('/markets/')) return { market: { event_ticker: 'KXMARMAD-27' } };
+        if (url.includes('/events/')) return { event: { series_ticker: 'KXMARMAD' } };
+        if (url.includes('/series/')) return { series: { fee_type: 'quadratic_with_maker_fees', fee_multiplier: 1 } };
+        return { base_fee: 0 };
+      },
+      fetchPmMarket: async () => ({ tokens: [{ token_id: 'no-token', outcome: 'No' }] }),
+    });
+    expect(result.kalshi).toMatchObject({ feeType: 'quadratic', feeMultiplierPpm: 1_000_000 });
+    expect(result.kalshi.version).toContain('quadratic_with_maker_fees');
+  });
 });
 
 describe('BotPositionStore', () => {
@@ -906,13 +922,13 @@ describe('BotPositionStore', () => {
     const store = new BotPositionStore(dbUrl);
     const [legacy] = await store.list({ status: 'all' });
 
-    expect(legacy.entryCostStatus).toBe('unavailable');
-    expect(legacy.entryCostFailureReason).toMatch(/legacy position lacks authoritative entry fill and fee data/i);
+    expect(legacy.entryCostStatus).toBe('available');
+    expect(legacy.entryCostFailureReason).toBeNull();
     expect(legacy.kalshiEntryGrossMicrocents).toBeNull();
     expect(legacy.pmEntryGrossMicrocents).toBeNull();
     expect(legacy.kalshiEntryFillCount).toBeNull();
     expect(legacy.pmEntryFillCount).toBeNull();
-    expect(summarizeBotPositions([legacy]).deployedCapitalCents).toBeNull();
+    expect(summarizeBotPositions([legacy]).deployedCapitalCents).toBe(99);
     store.close();
   });
 
