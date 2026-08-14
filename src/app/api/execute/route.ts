@@ -117,8 +117,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           );
         }
         const pmTokenId = effective.polymarketOrder.conditionId;
-        const authoritativeBook = pmTokenId ? await fetchClobBook(pmTokenId) : null;
-        const constraint = validateOneShareBookOrder(authoritativeBook, effective.polymarketOrder.price);
+        const authoritativeBook = pmTokenId
+          ? await fetchClobBook(pmTokenId, { bypassCache: true })
+          : null;
+        const constraint = validateOneShareBookOrder(
+          authoritativeBook,
+          pmTokenId,
+          effective.polymarketOrder.price,
+        );
         if (!constraint.valid) {
           return NextResponse.json(
             { error: constraint.blocker ?? 'Polymarket one-share constraint validation failed' },

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  fetchClobBook,
   fetchClobBooks,
   getClobPricesFromBooks,
   validateOneShareBookOrder,
@@ -86,22 +87,58 @@ describe('fetchClobBooks', () => {
 describe('validateOneShareBookOrder', () => {
   it('validates minimum, tick, and unsorted top-level depth for one share', () => {
     const validBook: ClobBook = {
+      asset_id: 'expected-token',
       bids: [],
       asks: [{ price: '0.60', size: '10' }, { price: '0.40', size: '1' }],
       min_order_size: '0.5',
       tick_size: '0.01',
     };
-    expect(validateOneShareBookOrder(validBook, 0.4)).toMatchObject({
+    expect(validateOneShareBookOrder(validBook, 'expected-token', 0.4)).toMatchObject({
       valid: true, minimumOrderSize: 0.5, tickSize: 0.01, bestAsk: 0.4, bestAskShares: 1,
     });
-    expect(validateOneShareBookOrder({ ...validBook, min_order_size: '5' }, 0.4).blocker)
+    expect(validateOneShareBookOrder({ ...validBook, min_order_size: '5' }, 'expected-token', 0.4).blocker)
       .toBe('Polymarket minimum order is 5 shares; requested 1 share');
-    expect(validateOneShareBookOrder({ ...validBook, asks: [{ price: '0.40', size: '0.9' }] }, 0.4).blocker)
+    expect(validateOneShareBookOrder({ ...validBook, asks: [{ price: '0.40', size: '0.9' }] }, 'expected-token', 0.4).blocker)
       .toBe('Polymarket top-of-book depth 0.9 cannot fill requested 1 share');
-    expect(validateOneShareBookOrder(validBook, 0.405).blocker)
+    expect(validateOneShareBookOrder(validBook, 'expected-token', 0.405).blocker)
       .toBe('Polymarket limit price 0.405 is not aligned to tick size 0.01');
-    expect(validateOneShareBookOrder(validBook, 0.99).blocker)
+    expect(validateOneShareBookOrder(validBook, 'expected-token', 0.99).blocker)
       .toBe('Polymarket limit price 0.99 does not match authoritative best ask 0.4');
+  });
+
+  it('fails closed on mismatched token identity and malformed levels', () => {
+    const validBook: ClobBook = {
+      asset_id: 'expected-token', bids: [], asks: [{ price: '0.40', size: '1' }],
+      min_order_size: '1', tick_size: '0.01',
+    };
+    expect(validateOneShareBookOrder({ ...validBook, asset_id: 'wrong-token' }, 'expected-token', 0.4))
+      .toMatchObject({ valid: false, blocker: 'Polymarket order book token does not match requested token' });
+    expect(validateOneShareBookOrder({ ...validBook, asset_id: undefined }, 'expected-token', 0.4))
+      .toMatchObject({ valid: false, blocker: 'Polymarket order book token is unavailable' });
+    expect(validateOneShareBookOrder({ ...validBook, asks: {} as ClobBook['asks'] }, 'expected-token', 0.4))
+      .toMatchObject({ valid: false, blocker: 'Polymarket order book asks are malformed' });
+    expect(validateOneShareBookOrder({ ...validBook, bids: {} as ClobBook['bids'] }, 'expected-token', 0.4))
+      .toMatchObject({ valid: false, blocker: 'Polymarket order book bids are malformed' });
+    expect(validateOneShareBookOrder({ ...validBook, asks: [{ price: '0.40', size: 1 as unknown as string }] }, 'expected-token', 0.4))
+      .toMatchObject({ valid: false, blocker: 'Polymarket order book asks are malformed' });
+  });
+});
+
+describe('fetchClobBook cache policy', () => {
+  it('bypasses a cached book for authoritative pre-placement reads', async () => {
+    const first = {
+      asset_id: 'fresh-token', bids: [], asks: [{ price: '0.40', size: '1' }],
+      min_order_size: '1', tick_size: '0.01',
+    };
+    const changed = { ...first, asks: [{ price: '0.50', size: '1' }], min_order_size: '5' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => first })
+      .mockResolvedValueOnce({ ok: true, json: async () => changed });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect((await fetchClobBook('fresh-token'))?.min_order_size).toBe('1');
+    expect((await fetchClobBook('fresh-token', { bypassCache: true }))?.min_order_size).toBe('5');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

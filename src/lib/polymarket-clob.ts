@@ -181,11 +181,16 @@ function setCachedBook(tokenId: string, data: ClobBook | null): void {
 /**
  * Fetch orderbook for a specific token (used for neg-risk markets).
  */
-export async function fetchClobBook(tokenId: string): Promise<ClobBook | null> {
-  const cached = getCachedBook(tokenId);
-  if (cached !== undefined) {
-    debugLog('[CLOB] book cache hit', tokenId.slice(0, 12));
-    return cached;
+export async function fetchClobBook(
+  tokenId: string,
+  options?: { bypassCache?: boolean },
+): Promise<ClobBook | null> {
+  if (!options?.bypassCache) {
+    const cached = getCachedBook(tokenId);
+    if (cached !== undefined) {
+      debugLog('[CLOB] book cache hit', tokenId.slice(0, 12));
+      return cached;
+    }
   }
 
   await clobSemaphore.acquire();
@@ -337,10 +342,45 @@ export interface OneShareBookValidation {
 }
 
 /** Validate a canonical one-share buy against authoritative token-book metadata. */
-export function validateOneShareBookOrder(book: ClobBook | null, limitPrice: number): OneShareBookValidation {
+export function validateOneShareBookOrder(
+  book: ClobBook | null,
+  expectedTokenId: string | undefined,
+  limitPrice: number,
+): OneShareBookValidation {
+  const invalid = (blocker: string): OneShareBookValidation => ({
+    valid: false,
+    minimumOrderSize: null,
+    tickSize: null,
+    bestAsk: null,
+    bestAskShares: 0,
+    blocker,
+  });
+  const validLevels = (value: unknown): value is ClobBook['asks'] =>
+    Array.isArray(value) && value.every((level) => {
+      if (level == null || typeof level !== 'object') return false;
+      const price = (level as { price?: unknown }).price;
+      const size = (level as { size?: unknown }).size;
+      const parsedPrice = finiteDecimal(price);
+      const parsedSize = finiteDecimal(size);
+      return typeof price === 'string' && typeof size === 'string'
+        && parsedPrice !== null && parsedPrice > 0 && parsedPrice <= 1
+        && parsedSize !== null && parsedSize > 0;
+    });
+
+  if (!book) return invalid('Polymarket order book is unavailable');
+  if (!expectedTokenId) return invalid('Polymarket requested token is unavailable');
+  if (typeof book.asset_id !== 'string' || book.asset_id.length === 0) {
+    return invalid('Polymarket order book token is unavailable');
+  }
+  if (book.asset_id !== expectedTokenId) {
+    return invalid('Polymarket order book token does not match requested token');
+  }
+  if (!validLevels(book.bids)) return invalid('Polymarket order book bids are malformed');
+  if (!validLevels(book.asks)) return invalid('Polymarket order book asks are malformed');
+
   const minimumOrderSize = positiveBookConstraint(book?.min_order_size);
   const tickSize = positiveBookConstraint(book?.tick_size);
-  const asks = (book?.asks ?? [])
+  const asks = book.asks
     .map((level) => ({ price: Number(level.price), size: Number(level.size) }))
     .filter((level) => Number.isFinite(level.price) && level.price > 0 && Number.isFinite(level.size) && level.size > 0);
   const bestAsk = asks.length > 0 ? Math.min(...asks.map((level) => level.price)) : null;
