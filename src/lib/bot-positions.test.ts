@@ -129,12 +129,22 @@ describe('summarizeBotPositions', () => {
 describe('summarizeBotPerformance', () => {
   it('does not treat a legacy position with unavailable authoritative entry cost as zero deployed capital', () => {
     const result = summarizeBotPerformance([
-      openPosition({ entryCostStatus: 'unavailable', entryCostFailureReason: 'Legacy position lacks authoritative entry fill breakdown' }),
+      openPosition({
+        currentValueCents: 1022,
+        lastValuationAt: '2026-08-11T13:55:00.000Z',
+        entryCostStatus: 'unavailable',
+        entryCostFailureReason: 'Legacy position lacks authoritative entry fill breakdown',
+      }),
     ], new Date('2026-08-11T14:00:00.000Z'));
 
     expect(result.capital.deployedCents).toBeNull();
+    expect(result.capital.currentCents).toBe(1022);
+    expect(result.capital.excludedOpenCostCents).toBe(978);
     expect(result.entryCost).toEqual({ available: 0, unavailable: 1 });
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: null, totalCents: null, roiBps: null });
     expect(result.entryCohorts[0].deployedCents).toBeNull();
+    expect(result.entryCohorts[0].currentCents).toBe(1022);
+    expect(result.entryCohorts[0].unrealizedCents).toBeNull();
   });
 
   it('uses one fee-inclusive population for cards and chart while suppressing stale executable marks', () => {
@@ -162,7 +172,7 @@ describe('summarizeBotPerformance', () => {
 
     expect(result.valuation).toMatchObject({ fresh: 0, stale: 0, unavailable: 1, pendingSettlement: 1 });
     expect(result.capital.excludedOpenCostCents).toBe(978);
-    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 0, totalCents: null, roiBps: null });
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: null, totalCents: null, roiBps: null });
   });
 
   it('accounts for verified closed positions and fails closed on incomplete terminal accounting', () => {

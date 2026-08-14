@@ -2111,14 +2111,16 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const allEntryCostsAvailable = unavailableEntryCosts === 0;
   const realizedCents = total(verifiedSettled.map((position) => position.realizedPnlCents!));
   const valuedOpen = freshOpen.filter(hasAvailableEntryCost);
-  const unrealizedCents = total(valuedOpen.map((position) => position.currentValueCents! - position.totalCostCents));
+  const unrealizedCents = open.length > 0 && valuedOpen.length === 0
+    ? null
+    : total(valuedOpen.map((position) => position.currentValueCents! - position.totalCostCents));
   const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
   const deployedCents = allEntryCostsAvailable ? total(rows.map((position) => position.totalCostCents)) : null;
   const currentCents = total(freshOpen.map((position) => position.currentValueCents!))
     + total(verifiedSettled.map((position) => position.resolutionPayoutCents!));
   const valuedCostCents = total(valuedOpen.map((position) => position.totalCostCents))
     + total(verifiedSettled.map((position) => position.totalCostCents));
-  const excludedOpenCostCents = total(open.filter((position) => mark(position) !== 'fresh').map((position) => position.totalCostCents));
+  const excludedOpenCostCents = total(open.filter((position) => mark(position) !== 'fresh' || !hasAvailableEntryCost(position)).map((position) => position.totalCostCents));
   const oldestFreshMs = freshOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
   const dates = new Map<string, BotPerformanceSummary['entryCohorts'][number] & { incomplete: boolean }>();
   for (const position of rows) {
@@ -2133,7 +2135,9 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       point.heldToResolutionCents += position.expectedPayoutCents;
       if (mark(position) === 'fresh') {
         point.currentCents! += position.currentValueCents!;
-        point.unrealizedCents! += position.currentValueCents! - position.totalCostCents;
+        point.unrealizedCents = !hasAvailableEntryCost(position) || point.unrealizedCents == null
+          ? null
+          : point.unrealizedCents + position.currentValueCents! - position.totalCostCents;
       }
     } else if (hasVerifiedTerminalAccounting(position)) {
       point.currentCents! += position.resolutionPayoutCents!;

@@ -538,11 +538,16 @@ export default function BotTraderPanel() {
                 const isExpanded = expanded.has(position.id);
                 const entryCostAvailable = position.entryCostStatus !== 'unavailable'
                   && Number.isSafeInteger(position.totalCostCents);
+                const entryCostUnavailableLabel = entryCostAvailable
+                  ? null
+                  : `Buy Cost unavailable: ${position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}`;
                 const openMark = position.status === 'open' ? openPositionMark(position) : null;
-                const pnl = position.status === 'open' ? (openMark?.available ? openMark.pnlCents : null) : position.realizedPnlCents;
+                const pnl = position.status === 'open'
+                  ? (openMark?.available && entryCostAvailable ? openMark.pnlCents : null)
+                  : entryCostAvailable ? position.realizedPnlCents : null;
                 const roiBps = position.status === 'open'
-                  ? (openMark?.available ? openMark.roiBps : null)
-                  : hasVerifiedTerminalAccounting(position) ? positionRoiBps(position) : null;
+                  ? (openMark?.available && entryCostAvailable ? openMark.roiBps : null)
+                  : entryCostAvailable && hasVerifiedTerminalAccounting(position) ? positionRoiBps(position) : null;
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
                 const settlementUnavailableLabel = position.status !== 'open' && !hasVerifiedTerminalAccounting(position) ? 'Pending verification' : null;
                 const valueUnavailableLabel = openUnavailableLabel ?? settlementUnavailableLabel;
@@ -577,8 +582,8 @@ export default function BotTraderPanel() {
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel ? 'text-[var(--status-warning)]' : ''}`}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? formatCents(openMark.currentValueCents) : formatCents(position.resolutionPayoutCents!))}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,

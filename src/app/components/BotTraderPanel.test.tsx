@@ -375,7 +375,12 @@ describe('BotTraderPanel', () => {
   });
 
   it('shows a specific unavailable Buy Cost reason for legacy paper positions and never displays zero', async () => {
-    const legacy = { ...positions[0], entryCostStatus: 'unavailable', entryCostFailureReason: 'Legacy paper position lacks authoritative entry fill and fee data' };
+    const legacy = {
+      ...positions[0],
+      lastValuationAt: new Date().toISOString(),
+      entryCostStatus: 'unavailable',
+      entryCostFailureReason: 'Legacy paper position lacks authoritative entry fill and fee data',
+    };
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input);
       if (url.includes('/analytics')) return response({ success: true, analytics: {
@@ -389,8 +394,13 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
     expect(Array.from(row.querySelectorAll('td'))[4].textContent).toBe('Unavailable');
+    expect(Array.from(row.querySelectorAll('td'))[5].textContent).toBe('$1.02');
+    expect(Array.from(row.querySelectorAll('td'))[6].textContent).toContain('Buy Cost unavailable:');
+    expect(Array.from(row.querySelectorAll('td'))[7].textContent).toContain('Buy Cost unavailable:');
+    expect(Array.from(row.querySelectorAll('td'))[6].textContent).not.toContain('+$0.05');
+    expect(Array.from(row.querySelectorAll('td'))[7].textContent).not.toContain('+5.2%');
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toBeTruthy();
+    expect(screen.getAllByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toHaveLength(3);
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('DeployedUnavailable');
   });
 
