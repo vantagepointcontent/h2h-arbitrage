@@ -80,6 +80,10 @@ module.exports = {
         // scan at least hourly. Adaptive tiers may run sooner, never later.
         H2H_SAVED_MARKET_FRESHNESS_SLA_MS: '3600000',
         H2H_POLL_CONCURRENCY: '8',
+        // Parallel scans routinely take 16-25s under production load. Keep the
+        // adaptive floor above sequential-run history so healthy workers can
+        // finish publication before the poller aborts their requests.
+        H2H_SCAN_MIN_TIMEOUT_MS: '25000',
         H2H_SCAN_TIMEOUT_MS: '35000',
         H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9'
       },
