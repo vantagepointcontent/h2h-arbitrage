@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   upstream: vi.fn(),
-  calculateAllArbitrages: vi.fn(() => []),
+  calculateAllArbitrages: vi.fn((): unknown[] => []),
   findSavedMarketByUrls: vi.fn(),
   persistAndConsumeBotScan: vi.fn(async () => undefined),
   reserveSavedMarketPublication: vi.fn(),
@@ -180,7 +180,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
       },
     ]);
 
-    const response = await POST(request());
+    const response = await executeFullScan(request());
 
     expect(response.status).toBe(200);
     expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(

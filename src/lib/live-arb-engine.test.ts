@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyPolymarketBook,
+  computeCapturedLiveArbitrages,
   computeAllLiveArbitrages,
   parseBookStaleMs,
 } from './live-arb-engine';
@@ -21,6 +22,7 @@ const outcome = {
   pmYesTokenId: 'pm-yes-bug-096',
   pmNoTokenId: 'pm-no-bug-096',
   pmBinaryVerified: true,
+  pmConditionId: 'condition-example',
 };
 
 const complement = {
@@ -29,6 +31,7 @@ const complement = {
   pmYesTokenId: 'pm-yes-bug-101-comp',
   pmNoTokenId: 'pm-no-bug-101-comp',
   pmBinaryVerified: true,
+  pmConditionId: 'condition-complement',
 };
 
 describe('parseBookStaleMs', () => {
@@ -133,6 +136,75 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     const result = computeAllLiveArbitrages([outcome, duplicate], 10);
 
     expect(result.every((candidate) => candidate.arbType !== 'cross')).toBe(true);
+  });
+
+  it('charges both actual YES-leg fees for a captured cross strategy', () => {
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.30, quantity: 100 }],
+      [{ price: 0.70, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.60, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.40, quantity: 100 }]);
+    orderbookState.setBook(complement.kalshiTicker,
+      [{ price: 0.60, quantity: 100 }],
+      [{ price: 0.40, quantity: 100 }],
+    );
+    orderbookState.setBook(complement.pmYesTokenId, [{ price: 0.40, quantity: 100 }], []);
+    orderbookState.setBook(complement.pmNoTokenId, [], [{ price: 0.60, quantity: 100 }]);
+
+    const [captured] = computeCapturedLiveArbitrages([outcome, complement], 100, 'sports', [{
+      kalshiTicker: outcome.kalshiTicker,
+      pmConditionId: complement.pmConditionId,
+      arbType: 'cross',
+      strategy: 'Buy YES both sides: Kalshi Example + PM Complement',
+    }]);
+
+    expect(captured.fees?.kalshiFee).toBeCloseTo(1.47, 5);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.72, 5);
+    expect(captured.roiPct).toBeCloseTo(27.81, 4);
+  });
+
+  it('prices a captured PM NO fee from its executable ask instead of the YES complement', () => {
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.30, quantity: 100 }],
+      [{ price: 0.70, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.60, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.45, quantity: 100 }]);
+
+    const [captured] = computeCapturedLiveArbitrages([outcome], 100, 'sports', [{
+      kalshiTicker: outcome.kalshiTicker,
+      pmConditionId: outcome.pmConditionId,
+      arbType: 'direct',
+      strategy: 'Buy YES Kalshi + NO PM',
+    }]);
+
+    expect(captured.fees?.kalshiFee).toBeCloseTo(1.47, 5);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.7425, 5);
+    expect(captured.roiPct).toBeCloseTo(22.7875, 4);
+  });
+
+  it('values the captured direct direction even after the opposite direction becomes better', () => {
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.40, quantity: 100 }],
+      [{ price: 0.60, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.55, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.45, quantity: 100 }]);
+
+    const best = computeAllLiveArbitrages([outcome], 100)[0];
+    const [captured] = computeCapturedLiveArbitrages([outcome], 100, undefined, [{
+      kalshiTicker: outcome.kalshiTicker,
+      pmConditionId: outcome.pmConditionId,
+      arbType: 'direct',
+      strategy: 'Buy YES PM + NO Kalshi',
+    }]);
+
+    expect(best.strategy).toBe('Buy YES Kalshi + NO PM');
+    expect(best.roiPct).toBeGreaterThan(0);
+    expect(captured.strategy).toBe('Buy YES PM + NO Kalshi');
+    expect(captured.kalshiStake + captured.pmStake).toBeGreaterThan(0);
+    expect(captured.roiPct).toBeCloseTo(-17.9175, 4);
   });
 
   it('skips a synthetic Kalshi ask below the REST floor and keeps price/depth paired', () => {

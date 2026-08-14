@@ -15,6 +15,16 @@ export interface LiveArbResult {
   pmNoAsk: number | null;
   pmYesDepth: number;
   pmNoDepth: number;
+  /** Full fillable dollar depth used by canonical direct-strategy allocation. */
+  kalshiYesExecutableDepth?: number;
+  kalshiNoExecutableDepth?: number;
+  pmYesExecutableDepth?: number;
+  pmNoExecutableDepth?: number;
+  kalshiBookStale?: boolean;
+  pmYesBookStale?: boolean;
+  pmNoBookStale?: boolean;
+  /** Book identifiers required by this exact strategy, excluding unrelated sides. */
+  requiredBookIds?: string[];
   /** Contracts at the exact displayed effective top ask; used to cap manual execution. */
   kalshiYesAskShares?: number;
   kalshiNoAskShares?: number;
@@ -69,6 +79,13 @@ export interface LiveMatchedOutcome {
   pmBinaryVerified?: boolean;
 }
 
+export interface CapturedLiveArbIdentity {
+  kalshiTicker: string;
+  pmConditionId: string;
+  strategy: string;
+  arbType: 'cross' | 'direct' | 'internal';
+}
+
 export function parseBookStaleMs(value: unknown): number {
   const parsed = finiteDecimal(value);
   return parsed !== null && parsed > 0 ? parsed : 90_000;
@@ -93,10 +110,10 @@ function computeSingleOutcome(
 
   // Staleness only blocks live execution math; we still surface the last known
   // quotes so users can see the market rather than seeing $0 profit/ROI.
-  const stale =
-    orderbookState.isStale(kalshiTicker, STALE_MS) ||
-    orderbookState.isStale(pmYesTokenId, STALE_MS) ||
-    orderbookState.isStale(pmNoTokenId, STALE_MS);
+  const kalshiBookStale = orderbookState.isStale(kalshiTicker, STALE_MS);
+  const pmYesBookStale = orderbookState.isStale(pmYesTokenId, STALE_MS);
+  const pmNoBookStale = orderbookState.isStale(pmNoTokenId, STALE_MS);
+  const stale = kalshiBookStale || pmYesBookStale || pmNoBookStale;
 
   const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', capital);
   const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', capital);
@@ -236,6 +253,13 @@ function computeSingleOutcome(
     pmNoAsk,
     pmYesDepth,
     pmNoDepth,
+    kalshiYesExecutableDepth: kYes.totalCost,
+    kalshiNoExecutableDepth: kNo.totalCost,
+    pmYesExecutableDepth: pYes.totalCost,
+    pmNoExecutableDepth: pNo.totalCost,
+    kalshiBookStale,
+    pmYesBookStale,
+    pmNoBookStale,
     kalshiYesAskShares,
     kalshiNoAskShares,
     pmYesAskShares,
@@ -255,6 +279,177 @@ function computeSingleOutcome(
     arbType: strategy.startsWith('Same-platform YES+NO') ? 'internal' : 'direct',
     lastUpdate: new Date().toISOString(),
   };
+}
+
+function capturedResult(
+  base: LiveArbResult,
+  identity: CapturedLiveArbIdentity,
+  values: Pick<LiveArbResult, 'roiPct' | 'expectedProfit' | 'kalshiStake' | 'pmStake' | 'fees' | 'stale' | 'requiredBookIds'>,
+): LiveArbResult {
+  return {
+    ...base,
+    ...values,
+    strategy: identity.strategy.replace(/Polymarket/g, 'PM'),
+    arbType: identity.arbType,
+    pmConditionId: identity.pmConditionId,
+    lastUpdate: new Date().toISOString(),
+  };
+}
+
+/** Fee valuation for captured legs is keyed by structured venue and price.
+ * Strategy labels are display text and cannot safely infer PM NO or cross legs. */
+function computeCapturedLegFees(
+  contracts: number,
+  kalshiPrice: number | null,
+  pmPrice: number | null,
+  category?: string,
+): { kalshiFee: number; pmFee: number } {
+  return {
+    kalshiFee: kalshiPrice == null ? 0 : calcKalshiFee(contracts, kalshiPrice),
+    pmFee: pmPrice == null
+      ? 0
+      : calcPolymarketFee(contracts, pmPrice, getPolymarketTheta(category)),
+  };
+}
+
+/**
+ * Value immutable logged strategy identities independently of today's winner.
+ * The normal scanner intentionally emits only the best strategy per outcome;
+ * Logs must instead retain a still-executable captured direction even when its
+ * ROI has fallen to zero or below.
+ */
+export function computeCapturedLiveArbitrages(
+  outcomes: LiveMatchedOutcome[],
+  capital: number,
+  category: string | undefined,
+  identities: CapturedLiveArbIdentity[],
+): LiveArbResult[] {
+  const bases = outcomes.map((outcome) => computeSingleOutcome(outcome, capital, category));
+  const normalize = (strategy: string) => strategy.replace(/Polymarket/g, 'PM');
+  const results: LiveArbResult[] = [];
+
+  for (const identity of identities) {
+    const strategy = normalize(identity.strategy);
+    const current = bases.find((result) => result.kalshiTicker === identity.kalshiTicker);
+    if (!current) continue;
+
+    if (identity.arbType === 'direct') {
+      if (current.pmConditionId !== identity.pmConditionId) continue;
+      const pmFirst = strategy === 'Buy YES PM + NO Kalshi';
+      const kalshiFirst = strategy === 'Buy YES Kalshi + NO PM';
+      if (!pmFirst && !kalshiFirst) continue;
+      const kalshiPrice = pmFirst ? current.kalshiNoAsk : current.kalshiYesAsk;
+      const pmPrice = pmFirst ? current.pmYesAsk : current.pmNoAsk;
+      const kalshiDepth = pmFirst
+        ? current.kalshiNoExecutableDepth ?? current.kalshiNoDepth
+        : current.kalshiYesExecutableDepth ?? current.kalshiYesDepth;
+      const pmDepth = pmFirst
+        ? current.pmYesExecutableDepth ?? current.pmYesDepth
+        : current.pmNoExecutableDepth ?? current.pmNoDepth;
+      if (kalshiPrice == null || pmPrice == null || kalshiPrice <= 0 || pmPrice <= 0) continue;
+      const requiredBookStale = current.kalshiBookStale
+        || (pmFirst ? current.pmYesBookStale : current.pmNoBookStale);
+      const effectiveCapital = requiredBookStale ? 0 : Math.min(
+        kalshiDepth > 0 ? kalshiDepth / kalshiPrice : 0,
+        pmDepth > 0 ? pmDepth / pmPrice : 0,
+        capital,
+      );
+      if (effectiveCapital <= 0) {
+        results.push(capturedResult(current, identity, {
+          roiPct: 0, expectedProfit: 0, kalshiStake: 0, pmStake: 0, fees: null, stale: Boolean(requiredBookStale),
+          requiredBookIds: [current.kalshiTicker!, pmFirst ? current.pmYesTokenId! : current.pmNoTokenId!],
+        }));
+        continue;
+      }
+      const kalshiStake = effectiveCapital * kalshiPrice;
+      const pmStake = effectiveCapital * pmPrice;
+      const fees = computeCapturedLegFees(effectiveCapital, kalshiPrice, pmPrice, category);
+      const worstCaseNetProfit = effectiveCapital - kalshiStake - pmStake - fees.kalshiFee - fees.pmFee;
+      results.push(capturedResult(current, identity, {
+        roiPct: (worstCaseNetProfit / effectiveCapital) * 100,
+        expectedProfit: worstCaseNetProfit,
+        kalshiStake,
+        pmStake,
+        fees: { kalshiFee: fees.kalshiFee, pmFee: fees.pmFee, worstCaseNetProfit },
+        stale: false,
+        requiredBookIds: [current.kalshiTicker!, pmFirst ? current.pmYesTokenId! : current.pmNoTokenId!],
+      }));
+      continue;
+    }
+
+    for (const companion of bases) {
+      if (companion === current) continue;
+      const crossStrategy = `Buy YES both sides: Kalshi ${current.artist} + PM ${companion.artist}`;
+      const kalshiInternalStrategy = `Same-platform YES+YES Kalshi: ${current.artist} + ${companion.artist}`;
+      const pmInternalStrategy = `Same-platform YES+YES PM: ${current.artist} + ${companion.artist}`;
+      const isCross = identity.arbType === 'cross'
+        && identity.pmConditionId === companion.pmConditionId
+        && strategy === crossStrategy;
+      const isKalshiInternal = identity.arbType === 'internal' && strategy === kalshiInternalStrategy;
+      const isPmInternal = identity.arbType === 'internal' && strategy === pmInternalStrategy;
+      if (!isCross && !isKalshiInternal && !isPmInternal) continue;
+
+      const firstPrice = isCross || isKalshiInternal ? current.kalshiYesAsk : current.pmYesAsk;
+      const secondPrice = isCross || isPmInternal ? companion.pmYesAsk : companion.kalshiYesAsk;
+      const firstDepth = isCross || isKalshiInternal ? current.kalshiYesDepth : current.pmYesDepth;
+      const secondDepth = isCross || isPmInternal ? companion.pmYesDepth : companion.kalshiYesDepth;
+      const stale = isCross
+        ? Boolean(current.kalshiBookStale || companion.pmYesBookStale)
+        : isKalshiInternal
+          ? Boolean(current.kalshiBookStale || companion.kalshiBookStale)
+          : Boolean(current.pmYesBookStale || companion.pmYesBookStale);
+      if (firstPrice == null || secondPrice == null || firstPrice <= 0 || secondPrice <= 0) continue;
+      const effectiveCapital = stale ? 0 : Math.min(
+        firstDepth > 0 ? firstDepth / firstPrice : 0,
+        secondDepth > 0 ? secondDepth / secondPrice : 0,
+        capital,
+      );
+      if (effectiveCapital <= 0) {
+        results.push(capturedResult(current, identity, {
+          roiPct: 0, expectedProfit: 0, kalshiStake: 0, pmStake: 0, fees: null, stale,
+          requiredBookIds: isCross
+            ? [current.kalshiTicker!, companion.pmYesTokenId!]
+            : isKalshiInternal
+              ? [current.kalshiTicker!, companion.kalshiTicker!]
+              : [current.pmYesTokenId!, companion.pmYesTokenId!],
+        }));
+        break;
+      }
+
+      const firstStake = effectiveCapital * firstPrice;
+      const secondStake = effectiveCapital * secondPrice;
+      const grossProfit = effectiveCapital - firstStake - secondStake;
+      let kalshiFee = 0;
+      let pmFee = 0;
+      if (isCross) {
+        const fees = computeCapturedLegFees(effectiveCapital, firstPrice, secondPrice, category);
+        kalshiFee = fees.kalshiFee;
+        pmFee = fees.pmFee;
+      } else if (isKalshiInternal) {
+        kalshiFee = calcKalshiFee(effectiveCapital, firstPrice) + calcKalshiFee(effectiveCapital, secondPrice);
+      } else {
+        const theta = getPolymarketTheta(category);
+        pmFee = calcPolymarketFee(effectiveCapital, firstPrice, theta) + calcPolymarketFee(effectiveCapital, secondPrice, theta);
+      }
+      const expectedProfit = grossProfit - kalshiFee - pmFee;
+      results.push(capturedResult(current, identity, {
+        roiPct: (expectedProfit / effectiveCapital) * 100,
+        expectedProfit,
+        kalshiStake: isCross ? firstStake : isKalshiInternal ? firstStake + secondStake : 0,
+        pmStake: isCross ? secondStake : isPmInternal ? firstStake + secondStake : 0,
+        fees: { kalshiFee, pmFee, worstCaseNetProfit: expectedProfit },
+        stale: false,
+        requiredBookIds: isCross
+          ? [current.kalshiTicker!, companion.pmYesTokenId!]
+          : isKalshiInternal
+            ? [current.kalshiTicker!, companion.kalshiTicker!]
+            : [current.pmYesTokenId!, companion.pmYesTokenId!],
+      }));
+      break;
+    }
+  }
+
+  return results;
 }
 
 /** Compute arbitrage for all matched outcomes in one pass.

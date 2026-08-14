@@ -1,5 +1,5 @@
 import { seedAllBooks } from './book-seed';
-import { computeAllLiveArbitrages } from './live-arb-engine';
+import { computeCapturedLiveArbitrages } from './live-arb-engine';
 import { PairResolveError, resolvePairFromLinks } from './pair-resolver';
 import { getScanValuationInputs } from './persistence';
 import { orderbookState } from './orderbook-state';
@@ -68,17 +68,6 @@ async function withPairPermit<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-function matchesCapturedCandidate(
-  result: ReturnType<typeof computeAllLiveArbitrages>[number],
-  candidates: ValuationInput['candidates'],
-): boolean {
-  const normalizeStrategy = (strategy: string) => strategy.replace(/Polymarket/g, 'PM');
-  return candidates.some((candidate) => candidate.kalshiTicker === result.kalshiTicker
-    && candidate.pmConditionId === result.pmConditionId
-    && candidate.arbType === result.arbType
-    && normalizeStrategy(candidate.strategy) === normalizeStrategy(result.strategy));
-}
-
 async function valuePair(input: ValuationInput): Promise<Omit<CurrentLogRoiValuation, 'id'>> {
   const key = valuationKey(input);
   const cached = cache.get(key);
@@ -94,8 +83,12 @@ async function valuePair(input: ValuationInput): Promise<Omit<CurrentLogRoiValua
         { platform: 'polymarket', url: input.polymarketUrl },
       ], capital);
       await seedAllBooks(resolved.kalshiTickers, resolved.pmTokenIds, resolved.pmTokenSides);
-      const results = computeAllLiveArbitrages(resolved.matchedOutcomes, capital, resolved.category);
-      const eligible = results.filter((result) => matchesCapturedCandidate(result, input.candidates));
+      const eligible = computeCapturedLiveArbitrages(
+        resolved.matchedOutcomes,
+        capital,
+        resolved.category,
+        input.candidates,
+      );
       if (eligible.length === 0) return { status: 'unavailable_book' as const };
 
       const executable = eligible
@@ -105,7 +98,8 @@ async function valuePair(input: ValuationInput): Promise<Omit<CurrentLogRoiValua
       const best = executable[0];
       if (!best) {
         if (eligible.some((result) => result.stale)) {
-          const requiredIds = eligible.flatMap((result) => [result.kalshiTicker, result.pmYesTokenId, result.pmNoTokenId])
+          const requiredIds = eligible.flatMap((result) => result.requiredBookIds
+            ?? [result.kalshiTicker, result.pmYesTokenId, result.pmNoTokenId])
             .filter((id): id is string => typeof id === 'string');
           return { status: requiredIds.some((id) => !orderbookState.hasBook(id)) ? 'unavailable_book' as const : 'stale_quote' as const };
         }

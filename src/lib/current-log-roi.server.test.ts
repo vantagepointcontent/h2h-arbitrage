@@ -4,13 +4,17 @@ const mocks = vi.hoisted(() => ({
   resolvePairFromLinks: vi.fn(),
   seedAllBooks: vi.fn(),
   computeAllLiveArbitrages: vi.fn(),
+  computeCapturedLiveArbitrages: vi.fn(),
   getScanValuationInputs: vi.fn(),
   hasBook: vi.fn(),
 }));
 
 vi.mock('./pair-resolver', () => ({ resolvePairFromLinks: mocks.resolvePairFromLinks, PairResolveError: class PairResolveError extends Error {} }));
 vi.mock('./book-seed', () => ({ seedAllBooks: mocks.seedAllBooks }));
-vi.mock('./live-arb-engine', () => ({ computeAllLiveArbitrages: mocks.computeAllLiveArbitrages }));
+vi.mock('./live-arb-engine', () => ({
+  computeAllLiveArbitrages: mocks.computeAllLiveArbitrages,
+  computeCapturedLiveArbitrages: mocks.computeCapturedLiveArbitrages,
+}));
 vi.mock('./persistence', () => ({ getScanValuationInputs: mocks.getScanValuationInputs }));
 vi.mock('./orderbook-state', () => ({ orderbookState: { hasBook: mocks.hasBook } }));
 
@@ -27,6 +31,11 @@ describe('getCurrentLogRoiBatch', () => {
     mocks.resolvePairFromLinks.mockResolvedValue({ matchedOutcomes: [{}], kalshiTickers: ['A'], pmTokenIds: ['Y', 'N'], pmTokenSides: new Map(), category: 'sports' });
     mocks.seedAllBooks.mockResolvedValue(undefined);
     mocks.hasBook.mockReturnValue(true);
+    mocks.computeCapturedLiveArbitrages.mockImplementation((_outcomes, _capital, _category, candidates) => (
+      mocks.computeAllLiveArbitrages().filter((result: { strategy: string }) => candidates.some((candidate: { strategy: string }) => (
+        candidate.strategy.replace(/Polymarket/g, 'PM') === result.strategy.replace(/Polymarket/g, 'PM')
+      )))
+    ));
   });
 
   it('returns the highest fee-aware executable result and deduplicates repeated scans', async () => {
@@ -74,7 +83,7 @@ describe('getCurrentLogRoiBatch', () => {
     expect(values).toMatchObject([{ id: 7, roiPct: 1 }, { id: 8, roiPct: 2 }]);
     expect(mocks.resolvePairFromLinks).toHaveBeenCalledTimes(2);
     expect(mocks.resolvePairFromLinks).toHaveBeenNthCalledWith(1, expect.any(Array), 100);
-    expect(mocks.computeAllLiveArbitrages).toHaveBeenNthCalledWith(1, expect.any(Array), 100, 'sports');
+    expect(mocks.computeCapturedLiveArbitrages).toHaveBeenNthCalledWith(1, expect.any(Array), 100, 'sports', expect.any(Array));
   });
 
   it('selects a fresh eligible result despite unrelated stale or missing books', async () => {
@@ -112,6 +121,35 @@ describe('getCurrentLogRoiBatch', () => {
     ]);
 
     await expect(getCurrentLogRoiBatch([7])).resolves.toMatchObject([{ id: 7, status: 'available', roiPct: 3 }]);
+  });
+
+  it('uses exact captured-strategy evaluation instead of filtering the current winner', async () => {
+    mocks.getScanValuationInputs.mockResolvedValue([{
+      id: 7,
+      kalshiUrl: 'https://kalshi.com/markets/a/a/A',
+      polymarketUrl: 'https://polymarket.com/event/a',
+      scanCapital: 100,
+      candidates: [{ kalshiTicker: 'A', pmConditionId: 'C', arbType: 'direct', strategy: 'Buy YES PM + NO Kalshi' }],
+    }]);
+    mocks.computeAllLiveArbitrages.mockReturnValue([
+      { strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: 12.0825, kalshiStake: 40, pmStake: 45, stale: false },
+    ]);
+    mocks.computeCapturedLiveArbitrages.mockReturnValue([
+      { strategy: 'Buy YES PM + NO Kalshi', arbType: 'direct', kalshiTicker: 'A', pmConditionId: 'C', roiPct: -17.9175, kalshiStake: 60, pmStake: 55, stale: false },
+    ]);
+
+    await expect(getCurrentLogRoiBatch([7])).resolves.toMatchObject([{
+      id: 7,
+      status: 'available',
+      strategy: 'Buy YES PM + NO Kalshi',
+      roiPct: -17.9175,
+    }]);
+    expect(mocks.computeCapturedLiveArbitrages).toHaveBeenCalledWith(
+      expect.any(Array),
+      100,
+      'sports',
+      expect.arrayContaining([expect.objectContaining({ strategy: 'Buy YES PM + NO Kalshi' })]),
+    );
   });
 
   it('limits concurrent unique pair resolutions', async () => {
