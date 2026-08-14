@@ -57,7 +57,8 @@ const server = http.createServer((request, response) => {
     };
     if (id === '0') return void finish(503, { error: 'injected repeated platform failure' });
     if (abandonedWorkerMode && id === '23') return void setTimeout(() => finish(200, { fullScanPersisted: true }), 7_000);
-    if (crossProcessMergeMode && (id === '20' || id === '21')) return void setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 500);
+    if (crossProcessMergeMode && id === '20') return void setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 500);
+    if (crossProcessMergeMode && id === '21') return void setTimeout(() => finish(503, { error: 'injected overlapping platform failure' }), 500);
     if (id === '1' && count === 1) return void setTimeout(() => finish(200, { fullScanPersisted: true }), 5_500);
     setTimeout(() => finish(200, { fullScanPersisted: true, outcomes: [] }), 20);
   });
@@ -203,15 +204,19 @@ try {
   await rm(env.H2H_SAVED_MARKET_LEASE_DIRECTORY, { recursive: true, force: true });
   await writeFile(files.saved, JSON.stringify(mergeMarkets));
   await writeFile(files.scheduler, JSON.stringify(mergeScheduler));
+  await writeFile(files.breaker, '{}');
   const mergeOwnerA = startPoller({ ...env, H2H_POLL_CONCURRENCY: '1' });
   await waitFor(() => active.has('20') || active.has('21'));
   const mergeOwnerB = startPoller({ ...env, H2H_POLL_CONCURRENCY: '1' });
   await Promise.all([mergeOwnerA.completed, mergeOwnerB.completed]);
   const afterMergeScheduler = JSON.parse(await readFile(files.scheduler, 'utf8'));
+  const afterMergeBreaker = JSON.parse(await readFile(files.breaker, 'utf8'));
   assert(afterMergeScheduler['market-20'].lastSuccessAt, 'first overlapping completion must survive');
-  assert(afterMergeScheduler['market-21'].lastSuccessAt, 'second overlapping completion must survive');
+  assert.match(afterMergeScheduler['market-21'].failureReason, /HTTP 503/, 'overlapping failure must survive');
   assert.equal(afterMergeScheduler['market-20'].inProgress, false);
   assert.equal(afterMergeScheduler['market-21'].inProgress, false);
+  assert(afterMergeBreaker['market-20'], 'first overlapping breaker update must survive');
+  assert(afterMergeBreaker['market-21'], 'second overlapping breaker update must survive');
   crossProcessMergeMode = false;
 
   // Kill a production poller with a request in flight. A successor launched
@@ -274,7 +279,8 @@ try {
       duplicateConcurrentScans,
       maxObservedConcurrency: maxConcurrency,
       abandonedOwnerKilled: true,
-      crossProcessSchedulerUpdatesMerged: Boolean(afterMergeScheduler['market-20'].lastSuccessAt && afterMergeScheduler['market-21'].lastSuccessAt),
+      crossProcessSchedulerUpdatesMerged: Boolean(afterMergeScheduler['market-20'].lastSuccessAt && afterMergeScheduler['market-21'].failureReason),
+      crossProcessBreakerUpdatesMerged: Boolean(afterMergeBreaker['market-20'] && afterMergeBreaker['market-21']),
       liveLeaseFencedSuccessor: Boolean(fencedSuccessor.stdout),
       expiredLeaseFencedAtServer: Boolean(expiredLeasePeer.stdout && duplicateAttemptFencedAtServer),
       abandonedLeaseReclaimed: Boolean(reclaimedRun.stdout && afterReclaimScheduler['market-23'].lastSuccessAt),

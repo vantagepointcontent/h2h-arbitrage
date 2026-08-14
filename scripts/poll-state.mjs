@@ -20,12 +20,15 @@ async function readState(stateFile) {
 async function acquireLock(lockPath) {
   const deadline = Date.now() + LOCK_WAIT_MS;
   while (Date.now() < deadline) {
+    const stagingPath = `${lockPath}.staging.${process.pid}.${randomUUID()}`;
     try {
-      await mkdir(lockPath);
-      await writeFile(path.join(lockPath, 'owner.json'), JSON.stringify({ pid: process.pid }));
+      await mkdir(stagingPath);
+      await writeFile(path.join(stagingPath, 'owner.json'), JSON.stringify({ pid: process.pid }));
+      await rename(stagingPath, lockPath);
       return;
     } catch (error) {
-      if (error?.code !== 'EEXIST') throw error;
+      await rm(stagingPath, { recursive: true, force: true });
+      if (error?.code !== 'EEXIST' && error?.code !== 'ENOTEMPTY') throw error;
       try {
         const owner = JSON.parse(await readFile(path.join(lockPath, 'owner.json'), 'utf8'));
         let ownerAlive = false;
@@ -44,7 +47,16 @@ async function acquireLock(lockPath) {
           continue;
         }
       } catch (lockError) {
-        if (lockError?.code === 'ENOENT') continue;
+        if (lockError?.code === 'ENOENT') {
+          const abandoned = `${lockPath}.ownerless.${process.pid}.${randomUUID()}`;
+          try {
+            await rename(lockPath, abandoned);
+            await rm(abandoned, { recursive: true, force: true });
+          } catch (reclaimError) {
+            if (reclaimError?.code !== 'ENOENT') throw reclaimError;
+          }
+          continue;
+        }
         if (lockError instanceof SyntaxError) {
           await sleep(10);
         } else {

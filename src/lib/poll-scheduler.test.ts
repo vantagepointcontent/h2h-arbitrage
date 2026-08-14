@@ -12,6 +12,8 @@ import {
 import { acquireMarketLease } from '../../scripts/poll-lease.mjs';
 import { updateSchedulerState } from '../../scripts/poll-state.mjs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -26,6 +28,28 @@ const market = (id: string, scannedAt: string | null = null): Market => ({
 });
 
 describe('saved-market fair scheduler', () => {
+  it('reclaims an ownerless lock left by a process death during acquisition', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-orphan-test-'));
+    const stateFile = path.join(directory, 'scheduler.json');
+    try {
+      const interruptedOwner = spawn(process.execPath, [
+        '-e',
+        'require("node:fs").mkdirSync(process.argv[1])',
+        `${stateFile}.lock`,
+      ]);
+      const [exitCode] = await once(interruptedOwner, 'exit');
+      expect(exitCode).toBe(0);
+
+      await updateSchedulerState(stateFile, state => {
+        state.recovered = true;
+      });
+
+      expect(JSON.parse(await readFile(stateFile, 'utf8'))).toEqual({ recovered: true });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 1_000);
+
   it('merges concurrent per-market scheduler updates without losing completed state', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'poll-state-test-'));
     const stateFile = path.join(directory, 'scheduler.json');

@@ -23,6 +23,7 @@ describe('BUG-140 production poller lifecycle evidence', () => {
       overlappingProcessLifetimes: true,
       abandonedOwnerKilled: true,
       crossProcessSchedulerUpdatesMerged: true,
+      crossProcessBreakerUpdatesMerged: true,
       liveLeaseFencedSuccessor: true,
       expiredLeaseFencedAtServer: true,
       abandonedLeaseReclaimed: true,

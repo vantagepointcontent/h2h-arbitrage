@@ -147,6 +147,7 @@ const BREAKER_BASE_COOLDOWN_MS = 5 * 60_000;
 const BREAKER_MAX_COOLDOWN_MS = 60 * 60_000;
 
 const scanStats = new Map(); // marketId -> { avgMs, consecFails, trips, cooldownUntil }
+const dirtyBreakerIds = new Set();
 let schedulerState = {};
 let schedulerWriteQueue = Promise.resolve();
 const pollerOwnerId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -194,12 +195,18 @@ function loadBreakerState() {
 
 async function saveBreakerState() {
   try {
-    // Only persist entries that carry signal (stats or open breakers)
-    const obj = {};
-    for (const [id, s] of scanStats) {
-      if (s.avgMs || s.consecFails > 0 || (s.cooldownUntil && s.cooldownUntil > Date.now())) obj[id] = s;
-    }
-    await writeJsonAtomic(BREAKER_FILE, obj);
+    const updates = new Map([...dirtyBreakerIds].map(id => [id, scanStats.get(id)]));
+    if (updates.size === 0) return;
+    await updateSchedulerState(BREAKER_FILE, persisted => {
+      for (const [id, state] of updates) {
+        if (state && (state.avgMs || state.consecFails > 0 || (state.cooldownUntil && state.cooldownUntil > Date.now()))) {
+          persisted[id] = JSON.parse(JSON.stringify(state));
+        } else {
+          delete persisted[id];
+        }
+      }
+    });
+    for (const id of updates.keys()) dirtyBreakerIds.delete(id);
   } catch (err) {
     console.warn(`[${new Date().toISOString()}] Failed saving breaker state:`, err.message);
   }
@@ -219,6 +226,7 @@ function adaptiveTimeoutMs(marketId) {
 
 function recordScanOutcome(marketId, ok, durationMs) {
   const s = getStats(marketId);
+  dirtyBreakerIds.add(marketId);
   if (ok) {
     // EWMA (α=0.3): adapts to shifts without overreacting to one slow scan
     s.avgMs = s.avgMs ? Math.round(0.7 * s.avgMs + 0.3 * durationMs) : durationMs;
@@ -588,6 +596,7 @@ async function pollOnce() {
   for (const market of markets) {
     if (manualSuccessIds.has(market.id)) {
       resetBreakerAfterExternalSuccess(scanStats.get(market.id));
+      dirtyBreakerIds.add(market.id);
     }
     const cooldownUntil = scanStats.get(market.id)?.cooldownUntil;
     if (cooldownUntil > Date.now() && cooldownUntil > Date.parse(schedulerState[market.id].nextDueAt)) {

@@ -10,7 +10,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 305170
+      "oldestSuccessAgeMs": 305135
     },
     {
       "eligibleCount": 25,
@@ -18,7 +18,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 310770
+      "oldestSuccessAgeMs": 310678
     }
   ],
   "outcomes": [
@@ -41,6 +41,7 @@
     "maxObservedConcurrency": 4,
     "abandonedOwnerKilled": true,
     "crossProcessSchedulerUpdatesMerged": true,
+    "crossProcessBreakerUpdatesMerged": true,
     "liveLeaseFencedSuccessor": true,
     "expiredLeaseFencedAtServer": true,
     "abandonedLeaseReclaimed": true
