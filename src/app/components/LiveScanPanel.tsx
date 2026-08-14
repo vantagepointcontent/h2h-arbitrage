@@ -5,6 +5,7 @@ import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, Zap } f
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
 import type { ExecutableBookQuote } from "@/lib/executable-book";
+import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
 
 /** Augment a LiveArbOutcome with scanTime + depthVerified for buildExecutableArb. */
 function withScanContext(o: LiveArbOutcome) {
@@ -61,6 +62,7 @@ interface LiveArbOutcome {
   lastUpdate: string;
   /** HOOKUP-04: leg identifiers for manual execution. */
   kalshiTicker?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
   pmConditionId?: string;

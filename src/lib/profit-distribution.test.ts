@@ -44,6 +44,19 @@ describe('calculateProfitDistribution', () => {
     expect(right.pmStake).toBe(center.pmStake);
   });
 
+  it('uses the resolved Kalshi authority when redistributing profit', () => {
+    const result = calculateProfitDistribution({
+      ...input,
+      splitPct: 50,
+      kalshiFeeAuthority: {
+        marketTicker: 'K', eventTicker: 'E', seriesTicker: 'S', feeType: 'quadratic',
+        feeMultiplierPpm: 0, source: 'event-override', observedAt: '2026-08-08T10:00:00.000Z', version: 'fee-free',
+      },
+    });
+    expect(result.kalshiFee).toBe(0);
+    expect(result.pmFee).toBeGreaterThan(0);
+  });
+
   it('keeps the same one-share hedge at the opposite slider extreme', () => {
     const center = calculateProfitDistribution({ ...input, splitPct: 50 });
     const left = calculateProfitDistribution({ ...input, splitPct: 0 });

@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
                 polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? 0,
                 totalFees: a.fees.totalFees ?? ((a.fees.kalshiFee ?? 0) + (a.fees.polymarketFee ?? a.fees.pmFee ?? 0)),
                 worstCaseNetProfit: a.fees.worstCaseNetProfit ?? a.expectedProfit ?? 0,
+                kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
               } : undefined,
             })),
           } : null,
@@ -143,6 +144,7 @@ export async function GET(request: NextRequest) {
                     polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? 0,
                     totalFees: a.fees.totalFees ?? ((a.fees.kalshiFee ?? 0) + (a.fees.polymarketFee ?? a.fees.pmFee ?? 0)),
                     worstCaseNetProfit: a.fees.worstCaseNetProfit ?? a.expectedProfit ?? 0,
+                    kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
                   } : undefined,
                 }))
               : [],

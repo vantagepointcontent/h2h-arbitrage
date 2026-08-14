@@ -16,9 +16,26 @@ describe('trade export', () => {
     expect(executionRows({ ...base, dryRun: true })).toEqual([]);
     const rows = executionRows({ ...base, dryRun: false });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual(['2026-08-08T10:00:01.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
-    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.at(-1)).toBe('apy');
-    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.at(-1)).toBe('Legacy/Unknown');
+    expect(rows[0]).toEqual(['2026-08-08T10:00:01.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual', '', '', '', '', '']);
+    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.[11]).toBe('apy');
+    expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.[11]).toBe('Legacy/Unknown');
+  });
+
+  it('exports authoritative Kalshi calculated and charged fee provenance', () => {
+    const execution = {
+      timestamp: '2026-08-08T10:00:00.000Z', arbId: 'arb-fee', marketTitle: 'Fee market',
+      dryRun: false, success: true, estimatedProfit: 1,
+      kalshiOrder: { ticker: 'K-1', outcome: 'yes', size: 1, price: 0.4 },
+      result: {
+        kalshiResult: { status: 'filled', filledSize: 1, filledPrice: 0.4, fees: 0.01,
+          orderId: 'k-1', timestamp: '2026-08-08T10:00:01.000Z', evidenceSource: 'venue' },
+        kalshiFeeQuote: { source: 'kalshi-series:KX', observedAt: '2026-08-08T10:00:00.000Z',
+          version: 'quadratic:1000000:v1', calculatedFeeCents: 2, chargedFeeCents: 1 },
+      },
+    };
+    expect(executionRows(execution as never)[0]?.slice(-5)).toEqual([
+      'kalshi-series:KX', '2026-08-08T10:00:00.000Z', 'quadratic:1000000:v1', 2, 1,
+    ]);
   });
 
   it('does not export requested order values as fills for an unverified live acknowledgement', () => {

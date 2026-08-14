@@ -15,6 +15,7 @@ import { seedAllBooks } from '@/lib/book-seed';
 import { applyKalshiWsMessage, applyPmWsUpdates } from '@/lib/ws-book-apply';
 import { parseLiveScanCapital } from '@/lib/live-scan-request';
 import logger from '@/lib/logger';
+import { resolveKalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,11 +202,30 @@ export async function GET(req: NextRequest) {
       // Also sends SSE comment lines (: heartbeat) to keep proxies alive.
       const staleMs = parseBookStaleMs(process.env.H2H_BOOK_STALE_MS);
       let reseedInFlight = false;
+      let feeRefreshInFlight = false;
+      let lastFeeRefresh = Date.now();
       const heartbeat = setInterval(() => {
         if (session.closed) return;
         // SSE comment line — keeps connection alive through proxies
         controller.enqueue(encoder.encode(`: heartbeat\n\n`));
         maybeSendResults();
+
+        if (!feeRefreshInFlight && Date.now() - lastFeeRefresh >= 30_000) {
+          feeRefreshInFlight = true;
+          Promise.all(session.matchedOutcomes.map((outcome) =>
+            resolveKalshiFeeAuthority(outcome.kalshiTicker),
+          )).then((authorities) => {
+            authorities.forEach((authority, index) => {
+              session.matchedOutcomes[index].kalshiFeeAuthority = authority;
+            });
+            lastFeeRefresh = Date.now();
+            feeRefreshInFlight = false;
+            maybeSendResults();
+          }).catch((err) => {
+            feeRefreshInFlight = false;
+            logger.error('[live-scan] fee authority refresh failed', { err, kalshiUrl });
+          });
+        }
 
         // BUG-104: auto-recovery. If every outcome is stale, re-seed books from
         // REST. This recovers when WS updates stop but the REST path is still live.

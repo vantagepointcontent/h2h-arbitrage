@@ -12,6 +12,7 @@ import type { MarketLink } from './platforms/types';
 import logger from './logger';
 import { fetchClobBook } from './polymarket-clob';
 import { finiteDecimal } from './market-price';
+import { resolveKalshiFeeAuthority } from './kalshi-fee-quote';
 
 interface PmToken {
   outcome: string;
@@ -138,6 +139,12 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
   if (matched.length === 0) {
     throw new PairResolveError('no_matches', 'No matching outcomes found between Kalshi and Polymarket');
   }
+  const feeAuthorities = new Map(await Promise.all(
+    [...new Set(matched.map((outcome) => outcome.kalshi!.ticker))].map(async (ticker) => [
+      ticker,
+      await resolveKalshiFeeAuthority(ticker),
+    ] as const),
+  ));
 
   // ── Resolve Polymarket token IDs for ALL matched markets ──
   const conditionIds = [...new Set(matched.map((o) => o.polymarket!.conditionId))];
@@ -202,6 +209,7 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
       pmNoMinOrderSize: constraints?.noMinOrderSize ?? null,
       pmYesTickSize: constraints?.yesTickSize ?? null,
       pmNoTickSize: constraints?.noTickSize ?? null,
+      kalshiFeeAuthority: feeAuthorities.get(o.kalshi!.ticker)!,
     });
     allKalshiTickers.add(o.kalshi!.ticker);
     allPmTokenIds.add(tokens.yes);

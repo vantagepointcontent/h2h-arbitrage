@@ -91,6 +91,23 @@ describe('buildExecutableArb', () => {
     expect(buildExecutableArb({ ...baseArb, kalshiYesAskShares: 0 }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', executionBlocker: expect.stringContaining('Kalshi YES') });
     expect(buildExecutableArb({ ...baseArb, pmNoAskShares: undefined }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', executionBlocker: expect.stringContaining('Polymarket NO top-of-book') });
     expect(buildExecutableArb({ ...baseArb, pmNoMinOrderSize: 5 }, 'Example market')).toMatchObject({ executionStatus: 'non_executable', shares: 1, executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share' });
+  });
+
+  it('reprices manual execution with the scanner fee authority', () => {
+    const standard = buildExecutableArb(baseArb, 'Example market');
+    const halfRate = buildExecutableArb({
+      ...baseArb,
+      kalshiFeeAuthority: {
+        marketTicker: 'KXEXAMPLE', eventTicker: 'KX-E', seriesTicker: 'KX',
+        feeType: 'quadratic', feeMultiplierPpm: 500_000,
+        source: 'kalshi-series:KX', observedAt: '2026-08-08T10:00:00.000Z', version: 'v2',
+      },
+    }, 'Example market');
+    expect(halfRate?.expectedProfit).toBeGreaterThan(standard!.expectedProfit);
+    expect(halfRate?.kalshiOrder.contracts).toBe(standard?.shares);
+  });
+
+  it('refuses stale, invalid-price, or missing executable quote data', () => {
     expect(buildExecutableArb({ ...baseArb, stale: true }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesAsk: 0 }, 'Example market')).toBeNull();
     expect(buildExecutableArb({ ...baseArb, kalshiYesExecutableQuote: undefined }, 'Example market')).toBeNull();

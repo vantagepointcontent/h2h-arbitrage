@@ -17,12 +17,13 @@ import { calculateShareRatio } from '@/lib/share-ratio';
 import { ProfitDistributionPanel } from './ProfitDistributionPanel';
 import { resolveDistributionStakes, type ProfitDistribution } from '@/lib/profit-distribution';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
+import type { KalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
 interface Outcome {
   artist: string;
   kalshiStale?: boolean;
   polymarketStale?: boolean;
-  kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
+  kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string; feeAuthority?: KalshiFeeAuthority } | null;
   polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number; yesMinOrderSize?: number | null; noMinOrderSize?: number | null; yesTickSize?: number | null; noTickSize?: number | null } | null;
   arbitrage: {
     expectedProfit: number;
@@ -46,6 +47,7 @@ interface Outcome {
       netProfitIfKalshiWins: number;
       netProfitIfPmWins: number;
       worstCaseNetProfit: number;
+      kalshiFeeAuthority?: KalshiFeeAuthority;
     };
   };
 }
@@ -173,6 +175,7 @@ function OutcomeTableBodyInner({
         pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
         pmConditionId: o.polymarket.conditionId,
+        kalshiFeeAuthority: o.arbitrage.fees?.kalshiFeeAuthority ?? o.kalshi.feeAuthority,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
         scanTime: scanTimeProp,

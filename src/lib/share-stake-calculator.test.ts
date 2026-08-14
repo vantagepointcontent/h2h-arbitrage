@@ -37,6 +37,18 @@ describe('calculateShareStake', () => {
     expect(calculateShareStake({ ...base, shares: 20 })).toBeNull();
   });
 
+  it('uses the resolved Kalshi authority for interactive sizing', () => {
+    const result = calculateShareStake({
+      ...base,
+      kalshiFeeAuthority: {
+        marketTicker: 'K', eventTicker: 'E', seriesTicker: 'S', feeType: 'quadratic',
+        feeMultiplierPpm: 0, source: 'event-override', observedAt: '2026-08-08T10:00:00.000Z', version: 'fee-free',
+      },
+    });
+    expect(result?.kalshiFee).toBe(0);
+    expect(result?.pmFee).toBeGreaterThan(0);
+  });
+
   it('does not treat dollar liquidity or absent data as executable ask depth', () => {
     expect(parseAskLevelDepth('$100K')).toBeNull();
     expect(parseAskLevelDepth('')).toBeNull();

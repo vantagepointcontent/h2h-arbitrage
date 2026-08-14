@@ -9,6 +9,7 @@ import { formatPrice } from "@/app/lib/page-shared";
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from "@/lib/matcher";
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from "@/lib/executable-book";
 import { isPriceAlignedToTick } from "@/lib/venue-constraints";
+import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -24,6 +25,7 @@ interface ArbLeg {
   price: number;
   orderType: "limit";
   executableQuote: ExecutableBookQuote;
+  kalshiFeeQuote?: import("@/lib/kalshi-fee-quote").KalshiFeeQuote;
 }
 
 export interface ExecutableArb {
@@ -81,6 +83,7 @@ export function buildExecutableArb(o: {
   pmYesTokenId?: string;
   pmNoTokenId?: string;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   /** ISO timestamp when the opportunity was last scanned/detected. */
   scanTime?: string;
   /** True only when every leg has a verified positive ask depth. */
@@ -155,7 +158,7 @@ export function buildExecutableArb(o: {
   const kalshiCost = kalshiVwap;
   const pmCost = pmVwap;
   const totalCost = kalshiCost + pmCost;
-  const fees = calcKalshiFee(shares, kalshiVwap)
+  const fees = calcKalshiFee(shares, kalshiVwap, o.kalshiFeeAuthority)
     + calcPolymarketFee(shares, pmVwap, getPolymarketTheta(o.category));
   const expectedProfit = shares - totalCost - fees;
   const roiPct = totalCost > 0 ? (expectedProfit / totalCost) * 100 : 0;

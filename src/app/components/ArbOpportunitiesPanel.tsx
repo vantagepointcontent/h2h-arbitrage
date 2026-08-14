@@ -14,6 +14,7 @@ import { ArbDecayCurve } from "./ArbDecayCurve";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
 import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
+import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
 import {
   ARB_ALERTS_STORAGE_KEY,
   type ArbAlert,
@@ -25,7 +26,7 @@ import {
 
 interface Outcome {
   artist: string;
-  kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string } | null;
+  kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string; feeAuthority?: KalshiFeeAuthority } | null;
   polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number; yesMinOrderSize?: number | null; noMinOrderSize?: number | null; yesTickSize?: number | null; noTickSize?: number | null } | null;
   arbitrage: {
     strategy: string;
@@ -47,6 +48,7 @@ interface Outcome {
       kalshiFeeDetails: string;
       pmFeeDetails: string;
       worstCaseNetProfit: number;
+      kalshiFeeAuthority?: KalshiFeeAuthority;
     };
   };
 }
@@ -211,6 +213,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
         pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
         pmConditionId: o.polymarket.conditionId,
+        kalshiFeeAuthority: o.arbitrage.fees?.kalshiFeeAuthority ?? o.kalshi.feeAuthority,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
       }, marketTitle);
@@ -462,6 +465,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                   kalshiAskDepth={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.kalshi?.yesAskDepth : o.kalshi?.noAskDepth}
                   pmAskDepth={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? o.polymarket?.noAskDepth : o.polymarket?.askDepth}
                   category={category}
+                  kalshiFeeAuthority={o.arbitrage.fees?.kalshiFeeAuthority ?? o.kalshi?.feeAuthority}
                   formatCurrency={formatCurrency}
                 />
               )}
@@ -473,6 +477,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                   kalshiStake={distributionStakes!.kalshiStake}
                   pmStake={distributionStakes!.pmStake}
                   category={category}
+                  kalshiFeeAuthority={o.arbitrage.fees?.kalshiFeeAuthority ?? o.kalshi?.feeAuthority}
                   kalshiWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO'}
                   pmWinLabel={o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' ? 'Polymarket NO' : 'Polymarket YES'}
                   formatCurrency={formatCurrency}

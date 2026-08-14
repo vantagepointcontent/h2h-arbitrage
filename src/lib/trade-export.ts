@@ -3,6 +3,7 @@ import type { ClosedPosition, ExecutionRecord } from './persistence';
 export const TRADE_EXPORT_HEADERS = [
   'Timestamp', 'Platform', 'Event Name', 'Market Name', 'Side', 'Shares',
   'Price', 'Fees', 'Realized P&L', 'Arb ID', 'Status', 'Method',
+  'Fee Source', 'Fee Observed At', 'Fee Version', 'Fee Calculated Cents', 'Fee Charged Cents',
 ] as const;
 
 export type TradeExportRow = readonly (string | number)[];
@@ -24,6 +25,9 @@ export function escapeTradeCsv(value: unknown): string {
 export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
   if (execution.dryRun || !execution.success) return [];
   const result = (execution.result ?? {}) as ExportValueRecord;
+  const kalshiQuote = result.kalshiFeeQuote && typeof result.kalshiFeeQuote === 'object'
+    ? result.kalshiFeeQuote as ExportValueRecord
+    : null;
   return ([
     ['Kalshi', execution.kalshiOrder, result.kalshiResult],
     ['Polymarket', execution.polymarketOrder, result.polymarketResult],
@@ -50,6 +54,13 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
       filledSize, filledPrice,
       fee, '', execution.arbId, status,
       execution.source === 'bot' ? (execution.selectionMethod ?? 'Legacy/Unknown') : 'Manual',
+      platform === 'Kalshi' ? String(kalshiQuote?.source ?? '') : '',
+      platform === 'Kalshi' ? String(kalshiQuote?.observedAt ?? '') : '',
+      platform === 'Kalshi' ? String(kalshiQuote?.version ?? '') : '',
+      platform === 'Kalshi' && Number.isSafeInteger(kalshiQuote?.calculatedFeeCents)
+        ? Number(kalshiQuote?.calculatedFeeCents) : '',
+      platform === 'Kalshi' && Number.isSafeInteger(kalshiQuote?.chargedFeeCents)
+        ? Number(kalshiQuote?.chargedFeeCents) : '',
     ] satisfies TradeExportRow];
   });
 }
@@ -66,7 +77,7 @@ export function closedPositionRow(position: ClosedPosition): TradeExportRow {
     finite(position.feesPaid),
     finite(position.realizedPnl),
     position.pairId ?? '',
-    'closed', 'Manual',
+    'closed', 'Manual', '', '', '', '', '',
   ];
 }
 

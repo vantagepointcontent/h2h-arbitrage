@@ -15,40 +15,10 @@ import { PlatformIcon } from '@/lib/platforms/PlatformIcon';
 import { DataTable, EmptyState, Metric } from '@/components/ui';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-// ── Fee helpers (client-safe, mirrors matcher.ts server-side math) ──
-
-/** Kalshi fee: round up to nearest cent. Default taker rate 0.07. */
-function calcKalshiExitFee(contracts: number, price: number, rate = 0.07): number {
-  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
-  const raw = rate * contracts * price * (1 - price);
-  return Math.ceil(raw * 100) / 100;
-}
-
-/** Polymarket fee: theta * contracts * price * (1 - price). Rounded to 5 decimals. */
-function calcPmExitFee(contracts: number, price: number, theta = 0.05): number {
-  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
-  const raw = theta * contracts * price * (1 - price);
-  return Math.round(raw * 100000) / 100000;
-}
-
-/** Compute exit fees for a pair. SELL orders pay fees on both legs. */
+/** Compute exit fees from the authoritative server quotes returned with each leg. */
 function computeExitFees(pair: PairedPosition): { kalshiFee: number; pmFee: number; totalFees: number } {
-  let kalshiFee = 0;
-  let pmFee = 0;
-
-  if (pair.kalshi) {
-    const contracts = Math.floor(pair.kalshi.size);
-    const price = pair.kalshi.currentPrice;
-    kalshiFee = calcKalshiExitFee(contracts, price);
-  }
-
-  if (pair.polymarket) {
-    const contracts = Math.floor(pair.polymarket.size);
-    const price = pair.polymarket.currentPrice;
-    // Default theta 0.05 — same as matcher.ts default for 'other' category
-    pmFee = calcPmExitFee(contracts, price, 0.05);
-  }
-
+  const kalshiFee = pair.kalshi?.exitFees ?? 0;
+  const pmFee = pair.polymarket?.exitFees ?? 0;
   return { kalshiFee, pmFee, totalFees: kalshiFee + pmFee };
 }
 
@@ -213,10 +183,13 @@ export default function OpenPositionsPanel() {
   }, []);
 
   useEffect(() => {
-    load();
+    const initialLoad = setTimeout(() => void load(), 0);
     // Poll every 30s
     pollRef.current = setInterval(load, 30_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      clearTimeout(initialLoad);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [load]);
 
   const sorted = [...positions].sort((a, b) => {
@@ -247,7 +220,7 @@ export default function OpenPositionsPanel() {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline opacity-30" />;
     return sortDir === 'asc'
       ? <ArrowUp className="w-3 h-3 inline" />
@@ -437,21 +410,21 @@ export default function OpenPositionsPanel() {
             <thead>
               <tr className="text-[10px] uppercase text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
                 <th title="Market event name; click to sort" className="text-left px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('market')}>
-                  Market <SortIcon field="market" />
+                  Market {renderSortIcon('market')}
                 </th>
                 <th title="Whether both arb legs are paired and hedged" className="text-left px-4 py-3 font-medium">Pair state</th>
                 <th title="Kalshi or Polymarket execution venue" className="text-left px-4 py-3 font-medium">Platform</th>
                 <th title="YES or NO contract side" className="text-left px-4 py-3 font-medium">Side</th>
                 <th title="Number of shares or contracts; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('size')}>
-                  Size <SortIcon field="size" />
+                  Size {renderSortIcon('size')}
                 </th>
                 <th title="Average price paid when opening the position" className="text-right px-4 py-3 font-medium">Entry</th>
                 <th title="Latest available market price" className="text-right px-4 py-3 font-medium">Current</th>
                 <th title="Current dollar value; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>
-                  Value <SortIcon field="value" />
+                  Value {renderSortIcon('value')}
                 </th>
                 <th title="Unrealized profit or loss after estimated exit fees; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
-                  Net P&amp;L <SortIcon field="roi" />
+                  Net P&amp;L {renderSortIcon('roi')}
                 </th>
                 <th title="Time remaining until the market resolves" className="text-right px-4 py-3 font-medium">Expiry</th>
                 <th title="Age of the latest price used for valuation" className="text-right px-4 py-3 font-medium">Quote age</th>
@@ -664,13 +637,13 @@ export default function OpenPositionsPanel() {
               </div>
               {fees.kalshiFee > 0 && (
                 <div className="flex justify-between pl-3 text-[10px] text-[var(--text-faint)]">
-                  <span>Kalshi fee (7%)</span>
+                  <span>Kalshi fee (authoritative quote)</span>
                   <span>{fmtUsd(fees.kalshiFee)}</span>
                 </div>
               )}
               {fees.pmFee > 0 && (
                 <div className="flex justify-between pl-3 text-[10px] text-[var(--text-faint)]">
-                  <span>Polymarket fee (θ=0.05)</span>
+                  <span>Polymarket fee (authoritative quote)</span>
                   <span>{fmtUsd(fees.pmFee)}</span>
                 </div>
               )}

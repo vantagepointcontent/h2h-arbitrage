@@ -42,6 +42,8 @@ export interface KalshiPosition {
   currentValue: number;
   /** ROI percentage */
   roiPct: number;
+  /** Cumulative market fees reported by Kalshi; not attributable to this open lot. */
+  reportedFeesPaidCents: number | null;
 }
 
 interface KalshiPositionRaw {
@@ -118,6 +120,12 @@ export async function getKalshiPositions(): Promise<KalshiPosition[]> {
       const position = parseFloat(pos.position_fp ?? '0');
       const totalCost = parseFloat(pos.total_traded_dollars ?? '0');
       const realizedPnl = parseFloat(pos.realized_pnl_dollars ?? '0');
+      const reportedFeesPaidCents = pos.fees_paid_dollars == null
+        ? null
+        : Math.round(parseFloat(pos.fees_paid_dollars) * 100);
+      if (reportedFeesPaidCents != null && (!Number.isSafeInteger(reportedFeesPaidCents) || reportedFeesPaidCents < 0)) {
+        throw new Error(`Malformed Kalshi charged fee for ${ticker}`);
+      }
 
       const yesBid = market ? parseFloat(market.yes_bid_dollars ?? '0') : 0;
       const yesAsk = market ? parseFloat(market.yes_ask_dollars ?? '0') : 0;
@@ -148,6 +156,7 @@ export async function getKalshiPositions(): Promise<KalshiPosition[]> {
         unrealizedPnl,
         currentValue,
         roiPct,
+        reportedFeesPaidCents,
       });
     } catch (err) {
       logger.warn('[kalshi-positions] enrichment failed', { ticker: pos.ticker, err });

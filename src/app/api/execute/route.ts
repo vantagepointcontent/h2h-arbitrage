@@ -23,6 +23,7 @@ import {
   validateOneShareBookOrder,
   type ClobMarket,
 } from '@/lib/polymarket-clob';
+import { calculateKalshiFeeQuote, resolveKalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
 function resolveBinaryOutcomeTokens(
   market: ClobMarket | null,
@@ -134,8 +135,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { status: 403 },
         );
       }
+      const kalshiTicker = request.kalshiOrder.ticker ?? request.kalshiOrder.marketId;
+      const contracts = request.kalshiOrder.contracts ?? request.kalshiOrder.size / request.kalshiOrder.price;
+      const feeAuthority = await resolveKalshiFeeAuthority(kalshiTicker);
+      const kalshiFeeQuote = calculateKalshiFeeQuote(feeAuthority, 'taker', [{
+        fills: [{ priceCents: request.kalshiOrder.price * 100, contracts }],
+      }]);
       let effective: ExecutionRequest = {
         ...request,
+        kalshiOrder: { ...request.kalshiOrder, contracts, kalshiFeeQuote },
         dryRun: executionModeToDryRun(mode),
       };
 
@@ -204,6 +212,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
 
       const result = await executeArb(effective);
+      if (result.kalshiResult.filledContracts != null && result.kalshiResult.filledPrice != null) {
+        const evidence = result.kalshiResult.venueEvidence;
+        const actualFills = evidence?.fills?.length
+          ? evidence.fills.map((fill) => ({
+            priceCents: fill.price * 100,
+            contracts: fill.quantity,
+            liquidityRole: fill.liquidityRole,
+          }))
+          : [{
+            priceCents: result.kalshiResult.filledPrice * 100,
+            contracts: result.kalshiResult.filledContracts,
+            liquidityRole: evidence?.liquidityRole,
+          }];
+        const defaultLiquidity = evidence?.liquidityRole ?? 'taker';
+        result.kalshiFeeQuote = calculateKalshiFeeQuote(feeAuthority, defaultLiquidity, [{
+          fills: actualFills,
+          chargedFeeCents: evidence?.chargedFeeCents ?? result.kalshiResult.chargedFeeCents,
+        }]);
+      } else {
+        result.kalshiFeeQuote = kalshiFeeQuote;
+      }
       // TRADES-001: durable copy — in-memory auditLog dies on restart
       await persistExecution({
         timestamp: new Date().toISOString(),

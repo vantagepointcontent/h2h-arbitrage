@@ -10,7 +10,7 @@
  */
 import { makeKalshiAuthHeaders } from './kalshi-auth';
 import logger from './logger';
-import type { VenueExecutionEvidence } from './execution-evidence';
+import type { VenueExecutionEvidence, VenueExecutionFill } from './execution-evidence';
 
 // Trading (portfolio) endpoints live on the elections host — the
 // external-api host used for market data does not accept authed
@@ -74,6 +74,14 @@ function parseExactCents(value: unknown): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+function parseFixedPointDollars(value: unknown): number | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const text = String(value).trim();
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return null;
+  const dollars = Number(text);
+  return Number.isFinite(dollars) ? dollars : null;
+}
+
 function isVenueTimestamp(value: unknown): value is string {
   return typeof value === 'string'
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
@@ -87,7 +95,7 @@ export function parseKalshiFillEvidence(
   if (!response || typeof response !== 'object') return null;
   const fills = (response as Record<string, unknown>).fills;
   if (!Array.isArray(fills) || fills.length === 0) return null;
-  const parsed = [];
+  const parsed: VenueExecutionFill[] = [];
   const ids = new Set<string>();
   for (const raw of fills) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -103,17 +111,26 @@ export function parseKalshiFillEvidence(
     if (fill.outcome_side !== submitted.outcomeSide) return null;
     const quantity = parseKalshiCount(fill.count_fp);
     if (quantity == null || !Number.isSafeInteger(quantity) || quantity <= 0) return null;
-    const priceCents = parseExactCents(submitted.outcomeSide === 'yes' ? fill.yes_price_dollars : fill.no_price_dollars);
+    const price = parseFixedPointDollars(submitted.outcomeSide === 'yes' ? fill.yes_price_dollars : fill.no_price_dollars);
     const chargedFeeCents = parseExactCents(fill.fee_cost);
-    if (priceCents == null || priceCents <= 0 || priceCents >= 100 || chargedFeeCents == null
-      || !isVenueTimestamp(fill.created_time)) return null;
+    if (price == null || price <= 0 || price >= 1 || chargedFeeCents == null
+      || typeof fill.is_taker !== 'boolean' || !isVenueTimestamp(fill.created_time)) return null;
     ids.add(fillId);
-    parsed.push({ executionId: fillId, quantity, price: priceCents / 100, chargedFeeCents, venueTimestamp: fill.created_time });
+    parsed.push({
+      executionId: fillId, quantity, price, chargedFeeCents,
+      venueTimestamp: fill.created_time,
+      liquidityRole: fill.is_taker ? 'taker' as const : 'maker' as const,
+    });
   }
   const filledQuantity = parsed.reduce((total, fill) => total + fill.quantity, 0);
   const chargedFeeCents = parsed.reduce((total, fill) => total + fill.chargedFeeCents, 0);
-  const fillPrice = parsed.reduce((total, fill) => total + fill.quantity * fill.price, 0) / filledQuantity;
+  const fillPrice = parsed.length === 1
+    ? parsed[0].price
+    : parsed.reduce((total, fill) => total + fill.quantity * fill.price, 0) / filledQuantity;
   const venueTimestamp = parsed.map((fill) => fill.venueTimestamp).sort().at(-1)!;
+  const commonLiquidityRole = parsed.every((fill) => fill.liquidityRole === parsed[0].liquidityRole)
+    ? parsed[0].liquidityRole
+    : undefined;
 
   return {
     venue: 'kalshi',
@@ -123,6 +140,7 @@ export function parseKalshiFillEvidence(
     executionId: fills.length === 1 ? parsed[0].executionId : submitted.orderId,
     venueTimestamp,
     orderId: submitted.orderId,
+    ...(commonLiquidityRole ? { liquidityRole: commonLiquidityRole } : {}),
     ...(fills.length > 1 ? { fills: parsed } : {}),
     raw: fills.length === 1 ? fills[0] : fills,
   };

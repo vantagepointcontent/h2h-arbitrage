@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { calculateProfitDistribution, type ProfitDistribution } from "@/lib/profit-distribution";
+import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
 
 interface Props {
   strategy: 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi';
@@ -11,6 +12,7 @@ interface Props {
   kalshiStake: number;
   pmStake: number;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   kalshiWinLabel: string;
   pmWinLabel: string;
   formatCurrency: (value: number) => string;
@@ -21,14 +23,14 @@ interface Props {
  * Read-only settlement view for the canonical one-share hedge.
  */
 export function ProfitDistributionPanel({
-  strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, kalshiWinLabel, pmWinLabel, formatCurrency, onChange,
+  strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, kalshiFeeAuthority, kalshiWinLabel, pmWinLabel, formatCurrency, onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
   const splitPct = 50;
   void onChange;
   const distribution = useMemo(() => calculateProfitDistribution({
-    strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, splitPct,
-  }), [strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, splitPct]);
+    strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, kalshiFeeAuthority, splitPct,
+  }), [strategy, kalshiPrice, pmPrice, kalshiStake, pmStake, category, kalshiFeeAuthority, splitPct]);
 
 
   return (

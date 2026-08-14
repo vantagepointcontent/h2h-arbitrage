@@ -1,4 +1,5 @@
 import { computeArbitrageFees } from './matcher';
+import type { KalshiFeeAuthority } from './kalshi-fee-quote';
 
 export type ShareStakeStrategy = 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi';
 
@@ -12,6 +13,7 @@ export interface ShareStakeInput {
   kalshiAvailableShares: number | null;
   pmAvailableShares: number | null;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
 }
 
 export interface ShareStakeCalculation {
@@ -57,6 +59,7 @@ export function calculateShareStake(input: ShareStakeInput): ShareStakeCalculati
     input.pmYesAsk,
     input.pmNoAsk,
     input.category,
+    input.kalshiFeeAuthority,
   );
   const netProfit = fees.worstCaseNetProfit;
 

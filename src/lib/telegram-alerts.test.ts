@@ -224,6 +224,25 @@ describe('telegram-alerts', () => {
       expect(msg).toContain('Net: $49.30');
     });
 
+    it('discloses authoritative Kalshi fee metadata', () => {
+      const msg = formatArbMessage({
+        ...baseArb,
+        fees: {
+          kalshiFee: 0.02,
+          pmFee: 0,
+          worstCaseNetProfit: 1,
+          kalshiFeeAuthority: {
+            marketTicker: 'KX-1', eventTicker: 'KX-E', seriesTicker: 'KX',
+            feeType: 'quadratic', feeMultiplierPpm: 500_000,
+            source: 'kalshi-series:KX', observedAt: '2026-08-08T10:00:00.000Z',
+            version: 'quadratic:500000:v2',
+          },
+        },
+      });
+      expect(msg).toContain('quadratic × 0.500000');
+      expect(msg).toContain('quadratic:500000:v2');
+    });
+
     it('omits net profit line when no fees', () => {
       const msg = formatArbMessage(baseArb);
       expect(msg).not.toContain('Net:');

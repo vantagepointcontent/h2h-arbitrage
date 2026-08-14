@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { AlertTriangle, Calculator } from 'lucide-react';
 import { calculateShareStake, parseAskLevelDepth, type ShareStakeStrategy } from '@/lib/share-stake-calculator';
+import type { KalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
 interface Props {
   strategy: ShareStakeStrategy;
@@ -13,11 +14,12 @@ interface Props {
   kalshiAskDepth?: string | number;
   pmAskDepth?: number;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   formatCurrency: (value: number) => string;
 }
 
 export function ShareStakeCalculator({
-  strategy, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category, formatCurrency,
+  strategy, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category, kalshiFeeAuthority, formatCurrency,
 }: Props) {
   const shares = 1;
   const kalshiLabel = strategy === 'Buy YES Kalshi + NO PM' ? 'Kalshi YES' : 'Kalshi NO';
@@ -32,7 +34,8 @@ export function ShareStakeCalculator({
     kalshiAvailableShares: parseAskLevelDepth(kalshiAskDepth),
     pmAvailableShares: parseAskLevelDepth(pmAskDepth),
     category,
-  }), [strategy, shares, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category]);
+    kalshiFeeAuthority,
+  }), [strategy, shares, kalshiYesAsk, kalshiNoAsk, pmYesAsk, pmNoAsk, kalshiAskDepth, pmAskDepth, category, kalshiFeeAuthority]);
 
   if (!calculation) return null;
 

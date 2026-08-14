@@ -3,6 +3,7 @@
 
 import { rateLimiters } from '@/lib/rate-limiter';
 import { createTtlMemo } from '@/lib/ttl-cache';
+import type { KalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
 export interface KalshiMarket {
   ticker: string;
@@ -31,6 +32,7 @@ export interface KalshiMarket {
   latest_expiration_time?: string;
   can_close_early?: boolean;
   early_close_condition?: string;
+  feeAuthority?: KalshiFeeAuthority;
 }
 
 export function extractKalshiEventTicker(url: string): string | null {

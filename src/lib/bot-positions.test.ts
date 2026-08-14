@@ -67,6 +67,8 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     pmEntryFeeObservedAt: '2026-08-01T00:00:00.000Z',
     pmEntryFeeVersion: 'clob-v1',
     kalshiEntryFeeCents: 18,
+    kalshiEntryCalculatedFeeCents: 18,
+    kalshiEntryChargedFeeCents: null,
     pmEntryFeeCents: 10,
     kalshiExitFeeType: 'quadratic',
     kalshiExitFeeMultiplierPpm: 1_000_000,
@@ -613,6 +615,8 @@ describe('calculateBotPositionEntryCost', () => {
       pmFeeRateBps: 400,
     });
     expect(result.kalshiEntryFeeCents).toBe(7);
+    expect(result.kalshiEntryCalculatedFeeCents).toBe(1);
+    expect(result.kalshiEntryChargedFeeCents).toBe(7);
     expect(result.pmEntryFeeCents).toBe(3);
     expect(result.totalCostCents).toBe(206);
   });
@@ -666,6 +670,18 @@ describe('calculateBotPositionEntryCost', () => {
     expect(result.pmEntryFeeCents).toBe(0);
     expect(result.totalCostCents).toBe(960);
   });
+
+  it('uses the authoritative flat fee type instead of defaulting to quadratic', () => {
+    const result = calculateBotPositionEntryCost({
+      buyPriceKalshiCents: 50, buyPricePmCents: 40,
+      sharesKalshi: 100, sharesPm: 100,
+      pmTheta: 0, kalshiFeeMultiplierPpm: 1_000_000,
+      kalshiFeeType: 'flat', pmFeeRateBps: 0,
+    });
+    expect(result.kalshiEntryCalculatedFeeCents).toBe(200);
+    expect(result.kalshiEntryChargedFeeCents).toBeNull();
+    expect(result.kalshiEntryFeeCents).toBe(200);
+  });
 });
 
 describe('fetchAuthoritativeBotFeeConfig', () => {
@@ -694,6 +710,12 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
 
     expect(result).toEqual({
       kalshi: {
+        authority: {
+          marketTicker: 'KXTEST-YES', eventTicker: 'KXTEST-EVENT', seriesTicker: 'KXTEST',
+          feeType: 'quadratic', feeMultiplierPpm: 500_000,
+          source: 'https://external-api.kalshi.com/trade-api/v2/series/KXTEST',
+          observedAt: '2026-08-08T12:00:00.000Z', version: 'quadratic:500000:series-v2',
+        },
         feeType: 'quadratic',
         feeMultiplierPpm: 500_000,
         source: 'https://external-api.kalshi.com/trade-api/v2/series/KXTEST',
@@ -743,7 +765,7 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
       },
       fetchPmMarket: async () => ({ tokens: [{ token_id: 'no-token', outcome: 'No' }] }),
     });
-    expect(result.kalshi).toMatchObject({ feeType: 'quadratic', feeMultiplierPpm: 1_000_000 });
+    expect(result.kalshi).toMatchObject({ feeType: 'quadratic_with_maker_fees', feeMultiplierPpm: 1_000_000 });
     expect(result.kalshi.version).toContain('quadratic_with_maker_fees');
   });
 });

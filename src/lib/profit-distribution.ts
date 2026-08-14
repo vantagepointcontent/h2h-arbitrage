@@ -1,4 +1,5 @@
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import type { KalshiFeeAuthority } from './kalshi-fee-quote';
 
 export interface ProfitDistributionInput {
   strategy: 'Buy YES Kalshi + NO PM' | 'Buy YES PM + NO Kalshi';
@@ -12,6 +13,7 @@ export interface ProfitDistributionInput {
   /** 0 = all cost on PM, 50 = balanced matched position, 100 = all cost on Kalshi. */
   splitPct: number;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
 }
 
 export interface ProfitDistribution {
@@ -105,7 +107,7 @@ export function calculateProfitDistribution(input: ProfitDistributionInput): Pro
   const kalshiStake = kalshiOrderCost;
   const pmStake = pmOrderCost;
   const totalStake = kalshiStake + pmStake;
-  const kalshiFee = calcKalshiFee(kalshiContracts, kalshiPrice);
+  const kalshiFee = calcKalshiFee(kalshiContracts, kalshiPrice, input.kalshiFeeAuthority);
   const pmFee = calcPolymarketFee(pmContracts, pmPrice, getPolymarketTheta(input.category));
   const totalFees = kalshiFee + pmFee;
 

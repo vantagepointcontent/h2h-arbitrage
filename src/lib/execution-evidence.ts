@@ -23,6 +23,8 @@ export interface VenueExecutionFill {
   price: number;
   chargedFeeCents: number;
   venueTimestamp: string;
+  /** Liquidity role reported for this individual fill when supplied by the venue. */
+  liquidityRole?: 'maker' | 'taker';
 }
 
 // ── Live Execution Evidence (authoritative) ─────────────────────────
@@ -51,6 +53,9 @@ export interface VenueExecutionEvidence {
 
   /** Every correlated venue fill when the order executed in multiple trades. */
   fills?: VenueExecutionFill[];
+
+  /** Common liquidity role when all correlated fills share one. */
+  liquidityRole?: 'maker' | 'taker';
 }
 
 /** A complete authoritative live execution requires evidence from BOTH legs. */

@@ -39,9 +39,10 @@ describe('parseKalshiFillEvidence', () => {
     market_ticker: 'KXTEST-26',
     outcome_side: 'yes',
     count_fp: '10.00',
-    yes_price_dollars: '0.43',
+    yes_price_dollars: '0.4301',
     no_price_dollars: '0.57',
     fee_cost: '0.07',
+    is_taker: true,
     created_time: '2026-08-12T13:30:45.123Z',
   };
 
@@ -49,8 +50,9 @@ describe('parseKalshiFillEvidence', () => {
     expect(parseKalshiFillEvidence({ fills: [completeFill], cursor: '' }, submittedOrder)).toEqual({
       venue: 'kalshi',
       filledQuantity: 10,
-      fillPrice: 0.43,
+      fillPrice: 0.4301,
       chargedFeeCents: 7,
+      liquidityRole: 'taker',
       executionId: 'fill-456',
       venueTimestamp: '2026-08-12T13:30:45.123Z',
       orderId: 'order-123',
@@ -84,7 +86,7 @@ describe('parseKalshiFillEvidence', () => {
     ['missing fill ID', { fills: [{ ...completeFill, fill_id: undefined, trade_id: undefined }], cursor: '' }],
     ['missing quantity', { fills: [{ ...completeFill, count_fp: undefined }], cursor: '' }],
     ['malformed price', { fills: [{ ...completeFill, yes_price_dollars: 'not-a-price' }], cursor: '' }],
-    ['sub-cent price', { fills: [{ ...completeFill, yes_price_dollars: '0.431' }], cursor: '' }],
+    ['out-of-range price', { fills: [{ ...completeFill, yes_price_dollars: '1.001' }], cursor: '' }],
     ['missing charged fee', { fills: [{ ...completeFill, fee_cost: undefined }], cursor: '' }],
     ['sub-cent charged fee', { fills: [{ ...completeFill, fee_cost: '0.001' }], cursor: '' }],
     ['local/zoneless timestamp', { fills: [{ ...completeFill, created_time: '2026-08-12T13:30:45' }], cursor: '' }],
@@ -124,14 +126,15 @@ describe('parseKalshiFillEvidence', () => {
     expect(parseKalshiFillEvidence({ fills: [completeFill, secondFill], cursor: '' }, submittedOrder)).toEqual({
       venue: 'kalshi',
       filledQuantity: 12,
-      fillPrice: 5.18 / 12,
+      fillPrice: (10 * 0.4301 + 2 * 0.44) / 12,
       chargedFeeCents: 9,
       executionId: 'order-123',
       venueTimestamp: '2026-08-12T13:31:45.123Z',
       orderId: 'order-123',
+      liquidityRole: 'taker',
       fills: [
-        { executionId: 'fill-456', quantity: 10, price: 0.43, chargedFeeCents: 7, venueTimestamp: '2026-08-12T13:30:45.123Z' },
-        { executionId: 'fill-789', quantity: 2, price: 0.44, chargedFeeCents: 2, venueTimestamp: '2026-08-12T13:31:45.123Z' },
+        { executionId: 'fill-456', quantity: 10, price: 0.4301, chargedFeeCents: 7, venueTimestamp: '2026-08-12T13:30:45.123Z', liquidityRole: 'taker' },
+        { executionId: 'fill-789', quantity: 2, price: 0.44, chargedFeeCents: 2, venueTimestamp: '2026-08-12T13:31:45.123Z', liquidityRole: 'taker' },
       ],
       raw: [completeFill, secondFill],
     });

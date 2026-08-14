@@ -11,6 +11,7 @@ import {
 } from './settlement-apy';
 import { calculateScanApy, type ScanApyUnavailableReason } from './scan-apy';
 import { isPriceAlignedToTick } from './venue-constraints';
+import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quote';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -28,6 +29,7 @@ export interface UnifiedOutcome {
     noAskDepth?: string;
     eventId?: string;
     settlementTiming?: SettlementTiming;
+    feeAuthority?: KalshiFeeAuthority;
   } | null;
   polymarket: {
     marketId: string;
@@ -114,6 +116,7 @@ export interface UnifiedOutcome {
       netProfitIfKalshiWins: number;
       netProfitIfPmWins: number;
       worstCaseNetProfit: number;
+      kalshiFeeAuthority?: KalshiFeeAuthority;
     };
   };
   source: 'auto' | 'manual';
@@ -214,12 +217,9 @@ export function getPolymarketTheta(category?: string): number {
   return 0.05;
 }
 
-/** Kalshi fee: round up to nearest cent. Default taker rate 0.07. */
-export function calcKalshiFee(contracts: number, price: number, rate = 0.07): number {
-  if (contracts <= 0 || price <= 0 || price >= 1) return 0;
-  const raw = rate * contracts * price * (1 - price);
-  // Ignore binary floating-point dust only; genuine fractions of a cent still round up.
-  return Math.ceil(raw * 100 - 1e-9) / 100;
+/** Compatibility facade; formula, multiplier, and rounding are centralized. */
+export function calcKalshiFee(contracts: number, price: number, authority?: KalshiFeeAuthority): number {
+  return calculateKalshiFeeUsd(contracts, price, authority);
 }
 
 /** Polymarket fee: theta * contracts * price * (1 - price). Rounded to 5 decimals. */
@@ -252,6 +252,7 @@ export function computeArbitrageFees(
   pmBuyPrice: number,
   pmSellPrice: number,
   category?: string,
+  kalshiFeeAuthority?: KalshiFeeAuthority,
 ): {
   grossProfit: number;
   kalshiFee: number;
@@ -262,6 +263,7 @@ export function computeArbitrageFees(
   worstCaseNetProfit: number;
   kalshiFeeDetails: string;
   pmFeeDetails: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
 } {
   const grossProfit = capital - kalshiStake - pmStake;
 
@@ -269,20 +271,21 @@ export function computeArbitrageFees(
   let kalshiFeeDetails = 'Kalshi: no fee (0 contracts or settled)';
   let pmFeeAmount = 0;
   let pmFeeDetails = 'Polymarket: no fee (0 contracts or settled)';
+  const isCrossOutcome = /^Buy YES both sides: Kalshi .+ \+ (?:PM|Polymarket) .+/.test(strategy);
 
-  if (strategy.includes('YES Kalshi')) {
+  if (strategy.includes('YES Kalshi') || isCrossOutcome) {
     // This strategy places exactly one Kalshi order: buy YES.
     const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
-    kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice);
+    kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice, kalshiFeeAuthority);
     kalshiFeeDetails = `Kalshi YES buy ${kalshiYesContracts.toFixed(0)} @ $${fmtProbPrice(kalshiBuyPrice)} = ${formatFee(kalshiFeeAmount)}`;
   } else if (strategy.includes('NO Kalshi')) {
     // This strategy places exactly one Kalshi order: buy NO.
     const kalshiNoContracts = kalshiStake / kalshiSellPrice;
-    kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice);
+    kalshiFeeAmount = calcKalshiFee(kalshiNoContracts, kalshiSellPrice, kalshiFeeAuthority);
     kalshiFeeDetails = `Kalshi NO buy ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   }
 
-  if (strategy.includes('YES PM')) {
+  if (strategy.includes('YES PM') || isCrossOutcome) {
     const pmYesContracts = pmStake / pmBuyPrice;
     const pmTheta = getPolymarketTheta(category);
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
@@ -322,6 +325,7 @@ export function computeArbitrageFees(
     worstCaseNetProfit,
     kalshiFeeDetails,
     pmFeeDetails,
+    kalshiFeeAuthority,
   };
 }
 
@@ -571,7 +575,7 @@ export function calculateArbitrageMax(
     const quoteCapital = authoritativeContracts > 1 ? authoritativeContracts : 100;
     const fees = computeArbitrageFees(
       quoteStrategy, quoteCapital, quoteCapital * kalshiPrice, quoteCapital * pmPrice,
-      kYes, kNo, pYes, pNo, category,
+      kYes, kNo, pYes, pNo, category, kalshi.feeAuthority,
     );
     const roiPct = (fees.worstCaseNetProfit / quoteCapital) * 100;
     if (roiPct > 0 && (!bestUnexecutableQuote || roiPct > bestUnexecutableQuote.roiPct)) {
@@ -633,6 +637,7 @@ export function calculateArbitrageMax(
         pYes,
         pNo,
         category,
+        kalshi.feeAuthority,
       );
       // UI-03: Track best candidate regardless of sign (not just > 0)
       if (fees.worstCaseNetProfit > maxProfit) {
@@ -653,6 +658,7 @@ export function calculateArbitrageMax(
           netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
+          kalshiFeeAuthority: fees.kalshiFeeAuthority,
         };
         hasCandidate = true;
       }
@@ -693,6 +699,7 @@ export function calculateArbitrageMax(
         pYes,
         pNo,
         category,
+        kalshi.feeAuthority,
       );
       // UI-03: Track best candidate regardless of sign (not just > 0)
       if (fees.worstCaseNetProfit > maxProfit) {
@@ -713,6 +720,7 @@ export function calculateArbitrageMax(
           netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
+          kalshiFeeAuthority: fees.kalshiFeeAuthority,
         };
         hasCandidate = true;
       }
@@ -875,8 +883,8 @@ export function calculateBestArbitrageForOutcome(
     if (contracts > 0) {
       const yesStake = contracts * kYes;
       const noStake = contracts * kNo;
-      const yesFee = calcKalshiFee(contracts, kYes);
-      const noFee = calcKalshiFee(contracts, kNo);
+      const yesFee = calcKalshiFee(contracts, kYes, current.kalshi.feeAuthority);
+      const noFee = calcKalshiFee(contracts, kNo, current.kalshi.feeAuthority);
       const totalFee = yesFee + noFee;
       const netProfit = contracts - yesStake - noStake - totalFee;
       const totalStake = yesStake + noStake;
@@ -894,6 +902,7 @@ export function calculateBestArbitrageForOutcome(
             pmFeeDetails: 'Polymarket: not involved',
             netProfitIfKalshiWins: netProfit, netProfitIfPmWins: netProfit,
             worstCaseNetProfit: netProfit,
+            kalshiFeeAuthority: current.kalshi.feeAuthority,
           },
         };
       }
@@ -977,6 +986,7 @@ export function calculateBestArbitrageForOutcome(
           pYesB,
           complement.polymarket.noPrice,
           category,
+          current.kalshi.feeAuthority,
         );
         if (fees.worstCaseNetProfit > best.expectedProfit) {
           best = {
@@ -1000,6 +1010,7 @@ export function calculateBestArbitrageForOutcome(
               netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
               netProfitIfPmWins: fees.netProfitIfPmWins,
               worstCaseNetProfit: fees.worstCaseNetProfit,
+              kalshiFeeAuthority: current.kalshi.feeAuthority,
             },
             depthVerified: true,
             requestedContracts: 1,
@@ -1386,6 +1397,8 @@ export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcom
     noBidDepth: km.no_bid_size_fp,
     noAskDepth: km.no_ask_size_fp,
     settlementTiming: kalshiSettlementTiming(km),
+    eventId: km.event_ticker,
+    feeAuthority: km.feeAuthority,
   };
 }
 

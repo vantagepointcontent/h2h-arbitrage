@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   persistExecution: vi.fn(),
   logExecution: vi.fn(),
   loggerError: vi.fn(),
+  resolveKalshiFeeAuthority: vi.fn(),
 }));
 
 vi.mock('@/lib/auto-execute', () => ({
@@ -26,6 +27,10 @@ vi.mock('@/lib/settings', () => ({
   setSettings: vi.fn(),
 }));
 vi.mock('@/lib/persistence', () => ({ persistExecution: mocks.persistExecution }));
+vi.mock('@/lib/kalshi-fee-quote', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/kalshi-fee-quote')>()),
+  resolveKalshiFeeAuthority: mocks.resolveKalshiFeeAuthority,
+}));
 vi.mock('@/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: mocks.loggerError },
   errorFingerprint: vi.fn(() => 'test-error'),
@@ -97,6 +102,16 @@ beforeEach(() => {
   mocks.getExecutionMode.mockResolvedValue('live');
   mocks.getCredentialStatus.mockResolvedValue({ allReady: true });
   mocks.persistExecution.mockResolvedValue(undefined);
+  mocks.resolveKalshiFeeAuthority.mockResolvedValue({
+    marketTicker: 'KXTEST',
+    eventTicker: 'KXTEST-EVENT',
+    seriesTicker: 'KXTEST',
+    feeType: 'quadratic',
+    feeMultiplierPpm: 1_000_000,
+    source: 'kalshi-series:KXTEST',
+    observedAt: new Date().toISOString(),
+    version: 'quadratic:1000000',
+  });
   mocks.executeArb.mockResolvedValue({
     success: true,
     kalshiResult: { platform: 'kalshi', status: 'filled', timestamp: new Date().toISOString() },

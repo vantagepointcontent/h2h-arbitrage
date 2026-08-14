@@ -26,6 +26,7 @@
 
 import { auditArbClassification, classifyArbType, type ArbType } from './arb-types';
 import type { ScanApyUnavailableReason } from './scan-apy';
+import type { KalshiFeeAuthority } from './kalshi-fee-quote';
 export type { ArbType } from './arb-types';
 
 /**
@@ -61,6 +62,7 @@ export interface ArbAlertInput {
     kalshiFee: number;
     pmFee: number;
     worstCaseNetProfit: number;
+    kalshiFeeAuthority?: KalshiFeeAuthority;
   };
   /** Optional platform prices for enhanced messages */
   kalshiYesPrice?: number;
@@ -247,6 +249,10 @@ export function formatArbMessage(arb: ArbAlertInput): string {
   const feeStr = arb.fees
     ? `Net: $${arb.fees.worstCaseNetProfit.toFixed(2)}`
     : '';
+  const kalshiFeeAuthority = arb.fees?.kalshiFeeAuthority;
+  const feeAuthorityLine = kalshiFeeAuthority
+    ? `🧾 Kalshi fee: ${kalshiFeeAuthority.feeType} × ${(kalshiFeeAuthority.feeMultiplierPpm / 1_000_000).toFixed(6)} (${escapeHtml(kalshiFeeAuthority.version)})`
+    : '';
   const deepLink = buildDeepLink(arb.marketId);
   const audit = auditArbClassification(arb.strategy, arb.arbType);
   const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
@@ -262,6 +268,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     `💵 Stake: $${stakeStr}`,
     buildPricesLine(arb),
+    feeAuthorityLine,
     buildPersistenceLine(arb.persistenceScore),
     '',
     buildFooter(deepLink),

@@ -514,7 +514,14 @@ describe('maybeExecuteBotTrade safety', () => {
     vi.doMock('./bot-positions', async (importOriginal) => ({
       ...(await importOriginal()),
       fetchAuthoritativeBotFeeConfig: vi.fn().mockResolvedValue({
-        kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000' },
+        kalshi: {
+          authority: {
+            marketTicker: 'KXTEST-YES', eventTicker: 'KXTEST-EVENT', seriesTicker: 'KXTEST',
+            feeType: 'quadratic', feeMultiplierPpm: 1_000_000,
+            source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000',
+          },
+          feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000',
+        },
         polymarket: { tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
         pmTheta: 0.04,
       }),

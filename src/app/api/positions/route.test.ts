@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   placePmSellOrder: vi.fn(),
   persistExecution: vi.fn(),
   persistClosedPosition: vi.fn(),
+  resolveKalshiFeeAuthority: vi.fn(),
 }));
 
 vi.mock('@/lib/settings', () => ({ getExecutionMode: mocks.getExecutionMode }));
@@ -21,6 +22,10 @@ vi.mock('@/lib/polymarket-orders', () => ({ placePmSellOrder: mocks.placePmSellO
 vi.mock('@/lib/persistence', () => ({
   persistExecution: mocks.persistExecution,
   persistClosedPosition: mocks.persistClosedPosition,
+}));
+vi.mock('@/lib/kalshi-fee-quote', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/kalshi-fee-quote')>()),
+  resolveKalshiFeeAuthority: mocks.resolveKalshiFeeAuthority,
 }));
 
 import { POST } from './route';
@@ -48,6 +53,7 @@ const kalshiPosition = {
   unrealizedPnl: 0.44,
   currentValue: 2.44,
   roiPct: 22,
+  reportedFeesPaidCents: 3,
 };
 
 const pmPosition = {
@@ -76,6 +82,11 @@ beforeEach(() => {
   mocks.getExecutionMode.mockResolvedValue('live');
   mocks.getKalshiPositions.mockResolvedValue([kalshiPosition]);
   mocks.getPolymarketPositions.mockResolvedValue([pmPosition]);
+  mocks.resolveKalshiFeeAuthority.mockResolvedValue({
+    marketTicker: 'KXTEST-YES', eventTicker: 'KXTEST', seriesTicker: 'KX',
+    feeType: 'quadratic', feeMultiplierPpm: 1_000_000,
+    source: 'kalshi-series:KX', observedAt: '2026-08-14T11:00:00.000Z', version: 'v1',
+  });
   mocks.placeKalshiSellOrder.mockResolvedValue({ status: 'submitted', orderId: 'k-1', filledCount: 4 });
   mocks.placePmSellOrder.mockResolvedValue({ status: 'submitted', orderId: 'p-1' });
   mocks.persistExecution.mockResolvedValue(undefined);

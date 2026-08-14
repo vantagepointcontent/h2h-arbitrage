@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
 import { getExecutionMode } from '@/lib/settings';
 import logger from '@/lib/logger';
-import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
+import { calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
 import { derivePositionRisk } from '@/lib/position-risk';
+import { calculateKalshiFeeQuote, resolveKalshiFeeAuthority, type KalshiFeeQuote } from '@/lib/kalshi-fee-quote';
 
 /**
  * Open Positions API.
@@ -42,6 +43,8 @@ interface KalshiPositionDto {
   netUnrealizedPnl: number; // unrealizedPnl - exitFees
   netRoiPct: number;      // net ROI %
   exitFees: number;       // estimated fees to sell at current price (USD)
+  entryFeeQuote: KalshiFeeQuote;
+  exitFeeQuote: KalshiFeeQuote;
   // Arb pair linkage
   pairId: string | null;  // shared with the opposite leg if part of an arb pair
 }
@@ -376,14 +379,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
   const { getKalshiPositions } = await import('@/lib/kalshi-positions');
   const positions = await getKalshiPositions();
-  return positions.map(p => {
+  return Promise.all(positions.map(async (p) => {
     const size = Math.abs(p.position);
     const entryPrice = p.totalCost / Math.max(size, 1);
     const currentPrice = p.position > 0 ? p.currentYesBid : p.currentNoBid;
-    // Entry fees: contracts * entryPrice * (1-entryPrice) * rate
-    const feesPaid = calcKalshiFee(size, entryPrice);
-    // Exit fees: selling at currentPrice
-    const exitFees = calcKalshiFee(size, currentPrice);
+    const authority = await resolveKalshiFeeAuthority(p.ticker);
+    const entryFeeQuote = calculateKalshiFeeQuote(authority, 'taker', [{
+      fills: [{ contracts: size, priceCents: entryPrice * 100 }],
+    }]);
+    const exitFeeQuote = calculateKalshiFeeQuote(authority, 'taker', [{
+      fills: [{ contracts: size, priceCents: currentPrice * 100 }],
+    }]);
+    const feesPaid = entryFeeQuote.effectiveFeeCents / 100;
+    const exitFees = exitFeeQuote.effectiveFeeCents / 100;
     const netUnrealizedPnl = p.unrealizedPnl - exitFees;
     const netRoiPct = p.totalCost > 0 ? (netUnrealizedPnl / p.totalCost) * 100 : 0;
     return {
@@ -406,9 +414,12 @@ async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
       netUnrealizedPnl,
       netRoiPct,
       exitFees,
+      entryFeeQuote,
+      exitFeeQuote,
+      reportedFeesPaidCents: p.reportedFeesPaidCents,
       pairId: null,  // populated by pairPositions()
     };
-  });
+  }));
 }
 
 async function fetchPmPositions(): Promise<PmPositionDto[]> {

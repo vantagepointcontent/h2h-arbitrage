@@ -3,9 +3,11 @@
 
 import { orderbookState } from './orderbook-state';
 import { calculateArbitrageMax, computeArbitrageFees, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
+import type { UnifiedOutcome } from './matcher';
 import { finiteDecimal } from './market-price';
 import type { ExecutableBookQuote } from './executable-book';
 import { isPriceAlignedToTick } from './venue-constraints';
+import { assertFreshKalshiFeeAuthority, type KalshiFeeAuthority } from './kalshi-fee-quote';
 
 export interface LiveArbResult {
   artist: string;
@@ -52,6 +54,7 @@ export interface LiveArbResult {
     kalshiFee: number;
     pmFee: number;
     worstCaseNetProfit: number;
+    kalshiFeeAuthority?: KalshiFeeAuthority;
   } | null;
   /** True when any underlying orderbook is missing or older than the staleness threshold. */
   stale: boolean;
@@ -63,6 +66,7 @@ export interface LiveArbResult {
   /** Stable parent market identity used by execution and revalidation. */
   pmConditionId?: string;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   /** ARB-01a: classification of the arb strategy.
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
@@ -99,6 +103,7 @@ export interface LiveMatchedOutcome {
   /** Explicit event-resolution review; pair count alone is never sufficient. */
   crossOutcomeMutuallyExclusiveVerified?: boolean;
   crossOutcomeExhaustiveVerified?: boolean;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
 }
 
 export interface CapturedLiveArbIdentity {
@@ -121,7 +126,7 @@ function computeSingleOutcome(
 ): LiveArbResult {
   const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified,
     pmYesMinOrderSize, pmNoMinOrderSize, pmYesTickSize, pmNoTickSize,
-    crossOutcomeMutuallyExclusiveVerified, crossOutcomeExhaustiveVerified } = outcome;
+    crossOutcomeMutuallyExclusiveVerified, crossOutcomeExhaustiveVerified, kalshiFeeAuthority } = outcome;
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
@@ -137,7 +142,15 @@ function computeSingleOutcome(
   const kalshiBookStale = orderbookState.isDepthStale(kalshiTicker, STALE_MS);
   const pmYesBookStale = orderbookState.isDepthStale(pmYesTokenId, STALE_MS);
   const pmNoBookStale = orderbookState.isDepthStale(pmNoTokenId, STALE_MS);
-  const stale = kalshiBookStale || pmYesBookStale || pmNoBookStale;
+  let feeAuthorityStale = false;
+  if (kalshiFeeAuthority) {
+    try {
+      assertFreshKalshiFeeAuthority(kalshiFeeAuthority, new Date().toISOString());
+    } catch {
+      feeAuthorityStale = true;
+    }
+  }
+  const stale = kalshiBookStale || pmYesBookStale || pmNoBookStale || feeAuthorityStale;
 
   const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', 1);
   const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', 1);
@@ -232,7 +245,7 @@ function computeSingleOutcome(
     // When stale, we cap deployed capital to 0 because we don't know if the
     // book is still fillable; the displayed quote remains for reference.
     const candidate = calculateArbitrageMax(
-      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as Parameters<typeof calculateArbitrageMax>[0],
+      { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk, feeAuthority: kalshiFeeAuthority } as Parameters<typeof calculateArbitrageMax>[0],
       {
         bestAsk: pmYesAsk,
         noPrice: pmNoAsk,
@@ -284,6 +297,7 @@ function computeSingleOutcome(
         kalshiFee: stale ? 0 : candidate.fees.kalshiFee,
         pmFee: stale ? 0 : candidate.fees.pmFee,
         worstCaseNetProfit: stale ? 0 : candidate.fees.worstCaseNetProfit,
+        kalshiFeeAuthority,
       };
     }
 
@@ -292,7 +306,8 @@ function computeSingleOutcome(
       const contracts = 1;
       const yesStake = contracts * kalshiYesAsk;
       const noStake = contracts * kalshiNoAsk;
-      const totalFee = calcKalshiFee(contracts, kalshiYesAsk) + calcKalshiFee(contracts, kalshiNoAsk);
+      const totalFee = calcKalshiFee(contracts, kalshiYesAsk, kalshiFeeAuthority)
+        + calcKalshiFee(contracts, kalshiNoAsk, kalshiFeeAuthority);
       const netProfit = contracts - yesStake - noStake - totalFee;
       if (netProfit > 0 && netProfit > expectedProfit) {
         strategy = `Same-platform YES+NO Kalshi: ${artist}`;
@@ -300,7 +315,7 @@ function computeSingleOutcome(
         expectedProfit = netProfit;
         kalshiStake = yesStake + noStake;
         pmStake = 0;
-        fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit };
+        fees = { kalshiFee: totalFee, pmFee: 0, worstCaseNetProfit: netProfit, kalshiFeeAuthority };
         executionStatus = 'executable';
         executionBlocker = undefined;
       }
@@ -376,6 +391,7 @@ function computeSingleOutcome(
     pmNoTokenId,
     pmConditionId,
     category,
+    kalshiFeeAuthority,
     arbType: strategy.startsWith('Same-platform YES+NO') ? 'internal' : 'direct',
     crossOutcomeMutuallyExclusiveVerified,
     crossOutcomeExhaustiveVerified,
@@ -405,9 +421,10 @@ function computeCapturedLegFees(
   kalshiPrice: number | null,
   pmPrice: number | null,
   category?: string,
+  kalshiFeeAuthority?: KalshiFeeAuthority,
 ): { kalshiFee: number; pmFee: number } {
   return {
-    kalshiFee: kalshiPrice == null ? 0 : calcKalshiFee(contracts, kalshiPrice),
+    kalshiFee: kalshiPrice == null ? 0 : calcKalshiFee(contracts, kalshiPrice, kalshiFeeAuthority),
     pmFee: pmPrice == null
       ? 0
       : calcPolymarketFee(contracts, pmPrice, getPolymarketTheta(category)),
@@ -470,7 +487,7 @@ export function computeCapturedLiveArbitrages(
       }
       const kalshiStake = effectiveCapital * kalshiPrice;
       const pmStake = effectiveCapital * pmPrice;
-      const fees = computeCapturedLegFees(effectiveCapital, kalshiPrice, pmPrice, category);
+      const fees = computeCapturedLegFees(effectiveCapital, kalshiPrice, pmPrice, category, current.kalshiFeeAuthority);
       const worstCaseNetProfit = effectiveCapital - kalshiStake - pmStake - fees.kalshiFee - fees.pmFee;
       results.push(capturedResult(current, identity, {
         roiPct: (worstCaseNetProfit / effectiveCapital) * 100,
@@ -547,11 +564,12 @@ export function computeCapturedLiveArbitrages(
       let kalshiFee = 0;
       let pmFee = 0;
       if (isCross) {
-        const fees = computeCapturedLegFees(effectiveCapital, firstPrice, secondPrice, category);
+        const fees = computeCapturedLegFees(effectiveCapital, firstPrice, secondPrice, category, current.kalshiFeeAuthority);
         kalshiFee = fees.kalshiFee;
         pmFee = fees.pmFee;
       } else if (isKalshiInternal) {
-        kalshiFee = calcKalshiFee(effectiveCapital, firstPrice) + calcKalshiFee(effectiveCapital, secondPrice);
+        kalshiFee = calcKalshiFee(effectiveCapital, firstPrice, current.kalshiFeeAuthority)
+          + calcKalshiFee(effectiveCapital, secondPrice, companion.kalshiFeeAuthority);
       } else {
         const theta = getPolymarketTheta(category);
         pmFee = calcPolymarketFee(effectiveCapital, firstPrice, theta) + calcPolymarketFee(effectiveCapital, secondPrice, theta);
@@ -629,6 +647,7 @@ export function computeAllLiveArbitrages(
         pYesB,
         comp.pmNoAsk,
         category,
+        cur.kalshiFeeAuthority,
       );
       if (fees.worstCaseNetProfit > cur.expectedProfit) {
         cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
@@ -641,6 +660,7 @@ export function computeAllLiveArbitrages(
           kalshiFee: fees.kalshiFee,
           pmFee: fees.pmFee,
           worstCaseNetProfit: fees.worstCaseNetProfit,
+          kalshiFeeAuthority: fees.kalshiFeeAuthority,
         };
         cur.requestedContracts = 1;
         cur.executionStatus = 'executable';

@@ -67,6 +67,8 @@ export interface OrderRequest {
   orderType: OrderType;
   /** Exact executable depth quote used for paper/live price parity. */
   executableQuote?: ExecutableBookQuote;
+  /** Authoritative pre-trade Kalshi fee quote; present only on Kalshi orders. */
+  kalshiFeeQuote?: import('./kalshi-fee-quote').KalshiFeeQuote;
 }
 
 export interface OrderResult {
@@ -120,6 +122,7 @@ export interface ExecutionResult {
   success: boolean;
   kalshiResult: OrderResult;
   polymarketResult: OrderResult;
+  kalshiFeeQuote?: import('./kalshi-fee-quote').KalshiFeeQuote;
   actualProfit?: number;
   /** Integer-cent cash reconciliation; actualProfit is its dollar compatibility projection. */
   cashLedger?: ExecutionCashLedger;

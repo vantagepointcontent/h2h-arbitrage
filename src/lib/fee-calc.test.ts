@@ -8,6 +8,28 @@ describe('Kalshi/Polymarket fees', () => {
     expect(fee).toBe(14.42);
   });
 
+  it('uses non-standard authoritative Kalshi multipliers in scanner math', () => {
+    const authority = {
+      marketTicker: 'K', eventTicker: 'E', seriesTicker: 'S', feeType: 'quadratic' as const,
+      feeMultiplierPpm: 500_000, source: 'series', observedAt: '2026-08-08T10:00:00.000Z', version: 'v2',
+    };
+    expect(calcKalshiFee(1000, 0.71, authority)).toBe(7.21);
+  });
+
+  it('charges both venue legs for cross-outcome YES+YES strategies', () => {
+    const authority = {
+      marketTicker: 'K', eventTicker: 'E', seriesTicker: 'S', feeType: 'quadratic' as const,
+      feeMultiplierPpm: 1_000_000, source: 'series', observedAt: '2026-08-08T10:00:00.000Z', version: 'v1',
+    };
+    const fees = computeArbitrageFees(
+      'Buy YES both sides: Kalshi A + PM B', 100, 40, 45,
+      0.4, 0.6, 0.45, 0.55, 'Politics', authority,
+    );
+    expect(fees.kalshiFee).toBeGreaterThan(0);
+    expect(fees.pmFee).toBeGreaterThan(0);
+    expect(fees.kalshiFeeAuthority).toEqual(authority);
+  });
+
   it('Polymarket Sports theta = 0.03', () => {
     expect(getPolymarketTheta('Sports')).toBe(0.03);
   });

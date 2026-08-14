@@ -42,6 +42,7 @@ import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
 import { createBotMessage, updateBotMessage, type BotMessageType } from './bot-trader-messages';
 import logger from './logger';
 import type { BotSelectionMethod } from './bot-candidate-selection';
+import { calculateKalshiFeeQuote, type KalshiFeeAuthority } from './kalshi-fee-quote';
 import {
   buildExecutionEvidence,
   isAnalyticsEligible,
@@ -193,7 +194,11 @@ export function liveEvidenceToBotPositionFill(evidence: LiveExecutionEvidence) {
   const fills = (venue: LiveExecutionEvidence['kalshi']) => (venue.fills ?? [{
     quantity: venue.filledQuantity,
     price: venue.fillPrice,
-  }]).map((item) => ({ priceCents: Math.round(item.price * 100_000_000) / 1_000_000, size: item.quantity }));
+  }]).map((item) => ({
+    priceCents: Math.round(item.price * 100_000_000) / 1_000_000,
+    size: item.quantity,
+    ...('liquidityRole' in item && item.liquidityRole ? { liquidityRole: item.liquidityRole } : {}),
+  }));
   return {
     kalshiContracts: evidence.kalshi.filledQuantity,
     pmContracts: evidence.polymarket.filledQuantity,
@@ -883,6 +888,7 @@ export async function maybeExecuteBotTrade(
 
   const entryLegs = pickLegPrices(input.strategy, input);
   let feeAuthority: AuthoritativeBotFeeConfig;
+  let resolvedKalshiAuthority: KalshiFeeAuthority;
   try {
     if (!entryLegs.supported || !input.kalshiTicker || !input.pmConditionId || !input.category?.trim()) {
       throw new Error('Missing supported venue legs, identifiers, or market category');
@@ -894,9 +900,17 @@ export async function maybeExecuteBotTrade(
       pmSide: entryLegs.pmOutcome,
       category: input.category,
     });
+    if (!feeAuthority.kalshi.authority) throw new Error('Resolved Kalshi fee identity unavailable');
+    resolvedKalshiAuthority = feeAuthority.kalshi.authority;
     // Placement and fee authority must bind the exact same executable token.
     execReq.polymarketOrder.marketId = feeAuthority.polymarket.tokenId;
     execReq.polymarketOrder.conditionId = feeAuthority.polymarket.tokenId;
+    execReq.kalshiOrder.kalshiFeeQuote = calculateKalshiFeeQuote(resolvedKalshiAuthority, 'taker', [{
+      fills: [{
+        contracts: execReq.kalshiOrder.contracts ?? execReq.kalshiOrder.size,
+        priceCents: execReq.kalshiOrder.price * 100,
+      }],
+    }]);
   } catch (error) {
     const reason = `Authoritative fee authority unavailable: ${String(error)}`;
     await log('safety-gate', reason, 'failed', { errorReason: reason });
@@ -915,6 +929,27 @@ export async function maybeExecuteBotTrade(
 
   const executionStarted = Date.now();
   const result = await executeArb(execReq);
+  if (result.kalshiResult.filledContracts != null && result.kalshiResult.filledPrice != null) {
+    const evidence = result.kalshiResult.venueEvidence;
+    const fills = evidence?.fills?.length
+      ? evidence.fills.map((fill) => ({
+        contracts: fill.quantity,
+        priceCents: fill.price * 100,
+        liquidityRole: fill.liquidityRole,
+      }))
+      : [{
+        contracts: result.kalshiResult.filledContracts,
+        priceCents: result.kalshiResult.filledPrice * 100,
+        liquidityRole: evidence?.liquidityRole,
+      }];
+    result.kalshiFeeQuote = calculateKalshiFeeQuote(
+      resolvedKalshiAuthority,
+      evidence?.liquidityRole ?? 'taker',
+      [{ fills, chargedFeeCents: evidence?.chargedFeeCents ?? result.kalshiResult.chargedFeeCents }],
+    );
+  } else {
+    result.kalshiFeeQuote = execReq.kalshiOrder.kalshiFeeQuote;
+  }
   const executionDurationMs = Date.now() - executionStarted;
   for (const step of result.steps ?? []) {
     const rawStatus = String(step.status ?? '').toLowerCase();

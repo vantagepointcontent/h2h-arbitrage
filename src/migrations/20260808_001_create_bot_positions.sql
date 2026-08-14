@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS bot_positions (
   category        TEXT,
   pm_theta        REAL,
   kalshi_entry_fee INTEGER NOT NULL DEFAULT 0,
+  kalshi_entry_calculated_fee INTEGER NOT NULL DEFAULT 0,
+  kalshi_entry_charged_fee INTEGER,
   pm_entry_fee    INTEGER NOT NULL DEFAULT 0,
   status          TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settled', 'closed')),
   opened_at       TEXT    NOT NULL,
