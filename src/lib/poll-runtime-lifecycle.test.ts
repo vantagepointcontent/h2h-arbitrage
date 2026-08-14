@@ -27,6 +27,9 @@ describe('BUG-140 production poller lifecycle evidence', () => {
       liveLeaseFencedSuccessor: true,
       expiredLeaseFencedAtServer: true,
       abandonedLeaseReclaimed: true,
+      apiLockSamePidDifferentInstanceReclaimed: true,
+      apiLockLiveOwnerFenced: true,
+      apiLockKilledOwnerReclaimed: true,
     });
     expect(report.restartRecovery.maxObservedConcurrency).toBeGreaterThan(1);
     expect(report.fairness.laterFinalEntryCompletedEveryCycle).toBe(true);

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { build } from 'esbuild';
 
 const SLA_MS = 5 * 60_000;
 const markets = Array.from({ length: 24 }, (_, index) => ({
@@ -254,6 +255,73 @@ try {
   assert.equal(attempts.get('23') || 0, beforeReclaimRequests + 2, 'expired lease must be reclaimed');
   assert(afterReclaimScheduler['market-23'].lastSuccessAt, 'reclaimed market must complete successfully');
 
+  // Exercise the production API-side execution lock in separate process
+  // instances. This covers PID reuse independently from the poller lease: a
+  // replacement must reclaim a predecessor lock with the same numeric PID but
+  // different boot/start identity, while a genuinely live request stays fenced.
+  const scanLockBundle = path.join(dir, 'saved-market-scan-lock.mjs');
+  const scanLockDirectory = path.join(dir, 'scan-locks');
+  await build({
+    entryPoints: [path.resolve('src/lib/saved-market-scan-lock.ts')],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    outfile: scanLockBundle,
+  });
+  const scanLockChildScript = String.raw`
+    import { createHash } from 'node:crypto';
+    import { mkdir, writeFile } from 'node:fs/promises';
+    import path from 'node:path';
+    import { pathToFileURL } from 'node:url';
+    const [bundle, marketId, mode] = process.argv.slice(1);
+    const lockDirectory = process.env.H2H_SAVED_MARKET_SCAN_LOCK_DIRECTORY;
+    const lockModule = await import(pathToFileURL(bundle).href);
+    if (mode === 'stale-same-pid') {
+      const lockPath = path.join(lockDirectory, createHash('sha256').update(marketId).digest('hex'));
+      await mkdir(lockPath, { recursive: true });
+      await writeFile(path.join(lockPath, 'owner.json'), JSON.stringify({
+        path: lockPath,
+        ownerToken: 'crashed-predecessor',
+        ownerPid: process.pid,
+        processIdentity: { bootId: 'previous-boot', startTimeTicks: '1' },
+      }));
+    }
+    const lock = await lockModule.acquireSavedMarketScanLock(marketId);
+    process.stdout.write(JSON.stringify({ acquired: Boolean(lock) }) + '\n');
+    if (lock && mode === 'hold') await new Promise(resolve => process.once('message', resolve));
+    if (lock) await lockModule.releaseSavedMarketScanLock(lock);
+  `;
+  const startScanLockProcess = (marketId, mode) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', scanLockChildScript, scanLockBundle, marketId, mode], {
+      env: { ...process.env, H2H_SAVED_MARKET_SCAN_LOCK_DIRECTORY: scanLockDirectory },
+      stdio: mode === 'hold' ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    const completed = new Promise((resolve, reject) => {
+      child.on('error', reject);
+      child.on('exit', (code, signal) => code === 0
+        ? resolve({ acquired: JSON.parse(stdout.trim()).acquired, signal })
+        : reject(new Error(`scan-lock process exited ${code ?? signal}: ${stderr}`)));
+    });
+    return { child, completed, output: () => stdout };
+  };
+
+  const staleSamePid = startScanLockProcess('api-restart-market', 'stale-same-pid');
+  const staleSamePidResult = await staleSamePid.completed;
+  assert.equal(staleSamePidResult.acquired, true, 'same-PID different-instance API lock must be reclaimed');
+
+  const liveApiOwner = startScanLockProcess('api-live-market', 'hold');
+  await waitFor(() => liveApiOwner.output().trim().length > 0);
+  const liveApiContender = await startScanLockProcess('api-live-market', 'acquire').completed;
+  assert.equal(liveApiContender.acquired, false, 'genuinely live API lock owner must fence a contender');
+  liveApiOwner.child.kill('SIGKILL');
+  await liveApiOwner.completed.catch(() => null);
+  const killedApiOwnerReplacement = await startScanLockProcess('api-live-market', 'acquire').completed;
+  assert.equal(killedApiOwnerReplacement.acquired, true, 'killed API lock owner must be reclaimed');
+
   for (const { id, payload } of requests) {
     assert.deepEqual(Object.keys(payload).sort(), ['kalshiUrl', 'polymarketUrl']);
     assert.equal(payload.kalshiUrl, `https://kalshi.example/events/${id}`);
@@ -284,6 +352,9 @@ try {
       liveLeaseFencedSuccessor: Boolean(fencedSuccessor.stdout),
       expiredLeaseFencedAtServer: Boolean(expiredLeasePeer.stdout && duplicateAttemptFencedAtServer),
       abandonedLeaseReclaimed: Boolean(reclaimedRun.stdout && afterReclaimScheduler['market-23'].lastSuccessAt),
+      apiLockSamePidDifferentInstanceReclaimed: staleSamePidResult.acquired,
+      apiLockLiveOwnerFenced: !liveApiContender.acquired,
+      apiLockKilledOwnerReclaimed: killedApiOwnerReplacement.acquired,
     },
     requestScope: {
       capturedRequestCount: requests.length,

@@ -10,7 +10,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 305135
+      "oldestSuccessAgeMs": 305131
     },
     {
       "eligibleCount": 25,
@@ -18,7 +18,7 @@
       "overdueCount": 2,
       "failedCount": 2,
       "inProgressCount": 0,
-      "oldestSuccessAgeMs": 310678
+      "oldestSuccessAgeMs": 310703
     }
   ],
   "outcomes": [
@@ -44,7 +44,10 @@
     "crossProcessBreakerUpdatesMerged": true,
     "liveLeaseFencedSuccessor": true,
     "expiredLeaseFencedAtServer": true,
-    "abandonedLeaseReclaimed": true
+    "abandonedLeaseReclaimed": true,
+    "apiLockSamePidDifferentInstanceReclaimed": true,
+    "apiLockLiveOwnerFenced": true,
+    "apiLockKilledOwnerReclaimed": true
   },
   "requestScope": {
     "capturedRequestCount": 53,
