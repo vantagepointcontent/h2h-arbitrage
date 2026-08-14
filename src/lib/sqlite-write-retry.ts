@@ -38,10 +38,10 @@ export async function withSqliteBusyRetry<T>(
   // Full-scan workers write concurrently from separate processes. A short
   // four-attempt/175ms window exhausted during normal WAL writer handoff and
   // converted otherwise successful scans into HTTP 500 responses. Keep the
-  // retry bounded below the scan-worker timeout while allowing contention to
-  // drain (50+100+200+400+800+1600+3200ms plus jitter at the maximum).
-  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 8));
-  const baseDelayMs = Math.max(0, Math.floor(options.baseDelayMs ?? 50));
+  // retry bounded below the scan-worker timeout while allowing watcher bursts
+  // to drain (25+50+100+200+400+800+1600+3200+6400ms plus jitter).
+  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 10));
+  const baseDelayMs = Math.max(0, Math.floor(options.baseDelayMs ?? 25));
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await operation();
