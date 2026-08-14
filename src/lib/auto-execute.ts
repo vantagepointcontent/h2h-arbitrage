@@ -852,8 +852,16 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     const cancellation = await cancelAndVerifyOrder(
       result,
       cancelLeg,
-      (current) => pollOrder(current, order, false),
+      async (current) => {
+        const polled = await pollOrder(current, order, false);
+        captureLatestTerminality(polled, { ...current, venue: current.platform });
+        return polled;
+      },
     );
+    captureLatestTerminality(cancellation.result, { ...result, venue: result.platform });
+    if (regressedEntryPlatforms.has(result.platform)) {
+      return { result: cancellation.result, verified: false, terminality: 'indeterminate' as const };
+    }
     entryTerminalities[result.platform] = { terminality: cancellation.terminality, source: 'post-cancel-poll' };
     return cancellation;
   };

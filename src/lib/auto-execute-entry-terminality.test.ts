@@ -258,4 +258,46 @@ describe('BUG-153 live entry terminality', () => {
     expect(result.success).toBe(false);
     expect(result.unhedged).toBe(true);
   }, 10_000);
+
+  it('fails closed when the post-cancel poll regresses a cumulative fill', async () => {
+    mocks.getKalshiOrder.mockResolvedValue(kalshiOrder('canceled', 1, 1, '2'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('canceled', 2, 1, '2'));
+    mocks.placePmSellOrder.mockResolvedValue(pmOrder('matched', 1, 1, '3'));
+
+    const result = await executeArb(request());
+
+    expect(mocks.placeKalshiSellOrder).not.toHaveBeenCalled();
+    expect(mocks.placePmSellOrder).not.toHaveBeenCalled();
+    expect(result.cashLedger?.entryOrders).toEqual(expect.arrayContaining([
+      expect.objectContaining({ venue: 'kalshi', terminality: 'indeterminate' }),
+      expect.objectContaining({ venue: 'polymarket', terminality: 'terminal' }),
+    ]));
+    expect(result.cashLedger?.matchedContracts).toBe(2);
+    expect(result.alerts).toContainEqual(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('regressed cumulative fill'),
+    }));
+    expect(result.cashLedger?.status).toBe('reconciliation-required');
+    expect(result.success).toBe(false);
+    expect(result.unhedged).toBe(true);
+  });
+
+  it('keeps a transient post-cancel regression indeterminate after a later terminal recovery', async () => {
+    mocks.getKalshiOrder
+      .mockResolvedValueOnce(kalshiOrder('resting', 1, 1, '2'))
+      .mockResolvedValueOnce(kalshiOrder('canceled', 3, 1, '3'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('canceled', 2, 1, '2'));
+    mocks.placeKalshiSellOrder.mockResolvedValue(kalshiOrder('executed', 1, 1, '4'));
+
+    const result = await executeArb(request());
+
+    expect(mocks.placeKalshiSellOrder).not.toHaveBeenCalled();
+    expect(mocks.placePmSellOrder).not.toHaveBeenCalled();
+    expect(result.cashLedger?.entryOrders).toEqual(expect.arrayContaining([
+      expect.objectContaining({ venue: 'kalshi', terminality: 'indeterminate' }),
+    ]));
+    expect(result.cashLedger?.status).toBe('reconciliation-required');
+    expect(result.success).toBe(false);
+    expect(result.unhedged).toBe(true);
+  });
 });
