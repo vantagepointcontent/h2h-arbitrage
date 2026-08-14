@@ -192,6 +192,8 @@ export interface BotExecutionLeg {
   marketRef: string | null;
   side: BotPositionSide;
   executionPriceCents: number;
+  /** Immutable pre-fee fill gross at microcent precision. */
+  originalGrossMicrocents: number | null;
   originalQuantity: number;
   originalPrincipalCents: number;
   entryFeeCents: number;
@@ -510,6 +512,10 @@ function isLegacyPaperEntryAuthorityMissing(position: BotPosition): boolean {
 }
 
 function assertValuationEntryEconomics(position: BotPosition): void {
+  if (!hasAvailableEntryCost(position)) {
+    throw new Error(position.entryCostFailureReason?.trim()
+      || `Authoritative entry fill and fee data unavailable for bot position ${position.id}`);
+  }
   // Mark-to-market uses the immutable fee-inclusive Buy Cost recorded in the
   // ledger. Historical per-fill provenance is useful for audit detail but is
   // not required to calculate current P&L from that recorded amount.
@@ -677,6 +683,11 @@ export function calculatePositionValuation(
 
 function rowToPosition(row: Record<string, unknown>): BotPosition {
   const executionMode: BotPositionExecutionMode = row.execution_mode === 'live' ? 'live' : 'paper';
+  const entryCostAvailable = row.entry_cost_status === 'available'
+    && row.kalshi_entry_gross_microcents != null
+    && row.pm_entry_gross_microcents != null
+    && row.kalshi_entry_fee != null
+    && row.pm_entry_fee != null;
   return {
     id: Number(row.id),
     executionId: Number(row.execution_id),
@@ -697,16 +708,12 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     remainingOpenFeesCents: row.live_fees != null ? Number(row.live_fees) : (row.status === 'open' ? Number(row.fees ?? 0) : 0),
     remainingOpenCostCents: row.live_cost != null ? Number(row.live_cost) : (row.status === 'open' ? Number(row.total_cost) : 0),
     totalCostCents: Number(row.total_cost),
-    // Legacy rows still contain the fee-inclusive amount recorded as paid.
-    // Missing detailed fill provenance does not make that ledger cost unknown.
-    entryCostStatus: Number.isSafeInteger(Number(row.total_cost)) && Number(row.total_cost) > 0
-      ? 'available'
-      : 'unavailable',
-    entryCostFailureReason: Number.isSafeInteger(Number(row.total_cost)) && Number(row.total_cost) > 0
+    entryCostStatus: entryCostAvailable ? 'available' : 'unavailable',
+    entryCostFailureReason: entryCostAvailable
       ? null
       : row.entry_cost_failure_reason != null
         ? String(row.entry_cost_failure_reason)
-        : 'Recorded Buy Cost is missing or invalid',
+        : 'Legacy position lacks authoritative entry fill and fee data',
     kalshiEntryGrossMicrocents: row.kalshi_entry_gross_microcents != null ? Number(row.kalshi_entry_gross_microcents) : null,
     pmEntryGrossMicrocents: row.pm_entry_gross_microcents != null ? Number(row.pm_entry_gross_microcents) : null,
     entryCostRoundingDeltaMicrocents: row.entry_cost_rounding_delta_microcents != null ? Number(row.entry_cost_rounding_delta_microcents) : null,
@@ -808,14 +815,13 @@ function marketKey(position: BotPosition): string {
 }
 
 function toExecution(position: BotPosition): BotExecution {
-  const kalshiPrincipal = position.buyPriceKalshiCents * position.sharesKalshi;
-  const pmPrincipal = position.buyPricePmCents * position.sharesPm;
   const status = executionStatus(position);
   const leg = (
     venue: 'kalshi' | 'polymarket',
     marketRef: string | null,
     side: BotPositionSide,
     price: number,
+    originalGrossMicrocents: number | null,
     originalQuantity: number,
     entryFeeCents: number,
     remainingQuantity: number,
@@ -837,7 +843,7 @@ function toExecution(position: BotPosition): BotExecution {
       ? position.kalshiLiquidationValueCents ?? calculatedLiquidationValueCents
       : position.pmLiquidationValueCents ?? calculatedLiquidationValueCents;
     return {
-      venue, marketRef, side, executionPriceCents: price, originalQuantity,
+      venue, marketRef, side, executionPriceCents: price, originalGrossMicrocents, originalQuantity,
       originalPrincipalCents, entryFeeCents, remainingOpenQuantity: remainingQuantity,
       remainingOpenPrincipalCents, remainingOpenFeeCents,
       currentExecutablePriceCents: currentPrice,
@@ -850,9 +856,11 @@ function toExecution(position: BotPosition): BotExecution {
   };
   const legs = [
     leg('kalshi', position.kalshiTicker, position.kalshiSide, position.buyPriceKalshiCents,
+      position.kalshiEntryGrossMicrocents ?? null,
       position.sharesKalshi, position.kalshiEntryFeeCents, position.remainingSharesKalshi,
       position.currentPriceKalshiCents),
     leg('polymarket', position.pmConditionId, position.pmSide, position.buyPricePmCents,
+      position.pmEntryGrossMicrocents ?? null,
       position.sharesPm, position.pmEntryFeeCents, position.remainingSharesPm,
       position.currentPricePmCents),
   ];
@@ -863,7 +871,7 @@ function toExecution(position: BotPosition): BotExecution {
     executedAt: position.openedAt,
     mode: position.dryRun ? 'paper' : 'production',
     executionStatus: status,
-    executionPrincipalCents: kalshiPrincipal + pmPrincipal,
+    executionPrincipalCents: position.totalCostCents - position.feesCents,
     executionFeesCents: position.feesCents,
     executionBuyCostCents: position.totalCostCents,
     currentValueCents: status === 'closed' || status === 'settled' ? 0 : position.currentValueCents,
@@ -1274,9 +1282,17 @@ export class BotPositionStore {
     if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId, input.executionMode)) {
       throw new Error('An open bot position already exists for this market pair');
     }
-    const executionPrincipalCents = input.kalshiEntryGrossMicrocents != null && input.pmEntryGrossMicrocents != null
-      ? roundRatio(BigInt(input.kalshiEntryGrossMicrocents + input.pmEntryGrossMicrocents), FEE_SCALE)
-      : input.buyPriceKalshiCents * input.sharesKalshi + input.buyPricePmCents * input.sharesPm;
+    // A direct create call explicitly identifies its aggregate fills through
+    // Buy Price and quantity. Persist that evidence at full ledger precision;
+    // only pre-migration rows that lack both representations remain legacy.
+    const kalshiEntryGrossMicrocents = input.kalshiEntryGrossMicrocents
+      ?? input.buyPriceKalshiCents * input.sharesKalshi * Number(FEE_SCALE);
+    const pmEntryGrossMicrocents = input.pmEntryGrossMicrocents
+      ?? input.buyPricePmCents * input.sharesPm * Number(FEE_SCALE);
+    const executionPrincipalCents = roundRatio(
+      BigInt(kalshiEntryGrossMicrocents + pmEntryGrossMicrocents),
+      FEE_SCALE,
+    );
     const expectedRoiBps = input.expectedRoiBps
       ?? roiBps(input.expectedProfitCents, input.totalCostCents);
 
@@ -1312,7 +1328,7 @@ export class BotPositionStore {
           input.sharesPm, input.sharesKalshi, input.sharesPm,
           executionPrincipalCents, input.feesCents, input.totalCostCents,
           input.totalCostCents, input.expectedPayoutCents, input.expectedProfitCents,
-          'available', null, input.kalshiEntryGrossMicrocents ?? null, input.pmEntryGrossMicrocents ?? null,
+          'available', null, kalshiEntryGrossMicrocents, pmEntryGrossMicrocents,
           input.entryCostRoundingDeltaMicrocents ?? null, input.kalshiEntryFillCount ?? 1, input.pmEntryFillCount ?? 1,
           expectedRoiBps, input.expectedApyBps ?? null, input.unitId ?? `execution:${input.executionId}`,
           input.feesCents, input.category, input.pmTheta,

@@ -499,8 +499,12 @@ describe('calculatePositionValuation', () => {
     expect(result.settledAt).toBe('2026-08-11T12:00:00.000Z');
   });
 
-  it('settles from recorded Buy Cost even when legacy entry provenance is absent', () => {
-    const result = calculatePositionValuation(openPosition({ kalshiEntryFeeMultiplierPpm: null }), {
+  it('fails settlement closed when legacy entry fill or fee evidence is unavailable', () => {
+    expect(() => calculatePositionValuation(openPosition({
+      entryCostStatus: 'unavailable',
+      entryCostFailureReason: 'Legacy position lacks authoritative entry fill and fee data',
+      kalshiEntryFeeMultiplierPpm: null,
+    }), {
       kalshiYesBidCents: 100,
       kalshiNoBidCents: 0,
       pmYesBidCents: 100,
@@ -509,9 +513,7 @@ describe('calculatePositionValuation', () => {
       expiryDate: '2026-08-10T00:00:00.000Z',
       kalshiResolved: true,
       pmResolved: true,
-    });
-    expect(result.status).toBe('settled');
-    expect(result.realizedPnlCents).toBe(22);
+    })).toThrow(/authoritative entry fill and fee data/i);
   });
 
   it('does not settle contradictory resolution prices', () => {
@@ -883,11 +885,11 @@ describe('BotPositionStore', () => {
       pmNoBids: [{ priceCents: 50, size: 1 }],
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: null,
-    })).toThrow(/recorded Buy Cost/i);
+    })).toThrow(/authoritative entry fill and fee data/i);
     store.close();
   });
 
-  it('does not invent authoritative fills from reconciling legacy prices and fee metadata', async () => {
+  it('fails closed instead of promoting rounded legacy prices and fee metadata to authoritative entry evidence', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-fees-'));
     dirs.push(dir);
     const dbUrl = `file:${path.join(dir, 'test.db')}`;
@@ -923,14 +925,40 @@ describe('BotPositionStore', () => {
     const store = new BotPositionStore(dbUrl);
     const [legacy] = await store.list({ status: 'all' });
 
-    expect(legacy.entryCostStatus).toBe('available');
-    expect(legacy.entryCostFailureReason).toBeNull();
+    expect(legacy.entryCostStatus).toBe('unavailable');
+    expect(legacy.entryCostFailureReason).toMatch(/legacy position lacks authoritative entry fill and fee data/i);
     expect(legacy.kalshiEntryGrossMicrocents).toBeNull();
     expect(legacy.pmEntryGrossMicrocents).toBeNull();
     expect(legacy.kalshiEntryFillCount).toBeNull();
     expect(legacy.pmEntryFillCount).toBeNull();
-    expect(summarizeBotPositions([legacy]).deployedCapitalCents).toBe(99);
+    expect(summarizeBotPositions([legacy]).deployedCapitalCents).toBeNull();
     store.close();
+  });
+
+  it('publishes execution principal and per-leg gross from authoritative fills rather than rounded Buy Price columns', () => {
+    const [market] = BotPositionStore.groupForAnalytics([openPosition({
+      buyPriceKalshiCents: 45,
+      buyPricePmCents: 52,
+      sharesKalshi: 3,
+      sharesPm: 1,
+      kalshiEntryGrossMicrocents: 12_345_679,
+      pmEntryGrossMicrocents: 85_012_344,
+      kalshiEntryFeeCents: 1,
+      pmEntryFeeCents: 0,
+      feesCents: 1,
+      totalCostCents: 99,
+      remainingOpenPrincipalCents: 98,
+      remainingOpenFeesCents: 1,
+      remainingOpenCostCents: 99,
+    })]);
+
+    expect(market.executions[0].executionPrincipalCents).toBe(98);
+    expect(market.executions[0].executionFeesCents).toBe(1);
+    expect(market.executions[0].executionBuyCostCents).toBe(99);
+    expect(market.executions[0].legs.map((leg) => leg.originalGrossMicrocents)).toEqual([
+      12_345_679,
+      85_012_344,
+    ]);
   });
 
   it('allows paper and live reservations for the same normalized venue pair', async () => {

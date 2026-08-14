@@ -372,12 +372,17 @@ describe('BotTraderPanel', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
 
+    expect(screen.getByText('Buy Price').parentElement?.textContent).toContain('YES 4.115226¢ K');
+    expect(screen.getByText('Buy Price').parentElement?.textContent).toContain('NO 85.012344¢ PM');
+    expect(screen.getByText('Buy Price').parentElement?.textContent).not.toContain('$0.45');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('3 units · 4.115226¢ rounded VWAP · $0.12345679 gross');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).not.toContain('exact fill');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.13345679 net leg cost');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('85.012344¢ exact fill · $0.85012344 gross');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('$0.00000000 execution fee · $0.85012344 net leg cost');
     expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Currency rounding delta: $0.00641977');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Gross fills $0.97358023');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Entry fees: Kalshi $0.01000000 · Polymarket $0.00000000');
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.99000000');
   });
 
@@ -408,6 +413,7 @@ describe('BotTraderPanel', () => {
     expect(Array.from(row.querySelectorAll('td'))[7].textContent).not.toContain('+5.2%');
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
     expect(screen.getAllByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toHaveLength(3);
+    expect(screen.getByText('Buy Price').parentElement?.textContent).toBe('Buy PriceUnavailable — authoritative fill evidence missing');
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('DeployedUnavailable');
   });
 

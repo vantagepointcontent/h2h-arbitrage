@@ -609,7 +609,9 @@ export default function BotTraderPanel() {
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
                         <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
                         <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>
-                        <div><span className="text-[var(--text-secondary)]">Buy prices</span><div>{position.kalshiSide.toUpperCase()} {formatCents(position.buyPriceKalshiCents)} K · {position.pmSide.toUpperCase()} {formatCents(position.buyPricePmCents)} PM</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Buy Price</span><div>{entryCostAvailable && position.kalshiEntryGrossMicrocents != null && position.pmEntryGrossMicrocents != null
+                          ? <>{position.kalshiSide.toUpperCase()} {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} K · {position.pmSide.toUpperCase()} {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} PM</>
+                          : <span className="text-[var(--status-warning)]">Unavailable — authoritative fill evidence missing</span>}</div></div>
                         <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
                       </div>
                       {!entryCostAvailable ? (
@@ -629,7 +631,7 @@ export default function BotTraderPanel() {
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                           </div>
                           <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>
-                          <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Full-precision gross plus both execution fees is rounded once to ledger cents.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Summary prices round each leg to cents and may not add to the rounded total.</div>
+                          <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Gross fills {formatExactMicrocents(position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents)} · Entry fees: Kalshi {formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} · Polymarket {formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)}.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Full-precision gross plus entry fees is rounded once to ledger cents.</div>
                         </div>
                       )}
                       <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2" aria-label="Persisted current price snapshots">
