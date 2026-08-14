@@ -111,7 +111,10 @@ export async function executeFullScan(request: NextRequest) {
 
     // Reserve ordering before upstream requests. Completion timestamps cannot
     // order overlapping scans that resolve within the same clock tick.
-    const savedMarket = await findSavedMarketByUrls(kalshiUrl!, polymarketUrl!);
+    // A disposable worker initializes its SQLite connection on this lookup.
+    // Gate it with the same cross-process writer lock so awaited PRAGMAs and
+    // schema verification cannot race another worker's publication transaction.
+    const savedMarket = await withSqliteWriterLock(() => findSavedMarketByUrls(kalshiUrl!, polymarketUrl!));
     savedMarketId = savedMarket?.id ?? null;
     if (savedMarketId) {
       const acquisition = await acquireSavedMarketScanLock(savedMarketId);

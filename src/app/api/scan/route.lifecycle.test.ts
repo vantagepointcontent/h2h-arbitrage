@@ -129,21 +129,21 @@ describe('POST /api/scan saved-market lifecycle', () => {
   it('rejects a second full scan while the first saved-market scan is still executing', async () => {
     let resolveUpstream!: (markets: unknown[]) => void;
     mocks.upstream.mockImplementationOnce(() => new Promise(resolve => { resolveUpstream = resolve; }));
-    mocks.acquireSavedMarketScanLock
-      .mockResolvedValueOnce({
+    let savedMarketLockAttempts = 0;
+    mocks.acquireSavedMarketScanLock.mockImplementation(async (lockId: string) => {
+      if (lockId === 'tx-07' && ++savedMarketLockAttempts > 1) {
+        return {
+          status: 'busy',
+          reason: 'owner_live',
+          retryable: true,
+          retryAfterMs: 5_000,
+        };
+      }
+      return {
         status: 'acquired',
-        lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'first' },
-      })
-      .mockResolvedValueOnce({
-        status: 'acquired',
-        lock: { path: '/tmp/sqlite-lock', ownerPid: 1, ownerToken: 'sqlite-first' },
-      })
-      .mockResolvedValueOnce({
-        status: 'busy',
-        reason: 'owner_live',
-        retryable: true,
-        retryAfterMs: 5_000,
-      });
+        lock: { path: `/tmp/${lockId}`, ownerPid: 1, ownerToken: `${lockId}-${savedMarketLockAttempts}` },
+      };
+    });
 
     const first = executeFullScan(request());
     await vi.waitFor(() => expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenCalledTimes(1));
@@ -173,21 +173,21 @@ describe('POST /api/scan saved-market lifecycle', () => {
   });
 
   it('waits for the cross-process SQLite writer instead of failing the scan burst', async () => {
-    mocks.acquireSavedMarketScanLock
-      .mockResolvedValueOnce({
+    let writerAttempts = 0;
+    mocks.acquireSavedMarketScanLock.mockImplementation(async (lockId: string) => {
+      if (lockId !== 'tx-07' && ++writerAttempts === 1) {
+        return {
+          status: 'busy',
+          reason: 'owner_live',
+          retryable: true,
+          retryAfterMs: 5_000,
+        };
+      }
+      return {
         status: 'acquired',
-        lock: { path: '/tmp/market-lock', ownerPid: 1, ownerToken: 'market' },
-      })
-      .mockResolvedValueOnce({
-        status: 'busy',
-        reason: 'owner_live',
-        retryable: true,
-        retryAfterMs: 5_000,
-      })
-      .mockResolvedValueOnce({
-        status: 'acquired',
-        lock: { path: '/tmp/sqlite-lock', ownerPid: 1, ownerToken: 'sqlite' },
-      });
+        lock: { path: `/tmp/${lockId}`, ownerPid: 1, ownerToken: `${lockId}-${writerAttempts}` },
+      };
+    });
 
     const response = await executeFullScan(request());
 

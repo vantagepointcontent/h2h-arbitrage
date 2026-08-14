@@ -17,22 +17,25 @@ let _client: ReturnType<typeof createClient> | null = null;
 function getClient() {
   if (!_client) {
     _client = createClient({ url: `file:${SQLITE_PATH}` });
-    // Wait up to 5s on writer contention instead of failing SQLITE_BUSY
-    // (Next.js, poller-driven scans, and ws-watcher all write this file).
-    void _client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
-    void _client.execute('PRAGMA journal_mode = WAL').catch(() => {});
-    void _client.execute('PRAGMA synchronous = NORMAL').catch(() => {});
-    // PERF-P3: keep WAL small (checkpoint every ~1000 pages ≈ 4MB), larger
-    // page cache (16MB) and mmap (256MB) — the whole DB fits in memory.
-    void _client.execute('PRAGMA wal_autocheckpoint = 1000').catch(() => {});
-    void _client.execute('PRAGMA cache_size = -16000').catch(() => {});
-    void _client.execute('PRAGMA mmap_size = 268435456').catch(() => {});
   }
   return _client;
 }
 
+async function configureClient(c: ReturnType<typeof createClient>): Promise<void> {
+  // These statements must finish before transactions start. Fire-and-forget
+  // PRAGMAs raced disposable scan-worker writes and produced both SQLITE_BUSY
+  // and "SQL statements in progress" commit failures.
+  await c.execute('PRAGMA busy_timeout = 5000');
+  await c.execute('PRAGMA journal_mode = WAL');
+  await c.execute('PRAGMA synchronous = NORMAL');
+  await c.execute('PRAGMA wal_autocheckpoint = 1000');
+  await c.execute('PRAGMA cache_size = -16000');
+  await c.execute('PRAGMA mmap_size = 268435456');
+}
+
 async function initDb(): Promise<void> {
   const c = getClient();
+  await configureClient(c);
   await c.execute(`
     CREATE TABLE IF NOT EXISTS scan_results (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -333,6 +336,16 @@ async function ensureDb(): Promise<void> {
   if (_dbInited) return;
   if (!_dbInitPromise) {
     _dbInitPromise = (async () => {
+      if (process.env.H2H_FULL_SCAN_WORKER === '1') {
+        const c = getClient();
+        await configureClient(c);
+        const existing = await c.execute(`SELECT COUNT(*) AS cnt FROM sqlite_master
+          WHERE type = 'table' AND name IN ('saved_markets', 'scan_results')`);
+        if (Number(existing.rows[0]?.cnt ?? 0) === 2) {
+          _dbInited = true;
+          return;
+        }
+      }
       await checkAndRestoreDb();
       await initDb();
       _dbInited = true;

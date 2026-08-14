@@ -77,7 +77,7 @@ function productionWorker(): ScanWorkerHandle {
     || [process.cwd(), 'dist', 'full-scan-worker.cjs'].join('/');
   const child: ChildProcess = fork(workerPath, [], {
     cwd: process.cwd(),
-    env: process.env,
+    env: { ...process.env, H2H_FULL_SCAN_WORKER: '1' },
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     serialization: 'advanced',
   });
