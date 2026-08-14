@@ -281,4 +281,82 @@ describe('matchCrossPlatformMarkets', () => {
     expect(fetchKalshiMarket).not.toHaveBeenCalled();
     expect(fetchPolymarketMarketAsEvent).not.toHaveBeenCalled();
   });
+
+  it('bounds confidence comparisons and yields the event loop for oversized catalog buckets', async () => {
+    const kalshiRows = Array.from({ length: 200 }, (_, index) => catalogRow(
+      'kalshi',
+      `Kalshi unrelated contract ${index}`,
+      `KX-${index}`,
+      `https://kalshi.com/markets/KX-${index}`,
+      'world',
+    ));
+    const polymarketRows = Array.from({ length: 200 }, (_, index) => catalogRow(
+      'polymarket',
+      `Polymarket different question ${index}`,
+      `pm-${index}`,
+      `https://polymarket.com/event/pm-${index}`,
+      'world',
+    ));
+    queryMarketCatalog.mockImplementation((opts?: { platform?: 'kalshi' | 'polymarket' }) => {
+      const rows = opts?.platform === 'kalshi' ? kalshiRows : polymarketRows;
+      return Promise.resolve({ rows, total: rows.length, nextCursor: null });
+    });
+
+    let eventLoopYielded = false;
+    setTimeout(() => { eventLoopYielded = true; }, 0);
+
+    const result = await matchCrossPlatformMarkets({
+      candidateThreshold: 101,
+      maxVerifications: 0,
+      maxCatalogRowsPerPlatform: 100,
+      maxCandidateComparisons: 250,
+      yieldEveryComparisons: 50,
+    });
+
+    expect(result.kalshiCatalogCount).toBe(200);
+    expect(result.polymarketCatalogCount).toBe(200);
+    expect(result.kalshiRowsLoaded).toBe(100);
+    expect(result.polymarketRowsLoaded).toBe(100);
+    expect(queryMarketCatalog).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
+    expect(result.candidateComparisons).toBe(250);
+    expect(result.matchingTruncated).toBe(true);
+    expect(eventLoopYielded).toBe(true);
+    expect(fetchKalshiMarket).not.toHaveBeenCalled();
+    expect(fetchPolymarketMarketAsEvent).not.toHaveBeenCalled();
+  });
+
+  it('reports truncation when the catalog row cap is reached without reaching the comparison cap', async () => {
+    const kalshiRows = [catalogRow(
+      'kalshi',
+      'Kalshi contract',
+      'KX-1',
+      'https://kalshi.com/markets/KX-1',
+      'politics',
+    )];
+    const polymarketRows = [catalogRow(
+      'polymarket',
+      'Polymarket question',
+      'pm-1',
+      'https://polymarket.com/event/pm-1',
+      'sports',
+    )];
+    queryMarketCatalog.mockImplementation((opts?: { platform?: 'kalshi' | 'polymarket' }) => {
+      const rows = opts?.platform === 'kalshi' ? kalshiRows : polymarketRows;
+      return Promise.resolve({ rows, total: 590_820, nextCursor: null });
+    });
+
+    const result = await matchCrossPlatformMarkets({
+      candidateThreshold: 101,
+      maxVerifications: 0,
+      maxCatalogRowsPerPlatform: 1,
+      maxCandidateComparisons: 100_000,
+    });
+
+    expect(result.kalshiCatalogCount).toBe(590_820);
+    expect(result.polymarketCatalogCount).toBe(590_820);
+    expect(result.kalshiRowsLoaded).toBe(1);
+    expect(result.polymarketRowsLoaded).toBe(1);
+    expect(result.candidateComparisons).toBe(0);
+    expect(result.matchingTruncated).toBe(true);
+  });
 });

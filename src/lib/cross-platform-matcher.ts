@@ -38,6 +38,9 @@ export interface MatcherOptions {
   maxExpiryDays?: number;
   autoQueueThreshold?: number;
   reviewThreshold?: number;
+  maxCatalogRowsPerPlatform?: number;
+  maxCandidateComparisons?: number;
+  yieldEveryComparisons?: number;
   onProgress?: (update: {
     step?: 'matching' | 'verifying';
     candidates?: number;
@@ -51,6 +54,10 @@ export interface MatcherOptions {
 export interface MatchRunResult {
   kalshiCatalogCount: number;
   polymarketCatalogCount: number;
+  kalshiRowsLoaded: number;
+  polymarketRowsLoaded: number;
+  candidateComparisons: number;
+  matchingTruncated: boolean;
   candidatesChecked: number;
   verifiedPairs: number;
   autoQueued: number;
@@ -72,6 +79,9 @@ export const DEFAULT_MATCHER_OPTIONS: Required<Omit<MatcherOptions, 'onProgress'
   maxExpiryDays: 7,
   autoQueueThreshold: 70,
   reviewThreshold: 50,
+  maxCatalogRowsPerPlatform: 10_000,
+  maxCandidateComparisons: 100_000,
+  yieldEveryComparisons: 250,
 };
 
 const CATEGORY_ALIASES: Record<string, string[]> = {
@@ -265,20 +275,30 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   const start = Date.now();
   const errors: string[] = [];
 
-  const loadCatalog = async (platform: 'kalshi' | 'polymarket'): Promise<MarketCatalogRow[]> => {
+  const loadCatalog = async (platform: 'kalshi' | 'polymarket'): Promise<{ rows: MarketCatalogRow[]; total: number }> => {
     const rows: MarketCatalogRow[] = [];
+    let total = 0;
     let cursor: number | null = 0;
     do {
-      const page = await queryMarketCatalog({ platform, includeStale: false, limit: 10000, cursor });
-      rows.push(...page.rows);
-      cursor = page.nextCursor;
+      const remaining = options.maxCatalogRowsPerPlatform - rows.length;
+      const page = await queryMarketCatalog({
+        platform,
+        includeStale: false,
+        limit: Math.min(10_000, remaining),
+        cursor,
+      });
+      total = page.total;
+      rows.push(...page.rows.slice(0, remaining));
+      cursor = rows.length >= options.maxCatalogRowsPerPlatform ? null : page.nextCursor;
     } while (cursor !== null);
-    return rows;
+    return { rows, total };
   };
-  const [kalshiMarkets, pmMarkets] = await Promise.all([
+  const [kalshiCatalog, pmCatalog] = await Promise.all([
     loadCatalog('kalshi'),
     loadCatalog('polymarket'),
   ]);
+  const kalshiMarkets = kalshiCatalog.rows;
+  const pmMarkets = pmCatalog.rows;
 
   opts?.onProgress?.({ step: 'matching', message: 'Matching cross-platform pairs...' });
 
@@ -292,11 +312,24 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   }
 
   const candidates: Candidate[] = [];
+  let candidateComparisons = 0;
+  let matchingTruncated =
+    kalshiCatalog.total > kalshiMarkets.length ||
+    pmCatalog.total > pmMarkets.length;
+  matchingLoop:
   for (const k of kalshiMarkets) {
     const cat = normalizeCategory(k.category);
     const pmList = pmByCategory.get(cat);
     if (!pmList || pmList.length === 0) continue;
     for (const p of pmList) {
+      if (candidateComparisons >= options.maxCandidateComparisons) {
+        matchingTruncated = true;
+        break matchingLoop;
+      }
+      candidateComparisons++;
+      if (candidateComparisons % options.yieldEveryComparisons === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
       if (!expiryWithinDays(k.expiryDate, p.expiryDate, options.maxExpiryDays)) continue;
       const { confidence, breakdown } = calculateConfidence(
         k.title,
@@ -386,8 +419,12 @@ export async function matchCrossPlatformMarkets(opts?: MatcherOptions): Promise<
   }, 5);
 
   return {
-    kalshiCatalogCount: kalshiMarkets.length,
-    polymarketCatalogCount: pmMarkets.length,
+    kalshiCatalogCount: kalshiCatalog.total,
+    polymarketCatalogCount: pmCatalog.total,
+    kalshiRowsLoaded: kalshiMarkets.length,
+    polymarketRowsLoaded: pmMarkets.length,
+    candidateComparisons,
+    matchingTruncated,
     candidatesChecked: candidates.length,
     verifiedPairs,
     autoQueued,
