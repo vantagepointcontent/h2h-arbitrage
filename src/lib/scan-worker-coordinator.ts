@@ -171,7 +171,6 @@ export class ScanWorkerCoordinator {
     });
     job.timer = setTimeout(() => {
       this.metrics.timedOutJobs += 1;
-      void worker.terminate();
       this.finish(job, new ScanWorkerError(`Scan exceeded ${this.timeoutMs}ms worker deadline`, 'SCAN_TIMEOUT'));
     }, this.timeoutMs);
     worker.postMessage({ type: 'run', jobId: id, request });
@@ -200,7 +199,6 @@ export class ScanWorkerCoordinator {
           this.metrics.cancelledJobs += 1;
           reject(new ScanWorkerError('Scan request was cancelled', 'SCAN_CANCELLED'));
           if (job.subscribers.size === 0 && !job.settled) {
-            void job.worker.terminate();
             this.finish(job, null);
           }
         };
@@ -221,6 +219,11 @@ export class ScanWorkerCoordinator {
     if (error) this.metrics.failedJobs += 1;
     else if (response) this.metrics.completedJobs += 1;
     this.metrics.activeJobs = this.active.size;
+
+    // Every production worker is disposable. Explicitly terminate after a
+    // result/error as a backstop so open database handles cannot keep an IPC
+    // child alive after its one scan has published.
+    void job.worker.terminate();
 
     for (const subscriber of job.subscribers) {
       if (subscriber.abort && subscriber.signal) subscriber.signal.removeEventListener('abort', subscriber.abort);

@@ -35,6 +35,7 @@ describe('ScanWorkerCoordinator', () => {
 
     await expect(first).resolves.toMatchObject({ status: 200 });
     await expect(duplicate).resolves.toMatchObject({ status: 200 });
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
     expect(coordinator.snapshot().deduplicatedJobs).toBe(1);
   });
 

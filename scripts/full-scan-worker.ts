@@ -20,6 +20,16 @@ async function serializeResponse(response: Response) {
 }
 
 let started = false;
+function publishAndExit(message: unknown, exitCode: number): void {
+  if (!process.send) {
+    process.exit(exitCode);
+  }
+  process.send(message, () => {
+    process.disconnect?.();
+    process.exit(exitCode);
+  });
+}
+
 process.on('message', async (message: RunMessage) => {
   if (started || message?.type !== 'run') return;
   started = true;
@@ -30,11 +40,9 @@ process.on('message', async (message: RunMessage) => {
       body: message.request.body,
     });
     const response = await executeFullScan(request);
-    process.send?.({ type: 'result', jobId: message.jobId, response: await serializeResponse(response) });
-    process.disconnect?.();
+    publishAndExit({ type: 'result', jobId: message.jobId, response: await serializeResponse(response) }, 0);
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
-    process.send?.({ type: 'error', jobId: message.jobId, error: text });
-    process.disconnect?.();
+    publishAndExit({ type: 'error', jobId: message.jobId, error: text }, 1);
   }
 });
