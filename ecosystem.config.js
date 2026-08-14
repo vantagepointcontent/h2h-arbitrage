@@ -27,6 +27,13 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '3000',
+        // Full scans execute in disposable child processes. Keep server worker
+        // capacity aligned with poller concurrency so recurring scans are not
+        // rejected in capacity bursts while still bounding CPU/memory.
+        H2H_SCAN_CONCURRENCY: '8',
+        H2H_SCAN_WORKER_TIMEOUT_MS: '30000',
+        H2H_POLL_CONCURRENCY: '8',
+        H2H_SCAN_TIMEOUT_MS: '35000',
         // Full per-outcome scan diagnostics overwhelm the event loop under the
         // poller's normal burst load. Enable only for short local investigations.
         DEBUG_H2H: '0',
@@ -69,6 +76,11 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         H2H_BASE_URL: 'http://localhost:3000',
+        // Every eligible saved market must receive a successful durable full
+        // scan at least hourly. Adaptive tiers may run sooner, never later.
+        H2H_SAVED_MARKET_FRESHNESS_SLA_MS: '3600000',
+        H2H_POLL_CONCURRENCY: '8',
+        H2H_SCAN_TIMEOUT_MS: '35000',
         H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9'
       },
 

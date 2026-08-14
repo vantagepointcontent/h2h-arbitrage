@@ -309,6 +309,43 @@ export interface LastScanResult {
   }[];
 }
 
+export interface SavedMarketScheduleState {
+  lastAttemptAt?: string | null;
+  lastSuccessAt?: string | null;
+  nextDueAt?: string | null;
+  inProgress?: boolean;
+  failureReason?: string | null;
+  retryCount?: number;
+  freshnessSlaMs?: number;
+}
+
+export function getSavedMarketScheduleView(
+  scheduler: SavedMarketScheduleState | null | undefined,
+  lastSuccessfulScanAt: string | null | undefined,
+  now = Date.now(),
+  freshnessSlaMs = scheduler?.freshnessSlaMs ?? 60 * 60_000,
+): { status: 'fresh' | 'due' | 'scanning' | 'failed' | 'rate_limited' | 'overdue' | 'unavailable'; ageMs: number | null; reason: string | null } {
+  const successAt = scheduler?.lastSuccessAt ?? lastSuccessfulScanAt;
+  const parsed = successAt ? Date.parse(successAt) : NaN;
+  const ageMs = Number.isFinite(parsed) ? Math.max(0, now - parsed) : null;
+  if (scheduler?.inProgress) return { status: 'scanning', ageMs, reason: 'A recurring full scan is currently running.' };
+  if (scheduler?.failureReason) {
+    const rateLimited = /(?:http\s*429|rate[ -]?limit|too many requests)/i.test(scheduler.failureReason);
+    return {
+      status: rateLimited ? 'rate_limited' : 'failed',
+      ageMs,
+      reason: scheduler.failureReason,
+    };
+  }
+  if (ageMs === null) return { status: 'unavailable', ageMs, reason: 'No successful full scan is available yet.' };
+  if (ageMs > freshnessSlaMs) return { status: 'overdue', ageMs, reason: 'Full scan is past the freshness SLA.' };
+  const nextDueAt = scheduler?.nextDueAt ? Date.parse(scheduler.nextDueAt) : NaN;
+  if (Number.isFinite(nextDueAt) && nextDueAt <= now) {
+    return { status: 'due', ageMs, reason: 'A recurring full scan is due and waiting in the fair queue.' };
+  }
+  return { status: 'fresh', ageMs, reason: null };
+}
+
 export interface SavedMarket {
   id: string;
   kalshiUrl: string;
@@ -319,6 +356,7 @@ export interface SavedMarket {
   expiryDate?: string | null;
   favorited?: boolean;
   lastScanResult?: LastScanResult | null;
+  scheduler?: SavedMarketScheduleState | null;
   liveResult?: {
     bestRoiPct: number;
     bestProfit: number;
@@ -390,6 +428,45 @@ export function selectSavedMarketPriceCache(
       priced.kalshiYesAsk != null && priced.pmYesPrice != null;
   });
   return hasLivePrices ? live! : market.lastScanResult ?? null;
+}
+
+export function getSavedMarketLastSuccessAt(market: SavedMarket): string | null {
+  if (market.scheduler?.lastSuccessAt) return market.scheduler.lastSuccessAt;
+  const status = market.lastScanResult?.matchStatus;
+  return status === 'matched' || status === 'confirmed_zero'
+    ? market.lastScanResult?.scannedAt ?? null
+    : null;
+}
+
+export function applyDurableFullScanToSavedMarket(
+  market: SavedMarket,
+  scan: Pick<ScanResult, 'outcomes' | 'kalshiCount' | 'pmCount' | 'matchedCount'> & { fullScanPersisted?: boolean },
+  scannedAt: string,
+): SavedMarket {
+  const liveResult = {
+    ...summarizeScanForSidebar(scan.outcomes),
+    scannedAt,
+    kalshiCount: scan.kalshiCount,
+    pmCount: scan.pmCount,
+    matchedCount: scan.matchedCount,
+  };
+  if (scan.fullScanPersisted !== true) return { ...market, liveResult };
+  const freshnessSlaMs = market.scheduler?.freshnessSlaMs ?? 60 * 60_000;
+  const scannedAtMs = Date.parse(scannedAt);
+  const nextDueAt = new Date(scannedAtMs + freshnessSlaMs).toISOString();
+  return {
+    ...market,
+    scheduler: {
+      ...market.scheduler,
+      lastSuccessAt: scannedAt,
+      nextDueAt,
+      inProgress: false,
+      failureReason: null,
+      retryCount: 0,
+      freshnessSlaMs,
+    },
+    liveResult,
+  };
 }
 
 export interface ScanResult {

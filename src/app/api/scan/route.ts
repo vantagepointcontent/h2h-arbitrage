@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScanClientKey, scanRateLimiter } from '@/lib/scan-rate-limit';
+import { getScanClientKey, isTrustedScheduledScan, scanRateLimiter } from '@/lib/scan-rate-limit';
 import { scanWorkerCoordinator, ScanWorkerError } from '@/lib/scan-worker-coordinator';
 import { resolveScanLinks } from '@/lib/scan-links';
 
@@ -18,8 +18,9 @@ function marketJobKey(body: string): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimit = scanRateLimiter.consume(getScanClientKey(request.headers));
-  if (!rateLimit.allowed) {
+  const scheduledScan = isTrustedScheduledScan(request.headers, process.env.H2H_API_TOKEN);
+  const rateLimit = scheduledScan ? null : scanRateLimiter.consume(getScanClientKey(request.headers));
+  if (rateLimit && !rateLimit.allowed) {
     return NextResponse.json(
       { error: 'Too many scan requests. Please retry shortly.' },
       {

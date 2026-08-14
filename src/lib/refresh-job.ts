@@ -143,7 +143,8 @@ export async function runRefreshJob(marketIds?: string[]) {
           category: market.category,
           publicationGeneration,
         };
-        await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
+        const published = await updateSavedMarketScanResult(market.id, scanResult, result.expiryDate);
+        if (!published) throw new Error('Scheduled scan publication was superseded before persistence');
         await persistAndConsumeBotScan(market.id, scanResult, 'scheduled');
         newState.succeeded++;
       } catch (e: unknown) {

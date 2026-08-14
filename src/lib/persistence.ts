@@ -1100,6 +1100,7 @@ export interface LastScanResult {
   bestRoiPct: number;      // t.ex. 26.5 (for backward compat / display)
   bestProfit: number;       // t.ex. 265
   strategy: string;         // "Buy YES Kalshi + NO PM"
+  arbType?: string | null;
   outcomeCount: number;
   matchedCount: number;
   kalshiCount: number;
@@ -1561,7 +1562,7 @@ export async function reserveSavedMarketPublication(
   });
 }
 
-export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<void> {
+export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<boolean> {
   // Targeted UPDATE — no read-modify-write of the whole list. This was the
   // main race: concurrent scans clobbering each other's lastScanResult.
   await ensureMarketsMigrated();
@@ -1571,21 +1572,21 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
     const current = await tx.execute({
       sql: 'SELECT last_scan_result, scan_publication_generation FROM saved_markets WHERE id = ?', args: [id],
     });
-    if (!current.rows[0]) { await tx.rollback(); return; }
+    if (!current.rows[0]) { await tx.rollback(); return false; }
     const previous = current.rows[0].last_scan_result
       ? JSON.parse(String(current.rows[0].last_scan_result)) as LastScanResult
       : null;
     if (result.publicationGeneration != null
       && result.publicationGeneration !== Number(current.rows[0].scan_publication_generation)) {
       await tx.rollback();
-      return;
+      return false;
     }
     if (isStaleMatchPublication(previous, result)) {
       await tx.rollback();
-      return;
+      return false;
     }
     const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan', tx);
-    if (!prepared) { await tx.rollback(); return; }
+    if (!prepared) { await tx.rollback(); return false; }
     const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
     await tx.execute({
       sql: `UPDATE saved_markets SET last_scan_result = ?,
@@ -1600,6 +1601,7 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   }
   invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
+  return true;
 }
 
 /** Restart recovery for scans whose worker process disappeared after publishing

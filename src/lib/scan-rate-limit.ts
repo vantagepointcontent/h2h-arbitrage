@@ -72,6 +72,14 @@ export function getScanClientKey(headers: Headers): string {
   return forwardedIp || 'anonymous';
 }
 
+/** Scheduled scans share one service address, so their authenticated traffic
+ * is governed by poller concurrency/backoff rather than the browser budget. */
+export function isTrustedScheduledScan(headers: Headers, apiToken: string | undefined): boolean {
+  return !!apiToken
+    && headers.get('x-h2h-token') === apiToken
+    && headers.get('x-h2h-scan-source') === 'saved-market-poller';
+}
+
 export const scanRateLimiter = new ScanRateLimiter();
 export const scanConcurrencyLimiter = new ScanConcurrencyLimiter(
   Math.max(1, Number(process.env.H2H_SCAN_CONCURRENCY || 1)),

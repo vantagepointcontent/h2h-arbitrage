@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getScanClientKey, ScanConcurrencyLimiter, ScanRateLimiter } from './scan-rate-limit';
+import { getScanClientKey, isTrustedScheduledScan, ScanConcurrencyLimiter, ScanRateLimiter } from './scan-rate-limit';
 
 describe('ScanRateLimiter', () => {
   it('allows the configured request budget, then rejects until the window resets', () => {
@@ -53,5 +53,25 @@ describe('ScanConcurrencyLimiter', () => {
     release?.();
     expect(limiter.tryAcquire()).not.toBeNull();
     expect(limiter.tryAcquire()).toBeNull();
+  });
+});
+
+describe('isTrustedScheduledScan', () => {
+  it('only bypasses browser rate limits for an authenticated poller request', () => {
+    const secret = 'poller-secret';
+    expect(isTrustedScheduledScan(new Headers({
+      'x-h2h-token': secret,
+      'x-h2h-scan-source': 'saved-market-poller',
+    }), secret)).toBe(true);
+    expect(isTrustedScheduledScan(new Headers({
+      'x-h2h-scan-source': 'saved-market-poller',
+    }), secret)).toBe(false);
+    expect(isTrustedScheduledScan(new Headers({
+      'x-h2h-token': secret,
+    }), secret)).toBe(false);
+    expect(isTrustedScheduledScan(new Headers({
+      'x-h2h-token': secret,
+      'x-h2h-scan-source': 'saved-market-poller',
+    }), undefined)).toBe(false);
   });
 });

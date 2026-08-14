@@ -5,6 +5,16 @@ import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
+import fs from 'fs/promises';
+import path from 'path';
+
+async function readSchedulerState(): Promise<Record<string, unknown>> {
+  try {
+    return JSON.parse(await fs.readFile(path.join(process.cwd(), 'data', 'saved-market-scheduler.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +23,22 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
 
     await reconcileSavedMarketMatchSummaries();
-    const markets = await getSavedMarkets();
+    const [savedMarkets, schedulerState] = await Promise.all([getSavedMarkets(), readSchedulerState()]);
+    const markets = savedMarkets.map(market => {
+      const scheduler = schedulerState[market.id] as Record<string, unknown> | undefined;
+      const scanAt = market.lastScanResult?.scannedAt;
+      const scanSucceeded = market.lastScanResult?.matchStatus === 'matched'
+        || market.lastScanResult?.matchStatus === 'confirmed_zero';
+      const schedulerSuccessAt = typeof scheduler?.lastSuccessAt === 'string' ? scheduler.lastSuccessAt : null;
+      const lastSuccessAt = scanSucceeded && scanAt
+        && (!schedulerSuccessAt || Date.parse(scanAt) > Date.parse(schedulerSuccessAt))
+        ? scanAt
+        : schedulerSuccessAt;
+      return {
+        ...market,
+        scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
+      };
+    });
 
     // Single full market by id — used by loadMarket() for instant-load allArbs
     if (id) {
@@ -48,6 +73,7 @@ export async function GET(request: NextRequest) {
           kalshiUrl: m.kalshiUrl,
           polymarketUrl: m.polymarketUrl,
           expiryDate: m.expiryDate,
+          scheduler: m.scheduler,
           lastScanResult: ls ? {
             bestRoiPct: ls.bestRoiPct ?? 0,
             bestProfit: ls.bestProfit ?? 0,

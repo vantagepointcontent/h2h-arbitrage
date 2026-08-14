@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   persistAndConsumeBotScan: vi.fn(async () => undefined),
   reserveSavedMarketPublication: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
+  acquireSavedMarketScanLock: vi.fn(),
+  releaseSavedMarketScanLock: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/kalshi', () => ({
@@ -51,12 +53,16 @@ vi.mock('@/lib/persistence', () => ({
   findSavedMarketByUrls: mocks.findSavedMarketByUrls,
   reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
   reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
-  updateSavedMarketScanResult: vi.fn(async () => undefined),
+  updateSavedMarketScanResult: vi.fn(async () => true),
   appendScanHistory: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
 vi.mock('@/lib/arb-lifecycle', () => ({ recordArbObservations: vi.fn(async () => ({ opened: 0, extended: 0, closed: 0 })) }));
 vi.mock('@/lib/telegram-alerts', () => ({ sendBatchAlerts: vi.fn(async () => undefined) }));
+vi.mock('@/lib/saved-market-scan-lock', () => ({
+  acquireSavedMarketScanLock: mocks.acquireSavedMarketScanLock,
+  releaseSavedMarketScanLock: mocks.releaseSavedMarketScanLock,
+}));
 vi.mock('@/lib/scan-shared', () => ({
   withTimeout: (promise: Promise<unknown>) => promise,
   chooseBestPmStructure: (markets: unknown[]) => markets,
@@ -86,6 +92,12 @@ function request(): NextRequest {
 describe('POST /api/scan saved-market lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.upstream.mockReset();
+    mocks.upstream.mockResolvedValue([]);
+    mocks.acquireSavedMarketScanLock.mockResolvedValue({
+      status: 'acquired',
+      lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'test' },
+    });
     mocks.findSavedMarketByUrls.mockResolvedValue({ id: 'tx-07', eventTitle: 'TX-07' });
     mocks.reserveSavedMarketPublication.mockResolvedValue(41);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
@@ -109,6 +121,35 @@ describe('POST /api/scan saved-market lifecycle', () => {
 
     rejectUpstream(new Error('Kalshi upstream timed out'));
     await pending;
+  });
+
+  it('rejects a second full scan while the first saved-market scan is still executing', async () => {
+    let resolveUpstream!: (markets: unknown[]) => void;
+    mocks.upstream.mockImplementationOnce(() => new Promise(resolve => { resolveUpstream = resolve; }));
+    mocks.acquireSavedMarketScanLock
+      .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'first' },
+      })
+      .mockResolvedValueOnce({
+        status: 'busy',
+        reason: 'owner_live',
+        retryable: true,
+        retryAfterMs: 5_000,
+      });
+
+    const first = executeFullScan(request());
+    await vi.waitFor(() => expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenCalledTimes(1));
+
+    const duplicate = await executeFullScan(request());
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toMatchObject({
+      error: expect.stringContaining('already in progress'),
+    });
+    expect(mocks.reserveSavedMarketPublication).toHaveBeenCalledTimes(1);
+
+    resolveUpstream([]);
+    await first;
   });
 
   it('publishes unavailable with the reserved generation after terminal upstream failure', async () => {

@@ -1,0 +1,70 @@
+{
+  "candidate": "BUG-140 production poller lifecycle",
+  "processRuns": 10,
+  "marketCount": 24,
+  "freshnessSlaMs": 300000,
+  "cycles": [
+    {
+      "eligibleCount": 25,
+      "dueCount": 0,
+      "overdueCount": 2,
+      "failedCount": 2,
+      "inProgressCount": 0,
+      "oldestSuccessAgeMs": 305131
+    },
+    {
+      "eligibleCount": 25,
+      "dueCount": 0,
+      "overdueCount": 2,
+      "failedCount": 2,
+      "inProgressCount": 0,
+      "oldestSuccessAgeMs": 310703
+    }
+  ],
+  "outcomes": [
+    {
+      "successCount": 22,
+      "failureCount": 2
+    },
+    {
+      "successCount": 22,
+      "failureCount": 1
+    }
+  ],
+  "restartRecovery": {
+    "productionPollerSpawnedTwice": true,
+    "overlappingProcessLifetimes": true,
+    "schedulerFileSurvived": true,
+    "breakerFileSurvived": true,
+    "staleManualSuccessCooldownRestored": false,
+    "duplicateConcurrentScans": false,
+    "maxObservedConcurrency": 4,
+    "abandonedOwnerKilled": true,
+    "crossProcessSchedulerUpdatesMerged": true,
+    "crossProcessBreakerUpdatesMerged": true,
+    "liveLeaseFencedSuccessor": true,
+    "expiredLeaseFencedAtServer": true,
+    "abandonedLeaseReclaimed": true,
+    "apiLockSamePidDifferentInstanceReclaimed": true,
+    "apiLockLiveOwnerFenced": true,
+    "apiLockKilledOwnerReclaimed": true
+  },
+  "requestScope": {
+    "capturedRequestCount": 53,
+    "fields": [
+      "kalshiUrl",
+      "polymarketUrl"
+    ],
+    "linkedEventUrlsOnly": true,
+    "sample": {
+      "kalshiUrl": "https://kalshi.example/events/23",
+      "polymarketUrl": "https://polymarket.example/events/23"
+    }
+  },
+  "fairness": {
+    "repeatedFailureMarket": "market-00",
+    "timeoutMarket": "market-01",
+    "laterFinalEntryCompletedEveryCycle": true
+  },
+  "childOutputCaptured": true
+}

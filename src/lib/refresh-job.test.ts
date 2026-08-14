@@ -40,7 +40,7 @@ beforeEach(() => {
   mocks.writeFile.mockResolvedValue(undefined);
   mocks.getSavedMarkets.mockResolvedValue(markets);
   mocks.getManualMatches.mockResolvedValue([]);
-  mocks.updateSavedMarketScanResult.mockResolvedValue(undefined);
+  mocks.updateSavedMarketScanResult.mockResolvedValue(true);
   mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
   mocks.reserveSavedMarketPublication.mockResolvedValue(11);
   mocks.persistAndConsumeBotScan.mockResolvedValue({ id: 1, decision: null, backlogProcessed: 0 });

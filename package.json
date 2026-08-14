@@ -10,6 +10,7 @@
     "build:valuer": "esbuild scripts/position-valuer.ts --bundle --platform=node --format=esm --outfile=dist/position-valuer.mjs --external:@libsql/client --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "build:maintenance": "cp scripts/db-maintenance.mjs dist/db-maintenance.mjs",
     "start": "next start",
+    "migrate:poll-leases": "node scripts/migrate-poll-leases.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"

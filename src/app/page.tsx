@@ -100,7 +100,7 @@ import {
   getStoredCustomTitles, setCustomTitle,
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
-  formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired, summarizeScanForSidebar,
+  applyDurableFullScanToSavedMarket, formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired,
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
@@ -756,18 +756,8 @@ export default function Home() {
         setLastUpdated(new Date(scannedAt));
         setLastScanTimestamp(scannedAt);
         if (scannedMarketId && Array.isArray(data.outcomes)) {
-          const summary = summarizeScanForSidebar(data.outcomes);
           setSavedMarkets((previous) => previous.map((market) => market.id === scannedMarketId
-            ? {
-                ...market,
-                liveResult: {
-                  ...summary,
-                  scannedAt,
-                  kalshiCount: data.kalshiCount ?? 0,
-                  pmCount: data.pmCount ?? 0,
-                  matchedCount: data.matchedCount ?? 0,
-                },
-              }
+            ? applyDurableFullScanToSavedMarket(market, data, scannedAt)
             : market));
         }
         // Record initial prices for change detection
