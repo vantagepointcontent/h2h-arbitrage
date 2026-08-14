@@ -45,7 +45,7 @@ describe('LogsPanel', () => {
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
       if (url === '/api/logs/current-roi') {
         expect(JSON.parse(String(init?.body))).toEqual({ ids: [91] });
-        return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: -1.234, strategy: 'Buy YES Kalshi + NO PM', quotedAt: '2026-08-13T20:00:00.000Z' }] }) });
+        return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: -1.234, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:00:00.000Z', scanId: 123 }] }) });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
@@ -62,11 +62,10 @@ describe('LogsPanel', () => {
   });
 
   it.each([
-    ['stale_quote', 'Stale quote'],
-    ['unavailable_book', 'Book unavailable'],
-    ['insufficient_depth', 'Insufficient depth'],
-    ['missing_links', 'Missing links'],
-    ['upstream_failure', 'Upstream failure'],
+    ['no_arbitrage', 'No arbitrage'],
+    ['never_scanned', 'Never scanned'],
+    ['unavailable', 'Unavailable'],
+    ['upstream_failure', 'Unavailable / failed'],
   ])('renders current ROI state %s without a fabricated number', async (status, label) => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -78,6 +77,60 @@ describe('LogsPanel', () => {
     render(createElement(LogsPanel));
     expect(await screen.findByText(label)).toBeTruthy();
     expect(screen.queryByText('0.00%', { selector: 'td' })).toBeNull();
+  });
+
+  it('loads the visible window in one bounded batch', async () => {
+    const rows = Array.from({ length: 100 }, (_, index) => ({
+      ...comparisonLog(), id: index + 1, market_id: 'same-linked-market', market_name: `Market row ${index + 1}`,
+    }));
+    const currentBodies: number[][] = [];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: rows, total: rows.length }) });
+      if (url === '/api/logs/current-roi') {
+        const ids = JSON.parse(String(init?.body)).ids as number[];
+        currentBodies.push(ids);
+        return Promise.resolve({ ok: true, json: async () => ({ valuations: ids.map((id) => ({ id, status: 'no_arbitrage' })) }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(currentBodies).toHaveLength(1));
+    expect(currentBodies).toHaveLength(1);
+    expect(currentBodies[0]).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
+  });
+
+  it('ignores an out-of-order Current ROI response from a superseded Logs generation', async () => {
+    let logRequest = 0;
+    let resolveOldCurrent!: (value: unknown) => void;
+    const oldCurrent = new Promise((resolve) => { resolveOldCurrent = resolve; });
+    const replacement = { ...comparisonLog(), id: 92, market_id: 'replacement', market_name: 'Replacement market' };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) {
+        logRequest += 1;
+        return Promise.resolve({ ok: true, json: async () => ({ logs: [logRequest === 1 ? comparisonLog() : replacement], total: 1 }) });
+      }
+      if (url === '/api/logs/current-roi') {
+        const [id] = JSON.parse(String(init?.body)).ids as number[];
+        if (id === 91) return oldCurrent;
+        return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 92, status: 'available', roiPct: 7.77 }] }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText('7.77%')).toBeTruthy();
+
+    resolveOldCurrent({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: 99.99 }] }) });
+    await Promise.resolve();
+    expect(screen.queryByText('99.99%')).toBeNull();
+    expect(screen.getByText('7.77%')).toBeTruthy();
   });
 
   it('uses the complete non-ROI-filtered dataset maximum for an accessible ROI slider and clamps on filter changes', async () => {

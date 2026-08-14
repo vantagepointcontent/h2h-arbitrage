@@ -79,20 +79,18 @@ type SortDir = "asc" | "desc";
 
 const LOG_ROW_HEIGHT = 37;
 const LOG_RENDER_WINDOW = 100;
-const CURRENT_ROI_BATCH_SIZE = 25;
+const CURRENT_ROI_BATCH_SIZE = 100;
 
-type CurrentRoiStatus = 'loading' | 'available' | 'stale_quote' | 'unavailable_book' | 'insufficient_depth' | 'missing_links' | 'missing_identifiers' | 'upstream_failure';
-type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; quotedAt?: string };
+type CurrentRoiStatus = 'loading' | 'available' | 'no_arbitrage' | 'never_scanned' | 'unavailable' | 'upstream_failure';
+type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; scannedAt?: string; scanId?: number };
 
 function currentRoiStatusLabel(status: CurrentRoiStatus): string {
   switch (status) {
     case 'loading': return 'Loading…';
-    case 'stale_quote': return 'Stale quote';
-    case 'unavailable_book': return 'Book unavailable';
-    case 'insufficient_depth': return 'Insufficient depth';
-    case 'missing_links': return 'Missing links';
-    case 'missing_identifiers': return 'Missing IDs';
-    case 'upstream_failure': return 'Upstream failure';
+    case 'no_arbitrage': return 'No arbitrage';
+    case 'never_scanned': return 'Never scanned';
+    case 'unavailable': return 'Unavailable';
+    case 'upstream_failure': return 'Unavailable / failed';
     case 'available': return 'Available';
   }
 }
@@ -1073,7 +1071,7 @@ function LogRow({
           )}
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
-        <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.strategy ?? currentRoiStatusLabel(currentRoi.status)}>
+        <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.scannedAt ? `Latest persisted scan: ${currentRoi.scannedAt}${currentRoi.strategy ? ` — ${currentRoi.strategy}` : ''}` : currentRoiStatusLabel(currentRoi.status)}>
           {currentRoi.status === 'available' && typeof currentRoi.roiPct === 'number'
             ? `${currentRoi.roiPct.toFixed(2)}%`
             : currentRoiStatusLabel(currentRoi.status)}
