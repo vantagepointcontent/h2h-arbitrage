@@ -20,8 +20,8 @@ import { buildExecutionRequest, liveArbResultToBotInput } from './bot-trader';
 const outcome = {
   artist: 'Example',
   kalshiTicker: 'KX-BUG-096',
-  pmYesTokenId: 'pm-yes-bug-096',
-  pmNoTokenId: 'pm-no-bug-096',
+  pmYesTokenId: '1001',
+  pmNoTokenId: '1002',
   pmBinaryVerified: true,
   pmYesMinOrderSize: 1,
   pmNoMinOrderSize: 1,
@@ -29,14 +29,14 @@ const outcome = {
   pmNoTickSize: 0.01,
   crossOutcomeMutuallyExclusiveVerified: true,
   crossOutcomeExhaustiveVerified: true,
-  pmConditionId: 'condition-example',
+  pmConditionId: `0x${'1'.repeat(64)}`,
 };
 
 const complement = {
   artist: 'Complement',
   kalshiTicker: 'KX-BUG-101-COMP',
-  pmYesTokenId: 'pm-yes-bug-101-comp',
-  pmNoTokenId: 'pm-no-bug-101-comp',
+  pmYesTokenId: '2001',
+  pmNoTokenId: '2002',
   pmBinaryVerified: true,
   pmYesMinOrderSize: 1,
   pmNoMinOrderSize: 1,
@@ -44,7 +44,7 @@ const complement = {
   pmNoTickSize: 0.01,
   crossOutcomeMutuallyExclusiveVerified: true,
   crossOutcomeExhaustiveVerified: true,
-  pmConditionId: 'condition-complement',
+  pmConditionId: `0x${'2'.repeat(64)}`,
 };
 
 describe('parseBookStaleMs', () => {
