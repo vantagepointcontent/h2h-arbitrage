@@ -30,6 +30,8 @@ vi.mock('./polymarket-orders', async (importOriginal) => {
 
 import { executeArb, type ExecutionRequest } from './auto-execute';
 import type { VenueExecutionEvidence } from './execution-evidence';
+import { walkExecutableBook } from './executable-book';
+import { orderbookState } from './orderbook-state';
 
 function evidence(
   venue: 'kalshi' | 'polymarket',
@@ -63,16 +65,33 @@ function pmOrder(status: string, quantity: number, fee: number, suffix: string) 
 }
 
 function request(): ExecutionRequest {
+  const depthTimestamp = new Date().toISOString();
+  const quote = (priceCents: number) => walkExecutableBook({
+    side: 'buy',
+    levels: [{ priceCents, quantityMicros: 1_000_000 }],
+    requestedQuantityMicros: 1_000_000,
+    tickSizeCents: 1,
+    minimumOrderQuantityMicros: 1_000_000,
+    depthTimestamp,
+  });
+  orderbookState.setBook('KXBUG153', [{ price: 0.45, quantity: 1 }], [], 0, {
+    tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp,
+  });
+  orderbookState.setBook('pm-token-bug-153', [{ price: 0.5, quantity: 1 }], [], 0, {
+    tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp,
+  });
   return {
     arbId: 'bug-153', marketTitle: 'Terminal entry regression', estimatedProfit: 0.25,
     maxSlippagePct: 2, timeoutMs: 1, dryRun: false,
     kalshiOrder: {
       platform: 'kalshi', marketId: 'KXBUG153', ticker: 'KXBUG153', side: 'buy', outcome: 'yes',
-      size: 2.25, contracts: 5, price: 0.45, orderType: 'limit',
+      size: 0.45, contracts: 1, minimumOrderSize: 1, tickSize: 0.01,
+      price: 0.45, orderType: 'limit', executableQuote: quote(45),
     },
     polymarketOrder: {
       platform: 'polymarket', marketId: 'pm-bug-153', conditionId: 'pm-token-bug-153', side: 'buy', outcome: 'yes',
-      size: 2.5, contracts: 5, price: 0.5, orderType: 'limit',
+      size: 0.5, contracts: 1, minimumOrderSize: 1, tickSize: 0.01,
+      price: 0.5, orderType: 'limit', executableQuote: quote(50),
     },
   };
 }
