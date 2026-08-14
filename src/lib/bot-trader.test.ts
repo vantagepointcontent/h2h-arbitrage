@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   evaluateBotTrade,
   buildExecutionRequest,
+  revalidateBotTradeEconomics,
   unifiedOutcomeToBotInput,
   getAuthoritativeMatchedFill,
   type BotSettings,
@@ -420,7 +421,7 @@ describe('buildExecutionRequest', () => {
     expect(req?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.94, contracts: 1 });
   });
 
-  it('sizes paper execution to the venue minimum and requires matched depth on both legs', () => {
+  it('rejects a venue minimum above the canonical one-share quantity', () => {
     const input = makeInput({
       kalshiYesAsk: 0.45,
       pmNoAsk: 0.50,
@@ -429,26 +430,47 @@ describe('buildExecutionRequest', () => {
       pmNoMinOrderSize: 5,
     });
 
-    const req = buildExecutionRequest(input, 1);
-    expect(req?.kalshiOrder).toMatchObject({ contracts: 5, size: 2.25 });
-    expect(req?.polymarketOrder).toMatchObject({ contracts: 5, size: 2.5, minimumOrderSize: 5 });
-    expect(req?.kalshiOrder.executableQuote?.requestedQuantityMicros).toBe(5_000_000);
-    expect(req?.polymarketOrder.executableQuote?.requestedQuantityMicros).toBe(5_000_000);
-    expect(req?.estimatedProfit).toBeCloseTo(0.075, 8);
-
-    expect(buildExecutionRequest({ ...input, kalshiYesDepth: 2.249999 }, 1)).toBeNull();
-    expect(buildExecutionRequest({ ...input, pmNoDepth: 2.499999 }, 1)).toBeNull();
+    expect(buildExecutionRequest(input, 1)).toBeNull();
   });
 
-  it('uses the configured minimum when it exceeds the venue minimum', () => {
+  it('does not upscale the canonical one-share quantity from a legacy configured minimum', () => {
     const req = buildExecutionRequest(makeInput({
       kalshiYesDepth: 3.15,
       pmNoDepth: 3.64,
-      pmNoMinOrderSize: 5,
     }), 7);
 
-    expect(req?.kalshiOrder.contracts).toBe(7);
-    expect(req?.polymarketOrder.contracts).toBe(7);
+    expect(req?.kalshiOrder.contracts).toBe(1);
+    expect(req?.polymarketOrder.contracts).toBe(1);
+  });
+
+  it('fails final qualification when fresh authoritative fees erase scan-time profit', () => {
+    const input = makeInput({
+      kalshiYesAsk: 0.49,
+      pmNoAsk: 0.50,
+      expectedProfit: 0.01,
+      roiPct: 1,
+    });
+    const request = buildExecutionRequest(input)!;
+    const economics = revalidateBotTradeEconomics(input, baseSettings({ minRoiPct: 0 }), request, {
+      kalshi: {
+        feeType: 'quadratic', feeMultiplierPpm: 1_000_000,
+        source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000',
+      },
+      polymarket: {
+        tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 700, feesEnabled: true,
+        feeSchedule: { rate: 0.07, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+        orderBaseFeeBps: 1000,
+        orderSource: `https://clob.polymarket.com/fee-rate?token_id=${TEST_PM_NO_TOKEN_ID}`,
+        orderVersion: 'token-order-base-fee:1000',
+        source: `https://gamma-api.polymarket.com/markets?condition_ids=${TEST_PM_CONDITION_ID}`,
+        observedAt: new Date().toISOString(), version: 'gamma-fee-schedule:700:1:true:0.25',
+      },
+      pmTheta: 0.07,
+    });
+
+    expect(economics.eligible).toBe(false);
+    expect(economics.expectedProfit).toBeLessThan(0);
+    expect(economics.reason).toContain('not positive');
   });
 });
 
@@ -499,7 +521,7 @@ describe('maybeExecuteBotTrade safety', () => {
         switch (key) {
           case 'bot.enabled': return true;
           case 'bot.mode': return 'paper';
-          case 'bot.minRoiPct': return 0.5;
+          case 'bot.minRoiPct': return 0;
           case 'bot.minApyPct': return 0;
           case 'bot.minDepthUsd': return 0.01;
           case 'bot.minSharesPerLeg': return 1;
@@ -522,7 +544,15 @@ describe('maybeExecuteBotTrade safety', () => {
           },
           feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series:KXTEST', observedAt: new Date().toISOString(), version: 'quadratic:1000000',
         },
-        polymarket: { tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 400, source: 'polymarket-clob:/fee-rate', observedAt: new Date().toISOString(), version: 'token-fee-rate:400' },
+        polymarket: {
+          tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 400, feesEnabled: true,
+          feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+          orderBaseFeeBps: 1000,
+          orderSource: `https://clob.polymarket.com/fee-rate?token_id=${TEST_PM_NO_TOKEN_ID}`,
+          orderVersion: 'token-order-base-fee:1000',
+          source: `https://gamma-api.polymarket.com/markets?condition_ids=${TEST_PM_CONDITION_ID}`,
+          observedAt: new Date().toISOString(), version: 'gamma-fee-schedule:400:1:true:0.25',
+        },
         pmTheta: 0.04,
       }),
       recordBotPosition: vi.fn().mockResolvedValue(undefined),
@@ -564,6 +594,10 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.reason).toContain('Paper');
     expect(persistence.hasOpenBotPosition).toHaveBeenCalledWith('bot:pair-1:team-a', 'paper');
     expect(persistence.getTodayBotExposure).toHaveBeenCalledWith('paper');
+    expect(result.executionRecord?.polymarketOrder).toMatchObject({
+      conditionId: TEST_PM_NO_TOKEN_ID,
+      signingFeeRateBps: 1000,
+    });
     expect(positions.recordBotPosition).toHaveBeenCalledWith(
       expect.objectContaining({
         executionMode: 'paper',

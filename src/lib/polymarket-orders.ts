@@ -21,6 +21,24 @@ export interface PmOrderParams {
   price: number;
   /** Number of shares (contracts). */
   size: number;
+  /** Token-level CLOB base_fee used only in the EIP-712 signed order. */
+  signingFeeRateBps?: number;
+}
+
+export function buildPmUserOrder<TSide extends string>(p: PmOrderParams, side: TSide) {
+  const signingFeeRateBps = p.signingFeeRateBps;
+  if (!Number.isSafeInteger(signingFeeRateBps)
+    || signingFeeRateBps! < 0
+    || signingFeeRateBps! > 10_000) {
+    throw new Error('Missing or malformed Polymarket order-signing fee authority');
+  }
+  return {
+    tokenID: p.tokenId,
+    price: p.price,
+    side,
+    size: p.size,
+    feeRateBps: signingFeeRateBps as number,
+  };
 }
 
 export interface PmOrderResponse {
@@ -219,12 +237,7 @@ export async function placePmOrder(p: PmOrderParams): Promise<PmOrderResponse> {
   // createAndPostOrder resolves tick size + neg-risk automatically and signs
   // the order EIP-712. GTC limit; the caller cancels on timeout/rollback.
   const resp = await client.createAndPostOrder(
-    {
-      tokenID: p.tokenId,
-      price: p.price,
-      side: Side.BUY,
-      size: p.size,
-    },
+    buildPmUserOrder(p, Side.BUY),
     undefined,          // tick-size/neg-risk options: resolved by the client
     OrderType.GTC,
   );
@@ -297,12 +310,7 @@ export async function placePmSellOrder(p: PmOrderParams): Promise<PmOrderRespons
   const { Side, OrderType } = await import('@polymarket/clob-client');
 
   const resp = await client.createAndPostOrder(
-    {
-      tokenID: p.tokenId,
-      price: p.price,
-      side: Side.SELL,
-      size: p.size,
-    },
+    buildPmUserOrder(p, Side.SELL),
     undefined,
     OrderType.GTC,
   );

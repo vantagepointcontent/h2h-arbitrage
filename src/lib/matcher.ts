@@ -271,7 +271,7 @@ export function computeArbitrageFees(
   let pmFeeDetails = 'Polymarket: no fee (0 contracts or settled)';
   const isCrossOutcome = /^Buy YES both sides: Kalshi .+ \+ (?:PM|Polymarket) .+/.test(strategy);
 
-  if (strategy.includes('YES Kalshi') || isCrossOutcome) {
+  if (strategy.includes('YES Kalshi') || isCrossOutcome || strategy.startsWith('Buy YES both sides:')) {
     // This strategy places exactly one Kalshi order: buy YES.
     const kalshiYesContracts = kalshiStake / kalshiBuyPrice;
     kalshiFeeAmount = calcKalshiFee(kalshiYesContracts, kalshiBuyPrice, kalshiFeeAuthority);
@@ -283,12 +283,15 @@ export function computeArbitrageFees(
     kalshiFeeDetails = `Kalshi NO buy ${kalshiNoContracts.toFixed(0)} @ $${fmtProbPrice(kalshiSellPrice)} = ${formatFee(kalshiFeeAmount)}`;
   }
 
-  if (strategy.includes('YES PM') || isCrossOutcome) {
+  if (strategy.includes('YES PM')
+      || strategy.includes('YES Polymarket')
+      || isCrossOutcome
+      || strategy.startsWith('Buy YES both sides:')) {
     const pmYesContracts = pmStake / pmBuyPrice;
     const pmTheta = (pmFeeRateBps ?? getPolymarketCategoryFeeRateBps(category)) / 10_000;
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
     pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${fmtProbPrice(pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
-  } else if (strategy.includes('NO PM')) {
+  } else if (strategy.includes('NO PM') || strategy.includes('NO Polymarket')) {
     const pmNoContracts = pmStake / pmSellPrice;
     const pmTheta = (pmFeeRateBps ?? getPolymarketCategoryFeeRateBps(category)) / 10_000;
     pmFeeAmount = calcPolymarketFee(pmNoContracts, pmSellPrice, pmTheta);

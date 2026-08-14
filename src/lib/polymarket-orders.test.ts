@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { mapPmOrderResponse, parsePmFilledContracts, parsePmFillEvidence } from './polymarket-orders';
+import { buildPmUserOrder, mapPmOrderResponse, parsePmFilledContracts, parsePmFillEvidence } from './polymarket-orders';
+
+describe('buildPmUserOrder', () => {
+  it('binds the separately fetched token base_fee into the signed CLOB order', () => {
+    expect(buildPmUserOrder({ tokenId: 'token-yes', price: 0.47, size: 3, signingFeeRateBps: 1000 }, 'BUY'))
+      .toEqual({ tokenID: 'token-yes', price: 0.47, size: 3, side: 'BUY', feeRateBps: 1000 });
+  });
+
+  it('fails closed on missing signing fee authority', () => {
+    expect(() => buildPmUserOrder({ tokenId: 'token-yes', price: 0.47, size: 3 }, 'BUY'))
+      .toThrow(/signing fee/i);
+  });
+});
 
 describe('parsePmFilledContracts', () => {
   it('parses authoritative size_matched contract units from a polled order', () => {

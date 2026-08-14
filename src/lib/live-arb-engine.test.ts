@@ -271,8 +271,57 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     }]);
 
     expect(captured.fees?.kalshiFee).toBeCloseTo(0.02, 5);
-    expect(captured.fees?.pmFee).toBeCloseTo(0.0072, 5);
-    expect(captured.roiPct).toBeCloseTo(27.28, 4);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.012, 5);
+    expect(captured.roiPct).toBeCloseTo(26.8, 4);
+  });
+
+  it('charges the authoritative PM YES fee while discovering a live cross strategy', () => {
+    const feeBearingComplement = {
+      ...complement,
+      pmFeeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+    };
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.30, quantity: 100 }],
+      [{ price: 0.80, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.80, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.80, quantity: 100 }]);
+    orderbookState.setBook(complement.kalshiTicker,
+      [{ price: 0.80, quantity: 100 }],
+      [{ price: 0.30, quantity: 100 }],
+    );
+    orderbookState.setBook(complement.pmYesTokenId, [{ price: 0.40, quantity: 100 }], []);
+    orderbookState.setBook(complement.pmNoTokenId, [], [{ price: 0.80, quantity: 100 }]);
+
+    const [discovered] = computeAllLiveArbitrages([outcome, feeBearingComplement], 100, 'sports');
+
+    expect(discovered.arbType).toBe('cross');
+    expect(discovered.pmFeeRateBps).toBe(400);
+    expect(discovered.fees?.pmFee).toBeCloseTo(0.0096, 5);
+    expect(discovered.expectedProfit).toBeCloseTo(0.2704, 5);
+  });
+
+  it('does not discover a cross strategy without companion Gamma fee authority', () => {
+    const missingAuthority = {
+      ...complement,
+      pmFeesEnabled: undefined,
+      pmFeeSchedule: undefined,
+    };
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.30, quantity: 100 }],
+      [{ price: 0.80, quantity: 100 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.80, quantity: 100 }], []);
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.80, quantity: 100 }]);
+    orderbookState.setBook(complement.kalshiTicker,
+      [{ price: 0.80, quantity: 100 }],
+      [{ price: 0.30, quantity: 100 }],
+    );
+    orderbookState.setBook(complement.pmYesTokenId, [{ price: 0.40, quantity: 100 }], []);
+    orderbookState.setBook(complement.pmNoTokenId, [], [{ price: 0.80, quantity: 100 }]);
+
+    expect(computeAllLiveArbitrages([outcome, missingAuthority], 100, 'sports')
+      .every((candidate) => candidate.arbType !== 'cross')).toBe(true);
   });
 
   it('prices a captured PM NO fee from its executable ask instead of the YES complement', () => {
@@ -291,8 +340,8 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     }]);
 
     expect(captured.fees?.kalshiFee).toBeCloseTo(0.02, 5);
-    expect(captured.fees?.pmFee).toBeCloseTo(0.007425, 5);
-    expect(captured.roiPct).toBeCloseTo(22.257, 4);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.01238, 5);
+    expect(captured.roiPct).toBeCloseTo(21.762, 4);
   });
 
   it('values the captured direct direction even after the opposite direction becomes better', () => {

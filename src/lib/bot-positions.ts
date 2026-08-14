@@ -22,6 +22,13 @@ function isKalshiFeeType(value: unknown): value is KalshiFeeType {
   return value === 'quadratic' || value === 'quadratic_with_maker_fees' || value === 'flat';
 }
 
+export interface PolymarketFeeSchedule {
+  rate: number;
+  exponent: number;
+  takerOnly: boolean;
+  rebateRate: number;
+}
+
 export interface AuthoritativeKalshiFeeConfig {
   authority?: KalshiFeeAuthority;
   feeType: KalshiFeeType;
@@ -36,12 +43,7 @@ export interface AuthoritativePolymarketFeeConfig {
   /** Economic fee rate from Gamma feeSchedule, not CLOB order-signing base_fee. */
   feeRateBps: number;
   feesEnabled: boolean;
-  feeSchedule: {
-    rate: number;
-    exponent: number;
-    takerOnly: boolean;
-    rebateRate: number;
-  } | null;
+  feeSchedule: PolymarketFeeSchedule | null;
   /** CLOB base_fee retained only for order signing. */
   orderBaseFeeBps: number;
   orderSource: string;
@@ -129,6 +131,11 @@ export interface BotPosition {
   kalshiEntryFeeVersion: string | null;
   pmEntryTokenId: string | null;
   pmEntryFeeRateBps: number | null;
+  pmEntryFeesEnabled: boolean | null;
+  pmEntryFeeSchedule: PolymarketFeeSchedule | null;
+  pmEntryOrderBaseFeeBps: number | null;
+  pmEntryOrderFeeSource: string | null;
+  pmEntryOrderFeeVersion: string | null;
   pmEntryFeeSource: string | null;
   pmEntryFeeObservedAt: string | null;
   pmEntryFeeVersion: string | null;
@@ -145,6 +152,11 @@ export interface BotPosition {
   kalshiExitFeeVersion: string | null;
   pmExitTokenId: string | null;
   pmExitFeeRateBps: number | null;
+  pmExitFeesEnabled: boolean | null;
+  pmExitFeeSchedule: PolymarketFeeSchedule | null;
+  pmExitOrderBaseFeeBps: number | null;
+  pmExitOrderFeeSource: string | null;
+  pmExitOrderFeeVersion: string | null;
   pmExitFeeSource: string | null;
   pmExitFeeObservedAt: string | null;
   pmExitFeeVersion: string | null;
@@ -389,6 +401,61 @@ const FEE_SCALE = 1_000_000n;
 const FEE_CONFIG_MAX_AGE_MS = 60_000;
 const EXECUTABLE_QUOTE_MAX_AGE_MS = 60_000;
 
+function feeScheduleRebateRatePpm(schedule: PolymarketFeeSchedule | null): number | null {
+  if (schedule == null) return null;
+  const rebateRatePpm = Math.round(schedule.rebateRate * 1_000_000);
+  if (!Number.isSafeInteger(rebateRatePpm) || rebateRatePpm / 1_000_000 !== schedule.rebateRate) {
+    throw new Error('Malformed authoritative Polymarket rebate rate precision');
+  }
+  return rebateRatePpm;
+}
+
+function assertPolymarketAuthorityRevision(authority: {
+  feeRateBps: number | null;
+  feesEnabled: boolean | null;
+  feeSchedule: PolymarketFeeSchedule | null;
+  orderBaseFeeBps: number | null;
+  orderSource: string | null;
+  orderVersion: string | null;
+}, label: string): void {
+  const schedule = authority.feeSchedule;
+  const enabled = authority.feesEnabled === true
+    && schedule != null
+    && Number.isFinite(schedule.rate)
+    && Math.round(schedule.rate * 10_000) === authority.feeRateBps
+    && schedule.rate === authority.feeRateBps! / 10_000
+    && schedule.exponent === 1
+    && schedule.takerOnly === true
+    && Number.isFinite(schedule.rebateRate)
+    && schedule.rebateRate >= 0
+    && schedule.rebateRate <= 1;
+  const disabled = authority.feesEnabled === false
+    && authority.feeRateBps === 0
+    && schedule == null;
+  if ((!enabled && !disabled)
+    || !Number.isSafeInteger(authority.orderBaseFeeBps)
+    || authority.orderBaseFeeBps! < 0
+    || authority.orderBaseFeeBps! > 10_000
+    || !authority.orderSource?.startsWith('https://clob.polymarket.com/fee-rate?token_id=')
+    || !authority.orderVersion?.startsWith('token-order-base-fee:')) {
+    throw new Error(`Missing or malformed authoritative Polymarket ${label} fee configuration`);
+  }
+  feeScheduleRebateRatePpm(schedule);
+}
+
+function rowPolymarketFeeSchedule(
+  row: Record<string, unknown>,
+  prefix: 'pm_entry' | 'pm_exit',
+): PolymarketFeeSchedule | null {
+  if (row[`${prefix}_fees_enabled`] !== 1) return null;
+  const rateBps = Number(row[`${prefix}_fee_rate_bps`]);
+  const exponent = Number(row[`${prefix}_fee_exponent`]);
+  const takerOnly = row[`${prefix}_fee_taker_only`] === 1;
+  const rebateRatePpm = Number(row[`${prefix}_fee_rebate_rate_ppm`]);
+  if (![rateBps, exponent, rebateRatePpm].every(Number.isSafeInteger)) return null;
+  return { rate: rateBps / 10_000, exponent, takerOnly, rebateRate: rebateRatePpm / 1_000_000 };
+}
+
 function fixedPoint(value: number, label: string): bigint {
   if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be a finite non-negative number`);
   const scaled = Math.round(value * Number(FEE_SCALE));
@@ -524,7 +591,20 @@ function assertCurrentFeeAuthority(position: BotPosition, observedAt: string): v
   if (!Number.isSafeInteger(expectedPmFeeRateBps) || expectedPmFeeRateBps !== position.pmExitFeeRateBps) {
     throw new Error(`Conflicting Polymarket fee configuration for bot position ${position.id}`);
   }
+  assertPolymarketAuthorityRevision({
+    feeRateBps: position.pmExitFeeRateBps,
+    feesEnabled: position.pmExitFeesEnabled,
+    feeSchedule: position.pmExitFeeSchedule,
+    orderBaseFeeBps: position.pmExitOrderBaseFeeBps,
+    orderSource: position.pmExitOrderFeeSource,
+    orderVersion: position.pmExitOrderFeeVersion,
+  }, 'exit');
   if (!Number.isFinite(observedMs)) throw new Error(`Malformed valuation timestamp for bot position ${position.id}`);
+  if (kalshiFeeMs > observedMs || pmFeeMs > observedMs
+    || observedMs - kalshiFeeMs > FEE_CONFIG_MAX_AGE_MS
+    || observedMs - pmFeeMs > FEE_CONFIG_MAX_AGE_MS) {
+    throw new Error(`Stale authoritative venue fee configuration for bot position ${position.id}`);
+  }
 }
 
 function persistedExitFeeAuthority(position: BotPosition, observedAt: string): AuthoritativeBotFeeConfig | null {
@@ -544,6 +624,11 @@ function persistedExitFeeAuthority(position: BotPosition, observedAt: string): A
     polymarket: {
       tokenId: position.pmExitTokenId!,
       feeRateBps: position.pmExitFeeRateBps!,
+      feesEnabled: position.pmExitFeesEnabled!,
+      feeSchedule: position.pmExitFeeSchedule!,
+      orderBaseFeeBps: position.pmExitOrderBaseFeeBps!,
+      orderSource: position.pmExitOrderFeeSource!,
+      orderVersion: position.pmExitOrderFeeVersion!,
       source: position.pmExitFeeSource!,
       observedAt: position.pmExitFeeObservedAt!,
       version: position.pmExitFeeVersion!,
@@ -567,6 +652,22 @@ function assertEntryFeeAuthority(input: CreateBotPosition): void {
     || !Number.isFinite(pmObservedMs)) {
     throw new Error('Missing or malformed authoritative Polymarket entry fee configuration');
   }
+  assertPolymarketAuthorityRevision({
+    feeRateBps: input.pmEntryFeeRateBps,
+    feesEnabled: input.pmEntryFeesEnabled,
+    feeSchedule: input.pmEntryFeeSchedule,
+    orderBaseFeeBps: input.pmEntryOrderBaseFeeBps,
+    orderSource: input.pmEntryOrderFeeSource,
+    orderVersion: input.pmEntryOrderFeeVersion,
+  }, 'entry');
+  assertPolymarketAuthorityRevision({
+    feeRateBps: input.pmExitFeeRateBps,
+    feesEnabled: input.pmExitFeesEnabled,
+    feeSchedule: input.pmExitFeeSchedule,
+    orderBaseFeeBps: input.pmExitOrderBaseFeeBps,
+    orderSource: input.pmExitOrderFeeSource,
+    orderVersion: input.pmExitOrderFeeVersion,
+  }, 'initial exit');
   if (!Number.isFinite(openedMs)
     || kalshiObservedMs > openedMs || pmObservedMs > openedMs
     || Math.abs(openedMs - kalshiObservedMs) > FEE_CONFIG_MAX_AGE_MS
@@ -638,6 +739,14 @@ function assertPersistedEntryEconomics(position: BotPosition): void {
     || openedMs - pmObservedMs > FEE_CONFIG_MAX_AGE_MS) {
     throw new Error(`Stale authoritative entry fee configuration for bot position ${position.id}`);
   }
+  assertPolymarketAuthorityRevision({
+    feeRateBps: position.pmEntryFeeRateBps,
+    feesEnabled: position.pmEntryFeesEnabled,
+    feeSchedule: position.pmEntryFeeSchedule,
+    orderBaseFeeBps: position.pmEntryOrderBaseFeeBps,
+    orderSource: position.pmEntryOrderFeeSource,
+    orderVersion: position.pmEntryOrderFeeVersion,
+  }, 'persisted entry');
   if (Math.round((position.pmTheta ?? Number.NaN) * 10_000) !== position.pmEntryFeeRateBps) {
     throw new Error(`Conflicting authoritative entry fee configuration for bot position ${position.id}`);
   }
@@ -678,6 +787,11 @@ function isLegacyPaperEntryAuthorityMissing(position: BotPosition): boolean {
     && position.kalshiEntryFeeVersion == null
     && position.pmEntryTokenId == null
     && position.pmEntryFeeRateBps == null
+    && position.pmEntryFeesEnabled == null
+    && position.pmEntryFeeSchedule == null
+    && position.pmEntryOrderBaseFeeBps == null
+    && position.pmEntryOrderFeeSource == null
+    && position.pmEntryOrderFeeVersion == null
     && position.pmEntryFeeSource == null
     && position.pmEntryFeeObservedAt == null
     && position.pmEntryFeeVersion == null;
@@ -814,7 +928,7 @@ export function calculatePositionValuation(
   if (position.pmTheta == null || !Number.isFinite(position.pmTheta)) {
     throw new Error(`Missing authoritative Polymarket theta for bot position ${position.id}`);
   }
-  assertCurrentFeeAuthority(position, quote.observedAt);
+  assertCurrentFeeAuthority(position, quote.valuedAt ?? quote.observedAt);
 
   const kalshiLevels = position.kalshiSide === 'yes' ? quote.kalshiYesBids : quote.kalshiNoBids;
   const pmLevels = position.pmSide === 'yes' ? quote.pmYesBids : quote.pmNoBids;
@@ -927,6 +1041,11 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiEntryFeeVersion: row.kalshi_entry_fee_version != null ? String(row.kalshi_entry_fee_version) : null,
     pmEntryTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
     pmEntryFeeRateBps: row.pm_entry_fee_rate_bps != null ? Number(row.pm_entry_fee_rate_bps) : null,
+    pmEntryFeesEnabled: row.pm_entry_fees_enabled === 1 ? true : row.pm_entry_fees_enabled === 0 ? false : null,
+    pmEntryFeeSchedule: rowPolymarketFeeSchedule(row, 'pm_entry'),
+    pmEntryOrderBaseFeeBps: row.pm_entry_order_base_fee_bps != null ? Number(row.pm_entry_order_base_fee_bps) : null,
+    pmEntryOrderFeeSource: row.pm_entry_order_fee_source != null ? String(row.pm_entry_order_fee_source) : null,
+    pmEntryOrderFeeVersion: row.pm_entry_order_fee_version != null ? String(row.pm_entry_order_fee_version) : null,
     pmEntryFeeSource: row.pm_entry_fee_source != null ? String(row.pm_entry_fee_source) : null,
     pmEntryFeeObservedAt: row.pm_entry_fee_observed_at != null ? String(row.pm_entry_fee_observed_at) : null,
     pmEntryFeeVersion: row.pm_entry_fee_version != null ? String(row.pm_entry_fee_version) : null,
@@ -942,6 +1061,11 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiExitFeeVersion: row.kalshi_exit_fee_version != null ? String(row.kalshi_exit_fee_version) : null,
     pmExitTokenId: row.pm_exit_token_id != null ? String(row.pm_exit_token_id) : null,
     pmExitFeeRateBps: row.pm_exit_fee_rate_bps != null ? Number(row.pm_exit_fee_rate_bps) : null,
+    pmExitFeesEnabled: row.pm_exit_fees_enabled === 1 ? true : row.pm_exit_fees_enabled === 0 ? false : null,
+    pmExitFeeSchedule: rowPolymarketFeeSchedule(row, 'pm_exit'),
+    pmExitOrderBaseFeeBps: row.pm_exit_order_base_fee_bps != null ? Number(row.pm_exit_order_base_fee_bps) : null,
+    pmExitOrderFeeSource: row.pm_exit_order_fee_source != null ? String(row.pm_exit_order_fee_source) : null,
+    pmExitOrderFeeVersion: row.pm_exit_order_fee_version != null ? String(row.pm_exit_order_fee_version) : null,
     pmExitFeeSource: row.pm_exit_fee_source != null ? String(row.pm_exit_fee_source) : null,
     pmExitFeeObservedAt: row.pm_exit_fee_observed_at != null ? String(row.pm_exit_fee_observed_at) : null,
     pmExitFeeVersion: row.pm_exit_fee_version != null ? String(row.pm_exit_fee_version) : null,
@@ -1214,6 +1338,13 @@ export class BotPositionStore {
         kalshi_entry_fee_version TEXT,
         pm_entry_token_id TEXT,
         pm_entry_fee_rate_bps INTEGER,
+        pm_entry_fees_enabled INTEGER,
+        pm_entry_fee_exponent INTEGER,
+        pm_entry_fee_taker_only INTEGER,
+        pm_entry_fee_rebate_rate_ppm INTEGER,
+        pm_entry_order_base_fee_bps INTEGER,
+        pm_entry_order_fee_source TEXT,
+        pm_entry_order_fee_version TEXT,
         pm_entry_fee_source TEXT,
         pm_entry_fee_observed_at TEXT,
         pm_entry_fee_version TEXT,
@@ -1229,6 +1360,13 @@ export class BotPositionStore {
         kalshi_exit_fee_version TEXT,
         pm_exit_token_id TEXT,
         pm_exit_fee_rate_bps INTEGER,
+        pm_exit_fees_enabled INTEGER,
+        pm_exit_fee_exponent INTEGER,
+        pm_exit_fee_taker_only INTEGER,
+        pm_exit_fee_rebate_rate_ppm INTEGER,
+        pm_exit_order_base_fee_bps INTEGER,
+        pm_exit_order_fee_source TEXT,
+        pm_exit_order_fee_version TEXT,
         pm_exit_fee_source TEXT,
         pm_exit_fee_observed_at TEXT,
         pm_exit_fee_version TEXT,
@@ -1320,6 +1458,13 @@ export class BotPositionStore {
       kalshi_entry_fee_version: 'TEXT',
       pm_entry_token_id: 'TEXT',
       pm_entry_fee_rate_bps: 'INTEGER',
+      pm_entry_fees_enabled: 'INTEGER',
+      pm_entry_fee_exponent: 'INTEGER',
+      pm_entry_fee_taker_only: 'INTEGER',
+      pm_entry_fee_rebate_rate_ppm: 'INTEGER',
+      pm_entry_order_base_fee_bps: 'INTEGER',
+      pm_entry_order_fee_source: 'TEXT',
+      pm_entry_order_fee_version: 'TEXT',
       pm_entry_fee_source: 'TEXT',
       pm_entry_fee_observed_at: 'TEXT',
       pm_entry_fee_version: 'TEXT',
@@ -1335,6 +1480,13 @@ export class BotPositionStore {
       kalshi_exit_fee_version: 'TEXT',
       pm_exit_token_id: 'TEXT',
       pm_exit_fee_rate_bps: 'INTEGER',
+      pm_exit_fees_enabled: 'INTEGER',
+      pm_exit_fee_exponent: 'INTEGER',
+      pm_exit_fee_taker_only: 'INTEGER',
+      pm_exit_fee_rebate_rate_ppm: 'INTEGER',
+      pm_exit_order_base_fee_bps: 'INTEGER',
+      pm_exit_order_fee_source: 'TEXT',
+      pm_exit_order_fee_version: 'TEXT',
       pm_exit_fee_source: 'TEXT',
       pm_exit_fee_observed_at: 'TEXT',
       pm_exit_fee_version: 'TEXT',
@@ -1558,16 +1710,23 @@ export class BotPositionStore {
           fees, category, pm_theta, kalshi_entry_fee, pm_entry_fee, pm_entry_fee_microusd,
           kalshi_entry_fee_type, kalshi_entry_fee_multiplier_ppm, kalshi_entry_fee_source,
           kalshi_entry_fee_observed_at, kalshi_entry_fee_version, pm_entry_token_id,
-          pm_entry_fee_rate_bps, pm_entry_fee_source, pm_entry_fee_observed_at, pm_entry_fee_version,
+          pm_entry_fee_rate_bps, pm_entry_fees_enabled, pm_entry_fee_exponent, pm_entry_fee_taker_only,
+          pm_entry_fee_rebate_rate_ppm, pm_entry_order_base_fee_bps,
+          pm_entry_order_fee_source, pm_entry_order_fee_version,
+          pm_entry_fee_source, pm_entry_fee_observed_at, pm_entry_fee_version,
           kalshi_exit_fee_type, kalshi_exit_fee_multiplier_ppm, kalshi_exit_fee_source,
           kalshi_exit_fee_observed_at, kalshi_exit_fee_version, pm_exit_token_id,
-          pm_exit_fee_rate_bps, pm_exit_fee_source, pm_exit_fee_observed_at, pm_exit_fee_version,
+          pm_exit_fee_rate_bps, pm_exit_fees_enabled, pm_exit_fee_exponent, pm_exit_fee_taker_only,
+          pm_exit_fee_rebate_rate_ppm, pm_exit_order_base_fee_bps,
+          pm_exit_order_fee_source, pm_exit_order_fee_version,
+          pm_exit_fee_source, pm_exit_fee_observed_at, pm_exit_fee_version,
           kalshi_entry_calculated_fee, kalshi_entry_charged_fee,
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
@@ -1586,10 +1745,18 @@ export class BotPositionStore {
           input.pmEntryFeeMicrousd ?? input.pmEntryFeeCents * 10_000,
           input.kalshiEntryFeeType, input.kalshiEntryFeeMultiplierPpm, input.kalshiEntryFeeSource,
           input.kalshiEntryFeeObservedAt, input.kalshiEntryFeeVersion, input.pmEntryTokenId,
-          input.pmEntryFeeRateBps, input.pmEntryFeeSource, input.pmEntryFeeObservedAt, input.pmEntryFeeVersion,
+          input.pmEntryFeeRateBps, input.pmEntryFeesEnabled ? 1 : 0,
+          input.pmEntryFeeSchedule?.exponent ?? null, input.pmEntryFeeSchedule?.takerOnly ? 1 : 0,
+          feeScheduleRebateRatePpm(input.pmEntryFeeSchedule), input.pmEntryOrderBaseFeeBps,
+          input.pmEntryOrderFeeSource, input.pmEntryOrderFeeVersion,
+          input.pmEntryFeeSource, input.pmEntryFeeObservedAt, input.pmEntryFeeVersion,
           input.kalshiExitFeeType, input.kalshiExitFeeMultiplierPpm, input.kalshiExitFeeSource,
           input.kalshiExitFeeObservedAt, input.kalshiExitFeeVersion, input.pmExitTokenId,
-          input.pmExitFeeRateBps, input.pmExitFeeSource, input.pmExitFeeObservedAt, input.pmExitFeeVersion,
+          input.pmExitFeeRateBps, input.pmExitFeesEnabled ? 1 : 0,
+          input.pmExitFeeSchedule?.exponent ?? null, input.pmExitFeeSchedule?.takerOnly ? 1 : 0,
+          feeScheduleRebateRatePpm(input.pmExitFeeSchedule), input.pmExitOrderBaseFeeBps,
+          input.pmExitOrderFeeSource, input.pmExitOrderFeeVersion,
+          input.pmExitFeeSource, input.pmExitFeeObservedAt, input.pmExitFeeVersion,
           input.kalshiEntryCalculatedFeeCents ?? input.kalshiEntryFeeCents,
           input.kalshiEntryChargedFeeCents ?? null,
           input.openedAt,
@@ -1934,13 +2101,19 @@ export class BotPositionStore {
       sql: `UPDATE bot_positions SET
         kalshi_exit_fee_type = ?, kalshi_exit_fee_multiplier_ppm = ?,
         kalshi_exit_fee_source = ?, kalshi_exit_fee_observed_at = ?, kalshi_exit_fee_version = ?,
-        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?, pm_exit_fee_source = ?,
+        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?,
+        pm_exit_fees_enabled = ?, pm_exit_fee_exponent = ?, pm_exit_fee_taker_only = ?,
+        pm_exit_fee_rebate_rate_ppm = ?, pm_exit_order_base_fee_bps = ?,
+        pm_exit_order_fee_source = ?, pm_exit_order_fee_version = ?, pm_exit_fee_source = ?,
         pm_exit_fee_observed_at = ?, pm_exit_fee_version = ?
         WHERE id = ? AND status = 'open'`,
       args: [
         kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
-        polymarket.tokenId, polymarket.feeRateBps, polymarket.source, polymarket.observedAt, polymarket.version,
-        id,
+        polymarket.tokenId, polymarket.feeRateBps, polymarket.feesEnabled ? 1 : 0,
+        polymarket.feeSchedule?.exponent ?? null, polymarket.feeSchedule?.takerOnly ? 1 : 0,
+        feeScheduleRebateRatePpm(polymarket.feeSchedule), polymarket.orderBaseFeeBps,
+        polymarket.orderSource, polymarket.orderVersion, polymarket.source,
+        polymarket.observedAt, polymarket.version, id,
       ],
     });
   }
@@ -1956,7 +2129,10 @@ export class BotPositionStore {
       sql: `UPDATE bot_positions SET
         kalshi_exit_fee_type = ?, kalshi_exit_fee_multiplier_ppm = ?,
         kalshi_exit_fee_source = ?, kalshi_exit_fee_observed_at = ?, kalshi_exit_fee_version = ?,
-        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?, pm_exit_fee_source = ?,
+        pm_exit_token_id = ?, pm_exit_fee_rate_bps = ?,
+        pm_exit_fees_enabled = ?, pm_exit_fee_exponent = ?, pm_exit_fee_taker_only = ?,
+        pm_exit_fee_rebate_rate_ppm = ?, pm_exit_order_base_fee_bps = ?,
+        pm_exit_order_fee_source = ?, pm_exit_order_fee_version = ?, pm_exit_fee_source = ?,
         pm_exit_fee_observed_at = ?, pm_exit_fee_version = ?,
         status = ?, current_price_kalshi = ?, current_price_pm = ?,
         current_value = ?,
@@ -1976,7 +2152,11 @@ export class BotPositionStore {
           AND (last_valuation_at IS NULL OR last_valuation_at <= ?)`,
       args: [
         kalshi.feeType, kalshi.feeMultiplierPpm, kalshi.source, kalshi.observedAt, kalshi.version,
-        polymarket.tokenId, polymarket.feeRateBps, polymarket.source, polymarket.observedAt, polymarket.version,
+        polymarket.tokenId, polymarket.feeRateBps, polymarket.feesEnabled ? 1 : 0,
+        polymarket.feeSchedule?.exponent ?? null, polymarket.feeSchedule?.takerOnly ? 1 : 0,
+        feeScheduleRebateRatePpm(polymarket.feeSchedule), polymarket.orderBaseFeeBps,
+        polymarket.orderSource, polymarket.orderVersion, polymarket.source,
+        polymarket.observedAt, polymarket.version,
         valuation.status, valuation.currentPriceKalshiCents, valuation.currentPricePmCents,
         valuation.currentValueCents,
         valuation.kalshiGrossProceedsMicrocents, valuation.pmGrossProceedsMicrocents,
@@ -2098,7 +2278,10 @@ export function calculateBotPositionEntryCost(input: {
     throw new Error('Malformed authoritative Polymarket charged fee precision');
   }
   if (input.pmChargedFeeMicrousd != null && input.pmChargedFeeCents != null) {
-    throw new Error('Conflicting authoritative Polymarket charged fee representations');
+    const roundedMicrousdCents = roundRatio(BigInt(input.pmChargedFeeMicrousd), 10_000n);
+    if (roundedMicrousdCents !== input.pmChargedFeeCents) {
+      throw new Error('Conflicting authoritative Polymarket charged fee representations');
+    }
   }
   const kalshiEntryFeeCents = input.kalshiChargedFeeCents ?? calculatedKalshiFeeCents;
   const pmEntryFeeMicrousd = input.pmChargedFeeMicrousd
@@ -2310,6 +2493,11 @@ export async function recordBotPosition(
     kalshiExitFeeVersion: feeAuthority.kalshi.version,
     pmExitTokenId: feeAuthority.polymarket.tokenId,
     pmExitFeeRateBps: feeAuthority.polymarket.feeRateBps,
+    pmExitFeesEnabled: feeAuthority.polymarket.feesEnabled,
+    pmExitFeeSchedule: feeAuthority.polymarket.feeSchedule,
+    pmExitOrderBaseFeeBps: feeAuthority.polymarket.orderBaseFeeBps,
+    pmExitOrderFeeSource: feeAuthority.polymarket.orderSource,
+    pmExitOrderFeeVersion: feeAuthority.polymarket.orderVersion,
     pmExitFeeSource: feeAuthority.polymarket.source,
     pmExitFeeObservedAt: feeAuthority.polymarket.observedAt,
     pmExitFeeVersion: feeAuthority.polymarket.version,
@@ -2379,6 +2567,11 @@ export async function recordBotPosition(
     kalshiEntryFeeVersion: authority.kalshi.version,
     pmEntryTokenId: authority.polymarket.tokenId,
     pmEntryFeeRateBps: authority.polymarket.feeRateBps,
+    pmEntryFeesEnabled: authority.polymarket.feesEnabled,
+    pmEntryFeeSchedule: authority.polymarket.feeSchedule,
+    pmEntryOrderBaseFeeBps: authority.polymarket.orderBaseFeeBps,
+    pmEntryOrderFeeSource: authority.polymarket.orderSource,
+    pmEntryOrderFeeVersion: authority.polymarket.orderVersion,
     pmEntryFeeSource: authority.polymarket.source,
     pmEntryFeeObservedAt: authority.polymarket.observedAt,
     pmEntryFeeVersion: authority.polymarket.version,
@@ -2394,6 +2587,11 @@ export async function recordBotPosition(
     kalshiExitFeeVersion: authority.kalshi.version,
     pmExitTokenId: authority.polymarket.tokenId,
     pmExitFeeRateBps: authority.polymarket.feeRateBps,
+    pmExitFeesEnabled: authority.polymarket.feesEnabled,
+    pmExitFeeSchedule: authority.polymarket.feeSchedule,
+    pmExitOrderBaseFeeBps: authority.polymarket.orderBaseFeeBps,
+    pmExitOrderFeeSource: authority.polymarket.orderSource,
+    pmExitOrderFeeVersion: authority.polymarket.orderVersion,
     pmExitFeeSource: authority.polymarket.source,
     pmExitFeeObservedAt: authority.polymarket.observedAt,
     pmExitFeeVersion: authority.polymarket.version,
@@ -2951,6 +3149,11 @@ export async function pollOpenBotPositions(dependencies?: {
           kalshiExitFeeVersion: authority.kalshi.version,
           pmExitTokenId: authority.polymarket.tokenId,
           pmExitFeeRateBps: authority.polymarket.feeRateBps,
+          pmExitFeesEnabled: authority.polymarket.feesEnabled,
+          pmExitFeeSchedule: authority.polymarket.feeSchedule,
+          pmExitOrderBaseFeeBps: authority.polymarket.orderBaseFeeBps,
+          pmExitOrderFeeSource: authority.polymarket.orderSource,
+          pmExitOrderFeeVersion: authority.polymarket.orderVersion,
           pmExitFeeSource: authority.polymarket.source,
           pmExitFeeObservedAt: authority.polymarket.observedAt,
           pmExitFeeVersion: authority.polymarket.version,
@@ -2981,6 +3184,11 @@ export async function pollOpenBotPositions(dependencies?: {
         }, {
           tokenId: valuedPosition.pmExitTokenId!,
           feeRateBps: valuedPosition.pmExitFeeRateBps!,
+          feesEnabled: valuedPosition.pmExitFeesEnabled!,
+          feeSchedule: valuedPosition.pmExitFeeSchedule,
+          orderBaseFeeBps: valuedPosition.pmExitOrderBaseFeeBps!,
+          orderSource: valuedPosition.pmExitOrderFeeSource!,
+          orderVersion: valuedPosition.pmExitOrderFeeVersion!,
           source: valuedPosition.pmExitFeeSource!,
           observedAt: valuedPosition.pmExitFeeObservedAt!,
           version: valuedPosition.pmExitFeeVersion!,

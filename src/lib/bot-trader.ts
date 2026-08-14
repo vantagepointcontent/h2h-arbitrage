@@ -13,7 +13,7 @@
  *     blocked and alerted; it never silently degrades to a paper placement.
  */
 
-import type { UnifiedOutcome } from './matcher';
+import { computeApy, type UnifiedOutcome } from './matcher';
 import type { LiveArbResult } from './live-arb-engine';
 import {
   executeArb,
@@ -646,7 +646,7 @@ function safeArbId(pairId: string, outcome: string): string {
   return `bot:${pairId}:${sanitized}`;
 }
 
-export function buildExecutionRequest(input: BotTradeInput, configuredMinShares = 1): ExecutionRequest | null {
+export function buildExecutionRequest(input: BotTradeInput, _configuredMinShares = 1): ExecutionRequest | null {
   const legs = pickLegPrices(input.strategy, input);
   if (!legs.supported || legs.kalshiPrice == null || legs.pmPrice == null) return null;
   if (input.strategy.startsWith('Buy YES both sides:')
@@ -668,7 +668,10 @@ export function buildExecutionRequest(input: BotTradeInput, configuredMinShares 
   if (!Number.isFinite(sourceShares) || sourceShares <= 0) return null;
 
   const explicitQuotes = pickLegQuotes(input.strategy, input);
-  const contracts = Math.ceil(Math.max(1, configuredMinShares, pmMinimumOrderSize!));
+  // Scan, reservation, and execution share one canonical quantity. Never turn
+  // a verified one-share opportunity into a larger order at the final boundary.
+  if (pmMinimumOrderSize! > 1) return null;
+  const contracts = 1;
   const requestedQuantityMicros = contracts * 1_000_000;
   const { depthKUsd, depthPUsd } = legDepths(legs, input);
   const depthTimestamp = explicitQuotes.pmQuote?.depthTimestamp ?? explicitQuotes.kalshiQuote?.depthTimestamp ?? null;
@@ -743,6 +746,44 @@ export function buildExecutionRequest(input: BotTradeInput, configuredMinShares 
     dryRun: true, // overwritten by caller before executeArb()
     scanTime: new Date().toISOString(),
     bestPriceFound: true,
+  };
+}
+
+export function revalidateBotTradeEconomics(
+  input: BotTradeInput,
+  settings: BotSettings,
+  request: ExecutionRequest,
+  authority: AuthoritativeBotFeeConfig,
+): { eligible: boolean; reason: string; expectedProfit: number; roiPct: number; apyPct: number | null } {
+  const quoteFills = (order: OrderRequest) => order.executableQuote!.fills.map((fill) => ({
+    priceCents: fill.priceMicroCents != null ? fill.priceMicroCents / 1_000_000 : fill.priceCents!,
+    size: fill.quantityMicros / 1_000_000,
+  }));
+  const costs = calculateBotPositionEntryCost({
+    kalshiFills: quoteFills(request.kalshiOrder),
+    pmFills: quoteFills(request.polymarketOrder),
+    pmTheta: authority.pmTheta,
+    kalshiFeeMultiplierPpm: authority.kalshi.feeMultiplierPpm,
+    kalshiFeeType: authority.kalshi.feeType,
+    pmFeeRateBps: authority.polymarket.feeRateBps,
+  });
+  const expectedProfit = (1_000_000 - costs.totalCostMicrousd) / 1_000_000;
+  const roiPct = expectedProfit * 100;
+  const apyPct = computeApy(roiPct, input.expiryDate);
+  const reasons: string[] = [];
+  if (expectedProfit <= 0) reasons.push(`Authoritative net profit $${expectedProfit.toFixed(5)} is not positive`);
+  if (settings.selectionMethod !== 'apy' && roiPct < settings.minRoiPct) {
+    reasons.push(`Authoritative ROI ${roiPct.toFixed(2)}% < min ${settings.minRoiPct.toFixed(2)}%`);
+  }
+  if (settings.selectionMethod !== 'roi' && settings.minApyPct > 0 && (apyPct ?? 0) < settings.minApyPct) {
+    reasons.push(`Authoritative APY ${(apyPct ?? 0).toFixed(2)}% < min ${settings.minApyPct.toFixed(2)}%`);
+  }
+  return {
+    eligible: reasons.length === 0,
+    reason: reasons.length === 0 ? 'Authoritative fee economics verified' : reasons.join('; '),
+    expectedProfit,
+    roiPct,
+    apyPct,
   };
 }
 
@@ -890,6 +931,7 @@ export async function maybeExecuteBotTrade(
   const entryLegs = pickLegPrices(input.strategy, input);
   let feeAuthority: AuthoritativeBotFeeConfig;
   let resolvedKalshiAuthority: KalshiFeeAuthority;
+  let executionInput = input;
   try {
     if (!entryLegs.supported || !input.kalshiTicker || !input.pmConditionId || !input.category?.trim()) {
       throw new Error('Missing supported venue legs, identifiers, or market category');
@@ -912,8 +954,18 @@ export async function maybeExecuteBotTrade(
         priceCents: execReq.kalshiOrder.price * 100,
       }],
     }]);
+    execReq.polymarketOrder.signingFeeRateBps = feeAuthority.polymarket.orderBaseFeeBps;
+    const economics = revalidateBotTradeEconomics(input, settings, execReq, feeAuthority);
+    if (!economics.eligible) throw new Error(economics.reason);
+    execReq.estimatedProfit = economics.expectedProfit;
+    executionInput = {
+      ...input,
+      expectedProfit: economics.expectedProfit,
+      roiPct: economics.roiPct,
+      apyPct: economics.apyPct ?? undefined,
+    };
   } catch (error) {
-    const reason = `Authoritative fee authority unavailable: ${String(error)}`;
+    const reason = `Authoritative fee authority/economics preflight failed: ${String(error)}`;
     await log('safety-gate', reason, 'failed', { errorReason: reason });
     logger.warn('[bot-trader] fee authority preflight failed', { arbId, error: String(error) });
     return { executed: false, dryRun: effectiveDryRun, reason };
@@ -971,7 +1023,7 @@ export async function maybeExecuteBotTrade(
     alertMetadata: result.alerts,
   });
 
-  const alertStatus = await sendBotExecutionAlert(input, result, effectiveDryRun, input.roiPct, tradeId);
+  const alertStatus = await sendBotExecutionAlert(executionInput, result, effectiveDryRun, executionInput.roiPct, tradeId);
   const auditedResult = { ...result, alertDelivery: alertStatus };
   if (!alertStatus.delivered) {
     await log('alert', result.unhedged ? 'Unhedged exposure alert delivery' : 'Execution alert delivery', 'failed', {
@@ -991,7 +1043,7 @@ export async function maybeExecuteBotTrade(
     kalshiOrder: execReq.kalshiOrder,
     polymarketOrder: execReq.polymarketOrder,
     result: auditedResult,
-    estimatedProfit: input.expectedProfit,
+    estimatedProfit: executionInput.expectedProfit,
     steps: result.steps,
     source: 'bot',
     selectionMethod: input.selectionMethod ?? null,
@@ -1050,6 +1102,7 @@ export async function maybeExecuteBotTrade(
             pmFills: fill.pmFills,
             kalshiChargedFeeCents: fill.kalshiChargedFeeCents,
             pmChargedFeeCents: fill.pmChargedFeeCents,
+            pmChargedFeeMicrousd: performanceEvidence.polymarket.chargedFeeMicrousd,
           } : {}),
           expectedProfit: result.actualProfit ?? execReq.estimatedProfit,
           expiryDate: input.expiryDate ?? null,

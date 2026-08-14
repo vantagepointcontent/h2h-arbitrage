@@ -313,11 +313,12 @@ describe('WS-107 liveResult persistence', () => {
       kalshiUrl: `https://kalshi.com/markets/${fixtureId}`, polymarketUrl: `https://polymarket.com/event/${fixtureId}`,
       eventTitle: `Live failure retention ${fixtureId}`, category: '', expiryDate: null,
     });
+    const secondScannedAtMs = Date.now();
     await persistence.updateSavedMarketLiveResult(m.id, makeScan({
-      scannedAt: new Date().toISOString(), matchedCount: 2, matchStatus: 'matched',
+      scannedAt: new Date(secondScannedAtMs - 1_000).toISOString(), matchedCount: 2, matchStatus: 'matched',
     }));
     await persistence.updateSavedMarketLiveResult(m.id, makeScan({
-      scannedAt: new Date().toISOString(), matchedCount: 0,
+      scannedAt: new Date(secondScannedAtMs).toISOString(), matchedCount: 0,
       matchStatus: 'unavailable', matchError: 'Kalshi unavailable', allArbs: [],
     }));
 

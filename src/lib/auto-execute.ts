@@ -69,6 +69,8 @@ export interface OrderRequest {
   executableQuote?: ExecutableBookQuote;
   /** Authoritative pre-trade Kalshi fee quote; present only on Kalshi orders. */
   kalshiFeeQuote?: import('./kalshi-fee-quote').KalshiFeeQuote;
+  /** Polymarket token base_fee bound into EIP-712 signing; never used for economics. */
+  signingFeeRateBps?: number;
 }
 
 export interface OrderResult {
@@ -409,7 +411,12 @@ async function placeRealPmLeg(req: OrderRequest): Promise<OrderResult> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const size = req.contracts!;
-      const r = await placePmOrder({ tokenId: req.conditionId, price: req.price, size });
+      const r = await placePmOrder({
+        tokenId: req.conditionId,
+        price: req.price,
+        size,
+        signingFeeRateBps: req.signingFeeRateBps,
+      });
       return mapPmOrderResponse(r, r.venueEvidence ?? null);
     } catch (err: unknown) {
       lastErr = err;
@@ -670,6 +677,7 @@ async function autoCloseLeg(
         tokenId: req.conditionId!,
         price: leg.filledPrice ?? req.price,
         size: contracts,
+        signingFeeRateBps: req.signingFeeRateBps,
       });
       const mapped = mapPmOrderResponse(r, r.venueEvidence ?? null);
       const filledContracts = mapped.filledContracts ?? 0;

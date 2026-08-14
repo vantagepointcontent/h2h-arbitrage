@@ -10,6 +10,8 @@ const polymarket = {
   marketId: 'pm-one', conditionId: 'condition-one', yesTokenId: 'yes-one', noTokenId: 'no-one',
   yesPrice: 0.55, noPrice: 0.5, bestBid: 0.5, bestAsk: 0.55, lastTradePrice: 0.55,
   askDepth: 550, noAskDepth: 500, yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
+  feesEnabled: true,
+  feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
   binaryVerified: true,
 };
 

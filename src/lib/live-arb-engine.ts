@@ -650,6 +650,9 @@ export function computeAllLiveArbitrages(
       const capP = comp.pmYesDepth > 0 ? comp.pmYesDepth / pYesB : 0;
       const pmYesLimit = comp.pmYesExecutableQuote?.limitPriceMicroCents == null
         ? null : comp.pmYesExecutableQuote.limitPriceMicroCents / 100_000_000;
+      // The PM leg belongs to the companion outcome. It must carry its own
+      // Gamma economic authority; category fallback is not authoritative.
+      if (comp.pmFeeRateBps == null) continue;
       const effectiveCapital = capK >= 1 && capP >= 1
         && comp.pmYesMinOrderSize != null && comp.pmYesMinOrderSize <= 1 && comp.pmYesTickSize != null
         && pmYesLimit != null && isPriceAlignedToTick(pmYesLimit, comp.pmYesTickSize) ? 1 : 0;
@@ -667,6 +670,7 @@ export function computeAllLiveArbitrages(
         comp.pmNoAsk,
         category,
         cur.kalshiFeeAuthority,
+        comp.pmFeeRateBps ?? undefined,
       );
       if (fees.worstCaseNetProfit > cur.expectedProfit) {
         cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
@@ -697,6 +701,7 @@ export function computeAllLiveArbitrages(
         cur.pmNoMinOrderSize = comp.pmNoMinOrderSize;
         cur.pmYesTickSize = comp.pmYesTickSize;
         cur.pmNoTickSize = comp.pmNoTickSize;
+        cur.pmFeeRateBps = comp.pmFeeRateBps;
         cur.crossOutcomeMutuallyExclusiveVerified = true;
         cur.crossOutcomeExhaustiveVerified = true;
       }

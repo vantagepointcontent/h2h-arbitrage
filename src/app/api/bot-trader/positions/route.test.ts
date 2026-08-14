@@ -36,6 +36,32 @@ describe('GET /api/bot-trader/positions', () => {
     expect(getBotPositionMarkets).toHaveBeenCalledWith({ status: 'settled', limit: 100, cursor: null });
   });
 
+  it('exports separated Polymarket economic and order-signing fee authority unchanged', async () => {
+    const feeAuthority = {
+      pmEntryFeesEnabled: true,
+      pmEntryFeeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+      pmEntryOrderBaseFeeBps: 1000,
+      pmEntryOrderFeeSource: 'https://clob.polymarket.com/fee-rate?token_id=pm-no-token',
+      pmEntryOrderFeeVersion: 'token-order-base-fee:1000',
+    };
+    vi.mocked(getBotPositionMarkets).mockResolvedValue({
+      marketCount: 1,
+      nextCursor: null,
+      positions: [],
+      markets: [{
+        marketId: null,
+        marketKey: 'test',
+        executions: [{ id: 1, status: 'open', ...feeAuthority }],
+        entries: [],
+      }],
+    } as never);
+
+    const response = await GET(new Request('http://localhost/api/bot-trader/positions') as never);
+    const body = await response.json();
+    expect(body.positions[0]).toMatchObject(feeAuthority);
+    expect(body.markets[0].executions[0]).toMatchObject(feeAuthority);
+  });
+
   it('treats refresh as a persisted-data reload and never starts live valuation', async () => {
     const response = await GET(new Request('http://localhost/api/bot-trader/positions?refresh=1') as never);
     expect(response.status).toBe(200);
