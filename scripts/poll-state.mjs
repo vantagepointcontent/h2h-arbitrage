@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const LOCK_WAIT_MS = 10_000;
+const INVALID_OWNER_GRACE_MS = 250;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -17,48 +18,110 @@ async function readState(stateFile) {
   }
 }
 
+async function readProcessIdentity(pid) {
+  try {
+    const [bootId, processStat] = await Promise.all([
+      readFile('/proc/sys/kernel/random/boot_id', 'utf8'),
+      readFile(`/proc/${pid}/stat`, 'utf8'),
+    ]);
+    const commandEnd = processStat.lastIndexOf(')');
+    if (commandEnd < 0) return null;
+    const fieldsAfterCommand = processStat.slice(commandEnd + 2).trim().split(/\s+/);
+    if (fieldsAfterCommand[0] === 'Z') return null;
+    const startTimeTicks = fieldsAfterCommand[19];
+    if (!startTimeTicks) return null;
+    return { bootId: bootId.trim(), startTimeTicks };
+  } catch {
+    return null;
+  }
+}
+
+function sameProcessIdentity(left, right) {
+  return typeof left?.bootId === 'string'
+    && typeof left?.startTimeTicks === 'string'
+    && left.bootId === right?.bootId
+    && left.startTimeTicks === right?.startTimeTicks;
+}
+
+function validOwnerMetadata(owner) {
+  return Number.isInteger(owner?.pid)
+    && owner.pid > 0
+    && typeof owner.ownerToken === 'string'
+    && owner.ownerToken.length > 0
+    && Number.isFinite(Date.parse(owner.acquiredAt))
+    && typeof owner.processIdentity?.bootId === 'string'
+    && typeof owner.processIdentity?.startTimeTicks === 'string';
+}
+
+async function reclaimLock(lockPath, label) {
+  const abandoned = `${lockPath}.${label}.${process.pid}.${randomUUID()}`;
+  try {
+    await rename(lockPath, abandoned);
+    await rm(abandoned, { recursive: true, force: true });
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function invalidOwnerIsPastGrace(lockPath) {
+  try {
+    const lockStat = await stat(lockPath);
+    return Date.now() - lockStat.mtimeMs >= INVALID_OWNER_GRACE_MS;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 async function acquireLock(lockPath) {
   const deadline = Date.now() + LOCK_WAIT_MS;
+  const processIdentity = await readProcessIdentity(process.pid);
+  if (!processIdentity) throw new Error('Cannot establish scheduler lock process identity');
   while (Date.now() < deadline) {
     const stagingPath = `${lockPath}.staging.${process.pid}.${randomUUID()}`;
+    const ownerToken = randomUUID();
     try {
       await mkdir(stagingPath);
-      await writeFile(path.join(stagingPath, 'owner.json'), JSON.stringify({ pid: process.pid }));
+      await writeFile(path.join(stagingPath, 'owner.json'), JSON.stringify({
+        pid: process.pid,
+        processIdentity,
+        ownerToken,
+        acquiredAt: new Date().toISOString(),
+      }));
       await rename(stagingPath, lockPath);
-      return;
+      return ownerToken;
     } catch (error) {
       await rm(stagingPath, { recursive: true, force: true });
       if (error?.code !== 'EEXIST' && error?.code !== 'ENOTEMPTY') throw error;
       try {
         const owner = JSON.parse(await readFile(path.join(lockPath, 'owner.json'), 'utf8'));
-        let ownerAlive = false;
-        if (Number.isInteger(owner.pid) && owner.pid > 0) {
-          try {
-            process.kill(owner.pid, 0);
-            ownerAlive = true;
-          } catch (ownerError) {
-            ownerAlive = ownerError?.code === 'EPERM';
+        if (!validOwnerMetadata(owner)) {
+          if (await invalidOwnerIsPastGrace(lockPath)) {
+            await reclaimLock(lockPath, 'malformed');
+            continue;
           }
+          await sleep(10);
+          continue;
         }
-        if (!ownerAlive) {
-          const abandoned = `${lockPath}.abandoned.${process.pid}.${randomUUID()}`;
-          await rename(lockPath, abandoned);
-          await rm(abandoned, { recursive: true, force: true });
+        const ownerIdentity = Number.isInteger(owner?.pid) && owner.pid > 0
+          ? await readProcessIdentity(owner.pid)
+          : null;
+        if (!sameProcessIdentity(owner.processIdentity, ownerIdentity)) {
+          await reclaimLock(lockPath, 'abandoned');
           continue;
         }
       } catch (lockError) {
         if (lockError?.code === 'ENOENT') {
-          const abandoned = `${lockPath}.ownerless.${process.pid}.${randomUUID()}`;
-          try {
-            await rename(lockPath, abandoned);
-            await rm(abandoned, { recursive: true, force: true });
-          } catch (reclaimError) {
-            if (reclaimError?.code !== 'ENOENT') throw reclaimError;
-          }
+          await reclaimLock(lockPath, 'ownerless');
           continue;
         }
         if (lockError instanceof SyntaxError) {
-          await sleep(10);
+          if (await invalidOwnerIsPastGrace(lockPath)) {
+            await reclaimLock(lockPath, 'malformed');
+            continue;
+          }
         } else {
           throw lockError;
         }
@@ -69,10 +132,22 @@ async function acquireLock(lockPath) {
   throw new Error(`Timed out acquiring scheduler state lock: ${lockPath}`);
 }
 
+async function releaseLock(lockPath, ownerToken) {
+  try {
+    const owner = JSON.parse(await readFile(path.join(lockPath, 'owner.json'), 'utf8'));
+    if (owner?.ownerToken !== ownerToken) return;
+    const releasedPath = `${lockPath}.released.${process.pid}.${randomUUID()}`;
+    await rename(lockPath, releasedPath);
+    await rm(releasedPath, { recursive: true, force: true });
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
 export async function updateSchedulerState(stateFile, mutate) {
   await mkdir(path.dirname(stateFile), { recursive: true });
   const lockPath = `${stateFile}.lock`;
-  await acquireLock(lockPath);
+  const ownerToken = await acquireLock(lockPath);
   try {
     const state = await readState(stateFile);
     await mutate(state);
@@ -81,6 +156,6 @@ export async function updateSchedulerState(stateFile, mutate) {
     await rename(temporary, stateFile);
     return state;
   } finally {
-    await rm(lockPath, { recursive: true, force: true });
+    await releaseLock(lockPath, ownerToken);
   }
 }
