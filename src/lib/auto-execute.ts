@@ -915,6 +915,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
             unhedged = true;
             break;
           }
+          if (regressedEntryPlatforms.size > 0) {
+            rollbackExecuted = true;
+            unhedged = true;
+            break;
+          }
           const close = await autoCloseLeg(kalshiResult, req.kalshiOrder, req.arbId, effectiveDryRun);
           closes.push(close);
           rollbackExecuted = true;
@@ -947,6 +952,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
             unhedged = true;
             break;
           }
+          if (regressedEntryPlatforms.size > 0) {
+            rollbackExecuted = true;
+            unhedged = true;
+            break;
+          }
           const close = await autoCloseLeg(polymarketResult, req.polymarketOrder, req.arbId, effectiveDryRun);
           closes.push(close);
           rollbackExecuted = true;
@@ -968,7 +978,9 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   const kFilled = hasFill(kalshiResult);
   const pFilled = hasFill(polymarketResult);
 
-  if (rollbackExecuted) {
+  if (regressedEntryPlatforms.size > 0) {
+    addStep('failed', 'Entry cumulative-fill evidence regressed — exposure requires manual reconciliation');
+  } else if (rollbackExecuted) {
     addStep(
       unhedged ? 'failed' : 'partial',
       unhedged

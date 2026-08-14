@@ -237,4 +237,25 @@ describe('BUG-153 live entry terminality', () => {
     expect(result.success).toBe(false);
     expect(result.unhedged).toBe(true);
   }, 12_000);
+
+  it('does not close the other leg when a regressed entry later reports a failed status', async () => {
+    mocks.placeKalshiOrder.mockResolvedValue(kalshiOrder('resting', 2, 1, '1'));
+    mocks.placePmOrder.mockResolvedValue(pmOrder('live', 2, 1, '1'));
+    mocks.getKalshiOrder.mockResolvedValue(kalshiOrder('canceled', 1, 1, '2'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('matched', 2, 1, '2'));
+    mocks.placePmSellOrder.mockResolvedValue(pmOrder('matched', 2, 1, '3'));
+    const req = request();
+    req.timeoutMs = 5_000;
+
+    const result = await executeArb(req);
+
+    expect(mocks.placeKalshiSellOrder).not.toHaveBeenCalled();
+    expect(mocks.placePmSellOrder).not.toHaveBeenCalled();
+    expect(result.cashLedger?.entryOrders).toEqual(expect.arrayContaining([
+      expect.objectContaining({ venue: 'kalshi', terminality: 'indeterminate' }),
+    ]));
+    expect(result.cashLedger?.status).toBe('reconciliation-required');
+    expect(result.success).toBe(false);
+    expect(result.unhedged).toBe(true);
+  }, 10_000);
 });
