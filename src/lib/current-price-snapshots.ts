@@ -52,6 +52,10 @@ function db(): Client {
 async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
+      // Disposable full-scan workers each own a connection. Configure the
+      // SQLite writer wait before schema verification or snapshot upserts so
+      // a concurrent WAL writer does not fail an otherwise durable scan.
+      await db().execute('PRAGMA busy_timeout = 5000');
       await db().execute(`CREATE TABLE IF NOT EXISTS platform_price_snapshots (
         platform TEXT NOT NULL,
         market_id TEXT NOT NULL,
