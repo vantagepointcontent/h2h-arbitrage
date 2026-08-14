@@ -86,6 +86,8 @@ export interface OrderResult {
 export interface ExecutionRequest {
   arbId: string;
   marketTitle: string;
+  /** Parent Polymarket condition ID; the selected order token remains on polymarketOrder.conditionId. */
+  pmConditionId?: string;
   kalshiOrder: OrderRequest;
   polymarketOrder: OrderRequest;
   estimatedProfit: number;

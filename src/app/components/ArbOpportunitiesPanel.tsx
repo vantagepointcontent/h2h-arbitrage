@@ -7,7 +7,7 @@ import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import type { OutcomeContingentApy } from "@/lib/settlement-apy";
-import { computeApy, parseDepth } from "@/lib/matcher";
+import { parseDepth } from "@/lib/matcher";
 import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
@@ -208,6 +208,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
         pmYesTickSize: o.polymarket.yesTickSize ?? undefined,
         pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
+        pmConditionId: o.polymarket.conditionId,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
       }, marketTitle);

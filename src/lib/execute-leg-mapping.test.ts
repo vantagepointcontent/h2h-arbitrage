@@ -32,6 +32,7 @@ const base = {
   pmNoMinOrderSize: 1,
   stale: false,
   kalshiTicker: 'KXTEST-26',
+  pmConditionId: 'parent-condition',
   pmYesTokenId: 'tok-yes-1',
   pmNoTokenId: 'tok-no-1',
 };
@@ -46,6 +47,7 @@ describe('buildExecutableArb leg mapping', () => {
     expect(arb!.polymarketOrder.outcome).toBe('no');
     expect(arb!.polymarketOrder.price).toBe(0.52);
     expect(arb!.polymarketOrder.conditionId).toBe('tok-no-1');
+    expect(arb!.pmConditionId).toBe('parent-condition');
   });
 
   it('Buy YES PM + NO Kalshi → K no @ noAsk, PM yes-token @ pmYesAsk', () => {
@@ -65,6 +67,7 @@ describe('buildExecutableArb leg mapping', () => {
 
   it('rejects rows missing identifiers or prices', () => {
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', kalshiTicker: undefined }, 'T')).toBeNull();
+    expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', pmConditionId: undefined }, 'T')).toBeNull();
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', pmNoTokenId: undefined }, 'T')).toBeNull();
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', pmNoAsk: null }, 'T')).toBeNull();
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', kalshiStake: 0 }, 'T')).toBeNull();

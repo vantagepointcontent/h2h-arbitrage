@@ -92,6 +92,7 @@ describe('validateOneShareBookOrder', () => {
       asks: [{ price: '0.60', size: '10' }, { price: '0.40', size: '1' }],
       min_order_size: '0.5',
       tick_size: '0.01',
+      timestamp: String(Date.now()),
     };
     expect(validateOneShareBookOrder(validBook, 'expected-token', 0.4)).toMatchObject({
       valid: true, minimumOrderSize: 0.5, tickSize: 0.01, bestAsk: 0.4, bestAskShares: 1,
@@ -109,7 +110,7 @@ describe('validateOneShareBookOrder', () => {
   it('fails closed on mismatched token identity and malformed levels', () => {
     const validBook: ClobBook = {
       asset_id: 'expected-token', bids: [], asks: [{ price: '0.40', size: '1' }],
-      min_order_size: '1', tick_size: '0.01',
+      min_order_size: '1', tick_size: '0.01', timestamp: String(Date.now()),
     };
     expect(validateOneShareBookOrder({ ...validBook, asset_id: 'wrong-token' }, 'expected-token', 0.4))
       .toMatchObject({ valid: false, blocker: 'Polymarket order book token does not match requested token' });
@@ -121,6 +122,25 @@ describe('validateOneShareBookOrder', () => {
       .toMatchObject({ valid: false, blocker: 'Polymarket order book bids are malformed' });
     expect(validateOneShareBookOrder({ ...validBook, asks: [{ price: '0.40', size: 1 as unknown as string }] }, 'expected-token', 0.4))
       .toMatchObject({ valid: false, blocker: 'Polymarket order book asks are malformed' });
+  });
+
+  it('accepts only fresh Unix epoch milliseconds encoded as a decimal string', () => {
+    const validBook: ClobBook = {
+      asset_id: 'expected-token', bids: [], asks: [{ price: '0.40', size: '1' }],
+      min_order_size: '1', tick_size: '0.01', timestamp: String(Date.now()),
+    };
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: undefined }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book timestamp is unavailable');
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: '2026-08-14T13:00:00.000Z' }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book timestamp is malformed');
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: String(Math.floor(Date.now() / 1000)) }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book timestamp is malformed');
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: Date.now() as unknown as string }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book timestamp is malformed');
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: '0' }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book is stale');
+    expect(validateOneShareBookOrder({ ...validBook, timestamp: String(Date.now() + 60_000) }, 'expected-token', 0.4).blocker)
+      .toBe('Polymarket order book timestamp is in the future');
   });
 });
 

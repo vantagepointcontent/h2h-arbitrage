@@ -29,6 +29,7 @@ interface ArbLeg {
 export interface ExecutableArb {
   arbId: string;
   marketTitle: string;
+  pmConditionId: string;
   outcome: string;
   strategy: string;
   roiPct: number;
@@ -76,6 +77,7 @@ export function buildExecutableArb(o: {
   /** Missing or stale books are never safe to execute against. */
   stale?: boolean;
   kalshiTicker?: string;
+  pmConditionId?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
   category?: string;
@@ -84,7 +86,7 @@ export function buildExecutableArb(o: {
   /** True only when every leg has a verified positive ask depth. */
   depthVerified?: boolean;
 }, marketTitle: string): ExecutableArb | null {
-  if (!o.kalshiTicker) return null;
+  if (!o.kalshiTicker || !o.pmConditionId) return null;
   let kOutcome: "yes" | "no";
   let kPrice: number | null;
   let pmOutcome: "yes" | "no";
@@ -161,6 +163,7 @@ export function buildExecutableArb(o: {
   return {
     arbId: `${Date.now().toString(36)}-${o.artist.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
     marketTitle,
+    pmConditionId: o.pmConditionId,
     outcome: o.artist,
     strategy: o.strategy,
     roiPct,
@@ -229,6 +232,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           request: {
             arbId: arb.arbId,
             marketTitle: arb.marketTitle,
+            pmConditionId: arb.pmConditionId,
             kalshiOrder: arb.kalshiOrder,
             polymarketOrder: arb.polymarketOrder,
             estimatedProfit: arb.expectedProfit,

@@ -169,6 +169,7 @@ function OutcomeTableBodyInner({
         pmYesTickSize: o.polymarket.yesTickSize ?? undefined,
         pmNoTickSize: o.polymarket.noTickSize ?? undefined,
         kalshiTicker: o.kalshi.ticker,
+        pmConditionId: o.polymarket.conditionId,
         pmYesTokenId: data.yesTokenId,
         pmNoTokenId: data.noTokenId,
         scanTime: scanTimeProp,

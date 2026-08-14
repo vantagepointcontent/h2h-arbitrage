@@ -17,7 +17,39 @@ import { getExecutionMode, setSettings } from '@/lib/settings';
 import { applyEmergencyStop, executionModeToDryRun } from '@/lib/execution-mode';
 import { persistExecution } from '@/lib/persistence';
 import logger from '@/lib/logger';
-import { fetchClobBook, validateOneShareBookOrder } from '@/lib/polymarket-clob';
+import {
+  fetchClobBook,
+  fetchClobMarket,
+  validateOneShareBookOrder,
+  type ClobMarket,
+} from '@/lib/polymarket-clob';
+
+function resolveBinaryOutcomeTokens(
+  market: ClobMarket | null,
+  expectedConditionId: string,
+): { yes: string; no: string } | null {
+  if (!market || typeof market.condition_id !== 'string'
+      || market.condition_id.toLowerCase() !== expectedConditionId.toLowerCase()
+      || !Array.isArray(market.tokens) || market.tokens.length !== 2) {
+    return null;
+  }
+
+  const byOutcome: { yes: string[]; no: string[] } = { yes: [], no: [] };
+  for (const candidate of market.tokens as unknown[]) {
+    if (!candidate || typeof candidate !== 'object') return null;
+    const tokenId = (candidate as { token_id?: unknown }).token_id;
+    const outcome = (candidate as { outcome?: unknown }).outcome;
+    if (typeof tokenId !== 'string' || !tokenId.trim() || typeof outcome !== 'string') return null;
+    const normalizedOutcome = outcome.toLowerCase();
+    if (normalizedOutcome !== 'yes' && normalizedOutcome !== 'no') return null;
+    byOutcome[normalizedOutcome].push(tokenId.trim());
+  }
+
+  if (byOutcome.yes.length !== 1 || byOutcome.no.length !== 1 || byOutcome.yes[0] === byOutcome.no[0]) {
+    return null;
+  }
+  return { yes: byOutcome.yes[0], no: byOutcome.no[0] };
+}
 
 /**
  * HOOKUP-04 (FEAT-006): MANUAL trade execution + credential management.
@@ -116,7 +148,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             { status: 403 },
           );
         }
-        const pmTokenId = effective.polymarketOrder.conditionId;
+        const pmConditionId = typeof effective.pmConditionId === 'string'
+          ? effective.pmConditionId.trim()
+          : '';
+        const pmTokenId = typeof effective.polymarketOrder.conditionId === 'string'
+          ? effective.polymarketOrder.conditionId.trim()
+          : '';
+        const pmOutcome = effective.polymarketOrder.outcome;
+        const parentMarket = pmConditionId
+          ? await fetchClobMarket(pmConditionId, { bypassCache: true })
+          : null;
+        const outcomeTokens = resolveBinaryOutcomeTokens(parentMarket, pmConditionId);
+        if (!outcomeTokens) {
+          return NextResponse.json(
+            { error: 'Polymarket parent token mapping is invalid' },
+            { status: 409 },
+          );
+        }
+        if ((pmOutcome !== 'yes' && pmOutcome !== 'no') || outcomeTokens[pmOutcome] !== pmTokenId) {
+          return NextResponse.json(
+            { error: `Polymarket ${String(pmOutcome).toUpperCase()} token does not match the parent market` },
+            { status: 409 },
+          );
+        }
         const authoritativeBook = pmTokenId
           ? await fetchClobBook(pmTokenId, { bypassCache: true })
           : null;

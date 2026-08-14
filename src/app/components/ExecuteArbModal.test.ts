@@ -32,6 +32,7 @@ const baseArb = {
   pmNoTickSize: 0.01,
   stale: false,
   kalshiTicker: 'KXEXAMPLE',
+  pmConditionId: 'parent-condition',
   pmYesTokenId: 'pm-yes',
   pmNoTokenId: 'pm-no',
   kalshiYesExecutableQuote: executableQuote(42_000_000),
@@ -61,6 +62,7 @@ describe('buildExecutableArb', () => {
     expect(arb?.kalshiOrder.executableQuote).toBeDefined();
     expect(arb?.polymarketOrder.executableQuote).toBeDefined();
     expect(arb?.executionStatus).toBe('executable');
+    expect(arb?.pmConditionId).toBe('parent-condition');
     // Full-book scanner profit must never leak into a top-level-depth-capped order.
     expect(arb?.expectedProfit).toBeLessThan(0);
     expect(arb?.expectedProfit).not.toBe(4.8);

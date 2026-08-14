@@ -63,6 +63,7 @@ interface LiveArbOutcome {
   kalshiTicker?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
+  pmConditionId?: string;
   /** HOOKUP-02 (FEAT-004): likelihood-to-last rating attached server-side. */
   persistence?: {
     score: number;

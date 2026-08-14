@@ -21,6 +21,7 @@ export interface ClobMarket {
 
 export interface ClobBook {
   asset_id?: string;
+  /** CLOB snapshot time: 13-digit Unix epoch milliseconds encoded as a decimal string. */
   timestamp?: string;
   bids: { price: string; size: string }[];
   asks: { price: string; size: string }[];
@@ -32,6 +33,9 @@ export interface ClobBook {
 
 const CLOB_RETRIES = 2;
 const CLOB_MAX_CONCURRENCY = 10;
+/** Server-owned live-placement freshness bounds; request data cannot weaken them. */
+export const CLOB_LIVE_BOOK_MAX_AGE_MS = 10_000;
+export const CLOB_LIVE_BOOK_MAX_FUTURE_SKEW_MS = 1_000;
 // PERF-P2: 15s (was 2s). Poller tiers are ≥5min and UI auto-refresh is 60s,
 // so a 15s orderbook cache is well within staleness tolerance for scanning.
 // Live WS uses its own REST-seed + WS-delta path and is unaffected.
@@ -98,12 +102,16 @@ function setCached(conditionId: string, data: ClobMarket): void {
   }
 }
 
-export async function fetchClobMarket(conditionId: string): Promise<ClobMarket | null> {
-  // Check cache first
-  const cached = getCached(conditionId);
-  if (cached) {
-    debugLog('[CLOB] cache hit', conditionId.slice(0, 12));
-    return cached;
+export async function fetchClobMarket(
+  conditionId: string,
+  options?: { bypassCache?: boolean },
+): Promise<ClobMarket | null> {
+  if (!options?.bypassCache) {
+    const cached = getCached(conditionId);
+    if (cached) {
+      debugLog('[CLOB] cache hit', conditionId.slice(0, 12));
+      return cached;
+    }
   }
 
   // Acquire semaphore to limit concurrent requests
@@ -377,6 +385,26 @@ export function validateOneShareBookOrder(
   }
   if (!validLevels(book.bids)) return invalid('Polymarket order book bids are malformed');
   if (!validLevels(book.asks)) return invalid('Polymarket order book asks are malformed');
+
+  const timestamp = book.timestamp;
+  if (timestamp == null) return invalid('Polymarket order book timestamp is unavailable');
+  // CLOB emits Unix epoch milliseconds as a JSON string. Reject numbers, ISO
+  // dates, epoch seconds, whitespace, signs, decimals, and non-canonical width.
+  // Preserve epoch zero as a well-formed but necessarily stale sentinel.
+  if (typeof timestamp !== 'string' || (timestamp !== '0' && !/^[1-9]\d{12}$/.test(timestamp))) {
+    return invalid('Polymarket order book timestamp is malformed');
+  }
+  const observedAtMs = Number(timestamp);
+  if (!Number.isSafeInteger(observedAtMs)) {
+    return invalid('Polymarket order book timestamp is malformed');
+  }
+  const nowMs = Date.now();
+  if (observedAtMs > nowMs + CLOB_LIVE_BOOK_MAX_FUTURE_SKEW_MS) {
+    return invalid('Polymarket order book timestamp is in the future');
+  }
+  if (nowMs - observedAtMs > CLOB_LIVE_BOOK_MAX_AGE_MS) {
+    return invalid('Polymarket order book is stale');
+  }
 
   const minimumOrderSize = positiveBookConstraint(book?.min_order_size);
   const tickSize = positiveBookConstraint(book?.tick_size);
