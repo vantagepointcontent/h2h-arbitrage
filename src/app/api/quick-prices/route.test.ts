@@ -20,50 +20,11 @@ vi.mock('@/lib/scan-rate-limit', () => ({
 
 import { POST } from './route';
 
-function quickRequest(marketId = 'nc-14', capital = 1000) {
-  return new NextRequest('http://localhost/api/quick-prices', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ marketId, capital }),
-  });
-}
-
 describe('POST /api/quick-prices diagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.reserveSavedMarketPublication.mockResolvedValue(7);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
-  });
-
-  it('deduplicates repeated clicks before reserving or fetching the same refresh', async () => {
-    let release!: (value: Record<string, unknown>) => void;
-    mocks.quickPricesScan.mockReturnValue(new Promise((resolve) => { release = resolve; }));
-
-    const first = POST(quickRequest('mlb-steals'));
-    await vi.waitFor(() => expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1));
-    const repeated = POST(quickRequest('mlb-steals'));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    release({
-      matchedCount: 1,
-      matchStatus: 'matched',
-      matchedPairs: [{ artist: 'Aaron Judge', kalshiTicker: 'KX-JUDGE', pmConditionId: 'pm-judge' }],
-      refreshStatus: 'complete',
-      retryable: false,
-      platformWarnings: [],
-      platformDiagnostics: {
-        kalshi: { status: 'fresh', count: 1 },
-        polymarket: { status: 'fresh', count: 1 },
-      },
-      outcomes: [{ artist: 'Aaron Judge' }],
-      _pmFetchedAt: '2026-08-14T09:45:00.000Z',
-    });
-
-    const [firstResponse, repeatedResponse] = await Promise.all([first, repeated]);
-    expect(firstResponse.status).toBe(200);
-    expect(repeatedResponse.status).toBe(200);
-    expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1);
-    expect(mocks.reserveSavedMarketPublication).toHaveBeenCalledTimes(1);
-    expect(repeatedResponse.headers.get('x-quick-prices-deduplicated')).toBe('true');
   });
 
   it('returns live prices even when the optional publication reservation hits SQLITE_BUSY', async () => {

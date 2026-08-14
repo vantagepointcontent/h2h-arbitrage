@@ -3,7 +3,6 @@ import { getSavedMarkets, recoverInterruptedScanPublications } from '@/lib/persi
 import { clientSafeError } from '@/lib/error-handler';
 import { getScanWorkerMetrics } from '@/lib/scan-worker-coordinator';
 import { getSqliteContentionMetrics } from '@/lib/sqlite-write-retry';
-import { getQuickPricesMetrics } from '@/lib/quick-prices-coordinator';
 
 let recovery: Promise<number> | null = null;
 
@@ -16,7 +15,6 @@ export async function GET() {
       status: 'ok',
       savedMarketCount: markets.length,
       scanWorkers: getScanWorkerMetrics(),
-      quickPrices: getQuickPricesMetrics(),
       sqliteContention: getSqliteContentionMetrics(),
       now: new Date().toISOString(),
     }, {
