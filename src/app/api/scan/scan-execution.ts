@@ -39,31 +39,6 @@ import {
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
-const SQLITE_WRITER_LOCK_ID = '__saved_market_sqlite_writer__';
-const SQLITE_WRITER_WAIT_MS = 10_000;
-
-async function acquireSqliteWriterLock(): Promise<SavedMarketScanLock> {
-  const deadline = Date.now() + SQLITE_WRITER_WAIT_MS;
-  let detail = 'SQLite writer is busy';
-  while (Date.now() < deadline) {
-    const result = await acquireSavedMarketScanLock(SQLITE_WRITER_LOCK_ID);
-    if (result.status === 'acquired') return result.lock;
-    detail = result.detail ?? result.reason;
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 50)));
-  }
-  throw Object.assign(new Error(`Timed out waiting for serialized scan persistence: ${detail}`), {
-    code: 'SQLITE_BUSY',
-  });
-}
-
-async function withSqliteWriterLock<T>(operation: () => Promise<T>): Promise<T> {
-  const lock = await acquireSqliteWriterLock();
-  try {
-    return await operation();
-  } finally {
-    await releaseSavedMarketScanLock(lock);
-  }
-}
 
 export async function executeFullScan(request: NextRequest) {
   let savedMarketId: string | null = null;
@@ -111,10 +86,7 @@ export async function executeFullScan(request: NextRequest) {
 
     // Reserve ordering before upstream requests. Completion timestamps cannot
     // order overlapping scans that resolve within the same clock tick.
-    // A disposable worker initializes its SQLite connection on this lookup.
-    // Gate it with the same cross-process writer lock so awaited PRAGMAs and
-    // schema verification cannot race another worker's publication transaction.
-    const savedMarket = await withSqliteWriterLock(() => findSavedMarketByUrls(kalshiUrl!, polymarketUrl!));
+    const savedMarket = await findSavedMarketByUrls(kalshiUrl!, polymarketUrl!);
     savedMarketId = savedMarket?.id ?? null;
     if (savedMarketId) {
       const acquisition = await acquireSavedMarketScanLock(savedMarketId);
@@ -134,16 +106,14 @@ export async function executeFullScan(request: NextRequest) {
       scanLock = acquisition.lock;
     }
     if (savedMarket) {
-      await withSqliteWriterLock(async () => {
-        publicationGeneration = await reserveSavedMarketPublication(savedMarket.id, 'scan');
-        await reconcileSavedMarketMatchSummary(savedMarket.id, {
-          matchedCount: 0,
-          matchStatus: 'refreshing',
-          matchError: undefined,
-          matchedPairs: undefined,
-          scannedAt: new Date().toISOString(),
-          publicationGeneration,
-        });
+      publicationGeneration = await reserveSavedMarketPublication(savedMarket.id, 'scan');
+      await reconcileSavedMarketMatchSummary(savedMarket.id, {
+        matchedCount: 0,
+        matchStatus: 'refreshing',
+        matchError: undefined,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
       });
     }
 
@@ -535,11 +505,6 @@ export async function executeFullScan(request: NextRequest) {
           };
           }),
         };
-        // Network/enrichment work remains parallel, while the short publication
-        // phase is serialized across disposable worker processes. SQLite WAL
-        // permits concurrent readers but only one writer; relying on retries
-        // alone caused otherwise successful scans to exhaust under burst load.
-        await withSqliteWriterLock(async () => {
         const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
         if (!published) throw new Error('Saved-market publication was superseded before persistence');
         await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
@@ -555,7 +520,6 @@ export async function executeFullScan(request: NextRequest) {
             positiveArbCount: positiveArbs.length,
             matchedCount,
           }));
-        });
         fullScanPersisted = true;
 
         // Bot consumption is secondary to publishing the saved-market result.
@@ -638,14 +602,14 @@ export async function executeFullScan(request: NextRequest) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
       if (savedMarketId && publicationGeneration != null) {
         const matchError = clientSafeError(e, 'Scan result persistence failed', { path: '/api/scan' });
-        await withSqliteWriterLock(() => reconcileSavedMarketMatchSummary(savedMarketId!, {
+        await reconcileSavedMarketMatchSummary(savedMarketId, {
           matchedCount: 0,
           matchStatus: 'unavailable',
           matchError,
           matchedPairs: undefined,
           scannedAt: new Date().toISOString(),
-          publicationGeneration: publicationGeneration ?? undefined,
-        })).catch(() => {});
+          publicationGeneration,
+        }).catch(() => {});
       }
     }
 

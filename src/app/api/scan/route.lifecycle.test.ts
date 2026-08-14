@@ -172,30 +172,6 @@ describe('POST /api/scan saved-market lifecycle', () => {
     expect(mocks.appendScanHistory).toHaveBeenCalledTimes(3);
   });
 
-  it('waits for the cross-process SQLite writer instead of failing the scan burst', async () => {
-    let writerAttempts = 0;
-    mocks.acquireSavedMarketScanLock.mockImplementation(async (lockId: string) => {
-      if (lockId !== 'tx-07' && ++writerAttempts === 1) {
-        return {
-          status: 'busy',
-          reason: 'owner_live',
-          retryable: true,
-          retryAfterMs: 5_000,
-        };
-      }
-      return {
-        status: 'acquired',
-        lock: { path: `/tmp/${lockId}`, ownerPid: 1, ownerToken: `${lockId}-${writerAttempts}` },
-      };
-    });
-
-    const response = await executeFullScan(request());
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
-    expect(mocks.acquireSavedMarketScanLock.mock.calls.length).toBeGreaterThanOrEqual(4);
-  });
-
   it('keeps a durable full scan successful when secondary bot persistence fails', async () => {
     mocks.persistAndConsumeBotScan.mockRejectedValueOnce(new Error('bot persistence unavailable'));
 
