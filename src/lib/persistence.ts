@@ -642,6 +642,99 @@ export async function getScanValuationInputs(ids: number[]): Promise<ScanValuati
   });
 }
 
+export type PersistedCurrentLogRoiStatus = 'available' | 'no_arbitrage' | 'never_scanned' | 'unavailable';
+
+export interface PersistedCurrentLogRoi {
+  id: number;
+  status: PersistedCurrentLogRoiStatus;
+  roiPct?: number;
+  strategy?: string;
+  scannedAt?: string;
+  scanId?: number;
+}
+
+/**
+ * Resolve Logs Current ROI from the newest completed persisted scan for each
+ * row's exact linked-event URL pair. One bounded query handles all distinct
+ * pairs; titles and market ids are deliberately excluded from identity.
+ */
+export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise<PersistedCurrentLogRoi[]> {
+  await ensureDb();
+  const uniqueIds = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0).slice(0, 100);
+  if (uniqueIds.length === 0) return [];
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const result = await getClient().execute({
+    sql: `WITH requested AS (
+            SELECT id, kalshi_url, polymarket_url, scan_status
+            FROM scan_results
+            WHERE id IN (${placeholders})
+          ), distinct_pairs AS (
+            SELECT DISTINCT kalshi_url, polymarket_url
+            FROM requested
+            WHERE kalshi_url IS NOT NULL AND kalshi_url <> ''
+              AND polymarket_url IS NOT NULL AND polymarket_url <> ''
+          ), ranked AS (
+            SELECT p.kalshi_url, p.polymarket_url,
+                   s.id AS scan_id, s.best_roi_pct, s.strategy, s.positive_arb_count,
+                   s.arb_valid, s.apy_unavailable_reason, s.scanned_at,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY p.kalshi_url, p.polymarket_url
+                     ORDER BY s.scanned_at DESC, s.id DESC
+                   ) AS scan_rank
+            FROM distinct_pairs p
+            JOIN scan_results s
+              ON s.kalshi_url = p.kalshi_url
+             AND s.polymarket_url = p.polymarket_url
+             AND s.scan_status = 'completed'
+          )
+          SELECT r.id, r.kalshi_url, r.polymarket_url, r.scan_status AS requested_scan_status,
+                 latest.scan_id, latest.best_roi_pct, latest.strategy,
+                 latest.positive_arb_count, latest.arb_valid,
+                 latest.apy_unavailable_reason, latest.scanned_at
+          FROM requested r
+          LEFT JOIN ranked latest
+            ON latest.kalshi_url = r.kalshi_url
+           AND latest.polymarket_url = r.polymarket_url
+           AND latest.scan_rank = 1`,
+    args: uniqueIds,
+  });
+  const rowsById = new Map(result.rows.map((row) => [Number(row.id), row]));
+
+  return uniqueIds.map((id) => {
+    const row = rowsById.get(id);
+    if (!row) return { id, status: 'never_scanned' as const };
+    if (typeof row.kalshi_url !== 'string' || row.kalshi_url.length === 0
+      || typeof row.polymarket_url !== 'string' || row.polymarket_url.length === 0) {
+      return { id, status: 'unavailable' as const };
+    }
+    const scanId = Number(row.scan_id);
+    if (!Number.isSafeInteger(scanId) || scanId <= 0) {
+      return { id, status: row.requested_scan_status === 'completed' ? 'never_scanned' as const : 'unavailable' as const };
+    }
+    const scannedAt = typeof row.scanned_at === 'string' ? row.scanned_at : undefined;
+    const common = { id, scanId, ...(scannedAt ? { scannedAt } : {}) };
+    const positiveArbCount = Number(row.positive_arb_count);
+    if (!Number.isSafeInteger(positiveArbCount) || positiveArbCount < 0) {
+      return { id, status: 'unavailable' as const };
+    }
+    if (positiveArbCount === 0) {
+      return row.arb_valid === 1 || row.apy_unavailable_reason === 'no_arbitrage'
+        ? { ...common, status: 'no_arbitrage' as const }
+        : { id, status: 'unavailable' as const };
+    }
+    const roiPct = Number(row.best_roi_pct);
+    if (row.arb_valid !== 1 || !Number.isFinite(roiPct)) {
+      return { id, status: 'unavailable' as const };
+    }
+    return {
+      ...common,
+      status: 'available' as const,
+      roiPct,
+      ...(typeof row.strategy === 'string' && row.strategy ? { strategy: row.strategy } : {}),
+    };
+  });
+}
+
 /**
  * UI-035: chunked, streaming-friendly scan history export.
  *
