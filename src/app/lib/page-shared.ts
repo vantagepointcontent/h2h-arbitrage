@@ -338,6 +338,25 @@ export interface SavedMarket {
   } | null;
 }
 
+/**
+ * Watcher results intentionally carry only ROI summaries for HOT markets. They
+ * are newer than the poller's full result, but cannot populate executable
+ * Market prices rows. Prefer them only when they actually contain venue ids and
+ * prices; otherwise retain the full persisted scan until quick-prices returns.
+ */
+export function selectSavedMarketPriceCache(
+  market: Pick<SavedMarket, 'lastScanResult' | 'liveResult'>,
+): LastScanResult | NonNullable<SavedMarket['liveResult']> | null {
+  const live = market.liveResult;
+  const hasLivePrices = Array.isArray(live?.allArbs) && live.allArbs.some((candidate) => {
+    const priced = candidate as NonNullable<LastScanResult['allArbs']>[number];
+    return typeof priced.kalshiTicker === 'string' && priced.kalshiTicker !== '' &&
+      typeof priced.pmConditionId === 'string' && priced.pmConditionId !== '' &&
+      priced.kalshiYesAsk != null && priced.pmYesPrice != null;
+  });
+  return hasLivePrices ? live! : market.lastScanResult ?? null;
+}
+
 export interface ScanResult {
   eventTitle: string;
   kalshiCount: number;

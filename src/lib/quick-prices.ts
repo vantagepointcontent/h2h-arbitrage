@@ -69,6 +69,26 @@ export interface QuickPricesResult {
   refreshStatus: 'complete' | 'partial' | 'failed';
   retryable: boolean;
   platformDiagnostics: Record<'kalshi' | 'polymarket', QuickPricesPlatformDiagnostic>;
+  refreshMetrics: QuickPricesRefreshMetrics;
+}
+
+export interface QuickPricesRefreshMetrics {
+  latencyMs: {
+    savedMarket: number;
+    kalshi: number;
+    polymarket: number;
+    linkedEvents: number;
+    clob: number;
+    matching: number;
+    total: number;
+  };
+  counts: {
+    kalshiRaw: number;
+    kalshiFiltered: number;
+    polymarketRaw: number;
+    polymarketFiltered: number;
+    matched: number;
+  };
 }
 
 export interface QuickPricesPlatformDiagnostic {
@@ -169,7 +189,10 @@ export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): P
 }
 
 export async function quickPricesScan(marketId: string, capital = 1000): Promise<QuickPricesResult> {
+  const totalStartedAt = performance.now();
+  const savedMarketStartedAt = performance.now();
   const market = await getSavedMarketById(marketId);
+  const savedMarketMs = Math.max(0, Math.round(performance.now() - savedMarketStartedAt));
   if (!market) {
     throw Object.assign(new Error('Market not found'), { status: 404 });
   }
@@ -188,21 +211,33 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   }
 
   const platformWarnings: string[] = [];
+  let kalshiMs = 0;
+  let polymarketMs = 0;
+  const linkedEventsStartedAt = performance.now();
   const [kalshiSettled, pmSettled, manualMatches, decoupledPairs] = await Promise.all([
-    withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets')
+    (() => {
+      const startedAt = performance.now();
+      return withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets')
       .then((value) => ({ ok: true as const, value }))
-      .catch((error: unknown) => ({ ok: false as const, error })),
-    withTimeout(
-      isPolymarketMarketUrl(polymarketUrl)
-        ? fetchPolymarketMarketAsEvent(pmSlug)
-        : fetchPolymarketEvent(pmSlug),
-      QUICK_PM_TIMEOUT_MS,
-      'Polymarket event',
-    ).then((value) => ({ ok: true as const, value }))
-      .catch((error: unknown) => ({ ok: false as const, error })),
+      .catch((error: unknown) => ({ ok: false as const, error }))
+      .finally(() => { kalshiMs = Math.max(0, Math.round(performance.now() - startedAt)); });
+    })(),
+    (() => {
+      const startedAt = performance.now();
+      return withTimeout(
+        isPolymarketMarketUrl(polymarketUrl)
+          ? fetchPolymarketMarketAsEvent(pmSlug)
+          : fetchPolymarketEvent(pmSlug),
+        QUICK_PM_TIMEOUT_MS,
+        'Polymarket event',
+      ).then((value) => ({ ok: true as const, value }))
+        .catch((error: unknown) => ({ ok: false as const, error }))
+        .finally(() => { polymarketMs = Math.max(0, Math.round(performance.now() - startedAt)); });
+    })(),
     getManualMatches(),
     getDecoupledPairs(),
   ]);
+  const linkedEventsMs = Math.max(0, Math.round(performance.now() - linkedEventsStartedAt));
 
   const kalshiResult = kalshiSettled.ok ? kalshiSettled.value : [] as KalshiMarket[];
   const pmEvent = pmSettled.ok ? pmSettled.value : null;
@@ -231,6 +266,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const pmFilteredCount = pmMarketsRaw.length;
 
   let clobFailureReason: string | undefined;
+  const clobStartedAt = performance.now();
   const pmMarkets = await withTimeout(
     enrichQuickPmMarketsWithClobPrices(pmMarketsRaw),
     QUICK_PM_TIMEOUT_MS,
@@ -243,8 +279,10 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     platformWarnings.push(clobFailureReason);
     return unavailableQuickPmMarkets(pmMarketsRaw);
   });
+  const clobMs = Math.max(0, Math.round(performance.now() - clobStartedAt));
 
-  const kalshiRawCount = kalshiMarkets.length;
+  const kalshiRawCount = kalshiResult.length;
+  const matchingStartedAt = performance.now();
   const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, eventTitle, capital, expiryDate);
   const matchedOutcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, expiryDate);
   const splitOutcomes = applyDecoupledPairs(matchedOutcomes as unknown as UnifiedOutcome[], decoupledPairs);
@@ -282,6 +320,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const matchedPairs = withArbitrage
     .filter((o) => o.kalshi && o.polymarket)
     .map((o) => ({ artist: o.artist, kalshiTicker: o.kalshi!.ticker, pmConditionId: o.polymarket!.conditionId }));
+  const matchingMs = Math.max(0, Math.round(performance.now() - matchingStartedAt));
   const matchError = platformWarnings.length > 0 ? platformWarnings.join(' ') : undefined;
   const matchStatus = matchError ? 'unavailable' : matchedCount > 0 ? 'matched' : 'confirmed_zero';
 
@@ -317,6 +356,24 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   };
   const failedPlatforms = Object.values(platformDiagnostics).filter(({ status }) => status === 'failed').length;
   const refreshStatus = failedPlatforms === 2 ? 'failed' : failedPlatforms === 1 ? 'partial' : 'complete';
+  const refreshMetrics: QuickPricesRefreshMetrics = {
+    latencyMs: {
+      savedMarket: savedMarketMs,
+      kalshi: kalshiMs,
+      polymarket: polymarketMs,
+      linkedEvents: linkedEventsMs,
+      clob: clobMs,
+      matching: matchingMs,
+      total: Math.max(0, Math.round(performance.now() - totalStartedAt)),
+    },
+    counts: {
+      kalshiRaw: kalshiRawCount,
+      kalshiFiltered: kalshiMarkets.length,
+      polymarketRaw: pmRawCount,
+      polymarketFiltered: pmFilteredCount,
+      matched: matchedCount,
+    },
+  };
 
   return {
     eventTitle,
@@ -346,5 +403,6 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     refreshStatus,
     retryable: failedPlatforms > 0,
     platformDiagnostics,
+    refreshMetrics,
   };
 }
