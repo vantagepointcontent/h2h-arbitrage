@@ -100,6 +100,30 @@ beforeEach(() => {
 });
 
 describe('quickPricesScan bounded platform failures', () => {
+  it('reports per-stage latency and outcome counts for refresh diagnostics', async () => {
+    const result = await quickPricesScan('saved-1');
+
+    expect(result.refreshMetrics).toEqual({
+      latencyMs: {
+        savedMarket: expect.any(Number),
+        kalshi: expect.any(Number),
+        polymarket: expect.any(Number),
+        linkedEvents: expect.any(Number),
+        clob: expect.any(Number),
+        matching: expect.any(Number),
+        total: expect.any(Number),
+      },
+      counts: {
+        kalshiRaw: 1,
+        kalshiFiltered: 1,
+        polymarketRaw: 1,
+        polymarketFiltered: 1,
+        matched: 0,
+      },
+    });
+    expect(Object.values(result.refreshMetrics.latencyMs).every((value) => value >= 0)).toBe(true);
+  });
+
   it('keeps Gamma and Kalshi outcomes when the CLOB batch exceeds its deadline', async () => {
     mocks.fetchClobBooks.mockImplementation(() => new Promise(() => {}));
 
