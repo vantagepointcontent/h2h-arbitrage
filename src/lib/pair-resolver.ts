@@ -210,6 +210,8 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
       pmYesTickSize: constraints?.yesTickSize ?? null,
       pmNoTickSize: constraints?.noTickSize ?? null,
       kalshiFeeAuthority: feeAuthorities.get(o.kalshi!.ticker)!,
+      pmFeesEnabled: o.polymarket!.feesEnabled,
+      pmFeeSchedule: o.polymarket!.feeSchedule,
     });
     allKalshiTickers.add(o.kalshi!.ticker);
     allPmTokenIds.add(tokens.yes);

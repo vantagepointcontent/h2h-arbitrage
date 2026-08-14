@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { calculateArbitrageMax, calcKalshiFee, calcPolymarketFee, computeArbitrageFees, getPolymarketTheta } from './matcher';
+import { calculateArbitrageMax, calcKalshiFee, computeArbitrageFees, getPolymarketTheta } from './matcher';
+
+const sportsFeeAuthority = {
+  feesEnabled: true,
+  feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+} as const;
 
 describe('Kalshi/Polymarket fees', () => {
   it('Kalshi fee rounds up formula 0.07 * C * P * (1-P)', () => {
@@ -30,12 +35,17 @@ describe('Kalshi/Polymarket fees', () => {
     expect(fees.kalshiFeeAuthority).toEqual(authority);
   });
 
-  it('Polymarket Sports theta = 0.03', () => {
-    expect(getPolymarketTheta('Sports')).toBe(0.03);
+  it('Polymarket Sports theta = 0.05', () => {
+    expect(getPolymarketTheta('Sports')).toBe(0.05);
   });
 
   it('Polymarket Politics theta = 0.04', () => {
     expect(getPolymarketTheta('Politics')).toBe(0.04);
+  });
+
+  it('keeps categories outside the current fee matrix fee-free', () => {
+    expect(getPolymarketTheta('Culture')).toBe(0);
+    expect(getPolymarketTheta()).toBe(0);
   });
 
   it('England example: fees turn apparent arb into a loss', () => {
@@ -51,6 +61,7 @@ describe('Kalshi/Polymarket fees', () => {
       noAskDepth: '$100K',
     };
     const pm = {
+      ...sportsFeeAuthority,
       marketId: 'pm-england',
       conditionId: 'c-england',
       yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
@@ -81,6 +92,7 @@ describe('Kalshi/Polymarket fees', () => {
       yesBidDepth: '$10K', yesAskDepth: '$5K', noBidDepth: '', noAskDepth: '',
     };
     const pm = {
+      ...sportsFeeAuthority,
       marketId: 'pm-test',
       conditionId: 'c-test',
       yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
@@ -115,6 +127,7 @@ describe('Kalshi/Polymarket fees', () => {
       noBidDepth: '$10K', noAskDepth: '$10K',
     };
     const pm = {
+      ...sportsFeeAuthority,
       marketId: 'pm-tx18',
       conditionId: 'c-tx18',
       yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
@@ -188,6 +201,7 @@ describe('Kalshi/Polymarket fees', () => {
       noBidDepth: '$10K', noAskDepth: '$10K',
     };
     const pm = {
+      ...sportsFeeAuthority,
       marketId: 'pm-tiny',
       conditionId: 'c-tiny',
       yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.001, noTickSize: 0.001,

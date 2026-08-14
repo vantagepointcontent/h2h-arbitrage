@@ -535,6 +535,8 @@ export async function executeFullScan(request: NextRequest) {
             pmBestAsk: selectedPmLeg?.bestAsk,
             pmYesDepth: selectedPmLeg?.askDepth,
             pmNoDepth: selectedPmLeg?.noAskDepth,
+            pmFeesEnabled: selectedPmLeg?.feesEnabled,
+            pmFeeSchedule: selectedPmLeg?.feeSchedule,
             pmYesMinOrderSize: selectedPmLeg?.yesMinOrderSize ?? null,
             pmNoMinOrderSize: selectedPmLeg?.noMinOrderSize ?? null,
             pmYesTickSize: selectedPmLeg?.yesTickSize ?? null,

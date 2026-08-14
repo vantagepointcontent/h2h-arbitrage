@@ -80,6 +80,8 @@ export interface OrderResult {
   filledPrice?: number;
   /** Venue-reported charged fee in integer cents. */
   chargedFeeCents?: number;
+  /** Venue-reported fee in integer millionths of USDC, when available. */
+  chargedFeeMicrousd?: number;
   /** Authoritative venue fill/trade ID, distinct from the submitted order ID. */
   executionId?: string;
   /** Venue-provided fill timestamp. */
@@ -342,6 +344,7 @@ export function mapKalshiOrderResult(r: KalshiOrderAdapterResponse): OrderResult
       filledContracts: evidence.filledQuantity,
       filledPrice: evidence.fillPrice,
       chargedFeeCents: evidence.chargedFeeCents,
+      chargedFeeMicrousd: evidence.chargedFeeMicrousd,
       executionId: evidence.executionId,
       venueTimestamp: evidence.venueTimestamp,
       orderId: r.orderId,

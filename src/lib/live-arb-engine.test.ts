@@ -30,6 +30,8 @@ const outcome = {
   crossOutcomeMutuallyExclusiveVerified: true,
   crossOutcomeExhaustiveVerified: true,
   pmConditionId: `0x${'1'.repeat(64)}`,
+  pmFeesEnabled: true,
+  pmFeeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
 };
 
 const complement = {
@@ -45,6 +47,8 @@ const complement = {
   crossOutcomeMutuallyExclusiveVerified: true,
   crossOutcomeExhaustiveVerified: true,
   pmConditionId: `0x${'2'.repeat(64)}`,
+  pmFeesEnabled: true,
+  pmFeeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
 };
 
 describe('parseBookStaleMs', () => {

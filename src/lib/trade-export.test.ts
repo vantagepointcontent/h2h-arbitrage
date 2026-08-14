@@ -51,6 +51,28 @@ describe('trade export', () => {
     })).toEqual([]);
   });
 
+  it('preserves the observed Polymarket five-decimal fee in execution exports', () => {
+    const rows = executionRows({
+      timestamp: '2026-08-08T10:00:00.000Z', arbId: 'arb-pm-fee', marketTitle: 'Politics',
+      dryRun: false, success: true, estimatedProfit: 1,
+      polymarketOrder: { conditionId: '0xpolitics', outcome: 'yes', size: 1, price: 0.7 },
+      result: { polymarketResult: {
+        platform: 'polymarket', status: 'filled', filledContracts: 1, filledPrice: 0.7,
+        chargedFeeCents: 1, chargedFeeMicrousd: 8_400,
+        executionId: 'pm-fill-1', venueTimestamp: '2026-08-08T10:00:01.000Z',
+        orderId: 'pm-order-1', timestamp: '2026-08-08T10:00:01.000Z',
+        venueEvidence: {
+          venue: 'polymarket', filledQuantity: 1, fillPrice: 0.7,
+          chargedFeeCents: 1, chargedFeeMicrousd: 8_400,
+          executionId: 'pm-fill-1', venueTimestamp: '2026-08-08T10:00:01.000Z',
+        },
+      } },
+    });
+
+    expect(rows[0]?.[7]).toBe(0.0084);
+    expect(escapeTradeCsv(rows[0]![7] as number)).toBe('0.0084');
+  });
+
   it.each([
     ['timestamp', { timestamp: undefined }],
     ['fee', { fee: undefined }],

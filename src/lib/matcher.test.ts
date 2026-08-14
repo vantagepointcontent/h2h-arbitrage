@@ -10,8 +10,6 @@ import {
   matchOutcomes,
   buildPmArbShape,
   buildKalshiArbShape,
-  calcKalshiFee,
-  calcPolymarketFee,
   normalizeOutcomePlatforms,
   parseSuspiciousRoiPct,
 } from './matcher';
@@ -50,6 +48,23 @@ describe('buildKalshiArbShape', () => {
 
     expect(shape.yesAsk).toBe(0);
     expect(shape.noAsk).toBe(0);
+  });
+});
+
+describe('buildPmArbShape fee authority', () => {
+  it('preserves Gamma fee authority on the API/persistence arb shape', () => {
+    const shape = buildPmArbShape({
+      id: 'pm-politics', conditionId: '0xpolitics', question: 'Will the candidate win?',
+      slug: 'candidate-win', outcomes: '["Yes","No"]', outcomePrices: '["0.70","0.30"]',
+      clobTokenIds: '["yes-token","no-token"]', bestBid: 0.69, bestAsk: 0.70,
+      active: true, closed: false, feesEnabled: true,
+      feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+    });
+
+    expect(shape).toMatchObject({
+      feesEnabled: true,
+      feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+    });
   });
 });
 
@@ -99,17 +114,19 @@ describe('calculateArbitrageMax', () => {
     lastTradePrice: 0.50,
     volume: '', liquidity: '', askDepth: 5000,
     yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
+    feesEnabled: true,
+    feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
   };
 
   it('caps executable capital by known Kalshi and PM ask depth', () => {
-    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 5000);
+    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 5000, 'Sports');
     expect(r.maxCapital).toBeGreaterThan(0);
     expect(r.maxCapital).toBeLessThanOrEqual(1000);
     expect(r.depthVerified).toBe(true);
   });
 
   it('shows a profitable quote but keeps it unexecutable when required depth is missing', () => {
-    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 0);
+    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, 0, 'Sports');
     expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
     expect(r.roiPct).toBeGreaterThan(0);
     expect(r.maxCapital).toBe(0);
@@ -127,7 +144,7 @@ describe('calculateArbitrageMax', () => {
   });
 
   it('fails closed when an unknown PM ask depth is represented as Infinity', () => {
-    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, parseDepth('Infinity'));
+    const r = calculateArbitrageMax(kalshi, pm, 5000, 0, 5000, parseDepth('Infinity'), 'Sports');
 
     expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
     expect(r.maxCapital).toBe(0);
@@ -143,7 +160,7 @@ describe('calculateArbitrageMax', () => {
       'Tech',
     );
     expect(r.strategy).toBe('Buy YES PM + NO Kalshi');
-    expect(r.roiPct).toBeCloseTo(1.3344, 3);
+    expect(r.roiPct).toBeCloseTo(1.088, 3);
     expect(r.expectedProfit).toBe(0);
     expect(r.kalshiStake + r.pmStake).toBe(0);
     expect(r.depthVerified).toBe(false);
@@ -826,6 +843,8 @@ function makeOutcome(overrides: Partial<any> = {}): any {
       lastTradePrice: 0.80,
       volume: '', liquidity: '', askDepth: 5000, noAskDepth: 1000,
       yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
+      feesEnabled: true,
+      feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
     },
     arbitrage: { strategy: 'No arb', kalshiStake: 0, pmStake: 0, expectedProfit: 0, roiPct: 0, buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0 },
     ...overrides,

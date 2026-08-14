@@ -35,17 +35,33 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
     if (!rawOrder) return [];
     const order = rawOrder as ExportValueRecord;
     const leg = (rawResult ?? {}) as ExportValueRecord;
-    const filledSize = Number(leg.filledSize);
-    const filledPrice = Number(leg.filledPrice);
-    const fee = leg.fees ?? leg.fee;
-    const timestamp = typeof leg.timestamp === 'string' ? leg.timestamp : '';
+    const evidence = leg.venueEvidence && typeof leg.venueEvidence === 'object'
+      ? leg.venueEvidence as ExportValueRecord : null;
+    const filledSize = Number(leg.filledContracts ?? evidence?.filledQuantity ?? leg.filledSize);
+    const filledPrice = Number(leg.filledPrice ?? evidence?.fillPrice);
+    const exactFeeMicrousd = leg.chargedFeeMicrousd ?? evidence?.chargedFeeMicrousd;
+    const chargedFeeCents = leg.chargedFeeCents ?? evidence?.chargedFeeCents;
+    const exactFeeValid = exactFeeMicrousd == null
+      || (typeof exactFeeMicrousd === 'number' && Number.isSafeInteger(exactFeeMicrousd)
+        && exactFeeMicrousd >= 0 && exactFeeMicrousd % 10 === 0);
+    const fee = exactFeeValid && typeof exactFeeMicrousd === 'number'
+      ? exactFeeMicrousd / 1_000_000
+      : typeof chargedFeeCents === 'number' && Number.isSafeInteger(chargedFeeCents)
+        ? chargedFeeCents / 100
+        : leg.fees ?? leg.fee;
+    const timestampValue = leg.venueTimestamp ?? evidence?.venueTimestamp ?? leg.timestamp;
+    const timestamp = typeof timestampValue === 'string' ? timestampValue : '';
+    const executionId = leg.executionId ?? evidence?.executionId ?? leg.orderId;
+    const venueEvidenceValid = evidence?.venue === platform.toLowerCase();
+    const legacyEvidenceValid = leg.evidenceSource === 'venue';
     if (!['filled', 'partial'].includes(String(leg.status))
       || !Number.isFinite(filledSize) || filledSize <= 0
       || !Number.isFinite(filledPrice) || filledPrice <= 0 || filledPrice > 1
+      || !exactFeeValid
       || typeof fee !== 'number' || !Number.isFinite(fee) || fee < 0
-      || typeof leg.orderId !== 'string' || !leg.orderId.trim()
+      || typeof executionId !== 'string' || !executionId.trim()
       || !Number.isFinite(Date.parse(timestamp))
-      || leg.evidenceSource !== 'venue') return [];
+      || (!venueEvidenceValid && !legacyEvidenceValid)) return [];
     const marketName = String(order.ticker ?? order.marketId ?? order.conditionId ?? '');
     const status = String(leg.status ?? (execution.success ? 'open' : 'failed'));
     return [[

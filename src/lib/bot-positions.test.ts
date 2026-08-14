@@ -682,6 +682,33 @@ describe('calculateBotPositionEntryCost', () => {
     expect(result.kalshiEntryChargedFeeCents).toBeNull();
     expect(result.kalshiEntryFeeCents).toBe(200);
   });
+
+  it('preserves Polymarket estimates and charged-fee overrides to five decimal USDC precision', () => {
+    const estimated = calculateBotPositionEntryCost({
+      buyPriceKalshiCents: 10,
+      buyPricePmCents: 70,
+      sharesKalshi: 1,
+      sharesPm: 1,
+      pmTheta: 0.04,
+      kalshiFeeMultiplierPpm: 0,
+      pmFeeRateBps: 400,
+    });
+    expect(estimated.pmEntryFeeMicrousd).toBe(8_400);
+    expect(estimated.totalCostMicrousd).toBe(808_400);
+
+    const charged = calculateBotPositionEntryCost({
+      buyPriceKalshiCents: 10,
+      buyPricePmCents: 70,
+      sharesKalshi: 1,
+      sharesPm: 1,
+      pmTheta: 0.04,
+      kalshiFeeMultiplierPpm: 0,
+      pmFeeRateBps: 400,
+      pmChargedFeeMicrousd: 12_340,
+    });
+    expect(charged.pmEntryFeeMicrousd).toBe(12_340);
+    expect(charged.pmEntryFeeCents).toBe(1);
+  });
 });
 
 describe('fetchAuthoritativeBotFeeConfig', () => {
@@ -706,6 +733,7 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
           { token_id: 'no-token', outcome: 'No' },
         ],
       }),
+      fetchPmMarketDetails: async () => ({ conditionId: '0xcondition', feesEnabled: false }),
     });
 
     expect(result).toEqual({
@@ -725,18 +753,25 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
       polymarket: {
         tokenId: 'no-token',
         feeRateBps: 0,
-        source: 'https://clob.polymarket.com/fee-rate?token_id=no-token',
+        feesEnabled: false,
+        feeSchedule: null,
+        orderBaseFeeBps: 0,
+        orderSource: 'https://clob.polymarket.com/fee-rate?token_id=no-token',
+        orderVersion: 'token-order-base-fee:0',
+        source: 'https://gamma-api.polymarket.com/markets?condition_ids=0xcondition',
         observedAt: '2026-08-08T12:00:00.000Z',
-        version: 'token-fee-rate:0',
+        version: 'gamma-fee-schedule:disabled',
       },
       pmTheta: 0,
     });
   });
 
-  it('uses the current token fee rate instead of stale category assumptions', async () => {
+  it('separates the observed politics economic schedule from token order-signing base_fee', async () => {
+    const conditionId = '0x66bbf6d55e0296278858b3147689f3df9259374f158f9f028b608baa322a639c';
+    const noTokenId = '6136336712352911156426560180855478229745540927722899997193789497766196705020';
     const result = await fetchAuthoritativeBotFeeConfig({
       kalshiTicker: 'KXTEST-YES',
-      pmConditionId: '0xcondition',
+      pmConditionId: conditionId,
       pmSide: 'no',
       category: 'Politics',
       observedAt: '2026-08-08T12:00:00.000Z',
@@ -745,12 +780,62 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
         if (url.includes('/markets/')) return { market: { event_ticker: 'KXTEST-EVENT' } };
         if (url.includes('/events/')) return { event: { series_ticker: 'KXTEST' } };
         if (url.includes('/series/')) return { series: { fee_type: 'quadratic', fee_multiplier: 1 } };
-        return { base_fee: 500 };
+        if (url.includes('/fee-rate')) return { base_fee: 1000 };
+        throw new Error(`Unexpected URL ${url}`);
+      },
+      fetchPmMarket: async () => ({ tokens: [{ token_id: noTokenId, outcome: 'No' }] }),
+      fetchPmMarketDetails: async () => ({
+        conditionId,
+        feesEnabled: true,
+        feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+      }),
+    });
+    expect(result.pmTheta).toBe(0.04);
+    expect(result.polymarket).toMatchObject({
+      tokenId: noTokenId,
+      orderBaseFeeBps: 1000,
+      feesEnabled: true,
+      feeSchedule: { rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+      feeRateBps: 400,
+    });
+  });
+
+  it('accepts an explicitly fee-free market without inventing a schedule', async () => {
+    const result = await fetchAuthoritativeBotFeeConfig({
+      kalshiTicker: 'KXTEST-YES', pmConditionId: '0xfree', pmSide: 'yes',
+    }, {
+      fetchJson: async (url) => {
+        if (url.includes('/markets/')) return { market: { event_ticker: 'KXTEST-EVENT' } };
+        if (url.includes('/events/')) return { event: { series_ticker: 'KXTEST' } };
+        if (url.includes('/series/')) return { series: { fee_type: 'quadratic', fee_multiplier: 1 } };
+        if (url.includes('/fee-rate')) return { base_fee: 0 };
+        throw new Error(`Unexpected URL ${url}`);
+      },
+      fetchPmMarket: async () => ({ tokens: [{ token_id: 'yes-token', outcome: 'Yes' }] }),
+      fetchPmMarketDetails: async () => ({ conditionId: '0xfree', feesEnabled: false }),
+    });
+    expect(result.polymarket).toMatchObject({ feesEnabled: false, feeSchedule: null, feeRateBps: 0 });
+    expect(result.pmTheta).toBe(0);
+  });
+
+  it.each([
+    { conditionId: '0xcondition' },
+    { conditionId: '0xcondition', feesEnabled: true },
+    { conditionId: '0xcondition', feesEnabled: true, feeSchedule: { rate: 0.04, exponent: 2, takerOnly: true, rebateRate: 0.25 } },
+  ])('fails closed when economic fee authority is missing or unsupported: %o', async (marketDetails) => {
+    await expect(fetchAuthoritativeBotFeeConfig({
+      kalshiTicker: 'KXTEST-YES', pmConditionId: '0xcondition', pmSide: 'no',
+    }, {
+      fetchJson: async (url) => {
+        if (url.includes('/markets/')) return { market: { event_ticker: 'KXTEST-EVENT' } };
+        if (url.includes('/events/')) return { event: { series_ticker: 'KXTEST' } };
+        if (url.includes('/series/')) return { series: { fee_type: 'quadratic', fee_multiplier: 1 } };
+        if (url.includes('/fee-rate')) return { base_fee: 1000 };
+        throw new Error(`Unexpected URL ${url}`);
       },
       fetchPmMarket: async () => ({ tokens: [{ token_id: 'no-token', outcome: 'No' }] }),
-    });
-    expect(result.pmTheta).toBe(0.05);
-    expect(result.polymarket).toMatchObject({ feeRateBps: 500, tokenId: 'no-token' });
+      fetchPmMarketDetails: async () => marketDetails,
+    })).rejects.toThrow(/Polymarket.*fee/i);
   });
 
   it('accepts Kalshi quadratic taker fees when the series also supports maker fees', async () => {
@@ -764,6 +849,7 @@ describe('fetchAuthoritativeBotFeeConfig', () => {
         return { base_fee: 0 };
       },
       fetchPmMarket: async () => ({ tokens: [{ token_id: 'no-token', outcome: 'No' }] }),
+      fetchPmMarketDetails: async () => ({ conditionId: '0xcondition', feesEnabled: false }),
     });
     expect(result.kalshi).toMatchObject({ feeType: 'quadratic_with_maker_fees', feeMultiplierPpm: 1_000_000 });
     expect(result.kalshi.version).toContain('quadratic_with_maker_fees');
@@ -800,6 +886,7 @@ describe('BotPositionStore', () => {
       sharesKalshi: 10,
       sharesPm: 10,
       totalCostCents: 978,
+      totalCostMicrousd: 9_780_000,
       expectedPayoutCents: 1000,
       expectedProfitCents: 22,
       feesCents: 28,
@@ -812,11 +899,12 @@ describe('BotPositionStore', () => {
       kalshiEntryFeeVersion: 'series-v1',
       pmEntryTokenId: 'pm-no-token',
       pmEntryFeeRateBps: 400,
-      pmEntryFeeSource: 'polymarket-clob:/fee-rate',
+      pmEntryFeeSource: 'polymarket-gamma:0xabc',
       pmEntryFeeObservedAt: '2026-08-08T12:00:00.000Z',
       pmEntryFeeVersion: 'clob-v1',
       kalshiEntryFeeCents: 18,
       pmEntryFeeCents: 10,
+      pmEntryFeeMicrousd: 100_000,
       kalshiExitFeeType: 'quadratic',
       kalshiExitFeeMultiplierPpm: 1_000_000,
       kalshiExitFeeSource: 'kalshi-series:KXTEST',
@@ -844,6 +932,8 @@ describe('BotPositionStore', () => {
     expect(created.kalshiEntryFeeMultiplierPpm).toBe(1_000_000);
     expect(created.pmEntryFeeRateBps).toBe(400);
     expect(created.pmEntryTokenId).toBe('pm-no-token');
+    expect(created.pmEntryFeeMicrousd).toBe(100_000);
+    expect(created.totalCostMicrousd).toBe(9_780_000);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'paper')).resolves.toBe(true);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).resolves.toBe(false);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
@@ -871,6 +961,7 @@ describe('BotPositionStore', () => {
       sharesKalshi: 2,
       sharesPm: 2,
       totalCostCents: 206,
+      totalCostMicrousd: 2_060_000,
       kalshiEntryGrossMicrocents: 12_000_000,
       pmEntryGrossMicrocents: 184_000_000,
       kalshiEntryFills: [
@@ -889,6 +980,7 @@ describe('BotPositionStore', () => {
       feesCents: 10,
       kalshiEntryFeeCents: 7,
       pmEntryFeeCents: 3,
+      pmEntryFeeMicrousd: 30_000,
     } as never);
     expect(live.executionMode).toBe('live');
     expect(live.remainingOpenPrincipalCents).toBe(196);
@@ -1443,6 +1535,20 @@ describe('BotPositionStore', () => {
   });
 });
 
+function authoritativePmFee(rateBps: number, observedAt: string) {
+  const enabled = rateBps > 0;
+  return {
+    tokenId: 'pm-no-token', feeRateBps: rateBps, feesEnabled: enabled,
+    feeSchedule: enabled ? { rate: rateBps / 10_000, exponent: 1, takerOnly: true, rebateRate: 0.25 } : null,
+    orderBaseFeeBps: 1_000,
+    orderSource: 'https://clob.polymarket.com/fee-rate?token_id=pm-no-token',
+    orderVersion: 'token-order-base-fee:1000',
+    source: 'https://gamma-api.polymarket.com/markets?condition_ids=condition-example',
+    observedAt,
+    version: enabled ? `gamma-fee-schedule:${rateBps}:1:true:0.25` : 'gamma-fee-schedule:disabled',
+  } as const;
+}
+
 describe('pollOpenBotPositions fail-closed valuation', () => {
   it('bounds position refresh concurrency so a large ledger cannot overflow venue queues', async () => {
     let active = 0;
@@ -1469,7 +1575,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
       fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
       fetchFeeConfig: async () => ({
         kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
-        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0.04,
+        polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'), pmTheta: 0.04,
       }),
     });
     expect(peak).toBeLessThanOrEqual(8);
@@ -1512,7 +1618,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
       fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:03.000Z' }),
       fetchFeeConfig: async () => ({
         kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:10.000Z', version: 'v1' },
-        polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:10.000Z', version: 'v1' }, pmTheta: 0.04,
+        polymarket: authoritativePmFee(400, '2026-08-08T12:00:10.000Z'), pmTheta: 0.04,
       }),
     });
     expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
@@ -1565,7 +1671,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
-          polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
+          polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'),
           pmTheta: 0.04,
         }),
       })).resolves.toEqual({ updated: 1, settled: 0, errors: [] });
@@ -1617,7 +1723,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
-          polymarket: { tokenId: 'pm-no-token', feeRateBps: 0, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0,
+          polymarket: authoritativePmFee(0, '2026-08-08T12:00:00.000Z'), pmTheta: 0,
         }),
       });
       expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
@@ -1664,7 +1770,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
-          polymarket: { tokenId: 'pm-no-token', feeRateBps: 400, source: 'pm-fee', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' }, pmTheta: 0.04,
+          polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'), pmTheta: 0.04,
         }),
       });
       expect(result.updated).toBe(1);
@@ -1732,13 +1838,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
             observedAt: attemptedAt,
             version: 'series-v1',
           },
-          polymarket: {
-            tokenId: 'pm-no-token',
-            feeRateBps: 400,
-            source: 'polymarket-clob:/fee-rate',
-            observedAt: attemptedAt,
-            version: 'clob-v1',
-          },
+          polymarket: authoritativePmFee(400, attemptedAt),
           pmTheta: 0.04,
         }),
       });

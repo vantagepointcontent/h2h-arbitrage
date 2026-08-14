@@ -1262,6 +1262,13 @@ export interface LastScanResult {
     pmNoDepth?: number | null;
     pmYesExecutableQuote?: import('./executable-book').ExecutableBookQuote;
     pmNoExecutableQuote?: import('./executable-book').ExecutableBookQuote;
+    pmFeesEnabled?: boolean;
+    pmFeeSchedule?: {
+      rate: number;
+      exponent: number;
+      takerOnly: boolean;
+      rebateRate: number;
+    } | null;
     kalshiStake?: number;
     pmStake?: number;
     apyPct?: number | null;

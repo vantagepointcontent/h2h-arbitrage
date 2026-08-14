@@ -12,6 +12,7 @@ import {
 import { calculateScanApy, type ScanApyUnavailableReason } from './scan-apy';
 import { isPriceAlignedToTick } from './venue-constraints';
 import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quote';
+import { getPolymarketCategoryFeeRateBps, resolvePolymarketFeeRateBps } from './polymarket-fees';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -60,6 +61,13 @@ export interface UnifiedOutcome {
     yesLimitPrice?: number;
     noLimitPrice?: number;
     negRisk?: boolean;
+    feesEnabled?: boolean;
+    feeSchedule?: {
+      rate: number;
+      exponent: number;
+      takerOnly: boolean;
+      rebateRate: number;
+    } | null;
     /** Exact [Yes, No] outcome structure was verified from platform data. */
     binaryVerified?: boolean;
     /** False when prices are indicative only (no executable CLOB asks). */
@@ -203,18 +211,7 @@ export function normalizeManualPairPolymarketShape(
 
 /** Default fee parameters per platform. Polymarket theta varies by category. */
 export function getPolymarketTheta(category?: string): number {
-  const c = (category || 'other').toLowerCase();
-  if (c.includes('geopol')) return 0;
-  if (c.includes('crypto')) return 0.07;
-  if (c.includes('sport')) return 0.03;
-  if (c.includes('finance')) return 0.04;
-  if (c.includes('politic')) return 0.04;
-  if (c.includes('econom')) return 0.05;
-  if (c.includes('culture')) return 0.05;
-  if (c.includes('weather')) return 0.05;
-  if (c.includes('mention')) return 0.04;
-  if (c.includes('tech')) return 0.04;
-  return 0.05;
+  return getPolymarketCategoryFeeRateBps(category) / 10_000;
 }
 
 /** Compatibility facade; formula, multiplier, and rounding are centralized. */
@@ -253,6 +250,7 @@ export function computeArbitrageFees(
   pmSellPrice: number,
   category?: string,
   kalshiFeeAuthority?: KalshiFeeAuthority,
+  pmFeeRateBps?: number,
 ): {
   grossProfit: number;
   kalshiFee: number;
@@ -287,12 +285,12 @@ export function computeArbitrageFees(
 
   if (strategy.includes('YES PM') || isCrossOutcome) {
     const pmYesContracts = pmStake / pmBuyPrice;
-    const pmTheta = getPolymarketTheta(category);
+    const pmTheta = (pmFeeRateBps ?? getPolymarketCategoryFeeRateBps(category)) / 10_000;
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
     pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${fmtProbPrice(pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   } else if (strategy.includes('NO PM')) {
     const pmNoContracts = pmStake / pmSellPrice;
-    const pmTheta = getPolymarketTheta(category);
+    const pmTheta = (pmFeeRateBps ?? getPolymarketCategoryFeeRateBps(category)) / 10_000;
     pmFeeAmount = calcPolymarketFee(pmNoContracts, pmSellPrice, pmTheta);
     pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${fmtProbPrice(pmSellPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   }
@@ -535,6 +533,16 @@ export function calculateArbitrageMax(
   const pNo = pm.noPrice;
   const pYesLimit = finiteDecimal(pm.yesLimitPrice) ?? pYes;
   const pNoLimit = finiteDecimal(pm.noLimitPrice) ?? pNo;
+  const pmFeeRateBps = resolvePolymarketFeeRateBps(pm, category);
+  if (pmFeeRateBps == null) {
+    return {
+      strategy: 'No arb', arbType: null, kalshiStake: 0, pmStake: 0,
+      expectedProfit: 0, roiPct: 0, apyPct: 0, maxCapital: 0,
+      buyPlatform: null, buyPrice: 0, sellPlatform: null, sellPrice: 0,
+      depthVerified: false, requestedContracts,
+      executionStatus: 'unavailable', executionBlocker: 'Polymarket fee authority is unavailable',
+    };
+  }
   // A zero, negative, non-finite, or above-par ask is not a tradeable quote.
   // Do not turn malformed/missing upstream prices into an apparent arbitrage.
   const isTradeableAsk = (price: number) => Number.isFinite(price) && price > 0 && price <= 1;
@@ -576,6 +584,7 @@ export function calculateArbitrageMax(
     const fees = computeArbitrageFees(
       quoteStrategy, quoteCapital, quoteCapital * kalshiPrice, quoteCapital * pmPrice,
       kYes, kNo, pYes, pNo, category, kalshi.feeAuthority,
+      pmFeeRateBps,
     );
     const roiPct = (fees.worstCaseNetProfit / quoteCapital) * 100;
     if (roiPct > 0 && (!bestUnexecutableQuote || roiPct > bestUnexecutableQuote.roiPct)) {
@@ -638,6 +647,7 @@ export function calculateArbitrageMax(
         pNo,
         category,
         kalshi.feeAuthority,
+        pmFeeRateBps,
       );
       // UI-03: Track best candidate regardless of sign (not just > 0)
       if (fees.worstCaseNetProfit > maxProfit) {
@@ -700,6 +710,7 @@ export function calculateArbitrageMax(
         pNo,
         category,
         kalshi.feeAuthority,
+        pmFeeRateBps,
       );
       // UI-03: Track best candidate regardless of sign (not just > 0)
       if (fees.worstCaseNetProfit > maxProfit) {
@@ -911,8 +922,10 @@ export function calculateBestArbitrageForOutcome(
 
   const pYes = current.polymarket.bestAsk;
   const pNo = current.polymarket.noPrice;
+  const currentPmFeeRateBps = resolvePolymarketFeeRateBps(current.polymarket, category);
   if (current.polymarket.binaryVerified === true && current.polymarket.negRisk !== true
-      && current.polymarket.conditionId && pYes > 0 && pNo > 0 && pYes + pNo < 1) {
+      && currentPmFeeRateBps != null && current.polymarket.conditionId
+      && pYes > 0 && pNo > 0 && pYes + pNo < 1) {
     const yesMinimum = finiteDecimal(current.polymarket.yesMinOrderSize);
     const noMinimum = finiteDecimal(current.polymarket.noMinOrderSize);
     const yesTick = finiteDecimal(current.polymarket.yesTickSize);
@@ -925,7 +938,7 @@ export function calculateBestArbitrageForOutcome(
     if (contracts > 0) {
       const yesStake = contracts * pYes;
       const noStake = contracts * pNo;
-      const theta = getPolymarketTheta(category);
+      const theta = currentPmFeeRateBps / 10_000;
       const yesFee = calcPolymarketFee(contracts, pYes, theta);
       const noFee = calcPolymarketFee(contracts, pNo, theta);
       const totalFee = yesFee + noFee;
@@ -958,7 +971,8 @@ export function calculateBestArbitrageForOutcome(
       && current.polymarket.conditionId !== complement.polymarket.conditionId) {
     const kYesA = current.kalshi.yesAsk;
     const pYesB = complement.polymarket.bestAsk;
-    if (kYesA + pYesB < 1) {
+    const complementPmFeeRateBps = resolvePolymarketFeeRateBps(complement.polymarket, category);
+    if (complementPmFeeRateBps != null && kYesA + pYesB < 1) {
       const compAskDepth = parseDepth(complement.polymarket.askDepth);
       const capKA = depthKYes >= kYesA ? 1 : 0;
       const capPB = compAskDepth >= pYesB ? 1 : 0;
@@ -987,6 +1001,7 @@ export function calculateBestArbitrageForOutcome(
           complement.polymarket.noPrice,
           category,
           current.kalshi.feeAuthority,
+          complementPmFeeRateBps,
         );
         if (fees.worstCaseNetProfit > best.expectedProfit) {
           best = {
@@ -1297,6 +1312,8 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
       yesTickSize: finiteDecimal(market.yesTickSize) ?? undefined,
       noTickSize: finiteDecimal(market.noTickSize) ?? undefined,
       negRisk: market.neg_risk === true,
+      feesEnabled: market.feesEnabled,
+      feeSchedule: market.feeSchedule,
       binaryVerified,
       isExecutable: false,
       settlementTiming: polymarketSettlementTiming(eventEndDate ?? market.endDate, market.endDate),
@@ -1366,6 +1383,8 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
     yesTickSize: finiteDecimal(market.yesTickSize) ?? undefined,
     noTickSize: finiteDecimal(market.noTickSize) ?? undefined,
     negRisk: market.neg_risk === true,
+    feesEnabled: market.feesEnabled,
+    feeSchedule: market.feeSchedule,
     binaryVerified,
     settlementTiming: polymarketSettlementTiming(eventEndDate ?? market.endDate, market.endDate),
   } as NonNullable<UnifiedOutcome['polymarket']>;

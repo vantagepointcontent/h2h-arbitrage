@@ -42,6 +42,9 @@ export interface VenueExecutionEvidence {
   /** Fee charged by the venue in cents (must be venue-reported, not locally calculated) */
   chargedFeeCents: number;
 
+  /** Exact venue fee in integer millionths of USDC when the venue reports finer precision. */
+  chargedFeeMicrousd?: number;
+
   /** Venue-provided execution/order identifier */
   executionId: string;
 
@@ -143,6 +146,10 @@ export function isAuthoritativeVenueEvidence(
 
   // Missing fee means unknown, not zero.
   if (!Number.isSafeInteger(e.chargedFeeCents) || Number(e.chargedFeeCents) < 0) return false;
+  if (e.chargedFeeMicrousd != null
+    && (!Number.isSafeInteger(e.chargedFeeMicrousd) || Number(e.chargedFeeMicrousd) < 0
+      || Number(e.chargedFeeMicrousd) % 10 !== 0
+      || Math.round(Number(e.chargedFeeMicrousd) / 10_000) !== e.chargedFeeCents)) return false;
 
   if (e.fills != null) {
     if (!Array.isArray(e.fills) || e.fills.length === 0) return false;

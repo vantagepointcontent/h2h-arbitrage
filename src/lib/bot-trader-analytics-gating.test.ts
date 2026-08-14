@@ -45,6 +45,7 @@ function liveResult(overrides: Partial<ExecutionResult> = {}): ExecutionResult {
         filledQuantity: 3,
         fillPrice: 0.59,
         chargedFeeCents: 4,
+        chargedFeeMicrousd: 38_400,
         executionId: 'pm-fill-456',
         venueTimestamp: '2026-08-12T10:00:01.000Z',
         fills: [
@@ -79,6 +80,7 @@ describe('BotTrader performance evidence gate', () => {
         filledQuantity: 3,
         fillPrice: 0.59,
         chargedFeeCents: 4,
+        chargedFeeMicrousd: 38_400,
         executionId: 'pm-fill-456',
         venueTimestamp: '2026-08-12T10:00:01.000Z',
         fills: [
@@ -98,6 +100,7 @@ describe('BotTrader performance evidence gate', () => {
       pmFills: [{ priceCents: 58, size: 1 }, { priceCents: 59.5, size: 2 }],
       kalshiChargedFeeCents: 2,
       pmChargedFeeCents: 4,
+      pmChargedFeeMicrousd: 38_400,
     });
   });
 

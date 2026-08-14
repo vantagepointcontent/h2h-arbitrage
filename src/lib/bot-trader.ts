@@ -208,6 +208,7 @@ export function liveEvidenceToBotPositionFill(evidence: LiveExecutionEvidence) {
     pmFills: fills(evidence.polymarket),
     kalshiChargedFeeCents: evidence.kalshi.chargedFeeCents,
     pmChargedFeeCents: evidence.polymarket.chargedFeeCents,
+    pmChargedFeeMicrousd: evidence.polymarket.chargedFeeMicrousd,
   };
 }
 

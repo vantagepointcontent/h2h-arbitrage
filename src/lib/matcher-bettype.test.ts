@@ -154,10 +154,12 @@ describe('calculateArbitrageMax — happy paths', () => {
     noMinOrderSize: 1,
     yesTickSize: 0.01,
     noTickSize: 0.01,
+    feesEnabled: true,
+    feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
   };
 
   it('detects Buy YES Kalshi + NO PM arb when prices sum < 1', () => {
-    const arb = calculateArbitrageMax(kalshi as any, pm as any, 1000, 800, 500, 400);
+    const arb = calculateArbitrageMax(kalshi as any, pm as any, 1000, 800, 500, 400, 'Sports');
     expect(arb.strategy).not.toBe('No arb');
     expect(arb.roiPct).toBeGreaterThan(0);
     expect(arb.expectedProfit).toBeGreaterThan(0);
@@ -172,7 +174,7 @@ describe('calculateArbitrageMax — happy paths', () => {
     const arb = calculateArbitrageMax(
       { ...kalshi, yesAsk: 0.60, noAsk: 0.40 } as any,
       { ...pm, yesPrice: 0.35, noPrice: 0.65, bestAsk: 0.35 } as any,
-      1000, 800, 500, 400,
+      1000, 800, 500, 400, 'Sports',
     );
     expect(arb.strategy).not.toBe('No arb');
     expect(arb.roiPct).toBeGreaterThan(0);

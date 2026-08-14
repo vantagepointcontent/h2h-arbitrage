@@ -38,6 +38,13 @@ export interface PMMarket {
   noMinOrderSize?: number | null;
   yesTickSize?: number | null;
   noTickSize?: number | null;
+  feesEnabled?: boolean;
+  feeSchedule?: {
+    rate: number;
+    exponent: number;
+    takerOnly: boolean;
+    rebateRate: number;
+  } | null;
 }
 
 export interface PMEvent {

@@ -38,6 +38,8 @@ function makePmShape(overrides?: any): any {
     noMinOrderSize: 1,
     yesTickSize: 0.01,
     noTickSize: 0.01,
+    feesEnabled: true,
+    feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
     ...overrides,
   };
   return buildPmArbShape(pm);
@@ -64,7 +66,7 @@ describe('REGRESSION: calculateArbitrageMax', () => {
     const arb = calculateArbitrageMax(
       makeKalshiShape({ no_ask_dollars: '0.40', no_bid_dollars: '0.38' }),
       makePmShape(),
-      0, 0, 0, 0,
+      0, 0, 0, 0, 'Sports',
     );
     expect(arb.maxCapital).toBe(0);
     expect(arb.depthVerified).toBe(false);
@@ -74,13 +76,13 @@ describe('REGRESSION: calculateArbitrageMax', () => {
     const arb = calculateArbitrageMax(
       makeKalshiShape({ no_ask_dollars: '0.40', no_bid_dollars: '0.38' }),
       makePmShape(),
-      1000, 800, 500, 400,
+      1000, 800, 500, 400, 'Sports',
     );
     expect(arb.maxCapital).toBeGreaterThan(0);
   });
 
   it('R9: ROI = (profit/stake)*100', () => {
-    const arb = calculateArbitrageMax(makeKalshiShape(), makePmShape(), 1000, 800, 500, 400);
+    const arb = calculateArbitrageMax(makeKalshiShape(), makePmShape(), 1000, 800, 500, 400, 'Sports');
     const totalStake = arb.kalshiStake + arb.pmStake;
     if (totalStake > 0) {
       const expectedRoi = (arb.expectedProfit / totalStake) * 100;
@@ -92,7 +94,7 @@ describe('REGRESSION: calculateArbitrageMax', () => {
     // Sätt upp så att Buy YES Kalshi + NO PM är klart bäst
     const kalshi = makeKalshiShape({ yes_ask_dollars: '0.45', no_ask_dollars: '0.55' });
     const pm = makePmShape({ bestAsk: 0.60, outcomePrices: '["0.60","0.40"]', bestBid: 0.58 });
-    const arb = calculateArbitrageMax(kalshi, pm, 1000, 1000, 1000, 1000);
+    const arb = calculateArbitrageMax(kalshi, pm, 1000, 1000, 1000, 1000, 'Sports');
     expect(arb.strategy).toContain('Buy YES Kalshi');
     expect(arb.strategy).toContain('NO PM');
   });

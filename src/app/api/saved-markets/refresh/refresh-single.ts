@@ -303,6 +303,8 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       pmBestAsk: selectedPmLeg?.bestAsk,
       pmYesDepth: selectedPmLeg?.askDepth,
       pmNoDepth: selectedPmLeg?.noAskDepth,
+      pmFeesEnabled: selectedPmLeg?.feesEnabled,
+      pmFeeSchedule: selectedPmLeg?.feeSchedule,
       pmYesMinOrderSize: selectedPmLeg?.yesMinOrderSize ?? null,
       pmNoMinOrderSize: selectedPmLeg?.noMinOrderSize ?? null,
       pmYesTickSize: selectedPmLeg?.yesTickSize ?? null,

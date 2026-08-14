@@ -8,6 +8,7 @@ import { finiteDecimal } from './market-price';
 import type { ExecutableBookQuote } from './executable-book';
 import { isPriceAlignedToTick } from './venue-constraints';
 import { assertFreshKalshiFeeAuthority, type KalshiFeeAuthority } from './kalshi-fee-quote';
+import { resolvePolymarketFeeRateBps } from './polymarket-fees';
 
 export interface LiveArbResult {
   artist: string;
@@ -67,6 +68,7 @@ export interface LiveArbResult {
   pmConditionId?: string;
   category?: string;
   kalshiFeeAuthority?: KalshiFeeAuthority;
+  pmFeeRateBps?: number | null;
   /** ARB-01a: classification of the arb strategy.
    *  - "direct": regular YES/NO across platforms (within-outcome)
    *  - "cross": cross-outcome YES+YES across platforms
@@ -104,6 +106,8 @@ export interface LiveMatchedOutcome {
   crossOutcomeMutuallyExclusiveVerified?: boolean;
   crossOutcomeExhaustiveVerified?: boolean;
   kalshiFeeAuthority?: KalshiFeeAuthority;
+  pmFeesEnabled?: boolean;
+  pmFeeSchedule?: { rate: number; exponent: number; takerOnly: boolean; rebateRate: number } | null;
 }
 
 export interface CapturedLiveArbIdentity {
@@ -126,7 +130,11 @@ function computeSingleOutcome(
 ): LiveArbResult {
   const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified,
     pmYesMinOrderSize, pmNoMinOrderSize, pmYesTickSize, pmNoTickSize,
+    pmFeesEnabled, pmFeeSchedule,
     crossOutcomeMutuallyExclusiveVerified, crossOutcomeExhaustiveVerified, kalshiFeeAuthority } = outcome;
+  const pmFeeRateBps = resolvePolymarketFeeRateBps(
+    { feesEnabled: pmFeesEnabled, feeSchedule: pmFeeSchedule }, category,
+  );
 
   // Staleness guard: don't compute arbs against dead/disconnected orderbooks.
   // BUG-06: Increased from 30s to 60s — the 30s window was too aggressive and
@@ -255,6 +263,8 @@ function computeSingleOutcome(
         noTickSize: pmNoTickSize,
         yesLimitPrice: quoteLimitPrice(pmYesExecutableQuote) ?? undefined,
         noLimitPrice: quoteLimitPrice(pmNoExecutableQuote) ?? undefined,
+        feesEnabled: pmFeesEnabled,
+        feeSchedule: pmFeeSchedule,
       } as Parameters<typeof calculateArbitrageMax>[1],
       stale ? 0 : kalshiYesDepth,
       stale ? 0 : kalshiNoDepth,
@@ -321,7 +331,7 @@ function computeSingleOutcome(
       }
     }
 
-    if (!stale && pmBinaryVerified === true && pmConditionId && pmYesTokenId !== pmNoTokenId
+    if (!stale && pmFeeRateBps != null && pmBinaryVerified === true && pmConditionId && pmYesTokenId !== pmNoTokenId
         && pmYesAsk + pmNoAsk < 1 && pmYesAskShares >= 1 && pmNoAskShares >= 1
         && pmYesMinOrderSize != null && pmYesMinOrderSize <= 1
         && pmNoMinOrderSize != null && pmNoMinOrderSize <= 1
@@ -331,7 +341,7 @@ function computeSingleOutcome(
       const contracts = 1;
       const yesStake = contracts * pmYesAsk;
       const noStake = contracts * pmNoAsk;
-      const theta = getPolymarketTheta(category);
+      const theta = pmFeeRateBps / 10_000;
       const totalFee = calcPolymarketFee(contracts, pmYesAsk, theta) + calcPolymarketFee(contracts, pmNoAsk, theta);
       const netProfit = contracts - yesStake - noStake - totalFee;
       if (netProfit > 0 && netProfit > expectedProfit) {
@@ -392,6 +402,7 @@ function computeSingleOutcome(
     pmConditionId,
     category,
     kalshiFeeAuthority,
+    pmFeeRateBps,
     arbType: strategy.startsWith('Same-platform YES+NO') ? 'internal' : 'direct',
     crossOutcomeMutuallyExclusiveVerified,
     crossOutcomeExhaustiveVerified,
@@ -420,14 +431,15 @@ function computeCapturedLegFees(
   contracts: number,
   kalshiPrice: number | null,
   pmPrice: number | null,
-  category?: string,
-  kalshiFeeAuthority?: KalshiFeeAuthority,
+  category: string | undefined,
+  kalshiFeeAuthority: KalshiFeeAuthority | undefined,
+  pmFeeRateBps: number,
 ): { kalshiFee: number; pmFee: number } {
   return {
     kalshiFee: kalshiPrice == null ? 0 : calcKalshiFee(contracts, kalshiPrice, kalshiFeeAuthority),
     pmFee: pmPrice == null
       ? 0
-      : calcPolymarketFee(contracts, pmPrice, getPolymarketTheta(category)),
+      : calcPolymarketFee(contracts, pmPrice, pmFeeRateBps / 10_000),
   };
 }
 
@@ -454,6 +466,7 @@ export function computeCapturedLiveArbitrages(
 
     if (identity.arbType === 'direct') {
       if (current.pmConditionId !== identity.pmConditionId) continue;
+      if (current.pmFeeRateBps == null) continue;
       const pmFirst = strategy === 'Buy YES PM + NO Kalshi';
       const kalshiFirst = strategy === 'Buy YES Kalshi + NO PM';
       if (!pmFirst && !kalshiFirst) continue;
@@ -487,7 +500,9 @@ export function computeCapturedLiveArbitrages(
       }
       const kalshiStake = effectiveCapital * kalshiPrice;
       const pmStake = effectiveCapital * pmPrice;
-      const fees = computeCapturedLegFees(effectiveCapital, kalshiPrice, pmPrice, category, current.kalshiFeeAuthority);
+      const fees = computeCapturedLegFees(
+        effectiveCapital, kalshiPrice, pmPrice, category, current.kalshiFeeAuthority, current.pmFeeRateBps,
+      );
       const worstCaseNetProfit = effectiveCapital - kalshiStake - pmStake - fees.kalshiFee - fees.pmFee;
       results.push(capturedResult(current, identity, {
         roiPct: (worstCaseNetProfit / effectiveCapital) * 100,
@@ -564,15 +579,19 @@ export function computeCapturedLiveArbitrages(
       let kalshiFee = 0;
       let pmFee = 0;
       if (isCross) {
-        const fees = computeCapturedLegFees(effectiveCapital, firstPrice, secondPrice, category, current.kalshiFeeAuthority);
+        if (companion.pmFeeRateBps == null) continue;
+        const fees = computeCapturedLegFees(
+          effectiveCapital, firstPrice, secondPrice, category, current.kalshiFeeAuthority, companion.pmFeeRateBps,
+        );
         kalshiFee = fees.kalshiFee;
         pmFee = fees.pmFee;
       } else if (isKalshiInternal) {
         kalshiFee = calcKalshiFee(effectiveCapital, firstPrice, current.kalshiFeeAuthority)
           + calcKalshiFee(effectiveCapital, secondPrice, companion.kalshiFeeAuthority);
       } else {
-        const theta = getPolymarketTheta(category);
-        pmFee = calcPolymarketFee(effectiveCapital, firstPrice, theta) + calcPolymarketFee(effectiveCapital, secondPrice, theta);
+        if (current.pmFeeRateBps == null || companion.pmFeeRateBps == null) continue;
+        pmFee = calcPolymarketFee(effectiveCapital, firstPrice, current.pmFeeRateBps / 10_000)
+          + calcPolymarketFee(effectiveCapital, secondPrice, companion.pmFeeRateBps / 10_000);
       }
       const expectedProfit = grossProfit - kalshiFee - pmFee;
       results.push(capturedResult(current, identity, {
