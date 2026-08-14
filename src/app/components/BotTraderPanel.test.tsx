@@ -183,6 +183,50 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('img', { name: 'BotTrader current performance by entry date chart' })).toBeTruthy();
   });
 
+  it('reconciles a partially reduced row with the portfolio current ROI', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const reduced = {
+      ...positions[0],
+      sharesKalshi: 3,
+      remainingSharesKalshi: 1,
+      remainingSharesPm: 1,
+      remainingOpenCostCents: 89,
+      totalCostCents: 98,
+      currentValueCents: 100,
+      kalshiGrossProceedsMicrocents: 10_000_000,
+      pmGrossProceedsMicrocents: 90_000_000,
+      kalshiNetProceedsCents: 10,
+      pmNetProceedsCents: 90,
+      kalshiExitFeeCents: 0,
+      pmExitFeeCents: 0,
+      realizedPnlCents: 4,
+      lastValuationAt: '2026-08-11T13:40:00.000Z',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: {
+        ...analytics,
+        positions: [reduced],
+        performance: {
+          ...analytics.performance,
+          capital: { deployedCents: 89, currentCents: 100, heldToResolutionCents: 100, excludedOpenCostCents: 0 },
+          pnl: { realizedCents: 4, unrealizedCents: 11, totalCents: 15, roiBps: 1685 },
+        },
+      } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    await screen.findByText('Trump 2026');
+    expect(screen.getByText('Deployed').parentElement?.textContent).toBe('Deployed$0.89');
+    expect(screen.getByText('Portfolio ROI').parentElement?.textContent).toBe('Portfolio ROI+16.9%');
+    expect(screen.getByText('Trump 2026').closest('tr')?.textContent).toContain('$1.00+$0.15+16.9%');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByTestId('kalshi-liquidation').textContent).toContain('1 held · 10.000¢ VWAP');
+    expect(screen.getByTestId('polymarket-liquidation').textContent).toContain('1 held · 90.000¢ VWAP');
+  });
+
   it('renders partial valuation and range-specific empty states without misleading P&L', async () => {
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input);
@@ -359,8 +403,14 @@ describe('BotTraderPanel', () => {
       pmEntryGrossMicrocents: 85_012_344,
       kalshiEntryFeeCents: 1,
       pmEntryFeeCents: 0,
-      entryCostRoundingDeltaMicrocents: 641_977,
-      totalCostCents: 99,
+      kalshiEntryFills: [
+        { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 4_345_679, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+      ],
+      pmEntryFills: [{ priceMicrocents: 85_012_344, sizeMicrounits: 1_000_000 }],
+      entryCostRoundingDeltaMicrocents: -358_023,
+      totalCostCents: 98,
     };
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input);
@@ -380,10 +430,14 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.13345679 net leg cost');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('85.012344¢ exact fill · $0.85012344 gross');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('$0.00000000 execution fee · $0.85012344 net leg cost');
-    expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Currency rounding delta: $0.00641977');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Currency rounding delta: -$0.00358023');
     expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Gross fills $0.97358023');
     expect(screen.getByTestId('entry-cost-reconciliation').textContent).toContain('Entry fees: Kalshi $0.01000000 · Polymarket $0.00000000');
-    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.99000000');
+    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.98000000');
+    expect(screen.getByTestId('kalshi-entry-fills').textContent).toContain('Fill 1: 1.000000 units @ 4.000000¢');
+    expect(screen.getByTestId('kalshi-entry-fills').textContent).toContain('Fill 2: 1.000000 units @ 4.345679¢');
+    expect(screen.getByTestId('kalshi-entry-fills').textContent).toContain('Fill 3: 1.000000 units @ 4.000000¢');
+    expect(screen.getByTestId('polymarket-entry-fills').textContent).toContain('Fill 1: 1.000000 units @ 85.012344¢');
   });
 
   it('shows a specific unavailable Buy Cost reason for legacy paper positions and never displays zero', async () => {

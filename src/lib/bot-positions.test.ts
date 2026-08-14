@@ -19,7 +19,7 @@ import {
 import { calcKalshiFee, calcPolymarketFee } from './matcher';
 
 function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
-  return {
+  const position: BotPosition = {
     id: 1,
     executionId: 7,
     marketId: 'pair-1',
@@ -33,9 +33,24 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     buyPricePmCents: 50,
     sharesKalshi: 10,
     sharesPm: 10,
+    remainingSharesKalshi: 10,
+    remainingSharesPm: 10,
+    remainingOpenPrincipalCents: 950,
+    remainingOpenFeesCents: 28,
+    remainingOpenCostCents: 978,
     totalCostCents: 978,
+    entryCostStatus: 'available',
+    entryCostFailureReason: null,
+    kalshiEntryGrossMicrocents: 450_000_000,
+    pmEntryGrossMicrocents: 500_000_000,
+    entryCostRoundingDeltaMicrocents: 0,
+    kalshiEntryFillCount: 1,
+    pmEntryFillCount: 1,
     expectedPayoutCents: 1000,
     expectedProfitCents: 22,
+    expectedRoiBps: 225,
+    expectedApyBps: null,
+    unitId: 'execution:7',
     feesCents: 28,
     category: 'Politics',
     pmTheta: 0.04,
@@ -65,6 +80,7 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     openedAt: '2026-08-01T00:00:00.000Z',
     expiryDate: '2026-08-10T00:00:00.000Z',
     settledAt: null,
+    closedAt: null,
     currentPriceKalshiCents: 45,
     currentPricePmCents: 55,
     currentValueCents: 1000,
@@ -77,12 +93,32 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     unrealizedPnlCents: 22,
     unrealizedRoiBps: 225,
     lastValuationAt: '2026-08-01T00:00:00.000Z',
+    valuationStatus: 'current',
+    valuationFailureReason: null,
+    valuationFailureAt: null,
+    kalshiValuationDepth: 10,
+    pmValuationDepth: 10,
+    kalshiLiquidationValueCents: 450,
+    pmLiquidationValueCents: 550,
+    kalshiQuoteTimestamp: '2026-08-01T00:00:00.000Z',
+    pmQuoteTimestamp: '2026-08-01T00:00:00.000Z',
+    kalshiQuoteSource: 'test',
+    pmQuoteSource: 'test',
+    realizedPnlBeforeSettlementCents: null,
     realizedPnlCents: null,
     settlementSide: null,
     executionMode: 'paper',
     dryRun: true,
     ...overrides,
   };
+  if (overrides.remainingSharesKalshi === undefined) position.remainingSharesKalshi = position.sharesKalshi;
+  if (overrides.remainingSharesPm === undefined) position.remainingSharesPm = position.sharesPm;
+  if (overrides.remainingOpenFeesCents === undefined) position.remainingOpenFeesCents = position.feesCents;
+  if (overrides.remainingOpenCostCents === undefined) position.remainingOpenCostCents = position.totalCostCents;
+  if (overrides.remainingOpenPrincipalCents === undefined) {
+    position.remainingOpenPrincipalCents = position.remainingOpenCostCents - position.remainingOpenFeesCents;
+  }
+  return position;
 }
 
 describe('summarizeBotPositions', () => {
@@ -787,6 +823,18 @@ describe('BotPositionStore', () => {
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'paper')).resolves.toBe(true);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).resolves.toBe(false);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
+    await expect(store.create({
+      ...created,
+      id: undefined,
+      executionId: 88,
+      executionMode: 'live',
+      kalshiTicker: 'KXTEST-LIVE-MISSING-FILLS',
+      pmConditionId: '0xlive-missing-fills',
+      kalshiEntryGrossMicrocents: undefined,
+      pmEntryGrossMicrocents: undefined,
+      kalshiEntryFills: undefined,
+      pmEntryFills: undefined,
+    } as never)).rejects.toThrow(/immutable.*fill evidence/i);
     const live = await store.create({
       ...created,
       id: undefined,
@@ -801,6 +849,14 @@ describe('BotPositionStore', () => {
       totalCostCents: 206,
       kalshiEntryGrossMicrocents: 12_000_000,
       pmEntryGrossMicrocents: 184_000_000,
+      kalshiEntryFills: [
+        { priceMicrocents: 5_500_000, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 6_500_000, sizeMicrounits: 1_000_000 },
+      ],
+      pmEntryFills: [
+        { priceMicrocents: 91_250_000, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 92_750_000, sizeMicrounits: 1_000_000 },
+      ],
       entryCostRoundingDeltaMicrocents: 0,
       kalshiEntryFillCount: 2,
       pmEntryFillCount: 2,
@@ -959,6 +1015,139 @@ describe('BotPositionStore', () => {
       12_345_679,
       85_012_344,
     ]);
+  });
+
+  it('keeps authoritative fractional fill accounting reconciled through a partial exposure reduction', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-reduction-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 1)`);
+    client.close();
+    const store = new BotPositionStore(dbUrl);
+    const created = await store.create({
+      ...openPosition(), id: undefined, dryRun: undefined,
+      buyPriceKalshiCents: 45,
+      buyPricePmCents: 52,
+      sharesKalshi: 3,
+      sharesPm: 1,
+      kalshiEntryGrossMicrocents: 12_345_679,
+      pmEntryGrossMicrocents: 85_012_344,
+      kalshiEntryFills: [
+        { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 4_345_679, sizeMicrounits: 1_000_000 },
+        { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+      ],
+      pmEntryFills: [{ priceMicrocents: 85_012_344, sizeMicrounits: 1_000_000 }],
+      entryCostRoundingDeltaMicrocents: -358_023,
+      kalshiEntryFillCount: 3,
+      pmEntryFillCount: 1,
+      kalshiEntryFeeMultiplierPpm: 0,
+      kalshiExitFeeMultiplierPpm: 0,
+      kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      pmTheta: 0,
+      pmEntryFeeRateBps: 0,
+      pmExitFeeRateBps: 0,
+      pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      kalshiEntryFeeCents: 1,
+      pmEntryFeeCents: 0,
+      feesCents: 1,
+      totalCostCents: 98,
+      expectedPayoutCents: 100,
+      expectedProfitCents: 2,
+    } as never);
+    expect(created.kalshiEntryFills).toEqual([
+      { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+      { priceMicrocents: 4_345_679, sizeMicrounits: 1_000_000 },
+      { priceMicrocents: 4_000_000, sizeMicrounits: 1_000_000 },
+    ]);
+    expect(created.pmEntryFills).toEqual([
+      { priceMicrocents: 85_012_344, sizeMicrounits: 1_000_000 },
+    ]);
+
+    await store.updateValuation(created.id, {
+      status: 'open',
+      currentPriceKalshiCents: 10,
+      currentPricePmCents: 90,
+      currentValueCents: 120,
+      kalshiGrossProceedsMicrocents: 30_000_000,
+      pmGrossProceedsMicrocents: 90_000_000,
+      kalshiNetProceedsCents: 30,
+      pmNetProceedsCents: 90,
+      kalshiExitFeeCents: 0,
+      pmExitFeeCents: 0,
+      unrealizedPnlCents: 22,
+      unrealizedRoiBps: 2245,
+      lastValuationAt: '2026-08-08T12:00:00.000Z',
+      settledAt: null,
+      realizedPnlCents: null,
+      settlementSide: null,
+    });
+    const reduced = await store.reduceExposure(created.id, {
+      expectedRemainingSharesKalshi: 3,
+      expectedRemainingSharesPm: 1,
+      expectedLastValuationAt: '2026-08-08T12:00:00.000Z',
+      remainingSharesKalshi: 1,
+      remainingSharesPm: 1,
+      realizedPnlCents: 4,
+      observedAt: '2026-08-08T12:01:00.000Z',
+    });
+
+    expect(reduced.remainingOpenPrincipalCents).toBe(89);
+    expect(reduced.remainingOpenFeesCents).toBe(0);
+    expect(reduced.remainingOpenCostCents).toBe(89);
+    expect(reduced.currentValueCents).toBe(100);
+    expect(reduced.unrealizedPnlCents).toBe(11);
+    expect(reduced.unrealizedRoiBps).toBe(1236);
+    const revalued = calculatePositionValuation(reduced, {
+      kalshiYesBidCents: 10,
+      kalshiNoBidCents: 90,
+      pmYesBidCents: 10,
+      pmNoBidCents: 90,
+      kalshiYesBids: [{ priceCents: 10, size: 1 }],
+      pmNoBids: [{ priceCents: 90, size: 1 }],
+      observedAt: '2026-08-08T12:01:00.000Z',
+      expiryDate: null,
+    });
+    expect(revalued.currentValueCents).toBe(100);
+    expect(revalued.unrealizedPnlCents).toBe(11);
+    expect(revalued.unrealizedRoiBps).toBe(1236);
+    expect(revalued.kalshiGrossProceedsMicrocents).toBe(10_000_000);
+    expect(revalued.pmGrossProceedsMicrocents).toBe(90_000_000);
+    const settled = calculatePositionValuation(reduced, {
+      kalshiYesBidCents: 100,
+      kalshiNoBidCents: 0,
+      pmYesBidCents: 100,
+      pmNoBidCents: 0,
+      observedAt: '2026-08-11T00:00:00.000Z',
+      expiryDate: '2026-08-10T00:00:00.000Z',
+      kalshiResolved: true,
+      pmResolved: true,
+    });
+    expect(settled.currentValueCents).toBe(100);
+    expect(settled.realizedPnlCents).toBe(15);
+    expect(summarizeBotPerformance([reduced], new Date('2026-08-08T12:02:00.000Z'))).toMatchObject({
+      capital: { deployedCents: 89, currentCents: 100, heldToResolutionCents: 100 },
+      pnl: { realizedCents: 4, unrealizedCents: 11, totalCents: 15, roiBps: 1685 },
+    });
+    const result = await store.listMarkets();
+    expect(result.markets[0].currentLiveStakeCents).toBe(89);
+    expect(result.markets[0].unrealizedPnlCents).toBe(11);
+    expect(result.positions[0].executionPrincipalCents).toBe(97);
+    expect(result.positions[0].legs.map((leg) => leg.originalPrincipalCents)).toEqual([12, 85]);
+    expect(result.positions[0].legs.map((leg) => leg.remainingOpenPrincipalCents)).toEqual([4, 85]);
+    expect(result.positions[0].legs.map((leg) => leg.currentLiquidationValueCents)).toEqual([10, 90]);
+    expect(result.positions[0].legs.map((leg) => leg.executableDepthUsed)).toEqual([null, null]);
+    await store.updateValuation(created.id, settled);
+    const [terminal] = await store.list({ status: 'settled' });
+    expect(terminal.realizedPnlBeforeSettlementCents).toBe(4);
+    expect(terminal.realizedPnlCents).toBe(15);
+    expect(summarizeBotPerformance([terminal], new Date('2026-08-11T00:01:00.000Z'))).toMatchObject({
+      pnl: { realizedCents: 15, unrealizedCents: 0, totalCents: 15 },
+      valuation: { pendingSettlement: 0 },
+    });
+    store.close();
   });
 
   it('allows paper and live reservations for the same normalized venue pair', async () => {
@@ -1164,6 +1353,8 @@ describe('BotPositionStore', () => {
       id: undefined,
       dryRun: undefined,
       executionMode: 'live',
+      kalshiEntryFills: [{ priceMicrocents: 45_000_000, sizeMicrounits: 10_000_000 }],
+      pmEntryFills: [{ priceMicrocents: 50_000_000, sizeMicrounits: 10_000_000 }],
     } as never);
     const currentKalshiFee = {
       feeType: 'quadratic',

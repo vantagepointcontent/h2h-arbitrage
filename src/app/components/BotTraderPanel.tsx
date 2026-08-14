@@ -45,6 +45,9 @@ interface BotPosition {
   buyPricePmCents: number;
   sharesKalshi: number;
   sharesPm: number;
+  remainingSharesKalshi?: number;
+  remainingSharesPm?: number;
+  remainingOpenCostCents?: number;
   totalCostCents: number;
   entryCostStatus?: 'available' | 'unavailable';
   entryCostFailureReason?: string | null;
@@ -55,6 +58,8 @@ interface BotPosition {
   entryCostRoundingDeltaMicrocents?: number | null;
   kalshiEntryFillCount?: number | null;
   pmEntryFillCount?: number | null;
+  kalshiEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number }> | null;
+  pmEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number }> | null;
   expectedPayoutCents: number;
   expectedProfitCents: number;
   feesCents: number;
@@ -80,6 +85,7 @@ interface BotPosition {
   lastValuationAt: string | null;
   valuationStatus?: 'current' | 'stale' | 'unavailable';
   valuationFailureReason?: string | null;
+  realizedPnlBeforeSettlementCents?: number | null;
   realizedPnlCents: number | null;
   settlementSide: 'kalshi' | 'pm' | null;
   resolutionPayoutCents?: number | null;
@@ -109,21 +115,35 @@ function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
   if (!Number.isFinite(observedAt)) return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: malformed quote timestamp' };
   if (position.valuationFailureReason?.trim()) return { available: false, label: position.valuationFailureReason.trim() };
   if (now - observedAt > VALUATION_STALE_MS) return { available: false, label: 'Stale executable quote' };
-  const pnlCents = position.currentValueCents - position.totalCostCents;
+  const openCostCents = Number.isSafeInteger(position.remainingOpenCostCents)
+    ? position.remainingOpenCostCents!
+    : position.totalCostCents;
+  const pnlCents = (position.realizedPnlCents ?? 0) + position.currentValueCents - openCostCents;
   return {
     available: true,
     currentValueCents: position.currentValueCents,
     pnlCents,
-    roiBps: position.totalCostCents > 0 ? Math.round((pnlCents * 10_000) / position.totalCostCents) : null,
+    roiBps: openCostCents > 0 ? Math.round((pnlCents * 10_000) / openCostCents) : null,
   };
 }
 
 function hasVerifiedTerminalAccounting(position: BotPosition): boolean {
+  const openCostCents = Number.isSafeInteger(position.remainingOpenCostCents)
+    ? position.remainingOpenCostCents!
+    : position.totalCostCents;
+  const knownPartialReduction = Number.isSafeInteger(position.remainingSharesKalshi)
+    && Number.isSafeInteger(position.remainingSharesPm)
+    && (position.remainingSharesKalshi !== position.sharesKalshi
+      || position.remainingSharesPm !== position.sharesPm);
+  const realizedBeforeSettlement = Number.isSafeInteger(position.realizedPnlBeforeSettlementCents)
+    ? position.realizedPnlBeforeSettlementCents!
+    : knownPartialReduction ? null : 0;
   return position.status !== 'open'
     && position.resolutionValidationStatus === 'verified'
     && Number.isSafeInteger(position.resolutionPayoutCents)
     && Number.isSafeInteger(position.realizedPnlCents)
-    && position.resolutionPayoutCents! - position.totalCostCents === position.realizedPnlCents;
+    && realizedBeforeSettlement != null
+    && realizedBeforeSettlement + position.resolutionPayoutCents! - openCostCents === position.realizedPnlCents;
 }
 
 
@@ -568,6 +588,12 @@ export default function BotTraderPanel() {
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
                 const settlementUnavailableLabel = position.status !== 'open' && !hasVerifiedTerminalAccounting(position) ? 'Pending verification' : null;
                 const valueUnavailableLabel = openUnavailableLabel ?? settlementUnavailableLabel;
+                const kalshiHeld = Number.isSafeInteger(position.remainingSharesKalshi)
+                  ? position.remainingSharesKalshi!
+                  : position.sharesKalshi;
+                const pmHeld = Number.isSafeInteger(position.remainingSharesPm)
+                  ? position.remainingSharesPm!
+                  : position.sharesPm;
                 const hasLiquidationBreakdown = valueUnavailableLabel == null
                   && position.currentValueCents != null
                   && Number.isSafeInteger(position.kalshiGrossProceedsMicrocents)
@@ -576,8 +602,8 @@ export default function BotTraderPanel() {
                   && Number.isSafeInteger(position.pmNetProceedsCents)
                   && Number.isSafeInteger(position.kalshiExitFeeCents)
                   && Number.isSafeInteger(position.pmExitFeeCents)
-                  && position.sharesKalshi > 0
-                  && position.sharesPm > 0
+                  && kalshiHeld > 0
+                  && pmHeld > 0
                   && position.kalshiExitFeeType === 'quadratic'
                   && Number.isSafeInteger(position.kalshiExitFeeMultiplierPpm)
                   && Number.isSafeInteger(position.pmExitFeeRateBps)
@@ -624,11 +650,13 @@ export default function BotTraderPanel() {
                             <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
+                            {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>Fill {index + 1}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
+                            {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>Fill {index + 1}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>
                           <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Gross fills {formatExactMicrocents(position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents)} · Entry fees: Kalshi {formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} · Polymarket {formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)}.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Full-precision gross plus entry fees is rounded once to ledger cents.</div>
@@ -655,12 +683,12 @@ export default function BotTraderPanel() {
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()}</div>
-                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} held · {formatVwapCents(position.kalshiGrossProceedsMicrocents!, position.sharesKalshi)} VWAP · {formatMicrocents(position.kalshiGrossProceedsMicrocents!)} gross</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(kalshiHeld)} held · {formatVwapCents(position.kalshiGrossProceedsMicrocents!, kalshiHeld)} VWAP · {formatMicrocents(position.kalshiGrossProceedsMicrocents!)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.kalshiExitFeeCents!)} fee ({position.kalshiExitFeeType}, ×{(position.kalshiExitFeeMultiplierPpm! / 1_000_000).toFixed(6)}) · <strong className="text-[var(--text-primary)]">{formatCents(kalshiNetProceedsCents!)} net</strong></div>
                           </div>
                           <div data-testid="polymarket-liquidation" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()}</div>
-                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} held · {formatVwapCents(position.pmGrossProceedsMicrocents!, position.sharesPm)} VWAP · {formatMicrocents(position.pmGrossProceedsMicrocents!)} gross</div>
+                            <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(pmHeld)} held · {formatVwapCents(position.pmGrossProceedsMicrocents!, pmHeld)} VWAP · {formatMicrocents(position.pmGrossProceedsMicrocents!)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{formatCents(position.pmExitFeeCents!)} fee ({(position.pmExitFeeRateBps! / 100).toFixed(2)}%) · <strong className="text-[var(--text-primary)]">{formatCents(pmNetProceedsCents!)} net</strong></div>
                           </div>
                           <div data-testid="combined-net-proceeds" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Combined net proceeds</span><span className="tabular-nums">{formatCents(kalshiNetProceedsCents! + pmNetProceedsCents!)}</span></div>
