@@ -300,4 +300,24 @@ describe('BUG-153 live entry terminality', () => {
     expect(result.success).toBe(false);
     expect(result.unhedged).toBe(true);
   });
+
+  it('preserves the maximum intermediate post-cancel fill after a later regression', async () => {
+    mocks.getKalshiOrder
+      .mockResolvedValueOnce(kalshiOrder('resting', 4, 1, '2'))
+      .mockResolvedValueOnce(kalshiOrder('canceled', 3, 1, '3'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('canceled', 2, 1, '2'));
+    mocks.placeKalshiSellOrder.mockResolvedValue(kalshiOrder('executed', 1, 1, '4'));
+
+    const result = await executeArb(request());
+
+    expect(mocks.placeKalshiSellOrder).not.toHaveBeenCalled();
+    expect(mocks.placePmSellOrder).not.toHaveBeenCalled();
+    expect(result.cashLedger?.entryPrincipalCents).toBe(280);
+    expect(result.cashLedger?.entryOrders).toEqual(expect.arrayContaining([
+      expect.objectContaining({ venue: 'kalshi', terminality: 'indeterminate' }),
+    ]));
+    expect(result.cashLedger?.status).toBe('reconciliation-required');
+    expect(result.success).toBe(false);
+    expect(result.unhedged).toBe(true);
+  });
 });

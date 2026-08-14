@@ -797,6 +797,13 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     (current.filledContracts ?? 0) >= (prior.filledContracts ?? 0)
       ? { ...current, venue: current.platform }
       : prior;
+  const capturePolledEntry = (current: OrderResult) => {
+    if (current.platform === 'kalshi') {
+      ledgerKalshiEntry = captureEntry(current, ledgerKalshiEntry);
+    } else {
+      ledgerPolymarketEntry = captureEntry(current, ledgerPolymarketEntry);
+    }
+  };
   const initialTerminality = (result: OrderResult): 'terminal' | 'live' | 'indeterminate' =>
     isTerminallyVerifiedOrder(result) ? 'terminal'
       : result.status === 'pending' || result.status === 'partial' ? 'live' : 'indeterminate';
@@ -855,6 +862,7 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       async (current) => {
         const polled = await pollOrder(current, order, false);
         captureLatestTerminality(polled, { ...current, venue: current.platform });
+        capturePolledEntry(polled);
         return polled;
       },
     );
