@@ -48,6 +48,7 @@ import {
   type ExecutionEvidence,
   type LiveExecutionEvidence,
 } from './execution-evidence';
+import type { ExecutableBookQuote } from './executable-book';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -120,6 +121,10 @@ export interface BotTradeInput {
   pmYesDepth?: number;
   /** Dollar depth at PM NO ask */
   pmNoDepth?: number;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   /** Market expiry ISO string */
   expiryDate?: string | null;
   category?: string;
@@ -430,6 +435,23 @@ function legDepths(
   };
 }
 
+function pickLegQuotes(strategy: string, input: BotTradeInput): {
+  kalshiQuote?: ExecutableBookQuote;
+  pmQuote?: ExecutableBookQuote;
+} {
+  const strategyLower = (strategy || '').toLowerCase();
+  if (strategyLower.includes('both sides')) {
+    return { kalshiQuote: input.kalshiYesExecutableQuote, pmQuote: input.pmYesExecutableQuote };
+  }
+  if (strategyLower.includes('yes kalshi')) {
+    return { kalshiQuote: input.kalshiYesExecutableQuote, pmQuote: input.pmNoExecutableQuote };
+  }
+  if (strategyLower.includes('yes pm')) {
+    return { kalshiQuote: input.kalshiNoExecutableQuote, pmQuote: input.pmYesExecutableQuote };
+  }
+  return {};
+}
+
 function buildCriteria(
   input: BotTradeInput,
   reasons: string[],
@@ -474,11 +496,22 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   );
   if (!Number.isFinite(sourceShares) || sourceShares <= 0) return null;
 
+  const explicitQuotes = pickLegQuotes(input.strategy, input);
+  const kalshiQuote = explicitQuotes.kalshiQuote;
+  const pmQuote = explicitQuotes.pmQuote;
+  if (kalshiQuote?.status !== 'executable' || pmQuote?.status !== 'executable'
+    || kalshiQuote.vwapPriceMicroCents == null || pmQuote.vwapPriceMicroCents == null
+    || kalshiQuote.limitPriceMicroCents == null || pmQuote.limitPriceMicroCents == null) return null;
+  const kalshiExecutionPrice = kalshiQuote.vwapPriceMicroCents / 100_000_000;
+  const pmExecutionPrice = pmQuote.vwapPriceMicroCents / 100_000_000;
+  const kalshiLimitPrice = kalshiQuote.limitPriceMicroCents / 100_000_000;
+  const pmLimitPrice = pmQuote.limitPriceMicroCents / 100_000_000;
+
   // Depth qualifies the opportunity; it does not size the placement. Each
   // BotTrader placement is one matched share on each selected strategy leg.
   const contracts = 1;
-  const kalshiStake = legs.kalshiPrice;
-  const pmStake = legs.pmPrice;
+  const kalshiStake = kalshiExecutionPrice;
+  const pmStake = pmExecutionPrice;
   const oneShareNetProfit = input.expectedProfit / sourceShares;
 
   const kalshiOrder: OrderRequest = {
@@ -489,8 +522,9 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
     outcome: legs.kalshiOutcome,
     size: kalshiStake,
     contracts,
-    price: legs.kalshiPrice,
+    price: kalshiLimitPrice,
     orderType: 'limit',
+    executableQuote: kalshiQuote,
   };
 
   const polymarketOrder: OrderRequest = {
@@ -501,8 +535,9 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
     outcome: legs.pmOutcome,
     size: pmStake,
     contracts,
-    price: legs.pmPrice,
+    price: pmLimitPrice,
     orderType: 'limit',
+    executableQuote: pmQuote,
   };
 
   return {
@@ -902,6 +937,10 @@ export function liveArbResultToBotInput(
     kalshiNoDepth: result.kalshiNoDepth,
     pmYesDepth: result.pmYesDepth,
     pmNoDepth: result.pmNoDepth,
+    kalshiYesExecutableQuote: result.kalshiYesExecutableQuote,
+    kalshiNoExecutableQuote: result.kalshiNoExecutableQuote,
+    pmYesExecutableQuote: result.pmYesExecutableQuote,
+    pmNoExecutableQuote: result.pmNoExecutableQuote,
     expiryDate,
   };
 }

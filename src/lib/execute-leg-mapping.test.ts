@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { buildExecutableArb } from '../app/components/ExecuteArbModal';
+import { walkExecutableBook } from './executable-book';
 
+const quote = (price: number) => walkExecutableBook({
+  side: 'buy',
+  levels: [{ priceMicroCents: Math.round(price * 100_000_000), quantityMicros: 1_000_000 }],
+  requestedQuantityMicros: 1_000_000,
+  tickSizeMicroCents: 100_000,
+  minimumOrderQuantityMicros: 1_000_000,
+  depthTimestamp: '2026-08-14T11:02:35.000Z',
+});
 const base = {
   artist: 'Outcome A',
   roiPct: 2.5,
@@ -11,6 +20,10 @@ const base = {
   kalshiNoAsk: 0.57,
   pmYesAsk: 0.41,
   pmNoAsk: 0.52,
+  kalshiYesExecutableQuote: quote(0.45),
+  kalshiNoExecutableQuote: quote(0.57),
+  pmYesExecutableQuote: quote(0.41),
+  pmNoExecutableQuote: quote(0.52),
   kalshiYesAskShares: 100,
   kalshiNoAskShares: 100,
   pmYesAskShares: 100,
@@ -55,10 +68,12 @@ describe('buildExecutableArb leg mapping', () => {
     expect(buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM', kalshiStake: 0 }, 'T')).toBeNull();
   });
 
-  it('uses the same matched whole-share quantity for both order sizes', () => {
+  it('uses the same one-share quantity for both order sizes', () => {
     const arb = buildExecutableArb({ ...base, strategy: 'Buy YES Kalshi + NO PM' }, 'T');
-    expect(arb!.shares).toBe(100);
-    expect(arb!.kalshiOrder.size).toBe(45);
-    expect(arb!.polymarketOrder.size).toBe(52);
+    expect(arb!.shares).toBe(1);
+    expect(arb!.kalshiOrder.contracts).toBe(1);
+    expect(arb!.polymarketOrder.contracts).toBe(1);
+    expect(arb!.kalshiOrder.size).toBe(0.45);
+    expect(arb!.polymarketOrder.size).toBe(0.52);
   });
 });

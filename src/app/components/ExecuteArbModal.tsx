@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Zap, ShieldAlert, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { formatPrice } from "@/app/lib/page-shared";
 import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from "@/lib/matcher";
+import { isExecutableQuoteConsistent, type ExecutableBookQuote } from "@/lib/executable-book";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -16,8 +17,10 @@ interface ArbLeg {
   side: "buy";
   outcome: "yes" | "no";
   size: number;
+  contracts: number;
   price: number;
   orderType: "limit";
+  executableQuote: ExecutableBookQuote;
 }
 
 export interface ExecutableArb {
@@ -52,6 +55,10 @@ export function buildExecutableArb(o: {
   kalshiNoAsk: number | null;
   pmYesAsk: number | null;
   pmNoAsk: number | null;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   /** Contracts available at the exact displayed effective ask level. */
   kalshiYesAskShares?: number;
   kalshiNoAskShares?: number;
@@ -74,25 +81,35 @@ export function buildExecutableArb(o: {
   let pmOutcome: "yes" | "no";
   let pmPrice: number | null;
   let pmToken: string | undefined;
+  let kalshiQuote: ExecutableBookQuote | undefined;
+  let pmQuote: ExecutableBookQuote | undefined;
 
   if (o.strategy === "Buy YES Kalshi + NO PM") {
-    kOutcome = "yes"; kPrice = o.kalshiYesAsk;
-    pmOutcome = "no"; pmPrice = o.pmNoAsk; pmToken = o.pmNoTokenId;
+    kOutcome = "yes"; kPrice = o.kalshiYesAsk; kalshiQuote = o.kalshiYesExecutableQuote;
+    pmOutcome = "no"; pmPrice = o.pmNoAsk; pmToken = o.pmNoTokenId; pmQuote = o.pmNoExecutableQuote;
   } else if (o.strategy === "Buy YES PM + NO Kalshi") {
-    kOutcome = "no"; kPrice = o.kalshiNoAsk;
-    pmOutcome = "yes"; pmPrice = o.pmYesAsk; pmToken = o.pmYesTokenId;
+    kOutcome = "no"; kPrice = o.kalshiNoAsk; kalshiQuote = o.kalshiNoExecutableQuote;
+    pmOutcome = "yes"; pmPrice = o.pmYesAsk; pmToken = o.pmYesTokenId; pmQuote = o.pmYesExecutableQuote;
   } else {
     return null; // cross-outcome / No arb — not executable from this button
   }
   if (kPrice == null || pmPrice == null || !pmToken || o.stale) return null;
   if (kPrice <= 0 || pmPrice <= 0 || o.kalshiStake <= 0 || o.pmStake <= 0) return null;
+  const oneShareMicros = 1_000_000;
+  if (!isExecutableQuoteConsistent(kalshiQuote, 'buy', oneShareMicros)
+      || !isExecutableQuoteConsistent(pmQuote, 'buy', oneShareMicros)) return null;
+
+  const kalshiVwap = kalshiQuote.vwapPriceMicroCents! / 100_000_000;
+  const pmVwap = pmQuote.vwapPriceMicroCents! / 100_000_000;
+  const kalshiLimit = kalshiQuote.limitPriceMicroCents! / 100_000_000;
+  const pmLimit = pmQuote.limitPriceMicroCents! / 100_000_000;
 
   const kAvailable = kOutcome === 'yes' ? o.kalshiYesAskShares : o.kalshiNoAskShares;
   const pmAvailable = pmOutcome === 'yes' ? o.pmYesAskShares : o.pmNoAskShares;
   if (!Number.isFinite(kAvailable) || !Number.isFinite(pmAvailable) || kAvailable! <= 0 || pmAvailable! <= 0) return null;
 
-  // One arbitrage contract needs one share on each venue. Cap the requested
-  // quantity by the dollar allocation AND the exact selected top ask on both legs.
+  // Current execution policy is exactly one matched share. The quote itself
+  // proves that the full share is available across the walked ladder.
   const constraints = [
     { label: "Kalshi allocation", value: o.kalshiStake / kPrice },
     { label: "Polymarket allocation", value: o.pmStake / pmPrice },
@@ -102,17 +119,17 @@ export function buildExecutableArb(o: {
   const limitingConstraint = constraints.reduce((lowest, constraint) =>
     constraint.value < lowest.value ? constraint : lowest,
   ).label;
-  const shares = Math.floor(Math.min(...constraints.map((constraint) => constraint.value)));
-  if (shares < 1) return null;
+  if (Math.min(...constraints.map((constraint) => constraint.value)) < 1) return null;
+  const shares = 1;
 
   // The scanner's full-book profit is no longer valid after a top-level depth
   // cap. Reprice the exact whole-share order shown in this modal, net of venue
   // fees, so the confirmation and submitted request describe the same trade.
-  const kalshiCost = shares * kPrice;
-  const pmCost = shares * pmPrice;
+  const kalshiCost = kalshiVwap;
+  const pmCost = pmVwap;
   const totalCost = kalshiCost + pmCost;
-  const fees = calcKalshiFee(shares, kPrice)
-    + calcPolymarketFee(shares, pmPrice, getPolymarketTheta(o.category));
+  const fees = calcKalshiFee(shares, kalshiVwap)
+    + calcPolymarketFee(shares, pmVwap, getPolymarketTheta(o.category));
   const expectedProfit = shares - totalCost - fees;
   const roiPct = totalCost > 0 ? (expectedProfit / totalCost) * 100 : 0;
 
@@ -127,11 +144,13 @@ export function buildExecutableArb(o: {
     limitingConstraint,
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,
-      side: "buy", outcome: kOutcome, size: shares * kPrice, price: kPrice, orderType: "limit",
+      side: "buy", outcome: kOutcome, size: kalshiCost, contracts: shares,
+      price: kalshiLimit, orderType: "limit", executableQuote: kalshiQuote,
     },
     polymarketOrder: {
       platform: "polymarket", marketId: pmToken, conditionId: pmToken,
-      side: "buy", outcome: pmOutcome, size: shares * pmPrice, price: pmPrice, orderType: "limit",
+      side: "buy", outcome: pmOutcome, size: pmCost, contracts: shares,
+      price: pmLimit, orderType: "limit", executableQuote: pmQuote,
     },
     scanTime: o.scanTime,
     bestPriceFound: o.depthVerified === true,

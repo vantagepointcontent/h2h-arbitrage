@@ -15,6 +15,7 @@ import {
   CLOB_RECONNECT_MAX_MS,
 } from './clob-ws';
 import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
+import { buildExecutionRequest, liveArbResultToBotInput } from './bot-trader';
 
 const outcome = {
   artist: 'Example',
@@ -101,6 +102,72 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
 });
 
 describe('computeAllLiveArbitrages effective execution quotes', () => {
+  it('walks one share across shuffled depth and carries the same executable VWAP into BotTrader', () => {
+    const observedAt = new Date().toISOString();
+    const constraints = {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: observedAt,
+    };
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.45, quantity: 0.7 }, { price: 0.40, quantity: 0.4 }],
+      [{ price: 0.70, quantity: 10 }],
+      0,
+      constraints,
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 10 }], [], 0, constraints);
+    orderbookState.setBook(outcome.pmNoTokenId,
+      [],
+      [{ price: 0.50, quantity: 0.6 }, { price: 0.45, quantity: 0.5 }],
+      0,
+      constraints,
+    );
+
+    const result = computeAllLiveArbitrages([outcome], 100)[0];
+    expect(result.kalshiYesExecutableQuote).toMatchObject({
+      status: 'executable',
+      vwapPriceMicroCents: 43_000_000,
+      depthTimestamp: observedAt,
+    });
+    expect(result.pmNoExecutableQuote).toMatchObject({
+      status: 'executable',
+      vwapPriceMicroCents: 47_500_000,
+      depthTimestamp: observedAt,
+    });
+    expect(result.kalshiYesAsk).toBe(0.43);
+    expect(result.pmNoAsk).toBe(0.475);
+
+    const request = buildExecutionRequest(liveArbResultToBotInput('pair-1', 'Market', undefined, result));
+    expect(request?.kalshiOrder).toMatchObject({ price: 0.45, executableQuote: result.kalshiYesExecutableQuote });
+    expect(request?.polymarketOrder).toMatchObject({ price: 0.50, executableQuote: result.pmNoExecutableQuote });
+  });
+
+  it('marks one-share Polymarket execution non-executable when the book minimum is five', () => {
+    const observedAt = '2026-08-14T11:02:35.000Z';
+    orderbookState.setBook(outcome.kalshiTicker,
+      [{ price: 0.40, quantity: 10 }],
+      [{ price: 0.70, quantity: 10 }],
+    );
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 10 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 5_000_000,
+      depthTimestamp: observedAt,
+    });
+    orderbookState.setBook(outcome.pmNoTokenId, [], [{ price: 0.45, quantity: 10 }], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 5_000_000,
+      depthTimestamp: observedAt,
+    });
+
+    const result = computeAllLiveArbitrages([outcome], 100)[0];
+    expect(result.pmNoExecutableQuote).toMatchObject({
+      status: 'non_executable',
+      reason: 'below_minimum_order',
+    });
+    expect(result.strategy).toBe('No arb');
+    expect(buildExecutionRequest(liveArbResultToBotInput('pair-1', 'Market', undefined, result))).toBeNull();
+  });
+
   it('classifies same-market YES+NO as Internal and never pairs two YES contracts', () => {
     orderbookState.setBook(outcome.kalshiTicker, [{ price: 0.30, quantity: 20 }], [{ price: 0.30, quantity: 20 }]);
     orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.70, quantity: 20 }], []);
@@ -159,9 +226,9 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
       strategy: 'Buy YES both sides: Kalshi Example + PM Complement',
     }]);
 
-    expect(captured.fees?.kalshiFee).toBeCloseTo(1.47, 5);
-    expect(captured.fees?.pmFee).toBeCloseTo(0.72, 5);
-    expect(captured.roiPct).toBeCloseTo(27.81, 4);
+    expect(captured.fees?.kalshiFee).toBeCloseTo(0.02, 5);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.0072, 5);
+    expect(captured.roiPct).toBeCloseTo(27.28, 4);
   });
 
   it('prices a captured PM NO fee from its executable ask instead of the YES complement', () => {
@@ -179,9 +246,9 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
       strategy: 'Buy YES Kalshi + NO PM',
     }]);
 
-    expect(captured.fees?.kalshiFee).toBeCloseTo(1.47, 5);
-    expect(captured.fees?.pmFee).toBeCloseTo(0.7425, 5);
-    expect(captured.roiPct).toBeCloseTo(22.7875, 4);
+    expect(captured.fees?.kalshiFee).toBeCloseTo(0.02, 5);
+    expect(captured.fees?.pmFee).toBeCloseTo(0.00743, 5);
+    expect(captured.roiPct).toBeCloseTo(22.257, 4);
   });
 
   it('values the captured direct direction even after the opposite direction becomes better', () => {
@@ -204,7 +271,7 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(best.roiPct).toBeGreaterThan(0);
     expect(captured.strategy).toBe('Buy YES PM + NO Kalshi');
     expect(captured.kalshiStake + captured.pmStake).toBeGreaterThan(0);
-    expect(captured.roiPct).toBeCloseTo(-17.9175, 4);
+    expect(captured.roiPct).toBeCloseTo(-18.238, 4);
   });
 
   it('skips a synthetic Kalshi ask below the REST floor and keeps price/depth paired', () => {
@@ -219,8 +286,8 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     const result = computeAllLiveArbitrages([outcome], 100)[0];
 
     expect(result.kalshiYesAsk).toBe(0.42);
-    expect(result.kalshiYesAskShares).toBe(7);
-    expect(result.kalshiYesDepth).toBeCloseTo(2.94);
+    expect(result.kalshiYesAskShares).toBe(1);
+    expect(result.kalshiYesDepth).toBeCloseTo(0.42);
   });
 
   it('does not turn a zero-depth live quote into a direct executable stake', () => {
@@ -264,9 +331,39 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
       { price: '0.37', size: '4' },
     ]);
 
-    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toMatchObject([
       { price: 0.37, quantity: 4 },
     ]);
+  });
+
+  it('preserves CLOB tick, minimum order, and response timestamp for executable validation', () => {
+    applyPolymarketBook(
+      outcome.pmYesTokenId,
+      [{ price: '0.31', size: '100' }],
+      'yes',
+      { tickSize: '0.01', minimumOrderSize: '5', depthTimestamp: '2026-08-14T11:02:35.000Z' },
+    );
+
+    expect(orderbookState.getExecutableQuote(outcome.pmYesTokenId, 'yes')).toMatchObject({
+      status: 'non_executable',
+      reason: 'below_minimum_order',
+      depthTimestamp: '2026-08-14T11:02:35.000Z',
+    });
+  });
+
+  it('preserves executable sub-cent CLOB ticks from decimal strings', () => {
+    applyPolymarketBook(
+      outcome.pmYesTokenId,
+      [{ price: '0.425', size: '1' }],
+      'yes',
+      { tickSize: '0.001', minimumOrderSize: '1', depthTimestamp: new Date().toISOString() },
+    );
+
+    expect(orderbookState.getExecutableQuote(outcome.pmYesTokenId, 'yes')).toMatchObject({
+      status: 'executable',
+      vwapPriceMicroCents: 42_500_000,
+      limitPriceMicroCents: 42_500_000,
+    });
   });
 
   it('rejects non-finite and out-of-range levels at the shared orderbook boundary', () => {
@@ -293,7 +390,12 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
   });
 
   it('removes a stale cheaper PM level when a price-only update reports a worse best ask', () => {
-    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.30, quantity: 10 }, { price: 0.45, quantity: 8 }], []);
+    const staleDepthTimestamp = '2020-01-01T00:00:00.000Z';
+    orderbookState.setBook(outcome.pmYesTokenId, [{ price: 0.30, quantity: 10 }, { price: 0.45, quantity: 8 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: staleDepthTimestamp,
+    });
 
     applyPmWsUpdates(
       [{ type: 'best_bid_ask', tokenId: outcome.pmYesTokenId, bestAsk: 0.40, bestBid: null, lastTradePrice: null, ts: Date.now() }],
@@ -303,6 +405,8 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(orderbookState.getBook(outcome.pmYesTokenId)?.yes.asks).toEqual([
       { price: 0.45, quantity: 8 },
     ]);
+    expect(orderbookState.getBook(outcome.pmYesTokenId)?.depthTimestamp).toBe(staleDepthTimestamp);
+    expect(orderbookState.isDepthStale(outcome.pmYesTokenId, 90_000)).toBe(true);
   });
 
   it('applies the first Kalshi snapshot after an early delta seeded an empty opposite side', () => {

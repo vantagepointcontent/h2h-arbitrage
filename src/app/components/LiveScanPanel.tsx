@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Play, Square, Activity, RefreshCw, AlertCircle, ChevronDown, X, Zap } from "lucide-react";
 import { SavedMarket } from "@/lib/persistence";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "@/app/components/ExecuteArbModal";
+import type { ExecutableBookQuote } from "@/lib/executable-book";
 
 /** Augment a LiveArbOutcome with scanTime + depthVerified for buildExecutableArb. */
 function withScanContext(o: LiveArbOutcome) {
@@ -27,6 +28,10 @@ interface LiveArbOutcome {
   kalshiNoDepth: number;
   pmYesAsk: number | null;
   pmNoAsk: number | null;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   pmYesDepth: number;
   pmNoDepth: number;
   /** Available contracts at the exact live ask displayed for each side. */

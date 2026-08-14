@@ -11,16 +11,33 @@ import {
   type SafetyLimits,
   type OrderRequest,
 } from './auto-execute';
+import { walkExecutableBook } from './executable-book';
+import { orderbookState } from './orderbook-state';
 
-function makeOrder(platform: 'kalshi' | 'polymarket', price: number, size: number): OrderRequest {
+function makeOrder(
+  platform: 'kalshi' | 'polymarket',
+  price: number,
+  size: number,
+  depthTimestamp = new Date().toISOString(),
+): OrderRequest {
+  const priceCents = Math.round(price * 100);
   return {
     platform,
     marketId: platform === 'kalshi' ? 'KXTEST' : 'pm-condition-1',
     side: 'buy',
     outcome: 'yes',
     size,
+    contracts: 1,
     price,
     orderType: 'limit',
+    executableQuote: price > 0 && price < 1 ? walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceCents, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    }) : undefined,
   };
 }
 
@@ -33,16 +50,34 @@ function makeRequest(
   maxSlippagePct = 2.0,
   timeoutMs = 10000,
 ): ExecutionRequest {
-  return {
+  const depthTimestamp = new Date().toISOString();
+  const request = {
     arbId: 'arb-1',
     marketTitle: 'Test Market',
-    kalshiOrder: makeOrder('kalshi', kalshiPrice, kalshiSize),
-    polymarketOrder: makeOrder('polymarket', pmPrice, pmSize),
+    kalshiOrder: makeOrder('kalshi', kalshiPrice, kalshiSize, depthTimestamp),
+    polymarketOrder: makeOrder('polymarket', pmPrice, pmSize, depthTimestamp),
     estimatedProfit: 0.05,
     maxSlippagePct,
     timeoutMs,
     dryRun,
-  };
+  } satisfies ExecutionRequest;
+  orderbookState.removeBook(request.kalshiOrder.marketId);
+  orderbookState.removeBook(request.polymarketOrder.marketId);
+  if (kalshiPrice > 0 && kalshiPrice < 1) {
+    orderbookState.setBook(request.kalshiOrder.marketId, [{ price: kalshiPrice, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    });
+  }
+  if (pmPrice > 0 && pmPrice < 1) {
+    orderbookState.setBook(request.polymarketOrder.marketId, [{ price: pmPrice, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    });
+  }
+  return request;
 }
 
 function defaultLimits(): SafetyLimits {
@@ -126,6 +161,117 @@ describe('executeArb', () => {
     vi.unstubAllEnvs();
   });
 
+  it('fails closed instead of fabricating a paper price when a quote is absent', async () => {
+    const req = makeRequest();
+    delete req.polymarketOrder.executableQuote;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('constraint-valid executable book quote');
+  });
+
+  it('rejects a forged executable status whose fills do not cover the request', async () => {
+    const req = makeRequest();
+    req.polymarketOrder.executableQuote = {
+      ...req.polymarketOrder.executableQuote!,
+      filledQuantityMicros: 0,
+      fills: [],
+    };
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('constraint-valid executable book quote');
+  });
+
+  it('rejects an off-tick forged quote before paper or live placement', async () => {
+    const req = makeRequest();
+    req.dryRun = false;
+    const quote = req.polymarketOrder.executableQuote!;
+    quote.tickSizeMicroCents = 1_000_000;
+    quote.fills[0].priceMicroCents = 50_500_000;
+    quote.fills[0].priceCents = 50.5;
+    quote.totalCostMicroCents = 50_500_000;
+    quote.vwapPriceMicroCents = 50_500_000;
+    quote.limitPriceMicroCents = 50_500_000;
+    req.polymarketOrder.price = 0.505;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('constraint-valid executable book quote');
+  });
+
+  it('rejects a below-minimum quote before paper or live placement', async () => {
+    const req = makeRequest();
+    req.dryRun = false;
+    req.polymarketOrder.executableQuote!.minimumOrderQuantityMicros = 5_000_000;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('constraint-valid executable book quote');
+  });
+
+  it('rejects a self-consistent quote that does not match the server-side token book', async () => {
+    const req = makeRequest();
+    req.polymarketOrder.executableQuote = walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceCents: 49, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: new Date().toISOString(),
+    });
+    req.polymarketOrder.price = 0.49;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('server-side executable book');
+  });
+
+  it('rejects a quote whose authoritative server-side depth is stale', async () => {
+    const req = makeRequest();
+    const staleTimestamp = new Date(Date.now() - 31_000).toISOString();
+    orderbookState.setBook(req.polymarketOrder.marketId, [{ price: 0.50, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: staleTimestamp,
+    });
+    req.polymarketOrder.executableQuote = orderbookState.getExecutableQuote(
+      req.polymarketOrder.marketId,
+      'yes',
+    );
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('server-side executable book is stale');
+  });
+
+  it('rejects non-canonical contract quantities before paper or live placement', async () => {
+    const req = makeRequest();
+    req.kalshiOrder.contracts = 1.5;
+    req.polymarketOrder.contracts = 1.5;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('exactly one contract');
+  });
+
+  it('rejects a buy limit above the walked worst consumed level', async () => {
+    const req = makeRequest();
+    req.polymarketOrder.price = 0.51;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('equal the worst consumed executable level');
+  });
+
   it('dry-run mode returns simulated success without placing real orders', async () => {
     const req = makeRequest(0.45, 100, 0.50, 100, true, 2.0, 3000);
     const result = await executeArb(req);
@@ -188,23 +334,13 @@ describe('executeArb', () => {
     )).toEqual({ matched: true, kalshiContracts: 31, polymarketContracts: 31 });
   });
 
-  it('retains the matched residual contracts after successfully closing an unequal-fill excess', async () => {
-    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    random
-      .mockReturnValueOnce(0.5) // Kalshi order fills
-      .mockReturnValueOnce(0.5) // Kalshi slippage = 0
-      .mockReturnValueOnce(0.9) // Kalshi gets the larger partial fill
-      .mockReturnValueOnce(0.5) // Kalshi order id
-      .mockReturnValueOnce(0.5) // PM order fills
-      .mockReturnValueOnce(0.5) // PM slippage = 0
-      .mockReturnValueOnce(0.5); // PM gets the smaller partial fill; later calls default to successful 0.5
-
+  it('keeps current one-share paper fills quantity-matched', async () => {
     const result = await executeArb(makeRequest(0.45, 45, 0.52, 52, true, 2, 1));
 
-    expect(result.rollbackExecuted).toBe(true);
+    expect(result.rollbackExecuted).toBe(false);
     expect(result.unhedged).toBe(false);
-    expect(result.kalshiResult.filledContracts).toBe(92);
-    expect(result.polymarketResult.filledContracts).toBe(92);
+    expect(result.kalshiResult.filledContracts).toBe(1);
+    expect(result.polymarketResult.filledContracts).toBe(1);
   });
 
   it('requires the venue to confirm the entire requested excess close', () => {
@@ -235,6 +371,32 @@ describe('executeArb', () => {
     const result = await executeArb(req);
     expect(result.kalshiResult.orderId).toMatch(/^dry-run-/);
     expect(result.polymarketResult.orderId).toMatch(/^dry-run-/);
+  });
+
+  it('uses walked executable VWAPs unchanged in paper mode', async () => {
+    const req = makeRequest(0.43, 0.43, 0.475, 0.475, true, 2, 3000);
+    const depthTimestamp = new Date().toISOString();
+    req.kalshiOrder.contracts = 1;
+    req.polymarketOrder.contracts = 1;
+    const kalshiLevels = [{ price: 0.40, quantity: 0.4 }, { price: 0.45, quantity: 0.6 }];
+    const pmLevels = [{ price: 0.45, quantity: 0.5 }, { price: 0.50, quantity: 0.5 }];
+    orderbookState.setBook(req.kalshiOrder.marketId, kalshiLevels, [], 0, {
+      tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp,
+    });
+    orderbookState.setBook(req.polymarketOrder.marketId, pmLevels, [], 0, {
+      tickSizeMicroCents: 100_000, minimumOrderQuantityMicros: 1_000_000, depthTimestamp,
+    });
+    req.kalshiOrder.executableQuote = orderbookState.getExecutableQuote(req.kalshiOrder.marketId, 'yes');
+    req.polymarketOrder.executableQuote = orderbookState.getExecutableQuote(req.polymarketOrder.marketId, 'yes');
+    req.kalshiOrder.price = 0.45;
+    req.polymarketOrder.price = 0.50;
+
+    const result = await executeArb(req);
+
+    expect(result.kalshiResult.filledPrice).toBe(0.43);
+    expect(result.polymarketResult.filledPrice).toBe(0.475);
+    expect(result.kalshiResult.filledContracts).toBe(1);
+    expect(result.polymarketResult.filledContracts).toBe(1);
   });
 });
 

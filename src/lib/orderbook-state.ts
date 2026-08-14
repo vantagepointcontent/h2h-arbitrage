@@ -1,8 +1,17 @@
 // Local orderbook state manager for live Kalshi + Polymarket WS streams.
 // Maintains full ask depth per outcome and calculates weighted average buy price.
 
+import {
+  MICRO_CENTS_PER_CENT,
+  MICRO_CENTS_PER_DOLLAR,
+  QUANTITY_SCALE,
+  walkExecutableBook,
+  type ExecutableBookQuote,
+} from './executable-book';
+
 export interface OrderbookLevel {
   price: number;
+  priceMicroCents?: number;
   quantity: number; // notional/contracts at that price level
 }
 
@@ -19,6 +28,19 @@ export interface FullBook {
    *  (from opposite bids) below this floor are synthetic and must not be used. */
   realYesAsk?: number;
   realNoAsk?: number;
+  /** Integer venue price tick in millionths of one cent. */
+  tickSizeMicroCents: number;
+  /** Integer millionths of a contract/share. */
+  minimumOrderQuantityMicros: number;
+  /** Successful book-response observation time, not calculation completion time. */
+  depthTimestamp: string;
+}
+
+export interface BookExecutionConstraints {
+  tickSizeCents?: number;
+  tickSizeMicroCents?: number;
+  minimumOrderQuantityMicros: number;
+  depthTimestamp: string;
 }
 
 export interface WeightedAskResult {
@@ -54,12 +76,76 @@ class OrderbookState {
   }
 
   /** Replace the entire book (used for snapshots). */
-  setBook(id: BookIdentifier, yes: OrderbookLevel[], no: OrderbookLevel[], seq = 0): void {
+  setBook(
+    id: BookIdentifier,
+    yes: OrderbookLevel[],
+    no: OrderbookLevel[],
+    seq = 0,
+    constraints?: BookExecutionConstraints,
+  ): void {
+    const existing = this.books.get(id);
+    const observedAt = constraints?.depthTimestamp ?? new Date().toISOString();
     this.books.set(id, {
       yes: { asks: this.sortAsks(yes) },
       no: { asks: this.sortAsks(no) },
       lastUpdate: Date.now(),
       seq,
+      tickSizeMicroCents: constraints?.tickSizeMicroCents
+        ?? (constraints?.tickSizeCents != null ? constraints.tickSizeCents * MICRO_CENTS_PER_CENT : undefined)
+        ?? existing?.tickSizeMicroCents
+        ?? MICRO_CENTS_PER_CENT,
+      minimumOrderQuantityMicros: constraints?.minimumOrderQuantityMicros
+        ?? existing?.minimumOrderQuantityMicros
+        ?? QUANTITY_SCALE,
+      depthTimestamp: observedAt,
+      ...(existing?.realYesAsk != null ? { realYesAsk: existing.realYesAsk } : {}),
+      ...(existing?.realNoAsk != null ? { realNoAsk: existing.realNoAsk } : {}),
+    });
+  }
+
+  getExecutableQuote(
+    id: BookIdentifier,
+    side: 'yes' | 'no',
+    requestedQuantityMicros = QUANTITY_SCALE,
+  ): ExecutableBookQuote {
+    const book = this.books.get(id);
+    if (!book) {
+      return walkExecutableBook({
+        side: 'buy',
+        levels: [],
+        requestedQuantityMicros,
+        tickSizeMicroCents: MICRO_CENTS_PER_CENT,
+        minimumOrderQuantityMicros: QUANTITY_SCALE,
+        depthTimestamp: null,
+      });
+    }
+
+    const floor = side === 'yes' ? book.realYesAsk : book.realNoAsk;
+    const asks = floor == null
+      ? book[side].asks
+      : book[side].asks.filter((level) => level.price >= floor - 1e-9);
+    const levels = asks.map((level) => {
+      const rawPriceMicroCents = level.price * MICRO_CENTS_PER_DOLLAR;
+      const rawQuantityMicros = level.quantity * QUANTITY_SCALE;
+      const priceMicroCents = level.priceMicroCents ?? Math.round(rawPriceMicroCents);
+      const quantityMicros = Math.round(rawQuantityMicros);
+      return {
+        priceMicroCents: Number.isSafeInteger(priceMicroCents)
+          && (level.priceMicroCents != null || Math.abs(rawPriceMicroCents - priceMicroCents) < 1e-6)
+          ? priceMicroCents
+          : Number.NaN,
+        quantityMicros: Number.isSafeInteger(quantityMicros) && Math.abs(rawQuantityMicros - quantityMicros) < 1e-6
+          ? quantityMicros
+          : Number.NaN,
+      };
+    });
+    return walkExecutableBook({
+      side: 'buy',
+      levels,
+      requestedQuantityMicros,
+      tickSizeMicroCents: book.tickSizeMicroCents,
+      minimumOrderQuantityMicros: book.minimumOrderQuantityMicros,
+      depthTimestamp: book.depthTimestamp,
     });
   }
 
@@ -86,6 +172,7 @@ class OrderbookState {
 
     book[side].asks = this.sortAsks(target);
     book.lastUpdate = Date.now();
+    book.depthTimestamp = new Date().toISOString();
     book.seq = seq;
   }
 
@@ -170,6 +257,14 @@ class OrderbookState {
     const book = this.books.get(id);
     if (!book) return true;
     return Date.now() - book.lastUpdate > maxAgeMs;
+  }
+
+  /** True when the last full size/depth observation is too old for execution. */
+  isDepthStale(id: BookIdentifier, maxAgeMs = 30_000): boolean {
+    const book = this.books.get(id);
+    if (!book) return true;
+    const observedAt = Date.parse(book.depthTimestamp);
+    return !Number.isFinite(observedAt) || Date.now() - observedAt > maxAgeMs;
   }
 
   private sortAsks(levels: OrderbookLevel[]): OrderbookLevel[] {

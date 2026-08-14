@@ -8,6 +8,8 @@ import {
   type BotTradeInput,
 } from './bot-trader';
 import type { UnifiedOutcome } from './matcher';
+import { walkExecutableBook } from './executable-book';
+import { orderbookState } from './orderbook-state';
 
 vi.mock('./bot-action-log', () => ({
   appendBotActionLog: vi.fn(async () => 1),
@@ -54,7 +56,8 @@ function baseSettings(overrides?: Partial<BotSettings>): BotSettings {
 
 function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
   const farFuture = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  return {
+  const depthTimestamp = new Date().toISOString();
+  const input: BotTradeInput = {
     pairId: 'pair-1',
     marketTitle: 'Test Market',
     outcome: 'Team A',
@@ -78,6 +81,55 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     category: 'Politics',
     ...overrides,
   };
+  const quote = (price: number | null | undefined, depth: number | undefined) => {
+    if (price == null || price <= 0 || depth == null || depth <= 0) return undefined;
+    return walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceCents: Math.round(price * 100), quantityMicros: Math.floor(depth / price * 1_000_000) }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    });
+  };
+  const result = {
+    ...input,
+    kalshiYesExecutableQuote: overrides?.kalshiYesExecutableQuote ?? quote(input.kalshiYesAsk, input.kalshiYesDepth),
+    kalshiNoExecutableQuote: overrides?.kalshiNoExecutableQuote ?? quote(input.kalshiNoAsk, input.kalshiNoDepth),
+    pmYesExecutableQuote: overrides?.pmYesExecutableQuote ?? quote(input.pmYesAsk, input.pmYesDepth),
+    pmNoExecutableQuote: overrides?.pmNoExecutableQuote ?? quote(input.pmNoAsk, input.pmNoDepth),
+  };
+  const quantity = (price: number | null | undefined, depth: number | undefined) =>
+    price != null && price > 0 && depth != null && depth > 0
+      ? Math.floor(depth / price * 1_000_000) / 1_000_000
+      : 0;
+  orderbookState.removeBook(input.kalshiTicker!);
+  orderbookState.setBook(input.kalshiTicker!, [
+    { price: input.kalshiYesAsk!, quantity: quantity(input.kalshiYesAsk, input.kalshiYesDepth) },
+  ], [
+    { price: input.kalshiNoAsk!, quantity: quantity(input.kalshiNoAsk, input.kalshiNoDepth) },
+  ], 0, { tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp });
+  const pmYesId = input.pmYesTokenId ?? input.pmConditionId!;
+  const pmNoId = input.pmNoTokenId ?? input.pmConditionId!;
+  orderbookState.removeBook(pmYesId);
+  if (pmNoId !== pmYesId) orderbookState.removeBook(pmNoId);
+  orderbookState.setBook(pmYesId, [
+    { price: input.pmYesAsk!, quantity: quantity(input.pmYesAsk, input.pmYesDepth) },
+  ], pmYesId === pmNoId ? [
+    { price: input.pmNoAsk!, quantity: quantity(input.pmNoAsk, input.pmNoDepth) },
+  ] : [], 0, { tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp });
+  if (pmNoId !== pmYesId) {
+    orderbookState.setBook(pmNoId, [], [
+      { price: input.pmNoAsk!, quantity: quantity(input.pmNoAsk, input.pmNoDepth) },
+    ], 0, { tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp });
+  }
+  // The fee-authority test fixture resolves the selected executable PM token
+  // to this ID before building the final order request.
+  orderbookState.removeBook('pm-no-token');
+  orderbookState.setBook('pm-no-token', [], [
+    { price: input.pmNoAsk!, quantity: quantity(input.pmNoAsk, input.pmNoDepth) },
+  ], 0, { tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp });
+  return result;
 }
 
 describe('buildExecutionRequest Polymarket identity', () => {
@@ -300,6 +352,14 @@ describe('evaluateBotTrade', () => {
 });
 
 describe('buildExecutionRequest', () => {
+  it('fails closed when no executable book quote is attached', () => {
+    const input = makeInput();
+    delete input.kalshiYesExecutableQuote;
+    delete input.pmNoExecutableQuote;
+
+    expect(buildExecutionRequest(input)).toBeNull();
+  });
+
   it('immutably carries strategy-selected YES/YES asks into one-share orders', () => {
     const req = buildExecutionRequest(makeInput({
       strategy: 'Buy YES both sides: Kalshi Republican + PM Democratic',
@@ -408,9 +468,23 @@ describe('maybeExecuteBotTrade safety', () => {
     const persistence = await import('./persistence');
     const positions = await import('./bot-positions');
     const { maybeExecuteBotTrade } = await import('./bot-trader');
-    const result = await maybeExecuteBotTrade(makeInput());
+    const input = makeInput();
+    // This describe block resets the module graph before dynamically importing
+    // BotTrader; seed the same runtime singleton used by executeArb.
+    const runtimeState = (await import('./orderbook-state')).orderbookState;
+    runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
+    });
+    runtimeState.setBook('pm-no-token', [], [{ price: 0.52, quantity: 1 }], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
+    });
+    const result = await maybeExecuteBotTrade(input);
     expect(result.dryRun).toBe(true);
-    expect(result.executed).toBe(true);
+    expect(result.executed, JSON.stringify(result)).toBe(true);
     expect(result.positionPersisted).toBe(true);
     expect(result.persistenceError).toBeUndefined();
     expect(result.reason).toContain('Paper');

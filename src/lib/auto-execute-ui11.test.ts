@@ -15,16 +15,34 @@ import {
   type OrderRequest,
   type ExecutionStep,
 } from './auto-execute';
+import { walkExecutableBook } from './executable-book';
+import { orderbookState } from './orderbook-state';
 
 function makeOrder(platform: 'kalshi' | 'polymarket', price: number, size: number): OrderRequest {
+  const marketId = platform === 'kalshi' ? 'KXTEST' : 'pm-condition-1';
+  const depthTimestamp = new Date().toISOString();
+  orderbookState.setBook(marketId, [{ price, quantity: 1 }], [], 0, {
+    tickSizeCents: 1,
+    minimumOrderQuantityMicros: 1_000_000,
+    depthTimestamp,
+  });
   return {
     platform,
-    marketId: platform === 'kalshi' ? 'KXTEST' : 'pm-condition-1',
+    marketId,
     side: 'buy',
     outcome: 'yes',
     size,
+    contracts: 1,
     price,
     orderType: 'limit',
+    executableQuote: walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceCents: Math.round(price * 100), quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    }),
   };
 }
 

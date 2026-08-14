@@ -44,8 +44,28 @@ export async function seedPmBook(tokenId: string, side: 'yes' | 'no'): Promise<v
   try {
     const res = await fetch(`https://clob.polymarket.com/book?token_id=${tokenId}`, { cache: 'no-store' });
     if (!res.ok) return;
-    const data = await res.json();
-    applyPolymarketBook(tokenId, (data.asks || []).map((a: any) => ({ price: String(a.price), size: String(a.size) })), side);
+    const data = await res.json() as {
+      asks?: unknown;
+      tick_size?: unknown;
+      min_order_size?: unknown;
+    };
+    const asks = Array.isArray(data.asks)
+      ? data.asks.flatMap((ask): Array<{ price: string; size: string }> => {
+        if (typeof ask !== 'object' || ask === null) return [];
+        const record = ask as Record<string, unknown>;
+        return [{ price: String(record.price ?? ''), size: String(record.size ?? '') }];
+      })
+      : [];
+    applyPolymarketBook(
+      tokenId,
+      asks,
+      side,
+      {
+        tickSize: String(data.tick_size ?? ''),
+        minimumOrderSize: String(data.min_order_size ?? ''),
+        depthTimestamp: new Date().toISOString(),
+      },
+    );
   } catch (err) {
     logger.warn('[book-seed] failed to seed PM book', { tokenId, err });
   }

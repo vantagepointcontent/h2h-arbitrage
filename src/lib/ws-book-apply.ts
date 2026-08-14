@@ -80,17 +80,23 @@ export function applyPmWsUpdates(updates: WsPriceUpdate[], pmTokenSides: Map<str
           : 0;
         newAsks.unshift({ price: u.bestAsk!, quantity: qty });
         newAsks.sort((a, b) => a.price - b.price);
+        const preservedConstraints = {
+          tickSizeMicroCents: existing.tickSizeMicroCents,
+          minimumOrderQuantityMicros: existing.minimumOrderQuantityMicros,
+          // A price-only message does not refresh the size observation.
+          depthTimestamp: existing.depthTimestamp,
+        };
         if (side === 'yes') {
-          orderbookState.setBook(u.tokenId, newAsks, existing.no.asks, u.ts);
+          orderbookState.setBook(u.tokenId, newAsks, existing.no.asks, u.ts, preservedConstraints);
         } else {
-          orderbookState.setBook(u.tokenId, existing.yes.asks, newAsks, u.ts);
+          orderbookState.setBook(u.tokenId, existing.yes.asks, newAsks, u.ts, preservedConstraints);
         }
       } else {
-        if (side === 'yes') {
-          orderbookState.setBook(u.tokenId, [], [], u.ts);
-        } else {
-          orderbookState.setBook(u.tokenId, [], [], u.ts);
-        }
+        orderbookState.setBook(u.tokenId, [], [], u.ts, {
+          tickSizeMicroCents: 0,
+          minimumOrderQuantityMicros: 0,
+          depthTimestamp: new Date().toISOString(),
+        });
       }
       changed = true;
     }

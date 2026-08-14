@@ -1,9 +1,10 @@
 // Live arbitrage engine: combines Kalshi + Polymarket local orderbooks
 // and runs the existing matcher fee/arb logic against weighted ask prices.
 
-import { orderbookState, WeightedAskResult } from './orderbook-state';
+import { orderbookState } from './orderbook-state';
 import { calculateArbitrageMax, computeArbitrageFees, calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from './matcher';
 import { finiteDecimal } from './market-price';
+import type { ExecutableBookQuote } from './executable-book';
 
 export interface LiveArbResult {
   artist: string;
@@ -13,6 +14,10 @@ export interface LiveArbResult {
   kalshiNoDepth: number;
   pmYesAsk: number | null;
   pmNoAsk: number | null;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   pmYesDepth: number;
   pmNoDepth: number;
   /** Full fillable dollar depth used by canonical direct-strategy allocation. */
@@ -110,23 +115,23 @@ function computeSingleOutcome(
 
   // Staleness only blocks live execution math; we still surface the last known
   // quotes so users can see the market rather than seeing $0 profit/ROI.
-  const kalshiBookStale = orderbookState.isStale(kalshiTicker, STALE_MS);
-  const pmYesBookStale = orderbookState.isStale(pmYesTokenId, STALE_MS);
-  const pmNoBookStale = orderbookState.isStale(pmNoTokenId, STALE_MS);
+  const kalshiBookStale = orderbookState.isDepthStale(kalshiTicker, STALE_MS);
+  const pmYesBookStale = orderbookState.isDepthStale(pmYesTokenId, STALE_MS);
+  const pmNoBookStale = orderbookState.isDepthStale(pmNoTokenId, STALE_MS);
   const stale = kalshiBookStale || pmYesBookStale || pmNoBookStale;
 
   const kYes = orderbookState.getWeightedAsk(kalshiTicker, 'yes', capital);
   const kNo = orderbookState.getWeightedAsk(kalshiTicker, 'no', capital);
   const pYes = orderbookState.getWeightedAsk(pmYesTokenId, 'yes', capital);
   const pNo = orderbookState.getWeightedAsk(pmNoTokenId, 'no', capital);
+  const kalshiYesExecutableQuote = orderbookState.getExecutableQuote(kalshiTicker, 'yes');
+  const kalshiNoExecutableQuote = orderbookState.getExecutableQuote(kalshiTicker, 'no');
+  const pmYesExecutableQuote = orderbookState.getExecutableQuote(pmYesTokenId, 'yes');
+  const pmNoExecutableQuote = orderbookState.getExecutableQuote(pmNoTokenId, 'no');
 
-  // BUG-06: Use top-of-book price for ROI calculation to match the scan API,
-  // which uses yesAsk/noAsk from REST (top-of-book). The weighted average
-  // price (avgPrice) was causing ROI mismatch because it includes slippage
-  // from deeper orderbook levels. The scan API doesn't account for slippage
-  // either, so using top-of-book makes both paths consistent.
-  // We still pass totalCost (fillable depth) to calculateArbitrageMax for
-  // depth-based capital capping.
+  // The executable price is the shared walker's exact one-share VWAP. When
+  // top depth is sufficient this equals the minimum ask; otherwise it consumes
+  // only the remainder needed from deeper levels.
 
   // The displayed quote and its depth must come from the exact same level.
   // Kalshi asks derived from opposite bids below the REST-seeded real floor are
@@ -145,15 +150,27 @@ function computeSingleOutcome(
   const kalshiNoLevel = getEffectiveTopAsk(kalshiTicker, 'no', true);
   const pmYesLevel = getEffectiveTopAsk(pmYesTokenId, 'yes', false);
   const pmNoLevel = getEffectiveTopAsk(pmNoTokenId, 'no', false);
-  const kalshiYesAsk = kalshiYesLevel?.price ?? (kYes.avgPrice > 0 ? kYes.avgPrice : null);
-  const kalshiNoAsk = kalshiNoLevel?.price ?? (kNo.avgPrice > 0 ? kNo.avgPrice : null);
-  const pmYesAsk = pmYesLevel?.price ?? (pYes.avgPrice > 0 ? pYes.avgPrice : null);
-  const pmNoAsk = pmNoLevel?.price ?? (pNo.avgPrice > 0 ? pNo.avgPrice : null);
+  const quotePrice = (quote: ExecutableBookQuote): number | null => quote.status === 'executable'
+    && quote.vwapPriceMicroCents != null
+    ? quote.vwapPriceMicroCents / 100_000_000
+    : null;
+  const kalshiYesAsk = quotePrice(kalshiYesExecutableQuote)
+    ?? kalshiYesLevel?.price
+    ?? (kYes.avgPrice > 0 ? kYes.avgPrice : null);
+  const kalshiNoAsk = quotePrice(kalshiNoExecutableQuote)
+    ?? kalshiNoLevel?.price
+    ?? (kNo.avgPrice > 0 ? kNo.avgPrice : null);
+  const pmYesAsk = quotePrice(pmYesExecutableQuote)
+    ?? pmYesLevel?.price
+    ?? (pYes.avgPrice > 0 ? pYes.avgPrice : null);
+  const pmNoAsk = quotePrice(pmNoExecutableQuote)
+    ?? pmNoLevel?.price
+    ?? (pNo.avgPrice > 0 ? pNo.avgPrice : null);
 
-  const kalshiYesAskShares = kalshiYesLevel?.quantity ?? 0;
-  const kalshiNoAskShares = kalshiNoLevel?.quantity ?? 0;
-  const pmYesAskShares = pmYesLevel?.quantity ?? 0;
-  const pmNoAskShares = pmNoLevel?.quantity ?? 0;
+  const kalshiYesAskShares = kalshiYesExecutableQuote.status === 'executable' ? 1 : kalshiYesLevel?.quantity ?? 0;
+  const kalshiNoAskShares = kalshiNoExecutableQuote.status === 'executable' ? 1 : kalshiNoLevel?.quantity ?? 0;
+  const pmYesAskShares = pmYesExecutableQuote.status === 'executable' ? 1 : pmYesLevel?.quantity ?? 0;
+  const pmNoAskShares = pmNoExecutableQuote.status === 'executable' ? 1 : pmNoLevel?.quantity ?? 0;
 
   // Dollar depth remains for the existing scanner display/capital calculations,
   // but it is intentionally derived from the same effective quote selected above.
@@ -170,11 +187,17 @@ function computeSingleOutcome(
   let fees: LiveArbResult['fees'] = null;
 
   const allAvailable = kalshiYesAsk != null && kalshiNoAsk != null && pmYesAsk != null && pmNoAsk != null;
+  const allExecutable = [
+    kalshiYesExecutableQuote,
+    kalshiNoExecutableQuote,
+    pmYesExecutableQuote,
+    pmNoExecutableQuote,
+  ].every((quote) => quote.status === 'executable');
 
   // BUG-104: even when stale we keep the last known prices visible in the UI.
   // Live execution math is only skipped when prices are missing, so stale rows
   // show greyed-out data instead of zeroed ROI/profit.
-  if (allAvailable) {
+  if (allAvailable && allExecutable) {
     // Depth args must be in DOLLARS (calculateArbitrageMax does depth/price
     // to derive contract capital) — use totalCost (fillable dollars up to
     // `capital`), NOT maxQuantity (contracts). Also forward the user's
@@ -186,10 +209,10 @@ function computeSingleOutcome(
     const candidate = calculateArbitrageMax(
       { yesAsk: kalshiYesAsk, noAsk: kalshiNoAsk } as any,
       { bestAsk: pmYesAsk, noPrice: pmNoAsk } as any,
-      stale ? 0 : kYes.totalCost,
-      stale ? 0 : kNo.totalCost,
-      stale ? 0 : pYes.totalCost,
-      stale ? 0 : pNo.totalCost,
+      stale ? 0 : kalshiYesDepth,
+      stale ? 0 : kalshiNoDepth,
+      stale ? 0 : pmYesDepth,
+      stale ? 0 : pmNoDepth,
       category,
       capital,
     );
@@ -251,12 +274,16 @@ function computeSingleOutcome(
     kalshiNoDepth,
     pmYesAsk,
     pmNoAsk,
+    kalshiYesExecutableQuote,
+    kalshiNoExecutableQuote,
+    pmYesExecutableQuote,
+    pmNoExecutableQuote,
     pmYesDepth,
     pmNoDepth,
-    kalshiYesExecutableDepth: kYes.totalCost,
-    kalshiNoExecutableDepth: kNo.totalCost,
-    pmYesExecutableDepth: pYes.totalCost,
-    pmNoExecutableDepth: pNo.totalCost,
+    kalshiYesExecutableDepth: kalshiYesExecutableQuote.status === 'executable' ? kalshiYesDepth : 0,
+    kalshiNoExecutableDepth: kalshiNoExecutableQuote.status === 'executable' ? kalshiNoDepth : 0,
+    pmYesExecutableDepth: pmYesExecutableQuote.status === 'executable' ? pmYesDepth : 0,
+    pmNoExecutableDepth: pmNoExecutableQuote.status === 'executable' ? pmNoDepth : 0,
     kalshiBookStale,
     pmYesBookStale,
     pmNoBookStale,
@@ -521,6 +548,7 @@ export function computeAllLiveArbitrages(
 // Each token_id represents a specific outcome (YES or NO). The caller must
 // specify which side this token is so we store it correctly.
 const STRICT_DECIMAL = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const FIXED_DECIMAL = /^(\d+)(?:\.(\d+))?$/;
 
 function parseExecutableDecimal(value: string): number | null {
   const normalized = value.trim();
@@ -529,23 +557,53 @@ function parseExecutableDecimal(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export function applyPolymarketBook(tokenId: string, asks: { price: string; size: string }[], side: 'yes' | 'no' = 'yes'): void {
+function parseFixedDecimal(value: string, fractionalDigits: number): number | null {
+  const match = FIXED_DECIMAL.exec(value.trim());
+  if (!match || (match[2]?.length ?? 0) > fractionalDigits) return null;
+  const scaled = BigInt(match[1]) * 10n ** BigInt(fractionalDigits)
+    + BigInt((match[2] ?? '').padEnd(fractionalDigits, '0'));
+  return scaled > 0n && scaled <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(scaled) : null;
+}
+
+export function applyPolymarketBook(
+  tokenId: string,
+  asks: { price: string; size: string }[],
+  side: 'yes' | 'no' = 'yes',
+  metadata?: { tickSize: string; minimumOrderSize: string; depthTimestamp: string },
+): void {
   // CLOB WebSocket payloads are untrusted. Require fully numeric, finite,
   // executable levels so malformed depth cannot create a phantom live arb.
   const levels = asks
-    .map((a) => ({ price: parseExecutableDecimal(a.price), quantity: parseExecutableDecimal(a.size) }))
-    .filter((a): a is { price: number; quantity: number } => a.price !== null && a.quantity !== null
-      && a.price < 1)
+    .map((a) => ({
+      price: parseExecutableDecimal(a.price),
+      priceMicroCents: parseFixedDecimal(a.price, 8),
+      quantity: parseExecutableDecimal(a.size),
+    }))
+    .filter((a): a is { price: number; priceMicroCents: number; quantity: number } => a.price !== null
+      && a.priceMicroCents !== null && a.quantity !== null && a.price < 1)
     .sort((a, b) => a.price - b.price);
 
   const existing = orderbookState.getBook(tokenId);
+  const tickSizeMicroCents = metadata ? parseFixedDecimal(metadata.tickSize, 8) : null;
+  const minimumOrderQuantityMicros = metadata ? parseFixedDecimal(metadata.minimumOrderSize, 6) : null;
+  const constraints = metadata ? {
+    tickSizeMicroCents: tickSizeMicroCents ?? 0,
+    minimumOrderQuantityMicros: minimumOrderQuantityMicros ?? 0,
+    depthTimestamp: metadata.depthTimestamp,
+  } : existing ? undefined : {
+    // A WS book arriving before its REST seed has depth but no venue tick/minimum
+    // authority. Keep it visible while making executable quoting fail closed.
+    tickSizeMicroCents: 0,
+    minimumOrderQuantityMicros: 0,
+    depthTimestamp: new Date().toISOString(),
+  };
   if (existing) {
     // Update only the specified side, preserve the other
     const yesAsks = side === 'yes' ? levels : existing.yes.asks;
     const noAsks = side === 'no' ? levels : existing.no.asks;
-    orderbookState.setBook(tokenId, yesAsks, noAsks);
+    orderbookState.setBook(tokenId, yesAsks, noAsks, 0, constraints);
   } else {
     // First time: seed the specified side
-    orderbookState.setBook(tokenId, side === 'yes' ? levels : [], side === 'no' ? levels : []);
+    orderbookState.setBook(tokenId, side === 'yes' ? levels : [], side === 'no' ? levels : [], 0, constraints);
   }
 }

@@ -22,6 +22,8 @@
  */
 
 import { isAuthoritativeVenueEvidence } from './execution-evidence';
+import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
+import { orderbookState } from './orderbook-state';
 
 function errorField(error: unknown, field: 'status' | 'code' | 'message'): unknown {
   return typeof error === 'object' && error !== null && field in error
@@ -52,6 +54,8 @@ export interface OrderRequest {
   contracts?: number;
   price: number;        // limit price (0-1)
   orderType: OrderType;
+  /** Exact executable depth quote used for paper/live price parity. */
+  executableQuote?: ExecutableBookQuote;
 }
 
 export interface OrderResult {
@@ -171,13 +175,64 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
   if (req.kalshiOrder.size <= 0 || req.polymarketOrder.size <= 0) {
     errors.push('Order sizes must be positive');
   }
+  for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
+    if (leg.contracts !== 1) {
+      errors.push(`${leg.platform} order must request exactly one contract`);
+    }
+    const limitMicroCents = leg.executableQuote?.limitPriceMicroCents;
+    const scaledLimit = leg.price * 100_000_000;
+    const submittedLimitMicroCents = Math.round(scaledLimit);
+    if (limitMicroCents != null && (!Number.isSafeInteger(submittedLimitMicroCents)
+        || Math.abs(scaledLimit - submittedLimitMicroCents) >= 1e-6
+        || submittedLimitMicroCents !== limitMicroCents)) {
+      errors.push(`${leg.platform} order limit must equal the worst consumed executable level`);
+    }
+  }
 
   return { valid: errors.length === 0, errors };
+}
+
+const MAX_EXECUTABLE_DEPTH_AGE_MS = 30_000;
+
+function quotesMatchAuthoritativeBook(
+  candidate: ExecutableBookQuote,
+  authoritative: ExecutableBookQuote,
+): boolean {
+  return candidate.status === authoritative.status
+    && candidate.reason === authoritative.reason
+    && candidate.requestedQuantityMicros === authoritative.requestedQuantityMicros
+    && candidate.filledQuantityMicros === authoritative.filledQuantityMicros
+    && candidate.totalCostMicroCents === authoritative.totalCostMicroCents
+    && candidate.vwapPriceMicroCents === authoritative.vwapPriceMicroCents
+    && candidate.limitPriceMicroCents === authoritative.limitPriceMicroCents
+    && candidate.depthTimestamp === authoritative.depthTimestamp
+    && candidate.tickSizeMicroCents === authoritative.tickSizeMicroCents
+    && candidate.minimumOrderQuantityMicros === authoritative.minimumOrderQuantityMicros
+    && candidate.fills.length === authoritative.fills.length
+    && candidate.fills.every((fill, index) => {
+      const expected = authoritative.fills[index];
+      return fill.priceMicroCents === expected.priceMicroCents
+        && fill.quantityMicros === expected.quantityMicros;
+    });
+}
+
+function getAuthoritativeExecutableQuote(leg: OrderRequest): ExecutableBookQuote {
+  const bookId = leg.platform === 'kalshi'
+    ? (leg.ticker ?? leg.marketId)
+    : (leg.conditionId ?? leg.marketId);
+  return orderbookState.getExecutableQuote(bookId, leg.outcome, 1_000_000);
 }
 
 // ─── Dry Run Simulator ──────────────────────────────────────────
 
 function simulateOrder(req: OrderRequest): OrderResult {
+  const quotePrice = req.executableQuote?.status === 'executable'
+    && req.executableQuote.vwapPriceMicroCents != null
+    ? req.executableQuote.vwapPriceMicroCents / 100_000_000
+    : null;
+  if (quotePrice == null) {
+    return { ...emptyResult(req.platform, 'rejected'), error: 'Missing executable book quote for paper fill' };
+  }
   // Simulate fill behavior — sometimes returns pending to exercise poll loop
   const roll = Math.random();
   if (roll < 0.15) {
@@ -187,20 +242,21 @@ function simulateOrder(req: OrderRequest): OrderResult {
       status: 'pending',
       filledSize: 0,
       filledContracts: 0,
-      filledPrice: req.price,
       orderId: `dry-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
     };
   }
-  // 85% chance: filled (with random slippage + partial fill ratio)
-  const slippage = (Math.random() - 0.5) * 0.005;
-  const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
+  // Fill probability is stochastic, but an executable price never is. Paper
+  // mode uses the same walked-book VWAP carried by the request.
+  const filledPrice = quotePrice;
   const fillRatio = 0.85 + Math.random() * 0.15; // 85-100% fill
   const requestedContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
-  const filledContracts = Math.floor(requestedContracts * fillRatio);
+  const filledContracts = requestedContracts === 1
+    ? 1
+    : Math.floor(requestedContracts * fillRatio);
   return {
     platform: req.platform,
-    status: fillRatio >= 0.99 ? 'filled' : 'partial',
+    status: filledContracts === requestedContracts ? 'filled' : 'partial',
     filledSize: filledContracts * filledPrice,
     filledContracts,
     filledPrice,
@@ -211,8 +267,13 @@ function simulateOrder(req: OrderRequest): OrderResult {
 
 /** Simulate polling a pending/partial dry-run order — the next poll fills the remainder. */
 function simulatePollResult(req: OrderRequest, orderId: string): OrderResult {
-  const slippage = (Math.random() - 0.5) * 0.005;
-  const filledPrice = Math.max(0.01, Math.min(0.99, req.price + slippage));
+  const filledPrice = req.executableQuote?.status === 'executable'
+    && req.executableQuote.vwapPriceMicroCents != null
+    ? req.executableQuote.vwapPriceMicroCents / 100_000_000
+    : null;
+  if (filledPrice == null) {
+    return { ...emptyResult(req.platform, 'rejected'), orderId, error: 'Missing executable book quote for paper fill' };
+  }
   const filledContracts = req.contracts ?? Math.floor(req.size / req.price + 1e-9);
   return {
     platform: req.platform,
@@ -342,27 +403,14 @@ async function cancelLeg(result: OrderResult): Promise<boolean> {
 async function tickCheckLeg(
   filledLeg: 'kalshi' | 'polymarket',
   unfilledReq: OrderRequest,
-  maxSlippagePct: number,
+  _maxSlippagePct: number,
   dryRun: boolean,
 ): Promise<TickCheckResult> {
   const expectedPrice = unfilledReq.price;
 
   if (dryRun) {
-    // Simulate: 80% chance price is fine, 20% chance it moved
-    const priceMoved = Math.random() < 0.2;
-    if (priceMoved) {
-      const moveDir = Math.random() < 0.5 ? -1 : 1;
-      const movePct = (maxSlippagePct + 0.5) * 0.01 * moveDir;
-      const actualPrice = Math.max(0.01, Math.min(0.99, expectedPrice + expectedPrice * movePct));
-      return {
-        triggered: true,
-        legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
-        expectedPrice,
-        actualPrice,
-        priceMoved: true,
-        action: 'cancel',
-      };
-    }
+    // Pending/fill probability is modelled by pollOrder. Without a new walked
+    // book, do not invent a price movement or an executable replacement price.
     return {
       triggered: true,
       legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
@@ -522,6 +570,25 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
 
   // Validate
   const validation = validateExecution(req, limits);
+  for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
+    const candidate = leg.executableQuote;
+    if (!isExecutableQuoteConsistent(candidate, leg.side, 1_000_000)) {
+      validation.errors.push(`${leg.platform} order requires a complete, constraint-valid executable book quote`);
+      continue;
+    }
+    const authoritative = getAuthoritativeExecutableQuote(leg);
+    if (!isExecutableQuoteConsistent(authoritative, leg.side, 1_000_000)
+        || !quotesMatchAuthoritativeBook(candidate, authoritative)) {
+      validation.errors.push(`${leg.platform} quote must match the server-side executable book`);
+      continue;
+    }
+    const observedAt = Date.parse(authoritative.depthTimestamp!);
+    const depthAgeMs = Date.now() - observedAt;
+    if (!Number.isFinite(depthAgeMs) || depthAgeMs < -5_000 || depthAgeMs > MAX_EXECUTABLE_DEPTH_AGE_MS) {
+      validation.errors.push(`${leg.platform} server-side executable book is stale`);
+    }
+  }
+  validation.valid = validation.errors.length === 0;
   if (!validation.valid) {
     return {
       success: false,
