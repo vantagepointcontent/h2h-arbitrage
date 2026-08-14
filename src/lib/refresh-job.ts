@@ -118,6 +118,11 @@ export async function runRefreshJob(marketIds?: string[]) {
           }).catch(() => {});
           return;
         }
+        const bestOutcome = result.allArbs.reduce<(typeof result.allArbs)[number] | null>(
+          (best, arb) => !best || arb.roiPct > best.roiPct ? arb : best,
+          null,
+        );
+        const outcomeApy = bestOutcome?.outcomeApy;
         const scanResult = {
           bestRoiPct: result.bestRoiPct,
           bestProfit: result.bestProfit,
@@ -131,7 +136,8 @@ export async function runRefreshJob(marketIds?: string[]) {
           pmCount: result.pmCount,
           positiveArbCount: result.allArbs.filter((arb) => arb.roiPct > 0).length,
           scannedAt: result.scannedAt,
-          expiryAt: result.expiryDate,
+          expiryAt: outcomeApy?.apyPct != null ? outcomeApy.scenarioA.settlementAt : null,
+          outcomeApy,
           allArbs: result.allArbs,
           expiryDate: result.expiryDate,
           category: market.category,

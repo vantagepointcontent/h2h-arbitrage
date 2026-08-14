@@ -6,7 +6,7 @@ import { buildTradePlan, type TradePlan } from "@/lib/trade-plan";
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
-import { computeApy } from "@/lib/matcher";
+import type { OutcomeContingentApy } from "@/lib/settlement-apy";
 import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
@@ -29,7 +29,8 @@ interface Outcome {
     strategy: string;
     expectedProfit: number;
     roiPct: number;
-    apyPct?: number;
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
     kalshiStake?: number;
     pmStake?: number;
     maxCapital?: number;
@@ -66,7 +67,7 @@ interface Props {
  * Execute button renders when marketTitle + ticker + conditionId are available.
  * Distinct from the outcomes table which shows ALL outcomes (including non-arb).
  */
-export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, marketExpiryDate, category, marketTitle, scannedAt }: Props) {
+export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, category, marketTitle, scannedAt }: Props) {
   const [executingArb, setExecutingArb] = useState<ExecutableArb | null>(null);
   const [resolvingArtist, setResolvingArtist] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
@@ -283,7 +284,8 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
             o.arbitrage.fees,
             o.arbitrage.expectedProfit,
           );
-          const apy = o.arbitrage.apyPct ?? computeApy(o.arbitrage.roiPct, marketExpiryDate);
+          const apy = o.arbitrage.apyPct;
+          const scenarioApy = o.arbitrage.outcomeApy;
 
           const distributionKey = `${idx}-${o.artist}`;
           const adjusted = distributions[distributionKey];
@@ -338,10 +340,18 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, mark
                 <span className="text-xs text-[#5DBE81]" title="Expected profit (net of fees)">
                   {formatCurrency(displayProfit)}
                 </span>
-                {apy > 0 && (
+                {apy != null && apy > 0 && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
                     APY {apy.toFixed(0)}%
                   </span>
+                )}
+                {apy == null && scenarioApy?.scenarioA.apyPct != null && scenarioApy.scenarioB.apyPct != null && (
+                  <span className="text-[10px] text-[#8A9BA8]" title={`Winning-leg settlement timing: ${scenarioApy.scenarioA.settlementAt} / ${scenarioApy.scenarioB.settlementAt}`}>
+                    APY K {scenarioApy.scenarioA.apyPct.toFixed(0)}% / PM {scenarioApy.scenarioB.apyPct.toFixed(0)}%
+                  </span>
+                )}
+                {apy == null && scenarioApy && (scenarioApy.scenarioA.apyPct == null || scenarioApy.scenarioB.apyPct == null) && (
+                  <span className="text-[10px] text-[#8A9BA8]" title={`APY unavailable: ${(scenarioApy.unavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>APY unavailable</span>
                 )}
                 {activeAlert && (
                   <span className={`inline-flex items-center gap-1 text-[10px] ${alertHit ? "text-[#5DBE81]" : "text-[#facc15]"}`} title={`Alert at ${activeAlert.targetRoiPct.toFixed(2)}% net ROI`}>

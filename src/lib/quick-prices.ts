@@ -23,7 +23,7 @@ import { ClobMarket, fetchClobBooks, getClobPricesFromBooks } from '@/lib/polyma
 import {
   matchOutcomes,
   calculateAllArbitrages,
-  computeApy,
+  attachOutcomeContingentApy,
   applyManualMatches,
   setSuspiciousRoiPct,
   UnifiedOutcome,
@@ -290,13 +290,10 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const suspRoi = await getSetting<number>('scanner.suspiciousRoiPct').catch(() => null);
   if (suspRoi != null) setSuspiciousRoiPct(suspRoi);
 
-  const withArbitrage = calculateAllArbitrages(splitOutcomes, eventTitle, capital).map((o) => ({
-    ...o,
-    arbitrage: {
-      ...o.arbitrage,
-      apyPct: computeApy(o.arbitrage.roiPct, expiryDate),
-    },
-  }));
+  const withArbitrage = attachOutcomeContingentApy(
+    calculateAllArbitrages(splitOutcomes, eventTitle, capital),
+    new Date().toISOString(),
+  );
 
   const priceResolved = computePriceResolved(
     withArbitrage.map((o) => ({

@@ -35,6 +35,7 @@ vi.mock('@/lib/matcher', () => ({
   buildKalshiArbShape: vi.fn(),
   matchOutcomes: () => [],
   calculateAllArbitrages: mocks.calculateAllArbitrages,
+  attachOutcomeContingentApy: (outcomes: unknown[]) => outcomes,
   parseDepth: vi.fn(),
   computeApy: () => 0,
   applyManualMatches: (outcomes: unknown[]) => outcomes,

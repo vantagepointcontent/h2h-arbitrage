@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryScanHistoryStream, countScanHistory, getSavedMarkets } from '@/lib/persistence';
+import { getSavedMarkets, queryScanHistoryStream, countScanHistory } from '@/lib/persistence';
+import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { clientSafeError } from '@/lib/error-handler';
 import { classifyArbType } from '@/lib/arb-types';
 import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
@@ -16,6 +17,16 @@ const headers = [
   'ROI %',
   'APY %',
   'APY Unavailable Reason',
+  'Scenario A Winner',
+  'Scenario A Settlement',
+  'Scenario A APY %',
+  'Scenario A Timing Source',
+  'Scenario A Unavailable Reason',
+  'Scenario B Winner',
+  'Scenario B Settlement',
+  'Scenario B APY %',
+  'Scenario B Timing Source',
+  'Scenario B Unavailable Reason',
   'Profit ($)',
   'Matched Count',
   'Kalshi Count',
@@ -94,6 +105,13 @@ export async function GET(request: NextRequest) {
 
         for await (const batch of queryScanHistoryStream(filters)) {
           for (const r of batch) {
+            let outcomeApy: OutcomeContingentApy | null = null;
+            try {
+              const raw = typeof r.raw_result === 'string'
+                ? JSON.parse(r.raw_result) as { outcomeApy?: OutcomeContingentApy; allArbs?: Array<{ outcomeApy?: OutcomeContingentApy }> }
+                : null;
+              outcomeApy = raw?.outcomeApy ?? raw?.allArbs?.[0]?.outcomeApy ?? null;
+            } catch { /* malformed legacy payload: export explicit blank provenance */ }
             const line = [
               r.scanned_at,
               r.market_title ?? nameMap.get(r.market_id) ?? '',
@@ -106,6 +124,16 @@ export async function GET(request: NextRequest) {
               r.best_roi_pct,
               r.apy_pct,
               r.apy_unavailable_reason,
+              outcomeApy?.scenarioA?.winner,
+              outcomeApy?.scenarioA?.settlementAt,
+              outcomeApy?.scenarioA?.apyPct,
+              outcomeApy?.scenarioA?.timingSource,
+              outcomeApy?.scenarioA?.unavailableReason,
+              outcomeApy?.scenarioB?.winner,
+              outcomeApy?.scenarioB?.settlementAt,
+              outcomeApy?.scenarioB?.apyPct,
+              outcomeApy?.scenarioB?.timingSource,
+              outcomeApy?.scenarioB?.unavailableReason,
               r.best_profit,
               r.matched_count,
               r.kalshi_count,

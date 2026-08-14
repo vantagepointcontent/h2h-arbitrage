@@ -52,6 +52,7 @@ vi.mock('@/lib/matcher', () => ({
   ],
   applyManualMatches: (outcomes: unknown[]) => outcomes,
   calculateAllArbitrages: (outcomes: unknown[]) => outcomes,
+  attachOutcomeContingentApy: (outcomes: unknown[]) => outcomes,
   computeApy: () => 0,
   setSuspiciousRoiPct: vi.fn(),
 }));

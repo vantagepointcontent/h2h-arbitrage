@@ -1,6 +1,8 @@
 // page-shared.ts — shared types, storage helpers, and utils for the main views.
 // Extracted from page.tsx (PERF-002 split). No behavior changes.
 
+import type { OutcomeContingentApy } from '@/lib/settlement-apy';
+
 // ─── Generic localStorage helpers ───
 
 function getStored<T>(key: string, fallback: T, validate?: (v: T) => boolean): T {
@@ -199,7 +201,8 @@ export interface ArbitrageInfo {
   pmStake: number;
   expectedProfit: number;
   roiPct: number;
-  apyPct?: number;
+  apyPct?: number | null;
+  outcomeApy?: OutcomeContingentApy;
   buyPlatform: "kalshi" | "polymarket" | null;
   buyPrice: number;
   sellPlatform: "kalshi" | "polymarket" | null;
@@ -297,7 +300,8 @@ export interface LastScanResult {
     pmBestAsk?: number;
     kalshiStake?: number;
     pmStake?: number;
-    apyPct?: number;
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
     buyPlatform?: string | null;
     buyPrice?: number;
     sellPlatform?: string | null;
@@ -334,8 +338,39 @@ export interface SavedMarket {
       expectedProfit: number;
       strategy: string;
       totalStake?: number;
+      apyPct?: number | null;
+      outcomeApy?: OutcomeContingentApy;
     }[];
   } | null;
+}
+
+export interface MarketApySummary {
+  scalarApyPct: number | null;
+  scenarioApyPct: { kalshi: number; polymarket: number } | null;
+  sortApyPct: number | null;
+  unavailableReason: string | null;
+}
+
+/** Read scan-time APY only; never re-annualize from the saved market's generic expiry. */
+export function getMarketApySummary(market: SavedMarket): MarketApySummary {
+  const arbs = market.liveResult?.allArbs ?? market.lastScanResult?.allArbs ?? [];
+  const best = arbs.reduce<(typeof arbs)[number] | null>(
+    (current, arb) => !current || arb.roiPct > current.roiPct ? arb : current,
+    null,
+  );
+  const outcomeApy = best?.outcomeApy;
+  const kalshi = outcomeApy?.scenarioA.apyPct;
+  const polymarket = outcomeApy?.scenarioB.apyPct;
+  const scenarios = outcomeApy?.apyPct == null && kalshi != null && polymarket != null
+    ? { kalshi, polymarket }
+    : null;
+  const scalarApyPct = best?.apyPct ?? outcomeApy?.apyPct ?? null;
+  return {
+    scalarApyPct,
+    scenarioApyPct: scenarios,
+    sortApyPct: scalarApyPct ?? (scenarios ? Math.min(scenarios.kalshi, scenarios.polymarket) : null),
+    unavailableReason: outcomeApy?.unavailableReason ?? null,
+  };
 }
 
 /**

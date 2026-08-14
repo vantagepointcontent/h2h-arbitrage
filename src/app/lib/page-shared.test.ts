@@ -6,6 +6,7 @@ import {
   summarizeScanForSidebar,
   getCanonicalMatchState,
   formatCanonicalMatchState,
+  getMarketApySummary,
   mergeSavedMarketMatchRefresh,
   markSavedMarketMatchRefreshing,
   type SavedMarket,
@@ -150,6 +151,30 @@ describe("BUG-133 canonical saved-market match summaries", () => {
     expect(merged.lastScanResult).toMatchObject({
       matchStatus: "unavailable", matchedCount: 2,
       matchedPairs: existing.lastScanResult?.matchedPairs,
+    });
+  });
+});
+
+describe('outcome-contingent market APY summary', () => {
+  it('preserves both venue scenarios and sorts by the explicit lower scenario', () => {
+    const scenario = (winner: 'kalshi' | 'polymarket', apyPct: number, settlementAt: string) => ({
+      label: winner === 'kalshi' ? 'scenario_a' as const : 'scenario_b' as const,
+      winner, roiPct: 1, apyPct, settlementAt, daysToSettlement: 100,
+      timingSource: winner === 'kalshi' ? 'kalshi.market.expected_expiration_time' as const : 'polymarket.event.endDate' as const,
+      unavailableReason: null,
+    });
+    const marketWithScenarios = {
+      id: 'market', kalshiUrl: '', polymarketUrl: '', eventTitle: 'Market', createdAt: '',
+      lastScanResult: { bestRoiPct: 1, bestProfit: 1, strategy: 'Direct', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T00:00:00Z', allArbs: [{
+        artist: 'A', roiPct: 1, expectedProfit: 1, strategy: 'Direct', apyPct: null,
+        outcomeApy: { observedAt: '2026-08-14T00:00:00Z', apyPct: null, unavailableReason: 'outcome_contingent' as const, scenarioA: scenario('kalshi', 2.5, '2027-01-01T00:00:00Z'), scenarioB: scenario('polymarket', 4.5, '2026-11-01T00:00:00Z'), kalshi: null, polymarket: null },
+      }] },
+    } as SavedMarket;
+    expect(getMarketApySummary(marketWithScenarios)).toMatchObject({
+      scalarApyPct: null,
+      scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
+      sortApyPct: 2.5,
+      unavailableReason: 'outcome_contingent',
     });
   });
 });

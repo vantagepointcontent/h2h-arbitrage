@@ -21,7 +21,7 @@ export interface OpportunitySource {
     strategy: string;
     expectedProfit: number;
     roiPct: number;
-    apyPct?: number;
+    apyPct?: number | null;
     kalshiStake?: number;
     pmStake?: number;
     maxCapital?: number;

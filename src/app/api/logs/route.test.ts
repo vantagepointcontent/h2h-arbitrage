@@ -144,6 +144,24 @@ describe('Logs scan-time APY serialization', () => {
     expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('');
   });
 
+  it('exports both winning-leg settlement scenarios and provenance', async () => {
+    mocks.queryScanHistoryStream.mockImplementationOnce(async function* () {
+      yield [{ ...persistedRow, apy_pct: null, apy_unavailable_reason: 'outcome_contingent', raw_result: JSON.stringify({ outcomeApy: {
+        scenarioA: { winner: 'kalshi', settlementAt: '2027-01-04T15:00:00.000Z', apyPct: 0.40858, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
+        scenarioB: { winner: 'polymarket', settlementAt: '2026-11-03T00:00:00.000Z', apyPct: 0.72627, timingSource: 'polymarket.event.endDate', unavailableReason: null },
+      } }) }];
+    });
+    const response = await exportLogs(new NextRequest('http://localhost/api/logs/export'));
+    const [header, row] = (await response.text()).trim().split('\n');
+    const columns = header.split(',');
+    const values = row.split(',');
+    expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('outcome_contingent');
+    expect(values[columns.indexOf('Scenario A Settlement')]).toBe('2027-01-04T15:00:00.000Z');
+    expect(values[columns.indexOf('Scenario A Timing Source')]).toBe('kalshi.market.expected_expiration_time');
+    expect(values[columns.indexOf('Scenario B Settlement')]).toBe('2026-11-03T00:00:00.000Z');
+    expect(values[columns.indexOf('Scenario B APY %')]).toBe('0.72627');
+  });
+
   it('applies search and classification filters to export before streaming', async () => {
     await exportLogs(new NextRequest(
       'http://localhost/api/logs/export?search=mn-01&eventType=arb&arbType=direct&maxTteDays=180',

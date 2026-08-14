@@ -15,6 +15,7 @@ import { MarketDepthCharts } from './MarketDepthCharts';
 import { calculateShareRatio } from '@/lib/share-ratio';
 import { ProfitDistributionPanel } from './ProfitDistributionPanel';
 import { resolveDistributionStakes, type ProfitDistribution } from '@/lib/profit-distribution';
+import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 
 interface Outcome {
   artist: string;
@@ -25,7 +26,8 @@ interface Outcome {
   arbitrage: {
     expectedProfit: number;
     roiPct: number;
-    apyPct?: number;
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
     kalshiStake?: number;
     pmStake?: number;
     maxCapital?: number;
@@ -216,8 +218,10 @@ function OutcomeTableBodyInner({
         // UI-08: quoted cross-platform price difference, signed PM YES − Kalshi YES.
         // Positive values rank first; fee-aware ROI remains the profitability signal.
         const spread = (outcome: Outcome) => ((outcome.polymarket?.yesPrice ?? 0) - (outcome.kalshi?.yesAsk ?? 0)) * 100;
-        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? (a.arbitrage.apyPct ?? 0) : sortField === "profit" ? a.arbitrage.expectedProfit : spread(a);
-        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? (b.arbitrage.apyPct ?? 0) : sortField === "profit" ? b.arbitrage.expectedProfit : spread(b);
+        const sortableApy = (outcome: Outcome) => outcome.arbitrage.apyPct
+          ?? Math.min(outcome.arbitrage.outcomeApy?.scenarioA.apyPct ?? Number.NEGATIVE_INFINITY, outcome.arbitrage.outcomeApy?.scenarioB.apyPct ?? Number.NEGATIVE_INFINITY);
+        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? sortableApy(a) : sortField === "profit" ? a.arbitrage.expectedProfit : spread(a);
+        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? sortableApy(b) : sortField === "profit" ? b.arbitrage.expectedProfit : spread(b);
         return mul * (va - vb);
       });
     }
@@ -250,7 +254,9 @@ function OutcomeTableBodyInner({
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
         const roiColor = !hasPrices ? "text-[var(--text-secondary)]" : o.arbitrage.roiPct > 0 ? "text-[var(--status-positive)]" : o.arbitrage.roiPct < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]";
         // APY color: gray for non-actionable (no prices, ROI <= 0, or APY <= 0); green only when ROI is positive and APY is positive
-        const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || (o.arbitrage.apyPct ?? 0) <= 0 ? "text-[var(--text-secondary)]" : "text-[var(--status-positive)]";
+        const hasPositiveApy = (o.arbitrage.apyPct ?? o.arbitrage.outcomeApy?.scenarioA.apyPct ?? 0) > 0
+          || (o.arbitrage.outcomeApy?.scenarioB.apyPct ?? 0) > 0;
+        const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || !hasPositiveApy ? "text-[var(--text-secondary)]" : "text-[var(--status-positive)]";
         const isExpanded = expandedArtist === o.artist;
         const totalStake = (o.arbitrage.kalshiStake ?? 0) + (o.arbitrage.pmStake ?? 0);
         const stakeRatio = totalStake > 0
@@ -286,9 +292,15 @@ function OutcomeTableBodyInner({
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (
-                  <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
+                  <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.outcomeApy?.scenarioA.daysToSettlement ?? getDaysToExpiry(marketExpiryDate)}>
                     {formatPercent(o.arbitrage.apyPct)}
                   </ApyValueTooltip>
+                ) : hasPrices && o.arbitrage.outcomeApy?.scenarioA.apyPct != null && o.arbitrage.outcomeApy.scenarioB.apyPct != null ? (
+                  <span title={`Kalshi-win settlement ${o.arbitrage.outcomeApy.scenarioA.settlementAt} (${o.arbitrage.outcomeApy.scenarioA.timingSource}); Polymarket-win settlement ${o.arbitrage.outcomeApy.scenarioB.settlementAt} (${o.arbitrage.outcomeApy.scenarioB.timingSource})`}>
+                    K {formatPercent(o.arbitrage.outcomeApy.scenarioA.apyPct)} / PM {formatPercent(o.arbitrage.outcomeApy.scenarioB.apyPct)}
+                  </span>
+                ) : hasPrices && o.arbitrage.outcomeApy ? (
+                  <span title={`APY unavailable: ${(o.arbitrage.outcomeApy.unavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>Unavailable</span>
                 ) : "—"}
               </td>
               <td className="relative px-4 py-3 text-right group">
@@ -421,7 +433,7 @@ function OutcomeTableBodyInner({
                     {hasPrices && o.arbitrage.apyPct != null && o.arbitrage.apyPct > 0 && (
                       <div className="flex items-center gap-2">
                         <span className="text-[var(--text-secondary)]">APY:</span>
-                        <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={getDaysToExpiry(marketExpiryDate)}>
+                        <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.outcomeApy?.scenarioA.daysToSettlement ?? getDaysToExpiry(marketExpiryDate)}>
                           <span className="font-bold text-[var(--status-positive)]">{formatPercent(o.arbitrage.apyPct)}</span>
                         </ApyValueTooltip>
                       </div>

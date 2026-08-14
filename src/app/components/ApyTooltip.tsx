@@ -27,7 +27,7 @@ export function HeaderInfo({ text }: { text: string }) {
 
 export function ApyHeaderInfo() {
   return (
-    <HeaderInfo text="Annualized ROI = ROI × (365 ÷ days to expiry).\nExample: 2% ROI on a 7-day market = 10,400% annualized (104x).\nHigher APY = better return relative to time held." />
+    <HeaderInfo text="Annualized ROI = ROI × (365 ÷ days until the winning leg releases cash).\nCross-venue rows show separate Kalshi-win and Polymarket-win APYs when settlement dates differ.\nUnavailable means venue timing is missing, malformed, or conflicting." />
   );
 }
 

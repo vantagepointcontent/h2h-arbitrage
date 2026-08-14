@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Check, Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
-import { computeApy } from "@/lib/matcher";
-import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState } from "@/app/lib/page-shared";
-import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
+
+import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
+import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
@@ -113,10 +113,7 @@ function OverviewPanelInner({
   useEffect(() => { onLoad(); }, []);
   const [renderedAt] = useState(() => Date.now());
 
-  const getMarketApy = (m: SavedMarket): number => {
-    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
-    return computeApy(roi, m.expiryDate);
-  };
+  const getMarketApy = (m: SavedMarket): number => getMarketApySummary(m).sortApyPct ?? 0;
 
   // Helper: check if a market's numeric value is missing (shows as "—")
   const hasNoValue = (m: SavedMarket, field: OverviewSort): boolean => {
@@ -450,7 +447,8 @@ function OverviewPanelInner({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredByExpiry.map((m) => {
             const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
-            const apy = getMarketApy(m);
+            const apySummary = getMarketApySummary(m);
+            const apy = apySummary.sortApyPct ?? 0;
             const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
             const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
             const matchedLabel = formatCanonicalMatchState(m);
@@ -480,11 +478,10 @@ function OverviewPanelInner({
                   </div>
                   <div className="text-[var(--text-secondary)] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
                   <div className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
-                    {apy !== 0 ? (
-                      <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
-                        {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
-                      </ApyValueTooltip>
-                    ) : "—"}
+                    {apySummary.scenarioApyPct
+                      ? `K ${formatPercent(apySummary.scenarioApyPct.kalshi)} / PM ${formatPercent(apySummary.scenarioApyPct.polymarket)}`
+                      : apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
+                        : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                   </div>
                   <div className="text-[var(--text-secondary)]">Est. Profit</div>
                   <div className="text-[var(--text-primary)] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
@@ -535,7 +532,8 @@ function OverviewPanelInner({
             <tbody>
               {filteredByExpiry.map((m) => {
                 const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
-                const apy = getMarketApy(m);
+                const apySummary = getMarketApySummary(m);
+                const apy = apySummary.sortApyPct ?? 0;
                 const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
                 const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
                 const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
@@ -580,11 +578,10 @@ function OverviewPanelInner({
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
                     <td className={`text-right font-bold ${metricTone(apy)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
-                      {apy !== 0 ? (
-                        <ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
-                          {`${apy > 0 ? "+" : ""}${formatPercent(apy)}`}
-                        </ApyValueTooltip>
-                      ) : "—"}
+                      {apySummary.scenarioApyPct
+                        ? `K ${formatPercent(apySummary.scenarioApyPct.kalshi)} / PM ${formatPercent(apySummary.scenarioApyPct.polymarket)}`
+                        : apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
+                          : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                     </td>
                     <td className={`whitespace-nowrap text-right font-semibold ${metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="whitespace-nowrap text-xs"><CompactStrategyDisplay strategy={strategy} /></td>

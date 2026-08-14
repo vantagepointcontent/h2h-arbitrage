@@ -80,4 +80,24 @@ describe('scan-time APY persistence', () => {
     expect(second.apy_pct).toBe(first.apy_pct);
     expect(second.days_to_expiry).toBe(first.days_to_expiry);
   });
+
+  it('persists outcome-contingent APY as unavailable instead of selecting one venue date', async () => {
+    const outcomeApy = {
+      observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'outcome_contingent' as const, kalshi: null, polymarket: null,
+      scenarioA: { label: 'scenario_a' as const, winner: 'kalshi' as const, roiPct: 1, apyPct: 2.5, settlementAt: '2027-01-04T15:00:00.000Z', daysToSettlement: 143, timingSource: 'kalshi.market.expected_expiration_time' as const, unavailableReason: null },
+      scenarioB: { label: 'scenario_b' as const, winner: 'polymarket' as const, roiPct: 1, apyPct: 4.5, settlementAt: '2026-11-03T00:00:00.000Z', daysToSettlement: 80, timingSource: 'polymarket.event.endDate' as const, unavailableReason: null },
+    };
+    const saved = await persistence.saveScanResult(`${prefix}-outcome-contingent`, {
+      bestRoiPct: 1, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 1, scannedAt: outcomeApy.observedAt,
+      expiryAt: null, outcomeApy, raw: { outcomeApy },
+    });
+    const row = (await persistence.queryScanHistory({ limit: 500 })).rows.find((candidate) => candidate.id === saved.id);
+    expect(row?.apy_pct).toBeNull();
+    expect(row?.expiry_at).toBeNull();
+    expect(row?.days_to_expiry).toBeNull();
+    expect(row?.apy_unavailable_reason).toBe('outcome_contingent');
+    const detail = await persistence.getScanHistoryDetail(saved.id);
+    expect(JSON.parse(detail?.raw_result ?? '{}').outcomeApy.scenarioB.timingSource).toBe('polymarket.event.endDate');
+  });
 });

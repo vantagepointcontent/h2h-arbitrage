@@ -9,10 +9,11 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches } from '@/lib/matcher';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
+import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
@@ -44,6 +45,8 @@ export interface SingleRefreshResult {
     pmYesDepth?: number | null;
     pmNoDepth?: number | null;
     fees?: any;
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
   }[];
 }
 
@@ -212,10 +215,11 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const decoupledPairs = await getDecoupledPairs();
   const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
 
-  const withArbitrage = calculateAllArbitrages(splitOutcomes, market.category || pmEvent.title).map(o => ({
-    ...o,
-    arbitrage: { ...o.arbitrage, apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate) },
-  }));
+  const scannedAt = new Date().toISOString();
+  const withArbitrage = attachOutcomeContingentApy(
+    calculateAllArbitrages(splitOutcomes, market.category || pmEvent.title),
+    scannedAt,
+  );
 
   const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
   const pmCount = withArbitrage.filter(o => o.polymarket).length;
@@ -224,14 +228,10 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     .filter(o => o.kalshi && o.polymarket)
     .map(o => ({ artist: o.artist, kalshiTicker: o.kalshi!.ticker, pmConditionId: o.polymarket!.conditionId }));
 
-  const positiveArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
   // UI-03: Track best net arb (positive OR negative) for display.
   const netArbs = withArbitrage.filter(o => o.arbitrage && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
   const bestNetArb = netArbs.length > 0
     ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
-    : null;
-  const bestArb = positiveArbs.length > 0
-    ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
     : null;
 
   return {
@@ -245,7 +245,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     matchedPairs,
     kalshiCount,
     pmCount,
-    scannedAt: new Date().toISOString(),
+    scannedAt,
     totalStake: bestNetArb ? (bestNetArb.arbitrage!.kalshiStake ?? 0) + (bestNetArb.arbitrage!.pmStake ?? 0) : 0,
     expiryDate: pmEvent.endDate,
     allArbs: netArbs.map(o => {
@@ -276,6 +276,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       kalshiStake: o.arbitrage!.kalshiStake,
       pmStake: o.arbitrage!.pmStake,
       apyPct: o.arbitrage!.apyPct,
+      outcomeApy: o.arbitrage!.outcomeApy,
       buyPlatform: o.arbitrage!.buyPlatform,
       buyPrice: o.arbitrage!.buyPrice,
       sellPlatform: o.arbitrage!.sellPlatform,

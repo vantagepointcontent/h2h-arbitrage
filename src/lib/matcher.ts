@@ -2,6 +2,13 @@ import { KalshiMarket } from './kalshi';
 import { PMMarket, parseOutcomes } from './polymarket';
 import type { ManualMatch } from './manual-matches';
 import { finiteDecimal, finiteMarketPrice } from './market-price';
+import {
+  calculateOutcomeContingentApy,
+  kalshiSettlementTiming,
+  polymarketSettlementTiming,
+  type OutcomeContingentApy,
+  type SettlementTiming,
+} from './settlement-apy';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -18,6 +25,7 @@ export interface UnifiedOutcome {
     noBidDepth?: string;
     noAskDepth?: string;
     eventId?: string;
+    settlementTiming?: SettlementTiming;
   } | null;
   polymarket: {
     marketId: string;
@@ -45,6 +53,7 @@ export interface UnifiedOutcome {
       originalSide: 'YES';
       normalizedSide: 'YES' | 'NO';
     };
+    settlementTiming?: SettlementTiming;
   } | null;
   arbitrage: {
     strategy: string;
@@ -57,7 +66,9 @@ export interface UnifiedOutcome {
     pmStake: number;
     expectedProfit: number;
     roiPct: number;
-    apyPct?: number;
+    /** Scalar APY exists only when both payout scenarios share one timing. */
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
     maxCapital: number;
     buyPlatform: 'kalshi' | 'polymarket' | null;
     buyPrice: number;
@@ -83,6 +94,8 @@ export interface UnifiedOutcome {
     };
   };
   source: 'auto' | 'manual';
+  /** True only when matching supplied explicit rule-alignment evidence. */
+  resolutionRulesAligned?: boolean;
   /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
   negRisk?: boolean;
   /** True when this outcome is a virtual cross-outcome arbitrage row */
@@ -1000,6 +1013,36 @@ export function calculateAllArbitrages(
   });
 }
 
+/** Bind scenario APY to the exact Kalshi/PM legs selected by each strategy. */
+export function attachOutcomeContingentApy(
+  outcomes: UnifiedOutcome[],
+  observedAt: string,
+): UnifiedOutcome[] {
+  return outcomes.map((outcome) => {
+    const selectedPm = outcome.arbitrage.pmConditionId
+      ? outcomes.find((candidate) => candidate.polymarket?.conditionId === outcome.arbitrage.pmConditionId)?.polymarket
+      : outcome.polymarket;
+    const outcomeApy = calculateOutcomeContingentApy({
+      roiPct: outcome.arbitrage.roiPct,
+      observedAt,
+      arbType: outcome.arbitrage.arbType,
+      strategy: outcome.arbitrage.strategy,
+      kalshi: outcome.kalshi?.settlementTiming ?? null,
+      polymarket: selectedPm?.settlementTiming ?? null,
+      rulesAligned: outcome.arbitrage.arbType === 'internal'
+        || outcome.resolutionRulesAligned === true,
+    });
+    return {
+      ...outcome,
+      arbitrage: {
+        ...outcome.arbitrage,
+        apyPct: outcomeApy.apyPct,
+        outcomeApy,
+      },
+    };
+  });
+}
+
 /** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
 export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
   if (roiPct <= 0) return 0;
@@ -1078,7 +1121,7 @@ function hasVerifiedBinaryTokens(market: PMMarket, outcomes: string[]): boolean 
 }
 
 // --- Helper to build the PM shape used by matching; scan route calculates arbitrage. ---
-export function buildPmArbShape(market: PMMarket) {
+export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
   const { outcomes, prices } = parseOutcomes(market);
   let tokenIds: string[] = [];
   try {
@@ -1146,6 +1189,7 @@ export function buildPmArbShape(market: PMMarket) {
       negRisk: market.neg_risk === true,
       binaryVerified,
       isExecutable: false,
+      settlementTiming: polymarketSettlementTiming(eventEndDate ?? market.endDate, market.endDate),
     } as NonNullable<UnifiedOutcome['polymarket']>;
   }
 
@@ -1204,6 +1248,7 @@ export function buildPmArbShape(market: PMMarket) {
     noAskDepth: Number.isFinite(market.noAskDepth) ? market.noAskDepth : 0,
     negRisk: market.neg_risk === true,
     binaryVerified,
+    settlementTiming: polymarketSettlementTiming(eventEndDate ?? market.endDate, market.endDate),
   } as NonNullable<UnifiedOutcome['polymarket']>;
 }
 
@@ -1232,6 +1277,7 @@ export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcom
     yesAskDepth: km.yes_ask_size_fp,
     noBidDepth: km.no_bid_size_fp,
     noAskDepth: km.no_ask_size_fp,
+    settlementTiming: kalshiSettlementTiming(km),
   };
 }
 
@@ -1346,13 +1392,14 @@ export function matchOutcomes(
     const exact = kalshiMap.get(pmNorm);
     if (exact) {
       const kalshi = buildKalshiArbShape(exact);
-      const pmShape = buildPmArbShape(pmo.market);
+      const pmShape = buildPmArbShape(pmo.market, expiryDate);
       matched.push({
         artist: stripBetTypePrefix(getKalshiName(exact)),
         kalshi,
         polymarket: pmShape,
         arbitrage: placeholderArb,
         source: 'auto' as const,
+        resolutionRulesAligned: true,
         negRisk: pmShape.negRisk,
       });
       usedKalshi.add(exact.ticker);
@@ -1380,7 +1427,7 @@ export function matchOutcomes(
     }
     if (bestKm) {
       const kalshi = buildKalshiArbShape(bestKm);
-      const pmShape = buildPmArbShape(pmo.market);
+      const pmShape = buildPmArbShape(pmo.market, expiryDate);
       const displayName = stripBetTypePrefix(getKalshiName(bestKm));
       matched.push({
         artist: displayName,
@@ -1412,7 +1459,7 @@ export function matchOutcomes(
   for (const pi of unusedPm) {
     if (!usedPm.has(pi)) {
       const pmo = pmOutcomes[pi];
-      const pmShape = buildPmArbShape(pmo.market);
+      const pmShape = buildPmArbShape(pmo.market, expiryDate);
       matched.push({
         artist: stripBetTypePrefix(pmo.title) || 'Unknown',
         kalshi: null,
@@ -1477,7 +1524,7 @@ export function applyManualMatches(
     // Rebuild PM shape using fresh market data if available
     const pmMarket = pmByConditionId.get(mm.pmConditionId);
     const pmShapeRaw = pmMarket
-      ? buildPmArbShape(pmMarket)
+      ? buildPmArbShape(pmMarket, expiryDate)
       : pmRaw;
     const pmShape = normalizeManualPairPolymarketShape(pmShapeRaw, mm.orientation);
 
@@ -1493,6 +1540,7 @@ export function applyManualMatches(
       polymarket: pmShape,
       arbitrage: noArbResult,
       source: 'manual' as const,
+      resolutionRulesAligned: true,
       negRisk: pmShape.negRisk,
     };
     indicesToRemove.add(pIdx);

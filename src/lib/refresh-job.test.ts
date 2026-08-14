@@ -55,6 +55,11 @@ afterEach(() => {
 describe('refresh job timeout cancellation', () => {
   it('persists completed scheduled scans through the durable BotTrader consumer', async () => {
     mocks.getSavedMarkets.mockResolvedValue([markets[0]]);
+    const outcomeApy = {
+      apyPct: null,
+      scenarioA: { settlementAt: '2027-01-04T15:00:00.000Z' },
+      scenarioB: { settlementAt: '2026-11-03T00:00:00.000Z' },
+    };
     mocks.refreshSingleMarket.mockResolvedValue({
       bestRoiPct: 3,
       bestProfit: 3,
@@ -63,7 +68,7 @@ describe('refresh job timeout cancellation', () => {
       kalshiCount: 1,
       pmCount: 1,
       scannedAt: new Date().toISOString(),
-      allArbs: [{ artist: 'A', roiPct: 3 }],
+      allArbs: [{ artist: 'A', roiPct: 3, outcomeApy }],
       expiryDate: null,
     });
 
@@ -79,7 +84,7 @@ describe('refresh job timeout cancellation', () => {
     });
     expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
       'one',
-      expect.objectContaining({ positiveArbCount: 1 }),
+      expect.objectContaining({ positiveArbCount: 1, expiryAt: null, outcomeApy }),
       'scheduled',
     );
     expect(mocks.updateSavedMarketScanResult).toHaveBeenCalledWith(

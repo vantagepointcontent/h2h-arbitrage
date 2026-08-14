@@ -5,6 +5,7 @@ import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
 import { auditArbClassification } from './arb-types';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
+import type { OutcomeContingentApy } from './settlement-apy';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -363,6 +364,7 @@ export async function saveScanResult(
     polymarketUrl?: string;
     arbType?: 'cross' | 'direct' | 'internal';
     expiryAt?: string | null;
+    outcomeApy?: OutcomeContingentApy;
   },
 ): Promise<{ id: number }> {
   await ensureDb();
@@ -372,7 +374,13 @@ export async function saveScanResult(
   const financiallyValid = audit.valid && audit.canonicalType !== null;
   const canonicalRoi = financiallyValid ? (result.bestRoiPct ?? 0) : 0;
   const snapshot = financiallyValid
-    ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
+    ? result.outcomeApy
+      ? {
+          daysToExpiry: result.outcomeApy.apyPct != null ? result.outcomeApy.scenarioA.daysToSettlement : null,
+          apyPct: result.outcomeApy.apyPct,
+          unavailableReason: result.outcomeApy.unavailableReason,
+        }
+      : calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
     : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
   const row = await c.execute({
     sql: `INSERT INTO scan_results
@@ -740,7 +748,8 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
 /**
  * UI-035: chunked, streaming-friendly scan history export.
  *
- * Yields batches of 500 slim rows (no raw_result blob) so a route can stream
+ * Yields bounded batches. raw_result is included so settlement/APY provenance
+ * can be exported without inventing a second persistence representation.
  * 50k+ rows to the client without holding them all in memory. Filters run in
  * SQLite, indexed on scanned_at DESC.
  */
@@ -772,7 +781,7 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                   arb_type, arb_valid, arb_invalidation_reason
+                   arb_type, arb_valid, arb_invalidation_reason, raw_result
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],
@@ -1128,7 +1137,8 @@ export interface LastScanResult {
     pmNoDepth?: number | null;
     kalshiStake?: number;
     pmStake?: number;
-    apyPct?: number;
+    apyPct?: number | null;
+    outcomeApy?: OutcomeContingentApy;
     buyPlatform?: string | null;
     buyPrice?: number;
     sellPlatform?: string | null;

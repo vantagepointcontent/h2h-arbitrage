@@ -25,6 +25,7 @@ import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
+import { calculateOutcomeContingentApy } from '@/lib/settlement-apy';
 import { reserveWatcherMatchPublication, type WatcherMatchPublication } from '@/lib/watcher-match-publication';
 
 import logger from '@/lib/logger';
@@ -367,6 +368,16 @@ async function writeLiveResult(
     : null;
 
   const matchedCount = canonical.matchedPairs.length;
+  const observedAt = new Date().toISOString();
+  const outcomeApyFor = (result: LiveArbResult) => calculateOutcomeContingentApy({
+    roiPct: result.roiPct,
+    observedAt,
+    arbType: result.arbType,
+    strategy: result.strategy,
+    kalshi: null,
+    polymarket: null,
+  });
+  const bestOutcomeApy = best ? outcomeApyFor(best) : undefined;
 
   const liveResult: LastScanResult = {
     bestRoiPct: best ? best.roiPct : 0,
@@ -379,7 +390,7 @@ async function writeLiveResult(
     matchDependencies: canonical.matchDependencies,
     kalshiCount: results.filter((r) => r.kalshiYesAsk != null).length,
     pmCount: results.filter((r) => r.pmYesAsk != null).length,
-    scannedAt: new Date().toISOString(),
+    scannedAt: observedAt,
     publicationGeneration: canonical.publicationGeneration,
     priceResolved: computePriceResolved(results.map((r) => ({
       kalshi: r.kalshiYesAsk != null && r.kalshiNoAsk != null
@@ -394,6 +405,8 @@ async function writeLiveResult(
       roiPct: r.roiPct,
       expectedProfit: r.expectedProfit,
       strategy: r.strategy,
+      apyPct: null,
+      outcomeApy: outcomeApyFor(r),
       fees: r.fees ? {
         kalshiFee: r.fees.kalshiFee,
         pmFee: r.fees.pmFee,
@@ -421,7 +434,8 @@ async function writeLiveResult(
         positiveArbCount: clean.length,
         totalStake: clean.reduce((sum, r) => sum + r.kalshiStake + r.pmStake, 0),
         scannedAt: liveResult.scannedAt!,
-        expiryAt: pair?.expiryDate ?? null,
+        expiryAt: null,
+        outcomeApy: bestOutcomeApy,
         marketTitle: pair?.title ?? pairId,
         arbType: best?.arbType ?? undefined,
         raw: {
@@ -431,6 +445,8 @@ async function writeLiveResult(
             strategy: r.strategy,
             roiPct: r.roiPct,
             expectedProfit: r.expectedProfit,
+            apyPct: null,
+            outcomeApy: outcomeApyFor(r),
             kalshiStake: r.kalshiStake,
             pmStake: r.pmStake,
             kalshiTicker: r.kalshiTicker,

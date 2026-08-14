@@ -11,7 +11,7 @@ interface StakeSuggestion {
   totalStake: number;
   expectedProfit: number;
   roiPct: number;
-  apyPct?: number;
+  apyPct?: number | null;
 }
 
 interface StakeCalculatorProps {

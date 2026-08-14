@@ -25,6 +25,12 @@ export interface KalshiMarket {
   no_ask_size_fp?: string;
   yes_sub_title?: string;
   no_sub_title?: string;
+  /** Venue timing fields used for outcome-contingent annualization. */
+  expected_expiration_time?: string;
+  expiration_time?: string;
+  latest_expiration_time?: string;
+  can_close_early?: boolean;
+  early_close_condition?: string;
 }
 
 export function extractKalshiEventTicker(url: string): string | null {

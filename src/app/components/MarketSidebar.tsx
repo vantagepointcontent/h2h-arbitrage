@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
-import { computeApy } from "@/lib/matcher";
-import { SavedMarket, formatPercent, isMarketExpired } from "@/app/lib/page-shared";
+
+import { SavedMarket, formatPercent, getMarketApySummary, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
-import { ApyHeaderInfo, ApyValueTooltip, buildMarketTooltip, getDaysToExpiry } from "./ApyTooltip";
+import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 
 /** Format a "time ago" string from an ISO timestamp for the sidebar hover tooltip. */
 function formatTimeAgo(scannedAt: string | null | undefined): string {
@@ -159,7 +159,9 @@ function MarketSidebarInner({
   }, []);
 
   // Filter + sort (memoized — PERF-P0: avoid re-running over 400+ markets on every parent render)
-  const filtered = useMemo(() => markets.filter(m => {
+  const marketApy = (market: SavedMarket) => getMarketApySummary(market).sortApyPct ?? 0;
+
+  const filtered = useMemo(() => markets.filter((m) => {
     // BUG-05b2: use smart expiry — in-play markets (trading prices) are NOT expired
     const isExpired = isMarketExpired(m);
     if (!showExpired && isExpired) return false;
@@ -193,8 +195,8 @@ function MarketSidebarInner({
       return mul * (ra - rb);
     }
     if (sort === "apy") {
-      const aa = computeApy(a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0, a.expiryDate);
-      const ab = computeApy(b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0, b.expiryDate);
+      const aa = marketApy(a);
+      const ab = marketApy(b);
       return mul * (aa - ab);
     }
     if (sort === "scanned") {
@@ -374,7 +376,8 @@ function MarketSidebarInner({
               <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
                 {filtered.map((m) => {
                   const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
-                  const apy = computeApy(roi, m.expiryDate);
+                  const apySummary = getMarketApySummary(m);
+                  const apy = apySummary.sortApyPct ?? 0;
                   const isActive = activeId === m.id;
                   return (
                     <div
@@ -438,13 +441,15 @@ function MarketSidebarInner({
                             {roi > 0 ? "+" : ""}{formatPercent(roi)}
                           </span>
                         )}
-                        {apy > 0 && (
-                          <span className="text-[10px] text-[var(--text-secondary)] ml-1">
-                            (<ApyValueTooltip apy={apy} roi={roi} daysToExpiry={getDaysToExpiry(m.expiryDate)}>
-                              {formatPercent(apy)}
-                            </ApyValueTooltip>)
+                        {apySummary.scenarioApyPct ? (
+                          <span className="text-[9px] text-[var(--text-secondary)] ml-1" title="Kalshi-win / Polymarket-win APY">
+                            (K {formatPercent(apySummary.scenarioApyPct.kalshi)} / PM {formatPercent(apySummary.scenarioApyPct.polymarket)})
                           </span>
-                        )}
+                        ) : apy > 0 ? (
+                          <span className="text-[10px] text-[var(--text-secondary)] ml-1">({formatPercent(apy)})</span>
+                        ) : apySummary.unavailableReason ? (
+                          <span className="text-[9px] text-[var(--text-secondary)] ml-1" title={`APY unavailable: ${apySummary.unavailableReason.replaceAll('_', ' ')}`}>(APY unavailable)</span>
+                        ) : null}
                       </div>
                     </div>
                   );

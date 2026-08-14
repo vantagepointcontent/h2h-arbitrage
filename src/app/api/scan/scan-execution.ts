@@ -11,7 +11,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, computeApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
+import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
@@ -346,13 +346,11 @@ export async function executeFullScan(request: NextRequest) {
     const suspRoi = await getSetting<number>('scanner.suspiciousRoiPct').catch(() => null);
     if (suspRoi != null) setSuspiciousRoiPct(suspRoi);
 
-    const withArbitrage = calculateAllArbitrages(splitOutcomes, pmEvent.title, capital).map(o => ({
-      ...o,
-      arbitrage: {
-        ...o.arbitrage,
-        apyPct: computeApy(o.arbitrage.roiPct, pmEvent.endDate),
-      },
-    }));
+    const scanObservedAt = new Date().toISOString();
+    const withArbitrage = attachOutcomeContingentApy(
+      calculateAllArbitrages(splitOutcomes, pmEvent.title, capital),
+      scanObservedAt,
+    );
 
     // BUG-05b2: Smart expiry — compute priceResolved once, reuse for DB save + response.
     // In-play markets (trading at 68/32 etc) are NOT expired even if closeTime passed.
@@ -430,7 +428,6 @@ export async function executeFullScan(request: NextRequest) {
         const bestArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
-        const scanObservedAt = new Date().toISOString();
         const scanResult = {
           bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
           bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
@@ -477,6 +474,7 @@ export async function executeFullScan(request: NextRequest) {
             kalshiStake: o.arbitrage!.kalshiStake,
             pmStake: o.arbitrage!.pmStake,
             apyPct: o.arbitrage!.apyPct,
+            outcomeApy: o.arbitrage!.outcomeApy,
             buyPlatform: o.arbitrage!.buyPlatform,
             buyPrice: o.arbitrage!.buyPrice,
             sellPlatform: o.arbitrage!.sellPlatform,
@@ -512,13 +510,16 @@ export async function executeFullScan(request: NextRequest) {
           positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
-          expiryAt: pmEvent.endDate,
+          expiryAt: bestNetArb?.arbitrage?.outcomeApy?.apyPct != null
+            ? bestNetArb.arbitrage.outcomeApy.scenarioA.settlementAt
+            : null,
+          outcomeApy: bestNetArb?.arbitrage?.outcomeApy,
           // ARB-01a: persist the best arb's type classification
           arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
           // PERF-P2: raw blob only stored when there are arbs to drill into —
           // zero-arb scans (vast majority) get NULL, keeping the DB lean.
           raw: (scanResult.allArbs?.length ?? 0) > 0
-            ? { allArbs: scanResult.allArbs, scanCapital: capital, expiryDate: pmEvent.endDate, category: scanCategory }
+            ? { allArbs: scanResult.allArbs, scanCapital: capital, outcomeApy: bestNetArb?.arbitrage?.outcomeApy, category: scanCategory }
             : undefined,
           marketTitle: pmEvent.title || market.eventTitle,
           kalshiUrl,
