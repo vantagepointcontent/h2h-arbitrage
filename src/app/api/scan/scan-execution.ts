@@ -56,6 +56,15 @@ async function acquireSqliteWriterLock(): Promise<SavedMarketScanLock> {
   });
 }
 
+async function withSqliteWriterLock<T>(operation: () => Promise<T>): Promise<T> {
+  const lock = await acquireSqliteWriterLock();
+  try {
+    return await operation();
+  } finally {
+    await releaseSavedMarketScanLock(lock);
+  }
+}
+
 export async function executeFullScan(request: NextRequest) {
   let savedMarketId: string | null = null;
   let publicationGeneration: number | null = null;
@@ -121,17 +130,17 @@ export async function executeFullScan(request: NextRequest) {
       }
       scanLock = acquisition.lock;
     }
-    publicationGeneration = savedMarket
-      ? await reserveSavedMarketPublication(savedMarket.id, 'scan')
-      : null;
-    if (savedMarketId && publicationGeneration != null) {
-      await reconcileSavedMarketMatchSummary(savedMarketId, {
-        matchedCount: 0,
-        matchStatus: 'refreshing',
-        matchError: undefined,
-        matchedPairs: undefined,
-        scannedAt: new Date().toISOString(),
-        publicationGeneration,
+    if (savedMarket) {
+      await withSqliteWriterLock(async () => {
+        publicationGeneration = await reserveSavedMarketPublication(savedMarket.id, 'scan');
+        await reconcileSavedMarketMatchSummary(savedMarket.id, {
+          matchedCount: 0,
+          matchStatus: 'refreshing',
+          matchError: undefined,
+          matchedPairs: undefined,
+          scannedAt: new Date().toISOString(),
+          publicationGeneration,
+        });
       });
     }
 
@@ -527,8 +536,7 @@ export async function executeFullScan(request: NextRequest) {
         // phase is serialized across disposable worker processes. SQLite WAL
         // permits concurrent readers but only one writer; relying on retries
         // alone caused otherwise successful scans to exhaust under burst load.
-        const sqliteWriterLock = await acquireSqliteWriterLock();
-        try {
+        await withSqliteWriterLock(async () => {
         const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
         if (!published) throw new Error('Saved-market publication was superseded before persistence');
         await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
@@ -612,22 +620,20 @@ export async function executeFullScan(request: NextRequest) {
           });
         }
         fullScanPersisted = true;
-        } finally {
-          await releaseSavedMarketScanLock(sqliteWriterLock);
-        }
+        });
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
       if (savedMarketId && publicationGeneration != null) {
         const matchError = clientSafeError(e, 'Scan result persistence failed', { path: '/api/scan' });
-        await reconcileSavedMarketMatchSummary(savedMarketId, {
+        await withSqliteWriterLock(() => reconcileSavedMarketMatchSummary(savedMarketId!, {
           matchedCount: 0,
           matchStatus: 'unavailable',
           matchError,
           matchedPairs: undefined,
           scannedAt: new Date().toISOString(),
-          publicationGeneration,
-        }).catch(() => {});
+          publicationGeneration: publicationGeneration ?? undefined,
+        })).catch(() => {});
       }
     }
 

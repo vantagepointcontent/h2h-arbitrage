@@ -135,6 +135,10 @@ describe('POST /api/scan saved-market lifecycle', () => {
         lock: { path: '/tmp/test-lock', ownerPid: 1, ownerToken: 'first' },
       })
       .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { path: '/tmp/sqlite-lock', ownerPid: 1, ownerToken: 'sqlite-first' },
+      })
+      .mockResolvedValueOnce({
         status: 'busy',
         reason: 'owner_live',
         retryable: true,
@@ -166,6 +170,30 @@ describe('POST /api/scan saved-market lifecycle', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ fullScanPersisted: true });
     expect(mocks.appendScanHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it('waits for the cross-process SQLite writer instead of failing the scan burst', async () => {
+    mocks.acquireSavedMarketScanLock
+      .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { path: '/tmp/market-lock', ownerPid: 1, ownerToken: 'market' },
+      })
+      .mockResolvedValueOnce({
+        status: 'busy',
+        reason: 'owner_live',
+        retryable: true,
+        retryAfterMs: 5_000,
+      })
+      .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { path: '/tmp/sqlite-lock', ownerPid: 1, ownerToken: 'sqlite' },
+      });
+
+    const response = await executeFullScan(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
+    expect(mocks.acquireSavedMarketScanLock.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
   it('publishes unavailable with the reserved generation after terminal upstream failure', async () => {
