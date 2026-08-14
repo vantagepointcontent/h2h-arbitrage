@@ -196,6 +196,15 @@ describe('POST /api/scan saved-market lifecycle', () => {
     expect(mocks.acquireSavedMarketScanLock.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
+  it('keeps a durable full scan successful when secondary bot persistence fails', async () => {
+    mocks.persistAndConsumeBotScan.mockRejectedValueOnce(new Error('bot persistence unavailable'));
+
+    const response = await executeFullScan(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
+  });
+
   it('publishes unavailable with the reserved generation after terminal upstream failure', async () => {
     mocks.upstream.mockRejectedValue(new Error('Kalshi upstream timed out'));
 

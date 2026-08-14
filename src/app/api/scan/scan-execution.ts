@@ -552,7 +552,15 @@ export async function executeFullScan(request: NextRequest) {
             positiveArbCount: positiveArbs.length,
             matchedCount,
           }));
-        await withSqliteBusyRetry(() => persistAndConsumeBotScan(market.id, {
+        });
+        fullScanPersisted = true;
+
+        // Bot consumption is secondary to publishing the saved-market result.
+        // Do not hold the global SQLite writer gate while strategy evaluation
+        // runs, and do not turn a durable full scan into an HTTP 500 if the bot
+        // consumer encounters independent contention.
+        try {
+          await withSqliteBusyRetry(() => persistAndConsumeBotScan(market.id, {
           bestRoiPct: scanResult.bestRoiPct,
           bestProfit: scanResult.bestProfit,
           strategy: scanResult.strategy,
@@ -577,7 +585,10 @@ export async function executeFullScan(request: NextRequest) {
           marketTitle: pmEvent.title || market.eventTitle,
           kalshiUrl,
           polymarketUrl,
-        }, 'scan_api'));
+          }, 'scan_api'));
+        } catch (botErr) {
+          console.warn('[bot-scan-consumer] persistence failed (scan unaffected):', botErr instanceof Error ? botErr.message : botErr);
+        }
 
         // ── Arb lifecycle tracking: open/extend/close episodes ──
         // Non-fatal: lifecycle data must never break a scan.
@@ -619,8 +630,6 @@ export async function executeFullScan(request: NextRequest) {
             logger.trackError(err, { service: 'telegram-alerts', context: 'scan batch' });
           });
         }
-        fullScanPersisted = true;
-        });
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
