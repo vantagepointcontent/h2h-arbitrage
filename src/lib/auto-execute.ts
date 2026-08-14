@@ -791,6 +791,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   let ledgerKalshiEntry: ExecutionLedgerLeg = { ...kalshiResult, venue: 'kalshi' };
   let ledgerPolymarketEntry: ExecutionLedgerLeg = { ...polymarketResult, venue: 'polymarket' };
   const closes: ExecutionLedgerClose[] = [];
+  let rollbackExecuted = false;
+  let unhedged = false;
   const captureEntry = (current: OrderResult, prior: ExecutionLedgerLeg): ExecutionLedgerLeg =>
     (current.filledContracts ?? 0) >= (prior.filledContracts ?? 0)
       ? { ...current, venue: current.platform }
@@ -805,13 +807,36 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     kalshi: { terminality: initialTerminality(kalshiResult), source: 'latest-order-response' },
     polymarket: { terminality: initialTerminality(polymarketResult), source: 'latest-order-response' },
   };
-  const captureLatestTerminality = (result: OrderResult) => {
+  const regressedEntryPlatforms = new Set<OrderResult['platform']>();
+  const captureLatestTerminality = (result: OrderResult, prior: ExecutionLedgerLeg) => {
+    const currentFilled = result.filledContracts;
+    const priorFilled = prior.filledContracts;
+    if (currentFilled != null && priorFilled != null
+      && Number.isFinite(currentFilled) && Number.isFinite(priorFilled)
+      && currentFilled + 1e-9 < priorFilled) {
+      if (!regressedEntryPlatforms.has(result.platform)) {
+        alerts.push({
+          level: 'error',
+          message: `${result.platform} entry poll regressed cumulative fill from ${priorFilled} to ${currentFilled} contracts — authoritative exposure is indeterminate`,
+          leg: result.platform,
+          action: 'manual reconciliation required',
+        });
+      }
+      regressedEntryPlatforms.add(result.platform);
+      entryTerminalities[result.platform] = { terminality: 'indeterminate', source: 'latest-order-response' };
+      unhedged = true;
+      return;
+    }
     entryTerminalities[result.platform] = {
       terminality: initialTerminality(result),
       source: 'latest-order-response',
     };
   };
   const cancelEntry = async (result: OrderResult, order: OrderRequest) => {
+    if (regressedEntryPlatforms.has(result.platform)) {
+      entryTerminalities[result.platform] = { terminality: 'indeterminate', source: 'latest-order-response' };
+      return { result, verified: false, terminality: 'indeterminate' as const };
+    }
     if (effectiveDryRun) {
       const cancellation = isSettled(result.status)
         ? { result, verified: true, terminality: 'terminal' as const }
@@ -827,8 +852,6 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     entryTerminalities[result.platform] = { terminality: cancellation.terminality, source: 'post-cancel-poll' };
     return cancellation;
   };
-  let rollbackExecuted = false;
-  let unhedged = false;
 
   // ── Phase 2: Poll loop with tick check ──
   const timeoutMs = req.timeoutMs || limits.orderTimeoutMs || DEFAULT_TIMEOUT_MS;
@@ -850,10 +873,10 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
       pollOrder(kalshiResult, req.kalshiOrder, effectiveDryRun),
       pollOrder(polymarketResult, req.polymarketOrder, effectiveDryRun),
     ]);
+    captureLatestTerminality(kalshiResult, ledgerKalshiEntry);
+    captureLatestTerminality(polymarketResult, ledgerPolymarketEntry);
     ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
     ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
-    captureLatestTerminality(kalshiResult);
-    captureLatestTerminality(polymarketResult);
 
     // ── Tick check: when one leg fills, verify the other leg's price ──
     if (!tickCheckDone) {
@@ -1010,7 +1033,10 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   } else if (kFilled && pFilled) {
     // Any resting remainder can change the hedge after this snapshot. Cancel and
     // re-poll both entries before comparing final authoritative quantities.
-    let entriesVerified = isTerminallyVerifiedOrder(kalshiResult) && isTerminallyVerifiedOrder(polymarketResult);
+    let entriesVerified = isTerminallyVerifiedOrder(kalshiResult)
+      && isTerminallyVerifiedOrder(polymarketResult)
+      && entryTerminalities.kalshi.terminality === 'terminal'
+      && entryTerminalities.polymarket.terminality === 'terminal';
     if (!entriesVerified) {
       const [kalshiCancellation, pmCancellation] = await Promise.all([
         cancelEntry(kalshiResult, req.kalshiOrder),

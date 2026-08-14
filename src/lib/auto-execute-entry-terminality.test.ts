@@ -190,4 +190,25 @@ describe('BUG-153 live entry terminality', () => {
     expect(result.cashLedger?.status).toBe('reconciled');
     expect(result.success).toBe(false);
   });
+
+  it('fails closed when an ordinary terminal poll regresses cumulative fills', async () => {
+    mocks.placeKalshiOrder.mockResolvedValue(kalshiOrder('resting', 2, 1, '1'));
+    mocks.placePmOrder.mockResolvedValue(pmOrder('live', 2, 1, '1'));
+    mocks.getKalshiOrder.mockResolvedValue(kalshiOrder('executed', 1, 1, '2'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('matched', 1, 1, '2'));
+    const req = request();
+    req.timeoutMs = 5_000;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.unhedged).toBe(true);
+    expect(result.cashLedger?.status).toBe('reconciliation-required');
+    expect(result.cashLedger?.issues).toContain('entry-order-not-terminal:kalshi:indeterminate');
+    expect(result.cashLedger?.issues).toContain('entry-order-not-terminal:polymarket:indeterminate');
+    expect(result.alerts).toContainEqual(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('regressed cumulative fill'),
+    }));
+  }, 10_000);
 });
