@@ -1091,7 +1091,7 @@ export class BotPositionStore {
   }
 
   private async createSchema(): Promise<void> {
-    await this.client.execute('PRAGMA busy_timeout = 5000');
+    await this.client.execute('PRAGMA busy_timeout = 30000');
     await this.client.execute('PRAGMA foreign_keys = ON');
     await this.client.execute(`
       CREATE TABLE IF NOT EXISTS bot_positions (

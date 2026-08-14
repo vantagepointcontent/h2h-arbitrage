@@ -34,6 +34,7 @@ import {
 } from './persistence';
 import {
   fetchAuthoritativeBotFeeConfig,
+  calculateBotPositionEntryCost,
   recordBotPosition,
   type AuthoritativeBotFeeConfig,
   type BotPositionExecutionMode,
@@ -50,6 +51,7 @@ import {
   type LiveExecutionEvidence,
 } from './execution-evidence';
 import type { ExecutableBookQuote } from './executable-book';
+import type { BotEntryEvidenceLegV1, BotEntryEvidenceV1 } from './bot-entry-recovery';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -194,6 +196,106 @@ export function liveEvidenceToBotPositionFill(evidence: LiveExecutionEvidence) {
     kalshiChargedFeeCents: evidence.kalshi.chargedFeeCents,
     pmChargedFeeCents: evidence.polymarket.chargedFeeCents,
   };
+}
+
+function roundedRatio(numerator: bigint, denominator: bigint): number {
+  const value = Number((numerator + denominator / 2n) / denominator);
+  if (!Number.isSafeInteger(value)) throw new Error('Entry evidence gross exceeds safe integer range');
+  return value;
+}
+
+export function buildBotEntryEvidence(
+  arbId: string,
+  dryRun: boolean,
+  request: ExecutionRequest,
+  result: Awaited<ReturnType<typeof executeArb>>,
+  evidence: ExecutionEvidence,
+  feeAuthority: AuthoritativeBotFeeConfig,
+): BotEntryEvidenceV1 | null {
+  const capturedAt = new Date().toISOString();
+  const paperLeg = (
+    venue: 'kalshi' | 'polymarket', order: OrderRequest, orderId: string | undefined, feeCents: number,
+  ): BotEntryEvidenceLegV1 | null => {
+    const quote = order.executableQuote;
+    if (!orderId?.trim() || quote?.status !== 'executable' || !Array.isArray(quote.fills) || quote.fills.length === 0
+      || !Number.isSafeInteger(quote.filledQuantityMicros) || quote.filledQuantityMicros <= 0
+      || !Number.isSafeInteger(quote.totalCostMicroCents) || quote.totalCostMicroCents <= 0) return null;
+    const fills = quote.fills.map((fill, index) => ({
+      fillId: `${orderId}:quote:${index}`,
+      fillAuthority: 'execution_quote' as const,
+      priceMicrocents: fill.priceMicroCents ?? Math.round((fill.priceCents ?? Number.NaN) * 1_000_000),
+      sizeMicrounits: fill.quantityMicros,
+      observedAt: quote.depthTimestamp!,
+    }));
+    return {
+      venue,
+      marketId: venue === 'kalshi' ? order.ticker ?? order.marketId : order.conditionId ?? order.marketId,
+      orderId,
+      quantityMicrounits: quote.filledQuantityMicros,
+      fills,
+      grossMicrocents: quote.totalCostMicroCents,
+      fee: venue === 'kalshi' ? {
+        amountCents: feeCents, authority: 'execution_estimate', source: feeAuthority.kalshi.source,
+        version: feeAuthority.kalshi.version, observedAt: feeAuthority.kalshi.observedAt, platformRounding: 'ceil_cent',
+      } : {
+        amountCents: feeCents, authority: 'execution_estimate', source: feeAuthority.polymarket.source,
+        version: feeAuthority.polymarket.version, observedAt: feeAuthority.polymarket.observedAt, platformRounding: 'nearest_cent',
+      },
+    };
+  };
+  const liveLeg = (
+    venueEvidence: LiveExecutionEvidence['kalshi'], order: OrderRequest, orderId: string | undefined,
+  ): BotEntryEvidenceLegV1 | null => {
+    if (!orderId?.trim() || !Array.isArray(venueEvidence.fills) || venueEvidence.fills.length === 0) return null;
+    const rawFills = venueEvidence.fills;
+    const fills = rawFills.map((fill) => ({
+      fillId: fill.executionId,
+      fillAuthority: 'venue_fill' as const,
+      priceMicrocents: Math.round(fill.price * 100_000_000),
+      sizeMicrounits: Math.round(fill.quantity * 1_000_000),
+      observedAt: fill.venueTimestamp,
+      chargedFeeCents: fill.chargedFeeCents,
+    }));
+    const grossNumerator = fills.reduce((sum, fill) =>
+      sum + BigInt(fill.priceMicrocents) * BigInt(fill.sizeMicrounits), 0n);
+    return {
+      venue: venueEvidence.venue,
+      marketId: venueEvidence.venue === 'kalshi' ? order.ticker ?? order.marketId : order.conditionId ?? order.marketId,
+      orderId,
+      quantityMicrounits: Math.round(venueEvidence.filledQuantity * 1_000_000),
+      fills,
+      grossMicrocents: roundedRatio(grossNumerator, 1_000_000n),
+      fee: {
+        amountCents: venueEvidence.chargedFeeCents, authority: 'charged',
+        source: `${venueEvidence.venue}-execution:${venueEvidence.executionId}`, version: 'venue-execution-evidence:v1',
+        observedAt: venueEvidence.venueTimestamp, platformRounding: 'venue_reported',
+      },
+    };
+  };
+
+  let kalshi: BotEntryEvidenceLegV1 | null;
+  let polymarket: BotEntryEvidenceLegV1 | null;
+  if (evidence.kind === 'live') {
+    kalshi = liveLeg(evidence.kalshi, request.kalshiOrder, result.kalshiResult.orderId);
+    polymarket = liveLeg(evidence.polymarket, request.polymarketOrder, result.polymarketResult.orderId);
+  } else {
+    const kalshiFills = request.kalshiOrder.executableQuote?.fills.map((fill) => ({
+      priceCents: (fill.priceMicroCents ?? 0) / 1_000_000, size: fill.quantityMicros / 1_000_000,
+    }));
+    const pmFills = request.polymarketOrder.executableQuote?.fills.map((fill) => ({
+      priceCents: (fill.priceMicroCents ?? 0) / 1_000_000, size: fill.quantityMicros / 1_000_000,
+    }));
+    if (!kalshiFills?.length || !pmFills?.length) return null;
+    const entryCost = calculateBotPositionEntryCost({
+      kalshiFills, pmFills, pmTheta: feeAuthority.pmTheta,
+      kalshiFeeMultiplierPpm: feeAuthority.kalshi.feeMultiplierPpm,
+      pmFeeRateBps: feeAuthority.polymarket.feeRateBps,
+    });
+    kalshi = paperLeg('kalshi', request.kalshiOrder, result.kalshiResult.orderId, entryCost.kalshiEntryFeeCents);
+    polymarket = paperLeg('polymarket', request.polymarketOrder, result.polymarketResult.orderId, entryCost.pmEntryFeeCents);
+  }
+  if (!kalshi || !polymarket) return null;
+  return { schemaVersion: 1, capturedAt, economicActionId: arbId, mode: dryRun ? 'paper' : 'live', legs: { kalshi, polymarket } };
 }
 
 // ─── Defaults ────────────────────────────────────────────────────
@@ -794,7 +896,11 @@ export async function maybeExecuteBotTrade(
   };
 
   const performanceEvidence = getBotPerformanceEvidence(result, effectiveDryRun);
-  const shouldPersistPerformance = performanceEvidence != null;
+  const durableEntryEvidence = performanceEvidence == null
+    ? null
+    : buildBotEntryEvidence(arbId, effectiveDryRun, execReq, result, performanceEvidence, feeAuthority);
+  const shouldPersistPerformance = performanceEvidence != null && durableEntryEvidence != null;
+  executionRecord.botEntryEvidence = durableEntryEvidence;
   if (performanceEvidence?.kind === 'live') {
     executionRecord.timestamp = [
       performanceEvidence.kalshi.venueTimestamp,
@@ -807,7 +913,10 @@ export async function maybeExecuteBotTrade(
   let positionPersisted = false;
   let persistenceError: string | undefined;
   try {
-    executionId = (await persistBotPerformanceExecution(executionRecord, performanceEvidence)) ?? undefined;
+    executionId = (await persistBotPerformanceExecution(
+      executionRecord,
+      shouldPersistPerformance ? performanceEvidence : null,
+    )) ?? undefined;
   } catch (e) {
     persistenceError = `Execution persistence failed: ${String(e)}`;
     logger.warn('[bot-trader] persistExecution failed', { arbId, error: String(e) });

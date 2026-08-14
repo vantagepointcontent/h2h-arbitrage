@@ -6,6 +6,7 @@ import { calculateScanApy } from './scan-apy';
 import { auditArbClassification } from './arb-types';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
 import type { OutcomeContingentApy } from './settlement-apy';
+import { botEntryEvidenceErrors } from './bot-entry-recovery';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1901,6 +1902,7 @@ async function ensureExecutionsTable(): Promise<void> {
       result           TEXT,
       estimated_profit REAL    NOT NULL DEFAULT 0,
       steps            TEXT,
+      bot_entry_evidence TEXT,
       selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL)
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
@@ -1912,6 +1914,8 @@ async function ensureExecutionsTable(): Promise<void> {
   // DATA-003: immutable attribution captured when BotTrader selects a trade.
   // Existing rows remain NULL: historical intent must never be guessed.
   try { await c.execute(`ALTER TABLE executions ADD COLUMN selection_method TEXT`); } catch { /* column already exists */ }
+  // BUG-157: immutable two-leg fill and fee authority captured by BotTrader.
+  try { await c.execute(`ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`); } catch { /* column already exists */ }
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
   _executionsReady = true;
 }
@@ -1931,14 +1935,27 @@ export interface ExecutionRecord {
   steps?: unknown;
   source?: 'manual' | 'bot';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
+  botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<number> {
+  if (e.source === 'bot' && e.success) {
+    const evidenceErrors = botEntryEvidenceErrors(e.botEntryEvidence, {
+      arbId: e.arbId,
+      dryRun: e.dryRun,
+      kalshiOrder: e.kalshiOrder,
+      polymarketOrder: e.polymarketOrder,
+      result: e.result,
+    });
+    if (evidenceErrors.length > 0) {
+      throw new Error(`Successful bot execution lacks durable entry evidence: ${evidenceErrors.join('; ')}`);
+    }
+  }
   await ensureExecutionsTable();
   const c = getClient();
   const res = await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
@@ -1950,6 +1967,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.steps != null ? JSON.stringify(e.steps) : null,
       e.source ?? 'manual',
       e.source === 'bot' ? (e.selectionMethod ?? null) : null,
+      e.botEntryEvidence != null ? JSON.stringify(e.botEntryEvidence) : null,
     ],
   });
   return Number((res.rows as any[])[0]?.id ?? 0);
@@ -1993,6 +2011,7 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
     source: (r.source ?? 'manual') as 'manual' | 'bot',
     selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
+    botEntryEvidence: r.bot_entry_evidence ? JSON.parse(String(r.bot_entry_evidence)) : null,
   };
 }
 
