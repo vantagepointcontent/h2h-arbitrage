@@ -805,6 +805,12 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     kalshi: { terminality: initialTerminality(kalshiResult), source: 'latest-order-response' },
     polymarket: { terminality: initialTerminality(polymarketResult), source: 'latest-order-response' },
   };
+  const captureLatestTerminality = (result: OrderResult) => {
+    entryTerminalities[result.platform] = {
+      terminality: initialTerminality(result),
+      source: 'latest-order-response',
+    };
+  };
   const cancelEntry = async (result: OrderResult, order: OrderRequest) => {
     if (effectiveDryRun) {
       const cancellation = isSettled(result.status)
@@ -846,6 +852,8 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
     ]);
     ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
     ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+    captureLatestTerminality(kalshiResult);
+    captureLatestTerminality(polymarketResult);
 
     // ── Tick check: when one leg fills, verify the other leg's price ──
     if (!tickCheckDone) {

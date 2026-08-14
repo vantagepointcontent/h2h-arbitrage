@@ -92,6 +92,39 @@ describe('BUG-153 live entry terminality', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it('records terminal provenance when initially live entries fully fill on the ordinary poll path', async () => {
+    mocks.placeKalshiOrder.mockResolvedValue({
+      orderId: 'k-entry', status: 'resting', filledCount: 0, remainingCount: 5, raw: {},
+    });
+    mocks.placePmOrder.mockResolvedValue({
+      orderId: 'p-entry', status: 'live', success: true, raw: { size_matched: '0' },
+    });
+    mocks.getKalshiOrder.mockResolvedValue(kalshiOrder('executed', 5, 2, '2'));
+    mocks.getPmOrder.mockResolvedValue(pmOrder('matched', 5, 2, '2'));
+    const req = request();
+    req.timeoutMs = 5_000;
+
+    const result = await executeArb(req);
+
+    expect(result.kalshiResult.status).toBe('filled');
+    expect(result.polymarketResult.status).toBe('filled');
+    expect(result.cashLedger).toMatchObject({
+      status: 'reconciled',
+      matchedContracts: 5,
+      entryPrincipalCents: 475,
+      expectedSettlementCents: 500,
+      totalEntryFeesCents: 4,
+      netPnlCents: 21,
+      entryOrders: [
+        { venue: 'kalshi', terminality: 'terminal', source: 'latest-order-response' },
+        { venue: 'polymarket', terminality: 'terminal', source: 'latest-order-response' },
+      ],
+    });
+    expect(result.success).toBe(true);
+    expect(mocks.cancelKalshiOrder).not.toHaveBeenCalled();
+    expect(mocks.cancelPmOrder).not.toHaveBeenCalled();
+  }, 10_000);
+
   it('cancels and re-polls matched live partials, recaptures equal late fills, and reconciles only terminal evidence', async () => {
     mocks.getKalshiOrder.mockResolvedValue(kalshiOrder('canceled', 3, 2, '2'));
     mocks.getPmOrder.mockResolvedValue(pmOrder('canceled', 3, 2, '2'));
