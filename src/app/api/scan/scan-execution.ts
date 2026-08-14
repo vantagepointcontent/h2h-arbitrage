@@ -39,6 +39,22 @@ import {
 const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s total scan times
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
+const SQLITE_WRITER_LOCK_ID = '__saved_market_sqlite_writer__';
+const SQLITE_WRITER_WAIT_MS = 10_000;
+
+async function acquireSqliteWriterLock(): Promise<SavedMarketScanLock> {
+  const deadline = Date.now() + SQLITE_WRITER_WAIT_MS;
+  let detail = 'SQLite writer is busy';
+  while (Date.now() < deadline) {
+    const result = await acquireSavedMarketScanLock(SQLITE_WRITER_LOCK_ID);
+    if (result.status === 'acquired') return result.lock;
+    detail = result.detail ?? result.reason;
+    await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 50)));
+  }
+  throw Object.assign(new Error(`Timed out waiting for serialized scan persistence: ${detail}`), {
+    code: 'SQLITE_BUSY',
+  });
+}
 
 export async function executeFullScan(request: NextRequest) {
   let savedMarketId: string | null = null;
@@ -507,8 +523,12 @@ export async function executeFullScan(request: NextRequest) {
           };
           }),
         };
-        // Keep the scan's writes ordered. Concurrent transactions here used to
-        // contend with each other before watcher/poller traffic was considered.
+        // Network/enrichment work remains parallel, while the short publication
+        // phase is serialized across disposable worker processes. SQLite WAL
+        // permits concurrent readers but only one writer; relying on retries
+        // alone caused otherwise successful scans to exhaust under burst load.
+        const sqliteWriterLock = await acquireSqliteWriterLock();
+        try {
         const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
         if (!published) throw new Error('Saved-market publication was superseded before persistence');
         await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
@@ -592,6 +612,9 @@ export async function executeFullScan(request: NextRequest) {
           });
         }
         fullScanPersisted = true;
+        } finally {
+          await releaseSavedMarketScanLock(sqliteWriterLock);
+        }
       }
     } catch (e) {
       logger.trackError(e, { service: 'scan', path: '/api/scan' });
