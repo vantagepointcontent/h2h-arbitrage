@@ -809,6 +809,11 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   };
   const regressedEntryPlatforms = new Set<OrderResult['platform']>();
   const captureLatestTerminality = (result: OrderResult, prior: ExecutionLedgerLeg) => {
+    if (regressedEntryPlatforms.has(result.platform)) {
+      entryTerminalities[result.platform] = { terminality: 'indeterminate', source: 'latest-order-response' };
+      unhedged = true;
+      return;
+    }
     const currentFilled = result.filledContracts;
     const priorFilled = prior.filledContracts;
     if (currentFilled != null && priorFilled != null
