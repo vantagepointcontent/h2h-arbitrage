@@ -145,7 +145,13 @@ async function snapshotLimiters() {
 //     exponential backoff (5min → 10 → 20 → 40, capped 60min). One probe
 //     scan after cooldown (half-open); success resets everything.
 // State persists across poller restarts via BREAKER_FILE.
-const TIMEOUT_FLOOR_MS = 8_000;
+const TIMEOUT_FLOOR_MS = parseBoundedNumber(
+  process.env.H2H_SCAN_MIN_TIMEOUT_MS,
+  8_000,
+  1_000,
+  SCAN_TIMEOUT_MS,
+  true,
+);
 const TIMEOUT_MULTIPLIER = 3;
 const BREAKER_THRESHOLD = 3;          // consecutive failures to trip
 const BREAKER_BASE_COOLDOWN_MS = 5 * 60_000;
