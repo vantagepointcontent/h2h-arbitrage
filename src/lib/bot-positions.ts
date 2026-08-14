@@ -2318,7 +2318,7 @@ export async function pollOpenBotPositions(dependencies?: {
     noBids: ExecutableBidLevel[];
     observedAt?: string;
   } | null>;
-  fetchPmBids?: (conditionId: string) => Promise<{
+  fetchPmBids?: (conditionId: string, heldSide?: BotPositionSide) => Promise<{
     yesBidCents: number | null;
     noBidCents: number | null;
     yesBids?: ExecutableBidLevel[];
@@ -2369,7 +2369,24 @@ export async function pollOpenBotPositions(dependencies?: {
       observedAt: new Date().toISOString(),
     };
   });
-  const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string) => {
+  const fetchPmBids = dependencies?.fetchPmBids ?? (async (conditionId: string, heldSide?: BotPositionSide) => {
+    // Legacy /market imports stored the held CLOB token id in the historical
+    // pmConditionId column. A token book is sufficient to mark the held leg.
+    if (/^\d+$/.test(conditionId)) {
+      const book = await fetchClobBook(conditionId);
+      if (!book || book.asset_id !== conditionId) return null;
+      const bids = parseExecutableBidLevels(book.bids, `Polymarket ${heldSide?.toUpperCase() ?? 'held'} bid`);
+      parseExecutableBidLevels(book.asks, `Polymarket ${heldSide?.toUpperCase() ?? 'held'} ask`);
+      const bestBid = bids.length > 0 ? Math.max(...bids.map((level) => level.priceCents)) : null;
+      return {
+        yesBidCents: heldSide === 'yes' ? bestBid : null,
+        noBidCents: heldSide === 'no' ? bestBid : null,
+        yesBids: heldSide === 'yes' ? bids : undefined,
+        noBids: heldSide === 'no' ? bids : undefined,
+        resolved: false,
+        observedAt: new Date().toISOString(),
+      };
+    }
     const market = await fetchClobMarket(conditionId);
     if (!market) return null;
     if (!Array.isArray(market.tokens)) throw new Error('Malformed Polymarket token payload');
@@ -2434,7 +2451,7 @@ export async function pollOpenBotPositions(dependencies?: {
       }
       const [kalshiResult, pmResult] = await Promise.allSettled([
         fetchKalshi(position.kalshiTicker),
-        fetchPmBids(position.pmConditionId),
+        fetchPmBids(position.pmConditionId, position.pmSide),
       ]);
       if (kalshiResult.status === 'rejected') {
         throw new Error(`Kalshi market lookup failed: ${kalshiResult.reason instanceof Error ? kalshiResult.reason.message : String(kalshiResult.reason)}`);
@@ -2492,7 +2509,8 @@ export async function pollOpenBotPositions(dependencies?: {
         const authority = await (dependencies?.fetchFeeConfig ?? fetchAuthoritativeBotFeeConfig)({
           kalshiTicker: position.kalshiTicker,
           pmConditionId: position.pmConditionId,
-          pmTokenId: position.pmEntryTokenId ?? undefined,
+          pmTokenId: position.pmEntryTokenId ?? position.pmExitTokenId
+            ?? (/^\d+$/.test(position.pmConditionId) ? position.pmConditionId : undefined),
           pmSide: position.pmSide,
           category: position.category ?? undefined,
         });
