@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // OPS-158: direct builds use a process-scoped path, never production.
+  // The release manager overrides this inside an isolated detached worktree;
+  // production points it at the atomically switched active release.
+  distDir: process.env.H2H_NEXT_DIST_DIR ?? `.builds/next-${process.pid}`,
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: true,

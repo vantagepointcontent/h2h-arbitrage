@@ -15,6 +15,8 @@
 
 # next.js
 /.next/
+/.builds/
+/.h2h-releases/
 /out/
 
 # production

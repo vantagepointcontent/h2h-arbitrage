@@ -4,7 +4,7 @@
 #
 # Exits 0 only if ALL checks pass:
 #   1. Vitest test suite passes (no failures, no skips)
-#   2. Build succeeds (npm run build)
+#   2. Commit-scoped isolated candidate build succeeds
 #   3. PM2 process is online and serving HTTP 200
 #   4. Specified endpoint returns expected data (if --endpoint given)
 #   5. Git commit exists and changed files are in it (if --commit given)
@@ -89,18 +89,19 @@ fi
 # ────────────────────────────────────────────────────────────────
 # 2. BUILD SUCCEEDS
 # ────────────────────────────────────────────────────────────────
-echo -e "${YELLOW}Running npm run build...${NC}"
-if BUILD_OUTPUT=$(npm run build 2>&1); then
+echo -e "${YELLOW}Building an isolated commit-scoped candidate...${NC}"
+if BUILD_OUTPUT=$(node scripts/release-manager.mjs build --commit "${COMMIT_HASH:-HEAD}" 2>&1); then
   BUILD_EXIT=0
 else
   BUILD_EXIT=$?
 fi
 
 if [[ $BUILD_EXIT -eq 0 ]]; then
-  BUILD_ID=$(cat .next/BUILD_ID 2>/dev/null || echo "unknown")
-  check "Build succeeds" "PASS" "(BUILD_ID: ${BUILD_ID:0:16}...)"
+  CANDIDATE_DIR=$(echo "$BUILD_OUTPUT" | tail -n 1)
+  BUILD_ID=$(cat "$CANDIDATE_DIR/.next/BUILD_ID" 2>/dev/null || echo "unknown")
+  check "Isolated candidate build succeeds" "PASS" "(BUILD_ID: ${BUILD_ID:0:16}...)"
 else
-  check "Build succeeds" "FAIL"
+  check "Isolated candidate build succeeds" "FAIL"
   echo "$BUILD_OUTPUT" | tail -20 | sed 's/^/    /'
 fi
 
@@ -186,24 +187,20 @@ else
 fi
 
 # ────────────────────────────────────────────────────────────────
-# 6. DEPLOYED BUILD vs COMMIT TIMESTAMP
+# 6. ACTIVE RELEASE IDENTITY + INTEGRITY
 # ────────────────────────────────────────────────────────────────
-BUILD_ID_FILE=".next/BUILD_ID"
-if [[ -f "$BUILD_ID_FILE" ]]; then
-  BUILD_TIME=$(stat -c %Y "$BUILD_ID_FILE" 2>/dev/null || stat -f %m "$BUILD_ID_FILE" 2>/dev/null || echo "0")
-  BUILD_TIME_HR=$(date -d "@$BUILD_TIME" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -r "$BUILD_TIME" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
-  LATEST_COMMIT_TIME=$(git log -1 --format='%ct' 2>/dev/null || echo "0")
-  LATEST_COMMIT_HR=$(git log -1 --format='%ci' 2>/dev/null || echo "unknown")
-
-  # Build should be newer than the latest commit (or within 60s tolerance)
-  DIFF=$((BUILD_TIME - LATEST_COMMIT_TIME))
-  if [[ $DIFF -ge -60 ]]; then
-    check "Deployed build matches commit" "PASS" "(build: $BUILD_TIME_HR, commit: $LATEST_COMMIT_HR)"
+if ACTIVE_JSON=$(node scripts/release-manager.mjs verify-active 2>/dev/null); then
+  ACTIVE_COMMIT=$(node -e 'const fs=require("fs"); const v=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(v.commit)' <<<"$ACTIVE_JSON")
+  ACTIVE_BUILD_ID=$(node -e 'const fs=require("fs"); const v=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(v.buildId)' <<<"$ACTIVE_JSON")
+  EXPECTED_COMMIT="${COMMIT_HASH:-$(git rev-parse HEAD)}"
+  EXPECTED_COMMIT=$(git rev-parse "$EXPECTED_COMMIT^{commit}")
+  if [[ "$ACTIVE_COMMIT" == "$EXPECTED_COMMIT" ]]; then
+    check "Active release integrity and commit identity" "PASS" "(commit: ${ACTIVE_COMMIT:0:12}, BUILD_ID: ${ACTIVE_BUILD_ID:0:16})"
   else
-    check "Deployed build matches commit" "FAIL" "(build is older than commit by ${DIFF}s — needs rebuild+restart)"
+    check "Active release integrity and commit identity" "FAIL" "(active: ${ACTIVE_COMMIT:0:12}, expected: ${EXPECTED_COMMIT:0:12})"
   fi
 else
-  check "Deployed build matches commit" "FAIL" "(no .next/BUILD_ID — build not found)"
+  check "Active release integrity and commit identity" "FAIL" "(active release missing or drifted)"
 fi
 
 # ────────────────────────────────────────────────────────────────

@@ -32,6 +32,10 @@ export async function GET() {
     const pollerStatus = classifyPollerHealth(pollerSnapshot);
     return NextResponse.json({
       status: 'ok',
+      deployment: {
+        commit: process.env.DEPLOY_COMMIT ?? null,
+        buildId: process.env.H2H_BUILD_ID ?? null,
+      },
       savedMarketCount: markets.length,
       scanWorkers: getScanWorkerMetrics(),
       quickPrices: getQuickPricesMetrics(),
