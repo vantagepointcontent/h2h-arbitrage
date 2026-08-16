@@ -105,6 +105,44 @@ async function inventoryArtifact(artifactDir) {
   return { files: hashes, integritySha256: digest.digest('hex') };
 }
 
+async function detectRuntimePackageAliases(artifactDir) {
+  const aliases = new Set();
+  const files = (await walkFiles(path.join(artifactDir, 'server', 'chunks')))
+    .filter((file) => file.endsWith('.js'));
+  for (const relative of files) {
+    const source = await readFile(path.join(artifactDir, 'server', 'chunks', relative), 'utf8');
+    for (const match of source.matchAll(/["']((?:@[^/"']+\/)?[^/"']+-[a-f0-9]{16})["']/g)) {
+      aliases.add(match[1]);
+    }
+  }
+  return [...aliases].sort();
+}
+
+function canonicalPackageForAlias(alias) {
+  const canonical = alias.replace(/-[a-f0-9]{16}$/, '');
+  if (canonical === alias || !/^(?:@[^/]+\/)?[^/]+$/.test(canonical)) {
+    throw new Error(`Invalid runtime package alias: ${alias}`);
+  }
+  return canonical;
+}
+
+async function materializeRuntimePackageAliases(repoRoot, aliases = []) {
+  for (const alias of aliases) {
+    const canonical = canonicalPackageForAlias(alias);
+    const canonicalPath = path.join(repoRoot, 'node_modules', canonical);
+    const aliasPath = path.join(repoRoot, 'node_modules', alias);
+    if (!await exists(canonicalPath)) throw new Error(`Missing canonical runtime package for ${alias}: ${canonical}`);
+    if (await exists(aliasPath)) {
+      if (await realpath(aliasPath) !== await realpath(canonicalPath)) {
+        throw new Error(`Runtime package alias points at the wrong target: ${alias}`);
+      }
+      continue;
+    }
+    await mkdir(path.dirname(aliasPath), { recursive: true });
+    await symlink(path.basename(canonicalPath), aliasPath);
+  }
+}
+
 async function processIdentity(pid = process.pid) {
   let startTicks = null;
   try {
@@ -180,7 +218,7 @@ async function appendEvent(repoRoot, event) {
   try { await handle.write(line); } finally { await handle.close(); }
 }
 
-export async function sealCandidate({ repoRoot, artifactDir, commit, runId, startedAt, builder, checks }) {
+export async function sealCandidate({ repoRoot, artifactDir, commit, runId, startedAt, builder, checks, runtimePackageAliases = [] }) {
   sanitize(commit, 'commit');
   sanitize(runId, 'run ID');
   const root = await initialize(repoRoot);
@@ -209,6 +247,7 @@ export async function sealCandidate({ repoRoot, artifactDir, commit, runId, star
       status: 'verified',
       artifactPath: '.next',
       inventory,
+      runtimePackageAliases,
       checks: checks ?? { build: 'passed', tests: 'external', lint: 'external' },
     };
     await atomicWrite(path.join(candidateDir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -223,6 +262,7 @@ export async function sealCandidate({ repoRoot, artifactDir, commit, runId, star
 
 export async function verifyRelease(releaseDir) {
   const manifest = JSON.parse(await readFile(path.join(releaseDir, MANIFEST), 'utf8'));
+  for (const alias of manifest.runtimePackageAliases ?? []) canonicalPackageForAlias(alias);
   const artifactDir = path.join(releaseDir, manifest.artifactPath ?? '.next');
   const deployCommit = (await readFile(path.join(artifactDir, 'DEPLOY_COMMIT'), 'utf8')).trim();
   const buildId = (await readFile(path.join(artifactDir, 'BUILD_ID'), 'utf8')).trim();
@@ -368,6 +408,7 @@ export async function promoteRelease(options) {
         throw new Error(`Stale candidate ${candidate.candidateId} predates active release ${active.candidateId}`);
       }
     }
+    await materializeRuntimePackageAliases(repoRoot, candidate.runtimePackageAliases);
     const releaseDir = path.join(root, 'releases', candidate.candidateId);
     if (!await exists(releaseDir)) {
       const stagingRelease = `${releaseDir}.${process.pid}.${Date.now()}.tmp`;
@@ -513,6 +554,7 @@ export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTes
     if (!await exists(path.join(source, '.next', 'ragnar-consumer.mjs'))) {
       throw new Error('Isolated release build did not package ragnar-consumer.mjs');
     }
+    const runtimePackageAliases = await detectRuntimePackageAliases(path.join(source, '.next'));
     await writeFile(path.join(source, '.next', 'DEPLOY_COMMIT'), `${resolvedCommit}\n`);
     return await sealCandidate({
       repoRoot,
@@ -521,6 +563,7 @@ export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTes
       runId: id,
       startedAt,
       builder,
+      runtimePackageAliases,
       checks: {
         build: 'passed',
         tests: skipTests ? 'skipped' : 'passed',

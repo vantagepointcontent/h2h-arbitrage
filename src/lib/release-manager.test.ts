@@ -66,7 +66,7 @@ describe('isolated production releases', () => {
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
   });
 
-  it('materializes dependencies inside the detached build worktree instead of using an external symlink', async () => {
+  it('materializes detached dependencies and preserves generated runtime package aliases', async () => {
     const api = await manager();
     const repo = await root();
     await execFileAsync('git', ['init'], { cwd: repo });
@@ -93,15 +93,20 @@ for (const file of ['build-manifest.json', 'routes-manifest.json', 'prerender-ma
 fs.writeFileSync(path.join('.next', 'BUILD_ID'), 'build-test\\n');
 fs.writeFileSync(path.join('.next', 'ragnar-consumer.mjs'), 'export {};\\n');
 fs.writeFileSync(path.join('.next', 'static', 'chunks', 'app.js'), 'app');
-fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'runtime');
+fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.exports=e=>e.y("fixture-package-aaaaaaaaaaaaaaaa")');
 `);
     await chmod(fakeNpm, 0o755);
 
     const originalPath = process.env.PATH;
     process.env.PATH = `${bin}:${originalPath}`;
     try {
-      await expect(api.buildCandidate({ repoRoot: repo, commit, runId: 'dependency-copy', skipTests: true }))
-        .resolves.toContain(`${commit}-dependency-copy`);
+      const candidate = await api.buildCandidate({ repoRoot: repo, commit, runId: 'dependency-copy', skipTests: true });
+      expect(candidate).toContain(`${commit}-dependency-copy`);
+      const manifest = JSON.parse(await readFile(path.join(candidate, 'release-manifest.json'), 'utf8'));
+      expect(manifest.runtimePackageAliases).toEqual(['fixture-package-aaaaaaaaaaaaaaaa']);
+      await api.promoteRelease({ repoRoot: repo, candidateDir: candidate, restart: false });
+      const alias = path.join(repo, 'node_modules', 'fixture-package-aaaaaaaaaaaaaaaa');
+      expect(await readFile(path.join(alias, 'marker'), 'utf8')).toBe('present\n');
     } finally {
       process.env.PATH = originalPath;
     }
