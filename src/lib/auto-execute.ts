@@ -192,13 +192,13 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
     errors.push('Order sizes must be positive');
   }
   for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
-    if (leg.contracts !== 1) {
-      errors.push(`${leg.platform} order must request exactly one contract/share`);
+    if (!Number.isSafeInteger(leg.contracts) || leg.contracts! < 1) {
+      errors.push(`${leg.platform} order must request a positive whole contract/share quantity`);
     }
     if (!Number.isFinite(leg.minimumOrderSize) || leg.minimumOrderSize! <= 0) {
       errors.push(`${leg.platform} minimum order is unavailable`);
-    } else if (leg.minimumOrderSize! > 1) {
-      errors.push(`${leg.platform} minimum order is ${leg.minimumOrderSize} shares; requested 1 share`);
+    } else if (leg.contracts! < leg.minimumOrderSize!) {
+      errors.push(`${leg.platform} minimum order is ${leg.minimumOrderSize} shares; requested ${leg.contracts} shares`);
     }
     if (!Number.isFinite(leg.tickSize) || leg.tickSize! <= 0) {
       errors.push(`${leg.platform} tick size is unavailable`);
@@ -214,8 +214,8 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
       errors.push(`${leg.platform} order limit must equal the worst consumed executable level`);
     }
     const vwapMicroCents = leg.executableQuote?.vwapPriceMicroCents;
-    if (vwapMicroCents != null && Math.abs(leg.size - (vwapMicroCents / 100_000_000)) > 1e-9) {
-      errors.push(`${leg.platform} one-share notional must equal its walked VWAP`);
+    if (vwapMicroCents != null && Math.abs(leg.size - (vwapMicroCents / 100_000_000) * leg.contracts!) > 1e-9) {
+      errors.push(`${leg.platform} notional must equal walked VWAP × contracts`);
     }
   }
 
@@ -250,7 +250,7 @@ function getAuthoritativeExecutableQuote(leg: OrderRequest): ExecutableBookQuote
   const bookId = leg.platform === 'kalshi'
     ? (leg.ticker ?? leg.marketId)
     : (leg.conditionId ?? leg.marketId);
-  return orderbookState.getExecutableQuote(bookId, leg.outcome, 1_000_000);
+  return orderbookState.getExecutableQuote(bookId, leg.outcome, (leg.contracts ?? 1) * 1_000_000);
 }
 
 // ─── Dry Run Simulator ──────────────────────────────────────────
@@ -735,12 +735,13 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   const validation = validateExecution(req, limits);
   for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
     const candidate = leg.executableQuote;
-    if (!isExecutableQuoteConsistent(candidate, leg.side, 1_000_000)) {
+    const expectedQuantityMicros = (leg.contracts ?? 1) * 1_000_000;
+    if (!isExecutableQuoteConsistent(candidate, leg.side, expectedQuantityMicros)) {
       validation.errors.push(`${leg.platform} order requires a complete, constraint-valid executable book quote`);
       continue;
     }
     const authoritative = getAuthoritativeExecutableQuote(leg);
-    if (!isExecutableQuoteConsistent(authoritative, leg.side, 1_000_000)
+    if (!isExecutableQuoteConsistent(authoritative, leg.side, expectedQuantityMicros)
         || !quotesMatchAuthoritativeBook(candidate, authoritative)) {
       validation.errors.push(`${leg.platform} quote must match the server-side executable book`);
       continue;

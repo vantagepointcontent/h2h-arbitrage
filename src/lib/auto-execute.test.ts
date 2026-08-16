@@ -257,7 +257,7 @@ describe('executeArb', () => {
     expect(result.error).toContain('server-side executable book is stale');
   });
 
-  it('rejects non-canonical contract quantities before paper or live placement', async () => {
+  it('rejects fractional contract quantities before paper or live placement', async () => {
     const req = makeRequest();
     req.kalshiOrder.contracts = 1.5;
     req.polymarketOrder.contracts = 1.5;
@@ -265,7 +265,7 @@ describe('executeArb', () => {
     const result = await executeArb(req);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('exactly one contract');
+    expect(result.error).toContain('positive whole contract/share quantity');
   });
 
   it('rejects a buy limit above the walked worst consumed level', async () => {
@@ -340,10 +340,10 @@ describe('executeArb', () => {
     )).toEqual({ matched: true, kalshiContracts: 31, polymarketContracts: 31 });
   });
 
-  it('rejects attempts to substitute oversized notionals for the canonical one-share order', async () => {
+  it('rejects notionals that do not equal walked VWAP times contracts', async () => {
     const result = await executeArb(makeRequest(0.45, 45, 0.52, 52, true, 2, 1));
     expect(result.success).toBe(false);
-    expect(result.error).toContain('one-share notional');
+    expect(result.error).toContain('notional must equal walked VWAP × contracts');
   });
 
 

@@ -391,7 +391,11 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const initiallyEligible: BotScanCandidate[] = [];
     for (const [parsedIndex, item] of scan.candidates.entries()) {
       const candidateIndex = item.candidateIndex ?? parsedIndex;
-      const unavailable = item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable';
+      // Paper BotTrader may recover scanner rows that were rejected only because
+      // the scanner evaluated the legacy one-share quantity. Its own criteria
+      // and execution request re-check matched depth at the effective quantity.
+      const unavailable = executionMode !== 'paper'
+        && (item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable');
       const evaluation = evaluateBotTrade(candidateToInput(scan, item, settings), settings);
       const eligible = !unavailable && validFees(item.fees) && evaluation.shouldTrade;
       const reasonCode = unavailable ? 'execution_unavailable' : !validFees(item.fees) ? 'fees_unavailable' : eligible ? 'scan_eligible' : 'scan_criteria_rejected';
@@ -722,7 +726,11 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
   const fees = row.fees && typeof row.fees === 'object' ? row.fees as Record<string, unknown> : null;
   const pmFee = fees?.pmFee ?? fees?.polymarketFee;
   const quote = (candidate: unknown): ExecutableBookQuote | undefined =>
-    isExecutableQuoteConsistent(candidate as ExecutableBookQuote | undefined, 'buy', 1_000_000)
+    isExecutableQuoteConsistent(
+      candidate as ExecutableBookQuote | undefined,
+      'buy',
+      (candidate as ExecutableBookQuote | undefined)?.requestedQuantityMicros ?? 0,
+    )
       ? candidate as ExecutableBookQuote
       : undefined;
   if (typeof row.artist !== 'string' || typeof row.strategy !== 'string'

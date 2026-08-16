@@ -221,6 +221,49 @@ describe('durable BotTrader scan consumer', () => {
     expect(result.placementCount).toBe(1);
   });
 
+  it('promotes a paper candidate rejected by the legacy one-share venue minimum check', async () => {
+    const venueMinimumCandidate = candidate({
+      executionStatus: 'non_executable',
+      executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share',
+      pmNoMinOrderSize: 5,
+      kalshiYesDepth: 2.25,
+      pmNoDepth: 2.50,
+    });
+    const h = harness({
+      scans: [scan({ candidates: [venueMinimumCandidate] })],
+      current: [venueMinimumCandidate],
+      botSettings: settings({ minSharesPerLeg: 1 }),
+      executionMode: 'paper',
+    });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
+      state: 'placed',
+      placementCount: 1,
+    });
+    expect(h.deps.execute).toHaveBeenCalledOnce();
+    expect(h.opportunityDecisions).toContainEqual(expect.objectContaining({
+      state: 'eligible',
+      reasonCode: 'scan_eligible',
+    }));
+  });
+
+  it('keeps venue-minimum scanner rejections blocked outside paper mode', async () => {
+    const blocked = candidate({
+      executionStatus: 'non_executable',
+      executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share',
+      pmNoMinOrderSize: 5,
+      kalshiYesDepth: 2.25,
+      pmNoDepth: 2.50,
+    });
+    const h = harness({ scans: [scan({ candidates: [blocked] })], current: [blocked], executionMode: 'live' });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
+      state: 'criteria_rejected',
+      reasonCode: 'execution_unavailable',
+    });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
   it('carries refreshed executable quotes through the real execution-request handoff', async () => {
     const conditionId = `0x${'a'.repeat(64)}`;
     const current = candidate({

@@ -48,7 +48,7 @@ import {
   type ExecutionEvidence,
   type LiveExecutionEvidence,
 } from './execution-evidence';
-import type { ExecutableBookQuote } from './executable-book';
+import { isExecutableQuoteConsistent, quoteOneShareFromTopAsk, type ExecutableBookQuote } from './executable-book';
 import type { BotEntryEvidenceLegV1, BotEntryEvidenceV1 } from './bot-entry-recovery';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -530,8 +530,6 @@ export function evaluateBotTrade(
   const pmTickSize = legs.pmOutcome === 'yes' ? input.pmYesTickSize : input.pmNoTickSize;
   if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0) {
     reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order is unavailable`);
-  } else if (pmMinimumOrderSize! > 1) {
-    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order is ${pmMinimumOrderSize} shares; requested 1 share`);
   }
   if (!Number.isFinite(pmTickSize) || pmTickSize! <= 0) {
     reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} tick size is unavailable`);
@@ -548,16 +546,17 @@ export function evaluateBotTrade(
     ? depthPUsd / legs.pmPrice
     : 0;
 
-  if (sharesK < 1 || sharesP < 1) {
+  const requestedShares = Math.ceil(Math.max(1, settings.minSharesPerLeg, pmMinimumOrderSize ?? 0));
+  if (sharesK < requestedShares || sharesP < requestedShares) {
     reasons.push(
-      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (requested 1)`,
+      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (requested ${requestedShares})`,
     );
   }
 
   // Executability is price-relative: N shares at a 24c ask require $0.24 × N,
   // not a fixed $0.50 on every leg. Depth values are best-ask dollar depth.
-  const requiredDepthKUsd = legs.kalshiPrice ?? 0;
-  const requiredDepthPUsd = legs.pmPrice ?? 0;
+  const requiredDepthKUsd = (legs.kalshiPrice ?? 0) * requestedShares;
+  const requiredDepthPUsd = (legs.pmPrice ?? 0) * requestedShares;
   if (depthKUsd < requiredDepthKUsd || depthPUsd < requiredDepthPUsd) {
     reasons.push(
       `Insufficient executable depth at quoted ask: Kalshi $${depthKUsd.toFixed(2)} / $${requiredDepthKUsd.toFixed(2)} required; PM $${depthPUsd.toFixed(2)} / $${requiredDepthPUsd.toFixed(2)} required`,
@@ -641,7 +640,7 @@ function safeArbId(pairId: string, outcome: string): string {
   return `bot:${pairId}:${sanitized}`;
 }
 
-export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | null {
+export function buildExecutionRequest(input: BotTradeInput, configuredMinShares = 1): ExecutionRequest | null {
   const legs = pickLegPrices(input.strategy, input);
   if (!legs.supported || legs.kalshiPrice == null || legs.pmPrice == null) return null;
   if (input.strategy.startsWith('Buy YES both sides:')
@@ -652,7 +651,7 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   const pmMinimumOrderSize = legs.pmOutcome === 'yes'
     ? input.pmYesMinOrderSize
     : input.pmNoMinOrderSize;
-  if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0 || pmMinimumOrderSize! > 1) return null;
+  if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0) return null;
   const pmTickSize = legs.pmOutcome === 'yes' ? input.pmYesTickSize : input.pmNoTickSize;
   if (!Number.isFinite(pmTickSize) || pmTickSize! <= 0) return null;
 
@@ -663,8 +662,24 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   if (!Number.isFinite(sourceShares) || sourceShares <= 0) return null;
 
   const explicitQuotes = pickLegQuotes(input.strategy, input);
-  const kalshiQuote = explicitQuotes.kalshiQuote;
-  const pmQuote = explicitQuotes.pmQuote;
+  const contracts = Math.ceil(Math.max(1, configuredMinShares, pmMinimumOrderSize!));
+  const requestedQuantityMicros = contracts * 1_000_000;
+  const { depthKUsd, depthPUsd } = legDepths(legs, input);
+  const depthTimestamp = explicitQuotes.pmQuote?.depthTimestamp ?? explicitQuotes.kalshiQuote?.depthTimestamp ?? null;
+  const rebuiltKalshiQuote = quoteOneShareFromTopAsk({
+    price: legs.kalshiPrice, depthUsd: depthKUsd, tickSize: 0.01, minimumOrderSize: 1,
+    requestedQuantity: contracts, depthTimestamp,
+  });
+  const rebuiltPmQuote = quoteOneShareFromTopAsk({
+    price: legs.pmPrice, depthUsd: depthPUsd, tickSize: pmTickSize, minimumOrderSize: pmMinimumOrderSize,
+    requestedQuantity: contracts, depthTimestamp,
+  });
+  const kalshiQuote = isExecutableQuoteConsistent(explicitQuotes.kalshiQuote, 'buy', requestedQuantityMicros)
+    ? explicitQuotes.kalshiQuote
+    : rebuiltKalshiQuote;
+  const pmQuote = isExecutableQuoteConsistent(explicitQuotes.pmQuote, 'buy', requestedQuantityMicros)
+    ? explicitQuotes.pmQuote
+    : rebuiltPmQuote;
   if (kalshiQuote?.status !== 'executable' || pmQuote?.status !== 'executable'
     || kalshiQuote.vwapPriceMicroCents == null || pmQuote.vwapPriceMicroCents == null
     || kalshiQuote.limitPriceMicroCents == null || pmQuote.limitPriceMicroCents == null) return null;
@@ -674,11 +689,8 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
   const pmLimitPrice = pmQuote.limitPriceMicroCents / 100_000_000;
   if (!isPriceAlignedToTick(pmLimitPrice, pmTickSize!)) return null;
 
-  // Depth qualifies the opportunity; it does not size the placement. Each
-  // BotTrader placement is one matched share on each selected strategy leg.
-  const contracts = 1;
-  const kalshiStake = kalshiExecutionPrice;
-  const pmStake = pmExecutionPrice;
+  const kalshiStake = kalshiExecutionPrice * contracts;
+  const pmStake = pmExecutionPrice * contracts;
   const oneShareNetProfit = input.expectedProfit / sourceShares;
 
   const kalshiOrder: OrderRequest = {
@@ -719,7 +731,7 @@ export function buildExecutionRequest(input: BotTradeInput): ExecutionRequest | 
     pmConditionId,
     kalshiOrder,
     polymarketOrder,
-    estimatedProfit: oneShareNetProfit,
+    estimatedProfit: oneShareNetProfit * contracts,
     maxSlippagePct: 2.0,
     timeoutMs: 15000,
     dryRun: true, // overwritten by caller before executeArb()
@@ -744,8 +756,8 @@ async function countTodayBotTrades(executionMode: BotPositionExecutionMode): Pro
 }
 
 /** Compute total proposed stake for the one-share execution plan. */
-function proposedStakeUsd(input: BotTradeInput): number {
-  const request = buildExecutionRequest(input);
+function proposedStakeUsd(input: BotTradeInput, configuredMinShares: number): number {
+  const request = buildExecutionRequest(input, configuredMinShares);
   return request ? request.kalshiOrder.size + request.polymarketOrder.size : Infinity;
 }
 
@@ -835,7 +847,8 @@ export async function maybeExecuteBotTrade(
   });
   const todayTrades = await countTodayBotTrades(executionMode).catch(() => 0);
   const maxDailyExposure = await getSetting<number>('execute.maxDailyExposure').catch(() => 500);
-  const proposedStake = proposedStakeUsd(input);
+  const requestedMinShares = effectiveDryRun ? settings.minSharesPerLeg : 1;
+  const proposedStake = proposedStakeUsd(input, requestedMinShares);
 
   if (todayTrades >= settings.maxTradesPerDay) {
     await log('preflight', 'Daily trade limit check', 'failed', { responsePayload: { todayTrades, maxTradesPerDay: settings.maxTradesPerDay }, errorReason: 'Daily bot trade limit reached', qualificationOutcome: 'dead' });
@@ -855,7 +868,7 @@ export async function maybeExecuteBotTrade(
     };
   }
 
-  const execReq = buildExecutionRequest(input);
+  const execReq = buildExecutionRequest(input, requestedMinShares);
   if (!execReq) {
     await log('preflight', 'Build two-leg execution request', 'failed', { errorReason: 'Missing leg data', qualificationOutcome: 'dead' });
     return { executed: false, dryRun: true, reason: 'Unable to build execution request (missing leg data)' };

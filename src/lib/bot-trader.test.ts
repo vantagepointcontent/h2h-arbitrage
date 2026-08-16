@@ -419,6 +419,37 @@ describe('buildExecutionRequest', () => {
     expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.03, contracts: 1 });
     expect(req?.polymarketOrder).toMatchObject({ outcome: 'no', price: 0.94, contracts: 1 });
   });
+
+  it('sizes paper execution to the venue minimum and requires matched depth on both legs', () => {
+    const input = makeInput({
+      kalshiYesAsk: 0.45,
+      pmNoAsk: 0.50,
+      kalshiYesDepth: 2.25,
+      pmNoDepth: 2.50,
+      pmNoMinOrderSize: 5,
+    });
+
+    const req = buildExecutionRequest(input, 1);
+    expect(req?.kalshiOrder).toMatchObject({ contracts: 5, size: 2.25 });
+    expect(req?.polymarketOrder).toMatchObject({ contracts: 5, size: 2.5, minimumOrderSize: 5 });
+    expect(req?.kalshiOrder.executableQuote?.requestedQuantityMicros).toBe(5_000_000);
+    expect(req?.polymarketOrder.executableQuote?.requestedQuantityMicros).toBe(5_000_000);
+    expect(req?.estimatedProfit).toBeCloseTo(0.075, 8);
+
+    expect(buildExecutionRequest({ ...input, kalshiYesDepth: 2.249999 }, 1)).toBeNull();
+    expect(buildExecutionRequest({ ...input, pmNoDepth: 2.499999 }, 1)).toBeNull();
+  });
+
+  it('uses the configured minimum when it exceeds the venue minimum', () => {
+    const req = buildExecutionRequest(makeInput({
+      kalshiYesDepth: 3.15,
+      pmNoDepth: 3.64,
+      pmNoMinOrderSize: 5,
+    }), 7);
+
+    expect(req?.kalshiOrder.contracts).toBe(7);
+    expect(req?.polymarketOrder.contracts).toBe(7);
+  });
 });
 
 describe('unifiedOutcomeToBotInput', () => {

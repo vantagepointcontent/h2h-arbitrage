@@ -58,6 +58,8 @@ export interface TopAskQuoteRequest {
   tickSize: number | null | undefined;
   minimumOrderSize: number | null | undefined;
   depthTimestamp: string | null;
+  /** Matched quantity to quote. Defaults to one share for legacy callers. */
+  requestedQuantity?: number;
 }
 
 function levelPriceMicroCents(level: ExecutableBookLevel): number {
@@ -181,7 +183,7 @@ export function walkExecutableBook(request: WalkExecutableBookRequest): Executab
   return quote(request, 'executable', null, fills);
 }
 
-/** Convert an authoritative top ask plus its exact dollar depth into a one-share quote. */
+/** Convert an authoritative top ask plus its exact dollar depth into an executable quote. */
 export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): ExecutableBookQuote {
   const priceMicroCents = Math.round(Number(request.price) * MICRO_CENTS_PER_DOLLAR);
   const normalizedDepth = typeof request.depthUsd === 'string'
@@ -190,6 +192,7 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
   const depthMicroCents = Math.round(normalizedDepth * MICRO_CENTS_PER_DOLLAR);
   const tickSizeMicroCents = Math.round(Number(request.tickSize) * MICRO_CENTS_PER_DOLLAR);
   const minimumOrderQuantityMicros = Math.round(Number(request.minimumOrderSize) * QUANTITY_SCALE);
+  const requestedQuantityMicros = Math.round(Number(request.requestedQuantity ?? 1) * QUANTITY_SCALE);
   const quantityMicros = Number.isSafeInteger(priceMicroCents) && priceMicroCents > 0
     && Number.isSafeInteger(depthMicroCents) && depthMicroCents > 0
     ? Number((BigInt(depthMicroCents) * BigInt(QUANTITY_SCALE)) / BigInt(priceMicroCents))
@@ -197,7 +200,7 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
   return walkExecutableBook({
     side: 'buy',
     levels: quantityMicros > 0 ? [{ priceMicroCents, quantityMicros }] : [],
-    requestedQuantityMicros: QUANTITY_SCALE,
+    requestedQuantityMicros,
     tickSizeMicroCents,
     minimumOrderQuantityMicros,
     depthTimestamp: request.depthTimestamp,
