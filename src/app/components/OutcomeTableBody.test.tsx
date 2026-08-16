@@ -119,4 +119,46 @@ describe('OutcomeTableBody outcome-contingent APY', () => {
     })));
     expect(screen.getByTitle('APY unavailable: missing expiry').textContent).toBe('Unavailable');
   });
+
+  it.each([
+    ['zero', 0, '0.00%'],
+    ['negative', -25, '-25.00%'],
+  ])('keeps a valid %s canonical APY in expanded detail', (_case, apyPct, formatted) => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      outcomes: [{
+        artist: `${_case} APY`,
+        kalshi: { yesAsk: 0.45, noAsk: 0.55 },
+        polymarket: { yesPrice: 0.46, noPrice: 0.54 },
+        arbitrage: { expectedProfit: -1, roiPct: apyPct, apyPct, daysToExpiry: 365, strategy: 'No arb' },
+      }],
+      expandedArtist: `${_case} APY`, setExpandedArtist: () => {}, formatCurrency: String,
+      formatPercent: (value: number) => `${value.toFixed(2)}%`,
+    })));
+
+    expect(screen.getByText('APY:')).toBeTruthy();
+    expect(screen.getAllByText(formatted).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not use venue APYs to sort or color an unavailable canonical APY', () => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      outcomes: [{
+        artist: 'Unavailable canonical', kalshi: { yesAsk: 0.4, noAsk: 0.6 }, polymarket: { yesPrice: 0.5, noPrice: 0.5 },
+        arbitrage: { expectedProfit: 1, roiPct: 5, apyPct: null, apyUnavailableReason: 'missing_expiry', strategy: 'No arb', outcomeApy: {
+          observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'outcome_contingent', kalshi: null, polymarket: null,
+          scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 5, apyPct: 500, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 1, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
+          scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 5, apyPct: 400, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 1, timingSource: 'polymarket.event.endDate', unavailableReason: null },
+        } },
+      }, {
+        artist: 'Canonical one', kalshi: { yesAsk: 0.4, noAsk: 0.6 }, polymarket: { yesPrice: 0.5, noPrice: 0.5 },
+        arbitrage: { expectedProfit: 1, roiPct: 1, apyPct: 1, daysToExpiry: 365, strategy: 'No arb' },
+      }],
+      expandedArtist: null, setExpandedArtist: () => {}, formatCurrency: String,
+      formatPercent: (value: number) => `${value.toFixed(2)}%`, sortField: 'apy', sortDir: 'desc',
+    })));
+
+    expect(screen.getAllByTestId('outcome-name-cell').map((cell) => cell.textContent)).toEqual(['▶Canonical one', '▶Unavailable canonical']);
+    const unavailable = screen.getByTitle('APY unavailable: missing expiry');
+    expect(unavailable.closest('td')?.className).toContain('text-[var(--text-secondary)]');
+    expect(unavailable.closest('td')?.className).not.toContain('text-[var(--status-positive)]');
+  });
 });
