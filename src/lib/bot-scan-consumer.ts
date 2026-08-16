@@ -674,7 +674,7 @@ async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
   await ensureSchema();
   const db = dbClient();
   try {
-    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ? AND arb_valid = 1', args: [scanId] });
+    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ?', args: [scanId] });
     const row = result.rows[0] as unknown as Record<string, unknown> | undefined;
     return row ? rowToScan(row) : null;
   } finally { db.close(); }
@@ -688,7 +688,7 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
       sql: `SELECT s.* FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id = s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer = 'bot_trader'
-        WHERE s.arb_valid = 1 AND (
+        WHERE (
           (s.id > COALESCE(c.last_scan_id, 0) AND d.scan_id IS NULL) OR d.state = 'received'
           OR (d.state = 'failed' AND d.reason_code = 'revalidation_failed')
         )
@@ -796,10 +796,10 @@ async function advanceCursor() {
       ) SELECT MAX(s.id) AS last_scan_id
       FROM scan_results s
       CROSS JOIN current c
-      WHERE s.arb_valid=1 AND s.id>c.last_scan_id AND NOT EXISTS (
+      WHERE s.id>c.last_scan_id AND NOT EXISTS (
         SELECT 1 FROM scan_results gap
         LEFT JOIN bot_scan_decisions d ON d.scan_id=gap.id
-        WHERE gap.arb_valid=1 AND gap.id>c.last_scan_id AND gap.id<=s.id AND (
+        WHERE gap.id>c.last_scan_id AND gap.id<=s.id AND (
           d.scan_id IS NULL OR d.state='received'
           OR (d.state='failed' AND d.reason_code='revalidation_failed')
         )
@@ -896,14 +896,14 @@ export async function getBotScanHealth(): Promise<{
   const db = dbClient();
   try {
     const [latest, latestPositive, cursor, decision, pending, opportunityCounts] = await Promise.all([
-      db.execute('SELECT id,scanned_at FROM scan_results WHERE arb_valid=1 ORDER BY id DESC LIMIT 1'),
-      db.execute('SELECT id,scanned_at FROM scan_results WHERE arb_valid=1 AND positive_arb_count>0 ORDER BY id DESC LIMIT 1'),
+      db.execute('SELECT id,scanned_at FROM scan_results ORDER BY id DESC LIMIT 1'),
+      db.execute('SELECT id,scanned_at FROM scan_results WHERE positive_arb_count>0 ORDER BY id DESC LIMIT 1'),
       db.execute("SELECT last_scan_id,updated_at FROM bot_scan_cursor WHERE consumer='bot_trader'"),
       db.execute('SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT 1'),
       db.execute(`SELECT COUNT(*) AS count FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
-        WHERE s.arb_valid=1 AND (
+        WHERE (
           (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state = 'received'
           OR (d.state='failed' AND d.reason_code='revalidation_failed'))`),
       db.execute(`SELECT COUNT(*) AS evaluated,
