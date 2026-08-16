@@ -11,6 +11,21 @@ function arb(overrides: Partial<UnifiedOutcome['arbitrage']> = {}): UnifiedOutco
 }
 
 describe('matcher settlement timing integration', () => {
+  it('produces the same canonical APY for aligned and unaligned rules with identical ROI/TTE', () => {
+    const observedAt = '2026-08-14T11:02:35.000Z';
+    const expiryAt = '2026-10-24T11:02:35.000Z';
+    const base = { artist: 'Maine', kalshi: null, polymarket: null, arbitrage: arb(), source: 'auto' as const };
+    const [aligned, unaligned] = attachOutcomeContingentApy([
+      { ...base, resolutionRulesAligned: true },
+      { ...base, artist: 'Maine unaligned', resolutionRulesAligned: false },
+    ], observedAt, expiryAt);
+
+    expect(aligned.arbitrage.apyPct).toBeCloseTo((1.0016026 ** (365 / 71) - 1) * 100, 10);
+    expect(unaligned.arbitrage.apyPct).toBe(aligned.arbitrage.apyPct);
+    expect(unaligned.arbitrage.daysToExpiry).toBe(71);
+    expect(unaligned.arbitrage.apyUnavailableReason).toBeNull();
+  });
+
   it('preserves venue timing and binds scenario APY to the selected legs', () => {
     const kalshi = buildKalshiArbShape({
       ticker: 'SENATEME-26-D', event_ticker: 'SENATEME-26',

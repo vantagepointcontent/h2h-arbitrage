@@ -202,6 +202,9 @@ export interface ArbitrageInfo {
   expectedProfit: number;
   roiPct: number;
   apyPct?: number | null;
+  daysToExpiry?: number | null;
+  expiryAt?: string | null;
+  apyUnavailableReason?: import('@/lib/scan-apy').ScanApyUnavailableReason | null;
   outcomeApy?: OutcomeContingentApy;
   buyPlatform: "kalshi" | "polymarket" | null;
   buyPrice: number;
@@ -301,6 +304,9 @@ export interface LastScanResult {
     kalshiStake?: number;
     pmStake?: number;
     apyPct?: number | null;
+    daysToExpiry?: number | null;
+    expiryAt?: string | null;
+    apyUnavailableReason?: import('@/lib/scan-apy').ScanApyUnavailableReason | null;
     outcomeApy?: OutcomeContingentApy;
     buyPlatform?: string | null;
     buyPrice?: number;
@@ -377,6 +383,9 @@ export interface SavedMarket {
       strategy: string;
       totalStake?: number;
       apyPct?: number | null;
+      daysToExpiry?: number | null;
+      expiryAt?: string | null;
+      apyUnavailableReason?: import('@/lib/scan-apy').ScanApyUnavailableReason | null;
       outcomeApy?: OutcomeContingentApy;
     }[];
   } | null;
@@ -402,12 +411,12 @@ export function getMarketApySummary(market: SavedMarket): MarketApySummary {
   const scenarios = outcomeApy?.apyPct == null && kalshi != null && polymarket != null
     ? { kalshi, polymarket }
     : null;
-  const scalarApyPct = best?.apyPct ?? outcomeApy?.apyPct ?? null;
+  const scalarApyPct = best?.apyPct ?? null;
   return {
     scalarApyPct,
     scenarioApyPct: scenarios,
-    sortApyPct: scalarApyPct ?? (scenarios ? Math.min(scenarios.kalshi, scenarios.polymarket) : null),
-    unavailableReason: outcomeApy?.unavailableReason ?? null,
+    sortApyPct: scalarApyPct,
+    unavailableReason: scalarApyPct == null ? (best?.apyUnavailableReason ?? null) : null,
   };
 }
 

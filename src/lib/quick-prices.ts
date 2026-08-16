@@ -301,6 +301,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const withArbitrage = attachOutcomeContingentApy(
     calculateAllArbitrages(splitOutcomes, eventTitle, capital),
     new Date().toISOString(),
+    expiryDate,
   );
 
   const priceResolved = computePriceResolved(

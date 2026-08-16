@@ -227,6 +227,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const withArbitrage = attachOutcomeContingentApy(
     calculateAllArbitrages(splitOutcomes, market.category || pmEvent.title),
     scannedAt,
+    pmEvent.endDate,
   );
 
   const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
@@ -291,6 +292,9 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       kalshiStake: o.arbitrage!.kalshiStake,
       pmStake: o.arbitrage!.pmStake,
       apyPct: o.arbitrage!.apyPct,
+      daysToExpiry: o.arbitrage!.daysToExpiry,
+      expiryAt: o.arbitrage!.expiryAt,
+      apyUnavailableReason: o.arbitrage!.apyUnavailableReason,
       outcomeApy: o.arbitrage!.outcomeApy,
       buyPlatform: o.arbitrage!.buyPlatform,
       buyPrice: o.arbitrage!.buyPrice,

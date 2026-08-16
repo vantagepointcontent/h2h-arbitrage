@@ -205,6 +205,13 @@ describe('telegram-alerts', () => {
       expect(msg).toContain('$1000');
     });
 
+    it('formats the persisted canonical APY/TTE or its exact blocker', () => {
+      expect(formatArbMessage({ ...baseArb, apyPct: 5.26, daysToExpiry: 71 }))
+        .toContain('APY: <b>5.26%</b> (71.00 days)');
+      expect(formatArbMessage({ ...baseArb, apyPct: null, apyUnavailableReason: 'missing_expiry' }))
+        .toContain('APY unavailable: missing expiry');
+    });
+
     it('includes net profit when fees are provided', () => {
       const msg = formatArbMessage({
         ...baseArb,

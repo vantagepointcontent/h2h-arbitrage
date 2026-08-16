@@ -256,16 +256,16 @@ describe('REGRESSION: computeApy', () => {
     expect(apy).toBeGreaterThan(100);
   });
 
-  it('R18: expired event → 0 APY', () => {
+  it('R18: expired event → unavailable APY', () => {
     const past = new Date();
     past.setDate(past.getDate() - 1);
     const apy = computeApy(10, past.toISOString());
-    expect(apy).toBe(0);
+    expect(apy).toBeNull();
   });
 
-  it('R19: null/undefined expiry → APY = ROI', () => {
-    expect(computeApy(10, null as any)).toBe(10);
-    expect(computeApy(10, undefined as any)).toBe(10);
+  it('R19: null/undefined expiry → unavailable APY', () => {
+    expect(computeApy(10, null as any)).toBeNull();
+    expect(computeApy(10, undefined as any)).toBeNull();
   });
 });
 

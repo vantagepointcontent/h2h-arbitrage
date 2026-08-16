@@ -1,4 +1,5 @@
 import type { KalshiMarket } from './kalshi';
+import { calculateApyPctFromDays } from './scan-apy';
 
 export type SettlementTimingSource =
   | 'kalshi.market.expected_expiration_time'
@@ -25,8 +26,7 @@ export type SettlementApyUnavailableReason =
   | 'missing_settlement_date'
   | 'invalid_expected_settlement'
   | 'invalid_contractual_settlement'
-  | 'conflicting_settlement_dates'
-  | 'unaligned_resolution_rules';
+  | 'conflicting_settlement_dates';
 
 export interface SettlementApyScenario {
   label: 'scenario_a' | 'scenario_b';
@@ -102,16 +102,15 @@ function scenario(
   roiPct: number,
   observedAt: string,
   timing: SettlementTiming | null,
-  rulesAligned: boolean,
 ): SettlementApyScenario {
   const unavailable = (reason: SettlementApyUnavailableReason): SettlementApyScenario => ({
     label, winner, roiPct, apyPct: null, settlementAt: null, daysToSettlement: null,
     timingSource: null, unavailableReason: reason,
   });
-  if (!Number.isFinite(roiPct)) return unavailable('invalid_roi');
+  if (!Number.isFinite(roiPct) || roiPct <= -100) return unavailable('invalid_roi');
   const observedMs = Date.parse(observedAt);
   if (!Number.isFinite(observedMs)) return unavailable('invalid_observed_at');
-  if (!rulesAligned) return unavailable('unaligned_resolution_rules');
+
   if (!timing || (!timing.expectedAt && !timing.contractualAt)) return unavailable('missing_settlement_date');
 
   const expectedMs = timing.expectedAt ? Date.parse(timing.expectedAt) : null;
@@ -136,7 +135,7 @@ function scenario(
     label,
     winner,
     roiPct,
-    apyPct: roiPct <= 0 ? 0 : roiPct * (365 / daysToSettlement),
+    apyPct: calculateApyPctFromDays(roiPct, daysToSettlement),
     settlementAt,
     daysToSettlement,
     timingSource,
@@ -158,10 +157,9 @@ export function calculateOutcomeContingentApy(input: {
     : null;
   const winnerA = internalWinner ?? 'kalshi';
   const winnerB = internalWinner ?? 'polymarket';
-  const rulesAligned = input.rulesAligned === true;
   const timing = (winner: 'kalshi' | 'polymarket') => winner === 'kalshi' ? input.kalshi : input.polymarket;
-  const scenarioA = scenario('scenario_a', winnerA, input.roiPct, input.observedAt, timing(winnerA), rulesAligned);
-  const scenarioB = scenario('scenario_b', winnerB, input.roiPct, input.observedAt, timing(winnerB), rulesAligned);
+  const scenarioA = scenario('scenario_a', winnerA, input.roiPct, input.observedAt, timing(winnerA));
+  const scenarioB = scenario('scenario_b', winnerB, input.roiPct, input.observedAt, timing(winnerB));
 
   const bothAvailable = scenarioA.apyPct != null && scenarioB.apyPct != null;
   const sameAnnualization = bothAvailable

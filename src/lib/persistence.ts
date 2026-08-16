@@ -5,7 +5,7 @@ import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
 import { auditArbClassification } from './arb-types';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
-import type { OutcomeContingentApy } from './settlement-apy';
+import { calculateOutcomeContingentApy, type OutcomeContingentApy, type SettlementTiming } from './settlement-apy';
 import { botEntryEvidenceErrors } from './bot-entry-recovery';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
@@ -244,14 +244,17 @@ async function initDb(): Promise<void> {
   // immutable scan payload, with the saved market's recorded expiry as the
   // legacy fallback. Always annualize from scanned_at, never from Date.now().
   const apyBackfill = await c.execute(`
-    SELECT r.id, r.best_roi_pct, r.scanned_at, r.raw_result, m.expiry_date
+    SELECT r.id, r.best_roi_pct, r.scanned_at, r.raw_result, r.expiry_at,
+           r.days_to_expiry, r.apy_pct, r.apy_unavailable_reason, m.expiry_date
     FROM scan_results r
     LEFT JOIN saved_markets m ON m.id = r.market_id
     WHERE r.apy_pct IS NULL AND r.apy_unavailable_reason IS NULL
   `);
   for (const row of apyBackfill.rows as unknown as Array<Record<string, unknown>>) {
-    let expiryAt = typeof row.expiry_date === 'string' ? row.expiry_date : null;
-    if (typeof row.raw_result === 'string') {
+    let expiryAt = typeof row.expiry_at === 'string'
+      ? row.expiry_at
+      : typeof row.expiry_date === 'string' ? row.expiry_date : null;
+    if (!expiryAt && typeof row.raw_result === 'string') {
       try {
         const raw = JSON.parse(row.raw_result) as { expiryDate?: unknown };
         if (typeof raw.expiryDate === 'string') expiryAt = raw.expiryDate;
@@ -264,6 +267,77 @@ async function initDb(): Promise<void> {
             WHERE id = ? AND apy_pct IS NULL AND apy_unavailable_reason IS NULL`,
       args: [expiryAt, snapshot.daysToExpiry, snapshot.apyPct, snapshot.unavailableReason, Number(row.id)],
     });
+  }
+  // BUG-159: idempotently migrate current saved opportunities from their
+  // persisted ROI, scan timestamp, and the same canonical expiry displayed by
+  // the market detail. This is local-only and never calls either venue.
+  const savedApyBackfill = await c.execute(`
+    SELECT id, expiry_date, last_scan_result, live_result FROM saved_markets
+    WHERE last_scan_result IS NOT NULL OR live_result IS NOT NULL
+  `);
+  for (const row of savedApyBackfill.rows as unknown as Array<Record<string, unknown>>) {
+    const expiryAt = typeof row.expiry_date === 'string' ? row.expiry_date : null;
+    const migrate = (raw: unknown): string | null => {
+      if (typeof raw !== 'string') return null;
+      try {
+        const result = JSON.parse(raw) as { scannedAt?: unknown; updatedAt?: unknown; allArbs?: Array<Record<string, unknown>> };
+        if (!Array.isArray(result.allArbs)) return raw;
+        const scannedAt = typeof result.scannedAt === 'string'
+          ? result.scannedAt
+          : typeof result.updatedAt === 'string' ? result.updatedAt : '';
+        result.allArbs = result.allArbs.map((arb) => {
+          const arbExpiryAt = typeof arb.expiryAt === 'string' ? arb.expiryAt : expiryAt;
+          const roiPct = typeof arb.roiPct === 'number' ? arb.roiPct : Number.NaN;
+          const snapshot = calculateScanApy(roiPct, scannedAt, arbExpiryAt);
+          const existingOutcomeApy = arb.outcomeApy && typeof arb.outcomeApy === 'object'
+            ? arb.outcomeApy as Partial<OutcomeContingentApy>
+            : null;
+          const strategy = typeof arb.strategy === 'string' ? arb.strategy : '';
+          const declaredType = arb.arbType === 'cross' || arb.arbType === 'direct' || arb.arbType === 'internal'
+            ? arb.arbType
+            : existingOutcomeApy?.scenarioA?.winner != null
+              && existingOutcomeApy.scenarioA.winner === existingOutcomeApy.scenarioB?.winner
+              ? 'internal'
+              : auditArbClassification(strategy, null).canonicalType;
+          const outcomeApy = existingOutcomeApy
+            ? calculateOutcomeContingentApy({
+                roiPct,
+                observedAt: typeof existingOutcomeApy.observedAt === 'string' ? existingOutcomeApy.observedAt : scannedAt,
+                arbType: declaredType,
+                strategy,
+                kalshi: (existingOutcomeApy.kalshi as SettlementTiming | null | undefined) ?? null,
+                polymarket: (existingOutcomeApy.polymarket as SettlementTiming | null | undefined) ?? null,
+              })
+            : arb.outcomeApy;
+          return {
+            ...arb,
+            arbType: declaredType,
+            apyPct: snapshot.apyPct,
+            daysToExpiry: snapshot.daysToExpiry,
+            expiryAt: arbExpiryAt,
+            apyUnavailableReason: snapshot.unavailableReason,
+            outcomeApy,
+          };
+        });
+        return JSON.stringify(result);
+      } catch {
+        return raw;
+      }
+    };
+    const lastScanResult = migrate(row.last_scan_result);
+    const liveResult = migrate(row.live_result);
+    if (lastScanResult !== row.last_scan_result) {
+      await c.execute({
+        sql: 'UPDATE saved_markets SET last_scan_result = ? WHERE id = ? AND last_scan_result IS ?',
+        args: [lastScanResult, String(row.id), typeof row.last_scan_result === 'string' ? row.last_scan_result : null],
+      });
+    }
+    if (liveResult !== row.live_result) {
+      await c.execute({
+        sql: 'UPDATE saved_markets SET live_result = ? WHERE id = ? AND live_result IS ?',
+        args: [liveResult, String(row.id), typeof row.live_result === 'string' ? row.live_result : null],
+      });
+    }
   }
   await c.execute(`
     CREATE TABLE IF NOT EXISTS scan_history (
@@ -388,13 +462,7 @@ export async function saveScanResult(
   const financiallyValid = audit.valid && audit.canonicalType !== null;
   const canonicalRoi = financiallyValid ? (result.bestRoiPct ?? 0) : 0;
   const snapshot = financiallyValid
-    ? result.outcomeApy
-      ? {
-          daysToExpiry: result.outcomeApy.apyPct != null ? result.outcomeApy.scenarioA.daysToSettlement : null,
-          apyPct: result.outcomeApy.apyPct,
-          unavailableReason: result.outcomeApy.unavailableReason,
-        }
-      : calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
+    ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
     : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
   const row = await c.execute({
     sql: `INSERT INTO scan_results
@@ -1114,7 +1182,7 @@ export interface LastScanResult {
   bestRoiPct: number;      // t.ex. 26.5 (for backward compat / display)
   bestProfit: number;       // t.ex. 265
   strategy: string;         // "Buy YES Kalshi + NO PM"
-  arbType?: string | null;
+  arbType?: import('./arb-types').ArbType | null;
   outcomeCount: number;
   matchedCount: number;
   kalshiCount: number;
@@ -1133,7 +1201,7 @@ export interface LastScanResult {
     roiPct: number;
     expectedProfit: number;
     strategy: string;
-    arbType?: string;
+    arbType?: import('./arb-types').ArbType;
     totalStake?: number;
     // Price fields for cached detail view rendering (UI: no empty "Refreshing prices")
     kalshiTicker?: string;
@@ -1153,6 +1221,9 @@ export interface LastScanResult {
     kalshiStake?: number;
     pmStake?: number;
     apyPct?: number | null;
+    daysToExpiry?: number | null;
+    expiryAt?: string | null;
+    apyUnavailableReason?: import('./scan-apy').ScanApyUnavailableReason | null;
     outcomeApy?: OutcomeContingentApy;
     buyPlatform?: string | null;
     buyPrice?: number;
@@ -1168,7 +1239,6 @@ export interface LastScanResult {
       worstCaseNetProfit: number;
     };
   }[];
-  arbType?: 'cross' | 'direct' | 'internal' | null;
 }
 
 export interface SavedMarket {

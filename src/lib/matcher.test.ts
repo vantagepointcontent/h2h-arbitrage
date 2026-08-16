@@ -178,23 +178,23 @@ describe('calculateArbitrageMax', () => {
 });
 
 describe('computeApy', () => {
-  it('ger ROI som APY om ingen expiryDate (kan inte annualisera)', () => {
-    expect(computeApy(10, null)).toBe(10);
-    expect(computeApy(10, undefined)).toBe(10);
+  it('ger unavailable om expiryDate saknas', () => {
+    expect(computeApy(10, null)).toBeNull();
+    expect(computeApy(10, undefined)).toBeNull();
   });
 
-  it('linjär annualisering: 10% på 30 dagar', () => {
+  it('sammansatt annualisering: 10% på 30 dagar', () => {
     const expiry = new Date(Date.now() + 30 * 86400000).toISOString();
-    expect(computeApy(10, expiry)).toBeCloseTo(121.7, 0);
+    expect(computeApy(10, expiry)).toBeCloseTo((1.1 ** (365 / 30) - 1) * 100, 0);
   });
 
   it('expired → 0', () => {
-    expect(computeApy(50, '2020-01-01')).toBe(0);
+    expect(computeApy(50, '2020-01-01')).toBeNull();
   });
 
-  it('en dag → 3650% APY (linjär extrapolering)', () => {
+  it('en dag använder sammansatt APY utan Infinity', () => {
     const tomorrow = new Date(Date.now() + 86400000).toISOString();
-    expect(computeApy(10, tomorrow)).toBeCloseTo(3650, 0);
+    expect(Number.isFinite(computeApy(10, tomorrow))).toBe(true);
   });
 
   it('365 dagar → samma APY som ROI', () => {

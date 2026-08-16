@@ -10,7 +10,7 @@ import { ExpandedChart } from './ExpandedChart';
 import { ArbDecayCurve } from './ArbDecayCurve';
 import { DepthHeatmap, computeLiquidityFromOutcome } from './DepthHeatmap';
 import { parseArbLegs, LegBreakdown, ArbTypeBadge } from './ArbLegBreakdown';
-import { ApyValueTooltip, getDaysToExpiry, buildMarketTooltip } from './ApyTooltip';
+import { ApyValueTooltip, buildMarketTooltip } from './ApyTooltip';
 import { formatPrice } from "@/app/lib/page-shared";
 import { MarketDepthCharts } from './MarketDepthCharts';
 import { calculateShareRatio } from '@/lib/share-ratio';
@@ -28,6 +28,9 @@ interface Outcome {
     expectedProfit: number;
     roiPct: number;
     apyPct?: number | null;
+    daysToExpiry?: number | null;
+    expiryAt?: string | null;
+    apyUnavailableReason?: import('@/lib/scan-apy').ScanApyUnavailableReason | null;
     outcomeApy?: OutcomeContingentApy;
     kalshiStake?: number;
     pmStake?: number;
@@ -71,9 +74,9 @@ interface OutcomeTableBodyProps {
 
 /** Format days-to-expiry as human-readable string:
  *  >1 day → "X days", <1 day → "X hours" or "X min", expired → "Expired" */
-function formatTimeToExpiry(expiryDate?: string | null): string {
-  const days = getDaysToExpiry(expiryDate);
-  if (days == null) return "Expired";
+function formatTimeToExpiry(days?: number | null): string {
+  if (days == null || !Number.isFinite(days)) return "Unavailable";
+  if (days <= 0) return "Expired";
   if (days >= 1) return `${Math.round(days)} days`;
   const hours = days * 24;
   if (hours >= 1) return `${Math.round(hours)} hours`;
@@ -298,15 +301,11 @@ function OutcomeTableBodyInner({
               <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (
-                  <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.outcomeApy?.scenarioA.daysToSettlement ?? getDaysToExpiry(marketExpiryDate)}>
+                  <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.daysToExpiry ?? null}>
                     {formatPercent(o.arbitrage.apyPct)}
                   </ApyValueTooltip>
-                ) : hasPrices && o.arbitrage.outcomeApy?.scenarioA.apyPct != null && o.arbitrage.outcomeApy.scenarioB.apyPct != null ? (
-                  <span title={`Kalshi-win settlement ${o.arbitrage.outcomeApy.scenarioA.settlementAt} (${o.arbitrage.outcomeApy.scenarioA.timingSource}); Polymarket-win settlement ${o.arbitrage.outcomeApy.scenarioB.settlementAt} (${o.arbitrage.outcomeApy.scenarioB.timingSource})`}>
-                    K {formatPercent(o.arbitrage.outcomeApy.scenarioA.apyPct)} / PM {formatPercent(o.arbitrage.outcomeApy.scenarioB.apyPct)}
-                  </span>
-                ) : hasPrices && o.arbitrage.outcomeApy ? (
-                  <span title={`APY unavailable: ${(o.arbitrage.outcomeApy.unavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>Unavailable</span>
+                ) : hasPrices ? (
+                  <span title={`APY unavailable: ${(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>Unavailable</span>
                 ) : "—"}
               </td>
               <td className="relative px-4 py-3 text-right group">
@@ -439,16 +438,28 @@ function OutcomeTableBodyInner({
                     {hasPrices && o.arbitrage.apyPct != null && o.arbitrage.apyPct > 0 && (
                       <div className="flex items-center gap-2">
                         <span className="text-[var(--text-secondary)]">APY:</span>
-                        <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.outcomeApy?.scenarioA.daysToSettlement ?? getDaysToExpiry(marketExpiryDate)}>
+                        <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.daysToExpiry ?? null}>
                           <span className="font-bold text-[var(--status-positive)]">{formatPercent(o.arbitrage.apyPct)}</span>
                         </ApyValueTooltip>
+                      </div>
+                    )}
+                    {hasPrices && o.arbitrage.outcomeApy?.scenarioA.apyPct != null && (
+                      <div className="flex items-center gap-2" title={`Settlement ${o.arbitrage.outcomeApy.scenarioA.settlementAt} (${o.arbitrage.outcomeApy.scenarioA.timingSource})`}>
+                        <span className="text-[var(--text-secondary)]">{o.arbitrage.outcomeApy.scenarioA.winner === 'kalshi' ? 'Kalshi' : 'Polymarket'} APY:</span>
+                        <span className="font-medium text-[var(--text-primary)]">{formatPercent(o.arbitrage.outcomeApy.scenarioA.apyPct)}</span>
+                      </div>
+                    )}
+                    {hasPrices && o.arbitrage.outcomeApy?.scenarioB.apyPct != null && (
+                      <div className="flex items-center gap-2" title={`Settlement ${o.arbitrage.outcomeApy.scenarioB.settlementAt} (${o.arbitrage.outcomeApy.scenarioB.timingSource})`}>
+                        <span className="text-[var(--text-secondary)]">{o.arbitrage.outcomeApy.scenarioB.winner === 'kalshi' ? 'Kalshi' : 'Polymarket'} APY:</span>
+                        <span className="font-medium text-[var(--text-primary)]">{formatPercent(o.arbitrage.outcomeApy.scenarioB.apyPct)}</span>
                       </div>
                     )}
                     {/* Days to expiry in expanded detail */}
                     <div className="flex items-center gap-2">
                       <span className="text-[var(--text-secondary)]">Days to expiry:</span>
-                      <span className={`font-medium ${formatTimeToExpiry(marketExpiryDate) === "Expired" ? "text-[var(--status-negative)]" : "text-[var(--text-primary)]"}`}>
-                        {formatTimeToExpiry(marketExpiryDate)}
+                      <span className={`font-medium ${formatTimeToExpiry(o.arbitrage.daysToExpiry) === "Expired" ? "text-[var(--status-negative)]" : "text-[var(--text-primary)]"}`}>
+                        {formatTimeToExpiry(o.arbitrage.daysToExpiry)}
                       </span>
                     </div>
                   </div>

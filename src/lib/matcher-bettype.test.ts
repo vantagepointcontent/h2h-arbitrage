@@ -264,14 +264,14 @@ describe('parseDepth', () => {
 // ─── computeApy tests ─────────────────────────────────────────────────
 
 describe('computeApy', () => {
-  it('returns raw ROI for null expiry (no annualization)', () => {
-    expect(computeApy(10, null)).toBe(10);
-    expect(computeApy(10, undefined)).toBe(10);
+  it('returns unavailable for null expiry', () => {
+    expect(computeApy(10, null)).toBeNull();
+    expect(computeApy(10, undefined)).toBeNull();
   });
 
   it('returns 0 for past expiry', () => {
     const past = new Date(Date.now() - 86400000).toISOString();
-    expect(computeApy(10, past)).toBe(0);
+    expect(computeApy(10, past)).toBeNull();
   });
 
   it('annualizes ROI for future expiry', () => {

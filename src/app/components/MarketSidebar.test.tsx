@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FullScanStatus, NavButton } from './MarketSidebar';
 import type { SavedMarket } from '@/app/lib/page-shared';
+import { readFileSync } from 'node:fs';
 
 describe('NavButton mobile accessibility', () => {
   it.each([
@@ -42,5 +43,13 @@ describe('saved-market full scan states', () => {
   ])('renders %s from the last successful full scan', (_status, saved, label) => {
     render(<FullScanStatus market={saved} now={now} />);
     expect(screen.getByText(label)).toBeTruthy();
+  });
+});
+
+describe.each(['desktop', 'mobile'])('BUG-159 compact APY on %s', () => {
+  it('does not render venue APY suffixes in the saved-market sidebar', () => {
+    const source = readFileSync(`${process.cwd()}/src/app/components/MarketSidebar.tsx`, 'utf8');
+    expect(source).not.toContain('Kalshi-win / Polymarket-win APY');
+    expect(source).not.toMatch(/\(K \{formatPercent\([^)]*kalshi/);
   });
 });

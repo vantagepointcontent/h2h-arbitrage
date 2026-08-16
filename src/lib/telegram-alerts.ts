@@ -25,6 +25,7 @@
 // ─── Types ────────────────────────────────────────────────────────
 
 import { auditArbClassification, classifyArbType, type ArbType } from './arb-types';
+import type { ScanApyUnavailableReason } from './scan-apy';
 export type { ArbType } from './arb-types';
 
 /**
@@ -45,6 +46,10 @@ export interface ArbAlertInput {
   marketTitle: string;
   marketId: string;
   roiPct: number;
+  /** Persisted canonical APY/TTE snapshot from the same scan event. */
+  apyPct?: number | null;
+  daysToExpiry?: number | null;
+  apyUnavailableReason?: ScanApyUnavailableReason | null;
   expectedProfit: number;
   strategy: string;
   totalStake?: number;
@@ -226,6 +231,11 @@ function buildFooter(deepLink: string): string {
  */
 export function formatArbMessage(arb: ArbAlertInput): string {
   const roiStr = arb.roiPct.toFixed(2);
+  const apyLine = arb.apyPct != null
+    ? `📊 APY: <b>${arb.apyPct.toFixed(2)}%</b>${arb.daysToExpiry != null ? ` (${arb.daysToExpiry.toFixed(2)} days)` : ''}`
+    : arb.apyUnavailableReason
+      ? `📊 APY unavailable: ${escapeHtml(arb.apyUnavailableReason.replaceAll('_', ' '))}`
+      : null;
   const profitStr = arb.expectedProfit.toFixed(2);
   const stakeStr = arb.totalStake ? arb.totalStake.toFixed(2) : '—';
   const feeStr = arb.fees
@@ -241,6 +251,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
     `📈 ROI: <b>${roiStr}%</b>`,
+    ...(apyLine ? [apyLine] : []),
     `💰 Profit: <b>$${profitStr}</b>${feeStr ? ` (${feeStr})` : ''}`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     `💵 Stake: $${stakeStr}`,
