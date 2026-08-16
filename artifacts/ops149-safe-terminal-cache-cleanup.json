@@ -1,0 +1,185 @@
+{
+  "timestamp": "2026-08-16T10:50:23.640287+00:00",
+  "dryRun": false,
+  "entries": [
+    {
+      "taskId": "t_98bfd433",
+      "status": "done",
+      "path": "/home/scott/h2h-arbitrage/.worktrees/t_98bfd433/node_modules",
+      "bytes": 16402,
+      "processPids": [
+        2162553,
+        2162574,
+        2162575
+      ],
+      "action": "protect"
+    },
+    {
+      "taskId": "t_98bfd433",
+      "status": "done",
+      "path": "/home/scott/h2h-arbitrage/.worktrees/t_98bfd433/dist",
+      "bytes": 8209343,
+      "processPids": [
+        2162553,
+        2162574,
+        2162575
+      ],
+      "action": "protect"
+    },
+    {
+      "taskId": "t_dc12de59",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_dc12de59/node_modules",
+      "bytes": 38,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_8db60a74",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_8db60a74/node_modules",
+      "bytes": 910158096,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_8db60a74",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_8db60a74/dist",
+      "bytes": 3773139,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_beae22a9",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_beae22a9/node_modules",
+      "bytes": 910170339,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_58bab486",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_58bab486/node_modules",
+      "bytes": 910178762,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_58bab486",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_58bab486/dist",
+      "bytes": 726427,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_43b6987d",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_43b6987d/node_modules",
+      "bytes": 910170390,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_43b6987d",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_43b6987d/dist",
+      "bytes": 3786590,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_497c3b85",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_497c3b85/node_modules",
+      "bytes": 910170656,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_497c3b85",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_497c3b85/dist",
+      "bytes": 3803596,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_048dc109",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_048dc109/node_modules",
+      "bytes": 910178762,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_048dc109",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_048dc109/dist",
+      "bytes": 726005,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_67c1d164",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_67c1d164/node_modules",
+      "bytes": 910168294,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_67c1d164",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_67c1d164/dist",
+      "bytes": 3587247,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_30c096a1",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_30c096a1/node_modules",
+      "bytes": 910158741,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_30c096a1",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_30c096a1/dist",
+      "bytes": 3590150,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    },
+    {
+      "taskId": "t_b6d705a0",
+      "status": "done",
+      "path": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_b6d705a0/node_modules",
+      "bytes": 901008315,
+      "processPids": [],
+      "action": "remove-cache",
+      "removed": true
+    }
+  ],
+  "plannedBytes": 8202355547,
+  "removedBytes": 8202355547
+}
