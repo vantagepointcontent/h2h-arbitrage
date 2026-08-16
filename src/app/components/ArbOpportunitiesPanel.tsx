@@ -7,6 +7,7 @@ import { parseArbLegs, LegBreakdown, ArbTypeBadge } from "./ArbLegBreakdown";
 import { ExecuteArbModal, buildExecutableArb, type ExecutableArb } from "./ExecuteArbModal";
 import { ProfitDistributionPanel } from "./ProfitDistributionPanel";
 import type { OutcomeContingentApy } from "@/lib/settlement-apy";
+import type { ScanApyUnavailableReason } from "@/lib/scan-apy";
 import { parseDepth } from "@/lib/matcher";
 import { resolveDistributionStakes, type ProfitDistribution } from "@/lib/profit-distribution";
 import { ArbDecayCurve } from "./ArbDecayCurve";
@@ -31,6 +32,7 @@ interface Outcome {
     expectedProfit: number;
     roiPct: number;
     apyPct?: number | null;
+    apyUnavailableReason?: ScanApyUnavailableReason | null;
     outcomeApy?: OutcomeContingentApy;
     kalshiStake?: number;
     pmStake?: number;
@@ -291,6 +293,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
             o.arbitrage.expectedProfit,
           );
           const apy = o.arbitrage.apyPct;
+          const hasCanonicalApy = typeof apy === 'number' && Number.isFinite(apy);
           const scenarioApy = o.arbitrage.outcomeApy;
 
           const distributionKey = `${idx}-${o.artist}`;
@@ -346,18 +349,15 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                 <span className="text-xs text-[#5DBE81]" title="Expected profit (net of fees)">
                   {formatCurrency(displayProfit)}
                 </span>
-                {apy != null && apy > 0 && (
+                {hasCanonicalApy && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
                     APY {apy.toFixed(0)}%
                   </span>
                 )}
-                {apy == null && scenarioApy?.scenarioA.apyPct != null && scenarioApy.scenarioB.apyPct != null && (
-                  <span className="text-[10px] text-[#8A9BA8]" title={`Winning-leg settlement timing: ${scenarioApy.scenarioA.settlementAt} / ${scenarioApy.scenarioB.settlementAt}`}>
-                    APY K {scenarioApy.scenarioA.apyPct.toFixed(0)}% / PM {scenarioApy.scenarioB.apyPct.toFixed(0)}%
+                {!hasCanonicalApy && (
+                  <span className="text-[10px] text-[#8A9BA8]" title={`APY unavailable: ${(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>
+                    APY unavailable: {(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}
                   </span>
-                )}
-                {apy == null && scenarioApy && (scenarioApy.scenarioA.apyPct == null || scenarioApy.scenarioB.apyPct == null) && (
-                  <span className="text-[10px] text-[#8A9BA8]" title={`APY unavailable: ${(scenarioApy.unavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>APY unavailable</span>
                 )}
                 {activeAlert && (
                   <span className={`inline-flex items-center gap-1 text-[10px] ${alertHit ? "text-[#5DBE81]" : "text-[#facc15]"}`} title={`Alert at ${activeAlert.targetRoiPct.toFixed(2)}% net ROI`}>
@@ -405,6 +405,16 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
               {breakdown.legs.length > 0 && (
                 <div className="mt-2">
                   <LegBreakdown breakdown={breakdown} formatCurrency={formatCurrency} />
+                </div>
+              )}
+              {scenarioApy && (scenarioApy.scenarioA.apyPct != null || scenarioApy.scenarioB.apyPct != null) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#8A9BA8]" aria-label="Venue settlement APY provenance">
+                  <span className="text-[#5E6875]">Venue settlement APY</span>
+                  {[scenarioApy.scenarioA, scenarioApy.scenarioB].map((scenario) => scenario.apyPct != null && (
+                    <span key={scenario.label} title={`Settlement ${scenario.settlementAt} (${scenario.timingSource})`}>
+                      {scenario.winner === 'kalshi' ? 'Kalshi' : 'Polymarket'} APY {scenario.apyPct.toFixed(0)}%
+                    </span>
+                  ))}
                 </div>
               )}
               <div className="mt-2 flex items-stretch gap-2 flex-wrap sm:items-center">
