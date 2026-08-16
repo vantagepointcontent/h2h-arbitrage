@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCapacityUtilization } from '@/lib/persistence';
+import { getCapacityUtilization, getOperationalTelemetryFreshness } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseDashboardRange } from '@/lib/dashboard-request';
+import { readWorkerTelemetryWriteHealth } from '@/lib/scan-worker-coordinator';
+
+function freshnessState(timestamp: string | null, staleAfterMs: number, degradedState: string) {
+  const ageMs = timestamp == null ? null : Math.max(0, Date.now() - Date.parse(timestamp));
+  return {
+    state: ageMs == null || ageMs > staleAfterMs ? degradedState : 'healthy',
+    lastObservedAt: timestamp,
+    ageMs,
+    staleAfterMs,
+  };
+}
 
 /**
  * GET /api/dashboard/capacity
@@ -9,9 +20,8 @@ import { parseDashboardRange } from '@/lib/dashboard-request';
  * Query params:
  *   range — "today" | "7d" | "30d" | "90d" | "all" (default: "30d")
  *
- * Returns hourly capacity utilization % per upstream API. Each row is one
- * hour (newest first) and includes one series per limiter. Gaps are filled
- * with 0% so the line chart is continuous. Aggregation is SQL-side.
+ * Returns hourly capacity utilization % per upstream API. Missing samples are
+ * represented as null and never silently converted to confirmed zero usage.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -40,13 +50,20 @@ export async function GET(request: NextRequest) {
         since = new Date(now.getTime() - 30 * 86400000).toISOString();
     }
 
-    const rows = await getCapacityUtilization(since);
+    const [rows, freshness, workerWriteHealth] = await Promise.all([
+      getCapacityUtilization(since),
+      getOperationalTelemetryFreshness(),
+      readWorkerTelemetryWriteHealth(),
+    ]);
 
-    // Build a continuous hour index, oldest → newest (chart-friendly)
-    const hoursSet = new Set(rows.map((r: { hour: string }) => r.hour));
-    if (since) hoursSet.add(since.slice(0, 13) + ':00:00');
-    hoursSet.add(new Date().toISOString().slice(0, 13) + ':00:00');
-    const hours = Array.from(hoursSet).sort();
+    const endMs = Date.parse(new Date().toISOString().slice(0, 13) + ':00:00Z');
+    const firstObserved = rows.map((row: { hour: string }) => row.hour).sort()[0];
+    const startIso = since ?? firstObserved ?? new Date(endMs).toISOString();
+    const startMs = Date.parse(startIso.slice(0, 13) + ':00:00Z');
+    const hours: string[] = [];
+    for (let cursor = startMs; cursor <= endMs; cursor += 3_600_000) {
+      hours.push(new Date(cursor).toISOString().slice(0, 19));
+    }
 
     // Limiters we want explicit series for (PredictionHunt intentionally omitted from chart)
     const chartLimiters = ['gamma', 'clob-markets', 'clob-book', 'kalshi'];
@@ -67,9 +84,12 @@ export async function GET(request: NextRequest) {
       isThrottled: number;
       avgQueueWaitMs: number;
       rejectedRequests: number;
+      sampleCount: number;
+      lastSampleAt: string;
+      serviceIdentities: string[];
     };
 
-    const series: { name: string; data: CapRow[] }[] = [];
+    const series: Array<{ name: string; data: Array<Record<string, unknown>> }> = [];
     for (const limiter of chartLimiters) {
       const byHour = new Map<string, CapRow>(rows.filter((r: CapRow) => r.limiter === limiter).map((r: CapRow) => [r.hour, r]));
       const data = hours.map((hour: string) => {
@@ -77,12 +97,23 @@ export async function GET(request: NextRequest) {
         return {
           hour,
           limiter,
-          utilizationPct: r?.utilizationPct ?? 0,
+          utilizationPct: r?.utilizationPct ?? null,
+          sampleState: r
+            ? (r.totalRequests > 0
+              ? 'observed_usage'
+              : hour === new Date().toISOString().slice(0, 13) + ':00:00'
+              && Date.now() - Date.parse(r.lastSampleAt) > 5 * 60_000
+              ? 'stale_last_known_sample'
+              : 'confirmed_zero')
+            : 'no_samples',
           isThrottled: r?.isThrottled ?? 0,
           avgQueueWaitMs: r?.avgQueueWaitMs ?? 0,
           rejectedRequests: r?.rejectedRequests ?? 0,
           totalRequests: r?.totalRequests ?? 0,
-          maxRequests: r?.maxRequests ?? Math.round((3600 * 1000) / 1000),
+          maxRequests: r?.maxRequests ?? null,
+          sampleCount: r?.sampleCount ?? 0,
+          lastSampleAt: r?.lastSampleAt ?? null,
+          serviceIdentities: r?.serviceIdentities ?? [],
         };
       });
       series.push({ name: displayNames[limiter] ?? limiter, data });
@@ -92,13 +123,22 @@ export async function GET(request: NextRequest) {
       range,
       hours,
       series,
+      telemetry: {
+        collector: freshnessState(freshness.latestCapacitySampleAt, 5 * 60_000, 'collector_degraded'),
+        workerCollector: freshnessState(freshness.latestWorkerCapacitySampleAt, 5 * 60_000, 'worker_collector_degraded'),
+        workerWrites: {
+          state: workerWriteHealth.error ? 'worker_collector_write_degraded' : 'healthy',
+          ...workerWriteHealth,
+        },
+        scanner: freshnessState(freshness.latestCompletedScanAt, 10 * 60_000, 'scanner_degraded'),
+      },
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
       { error: clientSafeError(err, 'Failed to fetch capacity data') },
       { status: 500 }

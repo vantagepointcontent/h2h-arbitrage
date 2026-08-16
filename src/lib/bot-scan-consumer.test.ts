@@ -143,7 +143,14 @@ function harness(options: {
     recordReplay: vi.fn(async (id) => {
       events.push({ scanId: id, state: 'duplicate_replay', code: 'duplicate_replay' });
     }),
-    advanceCursor: vi.fn(async (id) => { cursor = Math.max(cursor, id); }),
+    advanceCursor: vi.fn(async () => {
+      for (const item of scans.sort((a, b) => a.id - b.id)) {
+        if (item.id <= cursor) continue;
+        const decision = decisions.get(item.id);
+        if (!decision || decision.state === 'received' || (decision.state === 'failed' && decision.reasonCode === 'revalidation_failed')) break;
+        cursor = item.id;
+      }
+    }),
     revalidate: vi.fn(async () => {
       if (options.current instanceof Error) throw options.current;
       return options.current ?? [candidate()];
@@ -333,12 +340,12 @@ describe('durable BotTrader scan consumer', () => {
     expect(result).toMatchObject({ state: 'daily_limit', reasonCode: 'daily_limit' });
   });
 
-  it('keeps production requests in paper mode when the execution safety guard does', async () => {
+  it('blocks production requests instead of silently recording a paper placement', async () => {
     const h = harness({ botSettings: settings({ mode: 'production' }), execute: execution({ dryRun: true }) });
     const result = await h.consumer.consume(41, 'scan_api');
-    expect(result.state).toBe('placed');
-    expect(result.details).toMatchObject({ dryRun: true });
-    expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'paper');
+    expect(result).toMatchObject({ state: 'failed', reasonCode: 'production_execution_blocked' });
+    expect(h.deps.reserveOpportunity).not.toHaveBeenCalled();
+    expect(h.deps.execute).not.toHaveBeenCalled();
   });
 
   it('binds live reservation lifecycle callbacks and execution input to live mode', async () => {
@@ -395,6 +402,21 @@ describe('durable BotTrader scan consumer', () => {
     expect(results.map((result) => result.state)).toEqual(['placed', 'placed', 'placed']);
     expect(h.deps.execute).toHaveBeenCalledTimes(3);
     expect(h.cursor()).toBe(43);
+  });
+
+  it('checkpoints completed scans with zero opportunities', async () => {
+    const h = harness({ scans: [scan({ positiveArbCount: 0, candidates: [] })] });
+    const result = await h.consumer.consume(41, 'catch_up');
+    expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'no_opportunities' });
+    expect(h.cursor()).toBe(41);
+  });
+
+  it('does not advance the cursor across an unfinished completed-scan gap', async () => {
+    const h = harness({ scans: [scan({ id: 41 }), scan({ id: 42 })] });
+    await h.consumer.consume(42, 'scan_api');
+    expect(h.cursor()).toBe(0);
+    await h.consumer.consume(41, 'catch_up');
+    expect(h.cursor()).toBe(42);
   });
 
   it('retries a disabled decision after BotTrader is re-enabled using the same decision row', async () => {

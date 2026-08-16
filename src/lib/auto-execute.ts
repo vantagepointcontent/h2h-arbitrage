@@ -140,6 +140,7 @@ export interface TickCheckResult {
   actualPrice?: number;
   priceMoved: boolean;         // true if price moved beyond slippage threshold
   action: 'proceed' | 'cancel' | 'timeout';
+  reason?: string;
 }
 
 export interface ExecutionAlert {
@@ -455,10 +456,10 @@ export async function cancelAndVerifyOrder(
 // If price has moved beyond the slippage threshold, cancel the unfilled leg
 // and auto-close the filled leg to eliminate exposure.
 
-async function tickCheckLeg(
+export async function tickCheckLeg(
   filledLeg: 'kalshi' | 'polymarket',
   unfilledReq: OrderRequest,
-  _maxSlippagePct: number,
+  maxSlippagePct: number,
   dryRun: boolean,
 ): Promise<TickCheckResult> {
   const expectedPrice = unfilledReq.price;
@@ -476,21 +477,57 @@ async function tickCheckLeg(
     };
   }
 
-  // Real mode: orderbook fetch functions are not yet implemented.
-  // The tick check still runs in dry-run mode (simulated) and the poll loop's
-  // timeout + slippage validation provide the safety net in real mode.
-  // When orderbook fetch functions are added to kalshi-orders.ts / polymarket-orders.ts,
-  // this branch can be upgraded to do a live price verification.
-  //
-  // For now: proceed cautiously — the limit order protects against slippage,
-  // and the timeout will cancel the unfilled leg if it doesn't fill in time.
+  try {
+    const { seedKalshiBook, seedPmBook } = await import('./book-seed');
+    const exactBookId = unfilledReq.platform === 'kalshi'
+      ? (unfilledReq.ticker ?? unfilledReq.marketId)
+      : (unfilledReq.conditionId ?? unfilledReq.marketId);
+    // Never let a failed refresh inherit a previously cached response.
+    orderbookState.removeBook(exactBookId);
+    if (unfilledReq.platform === 'kalshi') {
+      await seedKalshiBook(exactBookId);
+    } else {
+      await seedPmBook(exactBookId, unfilledReq.outcome);
+    }
+  } catch (error) {
+    return {
+      triggered: true,
+      legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
+      expectedPrice,
+      priceMoved: true,
+      action: 'cancel',
+      reason: `Exact-market order-book refresh failed: ${errorMessage(error)}`,
+    };
+  }
+
+  const quote = getAuthoritativeExecutableQuote(unfilledReq);
+  const observedAt = Date.parse(quote.depthTimestamp ?? '');
+  const depthAgeMs = Date.now() - observedAt;
+  if (!isExecutableQuoteConsistent(quote, 'buy', 1_000_000)
+      || !Number.isFinite(depthAgeMs) || depthAgeMs < -5_000 || depthAgeMs > MAX_EXECUTABLE_DEPTH_AGE_MS
+      || quote.vwapPriceMicroCents == null) {
+    return {
+      triggered: true,
+      legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
+      expectedPrice,
+      priceMoved: true,
+      action: 'cancel',
+      reason: 'Latest exact-market quote is missing, stale, or lacks one-share executable depth',
+    };
+  }
+  const actualPrice = quote.vwapPriceMicroCents / 100_000_000;
+  const slippagePct = ((actualPrice - expectedPrice) / expectedPrice) * 100;
+  const priceMoved = actualPrice > expectedPrice + 1e-9 || slippagePct > maxSlippagePct;
   return {
     triggered: true,
     legChecked: filledLeg === 'kalshi' ? 'polymarket' : 'kalshi',
     expectedPrice,
-    actualPrice: undefined,
-    priceMoved: false,
-    action: 'proceed',
+    actualPrice,
+    priceMoved,
+    action: priceMoved ? 'cancel' : 'proceed',
+    reason: priceMoved
+      ? `Latest executable price ${actualPrice} exceeds submitted limit ${expectedPrice} (${slippagePct.toFixed(2)}% movement)`
+      : 'Latest exact-market quote remains executable for one share within the submitted limit',
   };
 }
 

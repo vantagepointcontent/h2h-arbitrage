@@ -8,11 +8,9 @@
  *   • `bot.mode === 'production'` alone is NOT enough to place live orders.
  *   • Real orders require BOTH `bot.mode === 'production'` AND the global
  *     `execute.mode === 'live'`.
- *   • Paper mode (`bot.mode === 'paper'` or `execute.mode === 'paper'`) always
- *     simulates, even when `bot.mode` is production.
- *   • The production/live path is currently BLOCKED by a hard-coded `false`
- *     guard in `maybeExecuteBotTrade`.  Victor must explicitly authorize
- *     automatic live order placement before that guard is removed.
+ *   • Paper mode is simulated only when BotTrader itself is configured for
+ *     paper. A production request with incomplete live prerequisites is
+ *     blocked and alerted; it never silently degrades to a paper placement.
  */
 
 import type { UnifiedOutcome } from './matcher';
@@ -25,7 +23,7 @@ import {
 } from './auto-execute';
 import { isPriceAlignedToTick } from './venue-constraints';
 import { getSetting } from './settings';
-import { executionModeToDryRun } from './execution-mode';
+import type { ExecutionMode } from './execution-mode';
 import {
   persistExecution,
   getTodayBotExposure,
@@ -154,6 +152,8 @@ export interface BotExecutionResult {
   /** True only after the authoritative/synthetic position row was durably written. */
   positionPersisted?: boolean;
   persistenceError?: string;
+  /** Durable executions primary key when an execution row was written. */
+  executionId?: number;
 }
 
 /** Canonical gate shared by execution and position performance persistence. */
@@ -312,8 +312,14 @@ const DEFAULT_BOT_SETTINGS: BotSettings = {
   maxTradesPerDay: 10,
 };
 
-/** MASTER SAFETY GUARD: keep `false` until Victor authorizes auto-live orders. */
-const AUTO_LIVE_ORDERS_AUTHORIZED = false;
+export interface BotExecutionReadiness {
+  requestedMode: BotSettings['mode'];
+  globalMode: ExecutionMode;
+  authorizationConfigured: boolean;
+  credentialsReady: boolean;
+  effectiveMode: BotPositionExecutionMode;
+  blockedReasons: string[];
+}
 
 // ─── Settings loading ────────────────────────────────────────────
 
@@ -349,13 +355,29 @@ export async function getBotSettings(): Promise<BotSettings> {
   };
 }
 
-export async function resolveBotExecutionMode(settings: BotSettings): Promise<BotPositionExecutionMode> {
+export async function getBotExecutionReadiness(settings: BotSettings): Promise<BotExecutionReadiness> {
   const { getExecutionMode } = await import('./settings');
+  const { getCredentialStatus } = await import('./execution-creds');
   const globalMode = await getExecutionMode().catch(() => 'paper' as const);
-  const wantsProduction = settings.mode === 'production' && globalMode === 'live';
-  return !executionModeToDryRun(globalMode) && wantsProduction && AUTO_LIVE_ORDERS_AUTHORIZED
-    ? 'live'
-    : 'paper';
+  const credentials = await getCredentialStatus().catch(() => ({ allReady: false }));
+  const authorizationConfigured = process.env.H2H_AUTO_LIVE_ORDERS_AUTHORIZED === 'true';
+  const blockedReasons = settings.mode === 'production' ? [
+    ...(globalMode !== 'live' ? [`Global execute.mode must be live (currently ${globalMode})`] : []),
+    ...(!authorizationConfigured ? ['Set H2H_AUTO_LIVE_ORDERS_AUTHORIZED=true in the protected PM2 environment'] : []),
+    ...(!credentials.allReady ? ['Configure valid Kalshi and Polymarket execution credentials, then restart PM2 with --update-env'] : []),
+  ] : [];
+  return {
+    requestedMode: settings.mode,
+    globalMode,
+    authorizationConfigured,
+    credentialsReady: credentials.allReady,
+    effectiveMode: settings.mode === 'production' && blockedReasons.length === 0 ? 'live' : 'paper',
+    blockedReasons,
+  };
+}
+
+export async function resolveBotExecutionMode(settings: BotSettings): Promise<BotPositionExecutionMode> {
+  return (await getBotExecutionReadiness(settings)).effectiveMode;
 }
 
 // ─── Evaluation ──────────────────────────────────────────────────
@@ -765,8 +787,23 @@ export async function maybeExecuteBotTrade(
   }
 
   const arbId = safeArbId(input.pairId, input.outcome);
-  const executionMode = await resolveBotExecutionMode(settings);
+  const readiness = await getBotExecutionReadiness(settings);
+  const executionMode = readiness.effectiveMode;
   const effectiveDryRun = executionMode === 'paper';
+  if (settings.mode === 'production' && readiness.blockedReasons.length > 0) {
+    const reason = `Production execution blocked: ${readiness.blockedReasons.join('; ')}`;
+    await log('preflight', 'Production execution readiness', 'failed', {
+      responsePayload: readiness,
+      errorReason: reason,
+      qualificationOutcome: 'dead',
+    });
+    const alert = await sendBotOperationalAlert(input, reason, tradeId).catch((error) => ({
+      durable: false,
+      delivered: false,
+      error: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+    }));
+    return { executed: false, dryRun: false, reason: alert.durable ? reason : `${reason}; ${alert.error}` };
+  }
   if (input.reservationMode != null && input.reservationMode !== executionMode) {
     const reason = `Execution mode changed after reservation (${input.reservationMode} -> ${executionMode})`;
     await log('preflight', 'Reservation mode check', 'failed', { errorReason: reason, qualificationOutcome: 'dead' });
@@ -810,13 +847,6 @@ export async function maybeExecuteBotTrade(
     };
   }
 
-  if (settings.mode === 'production' && executionMode === 'paper') {
-    logger.warn('[bot-trader] production/live requested but not yet authorized; falling back to paper simulation', {
-      pairId: input.pairId,
-      marketTitle: input.marketTitle,
-    });
-  }
-
   const execReq = buildExecutionRequest(input);
   if (!execReq) {
     await log('preflight', 'Build two-leg execution request', 'failed', { errorReason: 'Missing leg data', qualificationOutcome: 'dead' });
@@ -826,7 +856,7 @@ export async function maybeExecuteBotTrade(
   execReq.dryRun = effectiveDryRun;
   await log('preflight', 'Execution request and safety gates verified', 'passed', {
     requestPayload: execReq,
-    responsePayload: { effectiveDryRun, executionMode, autoLiveOrdersAuthorized: AUTO_LIVE_ORDERS_AUTHORIZED, todayTrades, todayExposure },
+    responsePayload: { effectiveDryRun, executionMode, readiness, todayTrades, todayExposure },
     qualificationOutcome: 'qualified',
   });
 
@@ -982,6 +1012,7 @@ export async function maybeExecuteBotTrade(
     exposureState: effectiveDryRun || shouldPersistPerformance ? undefined : 'pending_reconciliation',
     executionRecord,
     executionResult: result,
+    executionId,
     positionPersisted,
     persistenceError,
   };
@@ -1024,6 +1055,32 @@ async function sendBotTelegramAlert(
   await updateBotMessage(messageId, sent.ok
     ? { status: 'sent', telegramMessageId: sent.messageId }
     : { status: 'failed', errorReason: sent.error || 'Telegram send failed' });
+}
+
+export async function sendBotOperationalAlert(
+  input: Pick<BotTradeInput, 'pairId' | 'marketTitle' | 'outcome'>,
+  reason: string,
+  tradeId = `bot-operational:${crypto.randomUUID()}`,
+): Promise<{ durable: boolean; delivered: boolean; error?: string }> {
+  const config = await getConfigResolved();
+  const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
+  const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${input.marketTitle}\n<b>Outcome:</b> ${input.outcome}\n<b>Remediation:</b> ${reason}`;
+  const messageId = await createBotMessage({
+    chatId,
+    messageText: text,
+    messageType: 'trade_failed',
+    tradeId,
+    marketId: input.pairId,
+    marketTitle: input.marketTitle,
+    status: config && chatId ? 'pending' : 'failed',
+    errorReason: config && chatId ? null : 'Telegram not configured',
+  });
+  if (!config || !chatId) return { durable: true, delivered: false, error: 'Telegram not configured' };
+  const sent = await sendTelegramMessage(config.botToken, chatId, text);
+  await updateBotMessage(messageId, sent.ok
+    ? { status: 'sent', telegramMessageId: sent.messageId }
+    : { status: 'failed', errorReason: sent.error || 'Telegram send failed' });
+  return { durable: true, delivered: sent.ok, ...(sent.ok ? {} : { error: sent.error || 'Telegram send failed' }) };
 }
 
 // ─── Convenience adapters ────────────────────────────────────────

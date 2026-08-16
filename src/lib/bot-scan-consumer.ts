@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client';
 import path from 'path';
-import { evaluateBotTrade, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
+import { evaluateBotTrade, getBotExecutionReadiness, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, sendBotOperationalAlert, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
 import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 import { auditArbClassification } from './arb-types';
@@ -34,6 +34,8 @@ export interface BotScanCandidate {
   pmStake: number;
   kalshiTicker: string;
   pmConditionId: string;
+  pmYesTokenId?: string | null;
+  pmNoTokenId?: string | null;
   kalshiYesAsk: number | null;
   kalshiNoAsk: number | null;
   pmYesAsk: number | null;
@@ -46,6 +48,8 @@ export interface BotScanCandidate {
   pmNoMinOrderSize?: number | null;
   pmYesTickSize?: number | null;
   pmNoTickSize?: number | null;
+  executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+  executionBlocker?: string | null;
   fees: BotScanFees | null;
   expiryDate?: string | null;
   category?: string;
@@ -82,6 +86,7 @@ export interface BotScanConsumerDeps {
   now(): Date;
   getSettings(): Promise<BotSettings>;
   resolveExecutionMode(settings: BotSettings): Promise<BotPositionExecutionMode>;
+  reportModeBlock?(scan: PersistedBotScan, settings: BotSettings): Promise<{ reason: string; alertDurable: boolean; alertError?: string }>;
   loadScan(scanId: number): Promise<PersistedBotScan | null>;
   listBacklog(limit: number): Promise<PersistedBotScan[]>;
   acquire(scan: PersistedBotScan, source: BotScanSource): Promise<BotScanDecision | null>;
@@ -94,6 +99,7 @@ export interface BotScanConsumerDeps {
   reserveOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<boolean>;
   releaseOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void>;
   retainOpportunityForExposure?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void>;
+  recordCandidateDecision?(scan: PersistedBotScan, candidateIndex: number, candidate: BotScanCandidate, state: string, reasonCode: string, reason: string, details?: unknown): Promise<void>;
   maxScanAgeMs?: number;
 }
 
@@ -137,6 +143,8 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     pmStake: item.pmStake,
     kalshiTicker: item.kalshiTicker,
     pmConditionId: item.pmConditionId,
+    pmYesTokenId: item.pmYesTokenId ?? null,
+    pmNoTokenId: item.pmNoTokenId ?? null,
     kalshiYesAsk: item.kalshiYesAsk,
     kalshiNoAsk: item.kalshiNoAsk,
     pmYesAsk: item.pmYesAsk,
@@ -176,6 +184,39 @@ function rejection(
   return { state, reasonCode, reason, placementCount: 0, details };
 }
 
+function candidateAuditDetails(candidate: BotScanCandidate, settings: BotSettings, stage: string, extra: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    configVersion: `bot-settings-v1:${JSON.stringify(settings)}`,
+    stage,
+    thresholds: settings,
+    inputs: {
+      roiPct: candidate.roiPct,
+      apyPct: candidate.apyPct ?? null,
+      expectedProfit: candidate.expectedProfit,
+      expiryDate: candidate.expiryDate ?? null,
+      kalshiStake: candidate.kalshiStake,
+      pmStake: candidate.pmStake,
+      exactIds: {
+        kalshiTicker: candidate.kalshiTicker,
+        pmConditionId: candidate.pmConditionId,
+        pmYesTokenId: candidate.pmYesTokenId ?? null,
+        pmNoTokenId: candidate.pmNoTokenId ?? null,
+      },
+      asks: { kalshiYes: candidate.kalshiYesAsk, kalshiNo: candidate.kalshiNoAsk, pmYes: candidate.pmYesAsk, pmNo: candidate.pmNoAsk },
+      depthUsd: { kalshiYes: candidate.kalshiYesDepth, kalshiNo: candidate.kalshiNoDepth, pmYes: candidate.pmYesDepth, pmNo: candidate.pmNoDepth },
+      fees: candidate.fees,
+      venueConstraints: {
+        pmYesMinimumOrder: candidate.pmYesMinOrderSize ?? null,
+        pmNoMinimumOrder: candidate.pmNoMinOrderSize ?? null,
+        pmYesTickSize: candidate.pmYesTickSize ?? null,
+        pmNoTickSize: candidate.pmNoTickSize ?? null,
+      },
+    },
+    ...extra,
+  };
+}
+
 export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsumer {
   const maxScanAgeMs = deps.maxScanAgeMs ?? 5 * 60_000;
 
@@ -202,6 +243,21 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       return finish(rejection('disabled', 'bot_disabled', 'BotTrader was disabled when this persisted scan was consumed'));
     }
     const executionMode = await deps.resolveExecutionMode(settings);
+    if (settings.mode === 'production' && executionMode !== 'live') {
+      const report = await deps.reportModeBlock?.(scan, settings).catch((error) => ({
+        reason: 'Production execution prerequisites are incomplete',
+        alertDurable: false,
+        alertError: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+      }));
+      const reason = report?.reason ?? 'Production execution prerequisites are incomplete; execution was blocked instead of simulated';
+      return finish({
+        state: 'failed',
+        reasonCode: 'production_execution_blocked',
+        reason: report?.alertDurable === false && report.alertError ? `${reason}; ${report.alertError}` : reason,
+        placementCount: 0,
+        details: { executionMode, alertDurable: report?.alertDurable ?? false, alertError: report?.alertError ?? null },
+      });
+    }
 
     const scannedAtMs = Date.parse(scan.scannedAt);
     const ageMs = deps.now().getTime() - scannedAtMs;
@@ -209,12 +265,48 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       return finish(rejection('stale', 'scan_stale', `Persisted scan is stale or has an invalid timestamp (age ${Number.isFinite(ageMs) ? ageMs : 'unknown'}ms)`, { ageMs, maxScanAgeMs }));
     }
 
-    if (scan.positiveArbCount <= 0 || scan.candidates.length === 0) {
+    if (scan.positiveArbCount <= 0) {
+      return finish(rejection('criteria_rejected', 'no_opportunities', 'Completed scan contained no positive arbitrage opportunities', {
+        opportunitiesEvaluated: 0,
+        eligibleCount: 0,
+      }));
+    }
+    if (scan.candidates.length === 0) {
       return finish(rejection('criteria_rejected', 'malformed_scan', 'Positive-arbitrage scan has no parseable candidate rows'));
     }
 
-    const initiallyEligible = scan.candidates.filter((item) => validFees(item.fees) && evaluateBotTrade(candidateToInput(scan, item, settings), settings).shouldTrade);
+    const initiallyEligible: BotScanCandidate[] = [];
+    for (const [candidateIndex, item] of scan.candidates.entries()) {
+      const unavailable = item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable';
+      const evaluation = evaluateBotTrade(candidateToInput(scan, item, settings), settings);
+      const eligible = !unavailable && validFees(item.fees) && evaluation.shouldTrade;
+      const reasonCode = unavailable ? 'execution_unavailable' : !validFees(item.fees) ? 'fees_unavailable' : eligible ? 'scan_eligible' : 'scan_criteria_rejected';
+      const reason = unavailable
+        ? item.executionBlocker || `Scanner marked ${item.outcome} ${item.executionStatus}`
+        : !validFees(item.fees)
+          ? 'Authoritative fee data is unavailable for one or both legs'
+          : evaluation.reason;
+      await deps.recordCandidateDecision?.(
+        scan,
+        candidateIndex,
+        item,
+        eligible ? 'eligible' : 'rejected',
+        reasonCode,
+        reason,
+        candidateAuditDetails(item, settings, 'scan', { evaluation: evaluation.criteria, final: !eligible }),
+      );
+      if (eligible) initiallyEligible.push(item);
+    }
     if (initiallyEligible.length === 0) {
+      const blocked = scan.candidates.find((item) => item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable');
+      if (blocked) {
+        return finish(rejection(
+          'criteria_rejected',
+          'execution_unavailable',
+          blocked.executionBlocker || `Scanner marked ${blocked.outcome} ${blocked.executionStatus}`,
+          { outcome: blocked.outcome, executionStatus: blocked.executionStatus, executionBlocker: blocked.executionBlocker },
+        ));
+      }
       return finish(rejection('criteria_rejected', 'scan_criteria_rejected', 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data'));
     }
 
@@ -232,8 +324,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     }
 
     const executable: BotScanCandidate[] = [];
-    const rejections: Array<{ outcome: string; code: string; reason: string }> = [];
+    const rejections: Array<{ outcome: string; code: string; reason: string; candidateIndex: number; candidate: BotScanCandidate }> = [];
     for (const original of initiallyEligible) {
+      const candidateIndex = scan.candidates.indexOf(original);
       const current = currentCandidates.find((item) => sameProposition(original, item));
       if (!current) {
         const changed = currentCandidates.find((item) => sameNamedCandidate(original, item));
@@ -243,34 +336,52 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           reason: changed
             ? `Exact market identity changed (${original.kalshiTicker}/${original.pmConditionId} -> ${changed.kalshiTicker}/${changed.pmConditionId})`
             : 'Exact market/outcome identity was not present in the refreshed executable result',
+          candidateIndex,
+          candidate: changed ?? original,
         });
         continue;
       }
       if (current.stale) {
-        rejections.push({ outcome: original.outcome, code: 'current_quote_stale', reason: 'Current executable quote is stale' });
+        rejections.push({ outcome: original.outcome, code: 'current_quote_stale', reason: 'Current executable quote is stale', candidateIndex, candidate: current });
         continue;
       }
       if (!validFees(current.fees)) {
-        rejections.push({ outcome: original.outcome, code: 'fees_unavailable', reason: 'Authoritative current fee values are unavailable for one or both legs' });
+        rejections.push({ outcome: original.outcome, code: 'fees_unavailable', reason: 'Authoritative current fee values are unavailable for one or both legs', candidateIndex, candidate: current });
         continue;
       }
       const evaluation = evaluateBotTrade(candidateToInput(scan, current, settings), settings);
       if (!evaluation.shouldTrade) {
-        rejections.push({ outcome: original.outcome, code: 'current_criteria_rejected', reason: evaluation.reason });
+        rejections.push({ outcome: original.outcome, code: 'current_criteria_rejected', reason: evaluation.reason, candidateIndex, candidate: current });
         continue;
       }
       executable.push(current);
     }
 
+    for (const rejected of rejections) {
+      await deps.recordCandidateDecision?.(
+        scan,
+        rejected.candidateIndex,
+        rejected.candidate,
+        'rejected',
+        rejected.code,
+        rejected.reason,
+        candidateAuditDetails(rejected.candidate, settings, 'revalidation', { final: true }),
+      );
+    }
+
     if (executable.length === 0) {
-      const primary = rejections[0] ?? { code: 'current_criteria_rejected', reason: 'No refreshed candidate remained executable', outcome: '' };
+      const primary = rejections[0] ?? { code: 'current_criteria_rejected', reason: 'No refreshed candidate remained executable', outcome: '', candidateIndex: -1, candidate: scan.candidates[0] };
       return finish(rejection('revalidation_rejected', primary.code, primary.reason, { rejections }));
     }
 
     const reserved: BotScanCandidate[] = [];
     for (const item of executable) {
       if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item, executionMode))) {
-        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason: 'Exact economic legs are already reserved or have an open BotTrader position' });
+        const candidateIndex = scan.candidates.findIndex((candidate) => sameProposition(candidate, item));
+        const reason = 'Exact economic legs are already reserved or have an open BotTrader position';
+        rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason, candidateIndex, candidate: item });
+        await deps.recordCandidateDecision?.(scan, candidateIndex, item, 'rejected', 'opportunity_already_claimed', reason,
+          candidateAuditDetails(item, settings, 'reservation', { final: true, executionMode }));
         continue;
       }
       reserved.push(item);
@@ -300,6 +411,21 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       try {
         const result = await deps.execute(candidateToInput(scan, item, settings, executionMode));
         results.push({ outcome: item.outcome, result });
+        await deps.recordCandidateDecision?.(
+          scan,
+          scan.candidates.findIndex((candidate) => sameProposition(candidate, item)),
+          item,
+          result.executed ? 'accepted' : 'rejected',
+          result.executed ? 'execution_completed' : 'execution_rejected',
+          result.reason,
+          candidateAuditDetails(item, settings, 'execution', {
+            final: true,
+            executionId: result.executionId ?? null,
+            executionMode,
+            positionPersisted: result.positionPersisted ?? null,
+            unhedged: result.executionResult?.unhedged ?? null,
+          }),
+        );
         if (result.executionResult?.unhedged === true
           || result.exposureState === 'pending_reconciliation'
           || (result.executed && result.positionPersisted === false)) {
@@ -314,7 +440,17 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           });
         }
       } catch (error) {
-        results.push({ outcome: item.outcome, error: error instanceof Error ? error.message : String(error) });
+        const reason = error instanceof Error ? error.message : String(error);
+        results.push({ outcome: item.outcome, error: reason });
+        await deps.recordCandidateDecision?.(
+          scan,
+          scan.candidates.findIndex((candidate) => sameProposition(candidate, item)),
+          item,
+          'failed',
+          'execution_outcome_unknown',
+          reason,
+          candidateAuditDetails(item, settings, 'execution', { final: true, executionMode, possibleExposure: true }),
+        ).catch((auditError) => logger.error('[bot-scan-consumer] failed to persist final opportunity audit', { error: String(auditError) }));
         // executeArb can throw after one venue accepted an order. Preserve this
         // reservation as possible exposure and stop all further placements.
         await deps.retainOpportunityForExposure?.(item, executionMode).catch((retainError) => {
@@ -406,10 +542,37 @@ async function ensureSchema(): Promise<void> {
         created_at TEXT NOT NULL,
         details TEXT
       )`,
+      `CREATE TABLE IF NOT EXISTS bot_opportunity_decisions (
+        scan_id INTEGER NOT NULL,
+        candidate_index INTEGER NOT NULL,
+        market_id TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        strategy TEXT NOT NULL,
+        state TEXT NOT NULL,
+        reason_code TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        roi_pct REAL,
+        apy_pct REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        details TEXT,
+        threshold_config_version TEXT,
+        final_result TEXT,
+        execution_id INTEGER,
+        PRIMARY KEY (scan_id, candidate_index)
+      )`,
       `CREATE INDEX IF NOT EXISTS idx_bot_scan_decisions_state ON bot_scan_decisions(state, scan_id)`,
       `CREATE INDEX IF NOT EXISTS idx_bot_scan_events_scan ON bot_scan_decision_events(scan_id, id)`,
+      `CREATE INDEX IF NOT EXISTS idx_bot_opportunity_decisions_scan ON bot_opportunity_decisions(scan_id, candidate_index)`,
       `CREATE TABLE IF NOT EXISTS bot_scan_cursor (consumer TEXT PRIMARY KEY, last_scan_id INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)`,
     ], 'write');
+    for (const migration of [
+      'ALTER TABLE bot_opportunity_decisions ADD COLUMN threshold_config_version TEXT',
+      'ALTER TABLE bot_opportunity_decisions ADD COLUMN final_result TEXT',
+      'ALTER TABLE bot_opportunity_decisions ADD COLUMN execution_id INTEGER',
+    ]) {
+      try { await db.execute(migration); } catch { /* already migrated */ }
+    }
     schemaReady = true;
   } finally {
     db.close();
@@ -459,6 +622,8 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     pmStake: finite(row.pmStake) ? row.pmStake : 0,
     kalshiTicker: row.kalshiTicker,
     pmConditionId: row.pmConditionId,
+    pmYesTokenId: typeof row.pmYesTokenId === 'string' ? row.pmYesTokenId : null,
+    pmNoTokenId: typeof row.pmNoTokenId === 'string' ? row.pmNoTokenId : null,
     kalshiYesAsk: finite(row.kalshiYesAsk) ? row.kalshiYesAsk : null,
     kalshiNoAsk: finite(row.kalshiNoAsk) ? row.kalshiNoAsk : null,
     // `pmYesPrice` may be a CLOB/Gamma midpoint and is never executable.
@@ -472,6 +637,10 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     pmNoMinOrderSize: finite(row.pmNoMinOrderSize) ? row.pmNoMinOrderSize as number : null,
     pmYesTickSize: finite(row.pmYesTickSize) ? row.pmYesTickSize as number : null,
     pmNoTickSize: finite(row.pmNoTickSize) ? row.pmNoTickSize as number : null,
+    executionStatus: row.executionStatus === 'executable' || row.executionStatus === 'non_executable' || row.executionStatus === 'unavailable'
+      ? row.executionStatus
+      : undefined,
+    executionBlocker: typeof row.executionBlocker === 'string' ? row.executionBlocker : null,
     fees: fees && finite(fees.kalshiFee) && finite(pmFee) ? { kalshiFee: fees.kalshiFee, pmFee } : null,
     expiryDate: typeof row.expiryDate === 'string' ? row.expiryDate : expiryDate,
     category: typeof row.category === 'string' ? row.category : category,
@@ -505,7 +674,7 @@ async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
   await ensureSchema();
   const db = dbClient();
   try {
-    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ? AND arb_valid = 1 AND positive_arb_count > 0', args: [scanId] });
+    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ? AND arb_valid = 1', args: [scanId] });
     const row = result.rows[0] as unknown as Record<string, unknown> | undefined;
     return row ? rowToScan(row) : null;
   } finally { db.close(); }
@@ -518,8 +687,9 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
     const result = await db.execute({
       sql: `SELECT s.* FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id = s.id
-        WHERE s.arb_valid = 1 AND s.positive_arb_count > 0 AND (
-          d.scan_id IS NULL OR d.state IN ('received','disabled')
+        LEFT JOIN bot_scan_cursor c ON c.consumer = 'bot_trader'
+        WHERE s.arb_valid = 1 AND (
+          (s.id > COALESCE(c.last_scan_id, 0) AND d.scan_id IS NULL) OR d.state = 'received'
           OR (d.state = 'failed' AND d.reason_code = 'revalidation_failed')
         )
         ORDER BY s.id ASC LIMIT ?`,
@@ -539,22 +709,22 @@ async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<B
     await db.execute({
       sql: `INSERT INTO bot_scan_decisions
         (scan_id,idempotency_key,source,state,reason_code,reason,received_at,updated_at)
-        VALUES (?,?,?,'received','scan_received','Persisted positive-arbitrage scan received',?,?)
+        VALUES (?,?,?,'received','scan_received','Persisted completed scan received',?,?)
         ON CONFLICT(scan_id) DO NOTHING`,
       args: [scan.id, `scan:${scan.id}`, source, now.toISOString(), now.toISOString()],
     });
     const claimed = await db.execute({
       sql: `UPDATE bot_scan_decisions SET lease_owner=?, lease_expires_at=?, source=?, state='received',
-        reason_code='scan_received', reason='Persisted positive-arbitrage scan received', updated_at=?
+        reason_code='scan_received', reason='Persisted completed scan received', updated_at=?
         WHERE scan_id=?
-          AND (state IN ('received','disabled') OR (state='failed' AND reason_code='revalidation_failed'))
+          AND (state = 'received' OR (state='failed' AND reason_code='revalidation_failed'))
           AND (lease_owner IS NULL OR lease_expires_at < ?)
         RETURNING *`,
       args: [owner, expires, source, now.toISOString(), scan.id, now.toISOString()],
     });
     const row = claimed.rows[0] as unknown as Record<string, unknown> | undefined;
     if (!row) return null;
-    await appendEvent(db, scan.id, source, 'received', 'scan_received', 'Persisted positive-arbitrage scan received', null);
+    await appendEvent(db, scan.id, source, 'received', 'scan_received', 'Persisted completed scan received', null);
     return rowToDecision(row);
   } finally { db.close(); }
 }
@@ -593,15 +763,52 @@ async function recordReplay(scanId: number, source: BotScanSource) {
   finally { db.close(); }
 }
 
-async function advanceCursor(scanId: number) {
+async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: number, candidate: BotScanCandidate, state: string, reasonCode: string, reason: string, details?: unknown) {
+  await ensureSchema();
+  const db = dbClient();
+  const now = new Date().toISOString();
+  const audit = details && typeof details === 'object' ? details as Record<string, unknown> : null;
+  const configVersion = typeof audit?.configVersion === 'string' ? audit.configVersion : null;
+  const finalResult = audit?.final === true ? state : null;
+  const executionId = typeof audit?.executionId === 'number' && Number.isSafeInteger(audit.executionId) ? audit.executionId : null;
+  try {
+    await db.execute({
+      sql: `INSERT INTO bot_opportunity_decisions
+        (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,roi_pct,apy_pct,created_at,updated_at,details,threshold_config_version,final_result,execution_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(scan_id,candidate_index) DO UPDATE SET
+          state=excluded.state,reason_code=excluded.reason_code,reason=excluded.reason,
+          roi_pct=excluded.roi_pct,apy_pct=excluded.apy_pct,updated_at=excluded.updated_at,details=excluded.details,
+          threshold_config_version=excluded.threshold_config_version,final_result=excluded.final_result,execution_id=excluded.execution_id`,
+      args: [scan.id, candidateIndex, scan.marketId, candidate.outcome, candidate.strategy, state, reasonCode, reason,
+        candidate.roiPct, candidate.apyPct ?? null, now, now, details == null ? null : JSON.stringify(details), configVersion, finalResult, executionId],
+    });
+  } finally { db.close(); }
+}
+
+async function advanceCursor() {
   await ensureSchema();
   const db = dbClient();
   const now = new Date().toISOString();
   try {
+    const contiguous = await db.execute(`WITH current AS (
+        SELECT COALESCE(MAX(last_scan_id),0) AS last_scan_id FROM bot_scan_cursor WHERE consumer='bot_trader'
+      ) SELECT MAX(s.id) AS last_scan_id
+      FROM scan_results s
+      CROSS JOIN current c
+      WHERE s.arb_valid=1 AND s.id>c.last_scan_id AND NOT EXISTS (
+        SELECT 1 FROM scan_results gap
+        LEFT JOIN bot_scan_decisions d ON d.scan_id=gap.id
+        WHERE gap.arb_valid=1 AND gap.id>c.last_scan_id AND gap.id<=s.id AND (
+          d.scan_id IS NULL OR d.state='received'
+          OR (d.state='failed' AND d.reason_code='revalidation_failed')
+        )
+      )`);
+    const contiguousScanId = Number(contiguous.rows[0]?.last_scan_id ?? 0);
     await db.execute({
       sql: `INSERT INTO bot_scan_cursor (consumer,last_scan_id,updated_at) VALUES ('bot_trader',?,?)
         ON CONFLICT(consumer) DO UPDATE SET last_scan_id=MAX(last_scan_id,excluded.last_scan_id),updated_at=excluded.updated_at`,
-      args: [scanId, now],
+      args: [contiguousScanId, now],
     });
   } finally { db.close(); }
 }
@@ -638,7 +845,17 @@ const productionDeps: BotScanConsumerDeps = {
   transition: (id, owner, update) => updateDecision(id, owner, update, false),
   finish: (id, owner, update) => updateDecision(id, owner, update, true),
   recordReplay, advanceCursor, revalidate, execute: maybeExecuteBotTrade,
-  reserveOpportunity, releaseOpportunity, retainOpportunityForExposure,
+  reserveOpportunity, releaseOpportunity, retainOpportunityForExposure, recordCandidateDecision,
+  reportModeBlock: async (scan, settings) => {
+    const readiness = await getBotExecutionReadiness(settings);
+    const reason = `Production execution blocked: ${readiness.blockedReasons.join('; ')}`;
+    const alert = await sendBotOperationalAlert({
+      pairId: scan.marketId,
+      marketTitle: scan.marketTitle,
+      outcome: scan.candidates[0]?.outcome ?? 'scan-level readiness',
+    }, reason, `scan:${scan.id}:production-blocked`);
+    return { reason, alertDurable: alert.durable, alertError: alert.error };
+  },
 };
 
 const consumer = createBotScanConsumer(productionDeps);
@@ -660,6 +877,63 @@ export async function getBotScanDecisions(limit = 100): Promise<BotScanDecision[
   } finally { db.close(); }
 }
 
+export async function getBotScanHealth(): Promise<{
+  latestCompletedScanId: number | null;
+  latestCompletedScanAt: string | null;
+  latestPositiveScanId: number | null;
+  latestPositiveScanAt: string | null;
+  cursorScanId: number;
+  cursorUpdatedAt: string | null;
+  latestDecisionScanId: number | null;
+  latestDecisionAt: string | null;
+  pendingScans: number;
+  cursorLag: number;
+  opportunitiesEvaluated: number;
+  eligibleCount: number;
+  lastExecutionOrSkip: { scanId: number; state: string; reason: string; at: string } | null;
+}> {
+  await ensureSchema();
+  const db = dbClient();
+  try {
+    const [latest, latestPositive, cursor, decision, pending, opportunityCounts] = await Promise.all([
+      db.execute('SELECT id,scanned_at FROM scan_results WHERE arb_valid=1 ORDER BY id DESC LIMIT 1'),
+      db.execute('SELECT id,scanned_at FROM scan_results WHERE arb_valid=1 AND positive_arb_count>0 ORDER BY id DESC LIMIT 1'),
+      db.execute("SELECT last_scan_id,updated_at FROM bot_scan_cursor WHERE consumer='bot_trader'"),
+      db.execute('SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT 1'),
+      db.execute(`SELECT COUNT(*) AS count FROM scan_results s
+        LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
+        LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
+        WHERE s.arb_valid=1 AND (
+          (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state = 'received'
+          OR (d.state='failed' AND d.reason_code='revalidation_failed'))`),
+      db.execute(`SELECT COUNT(*) AS evaluated,
+        SUM(CASE WHEN state IN ('eligible','accepted') THEN 1 ELSE 0 END) AS eligible
+        FROM bot_opportunity_decisions`),
+    ]);
+    const latestDecision = decision.rows[0];
+    return {
+      latestCompletedScanId: latest.rows[0]?.id == null ? null : Number(latest.rows[0].id),
+      latestCompletedScanAt: latest.rows[0]?.scanned_at == null ? null : String(latest.rows[0].scanned_at),
+      latestPositiveScanId: latestPositive.rows[0]?.id == null ? null : Number(latestPositive.rows[0].id),
+      latestPositiveScanAt: latestPositive.rows[0]?.scanned_at == null ? null : String(latestPositive.rows[0].scanned_at),
+      cursorScanId: Number(cursor.rows[0]?.last_scan_id ?? 0),
+      cursorUpdatedAt: cursor.rows[0]?.updated_at == null ? null : String(cursor.rows[0].updated_at),
+      latestDecisionScanId: latestDecision?.scan_id == null ? null : Number(latestDecision.scan_id),
+      latestDecisionAt: latestDecision?.updated_at == null ? null : String(latestDecision.updated_at),
+      pendingScans: Number(pending.rows[0]?.count ?? 0),
+      cursorLag: Number(pending.rows[0]?.count ?? 0),
+      opportunitiesEvaluated: Number(opportunityCounts.rows[0]?.evaluated ?? 0),
+      eligibleCount: Number(opportunityCounts.rows[0]?.eligible ?? 0),
+      lastExecutionOrSkip: latestDecision?.scan_id == null ? null : {
+        scanId: Number(latestDecision.scan_id),
+        state: String(latestDecision.state),
+        reason: String(latestDecision.reason),
+        at: String(latestDecision.updated_at),
+      },
+    };
+  } finally { db.close(); }
+}
+
 export async function persistAndConsumeBotScan(
   marketId: string,
   result: Parameters<typeof import('./persistence').saveScanResult>[1],
@@ -667,15 +941,9 @@ export async function persistAndConsumeBotScan(
 ): Promise<{ id: number; decision: BotScanDecision | null; backlogProcessed: number }> {
   const { saveScanResult } = await import('./persistence');
   const saved = await saveScanResult(marketId, result);
-  const decision = (result.positiveArbCount ?? 0) > 0
-    ? await consumePersistedBotScan(saved.id, source)
-    : null;
-  // Every completed scan tick, including a zero-arb scan, is a restart/downtime
-  // catch-up opportunity. This keeps backlog progress independent of the UI and
-  // does not require a new positive arb to wake the durable consumer.
-  const backlog = await processBotScanBacklog(25).catch((error) => {
-    logger.warn('[bot-scan-consumer] backlog processing failed', { error: String(error) });
-    return [];
-  });
-  return { ...saved, decision, backlogProcessed: backlog.length };
+  // The dedicated h2h-ragnar process owns consumption and catch-up. Scanner
+  // workers only publish durable input, preventing execution work and repeated
+  // backlog walks from contending with scan persistence.
+  void source;
+  return { ...saved, decision: null, backlogProcessed: 0 };
 }

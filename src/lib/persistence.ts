@@ -157,11 +157,14 @@ async function initDb(): Promise<void> {
       tokens_available  INTEGER NOT NULL DEFAULT 0,
       is_throttled      INTEGER NOT NULL DEFAULT 0,
       effective_rate    REAL    NOT NULL DEFAULT 0,
-      refill_interval_ms INTEGER NOT NULL DEFAULT 0
+      refill_interval_ms INTEGER NOT NULL DEFAULT 0,
+      service_identity  TEXT    NOT NULL DEFAULT 'unknown'
     )
   `);
+  try { await c.execute(`ALTER TABLE rate_limiter_metrics ADD COLUMN service_identity TEXT NOT NULL DEFAULT 'unknown'`); } catch { /* column already exists */ }
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_rate_limiter_metrics_name_ts ON rate_limiter_metrics(limiter_name, timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_rate_limiter_metrics_ts ON rate_limiter_metrics(timestamp DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_rate_limiter_metrics_service_ts ON rate_limiter_metrics(service_identity, timestamp DESC)`);
 
   // ── OPS-009: saved markets + scan history live in SQLite ──────────
   // JSON files had multi-process write races (app + poller). SQLite with
@@ -1092,6 +1095,7 @@ export interface RateLimiterMetricRecord {
   isThrottled: boolean;
   effectiveRate: number;
   refillIntervalMs: number;
+  serviceIdentity?: string;
 }
 
 /** Persist one snapshot row per limiter. */
@@ -1103,8 +1107,8 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
       sql: `INSERT INTO rate_limiter_metrics
               (limiter_name, timestamp, total_requests, queued_requests, rejected_requests,
                retry_429_count, avg_queue_wait_ms, tokens_available, is_throttled,
-               effective_rate, refill_interval_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               effective_rate, refill_interval_ms, service_identity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         r.limiterName,
         r.timestamp,
@@ -1117,12 +1121,29 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
         r.isThrottled ? 1 : 0,
         r.effectiveRate ?? 0,
         r.refillIntervalMs ?? 0,
+        r.serviceIdentity ?? 'unknown',
       ],
     })),
     'write',
   );
   // Defensive: libsql batch returns an array of results; swallow so callers don't await them
   void insert;
+}
+
+export async function getOperationalTelemetryFreshness(): Promise<{
+  latestCapacitySampleAt: string | null;
+  latestWorkerCapacitySampleAt: string | null;
+}> {
+  await ensureDb();
+  const c = getClient();
+  const [aggregate, worker] = await Promise.all([
+    c.execute('SELECT MAX(timestamp) AS latest FROM rate_limiter_metrics'),
+    c.execute({ sql: 'SELECT MAX(timestamp) AS latest FROM rate_limiter_metrics WHERE service_identity = ?', args: ['full-scan-worker'] }),
+  ]);
+  return {
+    latestCapacitySampleAt: aggregate.rows[0]?.latest == null ? null : String(aggregate.rows[0].latest),
+    latestWorkerCapacitySampleAt: worker.rows[0]?.latest == null ? null : String(worker.rows[0].latest),
+  };
 }
 
 /**

@@ -38,8 +38,8 @@ module.exports = {
         // poller's normal burst load. Enable only for short local investigations.
         DEBUG_H2H: '0',
         PREDICTIONHUNT_API_KEY: 'pmx_U46EX9BAvyqxGoq9kinrYIqRt3KTWoWTrOU9B-I8VGQ',
-        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
-        NEXT_PUBLIC_H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9',
+        H2H_API_TOKEN: process.env.H2H_API_TOKEN,
+        NEXT_PUBLIC_H2H_API_TOKEN: process.env.NEXT_PUBLIC_H2H_API_TOKEN,
         TELEGRAM_MIN_ROI_PCT: '1.5',
         TELEGRAM_MIN_PROFIT_USD: '5',
         TELEGRAM_MIN_STAKE_USD: '50',
@@ -85,7 +85,7 @@ module.exports = {
         // finish publication before the poller aborts their requests.
         H2H_SCAN_MIN_TIMEOUT_MS: '18000',
         H2H_SCAN_TIMEOUT_MS: '21000',
-        H2H_API_TOKEN: '8f070c00782b4e90f004fec034ae2b7ded34f00251bb242cc8034cc97bd5a7f9'
+        H2H_API_TOKEN: process.env.H2H_API_TOKEN
       },
 
       log_file: '/home/scott/.pm2/logs/h2h-poller.log',
@@ -156,6 +156,54 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
       max_memory_restart: '256M'
+    },
+    {
+      name: 'h2h-ragnar',
+      script: './scripts/ragnar-consumer.mjs',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      restart_delay: 5000,
+      max_restarts: Infinity,
+      min_uptime: 15000,
+      kill_timeout: 10000,
+      shutdown_listener: true,
+      env: {
+        NODE_ENV: 'production',
+        H2H_BASE_URL: 'http://localhost:3000',
+        H2H_RAGNAR_INTERVAL_MS: '10000',
+        H2H_RAGNAR_BATCH_SIZE: '25',
+        H2H_RAGNAR_TIMEOUT_MS: '30000',
+        H2H_API_TOKEN: process.env.H2H_API_TOKEN,
+      },
+      log_file: '/home/scott/.pm2/logs/h2h-ragnar.log',
+      error_file: '/home/scott/.pm2/logs/h2h-ragnar-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-ragnar-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+      max_memory_restart: '256M',
+    },
+    {
+      name: 'h2h-release-monitor',
+      script: './scripts/release-manager.mjs',
+      args: 'monitor --interval-ms 60000',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      restart_delay: 5000,
+      min_uptime: 10000,
+      kill_timeout: 5000,
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_file: '/home/scott/.pm2/logs/h2h-release-monitor.log',
+      error_file: '/home/scott/.pm2/logs/h2h-release-monitor-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-release-monitor-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+      max_memory_restart: '128M'
     },
   ]
 };

@@ -1,5 +1,67 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFile, rename, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { persistRateLimiterMetrics, type RateLimiterMetricRecord } from './persistence';
+import { withSqliteBusyRetry } from './sqlite-write-retry';
+import logger from './logger';
+
+let telemetryWriteQueue: Promise<void> = Promise.resolve();
+const WORKER_TELEMETRY_HEALTH_PATH = path.join(process.cwd(), 'data', 'scan-worker-telemetry-health.json');
+
+export interface WorkerTelemetryWriteHealth {
+  lastReceivedAt: string | null;
+  lastPersistedAt: string | null;
+  lastFailureAt: string | null;
+  writeFailures: number;
+  error: string | null;
+}
+
+let workerTelemetryHealth: WorkerTelemetryWriteHealth = {
+  lastReceivedAt: null,
+  lastPersistedAt: null,
+  lastFailureAt: null,
+  writeFailures: 0,
+  error: null,
+};
+
+async function persistWorkerTelemetryHealth(): Promise<void> {
+  const temp = `${WORKER_TELEMETRY_HEALTH_PATH}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temp, JSON.stringify(workerTelemetryHealth), { mode: 0o600 });
+  await rename(temp, WORKER_TELEMETRY_HEALTH_PATH);
+}
+
+export async function readWorkerTelemetryWriteHealth(): Promise<WorkerTelemetryWriteHealth> {
+  try {
+    return JSON.parse(await readFile(WORKER_TELEMETRY_HEALTH_PATH, 'utf8')) as WorkerTelemetryWriteHealth;
+  } catch {
+    return { ...workerTelemetryHealth };
+  }
+}
+
+function enqueueWorkerTelemetry(records: RateLimiterMetricRecord[]): void {
+  if (records.length === 0) return;
+  workerTelemetryHealth = { ...workerTelemetryHealth, lastReceivedAt: new Date().toISOString() };
+  void persistWorkerTelemetryHealth().catch(() => {});
+  telemetryWriteQueue = telemetryWriteQueue
+    .then(() => withSqliteBusyRetry(() => persistRateLimiterMetrics(records)))
+    .then(async () => {
+      workerTelemetryHealth = { ...workerTelemetryHealth, lastPersistedAt: new Date().toISOString(), error: null };
+      await persistWorkerTelemetryHealth();
+    })
+    .catch((error) => {
+      workerTelemetryHealth = {
+        ...workerTelemetryHealth,
+        lastFailureAt: new Date().toISOString(),
+        writeFailures: workerTelemetryHealth.writeFailures + 1,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      void persistWorkerTelemetryHealth().catch(() => {});
+      logger.error('[scan-worker-coordinator] capacity telemetry persistence failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+}
 
 export interface ScanWorkerRequest {
   body: string;
@@ -153,8 +215,14 @@ export class ScanWorkerCoordinator {
     this.metrics.activeJobs = this.active.size;
 
     worker.on('message', (message) => {
-      const envelope = message as { type?: string; response?: ScanWorkerResponse; error?: string };
+      const envelope = message as {
+        type?: string;
+        response?: ScanWorkerResponse;
+        error?: string;
+        telemetry?: RateLimiterMetricRecord[];
+      };
       if (envelope.type === 'result' && envelope.response) {
+        enqueueWorkerTelemetry(envelope.telemetry ?? []);
         this.finish(job, null, envelope.response);
       } else if (envelope.type === 'error') {
         this.finish(job, new ScanWorkerError(envelope.error || 'Scan worker failed', 'SCAN_WORKER_FAILED'));

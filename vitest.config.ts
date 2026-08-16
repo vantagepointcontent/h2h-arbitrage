@@ -9,6 +9,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['node_modules', '.next', 'tests/**'],
     testTimeout: 10000,
+    // Persistence fixtures call process.chdir(), which is process-global.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

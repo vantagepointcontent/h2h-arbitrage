@@ -163,6 +163,23 @@ interface BotStatus {
   selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
   todayStakeUsd: number;
+  workflow?: {
+    health: 'healthy' | 'degraded';
+    degradedReasons: string[];
+    liveUnavailableReasons: string[];
+    effectiveExecutionMode: 'paper' | 'live';
+    requestedExecutionMode: 'paper' | 'production';
+    liveAuthorizationConfigured: boolean;
+    credentialsReady: boolean;
+    latestCompletedScanId: number | null;
+    latestCompletedScanAt: string | null;
+    cursorScanId: number;
+    pendingScans: number;
+    cursorLag: number;
+    opportunitiesEvaluated: number;
+    eligibleCount: number;
+    lastExecutionOrSkip: { scanId: number; state: string; reason: string; at: string } | null;
+  };
 }
 
 interface PerformanceAnalytics {
@@ -482,6 +499,16 @@ export default function BotTraderPanel() {
       <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-1" role="tablist" aria-label="BotTrader views">
         {(['analytics', 'logs', 'messages'] as const).map((tab) => <button key={tab} role="tab" aria-selected={view === tab} onClick={() => setView(tab)} className={`min-h-11 rounded-md px-4 text-xs font-semibold capitalize ${view === tab ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)]'}`}>{tab}</button>)}
       </div>
+
+      {status?.workflow && <div className={`rounded-lg border px-3 py-2 ${status.workflow.health === 'healthy' ? 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10' : 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[var(--text-primary)]">
+          <span>Execution workflow: {status.workflow.health}</span>
+          <span>{status.workflow.requestedExecutionMode} requested · {status.workflow.effectiveExecutionMode} effective</span>
+        </div>
+        <div className="mt-1 text-[10px] text-[var(--text-secondary)]">Latest completed scan {status.workflow.latestCompletedScanId ?? 'none'} · cursor {status.workflow.cursorScanId} · lag {status.workflow.cursorLag} · {status.workflow.opportunitiesEvaluated} opportunities evaluated · {status.workflow.eligibleCount} eligible</div>
+        {status.workflow.degradedReasons.length > 0 && <div className="mt-1 text-[10px] text-[var(--status-warning)]">{status.workflow.degradedReasons.join(' · ')}</div>}
+        {status.workflow.lastExecutionOrSkip && <div className="mt-1 text-[10px] text-[var(--text-secondary)]">Last result: scan {status.workflow.lastExecutionOrSkip.scanId} — {status.workflow.lastExecutionOrSkip.state}: {status.workflow.lastExecutionOrSkip.reason}</div>}
+      </div>}
 
       {status && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
         <div><div className="text-xs font-semibold text-[var(--text-primary)]">Ranked candidate sources</div><div className="text-[10px] text-[var(--text-secondary)]">All ROI and profit values are net of trading fees. This does not enable live trading.</div></div>

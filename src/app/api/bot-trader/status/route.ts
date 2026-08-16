@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { getSetting } from '@/lib/settings';
 import { getExecutions, getTodayBotExposure } from '@/lib/persistence';
 import logger from '@/lib/logger';
-import { getBotScanDecisions } from '@/lib/bot-scan-consumer';
+import { getBotScanDecisions, getBotScanHealth } from '@/lib/bot-scan-consumer';
+import { getCredentialStatus } from '@/lib/execution-creds';
+import { getBotExecutionReadiness, type BotSettings } from '@/lib/bot-trader';
 
 const DEFAULT_BOT_SETTINGS = {
   enabled: false,
@@ -16,6 +20,14 @@ const DEFAULT_BOT_SETTINGS = {
   maxTradesPerDay: 10,
   maxUnitsPerMarket: 3,
 };
+
+async function readConsumerHeartbeat(): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await readFile(path.join(process.cwd(), 'data', 'ragnar-consumer-health.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * GET /api/bot-trader/status
@@ -40,7 +52,7 @@ export async function GET() {
     const todayStart = new Date().toISOString().slice(0, 10);
     const todayEnd = `${todayStart}T23:59:59.999Z`;
 
-    const [todayStakeUsd, todayTrades, recentDecisions] = await Promise.all([
+    const [todayStakeUsd, todayTrades, recentDecisions, scanHealth, credentials, consumerHeartbeat] = await Promise.all([
       getTodayBotExposure().catch((e) => {
         logger.warn('[bot-trader-status] getTodayBotExposure failed', { error: String(e) });
         return 0;
@@ -53,6 +65,9 @@ export async function GET() {
         logger.warn('[bot-trader-status] getBotScanDecisions failed', { error: String(e) });
         return [];
       }),
+      getBotScanHealth(),
+      getCredentialStatus(),
+      readConsumerHeartbeat(),
     ]);
 
     const today = todayTrades.filter(
@@ -60,6 +75,30 @@ export async function GET() {
     );
     const todayCount2 = today.length;
     const lastTrade = todayTrades[0];
+    const activeSettings: BotSettings = {
+      enabled,
+      mode: mode === 'production' ? 'production' : 'paper',
+      selectionMethod: selectionMethod === 'roi' || selectionMethod === 'apy' ? selectionMethod : 'hybrid',
+      minRoiPct,
+      minApyPct,
+      minDepthUsd,
+      minSharesPerLeg,
+      maxExpiryDays,
+      maxTradesPerDay,
+    };
+    const readiness = await getBotExecutionReadiness(activeSettings);
+    const effectiveExecutionMode = readiness.effectiveMode;
+    const heartbeatAt = typeof consumerHeartbeat?.lastSuccessAt === 'string' ? consumerHeartbeat.lastSuccessAt : null;
+    const heartbeatAgeMs = heartbeatAt == null ? null : Math.max(0, Date.now() - Date.parse(heartbeatAt));
+    const degradedReasons = [
+      ...(!enabled ? ['BotTrader is disabled'] : []),
+      ...(heartbeatAgeMs == null || heartbeatAgeMs > 30_000 ? ['Ragnar consumer heartbeat is stale or missing'] : []),
+      ...(scanHealth.pendingScans > 0 ? [`${scanHealth.pendingScans} persisted scan(s) await a durable decision`] : []),
+      ...(mode === 'production' ? readiness.blockedReasons : []),
+    ];
+    const liveUnavailableReasons = [
+      ...readiness.blockedReasons,
+    ];
 
     const status = {
       enabled,
@@ -84,6 +123,35 @@ export async function GET() {
         latest: recentDecisions[0] ?? null,
         byState: Object.fromEntries([...new Set(recentDecisions.map((decision) => decision.state))]
           .map((state) => [state, recentDecisions.filter((decision) => decision.state === state).length])),
+      },
+      workflow: {
+        health: degradedReasons.length === 0 ? 'healthy' : 'degraded',
+        degradedReasons,
+        liveUnavailableReasons,
+        effectiveExecutionMode,
+        requestedExecutionMode: mode,
+        liveAuthorizationConfigured: readiness.authorizationConfigured,
+        credentialsReady: credentials.allReady,
+        latestCompletedScanId: scanHealth.latestCompletedScanId,
+        latestCompletedScanAt: scanHealth.latestCompletedScanAt,
+        latestPositiveScanId: scanHealth.latestPositiveScanId,
+        latestPositiveScanAt: scanHealth.latestPositiveScanAt,
+        cursorScanId: scanHealth.cursorScanId,
+        cursorUpdatedAt: scanHealth.cursorUpdatedAt,
+        latestDecisionScanId: scanHealth.latestDecisionScanId,
+        latestDecisionAt: scanHealth.latestDecisionAt,
+        pendingScans: scanHealth.pendingScans,
+        cursorLag: scanHealth.cursorLag,
+        opportunitiesEvaluated: scanHealth.opportunitiesEvaluated,
+        eligibleCount: scanHealth.eligibleCount,
+        lastExecutionOrSkip: scanHealth.lastExecutionOrSkip,
+        consumer: {
+          state: consumerHeartbeat?.state ?? 'missing',
+          lastSuccessAt: heartbeatAt,
+          ageMs: heartbeatAgeMs,
+          processed: consumerHeartbeat?.processed ?? null,
+          error: consumerHeartbeat?.error ?? null,
+        },
       },
       error: null,
     };
