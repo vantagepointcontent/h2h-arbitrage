@@ -21,11 +21,12 @@ import {
   type QuoteOutcome,
   type QuotePlatform,
 } from "@/lib/log-price-comparison";
+import { compareRoiDecline } from "@/lib/roi-declined";
 
 interface LogEntry {
   id: number;
   market_id: string;
-  best_roi_pct: number;
+  best_roi_pct: number | null;
   best_profit: number;
   strategy: string;
   outcome_count: number;
@@ -299,8 +300,8 @@ export default function LogsPanel() {
           bVal = new Date(b.scanned_at).getTime();
           break;
         case "best_roi_pct":
-          aVal = a.best_roi_pct;
-          bVal = b.best_roi_pct;
+          aVal = typeof a.best_roi_pct === 'number' && Number.isFinite(a.best_roi_pct) ? a.best_roi_pct : Number.NEGATIVE_INFINITY;
+          bVal = typeof b.best_roi_pct === 'number' && Number.isFinite(b.best_roi_pct) ? b.best_roi_pct : Number.NEGATIVE_INFINITY;
           break;
         case "best_profit":
           aVal = a.best_profit;
@@ -802,7 +803,7 @@ export default function LogsPanel() {
               }
             }}
           >
-            <table className="w-full min-w-[1160px] text-sm">
+            <table className="w-full min-w-[1240px] text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
                   <th className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
@@ -831,6 +832,12 @@ export default function LogsPanel() {
                   </th>
                   <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Current ROI %
+                  </th>
+                  <th
+                    className="px-3 py-2.5 text-center text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap"
+                    title="TRUE when scan-time ROI is greater than Current ROI."
+                  >
+                    ROI Declined?
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
@@ -870,13 +877,13 @@ export default function LogsPanel() {
               </thead>
               <tbody>
                 {visibleWindow.start > 0 && (
-                  <tr aria-hidden="true"><td colSpan={15} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={16} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
                 {visibleWindow.rows.map((log, i) => (
                   <LogRow key={log.id ?? i} log={log} currentRoi={currentRoiById.get(log.id) ?? { status: 'loading' }} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
                 {visibleWindow.end < sorted.length && (
-                  <tr aria-hidden="true"><td colSpan={15} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={16} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
               </tbody>
             </table>
@@ -957,13 +964,30 @@ function LogRow({
   fmtTime: (s: string) => string;
   savedMarkets: Map<string, { title: string; expiryDate?: string | null }>;
 }) {
-  const roiColor = log.best_roi_pct > 0 ? "text-[#5DBE81]" : log.best_roi_pct < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
+  const scanTimeRoi = typeof log.best_roi_pct === 'number' && Number.isFinite(log.best_roi_pct) ? log.best_roi_pct : null;
+  const roiColor = scanTimeRoi == null ? "text-[#8A9BA8]" : scanTimeRoi > 0 ? "text-[#5DBE81]" : scanTimeRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbIsValid = log.arb_valid !== 0;
   const arbTypeMeta = arbIsValid
     ? (log.arb_type ? ARB_TYPES[log.arb_type] : getArbTypeMeta(log.strategy))
     : null;
   const apy = logApyPct(log);
+  const currentRoiValue = currentRoi.status === 'available'
+    && typeof currentRoi.roiPct === 'number'
+    && Number.isFinite(currentRoi.roiPct)
+    ? currentRoi.roiPct
+    : null;
+  const roiDecline = compareRoiDecline(scanTimeRoi, currentRoiValue);
+  const roiDeclineText = roiDecline.declined ? 'TRUE' : 'FALSE';
+  const roiDeclineUnavailableReason = roiDecline.unavailableInputs.length === 0
+    ? null
+    : roiDecline.unavailableInputs.map((input) => input === 'Current ROI'
+      ? `Current ROI is unavailable: ${currentRoiStatusLabel(currentRoi.status)}`
+      : 'scan-time ROI is unavailable').join('; ');
+  const roiDeclineTitle = roiDeclineUnavailableReason
+    ? `ROI Declined? FALSE — ${roiDeclineUnavailableReason}.`
+    : `ROI Declined? ${roiDeclineText} — compared using full-precision persisted ROI values.`;
+  const roiDeclineDescriptionId = `roi-declined-reason-${log.id}`;
   // Kept at row scope so collapsing does not discard the brief lazy-fetch cache.
   const [comparisonCache] = useState<ComparisonCache>(() => new Map());
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -1070,11 +1094,27 @@ function LogRow({
             <span className="text-[#8A9BA8]">—</span>
           )}
         </td>
-        <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>{fmtPct(log.best_roi_pct)}</td>
+        <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`} title={scanTimeRoi == null ? 'Scan-time ROI unavailable' : 'ROI captured at scan time'}>
+          {scanTimeRoi == null ? 'Unavailable' : fmtPct(scanTimeRoi)}
+        </td>
         <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.scannedAt ? `Latest persisted scan: ${currentRoi.scannedAt}${currentRoi.strategy ? ` — ${currentRoi.strategy}` : ''}` : currentRoiStatusLabel(currentRoi.status)}>
-          {currentRoi.status === 'available' && typeof currentRoi.roiPct === 'number'
-            ? `${currentRoi.roiPct.toFixed(2)}%`
+          {currentRoiValue != null
+            ? `${currentRoiValue.toFixed(2)}%`
             : currentRoiStatusLabel(currentRoi.status)}
+        </td>
+        <td className="px-3 py-2 text-center whitespace-nowrap">
+          <span
+            aria-label={`ROI Declined? ${roiDeclineText}`}
+            aria-describedby={roiDeclineDescriptionId}
+            tabIndex={0}
+            title={roiDeclineTitle}
+            className={`inline-flex min-w-11 items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${roiDecline.declined
+              ? 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+              : 'border-[#3A4A59] bg-[#182533] text-[#A8B8C4]'}`}
+          >
+            {roiDeclineText}
+          </span>
+          <span id={roiDeclineDescriptionId} className="sr-only">{roiDeclineTitle}</span>
         </td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
         <td
@@ -1098,7 +1138,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={15} className="px-4 py-3">
+          <td colSpan={16} className="px-4 py-3">
             {detailState === 'loading' || detailState === 'idle' ? (
               <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
             ) : detailState === 'error' ? (

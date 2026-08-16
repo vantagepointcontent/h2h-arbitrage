@@ -4,6 +4,10 @@ import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { clientSafeError } from '@/lib/error-handler';
 import { classifyArbType } from '@/lib/arb-types';
 import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
+import { getCurrentLogRoiBatch } from '@/lib/current-log-roi.server';
+import { compareRoiDecline } from '@/lib/roi-declined';
+
+const CURRENT_ROI_BATCH_SIZE = 100;
 
 const headers = [
   'Scan Time',
@@ -15,6 +19,8 @@ const headers = [
   'Arb Valid',
   'Invalidation Reason',
   'ROI %',
+  'Current ROI %',
+  'ROI Declined?',
   'APY %',
   'APY Unavailable Reason',
   'Scenario A Winner',
@@ -104,6 +110,12 @@ export async function GET(request: NextRequest) {
         controller.enqueue(new TextEncoder().encode(headers.map(escapeCsv).join(',') + '\n'));
 
         for await (const batch of queryScanHistoryStream(filters)) {
+          const ids = batch.map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+          const currentRoiPages = await Promise.all(Array.from(
+            { length: Math.ceil(ids.length / CURRENT_ROI_BATCH_SIZE) },
+            (_, index) => getCurrentLogRoiBatch(ids.slice(index * CURRENT_ROI_BATCH_SIZE, (index + 1) * CURRENT_ROI_BATCH_SIZE)),
+          ));
+          const currentRoiById = new Map(currentRoiPages.flat().map((valuation) => [valuation.id, valuation]));
           for (const r of batch) {
             let outcomeApy: OutcomeContingentApy | null = null;
             try {
@@ -112,6 +124,13 @@ export async function GET(request: NextRequest) {
                 : null;
               outcomeApy = raw?.outcomeApy ?? raw?.allArbs?.[0]?.outcomeApy ?? null;
             } catch { /* malformed legacy payload: export explicit blank provenance */ }
+            const currentRoi = currentRoiById.get(Number(r.id));
+            const currentRoiPct = currentRoi?.status === 'available'
+              && typeof currentRoi.roiPct === 'number'
+              && Number.isFinite(currentRoi.roiPct)
+              ? currentRoi.roiPct
+              : null;
+            const roiDeclined = compareRoiDecline(r.best_roi_pct, currentRoiPct).declined;
             const line = [
               r.scanned_at,
               r.market_title ?? nameMap.get(r.market_id) ?? '',
@@ -122,6 +141,8 @@ export async function GET(request: NextRequest) {
               r.arb_valid === 1 ? 'true' : 'false',
               r.arb_invalidation_reason ?? '',
               r.best_roi_pct,
+              currentRoiPct,
+              roiDeclined ? 'TRUE' : 'FALSE',
               r.apy_pct,
               r.apy_unavailable_reason,
               outcomeApy?.scenarioA?.winner,

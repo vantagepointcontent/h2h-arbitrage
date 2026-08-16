@@ -7,8 +7,10 @@ const mocks = vi.hoisted(() => ({
   queryScanHistoryStream: vi.fn(),
   countScanHistory: vi.fn(),
   getSavedMarkets: vi.fn(),
+  getCurrentLogRoiBatch: vi.fn(),
 }));
 vi.mock('@/lib/persistence', () => mocks);
+vi.mock('@/lib/current-log-roi.server', () => ({ getCurrentLogRoiBatch: mocks.getCurrentLogRoiBatch }));
 
 import { GET as getLogs } from './route';
 import { GET as getLogDetail } from './[id]/route';
@@ -41,6 +43,7 @@ describe('Logs scan-time APY serialization', () => {
     mocks.getSavedMarkets.mockResolvedValue([]);
     mocks.queryScanHistory.mockResolvedValue({ rows: [persistedRow], total: 1, uniqueMarkets: 1 });
     mocks.queryScanHistoryStream.mockImplementation(async function* () { yield [persistedRow]; });
+    mocks.getCurrentLogRoiBatch.mockResolvedValue([{ id: 7, status: 'available', roiPct: 1.5 }]);
   });
 
   it('returns persisted APY and TTE through the Logs API', async () => {
@@ -142,6 +145,28 @@ describe('Logs scan-time APY serialization', () => {
     expect(columns).toContain('APY %');
     expect(values[columns.indexOf('APY %')]).toBe('1825');
     expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('');
+  });
+
+  it('exports Current ROI and ROI Declined from full-precision persisted values', async () => {
+    mocks.queryScanHistoryStream.mockImplementationOnce(async function* () {
+      yield [
+        { ...persistedRow, id: 7, best_roi_pct: 1.004 },
+        { ...persistedRow, id: 8, market_id: 'market-8', best_roi_pct: 4 },
+      ];
+    });
+    mocks.getCurrentLogRoiBatch.mockResolvedValueOnce([
+      { id: 7, status: 'available', roiPct: 1.003 },
+      { id: 8, status: 'never_scanned' },
+    ]);
+
+    const response = await exportLogs(new NextRequest('http://localhost/api/logs/export'));
+    const [header, first, second] = (await response.text()).trim().split('\n').map((line) => line.split(','));
+
+    const roiIndex = header.indexOf('ROI %');
+    expect(header.slice(roiIndex, roiIndex + 3)).toEqual(['ROI %', 'Current ROI %', 'ROI Declined?']);
+    expect(first.slice(roiIndex, roiIndex + 3)).toEqual(['1.004', '1.003', 'TRUE']);
+    expect(second.slice(roiIndex, roiIndex + 3)).toEqual(['4', '', 'FALSE']);
+    expect(mocks.getCurrentLogRoiBatch).toHaveBeenCalledWith([7, 8]);
   });
 
   it('exports both winning-leg settlement scenarios and provenance', async () => {
