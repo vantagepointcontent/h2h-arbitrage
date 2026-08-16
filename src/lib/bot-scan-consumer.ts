@@ -23,6 +23,8 @@ export type BotScanDecisionState =
 export interface BotScanFees {
   kalshiFee: number;
   pmFee: number;
+  kalshiFeeDetails?: string;
+  pmFeeDetails?: string;
 }
 
 export interface BotScanCandidate {
@@ -776,7 +778,12 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
       ? row.executionStatus
       : undefined,
     executionBlocker: typeof row.executionBlocker === 'string' ? row.executionBlocker : null,
-    fees: fees && finite(fees.kalshiFee) && finite(pmFee) ? { kalshiFee: fees.kalshiFee, pmFee } : null,
+    fees: fees && finite(fees.kalshiFee) && finite(pmFee) ? {
+      kalshiFee: fees.kalshiFee,
+      pmFee,
+      ...(typeof fees.kalshiFeeDetails === 'string' ? { kalshiFeeDetails: fees.kalshiFeeDetails } : {}),
+      ...(typeof fees.pmFeeDetails === 'string' ? { pmFeeDetails: fees.pmFeeDetails } : {}),
+    } : null,
     expiryDate: typeof row.expiryDate === 'string' ? row.expiryDate : expiryDate,
     category: typeof row.category === 'string' ? row.category : category,
     stale: row.stale === true,

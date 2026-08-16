@@ -53,11 +53,19 @@ describe('getBotScanHealth terminal decision semantics', () => {
           VALUES (42,'scan:42','catch_up','received','scan_received','Persisted completed scan received','2026-08-16T17:01:01.000Z','2026-08-16T17:01:01.000Z','lease-42','2026-08-16T17:16:01.000Z')`,
         args: [],
       },
+      {
+        sql: `INSERT INTO bot_opportunity_decisions
+          (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,roi_pct,apy_pct,created_at,updated_at,details)
+          VALUES (41,0,'pair-1','A','Buy YES Kalshi + NO PM','eligible','scan_eligible','Authoritative fees available',5,25,'2026-08-16T17:00:01.000Z','2026-08-16T17:00:01.000Z','{"inputs":{"fees":{"kalshiFee":0.01,"pmFee":0.02}}}')`,
+        args: [],
+      },
     ], 'write');
     db.close();
 
     await expect(getBotScanHealth()).resolves.toMatchObject({
       latestDecisionScanId: 42,
+      opportunitiesEvaluated: 1,
+      eligibleCount: 1,
       lastExecutionOrSkip: { scanId: 41, state: 'criteria_rejected', reason: 'No opportunities' },
       inProgress: { scanId: 42, state: 'received' },
     });

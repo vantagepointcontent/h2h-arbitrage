@@ -210,6 +210,26 @@ describe('durable BotTrader scan consumer', () => {
     expect(parsed?.pmYesAsk).toBeNull();
   });
 
+  it('preserves authoritative fee values and calculation provenance from persisted candidates', () => {
+    const parsed = parseBotScanCandidate({
+      artist: 'A', strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', roiPct: 5, expectedProfit: 5,
+      kalshiTicker: 'KX-A', pmConditionId: 'pm-a',
+      fees: {
+        kalshiFee: 0.01,
+        pmFee: 0.02,
+        kalshiFeeDetails: 'Kalshi YES buy 1 @ $0.45 = $0.01',
+        pmFeeDetails: 'Polymarket NO buy 1 @ $0.50 = $0.02',
+      },
+    });
+
+    expect(parsed?.fees).toEqual({
+      kalshiFee: 0.01,
+      pmFee: 0.02,
+      kalshiFeeDetails: 'Kalshi YES buy 1 @ $0.45 = $0.01',
+      pmFeeDetails: 'Polymarket NO buy 1 @ $0.50 = $0.02',
+    });
+  });
+
   it('records received, placement_attempted, and placed for a normal paper scan', async () => {
     const h = harness();
     const result = await h.consumer.consume(41, 'scan_api');

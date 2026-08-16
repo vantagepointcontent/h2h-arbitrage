@@ -271,5 +271,10 @@ describe('POST /api/scan saved-market lifecycle', () => {
       }),
       'scan_api',
     );
+    const calls = mocks.persistAndConsumeBotScan.mock.calls as unknown as Array<[string, {
+      raw?: { allArbs?: Array<{ fees?: unknown }> };
+    }, string]>;
+    const persisted = calls.at(-1)?.[1];
+    expect(persisted?.raw?.allArbs?.[0]?.fees).toEqual({ kalshiFee: 0.5, pmFee: 0.5 });
   });
 });

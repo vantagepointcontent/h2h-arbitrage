@@ -554,6 +554,7 @@ export function calculateArbitrageMax(
     sellPlatform: 'kalshi' | 'polymarket';
     sellPrice: number;
     blocker: string;
+    fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
   } | null = null;
 
   const considerUnexecutableQuote = (
@@ -578,6 +579,15 @@ export function calculateArbitrageMax(
         sellPlatform: quoteSellPlatform,
         sellPrice: quoteSellPlatform === 'kalshi' ? kNo : pNo,
         blocker,
+        fees: {
+          kalshiFee: fees.kalshiFee,
+          pmFee: fees.pmFee,
+          kalshiFeeDetails: fees.kalshiFeeDetails,
+          pmFeeDetails: fees.pmFeeDetails,
+          netProfitIfKalshiWins: fees.netProfitIfKalshiWins,
+          netProfitIfPmWins: fees.netProfitIfPmWins,
+          worstCaseNetProfit: fees.worstCaseNetProfit,
+        },
       };
     }
   };
@@ -718,6 +728,7 @@ export function calculateArbitrageMax(
       sellPlatform: 'kalshi' | 'polymarket';
       sellPrice: number;
       blocker: string;
+      fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
     } | null;
     if (quote) {
       return {
@@ -731,7 +742,7 @@ export function calculateArbitrageMax(
         pmStake: 0,
         expectedProfit: 0,
         maxCapital: 0,
-        fees: undefined,
+        fees: quote.fees,
         arbType: 'direct',
         depthVerified: false,
         requestedContracts,
@@ -766,6 +777,7 @@ export function calculateArbitrageMax(
     sellPlatform: 'kalshi' | 'polymarket';
     sellPrice: number;
     blocker: string;
+    fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
   } | null;
   const executableRoiPct = bestCapital > 0 ? (maxProfit / bestCapital) * 100 : 0;
   if (quote && quote.roiPct > executableRoiPct) {
@@ -780,7 +792,7 @@ export function calculateArbitrageMax(
       pmStake: 0,
       expectedProfit: 0,
       maxCapital: 0,
-      fees: undefined,
+      fees: quote.fees,
       arbType: 'direct',
       depthVerified: false,
       requestedContracts,

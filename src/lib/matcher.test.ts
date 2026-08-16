@@ -116,6 +116,14 @@ describe('calculateArbitrageMax', () => {
     expect(r.kalshiStake).toBe(0);
     expect(r.pmStake).toBe(0);
     expect(r.depthVerified).toBe(false);
+    expect(r.fees).toMatchObject({
+      kalshiFee: expect.any(Number),
+      pmFee: expect.any(Number),
+      kalshiFeeDetails: expect.stringContaining('Kalshi'),
+      pmFeeDetails: expect.stringContaining('Polymarket'),
+    });
+    expect(Number.isFinite(r.fees!.kalshiFee)).toBe(true);
+    expect(Number.isFinite(r.fees!.pmFee)).toBe(true);
   });
 
   it('fails closed when an unknown PM ask depth is represented as Infinity', () => {
