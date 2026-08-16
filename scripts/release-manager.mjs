@@ -501,7 +501,7 @@ export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTes
     await materializeDependencies(repoRoot, source);
     if (!skipTests) {
       await spawnCommand('npm', ['test'], { cwd: source, env: process.env });
-      await spawnCommand('npm', ['run', 'lint'], { cwd: source, env: process.env });
+      await spawnCommand(process.execPath, ['scripts/lint-baseline.mjs'], { cwd: source, env: process.env });
     }
     const env = {
       ...process.env,
