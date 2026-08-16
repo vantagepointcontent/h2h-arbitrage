@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ScanWorkerCoordinator, type ScanWorkerHandle } from './scan-worker-coordinator';
+import { resolveScanWorkerPath, ScanWorkerCoordinator, ScanWorkerError, type ScanWorkerHandle } from './scan-worker-coordinator';
 
 class FakeWorker extends EventEmitter implements ScanWorkerHandle {
   terminate = vi.fn(async () => 0);
@@ -8,6 +8,13 @@ class FakeWorker extends EventEmitter implements ScanWorkerHandle {
 }
 
 describe('ScanWorkerCoordinator', () => {
+  it('loads the full-scan worker from the active immutable release by default', () => {
+    expect(resolveScanWorkerPath('/repo', { H2H_NEXT_DIST_DIR: '.h2h-releases/active/.next' }))
+      .toBe('/repo/.h2h-releases/active/.next/full-scan-worker.cjs');
+    expect(resolveScanWorkerPath('/repo', { H2H_SCAN_WORKER_PATH: '/override/worker.cjs' }))
+      .toBe('/override/worker.cjs');
+  });
+
   let workers: FakeWorker[];
   let coordinator: ScanWorkerCoordinator;
 

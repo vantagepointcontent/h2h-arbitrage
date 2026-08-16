@@ -59,6 +59,9 @@ describe('canonical one-share opportunity policy', () => {
     expect(result.executionStatus).toBe('non_executable');
     expect(result.executionBlocker).toBe('Polymarket NO minimum order is 5 shares; requested 1 share');
     expect(result.maxCapital).toBe(0);
+    expect(result.fees).toMatchObject({ kalshiFee: expect.any(Number), pmFee: expect.any(Number) });
+    expect(result.fees?.kalshiFeeDetails).toContain('5 @');
+    expect(result.fees?.pmFeeDetails).toContain('5 @');
   });
 
   it('requires explicit mutual-exclusivity and exhaustiveness evidence for cross outcome', () => {

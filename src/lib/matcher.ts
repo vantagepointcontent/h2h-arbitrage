@@ -288,10 +288,10 @@ export function computeArbitrageFees(
     pmFeeAmount = calcPolymarketFee(pmYesContracts, pmBuyPrice, pmTheta);
     pmFeeDetails = `Polymarket YES buy ${pmYesContracts.toFixed(0)} @ $${fmtProbPrice(pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   } else if (strategy.includes('NO PM')) {
-    const pmNoContracts = pmStake / (1 - pmBuyPrice);
+    const pmNoContracts = pmStake / pmSellPrice;
     const pmTheta = getPolymarketTheta(category);
-    pmFeeAmount = calcPolymarketFee(pmNoContracts, 1 - pmBuyPrice, pmTheta);
-    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${fmtProbPrice(1 - pmBuyPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
+    pmFeeAmount = calcPolymarketFee(pmNoContracts, pmSellPrice, pmTheta);
+    pmFeeDetails = `Polymarket NO buy ${pmNoContracts.toFixed(0)} @ $${fmtProbPrice(pmSellPrice)} (θ=${pmTheta.toFixed(2)}) = ${formatFee(pmFeeAmount)}`;
   }
 
   // Both platforms charge trading fees at execution time, regardless of which
@@ -564,8 +564,11 @@ export function calculateArbitrageMax(
     quoteBuyPlatform: 'kalshi' | 'polymarket',
     quoteSellPlatform: 'kalshi' | 'polymarket',
     blocker: string,
+    authoritativeContracts: number,
   ) => {
-    const quoteCapital = 100;
+    // Preserve the established display normalization for depth/tick blockers,
+    // but price venue-minimum evidence at the exact quantity BotTrader will use.
+    const quoteCapital = authoritativeContracts > 1 ? authoritativeContracts : 100;
     const fees = computeArbitrageFees(
       quoteStrategy, quoteCapital, quoteCapital * kalshiPrice, quoteCapital * pmPrice,
       kYes, kNo, pYes, pNo, category,
@@ -616,7 +619,7 @@ export function calculateArbitrageMax(
           : undefined;
     const capital = blocker == null && isTradeableAsk(kYes) && isTradeableAsk(pNo) ? requestedContracts : 0;
     if (blocker && isTradeableAsk(kYes) && isTradeableAsk(pNo)) {
-      considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket', blocker);
+      considerUnexecutableQuote('Buy YES Kalshi + NO PM', kYes, pNo, 'kalshi', 'polymarket', blocker, pmMinimum ?? 1);
     }
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {
@@ -676,7 +679,7 @@ export function calculateArbitrageMax(
           : undefined;
     const capital = blocker == null && isTradeableAsk(pYes) && isTradeableAsk(kNo) ? requestedContracts : 0;
     if (blocker && isTradeableAsk(pYes) && isTradeableAsk(kNo)) {
-      considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi', blocker);
+      considerUnexecutableQuote('Buy YES PM + NO Kalshi', kNo, pYes, 'polymarket', 'kalshi', blocker, pmMinimum ?? 1);
     }
     const effectiveCapital = capital;
     if (effectiveCapital > 0) {

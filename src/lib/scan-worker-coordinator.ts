@@ -82,11 +82,21 @@ export interface ScanWorkerMetrics {
   maxDurationMs: number;
 }
 
+export function resolveScanWorkerPath(
+  cwd = process.cwd(),
+  env: { H2H_SCAN_WORKER_PATH?: string; H2H_NEXT_DIST_DIR?: string } = {
+    H2H_SCAN_WORKER_PATH: process.env.H2H_SCAN_WORKER_PATH,
+    H2H_NEXT_DIST_DIR: process.env.H2H_NEXT_DIST_DIR,
+  },
+): string {
+  if (env.H2H_SCAN_WORKER_PATH) return env.H2H_SCAN_WORKER_PATH;
+  return [cwd, env.H2H_NEXT_DIST_DIR || '.next', 'full-scan-worker.cjs'].join('/');
+}
+
 function productionWorker(): ScanWorkerHandle {
   // Build the deployment path at runtime. Treating it as a traced module makes
   // Turbopack try to bundle a generated artifact before build:scan-worker runs.
-  const workerPath = process.env.H2H_SCAN_WORKER_PATH
-    || [process.cwd(), 'dist', 'full-scan-worker.cjs'].join('/');
+  const workerPath = resolveScanWorkerPath();
   const child: ChildProcess = fork(workerPath, [], {
     cwd: process.cwd(),
     env: { ...process.env, H2H_FULL_SCAN_WORKER: '1' },
