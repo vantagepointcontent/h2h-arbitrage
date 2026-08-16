@@ -100,7 +100,18 @@ fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.e
     const originalPath = process.env.PATH;
     process.env.PATH = `${bin}:${originalPath}`;
     try {
-      const candidate = await api.buildCandidate({ repoRoot: repo, commit, runId: 'dependency-copy', skipTests: true });
+      const candidate = await api.buildCandidate({
+        repoRoot: repo,
+        commit,
+        runId: 'dependency-copy',
+        skipTests: true,
+        capacitySnapshot: {
+          totalBytes: 80_000_000_000,
+          freeBytes: 30_000_000_000,
+          totalInodes: 10_000_000,
+          availableInodes: 5_000_000,
+        },
+      });
       expect(candidate).toContain(`${commit}-dependency-copy`);
       const manifest = JSON.parse(await readFile(path.join(candidate, 'release-manifest.json'), 'utf8'));
       expect(manifest.runtimePackageAliases).toEqual(['fixture-package-aaaaaaaaaaaaaaaa']);
@@ -134,6 +145,37 @@ fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.e
     expect(await api.readActiveIdentity(repo)).toEqual(activeBefore);
     expect((await api.verifyRelease(candidateA)).commit).toBe('a'.repeat(40));
     expect((await api.verifyRelease(candidateB)).commit).toBe('b'.repeat(40));
+  });
+
+  it('blocks builds and promotions before they breach reserved disk headroom', async () => {
+    const api = await manager();
+    const repo = await root();
+    const constrained = {
+      totalBytes: 80_000_000_000,
+      freeBytes: 14_000_000_000,
+      totalInodes: 10_000_000,
+      availableInodes: 5_000_000,
+    };
+
+    await expect(api.buildCandidate({
+      repoRoot: repo,
+      runId: 'blocked-build',
+      capacitySnapshot: constrained,
+    })).rejects.toThrow(/capacity gate|headroom/i);
+
+    const source = await artifact(repo, 'e'.repeat(40), 'blocked-promotion');
+    const candidate = await api.sealCandidate({
+      repoRoot: repo,
+      artifactDir: source,
+      commit: 'e'.repeat(40),
+      runId: 'blocked-promotion',
+    });
+    await expect(api.promoteRelease({
+      repoRoot: repo,
+      candidateDir: candidate,
+      restart: false,
+      capacitySnapshot: constrained,
+    })).rejects.toThrow(/capacity gate|headroom/i);
   });
 
   it('atomically promotes, fences stale builders, survives interrupted promotion, and rolls back without rebuilding', async () => {

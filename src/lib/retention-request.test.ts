@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseRetentionDays } from "./retention-request";
 
 describe("parseRetentionDays", () => {
-  it("defaults to 30 days", () => {
-    expect(parseRetentionDays(null)).toBe(30);
-    expect(parseRetentionDays("")).toBe(30);
+  it("defaults to the seven-day zero-arbitrage retention policy", () => {
+    expect(parseRetentionDays(null)).toBe(7);
+    expect(parseRetentionDays("")).toBe(7);
   });
 
   it.each(["1", "30", "3650"])("accepts a bounded whole number: %s", (value) => {

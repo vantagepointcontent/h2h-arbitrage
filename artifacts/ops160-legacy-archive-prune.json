@@ -1,0 +1,33 @@
+{
+  "task": "t_67066a47",
+  "at": "2026-08-16T17:50:00Z",
+  "operation": "legacy-ops147-archive-prune",
+  "reason": "Remove superseded OPS-146 database snapshot and duplicated runtime evidence after validating newer protected rollback databases; retain git lost-and-found objects for forensic recovery.",
+  "preconditions": {
+    "openFiles": 0,
+    "gitStatus": "untracked legacy archive",
+    "newerProtectedBackups": [
+      "backups/bug159-pre-deploy-20260816T123720Z",
+      "backups/ops157-20260816T115131Z"
+    ],
+    "newerBackupIntegrity": "ok",
+    "newerBackupForeignKeyViolations": 0
+  },
+  "delete": [
+    {
+      "path": "data/backup-pre-ops147/backup-pre-ops146-20260814T111134Z.20260814T114125Z",
+      "apparentBytes": 2448939324
+    },
+    {
+      "path": "data/backup-pre-ops147/runtime-evidence.20260814T114125Z",
+      "apparentBytes": 6001874
+    },
+    {
+      "path": ".h2h-releases/releases/legacy-4d4c5438031b3d82d8cedf66f66713208c791817-1786886489386",
+      "apparentBytes": 92061696
+    }
+  ],
+  "preserve": [
+    "data/backup-pre-ops147/git-lost-found-objects"
+  ]
+}

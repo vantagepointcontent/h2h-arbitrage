@@ -5,8 +5,10 @@ import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
 import { auditArbClassification } from './arb-types';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
+import { boundedZeroArbRetentionDays, scanRetentionDeleteSql } from './scan-retention.mjs';
 import { calculateOutcomeContingentApy, type OutcomeContingentApy, type SettlementTiming } from './settlement-apy';
 import { botEntryEvidenceErrors } from './bot-entry-recovery';
+import { findLatestSqliteBackup } from './sqlite-backup-discovery.mjs';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -363,7 +365,7 @@ let _dbInitPromise: Promise<void> | null = null;
 /**
  * CORRUPT-001: Startup integrity guard.
  * Runs SQLite's bounded single-error quick check on the SQLite DB. If corrupt, attempts to
- * restore from the latest good backup in data/backups/ before initDb().
+ * restore from the latest backup in backups/ or the legacy data/backups/ before initDb().
  * Logs to stderr so it shows up in PM2/process logs.
  */
 async function checkAndRestoreDb(): Promise<void> {
@@ -375,25 +377,15 @@ async function checkAndRestoreDb(): Promise<void> {
 
     console.error(`[persistence] DB CORRUPT: quick_check = ${status}. Attempting restore...`);
 
-    // Find latest backup
-    const backupDir = path.join(process.cwd(), 'data', 'backups');
+    // Find the latest canonical or legacy backup.
     const fs2 = await import('fs');
-    if (!fs2.existsSync(backupDir)) {
-      console.error(`[persistence] No backup directory at ${backupDir}. Cannot restore.`);
-      return;
-    }
-    const backups = fs2.readdirSync(backupDir)
-      .filter((f: string) => f.startsWith('edgefinder-') && f.endsWith('.db'))
-      .sort()
-      .reverse();
-    if (backups.length === 0) {
-      console.error(`[persistence] No backups found in ${backupDir}. Cannot restore.`);
+    const latest = await findLatestSqliteBackup(process.cwd());
+    if (!latest) {
+      console.error('[persistence] No backups found in backups/ or data/backups/. Cannot restore.');
       return;
     }
 
-    const latest = backups[0];
-    const backupPath = path.join(backupDir, latest);
-    console.error(`[persistence] Restoring from ${backupPath}`);
+    console.error(`[persistence] Restoring from ${latest.path}`);
 
     // Close current client, copy backup over DB, reset client
     _client = null;
@@ -402,8 +394,8 @@ async function checkAndRestoreDb(): Promise<void> {
       const p = SQLITE_PATH + ext;
       try { fs2.unlinkSync(p); } catch { /* may not exist */ }
     }
-    fs2.copyFileSync(backupPath, SQLITE_PATH);
-    console.error(`[persistence] Restored DB from ${latest}. Re-initializing.`);
+    fs2.copyFileSync(latest.path, SQLITE_PATH);
+    console.error(`[persistence] Restored DB from ${latest.name}. Re-initializing.`);
   } catch (err) {
     // Non-fatal: if integrity check itself fails, let initDb try anyway
     console.error(`[persistence] Integrity check error (non-fatal):`, err);
@@ -503,13 +495,14 @@ export async function saveScanResult(
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
 }
 
-/** Prune scan results older than `days` days. Returns number of rows deleted. */
-export async function pruneOldScans(days: number = 30): Promise<number> {
+/** Prune zero-arbitrage scan results after at least seven days. Positive-arbitrage evidence is immutable. */
+export async function pruneOldScans(days: number = 7): Promise<number> {
   await ensureDb();
   const c = getClient();
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  const retentionDays = boundedZeroArbRetentionDays(days);
+  const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
   const result = await c.execute({
-    sql: 'DELETE FROM scan_results WHERE scanned_at < ?',
+    sql: scanRetentionDeleteSql,
     args: [cutoff],
   });
   return Number((result as any).rowsAffected ?? 0);

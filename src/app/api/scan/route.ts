@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getScanClientKey, isTrustedScheduledScan, scanRateLimiter } from '@/lib/scan-rate-limit';
 import { scanWorkerCoordinator, ScanWorkerError } from '@/lib/scan-worker-coordinator';
 import { resolveScanLinks } from '@/lib/scan-links';
+import { assertDiskCapacity } from '@/lib/disk-capacity.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,18 @@ export async function POST(request: NextRequest) {
         },
       },
     );
+  }
+
+  try {
+    await assertDiskCapacity('scan');
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'DISK_CAPACITY') {
+      return NextResponse.json(
+        { error: 'Scanner paused to preserve production disk headroom.', code: 'DISK_CAPACITY' },
+        { status: 503, headers: { 'Retry-After': '60' } },
+      );
+    }
+    throw error;
   }
 
   const body = await request.text();

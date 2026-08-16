@@ -1,5 +1,6 @@
 import { createClient } from '@libsql/client';
 import path from 'path';
+import { scanRetentionDeleteSql, boundedZeroArbRetentionDays } from '../src/lib/scan-retention.mjs';
 
 const DB_PATH = process.env.H2H_SQLITE_PATH
   || path.join(process.cwd(), 'data', 'edgefinder.db');
@@ -8,8 +9,8 @@ const CHECKPOINT_INTERVAL_MS = Math.max(
   Number(process.env.H2H_CHECKPOINT_INTERVAL_MS || 300_000),
 );
 const RETENTION_DAYS = Math.max(
-  1,
-  Number(process.env.H2H_PRUNE_RETENTION_DAYS || 30),
+  7,
+  boundedZeroArbRetentionDays(process.env.H2H_PRUNE_RETENTION_DAYS || 7),
 );
 const PRUNE_HOUR = Number(process.env.H2H_PRUNE_HOUR_UTC || '5');
 
@@ -33,11 +34,11 @@ async function prune(db) {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000).toISOString();
   const before = await db.execute('SELECT COUNT(*) AS cnt FROM scan_results');
   const beforeCount = Number(before.rows[0].cnt);
-  const result = await db.execute('DELETE FROM scan_results WHERE scanned_at < ?', [cutoff]);
+  const result = await db.execute(scanRetentionDeleteSql, [cutoff]);
   const deleted = Number(result.rowsAffected ?? 0);
   const after = await db.execute('SELECT COUNT(*) AS cnt FROM scan_results');
   const afterCount = Number(after.rows[0].cnt);
-  log(`pruned ${deleted} scan_results older than ${RETENTION_DAYS} days (${beforeCount} -> ${afterCount})`);
+  log(`pruned ${deleted} zero-arbitrage scan_results older than ${RETENTION_DAYS} days (${beforeCount} -> ${afterCount})`);
   return deleted;
 }
 

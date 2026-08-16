@@ -205,5 +205,47 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
       max_memory_restart: '128M'
     },
+    {
+      name: 'h2h-disk-monitor',
+      script: './scripts/disk-capacity-monitor.mjs',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      restart_delay: 5000,
+      min_uptime: 10000,
+      kill_timeout: 5000,
+      env: {
+        NODE_ENV: 'production',
+        H2H_DISK_RESERVE_BYTES: '15000000000',
+        H2H_DISK_RESERVE_INODES: '100000',
+      },
+      log_file: '/home/scott/.pm2/logs/h2h-disk-monitor.log',
+      error_file: '/home/scott/.pm2/logs/h2h-disk-monitor-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-disk-monitor-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+      max_memory_restart: '128M'
+    },
+    {
+      name: 'h2h-storage-retention',
+      script: './scripts/storage-retention.mjs',
+      args: '--live --daemon',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      cron_restart: '30 3 * * *',
+      env: {
+        NODE_ENV: 'production',
+      },
+      log_file: '/home/scott/.pm2/logs/h2h-storage-retention.log',
+      error_file: '/home/scott/.pm2/logs/h2h-storage-retention-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-storage-retention-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+      max_memory_restart: '128M'
+    },
   ]
 };

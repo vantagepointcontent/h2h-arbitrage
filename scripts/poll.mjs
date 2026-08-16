@@ -808,13 +808,13 @@ async function run() {
     if (today !== lastPruneDate) {
       lastPruneDate = today;
       try {
-        const res = await fetch(`${BASE_URL}/api/prune-scans?days=30`, {
+        const res = await fetch(`${BASE_URL}/api/prune-scans?days=7`, {
           method: 'POST',
           headers: process.env.H2H_API_TOKEN ? { 'x-h2h-token': process.env.H2H_API_TOKEN } : {},
         });
         if (res.ok) {
           const result = await res.json();
-          console.log(`[${new Date().toISOString()}] DB pruning: ${result.deleted} rows deleted (retention: 30d)`);
+          console.log(`[${new Date().toISOString()}] DB pruning: ${result.deleted} zero-arbitrage rows deleted (retention: 7d)`);
         }
       } catch (e) {
         console.warn(`[${new Date().toISOString()}] DB pruning failed:`, e.message);

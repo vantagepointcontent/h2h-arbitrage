@@ -1,4 +1,4 @@
-const DEFAULT_RETENTION_DAYS = 30;
+export const DEFAULT_RETENTION_DAYS = 7;
 const MAX_RETENTION_DAYS = 3650;
 
 export function parseRetentionDays(value: string | null): number | { error: string } {

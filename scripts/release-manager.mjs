@@ -19,6 +19,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { assertDiskCapacity } from '../src/lib/disk-capacity.mjs';
 
 const execFileAsync = promisify(execFile);
 const RELEASE_DIR = '.h2h-releases';
@@ -77,6 +78,14 @@ async function walkFiles(root, relative = '') {
     else if (entry.isFile()) result.push(next);
   }
   return result.sort();
+}
+
+async function artifactBytes(root) {
+  let total = 0;
+  for (const relative of await walkFiles(root)) {
+    total += (await stat(path.join(root, relative))).size;
+  }
+  return total;
 }
 
 async function hashFile(file) {
@@ -390,6 +399,11 @@ async function restartAndVerify(repoRoot, expected, options = {}) {
 export async function promoteRelease(options) {
   const { repoRoot, candidateDir } = options;
   return withPromotionLock(repoRoot, 'promote', async () => {
+    await assertDiskCapacity('promotion', {
+      snapshot: options.capacitySnapshot,
+      burstBytes: await artifactBytes(candidateDir),
+      metricsPath: path.join(repoRoot, 'data', 'disk-capacity-metrics.jsonl'),
+    });
     const root = await initialize(repoRoot);
     const candidate = await verifyRelease(candidateDir);
     if (candidate.status !== 'verified') throw new Error('Candidate is not verified');
@@ -526,7 +540,11 @@ async function materializeDependencies(repoRoot, source) {
   }
 }
 
-export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTests = false }) {
+export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTests = false, capacitySnapshot }) {
+  await assertDiskCapacity('build', {
+    snapshot: capacitySnapshot,
+    metricsPath: path.join(repoRoot, 'data', 'disk-capacity-metrics.jsonl'),
+  });
   const root = await initialize(repoRoot);
   const { stdout } = await execFileAsync('git', ['rev-parse', `${commit}^{commit}`], { cwd: repoRoot });
   const resolvedCommit = stdout.trim();

@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   consume: vi.fn(() => ({ allowed: true, retryAfterSeconds: 0 })),
   isTrustedScheduledScan: vi.fn(() => false),
+  assertDiskCapacity: vi.fn(),
   run: vi.fn(),
 }));
 
@@ -18,6 +19,9 @@ vi.mock('@/lib/scan-worker-coordinator', async () => {
 });
 vi.mock('@/lib/scan-links', () => ({
   resolveScanLinks: () => ({ kalshiUrl: 'https://kalshi.com/markets/a', polymarketUrl: 'https://polymarket.com/event/b' }),
+}));
+vi.mock('@/lib/disk-capacity.mjs', () => ({
+  assertDiskCapacity: mocks.assertDiskCapacity,
 }));
 
 import { POST } from './route';
@@ -36,6 +40,7 @@ describe('POST /api/scan worker boundary', () => {
     vi.clearAllMocks();
     mocks.consume.mockReturnValue({ allowed: true, retryAfterSeconds: 0 });
     mocks.isTrustedScheduledScan.mockReturnValue(false);
+    mocks.assertDiskCapacity.mockResolvedValue({ allowed: true });
     mocks.run.mockResolvedValue({ status: 200, headers: { 'content-type': 'application/json' }, body: '{"ok":true}', jobId: 'job-1' });
   });
 
@@ -65,6 +70,17 @@ describe('POST /api/scan worker boundary', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBe('2');
+  });
+
+  it('fails before starting a worker when reserved disk headroom would be breached', async () => {
+    mocks.assertDiskCapacity.mockRejectedValue(Object.assign(new Error('headroom'), { code: 'DISK_CAPACITY' }));
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('60');
+    expect(await response.json()).toMatchObject({ code: 'DISK_CAPACITY' });
+    expect(mocks.run).not.toHaveBeenCalled();
   });
 
   it('maps worker timeout to 504', async () => {

@@ -1,0 +1,194 @@
+{
+  "task": "t_af73a485",
+  "capturedAt": "2026-08-16T19:04:51Z",
+  "baselineHead": "064f9a7bf8ab4f767b79ed53c23f5bcc574ad72c",
+  "originMainAtCapture": "c002f41cd3efb125aa41843b97bcb01679af35cb",
+  "source": "OPS-160 handoff changed_files plus omitted poller retention wiring discovered by isolated build, independently-reviewed blocker fixes, and evidence documentation",
+  "files": [
+    {
+      "path": "ecosystem.config.js",
+      "sha256": "25bb723b9818732313dc9e8c58ec795c8cda0cd8acba7373128e8eda3f5a7e32"
+    },
+    {
+      "path": "package.json",
+      "sha256": "773ecfa55a79f988f8bea862a4c6656a4af61a746f255fc747f4d549fab4ef10"
+    },
+    {
+      "path": "scripts/artifact-retention.mjs",
+      "sha256": "433dd9c44b2d71344b6df52d2d13ece6f4b66a8ff61d4268999bedc0dcd1e8a2"
+    },
+    {
+      "path": "scripts/backup-retention.mjs",
+      "sha256": "e621aa2a69696f0ba3421d19cdf1a72a7a7f8f7a8e52ee10a1734ca2726e5009"
+    },
+    {
+      "path": "scripts/db-maintenance.mjs",
+      "sha256": "a1dab1a59e3f832e57d7ac7116f9a251a8e2c46c7b52facd9d381bfe3c4d0044"
+    },
+    {
+      "path": "scripts/disk-capacity-check.mjs",
+      "sha256": "0fe1a4f9384a1e781184a85ed9b880b46c319e08684a7f8ccefc48ad0e405ff4"
+    },
+    {
+      "path": "scripts/disk-capacity-monitor.mjs",
+      "sha256": "f1b496e39265d86ecfa4ef916052bdf514871a6e7af852a6064a340fc2872d79"
+    },
+    {
+      "path": "scripts/poll.mjs",
+      "sha256": "16942f6b52719d7c81362431a85a7c92cc1a3f11b187eae2796dfdc1ee5a194d"
+    },
+    {
+      "path": "scripts/release-manager.mjs",
+      "sha256": "a301fc5af546281b952ab87c283573ebda9d5728fc0f6dfe60eaf0af84991b77"
+    },
+    {
+      "path": "scripts/safe-sqlite-backup.mjs",
+      "sha256": "cad83e1ed82854f562231f1a968a66144034ebf7dab5593e3655c2800ecbd416"
+    },
+    {
+      "path": "scripts/storage-retention.mjs",
+      "sha256": "bcf4f21738b1e05de238c9dcb4cc439cea36fd2419e664638ed7b3700bcd0409"
+    },
+    {
+      "path": "scripts/workspace-cleanup.mjs",
+      "sha256": "951b8a003b17ff9925f626bc21a084db987c97fa99afd073ca5f69ae6953f9e9"
+    },
+    {
+      "path": "src/app/api/scan/route.ts",
+      "sha256": "4c928c8ee85ee005ea1b140ae328463f7074d7aec7b1c17c8c7093634239e13c"
+    },
+    {
+      "path": "src/app/api/scan/route.worker.test.ts",
+      "sha256": "17cc0515351d79e4d2a31f0715de5f20fa6069f49871d37e7886cffe1fcd03ab"
+    },
+    {
+      "path": "src/lib/artifact-retention.mjs",
+      "sha256": "a4aab20fbf82ed56c022eb10b47e5034bc344e1f1b2b8b97c46786fffd8d6b24"
+    },
+    {
+      "path": "src/lib/artifact-retention.test.ts",
+      "sha256": "82724b1fee6e53bbdda5e5281a812a5c3a82449e99ecf3d6710382362eefbbae"
+    },
+    {
+      "path": "src/lib/backup-retention.mjs",
+      "sha256": "78b564664e39afb3a01f520804dd1feffe5e857226d1e406d755ab1b828d7735"
+    },
+    {
+      "path": "src/lib/backup-retention.test.ts",
+      "sha256": "a5f819c41440f18c7f8dd9c2ee32457c9bfcc6030ceb3cf95a81547b4588eb56"
+    },
+    {
+      "path": "src/lib/disk-capacity.mjs",
+      "sha256": "55b471066d880b346ab4fe83e4aebab805f181fd8b09ba03142344edc18e3da9"
+    },
+    {
+      "path": "src/lib/disk-capacity.test.ts",
+      "sha256": "a9f60c3a5ca614d22027e9d680b7765b8516951fcdae9551fa4b6d61af3b7efa"
+    },
+    {
+      "path": "src/lib/disk-capacity-monitor.test.ts",
+      "sha256": "33cf1b75248fb84558418a62954c0a8102cefc4223d2cd88feb1ad1ebf6f2d02"
+    },
+    {
+      "path": "src/lib/operational-capacity.test.ts",
+      "sha256": "3c3fe5a958cf8b856421b865b6fe96f950304842b05726cdf7ca4c54280a7ed8"
+    },
+    {
+      "path": "src/lib/operational-retention.test.ts",
+      "sha256": "6fc342b971de69a16c815cf2523aadd072ae4f2e85ee2aae0cc574ae5236b05b"
+    },
+    {
+      "path": "src/lib/persistence.ts",
+      "sha256": "30fe882b2f39f2653abaf98e8643ce5a440a81f124e1716b461c550ad023a761"
+    },
+    {
+      "path": "src/lib/release-manager.test.ts",
+      "sha256": "ca10fef237b65479c41892fd8f2016ad25818e9204fa5b4506722c4ef605209f"
+    },
+    {
+      "path": "src/lib/retention-request.ts",
+      "sha256": "97933c13c3b88e4ca099c02baffa1df60da4dcdce1f994b4779c851bc2230065"
+    },
+    {
+      "path": "src/lib/retention-request.test.ts",
+      "sha256": "5b07a9bab81bc52e49d0aa44467955560cb81d701df00c0fec8e9740e5f771d3"
+    },
+    {
+      "path": "src/lib/safe-sqlite-backup.test.ts",
+      "sha256": "62c0079a4c2f419c4f5db84793876ea5a628f8c86abba6e2eb27f1750e2a8991"
+    },
+    {
+      "path": "src/lib/scan-retention.mjs",
+      "sha256": "987facd0c696d57004d509a89faf4b3db4d8ba276c3a95c8e31249f40203fea9"
+    },
+    {
+      "path": "src/lib/scan-retention.test.ts",
+      "sha256": "1f89e66e596d0300de9374eb4150b069fc7d22d663e0702ab25a0e4b8480f87d"
+    },
+    {
+      "path": "src/lib/sqlite-backup-discovery.mjs",
+      "sha256": "e0b2a4eb9df946f5c611aaf10afea6a9d40de36324152e968bc68fffeffe89a4"
+    },
+    {
+      "path": "src/lib/sqlite-backup-discovery.test.ts",
+      "sha256": "cf214280691729b62b7e9d9049dad1580ec7614b7103b659843a61b5d7a16284"
+    },
+    {
+      "path": "src/lib/workspace-cleanup.test.ts",
+      "sha256": "0ffcefcb201e7e45998f6dca99158972278aaef30ff0d54c84f2e144873653ad"
+    },
+    {
+      "path": "artifacts/ops160-disk-remediation-report.md",
+      "sha256": "fa62bb53f06418fafeda586c6bd9431e716400bba30fc071b00d9f935b68e029"
+    },
+    {
+      "path": "artifacts/ops160-legacy-archive-prune.json",
+      "sha256": "bc3e0ba393b0e0018e91b7e1940a02dc6dce9b3f168c381c681000336ed8c082"
+    }
+  ],
+  "gitStatus": [
+    "M ecosystem.config.js",
+    " M package.json",
+    " M scripts/db-maintenance.mjs",
+    " M scripts/poll.mjs",
+    " M scripts/release-manager.mjs",
+    " M scripts/workspace-cleanup.mjs",
+    " M src/app/api/scan/route.ts",
+    " M src/app/api/scan/route.worker.test.ts",
+    " M src/lib/persistence.ts",
+    " M src/lib/release-manager.test.ts",
+    " M src/lib/retention-request.test.ts",
+    " M src/lib/retention-request.ts",
+    " M src/lib/workspace-cleanup.test.ts",
+    "?? artifacts/ops160-disk-remediation-report.md",
+    "?? artifacts/ops160-legacy-archive-prune.json",
+    "?? scripts/artifact-retention.mjs",
+    "?? scripts/backup-retention.mjs",
+    "?? scripts/disk-capacity-check.mjs",
+    "?? scripts/disk-capacity-monitor.mjs",
+    "?? scripts/safe-sqlite-backup.mjs",
+    "?? scripts/storage-retention.mjs",
+    "?? src/lib/artifact-retention.mjs",
+    "?? src/lib/artifact-retention.test.ts",
+    "?? src/lib/backup-retention.mjs",
+    "?? src/lib/backup-retention.test.ts",
+    "?? src/lib/disk-capacity-monitor.test.ts",
+    "?? src/lib/disk-capacity.mjs",
+    "?? src/lib/disk-capacity.test.ts",
+    "?? src/lib/operational-capacity.test.ts",
+    "?? src/lib/operational-retention.test.ts",
+    "?? src/lib/safe-sqlite-backup.test.ts",
+    "?? src/lib/scan-retention.mjs",
+    "?? src/lib/scan-retention.test.ts",
+    "?? src/lib/sqlite-backup-discovery.mjs",
+    "?? src/lib/sqlite-backup-discovery.test.ts"
+  ],
+  "independentReview": {
+    "initialVerdict": "not approved",
+    "blockers": [
+      "canonical safe backups were not discoverable by corruption recovery",
+      "open regular backup files were not protected by lsof +D"
+    ],
+    "followupVerdict": "approved"
+  }
+}

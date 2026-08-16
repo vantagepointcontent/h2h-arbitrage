@@ -90,6 +90,9 @@ describe('OPS-149 lifecycle cleanup', () => {
     run(f);
     const second = run(f);
     expect(second.bytesReclaimed).toBe(0);
+    expect(second.pruneCaches).toBe(0);
+    expect(second.removeWorktree).toBe(0);
+    expect(second.metrics.cleanupSuccesses).toBe(0);
     expect(fs.existsSync(path.join(f.worktrees, 't_00000005', 'evidence.txt'))).toBe(true);
   });
 });

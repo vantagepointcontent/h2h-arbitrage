@@ -508,6 +508,11 @@ function executeDecision(candidate, decision, config, logEntries) {
         entry.errors.push('quarantine-failed');
       }
     } else {
+      if (!fs.existsSync(candidate.path)) {
+        entry.reasons.push('already-absent');
+        logEntries.push(entry);
+        return entry;
+      }
       const ok = removePath(candidate.path, config.dryRun);
       if (ok) {
         entry.removed.push(candidate.path);
@@ -604,12 +609,12 @@ function computeMetrics(config, candidates, decisions, logEntries, disk) {
     terminalWorktreeBytes: terminalBytes,
     buildCacheBytesReclaimed: cacheBytes,
     scratchWorkspaceBytes: scratchBytes,
-    cleanupSuccesses: logEntries.filter(e => e.errors.length === 0).length,
+    cleanupSuccesses: logEntries.filter(e => e.errors.length === 0 && (e.removed.length > 0 || e.quarantined.length > 0)).length,
     cleanupFailures: logEntries.filter(e => e.errors.length > 0).length,
     candidateCount: candidates.length,
     protectedCount: decisions.filter(d => d.decision === 'protect').length,
-    prunedCount: decisions.filter(d => d.decision === 'prune-caches').length,
-    removedCount: decisions.filter(d => d.decision === 'remove-worktree').length,
+    prunedCount: logEntries.filter(e => e.decision === 'prune-caches' && e.removed.length > 0).length,
+    removedCount: logEntries.filter(e => e.decision === 'remove-worktree' && e.removed.length > 0).length,
     oldestTerminalWorkspace: oldestTerminal ? oldestTerminal.c.path : null,
     oldestTerminalMtime: oldestTerminal ? oldestTerminal.mtime.toISOString() : null,
   };
@@ -666,8 +671,8 @@ function main() {
     disk,
     candidateCount: candidates.length,
     protected: decisions.filter(d => d.decision === 'protect').length,
-    pruneCaches: decisions.filter(d => d.decision === 'prune-caches').length,
-    removeWorktree: decisions.filter(d => d.decision === 'remove-worktree').length,
+    pruneCaches: logEntries.filter(e => e.decision === 'prune-caches' && e.removed.length > 0).length,
+    removeWorktree: logEntries.filter(e => e.decision === 'remove-worktree' && e.removed.length > 0).length,
     bytesReclaimed: logEntries.reduce((sum, e) => sum + (e.bytesReclaimed || 0), 0),
     metrics,
     log: config.logPath,
