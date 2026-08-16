@@ -20,7 +20,7 @@ vi.mock('./telegram-alerts', async (importOriginal) => {
   };
 });
 
-import { sendBotOperationalAlert } from './bot-trader';
+import { sendBotExecutionAlert, sendBotOperationalAlert } from './bot-trader';
 
 const input = { pairId: 'pair-1', marketTitle: 'Blocked market', outcome: 'Team A' };
 
@@ -55,5 +55,34 @@ describe('Ragnar production-readiness operational alerts', () => {
         error: 'Alert persistence failed: SQLITE_BUSY alert store',
       });
     expect(mocks.sendTelegramMessage).not.toHaveBeenCalled();
+  });
+
+  it('durably records an unhedged second-leg failure when Telegram delivery fails', async () => {
+    mocks.getConfigResolved.mockResolvedValue({ botToken: 'test-token', botTraderChatId: 'chat-1' });
+    mocks.sendTelegramMessage.mockResolvedValue({ ok: false, error: 'Telegram rate limited' });
+
+    await expect(sendBotExecutionAlert({
+      ...input,
+      strategy: 'Buy YES Kalshi + NO PM',
+      roiPct: 3,
+      expectedProfit: 0.03,
+      kalshiStake: 0.45,
+      pmStake: 0.52,
+    }, {
+      success: false,
+      unhedged: true,
+      error: 'Leg B disappeared and rollback close failed',
+      alerts: [{ level: 'error', message: 'Unhedged exposure remains' }],
+    }, false, 3, 'trade:unhedged'))
+      .resolves.toEqual({ durable: true, delivered: false, error: 'Telegram rate limited' });
+    expect(mocks.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      tradeId: 'trade:unhedged',
+      status: 'pending',
+      messageText: expect.stringMatching(/UNHEDGED|Leg B disappeared/),
+    }));
+    expect(mocks.updateBotMessage).toHaveBeenCalledWith(42, {
+      status: 'failed',
+      errorReason: 'Telegram rate limited',
+    });
   });
 });

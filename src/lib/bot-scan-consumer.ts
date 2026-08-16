@@ -279,6 +279,59 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         alertError: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}`,
       }));
       const reason = report?.reason ?? 'Production execution prerequisites are incomplete; execution was blocked instead of simulated';
+      for (const [parsedIndex, candidate] of scan.candidates.entries()) {
+        await deps.recordCandidateDecision?.(
+          scan,
+          candidate.candidateIndex ?? parsedIndex,
+          candidate,
+          'rejected',
+          'production_execution_blocked',
+          reason,
+          candidateAuditDetails(candidate, settings, 'production_readiness', {
+            final: true,
+            executionMode,
+            alertDurable: report?.alertDurable ?? false,
+            alertError: report?.alertError ?? null,
+          }),
+        );
+      }
+      for (const rejected of scan.rejectedCandidates ?? []) {
+        const placeholder: BotScanCandidate = {
+          candidateIndex: rejected.candidateIndex,
+          outcome: rejected.outcome,
+          strategy: rejected.strategy,
+          roiPct: 0,
+          expectedProfit: 0,
+          kalshiStake: 0,
+          pmStake: 0,
+          kalshiTicker: '',
+          pmConditionId: '',
+          kalshiYesAsk: null,
+          kalshiNoAsk: null,
+          pmYesAsk: null,
+          pmNoAsk: null,
+          kalshiYesDepth: 0,
+          kalshiNoDepth: 0,
+          pmYesDepth: 0,
+          pmNoDepth: 0,
+          fees: null,
+        };
+        await deps.recordCandidateDecision?.(
+          scan,
+          rejected.candidateIndex,
+          placeholder,
+          'rejected',
+          'production_execution_blocked',
+          `${reason}; candidate input was also invalid: ${rejected.reason}`,
+          candidateAuditDetails(placeholder, settings, 'production_readiness', {
+            final: true,
+            inputReasonCode: rejected.reasonCode,
+            executionMode,
+            alertDurable: report?.alertDurable ?? false,
+            alertError: report?.alertError ?? null,
+          }),
+        );
+      }
       return finish({
         state: 'failed',
         reasonCode: 'production_execution_blocked',
@@ -986,15 +1039,18 @@ export async function getBotScanHealth(): Promise<{
   opportunitiesEvaluated: number;
   eligibleCount: number;
   lastExecutionOrSkip: { scanId: number; state: string; reason: string; at: string } | null;
+  inProgress: { scanId: number; state: 'received'; reason: string; at: string } | null;
 }> {
   await ensureSchema();
   const db = dbClient();
   try {
-    const [latest, latestPositive, cursor, decision, pending, opportunityCounts] = await Promise.all([
+    const [latest, latestPositive, cursor, decision, terminalDecision, inProgress, pending, opportunityCounts] = await Promise.all([
       db.execute('SELECT id,scanned_at FROM scan_results ORDER BY id DESC LIMIT 1'),
       db.execute('SELECT id,scanned_at FROM scan_results WHERE positive_arb_count>0 ORDER BY id DESC LIMIT 1'),
       db.execute("SELECT last_scan_id,updated_at FROM bot_scan_cursor WHERE consumer='bot_trader'"),
       db.execute('SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT 1'),
+      db.execute("SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions WHERE state <> 'received' ORDER BY scan_id DESC LIMIT 1"),
+      db.execute("SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions WHERE state = 'received' ORDER BY scan_id DESC LIMIT 1"),
       db.execute(`SELECT COUNT(*) AS count FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
@@ -1006,6 +1062,8 @@ export async function getBotScanHealth(): Promise<{
         FROM bot_opportunity_decisions`),
     ]);
     const latestDecision = decision.rows[0];
+    const latestTerminalDecision = terminalDecision.rows[0];
+    const latestInProgress = inProgress.rows[0];
     return {
       latestCompletedScanId: latest.rows[0]?.id == null ? null : Number(latest.rows[0].id),
       latestCompletedScanAt: latest.rows[0]?.scanned_at == null ? null : String(latest.rows[0].scanned_at),
@@ -1019,11 +1077,17 @@ export async function getBotScanHealth(): Promise<{
       cursorLag: Number(pending.rows[0]?.count ?? 0),
       opportunitiesEvaluated: Number(opportunityCounts.rows[0]?.evaluated ?? 0),
       eligibleCount: Number(opportunityCounts.rows[0]?.eligible ?? 0),
-      lastExecutionOrSkip: latestDecision?.scan_id == null ? null : {
-        scanId: Number(latestDecision.scan_id),
-        state: String(latestDecision.state),
-        reason: String(latestDecision.reason),
-        at: String(latestDecision.updated_at),
+      lastExecutionOrSkip: latestTerminalDecision?.scan_id == null ? null : {
+        scanId: Number(latestTerminalDecision.scan_id),
+        state: String(latestTerminalDecision.state),
+        reason: String(latestTerminalDecision.reason),
+        at: String(latestTerminalDecision.updated_at),
+      },
+      inProgress: latestInProgress?.scan_id == null ? null : {
+        scanId: Number(latestInProgress.scan_id),
+        state: 'received',
+        reason: String(latestInProgress.reason),
+        at: String(latestInProgress.updated_at),
       },
     };
   } finally { db.close(); }

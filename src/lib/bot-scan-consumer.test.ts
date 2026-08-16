@@ -405,6 +405,40 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.deps.execute).not.toHaveBeenCalled();
   });
 
+  it('terminally audits every discovered candidate before advancing a production-readiness-blocked scan', async () => {
+    const first = candidate();
+    const second = candidate({ candidateIndex: 1, outcome: 'Team B', kalshiTicker: 'KXTEST-B', pmConditionId: 'pm-condition-b' });
+    const h = harness({
+      botSettings: settings({ mode: 'production' }),
+      scans: [scan({ candidates: [first, second] })],
+    });
+    h.deps.reportModeBlock = vi.fn(async () => ({
+      reason: 'Production execution blocked: live credentials missing',
+      alertDurable: true,
+      alertError: null,
+    }));
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
+      state: 'failed',
+      reasonCode: 'production_execution_blocked',
+    });
+    expect(h.opportunityDecisions).toEqual([
+      expect.objectContaining({
+        candidateIndex: 0,
+        state: 'rejected',
+        reasonCode: 'production_execution_blocked',
+        details: expect.objectContaining({ final: true, alertDurable: true }),
+      }),
+      expect.objectContaining({
+        candidateIndex: 1,
+        state: 'rejected',
+        reasonCode: 'production_execution_blocked',
+        details: expect.objectContaining({ final: true, alertDurable: true }),
+      }),
+    ]);
+    expect(h.cursor()).toBe(41);
+  });
+
   it('binds live reservation lifecycle callbacks and execution input to live mode', async () => {
     const h = harness({ botSettings: settings({ mode: 'production' }), executionMode: 'live', execute: execution({ dryRun: false }) });
     await h.consumer.consume(41, 'scan_api');

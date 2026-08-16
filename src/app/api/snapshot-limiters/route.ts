@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       isThrottled: s.throttle.isThrottled,
       effectiveRate: s.throttle.effectiveRate,
       refillIntervalMs: s.config.refillIntervalMs,
+      serviceIdentity: 'next-app' as const,
     }));
 
     await persistRateLimiterMetrics(records);
@@ -47,8 +48,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ persisted: records.length }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[snapshot-limiters] Failed:', err);
-    return NextResponse.json({ error: err.message || 'Snapshot failed' }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Snapshot failed' }, { status: 500 });
   }
 }

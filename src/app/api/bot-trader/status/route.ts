@@ -145,6 +145,7 @@ export async function GET() {
         opportunitiesEvaluated: scanHealth.opportunitiesEvaluated,
         eligibleCount: scanHealth.eligibleCount,
         lastExecutionOrSkip: scanHealth.lastExecutionOrSkip,
+        inProgress: scanHealth.inProgress,
         consumer: {
           state: consumerHeartbeat?.state ?? 'missing',
           lastSuccessAt: heartbeatAt,

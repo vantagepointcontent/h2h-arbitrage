@@ -1095,11 +1095,16 @@ export interface RateLimiterMetricRecord {
   isThrottled: boolean;
   effectiveRate: number;
   refillIntervalMs: number;
-  serviceIdentity?: string;
+  serviceIdentity: 'next-app' | 'full-scan-worker';
 }
 
 /** Persist one snapshot row per limiter. */
 export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord[]): Promise<void> {
+  for (const record of records) {
+    if (record.serviceIdentity !== 'next-app' && record.serviceIdentity !== 'full-scan-worker') {
+      throw new Error(`Invalid rate-limiter service identity: ${String(record.serviceIdentity)}`);
+    }
+  }
   await ensureDb();
   const c = getClient();
   const insert = await c.batch(
@@ -1121,7 +1126,7 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
         r.isThrottled ? 1 : 0,
         r.effectiveRate ?? 0,
         r.refillIntervalMs ?? 0,
-        r.serviceIdentity ?? 'unknown',
+        r.serviceIdentity,
       ],
     })),
     'write',

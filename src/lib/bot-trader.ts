@@ -154,6 +154,14 @@ export interface BotExecutionResult {
   persistenceError?: string;
   /** Durable executions primary key when an execution row was written. */
   executionId?: number;
+  /** Durable delivery state for the execution/exposure alert. */
+  alertStatus?: BotAlertStatus;
+}
+
+export interface BotAlertStatus {
+  durable: boolean;
+  delivered: boolean;
+  error?: string;
 }
 
 /** Canonical gate shared by execution and position performance persistence. */
@@ -914,6 +922,16 @@ export async function maybeExecuteBotTrade(
     alertMetadata: result.alerts,
   });
 
+  const alertStatus = await sendBotExecutionAlert(input, result, effectiveDryRun, input.roiPct, tradeId);
+  const auditedResult = { ...result, alertDelivery: alertStatus };
+  if (!alertStatus.delivered) {
+    await log('alert', result.unhedged ? 'Unhedged exposure alert delivery' : 'Execution alert delivery', 'failed', {
+      responsePayload: alertStatus,
+      errorReason: alertStatus.error ?? 'Alert was not delivered',
+      alertMetadata: { unhedged: result.unhedged, alerts: result.alerts },
+    });
+  }
+
   const executionRecord: ExecutionRecord = {
     timestamp: new Date().toISOString(),
     arbId,
@@ -923,7 +941,7 @@ export async function maybeExecuteBotTrade(
     strategy: input.strategy,
     kalshiOrder: execReq.kalshiOrder,
     polymarketOrder: execReq.polymarketOrder,
-    result,
+    result: auditedResult,
     estimatedProfit: input.expectedProfit,
     steps: result.steps,
     source: 'bot',
@@ -997,10 +1015,6 @@ export async function maybeExecuteBotTrade(
     }
   }
 
-  await sendBotTelegramAlert(input, result.success, effectiveDryRun, input.roiPct, tradeId).catch((e) => {
-    logger.warn('[bot-trader] telegram alert failed', { arbId, error: String(e) });
-  });
-
   return {
     executed: shouldPersistPerformance,
     dryRun: effectiveDryRun,
@@ -1011,24 +1025,25 @@ export async function maybeExecuteBotTrade(
         : `Production order acknowledgement pending authoritative fill reconciliation for ${input.marketTitle}`,
     exposureState: effectiveDryRun || shouldPersistPerformance ? undefined : 'pending_reconciliation',
     executionRecord,
-    executionResult: result,
+    executionResult: auditedResult,
     executionId,
     positionPersisted,
     persistenceError,
+    alertStatus,
   };
 }
 
-async function sendBotTelegramAlert(
+export async function sendBotExecutionAlert(
   input: BotTradeInput,
-  success: boolean,
+  result: Pick<Awaited<ReturnType<typeof executeArb>>, 'success' | 'unhedged' | 'error' | 'alerts'>,
   dryRun: boolean,
   roiPct: number,
   tradeId: string,
-): Promise<void> {
+): Promise<BotAlertStatus> {
   const config = await getConfigResolved();
-  const emoji = dryRun ? '🤖' : '🦾';
+  const emoji = result.unhedged ? '🚨' : dryRun ? '🤖' : '🦾';
   const modeLabel = dryRun ? 'PAPER' : 'PRODUCTION';
-  const status = success ? 'placed' : 'attempted';
+  const status = result.unhedged ? 'UNHEDGED EXPOSURE' : result.success ? 'placed' : 'attempted';
 
   const text = [
     `${emoji} <b>BotTrader ${status} — ${modeLabel}</b>`,
@@ -1039,22 +1054,49 @@ async function sendBotTelegramAlert(
     `<b>ROI:</b> ${roiPct.toFixed(2)}%`,
     `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
     `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,
+    ...(result.error ? [`<b>Error:</b> ${result.error}`] : []),
+    ...(result.unhedged ? ['<b>Action:</b> Immediate exposure reconciliation required'] : []),
   ].join('\n');
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
-  const messageType: BotMessageType = success ? 'trade_placed' : 'trade_failed';
+  const messageType: BotMessageType = result.success ? 'trade_placed' : 'trade_failed';
+  let messageId: number;
   if (!config || !chatId) {
-    await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'failed', errorReason: 'Telegram not configured' });
-    return;
+    try {
+      await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'failed', errorReason: 'Telegram not configured' });
+      return { durable: true, delivered: false, error: 'Telegram not configured' };
+    } catch (error) {
+      return { durable: false, delivered: false, error: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
   }
   if (await isPausedResolved()) {
-    await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'paused' });
-    return;
+    try {
+      await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'paused' });
+      return { durable: true, delivered: false, error: 'Telegram delivery paused' };
+    } catch (error) {
+      return { durable: false, delivered: false, error: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
   }
-  const messageId = await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'pending' });
-  const sent = await sendTelegramMessage(config.botToken, chatId, text);
-  await updateBotMessage(messageId, sent.ok
-    ? { status: 'sent', telegramMessageId: sent.messageId }
-    : { status: 'failed', errorReason: sent.error || 'Telegram send failed' });
+  try {
+    messageId = await createBotMessage({ chatId, messageText: text, messageType, tradeId, marketId: input.pairId, marketTitle: input.marketTitle, status: 'pending' });
+  } catch (error) {
+    return { durable: false, delivered: false, error: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const sent = await sendTelegramMessage(config.botToken, chatId, text).catch((error) => ({
+    ok: false as const,
+    error: error instanceof Error ? error.message : String(error),
+  }));
+  try {
+    await updateBotMessage(messageId, sent.ok
+      ? { status: 'sent', telegramMessageId: sent.messageId }
+      : { status: 'failed', errorReason: sent.error || 'Telegram send failed' });
+  } catch (error) {
+    return {
+      durable: true,
+      delivered: sent.ok,
+      error: `Alert status update failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  return { durable: true, delivered: sent.ok, ...(sent.ok ? {} : { error: sent.error || 'Telegram send failed' }) };
 }
 
 export async function sendBotOperationalAlert(

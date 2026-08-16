@@ -8,6 +8,7 @@ import {
   type BotTradeInput,
 } from './bot-trader';
 import type { UnifiedOutcome } from './matcher';
+import type { BotScanCandidate, PersistedBotScan } from './bot-scan-consumer';
 import { walkExecutableBook } from './executable-book';
 import { orderbookState } from './orderbook-state';
 
@@ -493,6 +494,7 @@ describe('maybeExecuteBotTrade safety', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.doUnmock('./auto-execute');
     vi.doUnmock('./persistence');
     vi.doUnmock('./settings');
     vi.doUnmock('./bot-positions');
@@ -534,6 +536,108 @@ describe('maybeExecuteBotTrade safety', () => {
         polymarket: expect.objectContaining({ tokenId: TEST_PM_NO_TOKEN_ID }),
       }),
     );
+  });
+
+  it('carries a controlled eligible scan through the real consumer and execution engine without a financial order', async () => {
+    const { createBotScanConsumer } = await import('./bot-scan-consumer');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const input = makeInput({ pmConditionId: TEST_PM_CONDITION_ID, pmNoTokenId: TEST_PM_NO_TOKEN_ID });
+    const runtimeState = (await import('./orderbook-state')).orderbookState;
+    runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
+    });
+    runtimeState.setBook(TEST_PM_NO_TOKEN_ID, [], [{ price: 0.52, quantity: 1 }], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
+    });
+    const refreshedCandidate = {
+      ...input,
+      fees: { kalshiFee: 0.01, pmFee: 0.01 },
+      candidateIndex: 0,
+    } as BotScanCandidate;
+    const scan: PersistedBotScan = {
+      id: 91,
+      marketId: input.pairId,
+      marketTitle: input.marketTitle,
+      scannedAt: new Date().toISOString(),
+      positiveArbCount: 1,
+      candidates: [refreshedCandidate],
+    };
+    const terminalAudits: Array<{ state: string; reasonCode: string; details: unknown }> = [];
+    const consumer = createBotScanConsumer({
+      now: () => new Date(),
+      getSettings: async () => baseSettings({ mode: 'paper' }),
+      resolveExecutionMode: async () => 'paper',
+      loadScan: async () => scan,
+      listBacklog: async () => [scan],
+      acquire: async () => ({
+        scanId: scan.id, idempotencyKey: `scan:${scan.id}`, source: 'catch_up', state: 'received',
+        reasonCode: 'scan_received', reason: 'received', receivedAt: scan.scannedAt, updatedAt: scan.scannedAt,
+        attempts: 0, placementCount: 0, details: null, leaseOwner: 'lease-91',
+      }),
+      transition: async (_id, _owner, update) => ({ ...update } as never),
+      finish: async (_id, _owner, update) => ({ ...update } as never),
+      recordReplay: async () => undefined,
+      advanceCursor: async () => undefined,
+      revalidate: async () => scan.candidates,
+      execute: maybeExecuteBotTrade,
+      reserveOpportunity: async () => true,
+      releaseOpportunity: async () => undefined,
+      retainOpportunityForExposure: async () => undefined,
+      recordCandidateDecision: async (_scan, _index, _candidate, state, reasonCode, _reason, details) => {
+        terminalAudits.push({ state, reasonCode, details });
+      },
+    });
+
+    await expect(consumer.consume(scan.id, 'catch_up')).resolves.toMatchObject({ state: 'placed', reasonCode: 'paper_placed' });
+    expect(terminalAudits).toContainEqual(expect.objectContaining({
+      state: 'accepted',
+      reasonCode: 'execution_completed',
+      details: expect.objectContaining({ final: true, executionMode: 'paper' }),
+    }));
+    expect((await import('./persistence')).persistExecution).toHaveBeenCalledOnce();
+  });
+
+  it('durably surfaces an unhedged rollback alert even when the alert store fails', async () => {
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb: vi.fn(async () => ({
+        success: false,
+        kalshiResult: { platform: 'kalshi', status: 'filled', filledContracts: 1, filledPrice: 0.45, timestamp: new Date().toISOString() },
+        polymarketResult: { platform: 'polymarket', status: 'cancelled', filledContracts: 0, timestamp: new Date().toISOString() },
+        rollbackExecuted: true,
+        unhedged: true,
+        executionTimeMs: 5,
+        error: 'Leg B disappeared and rollback close failed',
+        alerts: [{ level: 'error', message: 'Unhedged exposure remains after rollback failure', leg: 'kalshi' },
+        ],
+        steps: [],
+      })),
+    }));
+    const messages = await import('./bot-trader-messages');
+    vi.mocked(messages.createBotMessage).mockRejectedValueOnce(new Error('SQLITE_BUSY alert store'));
+    const actionLog = await import('./bot-action-log');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+
+    const result = await maybeExecuteBotTrade(makeInput());
+
+    expect(result).toMatchObject({
+      executed: false,
+      executionResult: { unhedged: true },
+      alertStatus: { durable: false, delivered: false, error: 'Alert persistence failed: SQLITE_BUSY alert store' },
+    });
+    expect(actionLog.appendBotActionLog).toHaveBeenCalledWith(expect.objectContaining({
+      step: 'alert',
+      responseStatus: 'failed',
+      responsePayload: expect.objectContaining({
+        durable: false,
+        error: 'Alert persistence failed: SQLITE_BUSY alert store',
+      }),
+      alertMetadata: expect.objectContaining({ unhedged: true }),
+    }));
   });
 
   it('fails closed before execution when authoritative fee lookup fails', async () => {
