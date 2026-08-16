@@ -30,7 +30,6 @@ const REQUIRED_FILES = [
   'routes-manifest.json',
   'prerender-manifest.json',
   'required-server-files.json',
-  'ragnar-consumer.mjs',
 ];
 const MUTABLE_BUILD_PATHS = ['cache/', 'diagnostics/'];
 const DEFAULT_KEEP_RELEASES = 4;
@@ -511,6 +510,9 @@ export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTes
       DEPLOY_COMMIT: resolvedCommit,
     };
     await spawnCommand('npm', ['run', 'build:raw'], { cwd: source, env });
+    if (!await exists(path.join(source, '.next', 'ragnar-consumer.mjs'))) {
+      throw new Error('Isolated release build did not package ragnar-consumer.mjs');
+    }
     await writeFile(path.join(source, '.next', 'DEPLOY_COMMIT'), `${resolvedCommit}\n`);
     return await sealCandidate({
       repoRoot,
