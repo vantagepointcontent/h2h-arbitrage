@@ -1133,16 +1133,19 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
 export async function getOperationalTelemetryFreshness(): Promise<{
   latestCapacitySampleAt: string | null;
   latestWorkerCapacitySampleAt: string | null;
+  latestCompletedScanAt: string | null;
 }> {
   await ensureDb();
   const c = getClient();
-  const [aggregate, worker] = await Promise.all([
+  const [aggregate, worker, scan] = await Promise.all([
     c.execute('SELECT MAX(timestamp) AS latest FROM rate_limiter_metrics'),
     c.execute({ sql: 'SELECT MAX(timestamp) AS latest FROM rate_limiter_metrics WHERE service_identity = ?', args: ['full-scan-worker'] }),
+    c.execute('SELECT MAX(scanned_at) AS latest FROM scan_results'),
   ]);
   return {
     latestCapacitySampleAt: aggregate.rows[0]?.latest == null ? null : String(aggregate.rows[0].latest),
     latestWorkerCapacitySampleAt: worker.rows[0]?.latest == null ? null : String(worker.rows[0].latest),
+    latestCompletedScanAt: scan.rows[0]?.latest == null ? null : String(scan.rows[0].latest),
   };
 }
 
@@ -1161,6 +1164,9 @@ export async function getCapacityUtilization(since?: string): Promise<{
   isThrottled: number;
   avgQueueWaitMs: number;
   rejectedRequests: number;
+  sampleCount: number;
+  lastSampleAt: string;
+  serviceIdentities: string[];
 }[]> {
   await ensureDb();
   const c = getClient();
@@ -1170,18 +1176,21 @@ export async function getCapacityUtilization(since?: string): Promise<{
     sql: `SELECT
             substr(timestamp, 1, 13) || ':00:00' AS hour,
             limiter_name                            AS limiter,
-            refill_interval_ms                      AS refill_interval_ms,
+            MAX(refill_interval_ms)                 AS refill_interval_ms,
             SUM(total_requests)                     AS total_requests,
             MAX(CASE WHEN is_throttled = 1 THEN 1 ELSE 0 END) AS was_throttled,
             AVG(avg_queue_wait_ms)                  AS avg_queue_wait_ms,
-            SUM(rejected_requests)                  AS rejected_requests
+            SUM(rejected_requests)                  AS rejected_requests,
+            COUNT(*)                                AS sample_count,
+            MAX(timestamp)                          AS last_sample_at,
+            GROUP_CONCAT(DISTINCT service_identity) AS service_identities
           FROM rate_limiter_metrics
           ${where}
           GROUP BY hour, limiter_name
           ORDER BY hour DESC, limiter_name`,
     args,
   });
-  const rows = Array.isArray(res.rows) ? (res.rows as any[]) : [];
+  const rows = Array.isArray(res.rows) ? (res.rows as unknown as Record<string, unknown>[]) : [];
   return rows.map((r) => {
     const totalRequests = Number(r.total_requests ?? 0);
     const refillIntervalMs = Math.max(1, Number(r.refill_interval_ms ?? 1000));
@@ -1195,6 +1204,9 @@ export async function getCapacityUtilization(since?: string): Promise<{
       isThrottled: Number(r.was_throttled ?? 0),
       avgQueueWaitMs: Math.round(Number(r.avg_queue_wait_ms ?? 0)),
       rejectedRequests: Number(r.rejected_requests ?? 0),
+      sampleCount: Number(r.sample_count ?? 0),
+      lastSampleAt: String(r.last_sample_at),
+      serviceIdentities: String(r.service_identities ?? '').split(',').filter(Boolean).sort(),
     };
   });
 }
@@ -1232,13 +1244,19 @@ export interface LastScanResult {
     kalshiNoBid?: number;
     kalshiYesDepth?: number | string | null;
     kalshiNoDepth?: number | string | null;
+    kalshiYesExecutableQuote?: import('./executable-book').ExecutableBookQuote;
+    kalshiNoExecutableQuote?: import('./executable-book').ExecutableBookQuote;
     pmConditionId?: string;
+    pmYesTokenId?: string;
+    pmNoTokenId?: string;
     pmYesPrice?: number;
     pmNoPrice?: number;
     pmBestBid?: number;
     pmBestAsk?: number;
     pmYesDepth?: number | null;
     pmNoDepth?: number | null;
+    pmYesExecutableQuote?: import('./executable-book').ExecutableBookQuote;
+    pmNoExecutableQuote?: import('./executable-book').ExecutableBookQuote;
     kalshiStake?: number;
     pmStake?: number;
     apyPct?: number | null;

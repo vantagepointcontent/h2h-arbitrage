@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  quoteOneShareFromTopAsk,
   isExecutableQuoteConsistent,
   walkExecutableBook,
   type ExecutableBookFill,
@@ -10,6 +11,31 @@ const ONE_SHARE = 1_000_000;
 const OBSERVED_AT = '2026-08-14T11:02:35.000Z';
 
 describe('walkExecutableBook', () => {
+  it('builds a fixed-point one-share quote from a server-derived top ask and dollar depth', () => {
+    expect(quoteOneShareFromTopAsk({
+      price: 0.425,
+      depthUsd: 0.425,
+      tickSize: 0.001,
+      minimumOrderSize: 1,
+      depthTimestamp: OBSERVED_AT,
+    })).toMatchObject({
+      status: 'executable',
+      requestedQuantityMicros: ONE_SHARE,
+      vwapPriceMicroCents: 42_500_000,
+      minimumOrderQuantityMicros: ONE_SHARE,
+    });
+  });
+
+  it('does not claim one-share execution when server-derived top-ask depth is insufficient', () => {
+    expect(quoteOneShareFromTopAsk({
+      price: 0.5,
+      depthUsd: 0.49,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: OBSERVED_AT,
+    }).status).toBe('non_executable');
+  });
+
   it('sorts shuffled asks and fills one share entirely at the minimum ask', () => {
     const quote = walkExecutableBook({
       side: 'buy',

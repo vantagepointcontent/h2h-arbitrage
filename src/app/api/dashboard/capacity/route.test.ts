@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   getCapacityUtilization: vi.fn(),
   getOperationalTelemetryFreshness: vi.fn(),
+  persistRateLimiterMetrics: vi.fn(),
 }));
 
 vi.mock('@/lib/persistence', () => mocks);

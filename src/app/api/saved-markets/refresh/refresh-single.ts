@@ -14,6 +14,7 @@ import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
+import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
 
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
@@ -276,6 +277,26 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       kalshiYesDepth: o.kalshi?.yesAskDepth,
       kalshiNoDepth: o.kalshi?.noAskDepth,
       pmConditionId: selectedPmConditionId,
+      pmYesTokenId: selectedPmLeg?.yesTokenId,
+      pmNoTokenId: selectedPmLeg?.noTokenId,
+      kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
+        price: o.kalshi?.yesAsk, depthUsd: o.kalshi?.yesAskDepth,
+        tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scannedAt,
+      }),
+      kalshiNoExecutableQuote: quoteOneShareFromTopAsk({
+        price: o.kalshi?.noAsk, depthUsd: o.kalshi?.noAskDepth,
+        tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scannedAt,
+      }),
+      pmYesExecutableQuote: quoteOneShareFromTopAsk({
+        price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
+        tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,
+        depthTimestamp: scannedAt,
+      }),
+      pmNoExecutableQuote: quoteOneShareFromTopAsk({
+        price: selectedPmLeg?.noPrice, depthUsd: selectedPmLeg?.noAskDepth,
+        tickSize: selectedPmLeg?.noTickSize, minimumOrderSize: selectedPmLeg?.noMinOrderSize,
+        depthTimestamp: scannedAt,
+      }),
       pmYesPrice: selectedPmLeg?.yesPrice,
       pmNoPrice: selectedPmLeg?.noPrice,
       pmBestBid: selectedPmLeg?.bestBid,

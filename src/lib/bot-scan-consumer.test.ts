@@ -8,7 +8,8 @@ import {
   type BotScanDecisionState,
   type PersistedBotScan,
 } from './bot-scan-consumer';
-import type { BotExecutionResult, BotSettings } from './bot-trader';
+import { buildExecutionRequest, type BotExecutionResult, type BotSettings } from './bot-trader';
+import { walkExecutableBook } from './executable-book';
 
 function settings(overrides: Partial<BotSettings> = {}): BotSettings {
   return {
@@ -54,6 +55,17 @@ function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate 
   };
 }
 
+function executableQuote(price: number) {
+  return walkExecutableBook({
+    side: 'buy',
+    levels: [{ priceCents: price * 100, quantityMicros: 1_000_000 }],
+    requestedQuantityMicros: 1_000_000,
+    tickSizeCents: 1,
+    minimumOrderQuantityMicros: 1_000_000,
+    depthTimestamp: '2026-08-11T12:00:10.000Z',
+  });
+}
+
 function scan(overrides: Partial<PersistedBotScan> = {}): PersistedBotScan {
   return {
     id: 41,
@@ -88,6 +100,7 @@ function harness(options: {
   const events: Array<{ scanId: number; state: BotScanDecisionState; code: string }> = [];
   const leases = new Set<number>();
   const opportunityReservations = new Set<string>();
+  const opportunityDecisions: Array<{ candidateIndex: number; state: string; reasonCode: string; details?: unknown }> = [];
   const opportunityKey = (item: BotScanCandidate) => `${item.kalshiTicker}\0${item.pmConditionId}`;
   let cursor = 0;
   const now = new Date('2026-08-11T12:00:10.000Z');
@@ -167,9 +180,12 @@ function harness(options: {
     }),
     releaseOpportunity: vi.fn(async (item, mode) => { opportunityReservations.delete(`${mode}:${opportunityKey(item)}`); }),
     retainOpportunityForExposure: vi.fn(async () => undefined),
+    recordCandidateDecision: vi.fn(async (_scan, candidateIndex, _candidate, state, reasonCode, _reason, details) => {
+      opportunityDecisions.push({ candidateIndex, state, reasonCode, details });
+    }),
   };
 
-  return { consumer: createBotScanConsumer(deps), deps, decisions, events, cursor: () => cursor, leases };
+  return { consumer: createBotScanConsumer(deps), deps, decisions, events, opportunityDecisions, cursor: () => cursor, leases };
 }
 
 describe('durable BotTrader scan consumer', () => {
@@ -205,6 +221,31 @@ describe('durable BotTrader scan consumer', () => {
     expect(result.placementCount).toBe(1);
   });
 
+  it('carries refreshed executable quotes through the real execution-request handoff', async () => {
+    const conditionId = `0x${'a'.repeat(64)}`;
+    const current = candidate({
+      pmConditionId: conditionId,
+      pmYesTokenId: 'pm-yes-token',
+      pmNoTokenId: 'pm-no-token',
+      kalshiYesExecutableQuote: executableQuote(0.45),
+      kalshiNoExecutableQuote: executableQuote(0.56),
+      pmYesExecutableQuote: executableQuote(0.49),
+      pmNoExecutableQuote: executableQuote(0.50),
+    });
+    const persisted = candidate({ pmConditionId: conditionId, pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token' });
+    const h = harness({ scans: [scan({ candidates: [persisted] })], current: [current] });
+    vi.mocked(h.deps.execute).mockImplementation(async (input) => {
+      expect(buildExecutionRequest(input)).toMatchObject({
+        kalshiOrder: { contracts: 1, executableQuote: current.kalshiYesExecutableQuote },
+        polymarketOrder: { contracts: 1, conditionId: 'pm-no-token', executableQuote: current.pmNoExecutableQuote },
+      });
+      return execution();
+    });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({ state: 'placed' });
+    expect(h.deps.execute).toHaveBeenCalledOnce();
+  });
+
   it('persists disabled instead of silently returning', async () => {
     const h = harness({ botSettings: settings({ enabled: false }) });
     const result = await h.consumer.consume(41, 'scan_api');
@@ -222,6 +263,22 @@ describe('durable BotTrader scan consumer', () => {
     const h = harness({ scans: [scan({ positiveArbCount: 1, candidates: [] })] });
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'malformed_scan' });
+  });
+
+  it('records a terminal per-opportunity audit for malformed discovered candidates', async () => {
+    const h = harness({ scans: [scan({
+      positiveArbCount: 1,
+      candidates: [],
+      rejectedCandidates: [{ candidateIndex: 0, outcome: 'Team A', strategy: 'Buy YES Kalshi + NO PM', reasonCode: 'missing_exact_ids', reason: 'Missing exact market identifiers' }],
+    })] });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({ reasonCode: 'malformed_scan' });
+    expect(h.opportunityDecisions).toEqual([expect.objectContaining({
+      candidateIndex: 0,
+      state: 'rejected',
+      reasonCode: 'missing_exact_ids',
+      details: expect.objectContaining({ final: true }),
+    })]);
   });
 
   it('persists criteria_rejected when scan-time ROI is below active settings', async () => {

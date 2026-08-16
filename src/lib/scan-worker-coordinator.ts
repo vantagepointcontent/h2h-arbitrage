@@ -26,7 +26,7 @@ let workerTelemetryHealth: WorkerTelemetryWriteHealth = {
 };
 
 async function persistWorkerTelemetryHealth(): Promise<void> {
-  const temp = `${WORKER_TELEMETRY_HEALTH_PATH}.${process.pid}.${Date.now()}.tmp`;
+  const temp = `${WORKER_TELEMETRY_HEALTH_PATH}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temp, JSON.stringify(workerTelemetryHealth), { mode: 0o600 });
   await rename(temp, WORKER_TELEMETRY_HEALTH_PATH);
 }
@@ -39,12 +39,16 @@ export async function readWorkerTelemetryWriteHealth(): Promise<WorkerTelemetryW
   }
 }
 
-function enqueueWorkerTelemetry(records: RateLimiterMetricRecord[]): void {
-  if (records.length === 0) return;
+function enqueueWorkerTelemetry(
+  records: RateLimiterMetricRecord[],
+  persist: (records: RateLimiterMetricRecord[]) => Promise<void>,
+): Promise<void> {
+  if (records.length === 0) return Promise.resolve();
   workerTelemetryHealth = { ...workerTelemetryHealth, lastReceivedAt: new Date().toISOString() };
   void persistWorkerTelemetryHealth().catch(() => {});
-  telemetryWriteQueue = telemetryWriteQueue
-    .then(() => withSqliteBusyRetry(() => persistRateLimiterMetrics(records)))
+  const operation = telemetryWriteQueue
+    .catch(() => undefined)
+    .then(() => withSqliteBusyRetry(() => persist(records)))
     .then(async () => {
       workerTelemetryHealth = { ...workerTelemetryHealth, lastPersistedAt: new Date().toISOString(), error: null };
       await persistWorkerTelemetryHealth();
@@ -60,7 +64,10 @@ function enqueueWorkerTelemetry(records: RateLimiterMetricRecord[]): void {
       logger.error('[scan-worker-coordinator] capacity telemetry persistence failed', {
         error: error instanceof Error ? error.message : String(error),
       });
+      throw error;
     });
+  telemetryWriteQueue = operation;
+  return operation;
 }
 
 export interface ScanWorkerRequest {
@@ -90,6 +97,7 @@ interface ScanWorkerCoordinatorOptions {
   timeoutMs?: number;
   createWorker?: () => ScanWorkerHandle;
   now?: () => number;
+  persistTelemetry?: (records: RateLimiterMetricRecord[]) => Promise<void>;
 }
 
 interface ActiveJob {
@@ -169,6 +177,7 @@ export class ScanWorkerCoordinator {
   private readonly timeoutMs: number;
   private readonly createWorker: () => ScanWorkerHandle;
   private readonly now: () => number;
+  private readonly persistTelemetry: (records: RateLimiterMetricRecord[]) => Promise<void>;
   private metrics: ScanWorkerMetrics = {
     queueDepth: 0,
     activeJobs: 0,
@@ -187,6 +196,7 @@ export class ScanWorkerCoordinator {
     this.timeoutMs = positiveInteger(options.timeoutMs, 60_000);
     this.createWorker = options.createWorker ?? productionWorker;
     this.now = options.now ?? Date.now;
+    this.persistTelemetry = options.persistTelemetry ?? persistRateLimiterMetrics;
   }
 
   run(key: string, request: ScanWorkerRequest, signal?: AbortSignal): Promise<ScanWorkerResponse> {
@@ -222,8 +232,12 @@ export class ScanWorkerCoordinator {
         telemetry?: RateLimiterMetricRecord[];
       };
       if (envelope.type === 'result' && envelope.response) {
-        enqueueWorkerTelemetry(envelope.telemetry ?? []);
-        this.finish(job, null, envelope.response);
+        void enqueueWorkerTelemetry(envelope.telemetry ?? [], this.persistTelemetry)
+          .then(() => this.finish(job, null, envelope.response))
+          .catch((error) => this.finish(job, new ScanWorkerError(
+            `Worker telemetry persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+            'SCAN_WORKER_FAILED',
+          )));
       } else if (envelope.type === 'error') {
         this.finish(job, new ScanWorkerError(envelope.error || 'Scan worker failed', 'SCAN_WORKER_FAILED'));
       }

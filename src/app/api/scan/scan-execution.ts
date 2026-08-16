@@ -23,6 +23,7 @@ import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { auditArbClassification } from '@/lib/arb-types';
+import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
@@ -497,6 +498,26 @@ export async function executeFullScan(request: NextRequest) {
             kalshiYesDepth: o.kalshi?.yesAskDepth,
             kalshiNoDepth: o.kalshi?.noAskDepth,
             pmConditionId: selectedPmConditionId,
+            pmYesTokenId: selectedPmLeg?.yesTokenId,
+            pmNoTokenId: selectedPmLeg?.noTokenId,
+            kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
+              price: o.kalshi?.yesAsk, depthUsd: o.kalshi?.yesAskDepth,
+              tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+            }),
+            kalshiNoExecutableQuote: quoteOneShareFromTopAsk({
+              price: o.kalshi?.noAsk, depthUsd: o.kalshi?.noAskDepth,
+              tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+            }),
+            pmYesExecutableQuote: quoteOneShareFromTopAsk({
+              price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
+              tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,
+              depthTimestamp: scanObservedAt,
+            }),
+            pmNoExecutableQuote: quoteOneShareFromTopAsk({
+              price: selectedPmLeg?.noPrice, depthUsd: selectedPmLeg?.noAskDepth,
+              tickSize: selectedPmLeg?.noTickSize, minimumOrderSize: selectedPmLeg?.noMinOrderSize,
+              depthTimestamp: scanObservedAt,
+            }),
             pmYesPrice: selectedPmLeg?.yesPrice,
             pmNoPrice: selectedPmLeg?.noPrice,
             pmBestBid: selectedPmLeg?.bestBid,

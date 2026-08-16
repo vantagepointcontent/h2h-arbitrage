@@ -30,6 +30,7 @@ async function artifact(base: string, commit: string, buildId: string) {
   await writeFile(path.join(dir, 'routes-manifest.json'), JSON.stringify({ version: 3 }));
   await writeFile(path.join(dir, 'prerender-manifest.json'), JSON.stringify({ version: 4 }));
   await writeFile(path.join(dir, 'required-server-files.json'), JSON.stringify({ version: 1, files: ['server/chunks/runtime.js'] }));
+  await writeFile(path.join(dir, 'ragnar-consumer.mjs'), 'export {};\n');
   await writeFile(path.join(dir, 'static', buildId, '_buildManifest.js'), `self.__BUILD=${JSON.stringify(buildId)}`);
   await writeFile(path.join(dir, 'static', 'chunks', 'app.js'), `self.__COMMIT=${JSON.stringify(commit)}`);
   await writeFile(path.join(dir, 'server', 'chunks', 'runtime.js'), `exports.commit=${JSON.stringify(commit)}`);
@@ -53,6 +54,7 @@ describe('isolated production releases', () => {
       readFile(path.join(repo, 'ecosystem.config.js'), 'utf8'),
     ]);
     expect(JSON.parse(packageJson).scripts.build).toContain('release-manager.mjs build');
+    expect(JSON.parse(packageJson).scripts['build:raw']).toContain('build:ragnar');
     expect(nextConfig).toContain('H2H_NEXT_DIST_DIR');
     expect(nextConfig).not.toMatch(/distDir:\s*['"]\.next['"]/);
     expect(startApp).toContain('release-manager.mjs verify-active');
@@ -61,6 +63,7 @@ describe('isolated production releases', () => {
     expect(health).toContain('deployment:');
     expect(health).toContain('H2H_BUILD_ID');
     expect(ecosystem).toContain("name: 'h2h-release-monitor'");
+    expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
   });
 
   it('materializes dependencies inside the detached build worktree instead of using an external symlink', async () => {
@@ -88,6 +91,7 @@ if (!fs.existsSync(path.join(dependencies, 'fixture-package', 'marker'))) proces
 for (const relative of ['static/build-test', 'static/chunks', 'server/chunks']) fs.mkdirSync(path.join('.next', relative), { recursive: true });
 for (const file of ['build-manifest.json', 'routes-manifest.json', 'prerender-manifest.json', 'required-server-files.json']) fs.writeFileSync(path.join('.next', file), '{}');
 fs.writeFileSync(path.join('.next', 'BUILD_ID'), 'build-test\\n');
+fs.writeFileSync(path.join('.next', 'ragnar-consumer.mjs'), 'export {};\\n');
 fs.writeFileSync(path.join('.next', 'static', 'chunks', 'app.js'), 'app');
 fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'runtime');
 `);

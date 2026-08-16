@@ -4,6 +4,7 @@ import { evaluateBotTrade, getBotExecutionReadiness, getBotSettings, maybeExecut
 import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 import { auditArbClassification } from './arb-types';
+import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
 export type BotScanDecisionState =
@@ -25,6 +26,7 @@ export interface BotScanFees {
 }
 
 export interface BotScanCandidate {
+  candidateIndex?: number;
   outcome: string;
   strategy: string;
   roiPct: number;
@@ -44,6 +46,10 @@ export interface BotScanCandidate {
   kalshiNoDepth: number;
   pmYesDepth: number;
   pmNoDepth: number;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   pmYesMinOrderSize?: number | null;
   pmNoMinOrderSize?: number | null;
   pmYesTickSize?: number | null;
@@ -56,6 +62,14 @@ export interface BotScanCandidate {
   stale?: boolean;
 }
 
+export interface RejectedBotScanCandidate {
+  candidateIndex: number;
+  outcome: string;
+  strategy: string;
+  reasonCode: string;
+  reason: string;
+}
+
 export interface PersistedBotScan {
   id: number;
   marketId: string;
@@ -63,6 +77,7 @@ export interface PersistedBotScan {
   scannedAt: string;
   positiveArbCount: number;
   candidates: BotScanCandidate[];
+  rejectedCandidates?: RejectedBotScanCandidate[];
 }
 
 export interface BotScanDecision {
@@ -153,6 +168,10 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     kalshiNoDepth: item.kalshiNoDepth,
     pmYesDepth: item.pmYesDepth,
     pmNoDepth: item.pmNoDepth,
+    kalshiYesExecutableQuote: item.kalshiYesExecutableQuote,
+    kalshiNoExecutableQuote: item.kalshiNoExecutableQuote,
+    pmYesExecutableQuote: item.pmYesExecutableQuote,
+    pmNoExecutableQuote: item.pmNoExecutableQuote,
     pmYesMinOrderSize: item.pmYesMinOrderSize ?? null,
     pmNoMinOrderSize: item.pmNoMinOrderSize ?? null,
     pmYesTickSize: item.pmYesTickSize ?? null,
@@ -173,6 +192,10 @@ function sameProposition(before: BotScanCandidate, current: BotScanCandidate): b
 
 function sameNamedCandidate(before: BotScanCandidate, current: BotScanCandidate): boolean {
   return before.outcome === current.outcome && before.strategy === current.strategy;
+}
+
+function sourceCandidateIndex(scan: PersistedBotScan, candidate: BotScanCandidate): number {
+  return candidate.candidateIndex ?? scan.candidates.findIndex((item) => sameProposition(item, candidate));
 }
 
 function rejection(
@@ -204,6 +227,12 @@ function candidateAuditDetails(candidate: BotScanCandidate, settings: BotSetting
         pmNoTokenId: candidate.pmNoTokenId ?? null,
       },
       asks: { kalshiYes: candidate.kalshiYesAsk, kalshiNo: candidate.kalshiNoAsk, pmYes: candidate.pmYesAsk, pmNo: candidate.pmNoAsk },
+      executableQuotes: {
+        kalshiYes: candidate.kalshiYesExecutableQuote ?? null,
+        kalshiNo: candidate.kalshiNoExecutableQuote ?? null,
+        pmYes: candidate.pmYesExecutableQuote ?? null,
+        pmNo: candidate.pmNoExecutableQuote ?? null,
+      },
       depthUsd: { kalshiYes: candidate.kalshiYesDepth, kalshiNo: candidate.kalshiNoDepth, pmYes: candidate.pmYesDepth, pmNo: candidate.pmNoDepth },
       fees: candidate.fees,
       venueConstraints: {
@@ -271,12 +300,44 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         eligibleCount: 0,
       }));
     }
+    for (const rejected of scan.rejectedCandidates ?? []) {
+      const placeholder: BotScanCandidate = {
+        candidateIndex: rejected.candidateIndex,
+        outcome: rejected.outcome,
+        strategy: rejected.strategy,
+        roiPct: 0,
+        expectedProfit: 0,
+        kalshiStake: 0,
+        pmStake: 0,
+        kalshiTicker: '',
+        pmConditionId: '',
+        kalshiYesAsk: null,
+        kalshiNoAsk: null,
+        pmYesAsk: null,
+        pmNoAsk: null,
+        kalshiYesDepth: 0,
+        kalshiNoDepth: 0,
+        pmYesDepth: 0,
+        pmNoDepth: 0,
+        fees: null,
+      };
+      await deps.recordCandidateDecision?.(
+        scan,
+        rejected.candidateIndex,
+        placeholder,
+        'rejected',
+        rejected.reasonCode,
+        rejected.reason,
+        candidateAuditDetails(placeholder, settings, 'input_validation', { final: true }),
+      );
+    }
     if (scan.candidates.length === 0) {
       return finish(rejection('criteria_rejected', 'malformed_scan', 'Positive-arbitrage scan has no parseable candidate rows'));
     }
 
     const initiallyEligible: BotScanCandidate[] = [];
-    for (const [candidateIndex, item] of scan.candidates.entries()) {
+    for (const [parsedIndex, item] of scan.candidates.entries()) {
+      const candidateIndex = item.candidateIndex ?? parsedIndex;
       const unavailable = item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable';
       const evaluation = evaluateBotTrade(candidateToInput(scan, item, settings), settings);
       const eligible = !unavailable && validFees(item.fees) && evaluation.shouldTrade;
@@ -326,7 +387,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const executable: BotScanCandidate[] = [];
     const rejections: Array<{ outcome: string; code: string; reason: string; candidateIndex: number; candidate: BotScanCandidate }> = [];
     for (const original of initiallyEligible) {
-      const candidateIndex = scan.candidates.indexOf(original);
+      const candidateIndex = sourceCandidateIndex(scan, original);
       const current = currentCandidates.find((item) => sameProposition(original, item));
       if (!current) {
         const changed = currentCandidates.find((item) => sameNamedCandidate(original, item));
@@ -377,7 +438,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const reserved: BotScanCandidate[] = [];
     for (const item of executable) {
       if (deps.reserveOpportunity && !(await deps.reserveOpportunity(item, executionMode))) {
-        const candidateIndex = scan.candidates.findIndex((candidate) => sameProposition(candidate, item));
+        const candidateIndex = sourceCandidateIndex(scan, item);
         const reason = 'Exact economic legs are already reserved or have an open BotTrader position';
         rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason, candidateIndex, candidate: item });
         await deps.recordCandidateDecision?.(scan, candidateIndex, item, 'rejected', 'opportunity_already_claimed', reason,
@@ -413,7 +474,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         results.push({ outcome: item.outcome, result });
         await deps.recordCandidateDecision?.(
           scan,
-          scan.candidates.findIndex((candidate) => sameProposition(candidate, item)),
+          sourceCandidateIndex(scan, item),
           item,
           result.executed ? 'accepted' : 'rejected',
           result.executed ? 'execution_completed' : 'execution_rejected',
@@ -444,7 +505,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         results.push({ outcome: item.outcome, error: reason });
         await deps.recordCandidateDecision?.(
           scan,
-          scan.candidates.findIndex((candidate) => sameProposition(candidate, item)),
+          sourceCandidateIndex(scan, item),
           item,
           'failed',
           'execution_outcome_unknown',
@@ -573,6 +634,11 @@ async function ensureSchema(): Promise<void> {
     ]) {
       try { await db.execute(migration); } catch { /* already migrated */ }
     }
+    await db.execute(`UPDATE bot_opportunity_decisions
+      SET state='legacy_incomplete', reason_code='legacy_final_result_missing',
+          reason='Historical decision lacked a terminal result and was reconciled without replaying execution',
+          final_result='legacy_incomplete', updated_at=COALESCE(updated_at, created_at)
+      WHERE final_result IS NULL`);
     schemaReady = true;
   } finally {
     db.close();
@@ -602,6 +668,10 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
   const row = value as Record<string, unknown>;
   const fees = row.fees && typeof row.fees === 'object' ? row.fees as Record<string, unknown> : null;
   const pmFee = fees?.pmFee ?? fees?.polymarketFee;
+  const quote = (candidate: unknown): ExecutableBookQuote | undefined =>
+    isExecutableQuoteConsistent(candidate as ExecutableBookQuote | undefined, 'buy', 1_000_000)
+      ? candidate as ExecutableBookQuote
+      : undefined;
   if (typeof row.artist !== 'string' || typeof row.strategy !== 'string'
       || !finite(row.roiPct) || !finite(row.expectedProfit)
       || typeof row.kalshiTicker !== 'string' || typeof row.pmConditionId !== 'string') return null;
@@ -633,6 +703,10 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     kalshiNoDepth: parseDepth(row.kalshiNoDepth),
     pmYesDepth: parseDepth(row.pmYesDepth),
     pmNoDepth: parseDepth(row.pmNoDepth),
+    kalshiYesExecutableQuote: quote(row.kalshiYesExecutableQuote),
+    kalshiNoExecutableQuote: quote(row.kalshiNoExecutableQuote),
+    pmYesExecutableQuote: quote(row.pmYesExecutableQuote),
+    pmNoExecutableQuote: quote(row.pmNoExecutableQuote),
     pmYesMinOrderSize: finite(row.pmYesMinOrderSize) ? row.pmYesMinOrderSize as number : null,
     pmNoMinOrderSize: finite(row.pmNoMinOrderSize) ? row.pmNoMinOrderSize as number : null,
     pmYesTickSize: finite(row.pmYesTickSize) ? row.pmYesTickSize as number : null,
@@ -650,13 +724,34 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
 
 function rowToScan(row: Record<string, unknown>): PersistedBotScan {
   const raw = parseJson(row.raw_result) as { allArbs?: unknown[]; expiryDate?: string; category?: string } | null;
+  const candidates: BotScanCandidate[] = [];
+  const rejectedCandidates: RejectedBotScanCandidate[] = [];
+  for (const [candidateIndex, value] of (raw?.allArbs ?? []).entries()) {
+    const parsed = parseBotScanCandidate(value, raw?.expiryDate, raw?.category);
+    if (parsed) {
+      candidates.push({ ...parsed, candidateIndex });
+      continue;
+    }
+    const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const missingIds = typeof source.kalshiTicker !== 'string' || typeof source.pmConditionId !== 'string';
+    rejectedCandidates.push({
+      candidateIndex,
+      outcome: typeof source.artist === 'string' ? source.artist : 'unknown',
+      strategy: typeof source.strategy === 'string' ? source.strategy : 'unknown',
+      reasonCode: missingIds ? 'missing_exact_ids' : 'malformed_candidate',
+      reason: missingIds
+        ? 'Discovered opportunity is missing exact Kalshi ticker or Polymarket condition ID'
+        : 'Discovered opportunity failed required field or arbitrage-classification validation',
+    });
+  }
   return {
     id: Number(row.id),
     marketId: String(row.market_id),
     marketTitle: String(row.market_title || row.market_id),
     scannedAt: String(row.scanned_at),
     positiveArbCount: Number(row.positive_arb_count ?? 0),
-    candidates: (raw?.allArbs ?? []).map((item) => parseBotScanCandidate(item, raw?.expiryDate, raw?.category)).filter((item): item is BotScanCandidate => item != null),
+    candidates,
+    rejectedCandidates,
   };
 }
 

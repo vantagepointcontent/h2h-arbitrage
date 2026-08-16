@@ -923,6 +923,49 @@ export async function executeArb(req: ExecutionRequest): Promise<ExecutionResult
   ) {
     if (Date.now() >= deadline) break;
 
+    // If one leg is already filled, revalidate the exact pending leg before a
+    // venue-status poll can observe it as filled. This closes the initial
+    // filled/pending bypass where the old post-poll check never ran.
+    if (!tickCheckDone) {
+      const kalshiFilled = isSettled(kalshiResult.status) && hasFill(kalshiResult);
+      const pmFilled = isSettled(polymarketResult.status) && hasFill(polymarketResult);
+      const kalshiPending = !isSettled(kalshiResult.status);
+      const pmPending = !isSettled(polymarketResult.status);
+      const filledLeg = kalshiFilled && pmPending ? 'kalshi'
+        : pmFilled && kalshiPending ? 'polymarket'
+        : null;
+      if (filledLeg) {
+        const pendingRequest = filledLeg === 'kalshi' ? req.polymarketOrder : req.kalshiOrder;
+        tickCheckResult = await tickCheckLeg(filledLeg, pendingRequest, req.maxSlippagePct, effectiveDryRun);
+        tickCheckDone = true;
+        addStep(
+          tickCheckResult.action === 'cancel' ? 'failed' : 'success',
+          `Pre-poll tick check on ${filledLeg} fill — ${tickCheckResult.legChecked} expected ${tickCheckResult.expectedPrice.toFixed(3)}${tickCheckResult.actualPrice ? `, actual ${tickCheckResult.actualPrice.toFixed(3)}` : ''} → ${tickCheckResult.action}`,
+          { legChecked: tickCheckResult.legChecked, priceMoved: tickCheckResult.priceMoved },
+        );
+        if (tickCheckResult.action === 'cancel') {
+          alerts.push({
+            level: 'warning',
+            message: `Pre-leg-B revalidation failed: ${tickCheckResult.reason ?? 'quote unavailable'} — cancelling pending leg and rolling back exposure`,
+            leg: tickCheckResult.legChecked,
+            action: `cancel + auto-close ${filledLeg}`,
+          });
+          if (filledLeg === 'kalshi') {
+            const cancellation = await cancelEntry(polymarketResult, req.polymarketOrder);
+            polymarketResult = cancellation.result;
+            ledgerPolymarketEntry = captureEntry(polymarketResult, ledgerPolymarketEntry);
+            if (!cancellation.verified) unhedged = true;
+          } else {
+            const cancellation = await cancelEntry(kalshiResult, req.kalshiOrder);
+            kalshiResult = cancellation.result;
+            ledgerKalshiEntry = captureEntry(kalshiResult, ledgerKalshiEntry);
+            if (!cancellation.verified) unhedged = true;
+          }
+          break;
+        }
+      }
+    }
+
     await sleep(POLL_INTERVAL_MS);
     if (Date.now() >= deadline) break;
 

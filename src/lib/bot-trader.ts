@@ -1065,16 +1065,25 @@ export async function sendBotOperationalAlert(
   const config = await getConfigResolved();
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
   const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${input.marketTitle}\n<b>Outcome:</b> ${input.outcome}\n<b>Remediation:</b> ${reason}`;
-  const messageId = await createBotMessage({
-    chatId,
-    messageText: text,
-    messageType: 'trade_failed',
-    tradeId,
-    marketId: input.pairId,
-    marketTitle: input.marketTitle,
-    status: config && chatId ? 'pending' : 'failed',
-    errorReason: config && chatId ? null : 'Telegram not configured',
-  });
+  let messageId: number;
+  try {
+    messageId = await createBotMessage({
+      chatId,
+      messageText: text,
+      messageType: 'trade_failed',
+      tradeId,
+      marketId: input.pairId,
+      marketTitle: input.marketTitle,
+      status: config && chatId ? 'pending' : 'failed',
+      errorReason: config && chatId ? null : 'Telegram not configured',
+    });
+  } catch (error) {
+    return {
+      durable: false,
+      delivered: false,
+      error: `Alert persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
   if (!config || !chatId) return { durable: true, delivered: false, error: 'Telegram not configured' };
   const sent = await sendTelegramMessage(config.botToken, chatId, text);
   await updateBotMessage(messageId, sent.ok

@@ -30,6 +30,7 @@ const REQUIRED_FILES = [
   'routes-manifest.json',
   'prerender-manifest.json',
   'required-server-files.json',
+  'ragnar-consumer.mjs',
 ];
 const MUTABLE_BUILD_PATHS = ['cache/', 'diagnostics/'];
 const DEFAULT_KEEP_RELEASES = 4;

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getPmOrder: vi.fn(),
   cancelPmOrder: vi.fn(),
   placePmSellOrder: vi.fn(),
+  seedKalshiBook: vi.fn(),
+  seedPmBook: vi.fn(),
 }));
 
 vi.mock('./kalshi-orders', () => ({
@@ -27,6 +29,10 @@ vi.mock('./polymarket-orders', async (importOriginal) => {
     placePmSellOrder: mocks.placePmSellOrder,
   };
 });
+vi.mock('./book-seed', () => ({
+  seedKalshiBook: mocks.seedKalshiBook,
+  seedPmBook: mocks.seedPmBook,
+}));
 
 import { executeArb, type ExecutionRequest } from './auto-execute';
 import type { VenueExecutionEvidence } from './execution-evidence';
@@ -107,6 +113,13 @@ describe('BUG-153 live entry terminality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     arrangeInitialMatchedPartial();
+    mocks.seedKalshiBook.mockResolvedValue(undefined);
+    mocks.seedPmBook.mockImplementation(async (tokenId: string) => {
+      const observedAt = new Date().toISOString();
+      orderbookState.setBook(tokenId, [{ price: 0.5, quantity: 1 }], [], 0, {
+        tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000, depthTimestamp: observedAt,
+      });
+    });
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -142,6 +155,22 @@ describe('BUG-153 live entry terminality', () => {
     expect(result.success).toBe(true);
     expect(mocks.cancelKalshiOrder).not.toHaveBeenCalled();
     expect(mocks.cancelPmOrder).not.toHaveBeenCalled();
+  }, 10_000);
+
+  it('revalidates the pending leg before the first poll can report it filled', async () => {
+    mocks.placeKalshiOrder.mockResolvedValue(kalshiOrder('executed', 1, 1, '1'));
+    mocks.placePmOrder.mockResolvedValue({
+      orderId: 'p-entry', status: 'live', success: true, raw: { size_matched: '0' },
+    });
+    mocks.getPmOrder.mockResolvedValue(pmOrder('matched', 1, 1, '2'));
+    const req = request();
+    req.timeoutMs = 5_000;
+
+    const result = await executeArb(req);
+
+    expect(result.tickCheck).toMatchObject({ triggered: true, legChecked: 'polymarket' });
+    expect(mocks.seedPmBook).toHaveBeenCalledWith('pm-token-bug-153', 'yes');
+    expect(mocks.seedPmBook.mock.invocationCallOrder[0]).toBeLessThan(mocks.getPmOrder.mock.invocationCallOrder[0]);
   }, 10_000);
 
   it('cancels and re-polls matched live partials, recaptures equal late fills, and reconciles only terminal evidence', async () => {

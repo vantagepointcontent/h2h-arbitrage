@@ -39,6 +39,40 @@ describe('ScanWorkerCoordinator', () => {
     expect(coordinator.snapshot().deduplicatedJobs).toBe(1);
   });
 
+  it('persists worker telemetry serially before completing concurrent scans', async () => {
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const persistTelemetry = vi.fn()
+      .mockImplementationOnce(async () => firstGate)
+      .mockResolvedValueOnce(undefined);
+    coordinator = new ScanWorkerCoordinator({
+      maxConcurrent: 2,
+      timeoutMs: 1_000,
+      createWorker: () => {
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      },
+      now: () => Date.now(),
+      persistTelemetry,
+    });
+    const first = coordinator.run('market-a', { body: '{}' });
+    const second = coordinator.run('market-b', { body: '{}' });
+    const telemetry = [{ limiterName: 'kalshi', timestamp: '2026-08-16T14:00:00.000Z', totalRequests: 1 }];
+
+    workers[0].emit('message', { type: 'result', response: { status: 200, headers: {}, body: '{}' }, telemetry });
+    workers[1].emit('message', { type: 'result', response: { status: 200, headers: {}, body: '{}' }, telemetry });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(coordinator.snapshot().completedJobs).toBe(0);
+    expect(persistTelemetry).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await expect(first).resolves.toMatchObject({ status: 200 });
+    await expect(second).resolves.toMatchObject({ status: 200 });
+    expect(persistTelemetry).toHaveBeenCalledTimes(2);
+  });
+
   it('preserves overload semantics for a different market at capacity', async () => {
     const active = coordinator.run('market-a', { body: '{}' });
 

@@ -51,6 +51,15 @@ export interface WalkExecutableBookRequest {
   depthTimestamp: string | null;
 }
 
+export interface TopAskQuoteRequest {
+  price: number | null | undefined;
+  /** Authoritative dollar notional available at this exact ask. */
+  depthUsd: number | string | null | undefined;
+  tickSize: number | null | undefined;
+  minimumOrderSize: number | null | undefined;
+  depthTimestamp: string | null;
+}
+
 function levelPriceMicroCents(level: ExecutableBookLevel): number {
   if (Number.isSafeInteger(level.priceMicroCents)) return level.priceMicroCents!;
   const scaled = (level.priceCents ?? Number.NaN) * MICRO_CENTS_PER_CENT;
@@ -170,6 +179,29 @@ export function walkExecutableBook(request: WalkExecutableBookRequest): Executab
 
   if (remaining > 0) return quote(request, 'non_executable', 'insufficient_depth', fills);
   return quote(request, 'executable', null, fills);
+}
+
+/** Convert an authoritative top ask plus its exact dollar depth into a one-share quote. */
+export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): ExecutableBookQuote {
+  const priceMicroCents = Math.round(Number(request.price) * MICRO_CENTS_PER_DOLLAR);
+  const normalizedDepth = typeof request.depthUsd === 'string'
+    ? Number(request.depthUsd.trim().replace(/^\$/, '').replaceAll(',', ''))
+    : Number(request.depthUsd);
+  const depthMicroCents = Math.round(normalizedDepth * MICRO_CENTS_PER_DOLLAR);
+  const tickSizeMicroCents = Math.round(Number(request.tickSize) * MICRO_CENTS_PER_DOLLAR);
+  const minimumOrderQuantityMicros = Math.round(Number(request.minimumOrderSize) * QUANTITY_SCALE);
+  const quantityMicros = Number.isSafeInteger(priceMicroCents) && priceMicroCents > 0
+    && Number.isSafeInteger(depthMicroCents) && depthMicroCents > 0
+    ? Number((BigInt(depthMicroCents) * BigInt(QUANTITY_SCALE)) / BigInt(priceMicroCents))
+    : 0;
+  return walkExecutableBook({
+    side: 'buy',
+    levels: quantityMicros > 0 ? [{ priceMicroCents, quantityMicros }] : [],
+    requestedQuantityMicros: QUANTITY_SCALE,
+    tickSizeMicroCents,
+    minimumOrderQuantityMicros,
+    depthTimestamp: request.depthTimestamp,
+  });
 }
 
 /** Validate an executable quote crossing an untrusted API/runtime boundary. */

@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { executeFullScan } from '../src/app/api/scan/scan-execution';
-import { captureAndPersistRateLimiterMetrics } from '../src/lib/rate-limiter-capture';
-import { persistRateLimiterMetrics } from '../src/lib/persistence';
+import { buildRateLimiterMetricRecords } from '../src/lib/rate-limiter-capture';
 import { rateLimiters, snapshotRateLimiterMetrics } from '../src/lib/rate-limiter';
 
 interface RunMessage {
@@ -43,17 +42,9 @@ process.on('message', async (message: RunMessage) => {
       body: message.request.body,
     });
     const response = await executeFullScan(request);
-    try {
-      await captureAndPersistRateLimiterMetrics({
-        serviceIdentity: 'full-scan-worker',
-        snapshot: snapshotRateLimiterMetrics,
-        persist: persistRateLimiterMetrics,
-        resetters: Object.values(rateLimiters).map((limiter) => () => limiter.resetMetrics()),
-      });
-    } catch (error) {
-      console.error('[full-scan-worker] capacity telemetry persistence failed', error);
-    }
-    publishAndExit({ type: 'result', jobId: message.jobId, response: await serializeResponse(response) }, 0);
+    const telemetry = buildRateLimiterMetricRecords('full-scan-worker', snapshotRateLimiterMetrics());
+    for (const limiter of Object.values(rateLimiters)) limiter.resetMetrics();
+    publishAndExit({ type: 'result', jobId: message.jobId, response: await serializeResponse(response), telemetry }, 0);
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     publishAndExit({ type: 'error', jobId: message.jobId, error: text }, 1);

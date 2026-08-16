@@ -159,7 +159,7 @@ module.exports = {
     },
     {
       name: 'h2h-ragnar',
-      script: './scripts/ragnar-consumer.mjs',
+      script: './.h2h-releases/active/.next/ragnar-consumer.mjs',
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
