@@ -22,6 +22,7 @@ import { getAvgEpisodeLifespanMin } from '../src/lib/arb-lifecycle';
 import { attachPersistenceScores } from '../src/lib/persistence-tracker';
 import { checkAndSendAlert } from '../src/lib/telegram-alerts';
 import { updateSavedMarketLiveResult, clearSavedMarketLiveResult, LastScanResult } from '@/lib/persistence';
+import { SerialKeyedWorkQueue } from '../src/lib/serial-keyed-work-queue';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
@@ -70,6 +71,7 @@ const tickerToPairs = new Map<string, Set<string>>();  // kalshi ticker -> pairI
 const tokenToPairs = new Map<string, Set<string>>();   // pm token -> pairIds
 const pmTokenSides = new Map<string, 'yes' | 'no'>();
 const pairDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+const pairComputeQueue = new SerialKeyedWorkQueue();
 const pmPool: ClobWsService[] = [];
 let kalshiSubKeys: string[] = [];
 let msgCount = 0;
@@ -266,10 +268,12 @@ async function syncSubscriptions(): Promise<void> {
 // ── Compute + alert path ─────────────────────────────────────────
 
 function schedulePairCompute(pairId: string): void {
-  if (pairDebounce.has(pairId)) return; // trailing debounce already scheduled
+  if (pairDebounce.has(pairId) || pairComputeQueue.has(pairId)) return;
   pairDebounce.set(pairId, setTimeout(() => {
     pairDebounce.delete(pairId);
-    computePair(pairId).catch((err) => logger.warn('[watcher] compute failed', { pairId, err }));
+    pairComputeQueue.enqueue(pairId, () => computePair(pairId).catch((err) => {
+      logger.warn('[watcher] compute failed', { pairId, err });
+    }));
   }, PAIR_DEBOUNCE_MS));
 }
 

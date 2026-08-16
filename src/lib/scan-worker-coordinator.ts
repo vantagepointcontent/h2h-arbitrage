@@ -1,73 +1,15 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { persistRateLimiterMetrics, type RateLimiterMetricRecord } from './persistence';
-import { withSqliteBusyRetry } from './sqlite-write-retry';
-import logger from './logger';
+import { WorkerTelemetrySpool, type WorkerTelemetryWriteHealth } from './scan-worker-telemetry-spool';
 
-let telemetryWriteQueue: Promise<void> = Promise.resolve();
-const WORKER_TELEMETRY_HEALTH_PATH = path.join(process.cwd(), 'data', 'scan-worker-telemetry-health.json');
+const workerTelemetrySpool = new WorkerTelemetrySpool({ persist: persistRateLimiterMetrics });
+workerTelemetrySpool.start();
 
-export interface WorkerTelemetryWriteHealth {
-  lastReceivedAt: string | null;
-  lastPersistedAt: string | null;
-  lastFailureAt: string | null;
-  writeFailures: number;
-  error: string | null;
-}
+export type { WorkerTelemetryWriteHealth } from './scan-worker-telemetry-spool';
 
-let workerTelemetryHealth: WorkerTelemetryWriteHealth = {
-  lastReceivedAt: null,
-  lastPersistedAt: null,
-  lastFailureAt: null,
-  writeFailures: 0,
-  error: null,
-};
-
-async function persistWorkerTelemetryHealth(): Promise<void> {
-  const temp = `${WORKER_TELEMETRY_HEALTH_PATH}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temp, JSON.stringify(workerTelemetryHealth), { mode: 0o600 });
-  await rename(temp, WORKER_TELEMETRY_HEALTH_PATH);
-}
-
-export async function readWorkerTelemetryWriteHealth(): Promise<WorkerTelemetryWriteHealth> {
-  try {
-    return JSON.parse(await readFile(WORKER_TELEMETRY_HEALTH_PATH, 'utf8')) as WorkerTelemetryWriteHealth;
-  } catch {
-    return { ...workerTelemetryHealth };
-  }
-}
-
-function enqueueWorkerTelemetry(
-  records: RateLimiterMetricRecord[],
-  persist: (records: RateLimiterMetricRecord[]) => Promise<void>,
-): Promise<void> {
-  if (records.length === 0) return Promise.resolve();
-  workerTelemetryHealth = { ...workerTelemetryHealth, lastReceivedAt: new Date().toISOString() };
-  void persistWorkerTelemetryHealth().catch(() => {});
-  const operation = telemetryWriteQueue
-    .catch(() => undefined)
-    .then(() => withSqliteBusyRetry(() => persist(records)))
-    .then(async () => {
-      workerTelemetryHealth = { ...workerTelemetryHealth, lastPersistedAt: new Date().toISOString(), error: null };
-      await persistWorkerTelemetryHealth();
-    })
-    .catch((error) => {
-      workerTelemetryHealth = {
-        ...workerTelemetryHealth,
-        lastFailureAt: new Date().toISOString(),
-        writeFailures: workerTelemetryHealth.writeFailures + 1,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      void persistWorkerTelemetryHealth().catch(() => {});
-      logger.error('[scan-worker-coordinator] capacity telemetry persistence failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    });
-  telemetryWriteQueue = operation;
-  return operation;
+export function readWorkerTelemetryWriteHealth(): Promise<WorkerTelemetryWriteHealth> {
+  return workerTelemetrySpool.readHealth();
 }
 
 export interface ScanWorkerRequest {
@@ -97,7 +39,7 @@ interface ScanWorkerCoordinatorOptions {
   timeoutMs?: number;
   createWorker?: () => ScanWorkerHandle;
   now?: () => number;
-  persistTelemetry?: (records: RateLimiterMetricRecord[]) => Promise<void>;
+  acceptTelemetry?: (id: string, records: RateLimiterMetricRecord[]) => Promise<void>;
 }
 
 interface ActiveJob {
@@ -177,7 +119,7 @@ export class ScanWorkerCoordinator {
   private readonly timeoutMs: number;
   private readonly createWorker: () => ScanWorkerHandle;
   private readonly now: () => number;
-  private readonly persistTelemetry: (records: RateLimiterMetricRecord[]) => Promise<void>;
+  private readonly acceptTelemetry: (id: string, records: RateLimiterMetricRecord[]) => Promise<void>;
   private metrics: ScanWorkerMetrics = {
     queueDepth: 0,
     activeJobs: 0,
@@ -196,7 +138,7 @@ export class ScanWorkerCoordinator {
     this.timeoutMs = positiveInteger(options.timeoutMs, 60_000);
     this.createWorker = options.createWorker ?? productionWorker;
     this.now = options.now ?? Date.now;
-    this.persistTelemetry = options.persistTelemetry ?? persistRateLimiterMetrics;
+    this.acceptTelemetry = options.acceptTelemetry ?? ((id, records) => workerTelemetrySpool.accept(id, records));
   }
 
   run(key: string, request: ScanWorkerRequest, signal?: AbortSignal): Promise<ScanWorkerResponse> {
@@ -232,12 +174,11 @@ export class ScanWorkerCoordinator {
         telemetry?: RateLimiterMetricRecord[];
       };
       if (envelope.type === 'result' && envelope.response) {
-        void enqueueWorkerTelemetry(envelope.telemetry ?? [], this.persistTelemetry)
+        void this.acceptTelemetry(job.id, envelope.telemetry ?? [])
           .then(() => this.finish(job, null, envelope.response))
-          .catch((error) => this.finish(job, new ScanWorkerError(
-            `Worker telemetry persistence failed: ${error instanceof Error ? error.message : String(error)}`,
-            'SCAN_WORKER_FAILED',
-          )));
+          // A completed scan remains a completed scan. Telemetry health carries
+          // an explicit spool failure instead of changing response semantics.
+          .catch(() => this.finish(job, null, envelope.response));
       } else if (envelope.type === 'error') {
         this.finish(job, new ScanWorkerError(envelope.error || 'Scan worker failed', 'SCAN_WORKER_FAILED'));
       }

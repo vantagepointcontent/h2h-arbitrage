@@ -1113,7 +1113,11 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
               (limiter_name, timestamp, total_requests, queued_requests, rejected_requests,
                retry_429_count, avg_queue_wait_ms, tokens_available, is_throttled,
                effective_rate, refill_interval_ms, service_identity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE NOT EXISTS (
+              SELECT 1 FROM rate_limiter_metrics
+              WHERE limiter_name = ? AND timestamp = ? AND service_identity = ?
+            )`,
       args: [
         r.limiterName,
         r.timestamp,
@@ -1126,6 +1130,9 @@ export async function persistRateLimiterMetrics(records: RateLimiterMetricRecord
         r.isThrottled ? 1 : 0,
         r.effectiveRate ?? 0,
         r.refillIntervalMs ?? 0,
+        r.serviceIdentity,
+        r.limiterName,
+        r.timestamp,
         r.serviceIdentity,
       ],
     })),

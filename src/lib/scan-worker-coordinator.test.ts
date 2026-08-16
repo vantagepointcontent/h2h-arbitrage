@@ -39,10 +39,10 @@ describe('ScanWorkerCoordinator', () => {
     expect(coordinator.snapshot().deduplicatedJobs).toBe(1);
   });
 
-  it('persists worker telemetry serially before completing concurrent scans', async () => {
+  it('durably accepts worker telemetry before completing concurrent scans', async () => {
     let releaseFirst!: () => void;
     const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
-    const persistTelemetry = vi.fn()
+    const acceptTelemetry = vi.fn()
       .mockImplementationOnce(async () => firstGate)
       .mockResolvedValueOnce(undefined);
     coordinator = new ScanWorkerCoordinator({
@@ -54,7 +54,7 @@ describe('ScanWorkerCoordinator', () => {
         return worker;
       },
       now: () => Date.now(),
-      persistTelemetry,
+      acceptTelemetry,
     });
     const first = coordinator.run('market-a', { body: '{}' });
     const second = coordinator.run('market-b', { body: '{}' });
@@ -64,13 +64,34 @@ describe('ScanWorkerCoordinator', () => {
     workers[1].emit('message', { type: 'result', response: { status: 200, headers: {}, body: '{}' }, telemetry });
     await Promise.resolve();
     await Promise.resolve();
-    expect(coordinator.snapshot().completedJobs).toBe(0);
-    expect(persistTelemetry).toHaveBeenCalledTimes(1);
+    expect(coordinator.snapshot().completedJobs).toBe(1);
+    expect(acceptTelemetry).toHaveBeenCalledTimes(2);
 
     releaseFirst();
     await expect(first).resolves.toMatchObject({ status: 200 });
     await expect(second).resolves.toMatchObject({ status: 200 });
-    expect(persistTelemetry).toHaveBeenCalledTimes(2);
+    expect(acceptTelemetry).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not turn a completed scan into a failed response when telemetry spooling fails', async () => {
+    coordinator = new ScanWorkerCoordinator({
+      maxConcurrent: 1,
+      timeoutMs: 1_000,
+      createWorker: () => {
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      },
+      acceptTelemetry: vi.fn(async () => { throw new Error('spool unavailable'); }),
+    });
+    const pending = coordinator.run('market-a', { body: '{}' });
+    workers[0].emit('message', {
+      type: 'result',
+      response: { status: 200, headers: {}, body: '{"persisted":true}' },
+      telemetry: [{ limiterName: 'kalshi' }],
+    });
+    await expect(pending).resolves.toMatchObject({ status: 200, body: '{"persisted":true}' });
+    expect(coordinator.snapshot()).toMatchObject({ completedJobs: 1, failedJobs: 0 });
   });
 
   it('preserves overload semantics for a different market at capacity', async () => {
