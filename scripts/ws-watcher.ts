@@ -26,6 +26,7 @@ import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
 import { calculateOutcomeContingentApy } from '@/lib/settlement-apy';
+import { calculateScanApy } from '@/lib/scan-apy';
 import { reserveWatcherMatchPublication, type WatcherMatchPublication } from '@/lib/watcher-match-publication';
 
 import logger from '@/lib/logger';
@@ -275,6 +276,7 @@ function schedulePairCompute(pairId: string): void {
 async function computePair(pairId: string): Promise<void> {
   const pair = hotPairs.get(pairId);
   if (!pair) return;
+  const observedAt = new Date().toISOString();
 
   // Capture the generation and exact canonical revision before computation.
   // A manual mutation during computation then fences this stale result.
@@ -301,7 +303,7 @@ async function computePair(pairId: string): Promise<void> {
   // WS-107: persist the live view so ALL UI surfaces (sidebar, Overview,
   // Dashboard) show real-time ROI for HOT markets, not the 5-min poller lag.
   if (canonical) {
-    await writeLiveResult(pairId, results, positive, canonical).catch((err) =>
+    await writeLiveResult(pairId, results, positive, canonical, observedAt).catch((err) =>
       logger.warn('[watcher] liveResult write failed', { pairId, err }));
   }
 
@@ -322,10 +324,14 @@ async function computePair(pairId: string): Promise<void> {
 
   // Alerts — existing pipeline, ALL filters unchanged.
   for (const r of positive) {
+    const canonicalApy = calculateScanApy(r.roiPct, observedAt, pair.expiryDate);
     await checkAndSendAlert({
       marketTitle: pair.title,
       marketId: pairId,
       roiPct: r.roiPct,
+      apyPct: canonicalApy.apyPct,
+      daysToExpiry: canonicalApy.daysToExpiry,
+      apyUnavailableReason: canonicalApy.unavailableReason,
       expectedProfit: r.expectedProfit,
       strategy: r.strategy,
       totalStake: r.kalshiStake + r.pmStake,
@@ -361,6 +367,7 @@ async function writeLiveResult(
   results: LiveArbResult[],
   positive: LiveArbResult[],
   canonical: WatcherMatchPublication,
+  observedAt: string,
 ): Promise<void> {
   const clean = positive.filter((r) => !isSuspiciousLive(r));
   const best = clean.length > 0
@@ -368,7 +375,6 @@ async function writeLiveResult(
     : null;
 
   const matchedCount = canonical.matchedPairs.length;
-  const observedAt = new Date().toISOString();
   const outcomeApyFor = (result: LiveArbResult) => calculateOutcomeContingentApy({
     roiPct: result.roiPct,
     observedAt,
@@ -378,6 +384,8 @@ async function writeLiveResult(
     polymarket: null,
   });
   const bestOutcomeApy = best ? outcomeApyFor(best) : undefined;
+  const pair = hotPairs.get(pairId);
+  const canonicalApyFor = (result: LiveArbResult) => calculateScanApy(result.roiPct, observedAt, pair?.expiryDate);
 
   const liveResult: LastScanResult = {
     bestRoiPct: best ? best.roiPct : 0,
@@ -405,7 +413,10 @@ async function writeLiveResult(
       roiPct: r.roiPct,
       expectedProfit: r.expectedProfit,
       strategy: r.strategy,
-      apyPct: null,
+      apyPct: canonicalApyFor(r).apyPct,
+      daysToExpiry: canonicalApyFor(r).daysToExpiry,
+      expiryAt: pair?.expiryDate ?? null,
+      apyUnavailableReason: canonicalApyFor(r).unavailableReason,
       outcomeApy: outcomeApyFor(r),
       fees: r.fees ? {
         kalshiFee: r.fees.kalshiFee,
@@ -422,7 +433,6 @@ async function writeLiveResult(
   try {
     await updateSavedMarketLiveResult(pairId, liveResult);
     if (clean.length > 0) {
-      const pair = hotPairs.get(pairId);
       const persisted = await persistAndConsumeBotScan(pairId, {
         bestRoiPct: best?.roiPct ?? 0,
         bestProfit: best?.expectedProfit ?? 0,
@@ -434,7 +444,7 @@ async function writeLiveResult(
         positiveArbCount: clean.length,
         totalStake: clean.reduce((sum, r) => sum + r.kalshiStake + r.pmStake, 0),
         scannedAt: liveResult.scannedAt!,
-        expiryAt: null,
+        expiryAt: pair?.expiryDate ?? null,
         outcomeApy: bestOutcomeApy,
         marketTitle: pair?.title ?? pairId,
         arbType: best?.arbType ?? undefined,
@@ -445,7 +455,10 @@ async function writeLiveResult(
             strategy: r.strategy,
             roiPct: r.roiPct,
             expectedProfit: r.expectedProfit,
-            apyPct: null,
+            apyPct: canonicalApyFor(r).apyPct,
+            daysToExpiry: canonicalApyFor(r).daysToExpiry,
+            expiryAt: pair?.expiryDate ?? null,
+            apyUnavailableReason: canonicalApyFor(r).unavailableReason,
             outcomeApy: outcomeApyFor(r),
             kalshiStake: r.kalshiStake,
             pmStake: r.pmStake,

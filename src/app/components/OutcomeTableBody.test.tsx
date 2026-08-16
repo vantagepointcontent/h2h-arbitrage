@@ -82,31 +82,83 @@ describe('OutcomeTableBody malformed cached market fallback', () => {
 });
 
 describe('OutcomeTableBody outcome-contingent APY', () => {
-  it('renders both winning-leg APYs and does not substitute the market expiry', () => {
-    render(createElement('table', null, createElement(OutcomeTableBody, {
-      outcomes: [{
-        artist: 'Maine Senate', kalshi: { yesAsk: 0.67, noAsk: 0.34 }, polymarket: { yesPrice: 0.7, noPrice: 0.31 },
-        arbitrage: { expectedProfit: 0.0016, roiPct: 0.16026, apyPct: null, strategy: 'Buy YES Kalshi + NO PM', outcomeApy: {
-          observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'outcome_contingent', kalshi: null, polymarket: null,
-          scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 0.16026, apyPct: 0.40858, settlementAt: '2027-01-04T15:00:00.000Z', daysToSettlement: 143.16, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
-          scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 0.16026, apyPct: 0.72627, settlementAt: '2026-11-03T00:00:00.000Z', daysToSettlement: 80.54, timingSource: 'polymarket.event.endDate', unavailableReason: null },
-        } },
-      }], expandedArtist: null, setExpandedArtist: () => {}, formatCurrency: (value: number) => `$${value.toFixed(2)}`, formatPercent: (value: number) => `${value.toFixed(2)}%`, marketExpiryDate: '2030-01-01T00:00:00Z',
-    })));
-    expect(screen.getByText('K 0.41% / PM 0.73%')).toBeTruthy();
+  it('renders canonical APY in the compact row and venue APYs only in expanded detail', () => {
+    function Harness() {
+      const [expandedArtist, setExpandedArtist] = useState<string | null>(null);
+      return createElement('table', null, createElement(OutcomeTableBody, {
+        outcomes: [{
+          artist: 'Maine Senate', kalshi: { yesAsk: 0.67, noAsk: 0.34 }, polymarket: { yesPrice: 0.7, noPrice: 0.31 },
+          arbitrage: { expectedProfit: 0.0016, roiPct: 0.16026, apyPct: 0.828, daysToExpiry: 71, strategy: 'Buy YES Kalshi + NO PM', outcomeApy: {
+            observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'outcome_contingent', kalshi: null, polymarket: null,
+            scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 0.16026, apyPct: 0.40858, settlementAt: '2027-01-04T15:00:00.000Z', daysToSettlement: 143.16, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
+            scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 0.16026, apyPct: 0.72627, settlementAt: '2026-11-03T00:00:00.000Z', daysToSettlement: 80.54, timingSource: 'polymarket.event.endDate', unavailableReason: null },
+          } },
+        }], expandedArtist, setExpandedArtist, formatCurrency: (value: number) => `$${value.toFixed(2)}`, formatPercent: (value: number) => `${value.toFixed(2)}%`, marketExpiryDate: '2026-10-24T11:02:35.000Z',
+      }));
+    }
+    render(<Harness />);
+    expect(screen.getByText('0.83%')).toBeTruthy();
+    expect(screen.queryByText('Kalshi APY:')).toBeNull();
+    expect(screen.queryByText('Polymarket APY:')).toBeNull();
+    fireEvent.click(screen.getByText('Maine Senate'));
+    expect(screen.getByText('Kalshi APY:')).toBeTruthy();
+    expect(screen.getByText('Polymarket APY:')).toBeTruthy();
+    expect(screen.getByText('71 days')).toBeTruthy();
   });
 
   it('shows an explicit unavailable reason instead of zero APY', () => {
     render(createElement('table', null, createElement(OutcomeTableBody, {
       outcomes: [{
         artist: 'Unknown timing', kalshi: { yesAsk: 0.4, noAsk: 0.6 }, polymarket: { yesPrice: 0.5, noPrice: 0.5 },
-        arbitrage: { expectedProfit: 1, roiPct: 1, apyPct: null, strategy: 'Buy YES Kalshi + NO PM', outcomeApy: {
+        arbitrage: { expectedProfit: 1, roiPct: 1, apyPct: null, apyUnavailableReason: 'missing_expiry', strategy: 'Buy YES Kalshi + NO PM', outcomeApy: {
           observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'missing_settlement_date', kalshi: null, polymarket: null,
           scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 1, apyPct: null, settlementAt: null, daysToSettlement: null, timingSource: null, unavailableReason: 'missing_settlement_date' },
           scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 1, apyPct: null, settlementAt: null, daysToSettlement: null, timingSource: null, unavailableReason: 'missing_settlement_date' },
         } },
       }], expandedArtist: null, setExpandedArtist: () => {}, formatCurrency: String, formatPercent: String,
     })));
-    expect(screen.getByTitle('APY unavailable: missing settlement date').textContent).toBe('Unavailable');
+    expect(screen.getByTitle('APY unavailable: missing expiry').textContent).toBe('Unavailable');
+  });
+
+  it.each([
+    ['zero', 0, '0.00%'],
+    ['negative', -25, '-25.00%'],
+  ])('keeps a valid %s canonical APY in expanded detail', (_case, apyPct, formatted) => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      outcomes: [{
+        artist: `${_case} APY`,
+        kalshi: { yesAsk: 0.45, noAsk: 0.55 },
+        polymarket: { yesPrice: 0.46, noPrice: 0.54 },
+        arbitrage: { expectedProfit: -1, roiPct: apyPct, apyPct, daysToExpiry: 365, strategy: 'No arb' },
+      }],
+      expandedArtist: `${_case} APY`, setExpandedArtist: () => {}, formatCurrency: String,
+      formatPercent: (value: number) => `${value.toFixed(2)}%`,
+    })));
+
+    expect(screen.getByText('APY:')).toBeTruthy();
+    expect(screen.getAllByText(formatted).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not use venue APYs to sort or color an unavailable canonical APY', () => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      outcomes: [{
+        artist: 'Unavailable canonical', kalshi: { yesAsk: 0.4, noAsk: 0.6 }, polymarket: { yesPrice: 0.5, noPrice: 0.5 },
+        arbitrage: { expectedProfit: 1, roiPct: 5, apyPct: null, apyUnavailableReason: 'missing_expiry', strategy: 'No arb', outcomeApy: {
+          observedAt: '2026-08-14T11:02:35.000Z', apyPct: null, unavailableReason: 'outcome_contingent', kalshi: null, polymarket: null,
+          scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 5, apyPct: 500, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 1, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
+          scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 5, apyPct: 400, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 1, timingSource: 'polymarket.event.endDate', unavailableReason: null },
+        } },
+      }, {
+        artist: 'Canonical one', kalshi: { yesAsk: 0.4, noAsk: 0.6 }, polymarket: { yesPrice: 0.5, noPrice: 0.5 },
+        arbitrage: { expectedProfit: 1, roiPct: 1, apyPct: 1, daysToExpiry: 365, strategy: 'No arb' },
+      }],
+      expandedArtist: null, setExpandedArtist: () => {}, formatCurrency: String,
+      formatPercent: (value: number) => `${value.toFixed(2)}%`, sortField: 'apy', sortDir: 'desc',
+    })));
+
+    expect(screen.getAllByTestId('outcome-name-cell').map((cell) => cell.textContent)).toEqual(['▶Canonical one', '▶Unavailable canonical']);
+    const unavailable = screen.getByTitle('APY unavailable: missing expiry');
+    expect(unavailable.closest('td')?.className).toContain('text-[var(--text-secondary)]');
+    expect(unavailable.closest('td')?.className).not.toContain('text-[var(--status-positive)]');
   });
 });

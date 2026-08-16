@@ -205,6 +205,13 @@ describe('telegram-alerts', () => {
       expect(msg).toContain('$1000');
     });
 
+    it('formats the persisted canonical APY/TTE or its exact blocker', () => {
+      expect(formatArbMessage({ ...baseArb, apyPct: 5.26, daysToExpiry: 71 }))
+        .toContain('APY: <b>5.26%</b> (71.00 days)');
+      expect(formatArbMessage({ ...baseArb, apyPct: null, apyUnavailableReason: 'missing_expiry' }))
+        .toContain('APY unavailable: missing expiry');
+    });
+
     it('includes net profit when fees are provided', () => {
       const msg = formatArbMessage({
         ...baseArb,
@@ -383,6 +390,13 @@ describe('telegram-alerts', () => {
       expect(msg).toContain('+2.20%');
     });
 
+    it('formats the persisted canonical APY/TTE or exact blocker', () => {
+      expect(formatSpreadWidenedMessage({ ...baseArb, apyPct: 5.26, daysToExpiry: 71 }, 3))
+        .toContain('APY: <b>5.26%</b> (71.00 days)');
+      expect(formatSpreadWidenedMessage({ ...baseArb, apyPct: null, apyUnavailableReason: 'non_positive_tte' }, 3))
+        .toContain('APY unavailable: non positive tte');
+    });
+
     it('checkAndSendAlert sends widened alert even during cooldown', async () => {
       process.env.TELEGRAM_BOT_TOKEN = 'tok';
       process.env.TELEGRAM_CHAT_ID = '-100';
@@ -439,6 +453,13 @@ describe('telegram-alerts', () => {
       expect(msg).toContain('⚠️');
       expect(msg).toContain('ARB VANISHING');
       expect(msg).toContain('Act now — spread is closing fast!');
+    });
+
+    it('formats the persisted canonical APY/TTE or exact blocker', () => {
+      expect(formatVanishingMessage({ ...baseArb, apyPct: 5.26, daysToExpiry: 71 }, 10))
+        .toContain('APY: <b>5.26%</b> (71.00 days)');
+      expect(formatVanishingMessage({ ...baseArb, apyPct: null, apyUnavailableReason: 'invalid_roi' }, 10))
+        .toContain('APY unavailable: invalid roi');
     });
 
     it('checkAndSendAlert sends vanishing alert even during cooldown', async () => {

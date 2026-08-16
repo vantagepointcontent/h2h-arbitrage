@@ -25,6 +25,7 @@
 // ─── Types ────────────────────────────────────────────────────────
 
 import { auditArbClassification, classifyArbType, type ArbType } from './arb-types';
+import type { ScanApyUnavailableReason } from './scan-apy';
 export type { ArbType } from './arb-types';
 
 /**
@@ -45,6 +46,10 @@ export interface ArbAlertInput {
   marketTitle: string;
   marketId: string;
   roiPct: number;
+  /** Persisted canonical APY/TTE snapshot from the same scan event. */
+  apyPct?: number | null;
+  daysToExpiry?: number | null;
+  apyUnavailableReason?: ScanApyUnavailableReason | null;
   expectedProfit: number;
   strategy: string;
   totalStake?: number;
@@ -219,6 +224,16 @@ function buildFooter(deepLink: string): string {
   return `\n🕐 ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC\n${deepLink}`;
 }
 
+/** Canonical persisted APY/TTE line shared by every opportunity alert variant. */
+function formatCanonicalApyLine(arb: ArbAlertInput): string | null {
+  if (arb.apyPct != null) {
+    return `📊 APY: <b>${arb.apyPct.toFixed(2)}%</b>${arb.daysToExpiry != null ? ` (${arb.daysToExpiry.toFixed(2)} days)` : ''}`;
+  }
+  return arb.apyUnavailableReason
+    ? `📊 APY unavailable: ${escapeHtml(arb.apyUnavailableReason.replaceAll('_', ' '))}`
+    : null;
+}
+
 /**
  * Format an arb opportunity as a Telegram message.
  * Uses HTML parse_mode for rich formatting.
@@ -226,6 +241,7 @@ function buildFooter(deepLink: string): string {
  */
 export function formatArbMessage(arb: ArbAlertInput): string {
   const roiStr = arb.roiPct.toFixed(2);
+  const apyLine = formatCanonicalApyLine(arb);
   const profitStr = arb.expectedProfit.toFixed(2);
   const stakeStr = arb.totalStake ? arb.totalStake.toFixed(2) : '—';
   const feeStr = arb.fees
@@ -241,6 +257,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
     `📈 ROI: <b>${roiStr}%</b>`,
+    ...(apyLine ? [apyLine] : []),
     `💰 Profit: <b>$${profitStr}</b>${feeStr ? ` (${feeStr})` : ''}`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     `💵 Stake: $${stakeStr}`,
@@ -256,6 +273,7 @@ export function formatArbMessage(arb: ArbAlertInput): string {
  */
 export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number): string {
   const delta = arb.roiPct - prevRoi;
+  const apyLine = formatCanonicalApyLine(arb);
   const deepLink = buildDeepLink(arb.marketId);
   const audit = auditArbClassification(arb.strategy, arb.arbType);
   const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
@@ -266,6 +284,7 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
     `ROI: ${prevRoi.toFixed(2)}% → <b>${arb.roiPct.toFixed(2)}%</b> (+${delta.toFixed(2)}%)`,
+    ...(apyLine ? [apyLine] : []),
     `💰 Profit: <b>$${arb.expectedProfit.toFixed(2)}</b>`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     buildPricesLine(arb),
@@ -280,6 +299,7 @@ export function formatSpreadWidenedMessage(arb: ArbAlertInput, prevRoi: number):
  */
 export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): string {
   const dropPct = ((prevRoi - arb.roiPct) / Math.abs(prevRoi) * 100);
+  const apyLine = formatCanonicalApyLine(arb);
   const deepLink = buildDeepLink(arb.marketId);
   const audit = auditArbClassification(arb.strategy, arb.arbType);
   const tag = audit.valid && audit.canonicalType ? `[${audit.canonicalType.toUpperCase()}]` : '';
@@ -290,6 +310,7 @@ export function formatVanishingMessage(arb: ArbAlertInput, prevRoi: number): str
     `<b>${escapeHtml(arb.marketTitle)}</b>`,
     '',
     `ROI: ${prevRoi.toFixed(2)}% → <b>${arb.roiPct.toFixed(2)}%</b> (-${dropPct.toFixed(1)}%)`,
+    ...(apyLine ? [apyLine] : []),
     `💰 Profit: <b>$${arb.expectedProfit.toFixed(2)}</b>`,
     `🎯 Strategy: ${escapeHtml(arb.strategy)}`,
     buildPricesLine(arb),

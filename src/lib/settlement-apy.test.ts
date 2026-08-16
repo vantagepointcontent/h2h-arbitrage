@@ -49,10 +49,10 @@ describe('outcome-contingent settlement APY', () => {
     expect(result.unavailableReason).toBeNull();
   });
 
-  it('does not collapse differing settlement dates to scalar zero for non-positive ROI', () => {
+  it('preserves negative ROI above -100% in each venue scenario', () => {
     const result = calculateOutcomeContingentApy({ roiPct: -1, observedAt, arbType: 'direct', strategy: 'Buy YES Kalshi + NO PM', kalshi, polymarket, rulesAligned: true });
-    expect(result.scenarioA.apyPct).toBe(0);
-    expect(result.scenarioB.apyPct).toBe(0);
+    expect(result.scenarioA.apyPct).toBeLessThan(0);
+    expect(result.scenarioB.apyPct).toBeLessThan(0);
     expect(result.apyPct).toBeNull();
     expect(result.unavailableReason).toBe('outcome_contingent');
   });
@@ -85,17 +85,17 @@ describe('outcome-contingent settlement APY', () => {
     expect(result.apyPct).toBeNull();
   });
 
-  it('fails closed when resolution rules are explicitly unaligned', () => {
+  it('does not gate venue timing analytics on resolution-rule alignment', () => {
     const result = calculateOutcomeContingentApy({ roiPct: 1, observedAt, arbType: 'direct', strategy: 'Buy YES Kalshi + NO PM', kalshi, polymarket, rulesAligned: false });
-    expect(result.scenarioA.unavailableReason).toBe('unaligned_resolution_rules');
-    expect(result.scenarioB.unavailableReason).toBe('unaligned_resolution_rules');
+    expect(result.scenarioA.unavailableReason).toBeNull();
+    expect(result.scenarioB.unavailableReason).toBeNull();
     expect(result.apyPct).toBeNull();
   });
 
-  it('fails closed when resolution-rule alignment is unknown', () => {
+  it('does not gate venue timing analytics when resolution-rule alignment is unknown', () => {
     const result = calculateOutcomeContingentApy({ roiPct: 1, observedAt, arbType: 'direct', strategy: 'Buy YES Kalshi + NO PM', kalshi, polymarket });
-    expect(result.scenarioA.unavailableReason).toBe('unaligned_resolution_rules');
-    expect(result.scenarioB.unavailableReason).toBe('unaligned_resolution_rules');
+    expect(result.scenarioA.unavailableReason).toBeNull();
+    expect(result.scenarioB.unavailableReason).toBeNull();
     expect(result.apyPct).toBeNull();
   });
 
@@ -105,7 +105,7 @@ describe('outcome-contingent settlement APY', () => {
     expect(result.scenarioB.unavailableReason).toBe('invalid_observed_at');
   });
 
-  it('fuzzes ROI and timing inputs without producing non-finite or negative APY values', () => {
+  it('fuzzes ROI and timing inputs without producing non-finite APY values', () => {
     let seed = 0x5eed1234;
     const random = () => {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -120,7 +120,7 @@ describe('outcome-contingent settlement APY', () => {
       for (const scenario of [result.scenarioA, result.scenarioB]) {
         if (scenario.apyPct != null) {
           expect(Number.isFinite(scenario.apyPct)).toBe(true);
-          expect(scenario.apyPct).toBeGreaterThanOrEqual(0);
+
         }
       }
     }

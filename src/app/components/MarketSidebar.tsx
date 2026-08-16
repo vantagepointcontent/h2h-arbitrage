@@ -301,7 +301,7 @@ function MarketSidebarInner({
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
                       sort === "apy" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
-                    title="Sort by APY — Annualized ROI = ROI × (365 ÷ days to expiry)"
+                    title="Sort by canonical compounded APY from persisted ROI and days to expiry"
                   >
                     APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")} <ApyHeaderInfo />
                   </button>
@@ -463,11 +463,7 @@ function MarketSidebarInner({
                             {roi > 0 ? "+" : ""}{formatPercent(roi)}
                           </span>
                         )}
-                        {apySummary.scenarioApyPct ? (
-                          <span className="text-[9px] text-[var(--text-secondary)] ml-1" title="Kalshi-win / Polymarket-win APY">
-                            (K {formatPercent(apySummary.scenarioApyPct.kalshi)} / PM {formatPercent(apySummary.scenarioApyPct.polymarket)})
-                          </span>
-                        ) : apy > 0 ? (
+                        {apy > 0 ? (
                           <span className="text-[10px] text-[var(--text-secondary)] ml-1">({formatPercent(apy)})</span>
                         ) : apySummary.unavailableReason ? (
                           <span className="text-[9px] text-[var(--text-secondary)] ml-1" title={`APY unavailable: ${apySummary.unavailableReason.replaceAll('_', ' ')}`}>(APY unavailable)</span>

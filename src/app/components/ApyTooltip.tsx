@@ -27,7 +27,7 @@ export function HeaderInfo({ text }: { text: string }) {
 
 export function ApyHeaderInfo() {
   return (
-    <HeaderInfo text="Annualized ROI = ROI × (365 ÷ days until the winning leg releases cash).\nCross-venue rows show separate Kalshi-win and Polymarket-win APYs when settlement dates differ.\nUnavailable means venue timing is missing, malformed, or conflicting." />
+    <HeaderInfo text="Canonical APY = ((1 + ROI ÷ 100)^(365 ÷ persisted days to expiry) − 1) × 100.\nSelected-market detail also shows venue-specific settlement-timing APYs.\nUnavailable means ROI or the canonical expiry/TTE input is missing or invalid." />
   );
 }
 
@@ -48,10 +48,8 @@ export function ApyValueTooltip({ apy, roi, daysToExpiry, children }: ApyValueTo
   }
 
   const apyLabel = apy > 0
-    ? `+${(apy / 100).toFixed(1)}%`
-    : `${(apy / 100).toFixed(1)}%`;
-  const multiplier = (apy / 100).toFixed(1);
-  const xLabel = `${multiplier}x`;
+    ? `+${apy.toFixed(1)}%`
+    : `${apy.toFixed(1)}%`;
 
   return (
     <div className="group relative inline-block">
@@ -61,7 +59,7 @@ export function ApyValueTooltip({ apy, roi, daysToExpiry, children }: ApyValueTo
         <div className="space-y-1">
           <div className="flex justify-between text-[#8A9BA8]">
             <span>ROI</span>
-            <span className="text-[#FFFFFF]">{roi > 0 ? "+" : ""}{(roi / 100).toFixed(1)}%</span>
+            <span className="text-[#FFFFFF]">{roi > 0 ? "+" : ""}{roi.toFixed(1)}%</span>
           </div>
           <div className="flex justify-between text-[#8A9BA8]">
             <span>Days to expiry</span>
@@ -77,7 +75,7 @@ export function ApyValueTooltip({ apy, roi, daysToExpiry, children }: ApyValueTo
           <span className="text-[#5DBE81] font-bold">{apyLabel}</span>
         </div>
         <div className="text-[10px] text-[#8A9BA8] mt-2 border-t border-[#182533] pt-2">
-          {((roi / 100)).toFixed(1)}% ROI × (365 ÷ {Math.round(daysToExpiry)} days) = {apyLabel} ({xLabel})
+          ((1 + {roi.toFixed(1)}% ÷ 100)^(365 ÷ {daysToExpiry.toFixed(2)} days) − 1) × 100 = {apyLabel}
         </div>
       </div>
     </div>

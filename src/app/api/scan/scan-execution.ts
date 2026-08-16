@@ -381,6 +381,7 @@ export async function executeFullScan(request: NextRequest) {
     const withArbitrage = attachOutcomeContingentApy(
       calculateAllArbitrages(splitOutcomes, pmEvent.title, capital),
       scanObservedAt,
+      pmEvent.endDate,
     );
 
     // BUG-05b2: Smart expiry — compute priceResolved once, reuse for DB save + response.
@@ -512,6 +513,9 @@ export async function executeFullScan(request: NextRequest) {
             kalshiStake: o.arbitrage!.kalshiStake,
             pmStake: o.arbitrage!.pmStake,
             apyPct: o.arbitrage!.apyPct,
+            daysToExpiry: o.arbitrage!.daysToExpiry,
+            expiryAt: o.arbitrage!.expiryAt,
+            apyUnavailableReason: o.arbitrage!.apyUnavailableReason,
             outcomeApy: o.arbitrage!.outcomeApy,
             buyPlatform: o.arbitrage!.buyPlatform,
             buyPrice: o.arbitrage!.buyPrice,
@@ -561,9 +565,7 @@ export async function executeFullScan(request: NextRequest) {
           positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
-          expiryAt: bestNetArb?.arbitrage?.outcomeApy?.apyPct != null
-            ? bestNetArb.arbitrage.outcomeApy.scenarioA.settlementAt
-            : null,
+          expiryAt: pmEvent.endDate ?? null,
           outcomeApy: bestNetArb?.arbitrage?.outcomeApy,
           // ARB-01a: persist the best arb's type classification
           arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
@@ -609,6 +611,9 @@ export async function executeFullScan(request: NextRequest) {
             marketId: market.id,
             outcome: o.artist,
             roiPct: o.arbitrage!.roiPct,
+            apyPct: o.arbitrage!.apyPct,
+            daysToExpiry: o.arbitrage!.daysToExpiry,
+            apyUnavailableReason: o.arbitrage!.apyUnavailableReason,
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
             arbType: (o.arbitrage as any).arbType,

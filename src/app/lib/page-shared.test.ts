@@ -258,8 +258,8 @@ describe("BUG-133 canonical saved-market match summaries", () => {
   });
 });
 
-describe('outcome-contingent market APY summary', () => {
-  it('preserves both venue scenarios and sorts by the explicit lower scenario', () => {
+describe('canonical market APY summary', () => {
+  it('uses persisted canonical APY while preserving both venue scenarios for detail', () => {
     const scenario = (winner: 'kalshi' | 'polymarket', apyPct: number, settlementAt: string) => ({
       label: winner === 'kalshi' ? 'scenario_a' as const : 'scenario_b' as const,
       winner, roiPct: 1, apyPct, settlementAt, daysToSettlement: 100,
@@ -269,15 +269,22 @@ describe('outcome-contingent market APY summary', () => {
     const marketWithScenarios = {
       id: 'market', kalshiUrl: '', polymarketUrl: '', eventTitle: 'Market', createdAt: '',
       lastScanResult: { bestRoiPct: 1, bestProfit: 1, strategy: 'Direct', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T00:00:00Z', allArbs: [{
-        artist: 'A', roiPct: 1, expectedProfit: 1, strategy: 'Direct', apyPct: null,
+        artist: 'A', roiPct: 1, expectedProfit: 1, strategy: 'Direct', apyPct: 5.26, daysToExpiry: 71,
         outcomeApy: { observedAt: '2026-08-14T00:00:00Z', apyPct: null, unavailableReason: 'outcome_contingent' as const, scenarioA: scenario('kalshi', 2.5, '2027-01-01T00:00:00Z'), scenarioB: scenario('polymarket', 4.5, '2026-11-01T00:00:00Z'), kalshi: null, polymarket: null },
       }] },
     } as SavedMarket;
     expect(getMarketApySummary(marketWithScenarios)).toMatchObject({
+      scalarApyPct: 5.26,
+      scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
+      sortApyPct: 5.26,
+      unavailableReason: null,
+    });
+
+    marketWithScenarios.lastScanResult!.allArbs![0].apyPct = null;
+    expect(getMarketApySummary(marketWithScenarios)).toMatchObject({
       scalarApyPct: null,
       scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
-      sortApyPct: 2.5,
-      unavailableReason: 'outcome_contingent',
+      sortApyPct: null,
     });
   });
 });

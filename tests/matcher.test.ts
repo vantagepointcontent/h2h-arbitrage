@@ -167,18 +167,18 @@ describe("calculateArbitrageMax", () => {
 });
 
 describe("computeApy", () => {
-  it("returns ROI for null expiry (no annualization possible)", () => {
-    expect(computeApy(10, null)).toBe(10);
+  it("returns unavailable for null expiry", () => {
+    expect(computeApy(10, null)).toBeNull();
   });
 
   it("annualises ROI correctly for 30 days", () => {
     const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    expect(computeApy(10, expiry)).toBeCloseTo(10 * (365 / 30), 0);
+    expect(computeApy(10, expiry)).toBeCloseTo((1.1 ** (365 / 30) - 1) * 100, 0);
   });
 
   it("returns 0 for expired markets", () => {
     const expiry = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
-    expect(computeApy(10, expiry)).toBe(0);
+    expect(computeApy(10, expiry)).toBeNull();
   });
 });
 

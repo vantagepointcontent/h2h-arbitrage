@@ -15,8 +15,8 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.1.0',
-    description: 'Scanner and saved-market contracts. Prices and stakes are represented in their existing endpoint units; settlement APY is outcome-contingent.',
+    version: '1.2.0',
+    description: 'Scanner and saved-market contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
     '/api/scan': {
@@ -77,7 +77,7 @@ const openapi = {
           timingSource: { anyOf: [{ $ref: '#/components/schemas/SettlementTimingSource' }, { type: 'null' }] },
           unavailableReason: {
             type: ['string', 'null'],
-            enum: ['invalid_roi', 'invalid_observed_at', 'missing_settlement_date', 'invalid_expected_settlement', 'invalid_contractual_settlement', 'conflicting_settlement_dates', 'unaligned_resolution_rules', null],
+            enum: ['invalid_roi', 'invalid_observed_at', 'missing_settlement_date', 'invalid_expected_settlement', 'invalid_contractual_settlement', 'conflicting_settlement_dates', null],
           },
         },
       },
@@ -88,7 +88,7 @@ const openapi = {
           apyPct: { type: ['number', 'null'], description: 'Populated only when both scenarios have the same APY.' },
           unavailableReason: {
             type: ['string', 'null'],
-            enum: ['invalid_roi', 'invalid_observed_at', 'missing_settlement_date', 'invalid_expected_settlement', 'invalid_contractual_settlement', 'conflicting_settlement_dates', 'unaligned_resolution_rules', 'outcome_contingent', null],
+            enum: ['invalid_roi', 'invalid_observed_at', 'missing_settlement_date', 'invalid_expected_settlement', 'invalid_contractual_settlement', 'conflicting_settlement_dates', 'outcome_contingent', null],
           },
           scenarioA: { $ref: '#/components/schemas/SettlementApyScenario' },
           scenarioB: { $ref: '#/components/schemas/SettlementApyScenario' },
@@ -100,7 +100,10 @@ const openapi = {
         type: 'object', additionalProperties: true,
         properties: {
           roiPct: { type: 'number' },
-          apyPct: { type: ['number', 'null'] },
+          apyPct: { type: ['number', 'null'], description: 'Canonical APY percentage: ((1 + ROI% / 100)^(365 / daysToExpiry) - 1) × 100.' },
+          daysToExpiry: { type: ['number', 'null'], description: 'Persisted event-time fractional TTE used for apyPct.' },
+          expiryAt: { type: ['string', 'null'], format: 'date-time', description: 'Canonical persisted expiry used for daysToExpiry and the visible Days to expiry value.' },
+          apyUnavailableReason: { type: ['string', 'null'], enum: ['invalid_roi', 'invalid_scan_timestamp', 'missing_expiry', 'invalid_expiry', 'non_positive_tte', null] },
           outcomeApy: { $ref: '#/components/schemas/OutcomeContingentApy' },
         },
       },
@@ -118,7 +121,10 @@ const openapi = {
       },
       SavedMarket: {
         type: 'object', additionalProperties: true,
-        properties: { lastScanResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] } },
+        properties: {
+          lastScanResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
+          liveResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
+        },
       },
     },
   },

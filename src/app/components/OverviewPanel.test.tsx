@@ -85,6 +85,31 @@ describe('OverviewPanel market navigation', () => {
   });
 });
 
+describe.each([
+  ['grid', 390],
+  ['table', 1280],
+] as const)('BUG-159 compact APY in the %s markets view', (layout, width) => {
+  it('renders only the persisted canonical scalar APY', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    const saved = marketWithOpportunity('apy', 'Canonical APY market');
+    const baseArb = saved.lastScanResult?.allArbs?.[0];
+    if (!baseArb || !saved.lastScanResult) throw new Error('fixture must contain an opportunity');
+    saved.lastScanResult.allArbs = [{
+      ...baseArb, apyPct: 12.34,
+      outcomeApy: {
+        observedAt: '2026-08-16T00:00:00.000Z', apyPct: null, unavailableReason: 'outcome_contingent', kalshi: null, polymarket: null,
+        scenarioA: { label: 'scenario_a', winner: 'kalshi', roiPct: 5, apyPct: 56.78, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 100, timingSource: 'kalshi.market.expected_expiration_time', unavailableReason: null },
+        scenarioB: { label: 'scenario_b', winner: 'polymarket', roiPct: 5, apyPct: 90.12, settlementAt: '2027-01-01T00:00:00.000Z', daysToSettlement: 100, timingSource: 'polymarket.event.endDate', unavailableReason: null },
+      },
+    }];
+
+    render(<OverviewPanel {...props} layout={layout} markets={[saved]} />);
+
+    expect(screen.getByText('+12.3%')).toBeTruthy();
+    expect(screen.queryByText(/56\.8%|90\.1%|Kalshi APY|Polymarket APY/)).toBeNull();
+  });
+});
+
 describe('OverviewPanel category filter', () => {
   it('lists discovered categories and shows only the selected category', () => {
     render(<OverviewPanel {...props} markets={[

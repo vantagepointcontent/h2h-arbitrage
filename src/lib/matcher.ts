@@ -9,6 +9,7 @@ import {
   type OutcomeContingentApy,
   type SettlementTiming,
 } from './settlement-apy';
+import { calculateScanApy, type ScanApyUnavailableReason } from './scan-apy';
 import { isPriceAlignedToTick } from './venue-constraints';
 
 export interface UnifiedOutcome {
@@ -81,8 +82,11 @@ export interface UnifiedOutcome {
     pmStake: number;
     expectedProfit: number;
     roiPct: number;
-    /** Scalar APY exists only when both payout scenarios share one timing. */
+    /** Canonical event-time APY derived from this ROI and persisted expiry/TTE. */
     apyPct?: number | null;
+    daysToExpiry?: number | null;
+    expiryAt?: string | null;
+    apyUnavailableReason?: ScanApyUnavailableReason | null;
     outcomeApy?: OutcomeContingentApy;
     maxCapital: number;
     buyPlatform: 'kalshi' | 'polymarket' | null;
@@ -1095,6 +1099,7 @@ export function calculateAllArbitrages(
 export function attachOutcomeContingentApy(
   outcomes: UnifiedOutcome[],
   observedAt: string,
+  expiryAt?: string | null,
 ): UnifiedOutcome[] {
   return outcomes.map((outcome) => {
     const selectedPm = outcome.arbitrage.pmConditionId
@@ -1110,27 +1115,24 @@ export function attachOutcomeContingentApy(
       rulesAligned: outcome.arbitrage.arbType === 'internal'
         || outcome.resolutionRulesAligned === true,
     });
+    const canonicalApy = calculateScanApy(outcome.arbitrage.roiPct, observedAt, expiryAt);
     return {
       ...outcome,
       arbitrage: {
         ...outcome.arbitrage,
-        apyPct: outcomeApy.apyPct,
+        apyPct: canonicalApy.apyPct,
+        daysToExpiry: canonicalApy.daysToExpiry,
+        expiryAt: expiryAt ?? null,
+        apyUnavailableReason: canonicalApy.unavailableReason,
         outcomeApy,
       },
     };
   });
 }
 
-/** Compute APY from ROI and days until expiry. Linear annualisation: 10% in 30 days = 10 * 365/30 = 121.7%. */
-export function computeApy(roiPct: number, expiryDate: string | null | undefined): number {
-  if (roiPct <= 0) return 0;
-  if (!expiryDate) return Math.max(0, roiPct);
-  const expiry = new Date(expiryDate).getTime();
-  const now = Date.now();
-  if (expiry <= now) return 0;
-  const daysToExpiry = (expiry - now) / (1000 * 60 * 60 * 24);
-  if (daysToExpiry <= 0) return 0;
-  return roiPct * (365 / daysToExpiry);
+/** @deprecated Persist calculateScanApy() at event time instead of recomputing in consumers. */
+export function computeApy(roiPct: number, expiryDate: string | null | undefined): number | null {
+  return calculateScanApy(roiPct, new Date().toISOString(), expiryDate).apyPct;
 }
 
 function filterKalshiMarketsByEventTitle(kMarkets: KalshiMarket[], pmEventTitle: string): KalshiMarket[] {

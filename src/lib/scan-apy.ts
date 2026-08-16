@@ -12,9 +12,19 @@ export interface ScanApySnapshot {
 }
 
 const MS_PER_DAY = 86_400_000;
+const MAX_APY_EXPONENT = Math.log(Number.MAX_VALUE / 100);
+
+/** Compound an event-time ROI over a positive fractional day count. */
+export function calculateApyPctFromDays(roiPct: number, daysToExpiry: number): number | null {
+  if (!Number.isFinite(roiPct) || roiPct <= -100 || !Number.isFinite(daysToExpiry) || daysToExpiry <= 0) return null;
+  if (roiPct === 0) return 0;
+  const exponent = Math.log1p(roiPct / 100) * (365 / daysToExpiry);
+  if (exponent >= MAX_APY_EXPONENT) return Number.MAX_VALUE;
+  return Math.expm1(exponent) * 100;
+}
 
 /**
- * Canonical EdgeFinder linear annualization evaluated at the scan timestamp.
+ * Canonical compounded annualization evaluated at the scan timestamp.
  * The result is a percentage, not a multiplier.
  */
 export function calculateScanApy(
@@ -22,7 +32,7 @@ export function calculateScanApy(
   scannedAt: string,
   expiryAt: string | null | undefined,
 ): ScanApySnapshot {
-  if (!Number.isFinite(roiPct)) {
+  if (typeof roiPct !== 'number' || !Number.isFinite(roiPct) || roiPct <= -100) {
     return { apyPct: null, daysToExpiry: null, unavailableReason: 'invalid_roi' };
   }
 
@@ -45,7 +55,7 @@ export function calculateScanApy(
   }
 
   return {
-    apyPct: roiPct <= 0 ? 0 : roiPct * (365 / daysToExpiry),
+    apyPct: calculateApyPctFromDays(roiPct, daysToExpiry),
     daysToExpiry,
     unavailableReason: null,
   };

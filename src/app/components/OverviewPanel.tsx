@@ -478,9 +478,7 @@ function OverviewPanelInner({
                   </div>
                   <div className="text-[var(--text-secondary)] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
                   <div className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
-                    {apySummary.scenarioApyPct
-                      ? `K ${formatPercent(apySummary.scenarioApyPct.kalshi)} / PM ${formatPercent(apySummary.scenarioApyPct.polymarket)}`
-                      : apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
+                    {apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
                         : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                   </div>
                   <div className="text-[var(--text-secondary)]">Est. Profit</div>
@@ -578,9 +576,7 @@ function OverviewPanelInner({
                       {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
                     </td>
                     <td className={`text-right font-bold ${metricTone(apy)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
-                      {apySummary.scenarioApyPct
-                        ? `K ${formatPercent(apySummary.scenarioApyPct.kalshi)} / PM ${formatPercent(apySummary.scenarioApyPct.polymarket)}`
-                        : apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
+                      {apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
                           : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                     </td>
                     <td className={`whitespace-nowrap text-right font-semibold ${metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>

@@ -145,6 +145,8 @@ describe('Logs scan-time APY serialization', () => {
     expect(columns).toContain('APY %');
     expect(values[columns.indexOf('APY %')]).toBe('1825');
     expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('');
+    expect(values[columns.indexOf('Days to Expiry')]).toBe('0.5');
+    expect(values[columns.indexOf('Expiry At')]).toBe('2026-08-13T00:00:00.000Z');
   });
 
   it('exports Current ROI and ROI Declined from full-precision persisted values', async () => {
