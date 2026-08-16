@@ -12,7 +12,10 @@ const localEslint = path.join(repo, 'node_modules', '.bin', 'eslint');
 const commonGitDir = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo, encoding: 'utf8' }).trim();
 const sharedEslint = path.join(path.dirname(commonGitDir), 'node_modules', '.bin', 'eslint');
 const eslintBin = fs.existsSync(localEslint) ? localEslint : sharedEslint;
-const run = spawnSync(eslintBin, ['.', '--format', 'json'], {
+const lintFiles = execFileSync('git', ['ls-files'], { cwd: repo, encoding: 'utf8' })
+  .split('\n')
+  .filter((file) => /\.(?:[cm]?js|jsx|tsx?)$/.test(file));
+const run = spawnSync(eslintBin, [...lintFiles, '--format', 'json'], {
   cwd: repo,
   encoding: 'utf8',
   maxBuffer: 64 * 1024 * 1024,
@@ -26,12 +29,24 @@ try {
   process.exit(2);
 }
 
+function normalizeKey(file, rule, message) {
+  const escapedFile = file
+    .split('/')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[/\\\\]');
+  const portableMessage = message.replace(
+    new RegExp(`(?:[A-Za-z]:)?[/\\\\][^\\n]*?[/\\\\]${escapedFile}`, 'g'),
+    `<repo>/${file}`,
+  );
+  return JSON.stringify([file, rule, portableMessage]);
+}
+
 const counts = {};
 for (const result of results) {
   const file = path.relative(repo, result.filePath).replaceAll(path.sep, '/');
   for (const finding of result.messages || []) {
     if (finding.severity < 2) continue;
-    const key = JSON.stringify([file, finding.ruleId || 'fatal', finding.message]);
+    const key = normalizeKey(file, finding.ruleId || 'fatal', finding.message);
     counts[key] = (counts[key] || 0) + 1;
   }
 }
@@ -51,7 +66,13 @@ if (!fs.existsSync(baselinePath)) {
   console.error('Missing eslint-baseline.json; a reviewed baseline must be committed first.');
   process.exit(2);
 }
-const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8')).errors || {};
+const storedBaseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8')).errors || {};
+const baseline = {};
+for (const [key, count] of Object.entries(storedBaseline)) {
+  const [file, rule, message] = JSON.parse(key);
+  const normalized = normalizeKey(file, rule, message);
+  baseline[normalized] = (baseline[normalized] || 0) + Number(count);
+}
 const regressions = [];
 for (const [key, count] of Object.entries(counts)) {
   const allowed = Number(baseline[key] || 0);
