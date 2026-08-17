@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient, type Client } from '@libsql/client';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { BotEntryRecoveryStore, type BotEntryEvidenceV1 } from './bot-entry-recovery';
+import { BotPositionStore, calculatePositionValuation } from './bot-positions';
 
 let tempDir: string | null = null;
 let db: Client | null = null;
@@ -21,6 +22,8 @@ async function harness() {
     )`,
     `CREATE TABLE bot_positions (
       id INTEGER PRIMARY KEY, execution_id INTEGER NOT NULL, execution_mode TEXT NOT NULL,
+      market_id TEXT, market_title TEXT NOT NULL, kalshi_ticker TEXT, pm_condition_id TEXT,
+      strategy TEXT, kalshi_side TEXT NOT NULL, pm_side TEXT NOT NULL, opened_at TEXT NOT NULL,
       status TEXT NOT NULL, shares_kalshi INTEGER NOT NULL, shares_pm INTEGER NOT NULL,
       live_shares_kalshi INTEGER, live_shares_pm INTEGER,
       buy_price_kalshi INTEGER NOT NULL, buy_price_pm INTEGER NOT NULL,
@@ -94,11 +97,13 @@ async function seedLegacy(
   });
   await client.execute({
     sql: `INSERT INTO bot_positions
-    (id,execution_id,execution_mode,status,shares_kalshi,shares_pm,live_shares_kalshi,live_shares_pm,
+    (id,execution_id,execution_mode,market_id,market_title,kalshi_ticker,pm_condition_id,strategy,
+     kalshi_side,pm_side,opened_at,status,shares_kalshi,shares_pm,live_shares_kalshi,live_shares_pm,
      buy_price_kalshi,buy_price_pm,total_cost,fees,live_principal,live_fees,live_cost,
      expected_payout,expected_profit,expected_roi_bps,current_value,unrealized_pnl,unrealized_roi_pct,
      entry_cost_status,entry_cost_failure_reason)
-    VALUES (7,11,?,'open',?,?,?,?,40,55,96,1,95,1,96,100,4,417,99,3,313,
+    VALUES (7,11,?,'pair-1','Test market','K-TICKER','pm-token-1','Buy YES Kalshi + NO PM',
+      'yes','no','2026-08-14T10:00:00.000Z','open',?,?,?,?,40,55,96,1,95,1,96,100,4,417,99,3,313,
       ?,'Legacy position lacks authoritative entry fill and fee data')`,
       args: [executionMode, shares, shares, shares, shares, entryCostStatus],
   });
@@ -109,9 +114,158 @@ afterEach(() => {
   db = null;
   if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   tempDir = null;
+  vi.unstubAllGlobals();
 });
 
+async function clonePosition(client: Client, id: number, executionId: number): Promise<void> {
+  const source = (await client.execute('SELECT * FROM bot_positions WHERE id=7')).rows[0];
+  const clone = { ...source, id, execution_id: executionId } as Record<string, unknown>;
+  const columns = Object.keys(clone);
+  await client.execute({
+    sql: `INSERT INTO bot_positions (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`,
+    args: columns.map((column) => clone[column] as string | number | null),
+  });
+}
+
 describe('BotEntryRecoveryStore', () => {
+  it('restores aggregate-fee Buy Cost without claiming canonical per-leg fee recovery', async () => {
+    const h = await harness();
+    await seedLegacy(h.db, null);
+
+    const manifest = await h.store.run();
+
+    expect(manifest.counts).toMatchObject({ fullyRecoverable: 0, recovered: 1, partiallyRecoverable: 1 });
+    expect(manifest.decisions[0]).toMatchObject({
+      verdict: 'partially_recoverable',
+      reasons: [
+        'Restored Buy Cost from immutable persisted position entry record; aggregate entry fee has no durable platform split',
+      ],
+    });
+    h.db.close();
+    db = createClient({ url: h.dbUrl });
+    const row = (await db.execute('SELECT * FROM bot_positions WHERE id=7')).rows[0];
+    expect(row).toMatchObject({
+      entry_cost_status: 'available', entry_cost_failure_reason: null,
+      total_cost: 96, fees: 1, kalshi_entry_fee: 0, pm_entry_fee: 0,
+      entry_fee_unallocated: 1,
+      kalshi_entry_gross_microcents: 40_000_000,
+      pm_entry_gross_microcents: 55_000_000,
+      entry_cost_rounding_delta_microcents: 0,
+      entry_record_version: 1,
+      entry_record_source: 'persisted_position',
+      entry_recorded_at: '2026-08-14T10:00:00.000Z',
+    });
+    expect(JSON.parse(String(row.kalshi_entry_fills_json))).toEqual([
+      expect.objectContaining({ priceMicrocents: 40_000_000, sizeMicrounits: 1_000_000, authority: 'persisted_position_aggregate' }),
+    ]);
+  });
+
+  it('preserves a recovered aggregate entry fee through partial reduction, restart, and settlement', async () => {
+    const h = await harness();
+    await seedLegacy(h.db, null, { shares: 2 });
+    await h.db.execute(`UPDATE bot_positions SET
+      total_cost=193, fees=3, live_principal=190, live_fees=3, live_cost=193,
+      expected_payout=200, expected_profit=7, current_value=198,
+      unrealized_pnl=5, unrealized_roi_pct=259
+      WHERE id=7`);
+    await h.store.run();
+
+    const positions = new BotPositionStore(h.dbUrl);
+    const recovered = await positions.getById(7);
+    expect(recovered).toMatchObject({
+      entryCostStatus: 'available',
+      feesCents: 3,
+      unallocatedEntryFeeCents: 3,
+      remainingOpenFeesCents: 3,
+      remainingOpenCostCents: 193,
+    });
+    const reduced = await positions.reduceExposure(7, {
+      expectedRemainingSharesKalshi: 2,
+      expectedRemainingSharesPm: 2,
+      expectedLastValuationAt: null,
+      remainingSharesKalshi: 1,
+      remainingSharesPm: 1,
+      realizedPnlCents: 5,
+      observedAt: '2026-08-14T10:01:00.000Z',
+    });
+    expect(reduced).toMatchObject({
+      remainingOpenPrincipalCents: 95,
+      remainingOpenFeesCents: 2,
+      remainingOpenCostCents: 97,
+      unallocatedEntryFeeCents: 3,
+    });
+    positions.close();
+
+    const restarted = new BotPositionStore(h.dbUrl);
+    const afterRestart = await restarted.getById(7);
+    expect(afterRestart).toMatchObject({
+      remainingOpenFeesCents: 2,
+      remainingOpenCostCents: 97,
+      realizedPnlCents: 5,
+    });
+    const settlement = calculatePositionValuation(afterRestart!, {
+      kalshiYesBidCents: 100,
+      kalshiNoBidCents: 0,
+      pmYesBidCents: 100,
+      pmNoBidCents: 0,
+      observedAt: '2026-08-16T00:00:00.000Z',
+      expiryDate: '2026-08-15T00:00:00.000Z',
+      kalshiResolved: true,
+      pmResolved: true,
+    });
+    expect(settlement.realizedPnlCents).toBe(8);
+    await restarted.updateValuation(7, settlement);
+    const terminal = await restarted.getById(7);
+    expect(terminal).toMatchObject({
+      status: 'settled',
+      remainingOpenFeesCents: 2,
+      remainingOpenCostCents: 97,
+      realizedPnlBeforeSettlementCents: 5,
+      realizedPnlCents: 8,
+    });
+    restarted.close();
+  });
+
+  it('converts a legacy gross-only total to fee-inclusive Buy Cost exactly once', async () => {
+    const h = await harness();
+    await seedLegacy(h.db, null);
+    await h.db.execute('UPDATE bot_positions SET total_cost=95,live_cost=95,live_principal=94 WHERE id=7');
+
+    const manifest = await h.store.run();
+
+    expect(manifest.counts.recovered).toBe(1);
+    const row = (await h.db.execute(`SELECT total_cost,fees,live_principal,live_fees,live_cost,
+      current_value,unrealized_pnl,unrealized_roi_pct FROM bot_positions WHERE id=7`)).rows[0];
+    expect(row).toMatchObject({
+      total_cost: 96, fees: 1, live_principal: 95, live_fees: 1, live_cost: 96,
+      current_value: 99, unrealized_pnl: 3, unrealized_roi_pct: 313,
+    });
+  });
+
+  it('isolates a malformed ledger row, recovers its valid sibling, and performs no venue or HTTP calls', async () => {
+    const h = await harness();
+    await seedLegacy(h.db, null);
+    await h.db.execute(`INSERT INTO executions
+      SELECT 12,timestamp,'arb-12',source,dry_run,success,kalshi_order,polymarket_order,result,steps,bot_entry_evidence
+      FROM executions WHERE id=11`);
+    await clonePosition(h.db, 8, 12);
+    await h.db.execute('UPDATE bot_positions SET total_cost=94 WHERE id=8');
+    const fetchSpy = vi.fn(() => { throw new Error('recovery must not call a venue'); });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const manifest = await h.store.run();
+
+    expect(manifest.counts).toMatchObject({ recovered: 1, partiallyRecoverable: 1, fullyRecoverable: 0, conflicting: 1 });
+    expect(manifest.decisions.find((decision) => decision.positionId === 8)?.reasons)
+      .toContain('persisted Buy Cost conflicts with persisted Buy Prices, quantities, and entry fees');
+    const rows = (await h.db.execute('SELECT id,total_cost,entry_cost_status FROM bot_positions ORDER BY id')).rows;
+    expect(rows).toEqual([
+      expect.objectContaining({ id: 7, total_cost: 96, entry_cost_status: 'available' }),
+      expect.objectContaining({ id: 8, total_cost: 94, entry_cost_status: 'unavailable' }),
+    ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('recovers exact two-leg evidence and reconciles Buy Cost and P&L', async () => {
     const h = await harness();
     await seedLegacy(h.db);
@@ -221,8 +375,19 @@ describe('BotEntryRecoveryStore', () => {
     await h.db.execute(`INSERT INTO executions
       SELECT 12,timestamp,arb_id,source,dry_run,success,kalshi_order,polymarket_order,result,steps,bot_entry_evidence
       FROM executions WHERE id=11`);
-    await h.db.execute(`INSERT INTO bot_positions
-      SELECT 8,12,execution_mode,status,shares_kalshi,shares_pm,live_shares_kalshi,live_shares_pm,
+    await h.db.execute(`INSERT INTO bot_positions (
+        id,execution_id,execution_mode,market_id,market_title,kalshi_ticker,pm_condition_id,strategy,
+        kalshi_side,pm_side,opened_at,status,shares_kalshi,shares_pm,live_shares_kalshi,live_shares_pm,
+        buy_price_kalshi,buy_price_pm,total_cost,fees,live_principal,live_fees,live_cost,
+        expected_payout,expected_profit,expected_roi_bps,current_value,unrealized_pnl,unrealized_roi_pct,
+        entry_cost_status,entry_evidence_revision,entry_cost_failure_reason,kalshi_entry_gross_microcents,pm_entry_gross_microcents,
+        entry_cost_rounding_delta_microcents,kalshi_entry_fill_count,pm_entry_fill_count,
+        kalshi_entry_fills_json,pm_entry_fills_json,kalshi_entry_fee,pm_entry_fee,
+        kalshi_entry_fee_type,kalshi_entry_fee_multiplier_ppm,kalshi_entry_fee_source,
+        kalshi_entry_fee_observed_at,kalshi_entry_fee_version,pm_entry_token_id,pm_entry_fee_rate_bps,
+        pm_entry_fee_source,pm_entry_fee_observed_at,pm_entry_fee_version
+      ) SELECT 8,12,execution_mode,market_id,market_title,kalshi_ticker,pm_condition_id,strategy,
+        kalshi_side,pm_side,opened_at,status,shares_kalshi,shares_pm,live_shares_kalshi,live_shares_pm,
         buy_price_kalshi,buy_price_pm,total_cost,fees,live_principal,live_fees,live_cost,
         expected_payout,expected_profit,expected_roi_bps,current_value,unrealized_pnl,unrealized_roi_pct,
         entry_cost_status,entry_evidence_revision,entry_cost_failure_reason,kalshi_entry_gross_microcents,pm_entry_gross_microcents,
@@ -251,7 +416,7 @@ describe('BotEntryRecoveryStore', () => {
     h.db.close();
     db = createClient({ url: h.dbUrl });
     expect((await db.execute('SELECT entry_evidence_revision FROM bot_positions WHERE id=7')).rows[0].entry_evidence_revision).toBe(1);
-    expect((await db.execute('SELECT COUNT(*) AS count FROM bot_entry_recovery_evidence')).rows[0].count).toBe(1);
+    expect((await db.execute('SELECT COUNT(*) AS count FROM bot_entry_recovery_evidence')).rows[0].count).toBe(2);
     expect((await db.execute('SELECT COUNT(*) AS count FROM bot_entry_recovery_runs')).rows[0].count).toBe(2);
     expect((await db.execute('SELECT COUNT(*) AS count FROM bot_entry_recovery_decisions')).rows[0].count).toBe(2);
   });
@@ -273,24 +438,33 @@ describe('BotEntryRecoveryStore', () => {
     expect(row.entry_cost_status).toBe('unavailable');
   });
 
-  it('does not treat a legacy available flag as authoritative without immutable evidence', async () => {
+  it('keeps an unproven legacy fee split aggregate even when the Buy Cost flag is already available', async () => {
     const h = await harness();
     await seedLegacy(h.db, null, { entryCostStatus: 'available' });
+    await h.db.execute('UPDATE bot_positions SET kalshi_entry_fee=1,pm_entry_fee=0 WHERE id=7');
 
     const manifest = await h.store.audit();
 
     expect(manifest.counts.alreadyAuthoritative).toBe(0);
-    expect(manifest.decisions[0].verdict).toBe('irrecoverable');
-    expect(manifest.decisions[0].reasons).toContain('Kalshi immutable fill ladder missing');
+    expect(manifest.decisions[0]).toMatchObject({
+      verdict: 'partially_recoverable',
+      persistedPositionEntry: {
+        unallocatedEntryFeeCents: 1,
+        legs: { kalshi: { feeCents: 0 }, polymarket: { feeCents: 0 } },
+      },
+    });
     const applied = await h.store.apply(manifest);
     expect(applied.reconciliation).toMatchObject({
       before: { availableBuyCostCents: 96, unavailableReportedBuyCostCents: 0 },
-      after: { availableBuyCostCents: 0, unavailableReportedBuyCostCents: 96 },
-      invalidatedBuyCostCents: 96,
+      after: { availableBuyCostCents: 96, unavailableReportedBuyCostCents: 0 },
+      invalidatedBuyCostCents: 0,
     });
-    const row = (await h.db.execute('SELECT entry_cost_status,entry_cost_failure_reason FROM bot_positions WHERE id=7')).rows[0];
-    expect(row.entry_cost_status).toBe('unavailable');
-    expect(String(row.entry_cost_failure_reason)).toContain('Kalshi immutable fill ladder missing');
+    const row = (await h.db.execute(`SELECT entry_cost_status,entry_cost_failure_reason,
+      kalshi_entry_fee,pm_entry_fee,entry_fee_unallocated FROM bot_positions WHERE id=7`)).rows[0];
+    expect(row).toMatchObject({
+      entry_cost_status: 'available', entry_cost_failure_reason: null,
+      kalshi_entry_fee: 0, pm_entry_fee: 0, entry_fee_unallocated: 1,
+    });
   });
 
   it('keeps dry-run audit read-only', async () => {
@@ -373,6 +547,35 @@ describe('BotEntryRecoveryStore', () => {
     });
   });
 
+  it.each(['partially_closed', 'closed', 'settled'])(
+    'preserves already-available %s lifecycle accounting while reporting incomplete legacy recovery',
+    async (status) => {
+      const h = await harness();
+      await seedLegacy(h.db, null, { entryCostStatus: 'available' });
+      const remaining = status === 'partially_closed' ? 0.5 : 0;
+      await h.db.execute({
+        sql: `UPDATE bot_positions SET status=?, live_shares_kalshi=?, live_shares_pm=?,
+          live_principal=47, live_fees=1, live_cost=48 WHERE id=7`,
+        args: [status, remaining, remaining],
+      });
+
+      const manifest = await h.store.run();
+
+      expect(manifest.decisions[0]).toMatchObject({ verdict: 'partially_recoverable' });
+      expect(manifest.decisions[0].reasons).toContain(
+        'position lifecycle is no longer pristine; exact reduction/settlement allocation evidence is required',
+      );
+      expect(manifest.reconciliation.invalidatedBuyCostCents).toBe(0);
+      expect((await h.db.execute(`SELECT status,entry_cost_status,total_cost,fees,
+        live_shares_kalshi,live_shares_pm,live_principal,live_fees,live_cost
+        FROM bot_positions WHERE id=7`)).rows[0]).toMatchObject({
+        status, entry_cost_status: 'available', total_cost: 96, fees: 1,
+        live_shares_kalshi: remaining, live_shares_pm: remaining,
+        live_principal: 47, live_fees: 1, live_cost: 48,
+      });
+    },
+  );
+
   it('rejects live fee estimates even when their labels and amounts are well-shaped', async () => {
     const h = await harness();
     const evidence = exactEvidence({ mode: 'live' });
@@ -412,15 +615,17 @@ describe('BotEntryRecoveryStore', () => {
     expect(decision).toMatchObject({ verdict: 'conflicting', reasons: ['persisted entry evidence is malformed'] });
   });
 
-  it('does not repeatedly revise an unchanged fail-closed classification', async () => {
+  it('keeps an unchanged aggregate-fee classification explicit and idempotent', async () => {
     const h = await harness();
     await seedLegacy(h.db, null);
     await h.store.run();
     const first = (await h.db.execute('SELECT entry_evidence_revision,entry_recovery_decision_id FROM bot_positions WHERE id=7')).rows[0];
 
-    await h.store.run();
+    const rerun = await h.store.run();
     const second = (await h.db.execute('SELECT entry_evidence_revision,entry_recovery_decision_id FROM bot_positions WHERE id=7')).rows[0];
 
+    expect(rerun.counts).toMatchObject({ partiallyRecoverable: 1, recovered: 0 });
+    expect(rerun.decisions[0]).toMatchObject({ verdict: 'partially_recoverable', persistedPositionEntry: null });
     expect(second).toEqual(first);
     expect(second.entry_evidence_revision).toBe(1);
   });
@@ -439,4 +644,26 @@ describe('BotEntryRecoveryStore', () => {
       live_shares_kalshi: 0.5, live_principal: 47, live_fees: 1, live_cost: 48,
     });
   });
+
+  it.each(['partially_closed', 'closed', 'settled'])(
+    'rejects an available-row audit after a concurrent transition to %s',
+    async (status) => {
+      const h = await harness();
+      await seedLegacy(h.db, null, { entryCostStatus: 'available' });
+      const manifest = await h.store.audit();
+      const remaining = status === 'partially_closed' ? 0.5 : 0;
+      await h.db.execute({
+        sql: `UPDATE bot_positions SET status=?,live_shares_kalshi=?,live_shares_pm=?,
+          live_principal=47,live_fees=1,live_cost=48 WHERE id=7`,
+        args: [status, remaining, remaining],
+      });
+
+      await expect(h.store.apply(manifest)).rejects.toThrow('Stale entry-evidence revision for bot position 7');
+      expect((await h.db.execute(`SELECT status,entry_cost_status,total_cost,fees,
+        live_principal,live_fees,live_cost FROM bot_positions WHERE id=7`)).rows[0]).toMatchObject({
+        status, entry_cost_status: 'available', total_cost: 96, fees: 1,
+        live_principal: 47, live_fees: 1, live_cost: 48,
+      });
+    },
+  );
 });

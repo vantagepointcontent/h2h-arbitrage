@@ -5,6 +5,7 @@ import {
   revalidateBotTradeEconomics,
   unifiedOutcomeToBotInput,
   getAuthoritativeMatchedFill,
+  getBotTradePublication,
   type BotSettings,
   type BotTradeInput,
 } from './bot-trader';
@@ -506,6 +507,7 @@ describe('unifiedOutcomeToBotInput', () => {
 
 describe('maybeExecuteBotTrade safety', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
     vi.stubEnv('H2H_DRY_RUN', 'true');
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -608,6 +610,54 @@ describe('maybeExecuteBotTrade safety', () => {
         polymarket: expect.objectContaining({ tokenId: TEST_PM_NO_TOKEN_ID }),
       }),
     );
+  });
+
+  it('does not publish a successful paper trade when canonical position persistence fails', async () => {
+    const positions = await import('./bot-positions');
+    const messages = await import('./bot-trader-messages');
+    const actionLog = await import('./bot-action-log');
+    vi.mocked(positions.recordBotPosition).mockRejectedValueOnce(new Error('disk full'));
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const input = makeInput();
+    const runtimeState = (await import('./orderbook-state')).orderbookState;
+    runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
+    });
+    runtimeState.setBook(TEST_PM_NO_TOKEN_ID, [], [{ price: 0.52, quantity: 1 }], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
+    });
+
+    const result = await maybeExecuteBotTrade(input);
+
+    expect(result).toMatchObject({
+      executed: false,
+      dryRun: true,
+      positionPersisted: false,
+      persistenceError: expect.stringContaining('disk full'),
+    });
+    expect(result.reason).toMatch(/paper trade persistence failed/i);
+    expect(result.reason).not.toMatch(/simulated/i);
+    expect(result.exposureState).toBeUndefined();
+    expect(messages.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      messageType: 'trade_failed',
+      messageText: expect.stringContaining('BotTrader attempted'),
+    }));
+    expect(messages.createBotMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+      messageType: 'trade_placed',
+    }));
+    expect(actionLog.appendBotActionLog).toHaveBeenCalledWith(expect.objectContaining({
+      step: 'result',
+      responseStatus: 'failed',
+      errorReason: expect.stringContaining('disk full'),
+    }));
+    expect(actionLog.appendBotActionLog).not.toHaveBeenCalledWith(expect.objectContaining({
+      step: 'result',
+      responseStatus: 'passed',
+    }));
   });
 
   it('carries a controlled eligible scan through the real consumer and execution engine without a financial order', async () => {
@@ -721,6 +771,26 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.executed).toBe(false);
     expect(result.reason).toMatch(/fee authority/i);
     expect(persistence.persistExecution).not.toHaveBeenCalled();
+  });
+});
+
+describe('BotTrader durable success publication', () => {
+  it('does not publish live placement success when canonical position persistence fails', () => {
+    const publication = getBotTradePublication({
+      dryRun: false,
+      marketTitle: 'Test Market',
+      resultSuccess: true,
+      shouldPersistPerformance: true,
+      positionPersisted: false,
+      persistenceError: 'Position persistence failed: disk full',
+    });
+
+    expect(publication).toEqual({
+      executed: false,
+      alertSuccess: false,
+      reason: 'Production trade persistence failed for Test Market: Position persistence failed: disk full',
+      exposureState: 'pending_reconciliation',
+    });
   });
 });
 

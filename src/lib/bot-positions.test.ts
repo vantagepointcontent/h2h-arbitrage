@@ -75,6 +75,10 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     kalshiEntryCalculatedFeeCents: 18,
     kalshiEntryChargedFeeCents: null,
     pmEntryFeeCents: 10,
+    unallocatedEntryFeeCents: 0,
+    entryRecordVersion: 1,
+    entryRecordSource: 'bot_position_create',
+    entryRecordedAt: '2026-08-01T00:00:00.000Z',
     kalshiExitFeeType: 'quadratic',
     kalshiExitFeeMultiplierPpm: 1_000_000,
     kalshiExitFeeSource: 'kalshi-series:KXTEST',
@@ -1018,6 +1022,14 @@ describe('BotPositionStore', () => {
     expect(created.pmExitOrderBaseFeeBps).toBe(1000);
     expect(created.pmEntryFeeMicrousd).toBe(100_000);
     expect(created.totalCostMicrousd).toBe(9_780_000);
+    expect(created).toMatchObject({
+      unallocatedEntryFeeCents: 0,
+      entryRecordVersion: 1,
+      entryRecordSource: 'bot_position_create',
+      entryRecordedAt: '2026-08-08T12:00:00.000Z',
+    });
+    await expect(store.create({ ...created, id: undefined, feesCents: 29 } as never))
+      .rejects.toThrow(/entry economics conflict/i);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'paper')).resolves.toBe(true);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).resolves.toBe(false);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
@@ -1105,6 +1117,7 @@ describe('BotPositionStore', () => {
       'pm_exit_fees_enabled', 'pm_exit_fee_exponent', 'pm_exit_fee_taker_only',
       'pm_exit_fee_rebate_rate_ppm', 'pm_exit_order_base_fee_bps',
       'pm_exit_order_fee_source', 'pm_exit_order_fee_version',
+      'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
     ]));
   });
 
@@ -1367,6 +1380,110 @@ describe('BotPositionStore', () => {
     store.close();
   });
 
+  it('preserves a recovered aggregate entry fee through reduction, restart, and settlement', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-aggregate-fee-reduction-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+    await client.execute(`INSERT INTO executions (id, dry_run) VALUES (7, 1)`);
+    client.close();
+
+    let store = new BotPositionStore(dbUrl);
+    const created = await store.create({
+      ...openPosition(), id: undefined, dryRun: undefined,
+      sharesKalshi: 2,
+      sharesPm: 2,
+      buyPriceKalshiCents: 40,
+      buyPricePmCents: 55,
+      kalshiEntryGrossMicrocents: 80_000_000,
+      pmEntryGrossMicrocents: 110_000_000,
+      kalshiEntryFills: [{ priceMicrocents: 40_000_000, sizeMicrounits: 2_000_000 }],
+      pmEntryFills: [{ priceMicrocents: 55_000_000, sizeMicrounits: 2_000_000 }],
+      kalshiEntryFillCount: 1,
+      pmEntryFillCount: 1,
+      kalshiEntryFeeCents: 1,
+      pmEntryFeeCents: 2,
+      feesCents: 3,
+      totalCostCents: 193,
+      expectedPayoutCents: 200,
+      expectedProfitCents: 7,
+      kalshiExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+      pmExitFeeObservedAt: '2026-08-01T00:00:00.000Z',
+    } as never);
+    store.close();
+
+    const recoveryClient = createClient({ url: dbUrl });
+    await recoveryClient.execute({
+      sql: `UPDATE bot_positions SET kalshi_entry_fee=0,pm_entry_fee=0,entry_fee_unallocated=3,
+        entry_record_source='persisted_position' WHERE id=?`,
+      args: [created.id],
+    });
+    recoveryClient.close();
+
+    store = new BotPositionStore(dbUrl);
+    await store.updateValuation(created.id, {
+      status: 'open',
+      currentPriceKalshiCents: 50,
+      currentPricePmCents: 50,
+      currentValueCents: 200,
+      kalshiGrossProceedsMicrocents: 100_000_000,
+      pmGrossProceedsMicrocents: 100_000_000,
+      kalshiNetProceedsCents: 100,
+      pmNetProceedsCents: 100,
+      kalshiExitFeeCents: 0,
+      pmExitFeeCents: 0,
+      unrealizedPnlCents: 7,
+      unrealizedRoiBps: 363,
+      lastValuationAt: '2026-08-08T12:00:00.000Z',
+      settledAt: null,
+      realizedPnlCents: null,
+      settlementSide: null,
+    });
+    const reduced = await store.reduceExposure(created.id, {
+      expectedRemainingSharesKalshi: 2,
+      expectedRemainingSharesPm: 2,
+      expectedLastValuationAt: '2026-08-08T12:00:00.000Z',
+      remainingSharesKalshi: 1,
+      remainingSharesPm: 1,
+      realizedPnlCents: 0,
+      observedAt: '2026-08-08T12:01:00.000Z',
+    });
+    expect(reduced.remainingOpenPrincipalCents).toBe(95);
+    expect(reduced.remainingOpenFeesCents).toBe(2);
+    expect(reduced.remainingOpenCostCents).toBe(97);
+    store.close();
+
+    store = new BotPositionStore(dbUrl);
+    const restarted = await store.getById(created.id);
+    expect(restarted).toMatchObject({
+      unallocatedEntryFeeCents: 3,
+      remainingOpenPrincipalCents: 95,
+      remainingOpenFeesCents: 2,
+      remainingOpenCostCents: 97,
+    });
+    const settlement = calculatePositionValuation(restarted!, {
+      kalshiYesBidCents: 100,
+      kalshiNoBidCents: 0,
+      pmYesBidCents: 100,
+      pmNoBidCents: 0,
+      observedAt: '2026-08-11T00:00:00.000Z',
+      expiryDate: '2026-08-10T00:00:00.000Z',
+      kalshiResolved: true,
+      pmResolved: true,
+    });
+    await store.updateValuation(created.id, settlement);
+    const settled = await store.getById(created.id);
+    expect(settled).toMatchObject({
+      status: 'settled',
+      unallocatedEntryFeeCents: 3,
+      remainingOpenFeesCents: 2,
+      remainingOpenCostCents: 97,
+      realizedPnlCents: 3,
+    });
+    store.close();
+  });
+
   it('allows paper and live reservations for the same normalized venue pair', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-'));
     dirs.push(dir);
@@ -1520,6 +1637,23 @@ describe('BotPositionStore', () => {
     await expect(client.execute(`INSERT INTO bot_positions
       (execution_id, execution_mode, kalshi_ticker, pm_condition_id, status, opened_at)
       VALUES (9, 'live', 'KXTEST', '0xABC', 'open', '')`)).rejects.toThrow(/open bot position already exists/i);
+    client.close();
+  });
+
+  it('creates canonical entry-record columns through the checked-in migration', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-migration-entry-record-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute(`CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)`);
+
+    const migration = await readFile('src/migrations/20260808_001_create_bot_positions.sql', 'utf8');
+    await client.executeMultiple(migration);
+    const columns = await client.execute('PRAGMA table_info(bot_positions)');
+
+    expect(columns.rows.map((row) => String(row.name))).toEqual(expect.arrayContaining([
+      'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
+    ]));
     client.close();
   });
 

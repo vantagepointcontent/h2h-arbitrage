@@ -448,6 +448,44 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('polymarket-entry-fills').textContent).toContain('Fill 1: 1.000000 units @ 85.012344¢');
   });
 
+  it('shows a recovered legacy Buy Cost without inventing a per-platform fee split', async () => {
+    const recoveredLegacy = {
+      ...positions[0],
+      totalCostCents: 96,
+      feesCents: 1,
+      kalshiEntryGrossMicrocents: 40_000_000,
+      pmEntryGrossMicrocents: 55_000_000,
+      kalshiEntryFeeCents: 0,
+      pmEntryFeeCents: 0,
+      unallocatedEntryFeeCents: 1,
+      kalshiEntryFills: [{ priceMicrocents: 40_000_000, sizeMicrounits: 1_000_000, authority: 'persisted_position_aggregate' as const }],
+      pmEntryFills: [{ priceMicrocents: 55_000_000, sizeMicrounits: 1_000_000, authority: 'persisted_position_aggregate' as const }],
+      entryRecordVersion: 1,
+      entryRecordSource: 'persisted_position',
+      entryRecordedAt: '2026-08-14T10:00:00.000Z',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [recoveredLegacy] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+    await screen.findByText('Trump 2026');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+
+    expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.96000000');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent)
+      .toContain('Entry fees: $0.01000000 legacy aggregate; platform split unavailable');
+    expect(screen.getByTestId('entry-cost-reconciliation').textContent)
+      .toContain('Evidence: persisted_position at 2026-08-14T10:00:00.000Z');
+    expect(screen.getAllByText('Platform fee allocation unavailable for this legacy entry')).toHaveLength(2);
+    expect(screen.getByTestId('kalshi-entry-fills').textContent).toContain('Persisted aggregate: 1.000000 units @ 40.000000¢');
+    expect(screen.getByTestId('polymarket-entry-fills').textContent).toContain('Persisted aggregate: 1.000000 units @ 55.000000¢');
+    expect(screen.queryByText(/Buy Cost unavailable/)).toBeNull();
+  });
+
   it('shows a specific unavailable Buy Cost reason for legacy paper positions and never displays zero', async () => {
     const legacy = {
       ...positions[0],

@@ -57,11 +57,15 @@ interface BotPosition {
   pmEntryGrossMicrocents?: number | null;
   kalshiEntryFeeCents?: number;
   pmEntryFeeCents?: number;
+  unallocatedEntryFeeCents?: number;
+  entryRecordVersion?: number | null;
+  entryRecordSource?: string | null;
+  entryRecordedAt?: string | null;
   entryCostRoundingDeltaMicrocents?: number | null;
   kalshiEntryFillCount?: number | null;
   pmEntryFillCount?: number | null;
-  kalshiEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number }> | null;
-  pmEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number }> | null;
+  kalshiEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number; authority?: 'persisted_position_aggregate' }> | null;
+  pmEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number; authority?: 'persisted_position_aggregate' }> | null;
   expectedPayoutCents: number;
   expectedProfitCents: number;
   feesCents: number;
@@ -612,6 +616,8 @@ export default function BotTraderPanel() {
                 const isExpanded = expanded.has(position.id);
                 const entryCostAvailable = position.entryCostStatus !== 'unavailable'
                   && Number.isSafeInteger(position.totalCostCents);
+                const unallocatedEntryFeeCents = position.unallocatedEntryFeeCents ?? 0;
+                const feeSplitAvailable = unallocatedEntryFeeCents === 0;
                 const entryCostUnavailableLabel = entryCostAvailable
                   ? null
                   : `Buy Cost unavailable: ${position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}`;
@@ -687,17 +693,17 @@ export default function BotTraderPanel() {
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
-                            <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
-                            {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>Fill {index + 1}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
+                            <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
+                            {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
                             <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
-                            <div className="tabular-nums text-[var(--text-secondary)]">{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong>{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
-                            {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>Fill {index + 1}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
+                            <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
+                            {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="combined-entry-cost" className="flex items-center justify-between rounded border border-[var(--border-strong)] px-3 py-2 font-semibold lg:col-span-2"><span>Reconciled Buy Cost</span><span className="tabular-nums">{formatExactMicrocents(position.totalCostCents * 1_000_000)}</span></div>
-                          <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Gross fills {formatExactMicrocents(position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents)} · Entry fees: Kalshi {formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} · Polymarket {formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)}.{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'} Full-precision gross plus entry fees is rounded once to ledger cents.</div>
+                          <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Gross fills {formatExactMicrocents(position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents)} · {feeSplitAvailable ? <>Entry fees: Kalshi {formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} · Polymarket {formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)}.</> : <>Entry fees: {formatExactMicrocents(unallocatedEntryFeeCents * 1_000_000)} legacy aggregate; platform split unavailable.</>}{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'}{position.entryRecordSource ? ` Evidence: ${position.entryRecordSource}${position.entryRecordedAt ? ` at ${position.entryRecordedAt}` : ''}.` : ''}</div>
                         </div>
                       )}
                       <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2" aria-label="Persisted current price snapshots">

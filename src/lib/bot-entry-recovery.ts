@@ -42,6 +42,23 @@ export interface BotEntryEvidenceV1 {
   legs: { kalshi: BotEntryEvidenceLegV1; polymarket: BotEntryEvidenceLegV1 };
 }
 
+export interface PersistedPositionEntryRecordV1 {
+  schemaVersion: 1;
+  source: 'persisted_position';
+  tradeId: number;
+  economicActionId: string;
+  mode: 'paper' | 'live';
+  recordedAt: string;
+  legs: {
+    kalshi: { marketId: string; side: string; quantityMicrounits: number; grossMicrocents: number; feeCents: number };
+    polymarket: { marketId: string; side: string; quantityMicrounits: number; grossMicrocents: number; feeCents: number };
+  };
+  unallocatedEntryFeeCents: number;
+  totalEntryFeeCents: number;
+  buyCostCents: number;
+  roundingDeltaMicrocents: number;
+}
+
 export interface BotEntryRecoveryDecision {
   positionId: number;
   executionId: number;
@@ -52,6 +69,7 @@ export interface BotEntryRecoveryDecision {
   sourceHashes: Record<string, string>;
   sourceSnapshot: string;
   evidence: BotEntryEvidenceV1 | null;
+  persistedPositionEntry: PersistedPositionEntryRecordV1 | null;
   reportedBuyCostCents: number;
   originalEntryCostStatus: string;
 }
@@ -91,6 +109,12 @@ interface SourceRow extends Record<string, unknown> {
   id: number;
   execution_id: number;
   execution_mode: string;
+  market_id: string | null;
+  kalshi_ticker: string | null;
+  pm_condition_id: string | null;
+  kalshi_side: string;
+  pm_side: string;
+  opened_at: string;
   status: string;
   shares_kalshi: number;
   shares_pm: number;
@@ -102,6 +126,11 @@ interface SourceRow extends Record<string, unknown> {
   entry_cost_failure_reason: string | null;
   total_cost: number;
   fees: number;
+  kalshi_entry_fee: number | null;
+  pm_entry_fee: number | null;
+  entry_fee_unallocated: number | null;
+  entry_record_version: number | null;
+  entry_record_source: string | null;
   live_principal: number | null;
   live_fees: number | null;
   live_cost: number | null;
@@ -168,6 +197,72 @@ function roiBps(pnlCents: number, costCents: number): number {
   const numerator = BigInt(pnlCents) * 10_000n;
   const magnitude = roundRatio(numerator < 0n ? -numerator : numerator, BigInt(costCents));
   return numerator < 0n ? -magnitude : magnitude;
+}
+
+function persistedPositionEntry(row: SourceRow): { record: PersistedPositionEntryRecordV1 | null; reasons: string[] } {
+  const reasons: string[] = [];
+  const executionId = Number(row.execution_id);
+  const sharesKalshi = Number(row.shares_kalshi);
+  const sharesPm = Number(row.shares_pm);
+  const buyPriceKalshi = Number(row.buy_price_kalshi);
+  const buyPricePm = Number(row.buy_price_pm);
+  const totalEntryFeeCents = Number(row.fees);
+  if (!Number.isSafeInteger(executionId) || executionId <= 0) reasons.push('persisted trade ID is missing or malformed');
+  if (!Number.isFinite(Date.parse(row.opened_at ?? ''))) reasons.push('persisted entry timestamp is missing or malformed');
+  if (!nonEmpty(row.kalshi_ticker) || !nonEmpty(row.pm_condition_id)) reasons.push('persisted platform leg identity is missing');
+  if (!nonEmpty(row.kalshi_side) || !nonEmpty(row.pm_side)) reasons.push('persisted platform leg side is missing');
+  if (!Number.isSafeInteger(sharesKalshi) || sharesKalshi <= 0
+    || !Number.isSafeInteger(sharesPm) || sharesPm <= 0) reasons.push('persisted entry quantity is missing or malformed');
+  if (!Number.isSafeInteger(buyPriceKalshi) || buyPriceKalshi < 0 || buyPriceKalshi > 100
+    || !Number.isSafeInteger(buyPricePm) || buyPricePm < 0 || buyPricePm > 100) {
+    reasons.push('persisted pre-fee Buy Price is missing or malformed');
+  }
+  if (!safeNonNegativeInteger(totalEntryFeeCents)) reasons.push('persisted aggregate entry fee is missing or malformed');
+  if (reasons.length > 0) return { record: null, reasons };
+
+  const kalshiGrossMicrocents = buyPriceKalshi * sharesKalshi * MICRO;
+  const pmGrossMicrocents = buyPricePm * sharesPm * MICRO;
+  const grossCents = buyPriceKalshi * sharesKalshi + buyPricePm * sharesPm;
+  if (!Number.isSafeInteger(kalshiGrossMicrocents) || !Number.isSafeInteger(pmGrossMicrocents)
+    || !Number.isSafeInteger(grossCents)) return { record: null, reasons: ['persisted entry gross exceeds safe integer range'] };
+  const storedCost = Number(row.total_cost);
+  const feeInclusiveCost = grossCents + totalEntryFeeCents;
+  if (!Number.isSafeInteger(storedCost) || storedCost < 0
+    || (storedCost !== grossCents && storedCost !== feeInclusiveCost)) {
+    return { record: null, reasons: ['persisted Buy Cost conflicts with persisted Buy Prices, quantities, and entry fees'] };
+  }
+  // Legacy platform columns are projections, not durable charged-fee
+  // provenance. Preserve the immutable aggregate without inventing a split.
+  const kalshiFeeCents = 0;
+  const pmFeeCents = 0;
+  const unallocatedEntryFeeCents = totalEntryFeeCents;
+  return {
+    record: {
+      schemaVersion: 1,
+      source: 'persisted_position',
+      tradeId: executionId,
+      economicActionId: nonEmpty(row.arb_id) ? row.arb_id : `execution:${executionId}`,
+      mode: row.execution_mode === 'live' ? 'live' : 'paper',
+      recordedAt: row.opened_at,
+      legs: {
+        kalshi: {
+          marketId: row.kalshi_ticker!, side: row.kalshi_side,
+          quantityMicrounits: sharesKalshi * MICRO, grossMicrocents: kalshiGrossMicrocents, feeCents: kalshiFeeCents,
+        },
+        polymarket: {
+          marketId: row.pm_condition_id!, side: row.pm_side,
+          quantityMicrounits: sharesPm * MICRO, grossMicrocents: pmGrossMicrocents, feeCents: pmFeeCents,
+        },
+      },
+      unallocatedEntryFeeCents,
+      totalEntryFeeCents,
+      buyCostCents: feeInclusiveCost,
+      roundingDeltaMicrocents: 0,
+    },
+    reasons: unallocatedEntryFeeCents > 0
+      ? ['Restored Buy Cost from immutable persisted position entry record; aggregate entry fee has no durable platform split']
+      : ['Restored from immutable persisted position entry record'],
+  };
 }
 
 function parseEvidence(value: string | null): BotEntryEvidenceV1 | null {
@@ -377,6 +472,7 @@ function sourceSnapshot(row: SourceRow): string {
     result: row.result,
     steps: row.execution_steps,
     botEntryEvidence: row.bot_entry_evidence,
+    persistedPosition: JSON.parse(positionRevisionSnapshot(row)),
   });
 }
 
@@ -384,6 +480,12 @@ function positionRevisionSnapshot(row: SourceRow): string {
   return JSON.stringify({
     positionId: row.id,
     executionId: row.execution_id,
+    marketId: row.market_id,
+    kalshiTicker: row.kalshi_ticker,
+    pmConditionId: row.pm_condition_id,
+    kalshiSide: row.kalshi_side,
+    pmSide: row.pm_side,
+    openedAt: row.opened_at,
     status: row.status,
     entryCostStatus: row.entry_cost_status,
     entryCostFailureReason: row.entry_cost_failure_reason,
@@ -396,6 +498,9 @@ function positionRevisionSnapshot(row: SourceRow): string {
     buyPricePmCents: row.buy_price_pm,
     totalCostCents: row.total_cost,
     feesCents: row.fees,
+    kalshiEntryFeeCents: row.kalshi_entry_fee,
+    pmEntryFeeCents: row.pm_entry_fee,
+    unallocatedEntryFeeCents: row.entry_fee_unallocated,
     livePrincipalCents: row.live_principal,
     liveFeesCents: row.live_fees,
     liveCostCents: row.live_cost,
@@ -447,6 +552,10 @@ export class BotEntryRecoveryStore {
       pm_entry_fee_authority: 'TEXT',
       kalshi_entry_fee_rounding: 'TEXT',
       pm_entry_fee_rounding: 'TEXT',
+      entry_fee_unallocated: 'INTEGER NOT NULL DEFAULT 0',
+      entry_record_version: 'INTEGER',
+      entry_record_source: 'TEXT',
+      entry_recorded_at: 'TEXT',
     };
     for (const [name, definition] of Object.entries(additions)) {
       if (!existing.has(name)) await this.client.execute(`ALTER TABLE bot_positions ADD COLUMN ${name} ${definition}`);
@@ -485,8 +594,11 @@ export class BotEntryRecoveryStore {
     const revisionProjection = positionColumns.has('entry_evidence_revision')
       ? 'bp.entry_evidence_revision'
       : '0 AS entry_evidence_revision';
+    const unallocatedFeeProjection = positionColumns.has('entry_fee_unallocated')
+      ? 'bp.entry_fee_unallocated'
+      : '0 AS entry_fee_unallocated';
     const result = await this.client.execute(`
-      SELECT bp.*, ${revisionProjection}, e.id AS exact_execution_id, e.arb_id, e.dry_run,
+      SELECT bp.*, ${revisionProjection}, ${unallocatedFeeProjection}, e.id AS exact_execution_id, e.arb_id, e.dry_run,
         e.success AS execution_success, e.kalshi_order, e.polymarket_order,
         e.result, e.steps AS execution_steps, ${evidenceProjection}
       FROM bot_positions bp LEFT JOIN executions e ON e.id = bp.execution_id
@@ -520,6 +632,7 @@ export class BotEntryRecoveryStore {
       };
       let verdict: RecoveryVerdict;
       let reasons: string[];
+      let positionEntry: PersistedPositionEntryRecordV1 | null = null;
       if (Number(row.exact_execution_id) !== Number(row.execution_id)) {
         verdict = 'irrecoverable';
         reasons = ['missing exact executions.id linkage'];
@@ -539,11 +652,9 @@ export class BotEntryRecoveryStore {
           && (orderUses.get(`polymarket:${sourceIds.polymarketOrderId}`)?.length ?? 0) > 1) {
           reasons.push('duplicate Polymarket order ID');
         }
-        const lifecycleBlocked = row.entry_cost_status !== 'available' && (
-          row.status !== 'open'
+        const lifecycleBlocked = row.status !== 'open'
           || Number(row.live_shares_kalshi) !== Number(row.shares_kalshi)
-          || Number(row.live_shares_pm) !== Number(row.shares_pm)
-        );
+          || Number(row.live_shares_pm) !== Number(row.shares_pm);
         if (reasons.length === 0 && lifecycleBlocked) {
           reasons.push('position lifecycle is no longer pristine; exact reduction/settlement allocation evidence is required');
         }
@@ -554,33 +665,34 @@ export class BotEntryRecoveryStore {
         verdict = 'conflicting';
         reasons = ['persisted entry evidence is malformed'];
       } else {
-        const kr = asObject(executionResult.kalshiResult);
-        const pr = asObject(executionResult.polymarketResult);
-        const conflicts: string[] = [];
-        if (Number(row.execution_success) !== 1 || executionResult.success !== true) conflicts.push('execution success conflicts with persisted position');
-        if (kr.filledContracts != null && kr.filledContracts !== Number(row.shares_kalshi)) conflicts.push('Kalshi quantity conflicts with position');
-        if (pr.filledContracts != null && pr.filledContracts !== Number(row.shares_pm)) conflicts.push('Polymarket quantity conflicts with position');
-        for (const venue of ['kalshi', 'polymarket'] as const) {
-          const id = exactOrderId(executionResult, venue);
-          if (id && (orderUses.get(`${venue}:${id}`)?.length ?? 0) > 1) conflicts.push(`duplicate ${venue === 'kalshi' ? 'Kalshi' : 'Polymarket'} order ID`);
+        const derived = persistedPositionEntry(row);
+        positionEntry = derived.record;
+        reasons = derived.reasons;
+        const lifecycleBlocked = row.status !== 'open'
+          || Number(row.live_shares_kalshi) !== Number(row.shares_kalshi)
+          || Number(row.live_shares_pm) !== Number(row.shares_pm);
+        if (positionEntry && lifecycleBlocked) {
+          positionEntry = null;
+          reasons.push('position lifecycle is no longer pristine; exact reduction/settlement allocation evidence is required');
         }
-        if (conflicts.length > 0) {
-          verdict = 'conflicting';
-          reasons = conflicts;
-        } else {
-          const completeAggregate = Number.isSafeInteger(kr.filledContracts) && Number(kr.filledContracts) > 0
-            && Number.isSafeInteger(pr.filledContracts) && Number(pr.filledContracts) > 0
-            && typeof kr.filledPrice === 'number' && Number.isFinite(kr.filledPrice)
-            && typeof pr.filledPrice === 'number' && Number.isFinite(pr.filledPrice)
-            && sourceIds.kalshiOrderId != null && sourceIds.polymarketOrderId != null;
-          verdict = completeAggregate ? 'partially_recoverable' : 'irrecoverable';
-          reasons = completeAggregate
-            ? ['aggregate simulated legs exist but immutable fill ladders and execution-time fee authority are absent']
-            : ['one or more exact positive leg quantities, prices, or order IDs are missing'];
-        }
-        reasons.push('Kalshi immutable fill ladder missing', 'Polymarket immutable fill ladder missing', 'Kalshi execution-time fee amount/provenance missing', 'Polymarket execution-time fee amount/provenance missing');
+        const positionRecordAlreadyCanonical = row.entry_cost_status === 'available'
+          && Number(row.entry_record_version) === 1
+          && row.entry_record_source === 'persisted_position'
+          && Number(row.entry_fee_unallocated) === Number(positionEntry?.unallocatedEntryFeeCents ?? 0);
+        verdict = positionEntry
+          ? (positionEntry.unallocatedEntryFeeCents > 0
+              ? 'partially_recoverable'
+              : positionRecordAlreadyCanonical ? 'already_authoritative' : 'fully_recoverable')
+          : lifecycleBlocked ? 'partially_recoverable' : 'conflicting';
+        if (positionRecordAlreadyCanonical && verdict === 'partially_recoverable') positionEntry = null;
       }
-      return { positionId: Number(row.id), executionId: Number(row.execution_id), expectedRevision: Number(row.entry_evidence_revision ?? 0), verdict, reasons: [...new Set(reasons)], sourceIds, sourceHashes, sourceSnapshot: snapshot, evidence: verdict === 'fully_recoverable' ? evidence : null, reportedBuyCostCents: Number(row.total_cost), originalEntryCostStatus: row.entry_cost_status };
+      return {
+        positionId: Number(row.id), executionId: Number(row.execution_id), expectedRevision: Number(row.entry_evidence_revision ?? 0),
+        verdict, reasons: [...new Set(reasons)], sourceIds, sourceHashes, sourceSnapshot: snapshot,
+        evidence: verdict === 'fully_recoverable' ? evidence : null,
+        persistedPositionEntry: verdict === 'fully_recoverable' || verdict === 'partially_recoverable' ? positionEntry : null,
+        reportedBuyCostCents: Number(row.total_cost), originalEntryCostStatus: row.entry_cost_status,
+      };
     });
     const count = (verdict: RecoveryVerdict) => decisions.filter((decision) => decision.verdict === verdict).length;
     const availableBuyCostCents = decisions
@@ -626,28 +738,20 @@ export class BotEntryRecoveryStore {
       for (const decision of manifest.decisions) {
         const currentSource = await transaction.execute({
           sql: `SELECT bp.*,
-              e.arb_id,e.kalshi_order,e.polymarket_order,e.result,e.steps,e.bot_entry_evidence
+              e.arb_id,e.kalshi_order,e.polymarket_order,e.result,e.steps AS execution_steps,e.bot_entry_evidence
             FROM bot_positions bp JOIN executions e ON e.id=bp.execution_id
             WHERE bp.id=? AND bp.execution_id=?`,
           args: [decision.positionId, decision.executionId],
         });
         const source = currentSource.rows[0];
-        const currentSnapshot = source == null ? null : JSON.stringify({
-          positionId: decision.positionId,
-          executionId: decision.executionId,
-          arbId: source.arb_id,
-          kalshiOrder: source.kalshi_order,
-          polymarketOrder: source.polymarket_order,
-          result: source.result,
-          steps: source.steps,
-          botEntryEvidence: source.bot_entry_evidence,
-        });
-        if (currentSnapshot == null || sha256(currentSnapshot) !== decision.sourceHashes.snapshotSha256) {
-          throw new Error(`Stale source evidence for bot position ${decision.positionId}`);
-        }
+        const currentSnapshot = source == null ? null : sourceSnapshot(source as unknown as SourceRow);
+        if (source == null) throw new Error(`Stale source evidence for bot position ${decision.positionId}`);
         const currentPositionRevisionHash = sha256(positionRevisionSnapshot(source as unknown as SourceRow));
         if (currentPositionRevisionHash !== decision.sourceHashes.positionRevisionSha256) {
           throw new Error(`Stale entry-evidence revision for bot position ${decision.positionId}`);
+        }
+        if (sha256(currentSnapshot) !== decision.sourceHashes.snapshotSha256) {
+          throw new Error(`Stale source evidence for bot position ${decision.positionId}`);
         }
         if (decision.evidence != null
           && sha256(JSON.stringify(decision.evidence)) !== decision.sourceHashes.normalizedEntryEvidenceSha256) {
@@ -680,6 +784,8 @@ export class BotEntryRecoveryStore {
               kalshi_entry_fee_rounding=?, pm_entry_fee_rounding=?,
               kalshi_entry_fee_source=?, kalshi_entry_fee_observed_at=?, kalshi_entry_fee_version=?,
               pm_entry_fee_source=?, pm_entry_fee_observed_at=?, pm_entry_fee_version=?,
+              entry_fee_unallocated=0, entry_record_version=1,
+              entry_record_source='execution_evidence', entry_recorded_at=?,
               entry_evidence_sha256=?,
               entry_evidence_revision=entry_evidence_revision+1
               WHERE id=? AND execution_id=? AND entry_cost_status='unavailable' AND entry_evidence_revision=?
@@ -707,6 +813,7 @@ export class BotEntryRecoveryStore {
               decision.evidence.legs.kalshi.fee.platformRounding, decision.evidence.legs.polymarket.fee.platformRounding,
               decision.evidence.legs.kalshi.fee.source, decision.evidence.legs.kalshi.fee.observedAt, decision.evidence.legs.kalshi.fee.version,
               decision.evidence.legs.polymarket.fee.source, decision.evidence.legs.polymarket.fee.observedAt, decision.evidence.legs.polymarket.fee.version,
+              decision.evidence.capturedAt,
               decision.sourceHashes.entryEvidenceSha256,
               decision.positionId, decision.executionId, decision.expectedRevision,
               source.status, source.entry_cost_failure_reason,
@@ -742,6 +849,62 @@ export class BotEntryRecoveryStore {
           afterStatus = 'available';
           positionMutated = true;
           recovered += 1;
+        } else if ((decision.verdict === 'fully_recoverable' || decision.verdict === 'partially_recoverable')
+          && decision.persistedPositionEntry) {
+          const entry = decision.persistedPositionEntry;
+          const principalCents = roundRatio(
+            BigInt(entry.legs.kalshi.grossMicrocents + entry.legs.polymarket.grossMicrocents),
+            BigInt(MICRO),
+          );
+          const currentValueCents = safeNonNegativeInteger(source.current_value) ? Number(source.current_value) : null;
+          const unrealizedPnlCents = currentValueCents == null ? null : currentValueCents - entry.buyCostCents;
+          const unrealizedRoiBps = unrealizedPnlCents == null ? null : roiBps(unrealizedPnlCents, entry.buyCostCents);
+          const aggregateFill = (leg: PersistedPositionEntryRecordV1['legs']['kalshi']) => JSON.stringify([{
+            priceMicrocents: roundRatio(BigInt(leg.grossMicrocents) * BigInt(MICRO), BigInt(leg.quantityMicrounits)),
+            sizeMicrounits: leg.quantityMicrounits,
+            authority: 'persisted_position_aggregate',
+          }]);
+          const update = await transaction.execute({
+            sql: `UPDATE bot_positions SET
+                total_cost=?, fees=?, live_principal=?, live_fees=?, live_cost=?,
+                unrealized_pnl=?, unrealized_roi_pct=?,
+                entry_cost_status='available', entry_cost_failure_reason=NULL,
+                kalshi_entry_gross_microcents=?, pm_entry_gross_microcents=?, entry_cost_rounding_delta_microcents=?,
+                kalshi_entry_fill_count=1, pm_entry_fill_count=1,
+                kalshi_entry_fills_json=?, pm_entry_fills_json=?,
+                kalshi_entry_fee=?, pm_entry_fee=?, entry_fee_unallocated=?,
+                entry_record_version=1, entry_record_source='persisted_position', entry_recorded_at=?,
+                entry_evidence_sha256=?, entry_evidence_revision=entry_evidence_revision+1
+              WHERE id=? AND execution_id=? AND entry_cost_status=? AND entry_evidence_revision=?
+                AND status='open' AND live_shares_kalshi=shares_kalshi AND live_shares_pm=shares_pm`,
+            args: [
+              entry.buyCostCents, entry.totalEntryFeeCents, principalCents, entry.totalEntryFeeCents, entry.buyCostCents,
+              unrealizedPnlCents, unrealizedRoiBps,
+              entry.legs.kalshi.grossMicrocents, entry.legs.polymarket.grossMicrocents, entry.roundingDeltaMicrocents,
+              aggregateFill(entry.legs.kalshi), aggregateFill(entry.legs.polymarket),
+              entry.legs.kalshi.feeCents, entry.legs.polymarket.feeCents, entry.unallocatedEntryFeeCents,
+              entry.recordedAt, decision.sourceHashes.positionRevisionSha256,
+              decision.positionId, decision.executionId, beforeStatus, decision.expectedRevision,
+            ],
+          });
+          if (update.rowsAffected !== 1) throw new Error(`Stale entry-evidence revision for bot position ${decision.positionId}`);
+          recoveredPositions.push({
+            positionId: decision.positionId,
+            valuationStatus: source.valuation_status == null ? null : String(source.valuation_status),
+            currentValueBefore: currentValueCents,
+            currentValueAfter: currentValueCents,
+            unrealizedPnlBefore: source.unrealized_pnl == null ? null : Number(source.unrealized_pnl),
+            unrealizedPnlAfter: unrealizedPnlCents,
+            unrealizedRoiBefore: source.unrealized_roi_pct == null ? null : Number(source.unrealized_roi_pct),
+            unrealizedRoiAfter: unrealizedRoiBps,
+          });
+          afterStatus = 'available';
+          positionMutated = true;
+          recovered += 1;
+        } else if (decision.verdict === 'partially_recoverable' && beforeStatus === 'available') {
+          // Original Buy Cost remains usable, but lifecycle allocation or a
+          // legacy fee split is incomplete. Record that manifest state without
+          // rewriting remaining basis or discarding valid aggregate economics.
         } else {
           const reason = reasonText(decision);
           const update = await transaction.execute({
@@ -771,14 +934,32 @@ export class BotEntryRecoveryStore {
           });
         }
       }
-      const recoveredDecisions = manifest.decisions.filter((decision) => decision.verdict === 'fully_recoverable' && decision.evidence);
+      const recoveredDecisions = manifest.decisions.filter((decision) =>
+        (decision.verdict === 'fully_recoverable' || decision.verdict === 'partially_recoverable')
+        && (decision.evidence || decision.persistedPositionEntry));
       const recoveredBuyCostCents = recoveredDecisions.reduce((sum, decision) =>
-        sum + this.recoveredEconomics(decision.evidence!).totalCostCents, 0);
-      const removedUnavailableReportedCents = recoveredDecisions.reduce((sum, decision) =>
+        sum + (decision.evidence
+          ? this.recoveredEconomics(decision.evidence).totalCostCents
+          : decision.persistedPositionEntry!.buyCostCents), 0);
+      const recoveredFromUnavailableCents = recoveredDecisions
+        .filter((decision) => decision.originalEntryCostStatus !== 'available')
+        .reduce((sum, decision) => sum + (decision.evidence
+          ? this.recoveredEconomics(decision.evidence).totalCostCents
+          : decision.persistedPositionEntry!.buyCostCents), 0);
+      const recoveredAvailableDeltaCents = recoveredDecisions
+        .filter((decision) => decision.originalEntryCostStatus === 'available')
+        .reduce((sum, decision) => sum + (decision.evidence
+          ? this.recoveredEconomics(decision.evidence).totalCostCents
+          : decision.persistedPositionEntry!.buyCostCents) - decision.reportedBuyCostCents, 0);
+      const removedUnavailableReportedCents = recoveredDecisions
+        .filter((decision) => decision.originalEntryCostStatus !== 'available')
+        .reduce((sum, decision) =>
         sum + decision.reportedBuyCostCents, 0);
       const invalidatedBuyCostCents = manifest.decisions
         .filter((decision) => decision.originalEntryCostStatus === 'available'
-          && decision.verdict !== 'already_authoritative')
+          && decision.verdict !== 'already_authoritative'
+          && decision.verdict !== 'fully_recoverable'
+          && decision.verdict !== 'partially_recoverable')
         .reduce((sum, decision) => sum + decision.reportedBuyCostCents, 0);
       const completed = {
         ...manifest,
@@ -787,7 +968,7 @@ export class BotEntryRecoveryStore {
           ...manifest.reconciliation,
           after: {
             availableBuyCostCents: manifest.reconciliation.before.availableBuyCostCents
-              + recoveredBuyCostCents - invalidatedBuyCostCents,
+              + recoveredFromUnavailableCents + recoveredAvailableDeltaCents - invalidatedBuyCostCents,
             unavailableReportedBuyCostCents: manifest.reconciliation.before.unavailableReportedBuyCostCents
               - removedUnavailableReportedCents + invalidatedBuyCostCents,
           },
@@ -821,12 +1002,12 @@ export class BotEntryRecoveryStore {
       sql: `INSERT OR IGNORE INTO bot_entry_recovery_evidence
         (execution_id,source_table,source_row_id,source_sha256,source_payload,captured_at)
         VALUES (?,?,?,?,?,?)`,
-      args: [decision.executionId, 'executions', decision.executionId, hash, decision.sourceSnapshot, new Date().toISOString()],
+      args: [decision.executionId, 'joined_entry_source', decision.positionId, hash, decision.sourceSnapshot, new Date().toISOString()],
     });
     const existing = await transaction.execute({
       sql: `SELECT id FROM bot_entry_recovery_evidence
-        WHERE source_table='executions' AND source_row_id=? AND source_sha256=?`,
-      args: [decision.executionId, hash],
+        WHERE source_table='joined_entry_source' AND source_row_id=? AND source_sha256=?`,
+      args: [decision.positionId, hash],
     });
     const id = Number(existing.rows[0]?.id ?? 0);
     if (!id) throw new Error(`Could not preserve source evidence for execution ${decision.executionId}`);

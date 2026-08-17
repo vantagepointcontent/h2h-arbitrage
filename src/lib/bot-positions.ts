@@ -83,6 +83,8 @@ export interface BotEntryFillEvidence {
   /** Filled contract quantity in millionths of one contract. */
   sizeMicrounits: number;
   liquidityRole?: 'maker' | 'taker';
+  /** Distinguishes a legacy persisted aggregate from a venue fill. */
+  authority?: 'persisted_position_aggregate';
 }
 
 export interface BotPosition {
@@ -145,6 +147,10 @@ export interface BotPosition {
   pmEntryFeeCents: number;
   /** Polymarket fee rounded to the venue's five-decimal USDC precision. */
   pmEntryFeeMicrousd?: number | null;
+  unallocatedEntryFeeCents: number;
+  entryRecordVersion: number | null;
+  entryRecordSource: string | null;
+  entryRecordedAt: string | null;
   kalshiExitFeeType: KalshiFeeType | null;
   kalshiExitFeeMultiplierPpm: number | null;
   kalshiExitFeeSource: string | null;
@@ -216,7 +222,8 @@ export type CreateBotPosition = Omit<BotPosition,
   'kalshiLiquidationValueCents' | 'pmLiquidationValueCents' |
   'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource' |
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
-  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents'
+  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' |
+  'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt'
 > & {
   expectedRoiBps?: number | null;
   expectedApyBps?: number | null;
@@ -483,13 +490,14 @@ function parseEntryFills(value: unknown): BotEntryFillEvidence[] | null {
   const fills: BotEntryFillEvidence[] = [];
   for (const fill of parsed) {
     if (!fill || typeof fill !== 'object' || Array.isArray(fill)) return null;
-    const { priceMicrocents, sizeMicrounits, liquidityRole } = fill as Record<string, unknown>;
+    const { priceMicrocents, sizeMicrounits, liquidityRole, authority } = fill as Record<string, unknown>;
     if (!Number.isSafeInteger(priceMicrocents) || Number(priceMicrocents) < 0
       || !Number.isSafeInteger(sizeMicrounits) || Number(sizeMicrounits) <= 0
       || (liquidityRole != null && liquidityRole !== 'maker' && liquidityRole !== 'taker')) return null;
     fills.push({
       priceMicrocents: Number(priceMicrocents), sizeMicrounits: Number(sizeMicrounits),
       ...(liquidityRole ? { liquidityRole } : {}),
+      ...(authority === 'persisted_position_aggregate' ? { authority } : {}),
     });
   }
   return fills;
@@ -989,7 +997,12 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     && row.pm_entry_gross_microcents != null
     && row.kalshi_entry_fee != null
     && row.pm_entry_fee != null
+    && row.entry_fee_unallocated != null
     && row.entry_cost_rounding_delta_microcents != null
+    && Number(row.fees) === Number(row.kalshi_entry_fee) + Number(row.pm_entry_fee) + Number(row.entry_fee_unallocated)
+    && Number(row.total_cost) * Number(FEE_SCALE) === Number(row.kalshi_entry_gross_microcents)
+      + Number(row.pm_entry_gross_microcents) + Number(row.fees) * Number(FEE_SCALE)
+      + Number(row.entry_cost_rounding_delta_microcents)
     && entryFillsReconcile(kalshiEntryFills, Number(row.shares_kalshi), Number(row.kalshi_entry_gross_microcents), 'Kalshi')
     && entryFillsReconcile(pmEntryFills, Number(row.shares_pm), Number(row.pm_entry_gross_microcents), 'Polymarket');
   return {
@@ -1054,6 +1067,10 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiEntryChargedFeeCents: row.kalshi_entry_charged_fee != null ? Number(row.kalshi_entry_charged_fee) : null,
     pmEntryFeeCents: Number(row.pm_entry_fee ?? 0),
     pmEntryFeeMicrousd: row.pm_entry_fee_microusd != null ? Number(row.pm_entry_fee_microusd) : null,
+    unallocatedEntryFeeCents: Number(row.entry_fee_unallocated ?? 0),
+    entryRecordVersion: row.entry_record_version != null ? Number(row.entry_record_version) : null,
+    entryRecordSource: row.entry_record_source != null ? String(row.entry_record_source) : null,
+    entryRecordedAt: row.entry_recorded_at != null ? String(row.entry_recorded_at) : null,
     kalshiExitFeeType: isKalshiFeeType(row.kalshi_exit_fee_type) ? row.kalshi_exit_fee_type : null,
     kalshiExitFeeMultiplierPpm: row.kalshi_exit_fee_multiplier_ppm != null ? Number(row.kalshi_exit_fee_multiplier_ppm) : null,
     kalshiExitFeeSource: row.kalshi_exit_fee_source != null ? String(row.kalshi_exit_fee_source) : null,
@@ -1353,6 +1370,10 @@ export class BotPositionStore {
         kalshi_entry_charged_fee INTEGER,
         pm_entry_fee INTEGER NOT NULL DEFAULT 0,
         pm_entry_fee_microusd INTEGER,
+        entry_fee_unallocated INTEGER NOT NULL DEFAULT 0,
+        entry_record_version INTEGER,
+        entry_record_source TEXT,
+        entry_recorded_at TEXT,
         kalshi_exit_fee_type TEXT,
         kalshi_exit_fee_multiplier_ppm INTEGER,
         kalshi_exit_fee_source TEXT,
@@ -1473,6 +1494,10 @@ export class BotPositionStore {
       kalshi_entry_charged_fee: 'INTEGER',
       pm_entry_fee: 'INTEGER NOT NULL DEFAULT 0',
       pm_entry_fee_microusd: 'INTEGER',
+      entry_fee_unallocated: 'INTEGER NOT NULL DEFAULT 0',
+      entry_record_version: 'INTEGER',
+      entry_record_source: 'TEXT',
+      entry_recorded_at: 'TEXT',
       kalshi_exit_fee_type: 'TEXT',
       kalshi_exit_fee_multiplier_ppm: 'INTEGER',
       kalshi_exit_fee_source: 'TEXT',
@@ -1723,11 +1748,12 @@ export class BotPositionStore {
           kalshi_entry_calculated_fee, kalshi_entry_charged_fee,
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
-          last_valuation_at, selection_method
+          last_valuation_at, selection_method,
+          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -1762,6 +1788,7 @@ export class BotPositionStore {
           input.openedAt,
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
+          0, 1, 'bot_position_create', input.openedAt,
         ],
       });
     } catch (error) {
@@ -1898,7 +1925,14 @@ export class BotPositionStore {
     const kalshiFees = prorateCents(current.kalshiEntryFeeCents, reduction.remainingSharesKalshi, current.sharesKalshi);
     const pmFees = prorateCents(current.pmEntryFeeCents, reduction.remainingSharesPm, current.sharesPm);
     const livePrincipal = kalshiPrincipal + pmPrincipal;
-    const liveFees = kalshiFees + pmFees;
+    const originalPrincipal = originalKalshiPrincipal + originalPmPrincipal;
+    const unallocatedFees = originalPrincipal === 0
+      ? 0
+      : roundRatio(
+          BigInt(current.unallocatedEntryFeeCents) * BigInt(livePrincipal),
+          BigInt(originalPrincipal),
+        );
+    const liveFees = kalshiFees + pmFees + unallocatedFees;
     const liveCost = livePrincipal + liveFees;
     const fullyClosed = reduction.remainingSharesKalshi === 0 && reduction.remainingSharesPm === 0;
     let currentValue: number | null = fullyClosed ? 0 : null;

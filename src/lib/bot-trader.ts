@@ -165,6 +165,44 @@ export interface BotAlertStatus {
   error?: string;
 }
 
+interface BotTradePublicationInput {
+  dryRun: boolean;
+  marketTitle: string;
+  resultSuccess: boolean;
+  shouldPersistPerformance: boolean;
+  positionPersisted: boolean;
+  persistenceError?: string;
+}
+
+export function getBotTradePublication(input: BotTradePublicationInput): {
+  executed: boolean;
+  alertSuccess: boolean;
+  reason: string;
+  exposureState?: 'pending_reconciliation';
+} {
+  const durableSuccess = input.resultSuccess
+    && input.shouldPersistPerformance
+    && input.positionPersisted;
+  let reason: string;
+  if (durableSuccess) {
+    reason = input.dryRun
+      ? `Paper trade simulated for ${input.marketTitle}`
+      : `Production trade executed for ${input.marketTitle}`;
+  } else if (input.persistenceError) {
+    reason = `${input.dryRun ? 'Paper' : 'Production'} trade persistence failed for ${input.marketTitle}: ${input.persistenceError}`;
+  } else if (input.dryRun) {
+    reason = `Paper trade did not produce a durable canonical entry record for ${input.marketTitle}`;
+  } else {
+    reason = `Production order acknowledgement pending authoritative fill reconciliation for ${input.marketTitle}`;
+  }
+  return {
+    executed: durableSuccess,
+    alertSuccess: durableSuccess,
+    reason,
+    exposureState: !input.dryRun && !durableSuccess ? 'pending_reconciliation' : undefined,
+  };
+}
+
 /** Canonical gate shared by execution and position performance persistence. */
 export function getBotPerformanceEvidence(
   result: Awaited<ReturnType<typeof executeArb>>,
@@ -1012,27 +1050,6 @@ export async function maybeExecuteBotTrade(
       errorReason: responseStatus === 'failed' ? step.description : null,
     });
   }
-  await log('result', result.success
-    ? `${effectiveDryRun ? 'Paper simulation completed' : 'Trade completed'} for ${input.marketTitle}`
-    : `Trade attempt failed for ${input.marketTitle}`,
-  result.success ? 'passed' : 'failed', {
-    requestPayload: execReq,
-    responsePayload: result,
-    errorReason: result.success ? null : (result.error || 'Execution failed'),
-    durationMs: executionDurationMs,
-    alertMetadata: result.alerts,
-  });
-
-  const alertStatus = await sendBotExecutionAlert(executionInput, result, effectiveDryRun, executionInput.roiPct, tradeId);
-  const auditedResult = { ...result, alertDelivery: alertStatus };
-  if (!alertStatus.delivered) {
-    await log('alert', result.unhedged ? 'Unhedged exposure alert delivery' : 'Execution alert delivery', 'failed', {
-      responsePayload: alertStatus,
-      errorReason: alertStatus.error ?? 'Alert was not delivered',
-      alertMetadata: { unhedged: result.unhedged, alerts: result.alerts },
-    });
-  }
-
   const executionRecord: ExecutionRecord = {
     timestamp: new Date().toISOString(),
     arbId,
@@ -1042,7 +1059,7 @@ export async function maybeExecuteBotTrade(
     strategy: input.strategy,
     kalshiOrder: execReq.kalshiOrder,
     polymarketOrder: execReq.polymarketOrder,
-    result: auditedResult,
+    result,
     estimatedProfit: executionInput.expectedProfit,
     steps: result.steps,
     source: 'bot',
@@ -1117,15 +1134,48 @@ export async function maybeExecuteBotTrade(
     }
   }
 
-  return {
-    executed: shouldPersistPerformance,
+  const publication = getBotTradePublication({
     dryRun: effectiveDryRun,
-    reason: effectiveDryRun
-      ? `Paper trade simulated for ${input.marketTitle}`
-      : shouldPersistPerformance
-        ? `Production trade executed for ${input.marketTitle}`
-        : `Production order acknowledgement pending authoritative fill reconciliation for ${input.marketTitle}`,
-    exposureState: effectiveDryRun || shouldPersistPerformance ? undefined : 'pending_reconciliation',
+    marketTitle: input.marketTitle,
+    resultSuccess: result.success,
+    shouldPersistPerformance,
+    positionPersisted,
+    persistenceError,
+  });
+  await log('result', publication.reason, publication.executed ? 'passed' : 'failed', {
+    requestPayload: execReq,
+    responsePayload: result,
+    errorReason: publication.executed ? null : (persistenceError ?? result.error ?? publication.reason),
+    durationMs: executionDurationMs,
+    alertMetadata: result.alerts,
+  });
+
+  const publicationResult = {
+    ...result,
+    success: publication.alertSuccess,
+    error: publication.alertSuccess ? result.error : (persistenceError ?? result.error ?? publication.reason),
+  };
+  const alertStatus = await sendBotExecutionAlert(
+    executionInput,
+    publicationResult,
+    effectiveDryRun,
+    executionInput.roiPct,
+    tradeId,
+  );
+  const auditedResult = { ...result, alertDelivery: alertStatus };
+  executionRecord.result = auditedResult;
+  if (!alertStatus.delivered) {
+    await log('alert', result.unhedged ? 'Unhedged exposure alert delivery' : 'Execution alert delivery', 'failed', {
+      responsePayload: alertStatus,
+      errorReason: alertStatus.error ?? 'Alert was not delivered',
+      alertMetadata: { unhedged: result.unhedged, alerts: result.alerts },
+    });
+  }
+  return {
+    executed: publication.executed,
+    dryRun: effectiveDryRun,
+    reason: publication.reason,
+    exposureState: publication.exposureState,
     executionRecord,
     executionResult: auditedResult,
     executionId,
