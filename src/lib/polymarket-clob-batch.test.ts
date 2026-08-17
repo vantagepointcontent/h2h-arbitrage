@@ -20,6 +20,7 @@ function book(assetId: string, bids: string[], asks: string[]): ClobBook & { ass
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -193,6 +194,58 @@ describe('fetchClobBooksDetailed', () => {
     expect(result.diagnostics.get('budget-token-detail')).toMatchObject({
       status: 'timeout', attemptCount: 1, deadlineSource: 'refresh-budget',
       reason: 'refresh budget 100ms exhausted',
+    });
+  });
+
+  it('bounds shared semaphore queueing and removes the timed-out waiter', async () => {
+    vi.useFakeTimers();
+    const holderResolvers: Array<(response: Response) => void> = [];
+    const fetchedTokens: string[] = [];
+    const fetchMock = vi.fn((url: string) => {
+      const tokenId = new URL(url).searchParams.get('token_id')!;
+      fetchedTokens.push(tokenId);
+      if (tokenId.startsWith('holder-token-')) {
+        return new Promise<Response>((resolve) => holderResolvers.push(resolve));
+      }
+      return Promise.resolve(new Response(
+        JSON.stringify(book(tokenId, ['0.40'], ['0.42'])),
+        { status: 200 },
+      ));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const holders = Array.from({ length: 10 }, (_, index) =>
+      fetchClobBook(`holder-token-${index}`, { bypassCache: true }));
+    await vi.waitFor(() => expect(holderResolvers).toHaveLength(10));
+
+    const startedAt = performance.now();
+    const queuedResultPromise = fetchClobBooksDetailed(
+      ['queued-deadline-token'],
+      { bypassCache: true, maxAttempts: 2, requestTimeoutMs: 100, totalDeadlineMs: 100, retryBackoffMs: 0 },
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    const queuedResult = await queuedResultPromise;
+
+    expect(performance.now() - startedAt).toBeLessThanOrEqual(100);
+    expect(fetchedTokens).not.toContain('queued-deadline-token');
+    expect(queuedResult.diagnostics.get('queued-deadline-token')).toMatchObject({
+      status: 'timeout', attemptCount: 0, deadlineSource: 'refresh-budget',
+      reason: 'refresh budget 100ms exhausted',
+    });
+
+    holderResolvers.forEach((resolve, index) => resolve(new Response(
+      JSON.stringify(book(`holder-token-${index}`, ['0.40'], ['0.42'])),
+      { status: 200 },
+    )));
+    await Promise.all(holders);
+
+    const recovery = await fetchClobBooksDetailed(
+      ['post-timeout-recovery-token'],
+      { bypassCache: true, maxAttempts: 1, requestTimeoutMs: 100, totalDeadlineMs: 100 },
+    );
+    expect(fetchedTokens).toContain('post-timeout-recovery-token');
+    expect(recovery.diagnostics.get('post-timeout-recovery-token')).toMatchObject({
+      status: 'success', attemptCount: 1,
     });
   });
 });
