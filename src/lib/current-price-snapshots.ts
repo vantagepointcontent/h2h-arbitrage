@@ -40,6 +40,12 @@ export interface PriceSnapshotInput {
   markFailureReason?: string | null;
   source: 'saved-market-full-scan' | 'saved-market-quick-refresh';
   observedAt: string;
+  /** Request observation/start time, separate from successful quote observation. */
+  attemptedAt?: string;
+  /** Monotonic saved-market scan generation reserved before upstream work. */
+  publicationGeneration?: number;
+  /** Saved-market identity that scopes publicationGeneration comparisons. */
+  publicationScope?: string | null;
 }
 
 const SQLITE_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
@@ -76,6 +82,8 @@ async function ensureSchema(): Promise<void> {
         snapshot_status TEXT NOT NULL,
         source TEXT NOT NULL,
         observed_at TEXT NOT NULL,
+        publication_generation INTEGER NOT NULL DEFAULT 0,
+        publication_scope TEXT,
         PRIMARY KEY (platform, market_id, side)
       )`);
       await db().execute('CREATE INDEX IF NOT EXISTS idx_platform_price_snapshot_token ON platform_price_snapshots(platform, token_id, side)');
@@ -98,6 +106,12 @@ async function ensureSchema(): Promise<void> {
       }
       if (!columns.has('mark_failure_reason')) {
         await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN mark_failure_reason TEXT');
+      }
+      if (!columns.has('publication_generation')) {
+        await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN publication_generation INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!columns.has('publication_scope')) {
+        await db().execute('ALTER TABLE platform_price_snapshots ADD COLUMN publication_scope TEXT');
       }
     })().catch((error) => {
       schemaReady = null;
@@ -163,6 +177,7 @@ export function snapshotInputsFromOutcomes(
   outcomes: UnifiedOutcome[],
   observedAt: { kalshi: string; polymarket: string },
   source: PriceSnapshotInput['source'],
+  publication?: { attemptedAt?: string; generation?: number; scope?: string | null },
 ): PriceSnapshotInput[] {
   const snapshots = new Map<string, PriceSnapshotInput>();
   for (const outcome of outcomes) {
@@ -175,6 +190,9 @@ export function snapshotInputsFromOutcomes(
             side === 'yes' ? outcome.kalshi.yesBid : outcome.kalshi.noBid,
             side === 'yes' ? outcome.kalshi.yesBidDepth : outcome.kalshi.noBidDepth),
           source, observedAt: observedAt.kalshi,
+          attemptedAt: publication?.attemptedAt,
+          publicationGeneration: publication?.generation,
+          publicationScope: publication?.scope,
         };
         input.markFailureReason = input.priceMicrocents == null
           ? `Kalshi ${side.toUpperCase()} last-scanned price unavailable`
@@ -192,6 +210,9 @@ export function snapshotInputsFromOutcomes(
             side === 'yes' ? outcome.polymarket.yesBid : outcome.polymarket.noBid,
             side === 'yes' ? outcome.polymarket.yesBidDepth : outcome.polymarket.noBidDepth),
           source, observedAt: outcome.polymarket.quoteObservedAt ?? observedAt.polymarket,
+          attemptedAt: publication?.attemptedAt,
+          publicationGeneration: publication?.generation,
+          publicationScope: publication?.scope,
         };
         input.markFailureReason = input.priceMicrocents == null
           ? `Polymarket ${side.toUpperCase()} last-scanned price unavailable`
@@ -211,11 +232,18 @@ export async function persistPlatformPriceSnapshots(inputs: PriceSnapshotInput[]
     const statements = valid.slice(offset, offset + READ_CHUNK_SIZE).map((input) => {
       const exactIdentityAvailable = input.platform === 'kalshi' || Boolean(input.tokenId?.trim());
       const indicativePriceAvailable = input.priceMicrocents != null || input.priceCents != null;
+      const publicationGeneration = Number.isSafeInteger(input.publicationGeneration)
+        && (input.publicationGeneration ?? 0) >= 0 ? input.publicationGeneration! : 0;
+      const attemptedAt = input.attemptedAt && Number.isFinite(Date.parse(input.attemptedAt))
+        ? input.attemptedAt : input.observedAt;
+      const publicationScope = input.publicationScope?.trim()
+        ? normalized(input.publicationScope) : null;
       return {
         sql: `INSERT INTO platform_price_snapshots
         (platform, market_id, side, token_id, price_cents, price_microcents, executable_depth_micros,
-         snapshot_status, source, observed_at, attempted_at, failure_reason, mark_failure_reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         snapshot_status, source, observed_at, attempted_at, failure_reason, mark_failure_reason,
+         publication_generation, publication_scope)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(platform, market_id, side) DO UPDATE SET
           token_id = COALESCE(excluded.token_id, platform_price_snapshots.token_id),
           price_cents = CASE WHEN excluded.snapshot_status = 'available'
@@ -229,17 +257,24 @@ export async function persistPlatformPriceSnapshots(inputs: PriceSnapshotInput[]
           observed_at = CASE WHEN excluded.snapshot_status = 'available' THEN excluded.observed_at ELSE platform_price_snapshots.observed_at END,
           attempted_at = excluded.attempted_at,
           failure_reason = excluded.failure_reason,
-          mark_failure_reason = excluded.mark_failure_reason
-        WHERE excluded.attempted_at > COALESCE(platform_price_snapshots.attempted_at, platform_price_snapshots.observed_at)`,
+          mark_failure_reason = excluded.mark_failure_reason,
+          publication_generation = excluded.publication_generation,
+          publication_scope = excluded.publication_scope
+        WHERE excluded.attempted_at > COALESCE(platform_price_snapshots.attempted_at, platform_price_snapshots.observed_at)
+          OR (excluded.attempted_at = COALESCE(platform_price_snapshots.attempted_at, platform_price_snapshots.observed_at)
+            AND excluded.publication_scope IS NOT NULL
+            AND excluded.publication_scope = platform_price_snapshots.publication_scope
+            AND excluded.publication_generation > COALESCE(platform_price_snapshots.publication_generation, 0))`,
         args: [input.platform, normalized(input.marketId), input.side,
           input.tokenId ? normalized(input.tokenId) : null, input.priceCents,
           input.priceMicrocents ?? (input.priceCents == null ? null : input.priceCents * 1_000_000),
           input.executableDepthMicros,
           indicativePriceAvailable && exactIdentityAvailable ? 'available' : 'unavailable',
-          input.source, input.observedAt, input.observedAt, input.failureReason,
+          input.source, input.observedAt, attemptedAt, input.failureReason,
           input.markFailureReason ?? (!exactIdentityAvailable
             ? 'Polymarket exact outcome token unavailable'
-            : !indicativePriceAvailable ? 'Last-scanned price unavailable' : null)],
+            : !indicativePriceAvailable ? 'Last-scanned price unavailable' : null),
+          publicationGeneration, publicationScope],
       };
     });
     metrics.writeBatches += 1;

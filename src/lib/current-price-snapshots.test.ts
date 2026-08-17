@@ -155,6 +155,53 @@ describe('persisted current-price snapshots', () => {
     });
   });
 
+  it('keeps the newer-started publication authoritative when an older refresh completes last', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'generation-fenced-price-snapshots-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'snapshots.db');
+    const snapshots = await import('./current-price-snapshots');
+
+    let releaseOlder!: () => void;
+    let releaseNewer!: () => void;
+    const olderCompleted = new Promise<void>((resolve) => { releaseOlder = resolve; });
+    const newerCompleted = new Promise<void>((resolve) => { releaseNewer = resolve; });
+    const older = (async () => {
+      await olderCompleted;
+      return snapshots.persistPlatformPriceSnapshots([{
+        platform: 'polymarket', marketId: '0xoverlap', side: 'yes', tokenId: 'token-overlap',
+        priceCents: 41, priceMicrocents: 41_000_000, executableDepthMicros: null,
+        failureReason: 'older refresh warning', markFailureReason: 'older mark warning',
+        source: 'saved-market-quick-refresh', observedAt: '2026-08-17T12:02:00.000Z',
+        attemptedAt: '2026-08-17T12:00:00.000Z', publicationGeneration: 11,
+        publicationScope: 'saved-overlap',
+      }]);
+    })();
+    const newer = (async () => {
+      await newerCompleted;
+      return snapshots.persistPlatformPriceSnapshots([{
+        platform: 'polymarket', marketId: '0xoverlap', side: 'yes', tokenId: 'token-overlap',
+        priceCents: 63, priceMicrocents: 63_000_000, executableDepthMicros: 2_000_000,
+        failureReason: 'newer refresh warning', markFailureReason: 'newer mark warning',
+        source: 'saved-market-quick-refresh', observedAt: '2026-08-17T12:01:00.000Z',
+        attemptedAt: '2026-08-17T12:00:01.000Z', publicationGeneration: 12,
+        publicationScope: 'saved-overlap',
+      }]);
+    })();
+
+    releaseNewer();
+    expect((await newer).applied).toBe(1);
+    releaseOlder();
+    expect((await older).applied).toBe(0);
+
+    const result = await snapshots.getPersistedCurrentPriceBatch([{
+      platform: 'polymarket', marketId: '0xoverlap', side: 'yes', tokenId: 'token-overlap',
+    }], Date.parse('2026-08-17T12:03:00.000Z'));
+    expect(result.get('polymarket|0xoverlap|yes|token-overlap')).toMatchObject({
+      status: 'available', priceCents: 63, priceMicrocents: 63_000_000,
+      observedAt: '2026-08-17T12:01:00.000Z', executableDepthMicros: 2_000_000,
+      failureReason: 'newer refresh warning', markFailureReason: 'newer mark warning',
+    });
+  });
+
   it('updates the indicative mark even when newer executable depth is insufficient', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-price-snapshots-fallback-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'snapshots.db');

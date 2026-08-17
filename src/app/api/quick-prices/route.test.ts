@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   quickPricesScan: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
   reserveSavedMarketPublication: vi.fn(),
+  persistPlatformPriceSnapshots: vi.fn(),
+  snapshotInputsFromOutcomes: vi.fn(),
   consume: vi.fn(() => ({ allowed: true })),
 }));
 
@@ -12,6 +14,10 @@ vi.mock('@/lib/quick-prices', () => ({ quickPricesScan: mocks.quickPricesScan })
 vi.mock('@/lib/persistence', () => ({
   reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
   reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
+}));
+vi.mock('@/lib/current-price-snapshots', () => ({
+  persistPlatformPriceSnapshots: mocks.persistPlatformPriceSnapshots,
+  snapshotInputsFromOutcomes: mocks.snapshotInputsFromOutcomes,
 }));
 vi.mock('@/lib/scan-rate-limit', () => ({
   scanRateLimiter: { consume: mocks.consume },
@@ -33,6 +39,11 @@ describe('POST /api/quick-prices diagnostics', () => {
     vi.clearAllMocks();
     mocks.reserveSavedMarketPublication.mockResolvedValue(7);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
+    mocks.persistPlatformPriceSnapshots.mockResolvedValue({ attempted: 0, applied: 0 });
+    mocks.snapshotInputsFromOutcomes.mockImplementation((
+      _outcomes: unknown[], _observedAt: unknown, _source: unknown,
+      publication: { attemptedAt: string; generation: number; scope: string },
+    ) => [{ platform: 'kalshi', marketId: 'KX-TEST', ...publication }]);
   });
 
   it('deduplicates repeated clicks before reserving or fetching the same refresh', async () => {
@@ -64,6 +75,45 @@ describe('POST /api/quick-prices diagnostics', () => {
     expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1);
     expect(mocks.reserveSavedMarketPublication).toHaveBeenCalledTimes(1);
     expect(repeatedResponse.headers.get('x-quick-prices-deduplicated')).toBe('true');
+  });
+
+  it('carries request-start publication order across overlapping capital refreshes', async () => {
+    let releaseOlder!: (value: Record<string, unknown>) => void;
+    let releaseNewer!: (value: Record<string, unknown>) => void;
+    mocks.reserveSavedMarketPublication
+      .mockResolvedValueOnce(11)
+      .mockResolvedValueOnce(12);
+    mocks.quickPricesScan
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseOlder = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseNewer = resolve; }));
+    const result = (observedAt: string) => ({
+      matchedCount: 1, matchStatus: 'matched', matchedPairs: [],
+      refreshStatus: 'complete', retryable: false, platformWarnings: [],
+      platformDiagnostics: {
+        kalshi: { status: 'fresh', count: 1 }, polymarket: { status: 'fresh', count: 1 },
+      },
+      outcomes: [{ artist: 'Matched outcome' }],
+      pmRefresh: { outcomes: [] },
+      _kalshiFetchedAt: observedAt, _pmFetchedAt: observedAt,
+    });
+
+    const older = POST(quickRequest('overlap-market', 1000));
+    await vi.waitFor(() => expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1));
+    const newer = POST(quickRequest('overlap-market', 2000));
+    await vi.waitFor(() => expect(mocks.quickPricesScan).toHaveBeenCalledTimes(2));
+    releaseNewer(result('2026-08-17T12:01:00.000Z'));
+    await newer;
+    releaseOlder(result('2026-08-17T12:02:00.000Z'));
+    await older;
+
+    expect(mocks.snapshotInputsFromOutcomes).toHaveBeenNthCalledWith(
+      1, expect.any(Array), expect.any(Object), 'saved-market-quick-refresh',
+      expect.objectContaining({ attemptedAt: expect.any(String), generation: 12, scope: 'overlap-market' }),
+    );
+    expect(mocks.snapshotInputsFromOutcomes).toHaveBeenNthCalledWith(
+      2, expect.any(Array), expect.any(Object), 'saved-market-quick-refresh',
+      expect.objectContaining({ attemptedAt: expect.any(String), generation: 11, scope: 'overlap-market' }),
+    );
   });
 
   it('returns live prices even when the optional publication reservation hits SQLITE_BUSY', async () => {

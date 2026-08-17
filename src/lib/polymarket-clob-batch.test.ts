@@ -124,14 +124,15 @@ describe('fetchClobBooksDetailed', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await fetchClobBooksDetailed(
-      ['stable-token-detail', 'retry-token-detail'],
+      ['stable-token-detail', 'retry-token-detail', 'stable-token-detail', 'retry-token-detail'],
       { bypassCache: true, concurrency: 2, maxAttempts: 2, requestTimeoutMs: 100, retryBackoffMs: 0 },
     );
 
     expect(calls.get('stable-token-detail')).toBe(1);
     expect(calls.get('retry-token-detail')).toBe(2);
     expect(result.diagnostics.get('retry-token-detail')).toMatchObject({ status: 'success', attemptCount: 2 });
-    expect(result.metrics).toMatchObject({ successCount: 2, retryCount: 1, errorCount: 0 });
+    expect(result.metrics).toMatchObject({ tokenCount: 2, successCount: 2, retryCount: 1, errorCount: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('classifies an exhausted exact-token timeout with its deadline source', async () => {
@@ -151,6 +152,32 @@ describe('fetchClobBooksDetailed', () => {
       reason: 'The operation timed out',
     });
     expect(result.metrics).toMatchObject({ timeoutCount: 1, retryCount: 1, successCount: 0 });
+  });
+
+  it('cancels an in-flight exact-token request at the CLOB timeout boundary', async () => {
+    let deliveredSignal: AbortSignal | null = null;
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      deliveredSignal = init?.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        deliveredSignal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation timed out', 'TimeoutError'));
+        }, { once: true });
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchClobBooksDetailed(
+      ['cancelled-token-detail'],
+      { bypassCache: true, maxAttempts: 1, requestTimeoutMs: 100, totalDeadlineMs: 100 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(deliveredSignal).not.toBeNull();
+    expect(deliveredSignal!.aborted).toBe(true);
+    expect(result.diagnostics.get('cancelled-token-detail')).toMatchObject({
+      status: 'timeout', attemptCount: 1, deadlineSource: 'per-token',
+    });
+    expect(result.metrics).toMatchObject({ tokenCount: 1, timeoutCount: 1, retryCount: 0 });
   });
 
   it('does not start a retry whose backoff would exceed the absolute refresh budget', async () => {

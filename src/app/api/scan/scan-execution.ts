@@ -43,6 +43,7 @@ const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 export async function executeFullScan(request: NextRequest) {
+  const scanAttemptedAt = new Date().toISOString();
   let savedMarketId: string | null = null;
   let publicationGeneration: number | null = null;
   let fullScanPersisted = false;
@@ -576,6 +577,11 @@ export async function executeFullScan(request: NextRequest) {
             withArbitrage,
             { kalshi: scanObservedAt, polymarket: scanObservedAt },
             'saved-market-full-scan',
+            {
+              attemptedAt: scanAttemptedAt,
+              generation: publicationGeneration ?? 0,
+              scope: savedMarketId,
+            },
           )));
         } catch (snapshotErr) {
           console.warn('[current-price-snapshots] persistence failed (scan result remains durable):', snapshotErr instanceof Error ? snapshotErr.message : snapshotErr);
