@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchClobBook,
   fetchClobBooks,
+  fetchClobBooksDetailed,
   getClobPricesFromBooks,
   validateOneShareBookOrder,
   type ClobBook,
@@ -81,6 +82,91 @@ describe('fetchClobBooks', () => {
     const books = await fetchClobBooks(['mixed-duplicate-token']);
 
     expect(books.get('mixed-duplicate-token')).toBeNull();
+  });
+});
+
+describe('fetchClobBooksDetailed', () => {
+  it('keeps exact-token successes when a sibling token is unavailable', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const tokenId = new URL(url).searchParams.get('token_id');
+      return tokenId === 'fresh-token-detail'
+        ? new Response(JSON.stringify(book(tokenId, ['0.40'], ['0.42'])), { status: 200 })
+        : new Response('missing', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchClobBooksDetailed(
+      ['fresh-token-detail', 'missing-token-detail'],
+      { bypassCache: true, concurrency: 2, maxAttempts: 2, requestTimeoutMs: 100 },
+    );
+
+    expect(result.books.get('fresh-token-detail')?.asks[0]?.price).toBe('0.42');
+    expect(result.books.get('missing-token-detail')).toBeNull();
+    expect(result.diagnostics.get('fresh-token-detail')).toMatchObject({ status: 'success', attemptCount: 1 });
+    expect(result.diagnostics.get('missing-token-detail')).toMatchObject({
+      status: 'unavailable', attemptCount: 1, upstreamStatus: 404,
+    });
+    expect(result.metrics).toMatchObject({
+      tokenCount: 2, successCount: 1, unavailableCount: 1, retryCount: 0,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries only a transiently failed exact token and records attempts', async () => {
+    const calls = new Map<string, number>();
+    const fetchMock = vi.fn(async (url: string) => {
+      const tokenId = new URL(url).searchParams.get('token_id')!;
+      const count = (calls.get(tokenId) ?? 0) + 1;
+      calls.set(tokenId, count);
+      if (tokenId === 'retry-token-detail' && count === 1) return new Response('slow down', { status: 429 });
+      return new Response(JSON.stringify(book(tokenId, ['0.40'], ['0.42'])), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchClobBooksDetailed(
+      ['stable-token-detail', 'retry-token-detail'],
+      { bypassCache: true, concurrency: 2, maxAttempts: 2, requestTimeoutMs: 100, retryBackoffMs: 0 },
+    );
+
+    expect(calls.get('stable-token-detail')).toBe(1);
+    expect(calls.get('retry-token-detail')).toBe(2);
+    expect(result.diagnostics.get('retry-token-detail')).toMatchObject({ status: 'success', attemptCount: 2 });
+    expect(result.metrics).toMatchObject({ successCount: 2, retryCount: 1, errorCount: 0 });
+  });
+
+  it('classifies an exhausted exact-token timeout with its deadline source', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new DOMException('The operation timed out', 'TimeoutError');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchClobBooksDetailed(
+      ['timeout-token-detail'],
+      { bypassCache: true, maxAttempts: 2, requestTimeoutMs: 100, retryBackoffMs: 0 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.diagnostics.get('timeout-token-detail')).toMatchObject({
+      status: 'timeout', attemptCount: 2, deadlineSource: 'per-token',
+      reason: 'The operation timed out',
+    });
+    expect(result.metrics).toMatchObject({ timeoutCount: 1, retryCount: 1, successCount: 0 });
+  });
+
+  it('does not start a retry whose backoff would exceed the absolute refresh budget', async () => {
+    const fetchMock = vi.fn(async () => new Response('busy', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchClobBooksDetailed(
+      ['budget-token-detail'],
+      { bypassCache: true, maxAttempts: 2, requestTimeoutMs: 100, totalDeadlineMs: 100, retryBackoffMs: 100 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.diagnostics.get('budget-token-detail')).toMatchObject({
+      status: 'timeout', attemptCount: 1, deadlineSource: 'refresh-budget',
+      reason: 'refresh budget 100ms exhausted',
+    });
   });
 });
 

@@ -9,7 +9,8 @@ describe('UI-041 market workspace behavior', () => {
     expect(header).toContain('Highest net ROI % across all matched outcomes');
     expect(header).toContain('Highest expected dollar profit across all matched outcomes');
     expect(header).toContain('Maximum dollar stake that can be filled');
-    expect(header).toContain('Seconds since the last price refresh');
+    expect(header).toContain('Age of the oldest latest-valid Polymarket outcome price');
+    expect(header).toContain('Partial · ${ageSeconds}');
     expect(header).toContain('title={metricTooltips[label]}');
   });
 

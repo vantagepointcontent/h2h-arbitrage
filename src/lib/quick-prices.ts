@@ -19,7 +19,14 @@ import {
   type KalshiMarket,
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, PMMarket } from '@/lib/polymarket';
-import { ClobMarket, fetchClobBooks, getClobPricesFromBooks } from '@/lib/polymarket-clob';
+import {
+  ClobMarket,
+  fetchClobBooks,
+  fetchClobBooksDetailed,
+  getClobPricesFromBooks,
+  type ClobBookFetchDiagnostic,
+  type ClobBooksDetailedResult,
+} from '@/lib/polymarket-clob';
 import {
   matchOutcomes,
   calculateAllArbitrages,
@@ -64,6 +71,13 @@ export interface QuickPricesResult {
   _ts: number;
   _kalshiFetchedAt: string;
   _pmFetchedAt: string;
+  _priceDataObservedAt: string | null;
+  refreshLifecycle: {
+    requestedAt: string;
+    structureFetchedAt: string | null;
+    completedAt: string;
+  };
+  pmRefresh: QuickPmRefresh;
   /** Bounded upstream failures. A non-empty list means cached/partial data is still usable. */
   platformWarnings: string[];
   refreshStatus: 'complete' | 'partial' | 'failed';
@@ -89,18 +103,41 @@ export interface QuickPricesRefreshMetrics {
     polymarketFiltered: number;
     matched: number;
   };
+  clob: ClobBooksDetailedResult['metrics'];
 }
 
 export interface QuickPricesPlatformDiagnostic {
-  status: 'fresh' | 'empty' | 'failed';
+  status: 'fresh' | 'partial' | 'empty' | 'failed';
   count: number;
   reason?: string;
+}
+
+export interface QuickPmOutcomeRefresh {
+  conditionId: string;
+  outcome: string;
+  tokenIds: string[];
+  status: 'refreshed' | 'timed_out' | 'error' | 'unavailable';
+  observedAt: string | null;
+  source: 'live-clob' | 'saved-market-snapshot' | null;
+  servedFromSnapshot: boolean;
+  snapshotAgeMs: number | null;
+  reason?: string;
+  tokens: ClobBookFetchDiagnostic[];
+}
+
+export interface QuickPmRefresh {
+  outcomes: QuickPmOutcomeRefresh[];
+  refreshedCount: number;
+  timedOutCount: number;
+  errorCount: number;
+  unavailableCount: number;
+  snapshotCount: number;
 }
 
 const KALSHI_TIMEOUT_WARNING = 'Kalshi timed out; showing available Polymarket data and saved market data.';
 const KALSHI_EMPTY_WARNING = 'Kalshi linked event returned zero open markets.';
 const PM_UNAVAILABLE_WARNING = 'Polymarket event is unavailable or no longer open; showing available Kalshi and saved market data.';
-const CLOB_TIMEOUT_WARNING = 'Polymarket order books timed out; showing saved market structure without live Polymarket prices.';
+
 
 function unavailableQuickPmMarkets(markets: PMMarket[]): PMMarket[] {
   return markets.map((market) => ({
@@ -146,35 +183,94 @@ function quickClobMarket(market: PMMarket): ClobMarket | null {
   };
 }
 
-/** Enrich Gamma markets with executable CLOB quotes using one batch book call. */
-export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): Promise<PMMarket[]> {
+type SavedPmQuote = {
+  pmConditionId?: string;
+  pmYesPrice?: number;
+  pmNoPrice?: number;
+  pmBestBid?: number;
+  pmBestAsk?: number;
+  pmYesDepth?: number | null;
+  pmNoDepth?: number | null;
+};
+
+/** Enrich exact matched token books independently and retain scoped failures. */
+async function enrichQuickPmMarketsWithClobPricesDetailed(
+  markets: PMMarket[],
+  savedQuotes: SavedPmQuote[] = [],
+  savedObservedAt: string | null = null,
+): Promise<{ markets: PMMarket[]; refresh: QuickPmRefresh; metrics: ClobBooksDetailedResult['metrics'] }> {
   const clobMarkets = markets.map(quickClobMarket);
-  // Prices and displayed depth must come from the same current refresh. Standard
-  // markets may use valid aggregate quotes, but still need token books for
-  // executable best-level depth; fetch every linked market's two token books.
   const tokenIds = clobMarkets.flatMap((clob) =>
     clob ? clob.tokens.map((token) => token.token_id) : []);
-  const books = await fetchClobBooks(tokenIds, { throwOnFailure: true, bypassCache: true });
+  const detailed = await fetchClobBooksDetailed(tokenIds, {
+    bypassCache: true, concurrency: 4, maxAttempts: 2,
+    requestTimeoutMs: 3_500, retryBackoffMs: 250, totalDeadlineMs: 12_000,
+  });
+  const savedByCondition = new Map(savedQuotes
+    .filter((quote) => typeof quote.pmConditionId === 'string')
+    .map((quote) => [quote.pmConditionId!.toLowerCase(), quote]));
+  const refreshOutcomes: QuickPmOutcomeRefresh[] = [];
 
-  if (tokenIds.length > 0 && tokenIds.every((tokenId) => books.get(tokenId) == null)) {
-    throw new Error('Polymarket CLOB returned no order books for the linked event');
-  }
-
-  return markets.map((market, index) => {
+  const enriched = markets.map((market, index) => {
     const clob = clobMarkets[index];
     if (!clob) {
+      refreshOutcomes.push({
+        conditionId: market.conditionId, outcome: market.groupItemTitle || market.question,
+        tokenIds: [], status: 'unavailable', observedAt: null, source: null,
+        servedFromSnapshot: false, snapshotAgeMs: null, reason: 'missing or malformed exact token identifiers', tokens: [],
+      });
       return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
     }
     const yesToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
     const noToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+    const tokenDiagnostics = clob.tokens
+      .map((token) => detailed.diagnostics.get(token.token_id))
+      .filter((diagnostic): diagnostic is ClobBookFetchDiagnostic => diagnostic != null);
+    // A derived complementary quote can keep display continuity for standard
+    // binaries, but it cannot make a failed exact token request fresh. This is
+    // especially critical for neg-risk markets where YES and NO are independent.
+    const allRequiredBooksFresh = tokenDiagnostics.length === clob.tokens.length
+      && tokenDiagnostics.every((diagnostic) => diagnostic.status === 'success');
     const live = getClobPricesFromBooks(
       clob,
-      yesToken ? books.get(yesToken.token_id) ?? null : null,
-      noToken ? books.get(noToken.token_id) ?? null : null,
+      yesToken ? detailed.books.get(yesToken.token_id) ?? null : null,
+      noToken ? detailed.books.get(noToken.token_id) ?? null : null,
     );
-    if (!live) {
-      return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
+    if (!live || !allRequiredBooksFresh) {
+      const status: QuickPmOutcomeRefresh['status'] = tokenDiagnostics.some((item) => item.status === 'timeout')
+        ? 'timed_out' : tokenDiagnostics.some((item) => item.status === 'error') ? 'error' : 'unavailable';
+      const saved = savedByCondition.get(market.conditionId.toLowerCase());
+      const hasSaved = saved != null && typeof saved.pmYesPrice === 'number' && saved.pmYesPrice > 0
+        && typeof saved.pmNoPrice === 'number' && saved.pmNoPrice > 0;
+      const snapshotAgeMs = hasSaved && savedObservedAt && Number.isFinite(Date.parse(savedObservedAt))
+        ? Math.max(0, Date.now() - Date.parse(savedObservedAt)) : null;
+      const reason = tokenDiagnostics.length > 0
+        ? tokenDiagnostics.filter((item) => item.status !== 'success')
+          .map((item) => `${item.tokenId}: ${item.reason ?? item.status}`).join('; ')
+        : 'required YES/NO token book unavailable';
+      refreshOutcomes.push({
+        conditionId: market.conditionId, outcome: market.groupItemTitle || market.question,
+        tokenIds: clob.tokens.map((token) => token.token_id), status,
+        observedAt: hasSaved ? savedObservedAt : null,
+        source: hasSaved ? 'saved-market-snapshot' : null,
+        servedFromSnapshot: hasSaved, snapshotAgeMs, reason, tokens: tokenDiagnostics,
+      });
+      return hasSaved ? {
+        ...market, clobEmpty: true,
+        outcomePrices: JSON.stringify([saved.pmYesPrice, saved.pmNoPrice]),
+        bestAsk: saved.pmBestAsk ?? saved.pmYesPrice,
+        bestBid: saved.pmBestBid ?? 0,
+        askDepth: 0, noAskDepth: 0, quoteObservedAt: savedObservedAt ?? undefined,
+      } : { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
     }
+    const observedAt = tokenDiagnostics
+      .map((item) => item.observedAt).filter((value): value is string => value != null)
+      .sort()[0] ?? new Date().toISOString();
+    refreshOutcomes.push({
+      conditionId: market.conditionId, outcome: market.groupItemTitle || market.question,
+      tokenIds: clob.tokens.map((token) => token.token_id), status: 'refreshed', observedAt,
+      source: 'live-clob', servedFromSnapshot: false, snapshotAgeMs: 0, tokens: tokenDiagnostics,
+    });
     return {
       ...market,
       outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
@@ -191,6 +287,52 @@ export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): P
       noMinOrderSize: live.noMinOrderSize ?? null,
       yesTickSize: live.yesTickSize ?? null,
       noTickSize: live.noTickSize ?? null,
+      quoteObservedAt: observedAt,
+      neg_risk: clob.neg_risk,
+    };
+  });
+  return {
+    markets: enriched,
+    refresh: {
+      outcomes: refreshOutcomes,
+      refreshedCount: refreshOutcomes.filter((item) => item.status === 'refreshed').length,
+      timedOutCount: refreshOutcomes.filter((item) => item.status === 'timed_out').length,
+      errorCount: refreshOutcomes.filter((item) => item.status === 'error').length,
+      unavailableCount: refreshOutcomes.filter((item) => item.status === 'unavailable').length,
+      snapshotCount: refreshOutcomes.filter((item) => item.servedFromSnapshot).length,
+    },
+    metrics: detailed.metrics,
+  };
+}
+
+/** Backwards-compatible market-only projection used by focused price tests. */
+export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): Promise<PMMarket[]> {
+  const clobMarkets = markets.map(quickClobMarket);
+  const tokenIds = clobMarkets.flatMap((clob) => clob ? clob.tokens.map((token) => token.token_id) : []);
+  const books = await fetchClobBooks(tokenIds, { throwOnFailure: true, bypassCache: true });
+  if (tokenIds.length > 0 && tokenIds.every((tokenId) => books.get(tokenId) == null)) {
+    throw new Error('Polymarket CLOB returned no order books for the linked event');
+  }
+  return markets.map((market, index) => {
+    const clob = clobMarkets[index];
+    if (!clob) return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
+    const yesToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'yes');
+    const noToken = clob.tokens.find((token) => token.outcome.toLowerCase() === 'no');
+    const live = getClobPricesFromBooks(
+      clob,
+      yesToken ? books.get(yesToken.token_id) ?? null : null,
+      noToken ? books.get(noToken.token_id) ?? null : null,
+    );
+    if (!live) return { ...market, clobEmpty: true, outcomePrices: '[0,0]', bestAsk: 0, bestBid: 0 };
+    return {
+      ...market,
+      outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
+      bestBid: live.bestBid, bestAsk: live.bestAsk, lastTradePrice: live.lastTradePrice,
+      askDepth: live.yesAskDepth ?? 0, noAskDepth: live.noAskDepth ?? 0,
+      yesBid: live.yesBid, noBid: live.noBid,
+      yesBidDepth: live.yesBidDepth, noBidDepth: live.noBidDepth,
+      yesMinOrderSize: live.yesMinOrderSize ?? null, noMinOrderSize: live.noMinOrderSize ?? null,
+      yesTickSize: live.yesTickSize ?? null, noTickSize: live.noTickSize ?? null,
       neg_risk: clob.neg_risk,
     };
   });
@@ -198,6 +340,7 @@ export async function enrichQuickPmMarketsWithClobPrices(markets: PMMarket[]): P
 
 export async function quickPricesScan(marketId: string, capital = 1000): Promise<QuickPricesResult> {
   const totalStartedAt = performance.now();
+  const requestedAt = new Date().toISOString();
   const savedMarketStartedAt = performance.now();
   const market = await getSavedMarketById(marketId);
   const savedMarketMs = Math.max(0, Math.round(performance.now() - savedMarketStartedAt));
@@ -221,12 +364,17 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const platformWarnings: string[] = [];
   let kalshiMs = 0;
   let polymarketMs = 0;
+  let kalshiFetchedAt: string | null = null;
+  let pmStructureFetchedAt: string | null = null;
   const linkedEventsStartedAt = performance.now();
   const [kalshiSettled, pmSettled, manualMatches, decoupledPairs] = await Promise.all([
     (() => {
       const startedAt = performance.now();
       return withTimeout(fetchKalshiEventMarkets(kalshiTicker), QUICK_KALSHI_TIMEOUT_MS, 'Kalshi event markets')
-      .then((value) => ({ ok: true as const, value }))
+      .then((value) => {
+        kalshiFetchedAt = new Date().toISOString();
+        return { ok: true as const, value };
+      })
       .catch((error: unknown) => ({ ok: false as const, error }))
       .finally(() => { kalshiMs = Math.max(0, Math.round(performance.now() - startedAt)); });
     })(),
@@ -238,7 +386,10 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
           : fetchPolymarketEvent(pmSlug),
         QUICK_PM_TIMEOUT_MS,
         'Polymarket event',
-      ).then((value) => ({ ok: true as const, value }))
+      ).then((value) => {
+        if (value) pmStructureFetchedAt = new Date().toISOString();
+        return { ok: true as const, value };
+      })
         .catch((error: unknown) => ({ ok: false as const, error }))
         .finally(() => { polymarketMs = Math.max(0, Math.round(performance.now() - startedAt)); });
     })(),
@@ -273,20 +424,47 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const pmMarketsRaw = chooseBestPmStructure(pmEvent?.markets || [], kalshiMarkets, eventTitle);
   const pmFilteredCount = pmMarketsRaw.length;
 
-  let clobFailureReason: string | undefined;
   const clobStartedAt = performance.now();
-  const pmMarkets = await withTimeout(
-    enrichQuickPmMarketsWithClobPrices(pmMarketsRaw),
-    QUICK_PM_TIMEOUT_MS,
-    'CLOB quick prices',
+  const emptyClobMetrics: ClobBooksDetailedResult['metrics'] = {
+    tokenCount: 0, successCount: 0, timeoutCount: 0, errorCount: 0,
+    unavailableCount: 0, retryCount: 0, queueWaitMs: 0, upstreamLatencyMs: 0, durationMs: 0,
+  };
+  const pmEnrichment = await enrichQuickPmMarketsWithClobPricesDetailed(
+    pmMarketsRaw,
+    market.lastScanResult?.allArbs ?? [],
+    market.lastScanResult?.scannedAt ?? null,
   ).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    clobFailureReason = message.includes('timed out')
-      ? CLOB_TIMEOUT_WARNING
-      : `Polymarket order books are unavailable: ${message}`;
-    platformWarnings.push(clobFailureReason);
-    return unavailableQuickPmMarkets(pmMarketsRaw);
+    return {
+      markets: unavailableQuickPmMarkets(pmMarketsRaw),
+      refresh: {
+        outcomes: pmMarketsRaw.map((item): QuickPmOutcomeRefresh => ({
+          conditionId: item.conditionId, outcome: item.groupItemTitle || item.question,
+          tokenIds: parseStringArray(item.clobTokenIds), status: 'error', observedAt: null,
+          source: null, servedFromSnapshot: false, snapshotAgeMs: null, reason: message, tokens: [],
+        })),
+        refreshedCount: 0, timedOutCount: 0, errorCount: pmMarketsRaw.length,
+        unavailableCount: 0, snapshotCount: 0,
+      },
+      metrics: { ...emptyClobMetrics, tokenCount: pmMarketsRaw.length * 2, errorCount: pmMarketsRaw.length * 2 },
+    };
   });
+  const pmMarkets = pmEnrichment.markets;
+  const pmRefresh = pmEnrichment.refresh;
+  const affected = pmRefresh.outcomes.filter((item) => item.status !== 'refreshed');
+  let clobFailureReason: string | undefined;
+  if (affected.length > 0) {
+    const identities = affected.map((item) => item.outcome).join(', ');
+    const details = [
+      pmRefresh.timedOutCount > 0 ? `${pmRefresh.timedOutCount} timed out` : null,
+      pmRefresh.errorCount > 0 ? `${pmRefresh.errorCount} errored` : null,
+      pmRefresh.unavailableCount > 0 ? `${pmRefresh.unavailableCount} unavailable` : null,
+    ].filter(Boolean).join(', ');
+    clobFailureReason = `${pmRefresh.refreshedCount} of ${pmRefresh.outcomes.length} Polymarket outcomes refreshed; ${details}: ${identities}.`
+      + (pmRefresh.snapshotCount > 0 ? ` ${pmRefresh.snapshotCount} served from last-known snapshots.` : '')
+      + ' Transient failures were retried per exact token. Refresh prices to try affected outcomes again.';
+    platformWarnings.push(clobFailureReason);
+  }
   const clobMs = Math.max(0, Math.round(performance.now() - clobStartedAt));
 
   const kalshiRawCount = kalshiResult.length;
@@ -298,11 +476,28 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const suspRoi = await getSetting<number>('scanner.suspiciousRoiPct').catch(() => null);
   if (suspRoi != null) setSuspiciousRoiPct(suspRoi);
 
-  const withArbitrage = attachOutcomeContingentApy(
+  const calculated = attachOutcomeContingentApy(
     calculateAllArbitrages(splitOutcomes, eventTitle, capital),
     new Date().toISOString(),
     expiryDate,
   );
+  const refreshByCondition = new Map(pmRefresh.outcomes.map((item) => [item.conditionId.toLowerCase(), item]));
+  const withArbitrage = calculated.map((outcome) => {
+    const refresh = outcome.polymarket
+      ? refreshByCondition.get(outcome.polymarket.conditionId.toLowerCase())
+      : undefined;
+    if (!refresh || refresh.status === 'refreshed') return { ...outcome, polymarketStale: false, polymarketRefresh: refresh };
+    return {
+      ...outcome,
+      polymarketStale: true,
+      polymarketRefresh: refresh,
+      arbitrage: {
+        ...outcome.arbitrage, expectedProfit: 0, roiPct: 0, apyPct: 0,
+        kalshiStake: 0, pmStake: 0, maxCapital: 0, depthVerified: false,
+        strategy: 'Unavailable — stale Polymarket outcome',
+      },
+    };
+  });
 
   const priceResolved = computePriceResolved(
     withArbitrage.map((o) => ({
@@ -357,11 +552,12 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     polymarket: pmReason
       ? { status: pmSettled.ok ? 'empty' : 'failed', count: 0, reason: pmReason }
       : clobFailureReason
-        ? { status: 'failed', count: pmMarkets.length, reason: clobFailureReason }
+        ? { status: pmRefresh.refreshedCount > 0 ? 'partial' : 'failed', count: pmRefresh.refreshedCount, reason: clobFailureReason }
       : { status: 'fresh', count: pmMarkets.length },
   };
   const failedPlatforms = Object.values(platformDiagnostics).filter(({ status }) => status === 'failed').length;
-  const refreshStatus = failedPlatforms === 2 ? 'failed' : failedPlatforms === 1 ? 'partial' : 'complete';
+  const hasPartialPlatform = Object.values(platformDiagnostics).some(({ status }) => status === 'partial');
+  const refreshStatus = failedPlatforms === 2 ? 'failed' : failedPlatforms > 0 || hasPartialPlatform ? 'partial' : 'complete';
   const refreshMetrics: QuickPricesRefreshMetrics = {
     latencyMs: {
       savedMarket: savedMarketMs,
@@ -379,7 +575,22 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
       polymarketFiltered: pmFilteredCount,
       matched: matchedCount,
     },
+    clob: pmEnrichment.metrics,
   };
+
+  const validPmObservationTimes = pmRefresh.outcomes
+    .map((item) => item.observedAt).filter((value): value is string => value != null && Number.isFinite(Date.parse(value)));
+  const polymarketFullyFresh = pmRefresh.outcomes.length > 0
+    && pmRefresh.outcomes.every((item) => item.status === 'refreshed');
+  // Match summaries retain prior allArbs when a refresh is unavailable. Include
+  // the prior observation whenever any PM outcome is unresolved so unchanged
+  // quotes cannot be rebased onto a sibling response or completion timestamp.
+  if (!polymarketFullyFresh && market.lastScanResult?.scannedAt
+      && Number.isFinite(Date.parse(market.lastScanResult.scannedAt))) {
+    validPmObservationTimes.push(market.lastScanResult.scannedAt);
+  }
+  const priceDataObservedAt = validPmObservationTimes.length > 0 ? validPmObservationTimes.sort()[0] : null;
+  const completedAt = new Date().toISOString();
 
   return {
     eventTitle,
@@ -403,11 +614,18 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
     expired,
     priceResolved,
     _ts: Date.now(),
-    _kalshiFetchedAt: new Date().toISOString(),
-    _pmFetchedAt: new Date().toISOString(),
+    _kalshiFetchedAt: kalshiFetchedAt ?? completedAt,
+    _pmFetchedAt: priceDataObservedAt ?? completedAt,
+    _priceDataObservedAt: priceDataObservedAt,
+    refreshLifecycle: {
+      requestedAt,
+      structureFetchedAt: pmStructureFetchedAt,
+      completedAt,
+    },
+    pmRefresh,
     platformWarnings,
     refreshStatus,
-    retryable: failedPlatforms > 0,
+    retryable: failedPlatforms > 0 || hasPartialPlatform,
     platformDiagnostics,
     refreshMetrics,
   };

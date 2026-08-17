@@ -106,10 +106,15 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       const freshPlatforms = new Set(Object.entries(result.platformDiagnostics ?? {})
         .filter(([, diagnostic]) => diagnostic.status === 'fresh')
         .map(([platform]) => platform));
+      const freshPmConditions = new Set((result.pmRefresh?.outcomes ?? [])
+        .filter((outcome) => outcome.status === 'refreshed')
+        .map((outcome) => outcome.conditionId.toLowerCase()));
       await persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(result.outcomes ?? [], {
         kalshi: result._kalshiFetchedAt,
         polymarket: result._pmFetchedAt,
-      }, 'saved-market-quick-refresh').filter((snapshot) => freshPlatforms.has(snapshot.platform)));
+      }, 'saved-market-quick-refresh').filter((snapshot) =>
+        freshPlatforms.has(snapshot.platform)
+        || (snapshot.platform === 'polymarket' && freshPmConditions.has(snapshot.marketId.toLowerCase()))));
       if (taskPublicationGeneration != null) {
         await reconcileSavedMarketMatchSummary(marketId!, {
           matchedCount: result.matchedCount,
@@ -140,6 +145,8 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       deduplicated: coordinated.deduplicated,
       durationMs: coordinated.durationMs,
       metrics: result.refreshMetrics,
+      lifecycle: result.refreshLifecycle,
+      polymarketOutcomes: result.pmRefresh,
     }));
     return NextResponse.json({ ...result, error, persistenceWarning }, {
       status,

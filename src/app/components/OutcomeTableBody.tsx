@@ -23,6 +23,12 @@ interface Outcome {
   artist: string;
   kalshiStale?: boolean;
   polymarketStale?: boolean;
+  polymarketRefresh?: {
+    status: 'refreshed' | 'timed_out' | 'error' | 'unavailable';
+    source: 'live-clob' | 'saved-market-snapshot' | null;
+    snapshotAgeMs: number | null;
+    reason?: string;
+  };
   kalshi?: { ticker?: string; yesAsk: number; noAsk: number; yesAskDepth?: string; noAskDepth?: string; feeAuthority?: KalshiFeeAuthority } | null;
   polymarket?: { conditionId?: string; yesPrice: number; noPrice: number; askDepth?: number; noAskDepth?: number; yesMinOrderSize?: number | null; noMinOrderSize?: number | null; yesTickSize?: number | null; noTickSize?: number | null } | null;
   arbitrage: {
@@ -85,6 +91,14 @@ function formatTimeToExpiry(days?: number | null): string {
   const mins = hours * 60;
   if (mins >= 1) return `${Math.round(mins)} min`;
   return "Expired";
+}
+
+function compactAge(ageMs: number | null | undefined): string {
+  if (ageMs == null || !Number.isFinite(ageMs)) return 'age unknown';
+  const seconds = Math.max(0, Math.round(ageMs / 1_000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`;
 }
 
 function OutcomeTableBodyInner({
@@ -284,7 +298,14 @@ function OutcomeTableBodyInner({
                 <div className="flex items-center gap-1.5" title={buildMarketTooltip({ eventTitle: marketTitle ?? o.artist, expiryDate: marketExpiryDate })}>
                   <span className={`transition-transform text-[var(--text-secondary)] ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                   {o.artist}
-                  {stale && <span className="rounded border border-[var(--status-warning)]/40 px-1 py-0.5 text-xs text-[var(--status-warning)]">Stale</span>}
+                  {stale && <span
+                    className="rounded border border-[var(--status-warning)]/40 px-1 py-0.5 text-xs text-[var(--status-warning)]"
+                    title={o.polymarketRefresh?.reason ?? 'A linked venue price did not refresh'}
+                  >
+                    {o.polymarketRefresh?.source === 'saved-market-snapshot'
+                      ? `Last-known ${compactAge(o.polymarketRefresh.snapshotAgeMs)}`
+                      : o.polymarketRefresh ? `PM ${o.polymarketRefresh.status.replace('_', ' ')}` : 'Stale'}
+                  </span>}
                 </div>
               </td>
               <td className="px-4 py-3 text-right text-[var(--text-primary)]">

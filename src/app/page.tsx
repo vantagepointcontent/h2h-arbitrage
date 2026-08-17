@@ -639,6 +639,7 @@ export default function Home() {
       const data = res.body as Partial<ScanResult> & {
         error?: string;
         _pmFetchedAt?: string;
+        _priceDataObservedAt?: string | null;
         matchStatus?: LastScanResult['matchStatus'];
         matchError?: string;
         matchedPairs?: LastScanResult['matchedPairs'];
@@ -649,9 +650,10 @@ export default function Home() {
           if (!prev) return data as ScanResult;
           return mergeQuickPricesResult(prev, data as ScanResult);
         });
-        const scannedAt = new Date().toISOString();
-        setLastUpdated(new Date(scannedAt));
-        setLastScanTimestamp(scannedAt);
+        const completedAt = data.refreshLifecycle?.completedAt ?? new Date().toISOString();
+        const priceObservedAt = data._priceDataObservedAt ?? data._pmFetchedAt ?? null;
+        setLastUpdated(priceObservedAt ? new Date(priceObservedAt) : null);
+        setLastScanTimestamp(priceObservedAt);
         if (Array.isArray(data.outcomes)) {
           const prices = new Map<string, { kYes: number; pYes: number }>();
           (data.outcomes as UnifiedOutcome[]).forEach((o: UnifiedOutcome) => {
@@ -661,7 +663,7 @@ export default function Home() {
           });
           previousPricesRef.current = prices;
         }
-        const refreshedAt = typeof data._pmFetchedAt === 'string' ? data._pmFetchedAt : scannedAt;
+        const refreshedAt = typeof data._pmFetchedAt === 'string' ? data._pmFetchedAt : completedAt;
         setSavedMarkets((previous) => previous.map((market) => market.id === marketId
           ? mergeSavedMarketMatchRefresh(market, {
               scannedAt: refreshedAt,
@@ -2025,6 +2027,7 @@ export default function Home() {
                         market={{ ...market, eventTitle: result.eventTitle, expiryDate: market.expiryDate ?? undefined }}
                         outcomes={(result.outcomes ?? []) as Array<Record<string, any>>}
                         scannedAt={lastScanTimestamp ?? lastUpdated?.toISOString()}
+                        refreshStatus={result.refreshStatus}
                         loading={loading}
                         refreshing={bgRefreshing}
                         favorite={favoriteIds.has(activeMarketId)}

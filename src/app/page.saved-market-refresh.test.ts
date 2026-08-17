@@ -146,6 +146,37 @@ describe('saved-market quick-price request ownership', () => {
     expect(merged.outcomes[0].arbitrage.roiPct).toBe(0);
   });
 
+  it('preserves exact-outcome staleness during a partial Polymarket refresh merge', () => {
+    const previous = {
+      eventTitle: 'NC-14', kalshiCount: 1, pmCount: 1, matchedCount: 1,
+      outcomes: [{
+        artist: 'Democratic', kalshi: null,
+        polymarket: { marketId: 'p', conditionId: 'p', yesPrice: 0.18, noPrice: 0.83, bestBid: 0.17, bestAsk: 0.18, lastTradePrice: 0.18 },
+        arbitrage: { strategy: 'old', kalshiStake: 0, pmStake: 100, expectedProfit: 9, roiPct: 4.5, buyPlatform: 'polymarket' as const, buyPrice: 0.18, sellPlatform: null, sellPrice: 0 },
+      }], unmatchedKalshi: [], unmatchedPolymarket: [],
+    };
+    const incoming = {
+      ...previous,
+      outcomes: [{
+        ...previous.outcomes[0], polymarketStale: true,
+        polymarketRefresh: { conditionId: 'p', outcome: 'Democratic', tokenIds: ['yes', 'no'], status: 'timed_out' as const, observedAt: '2026-08-17T13:55:00Z', source: 'saved-market-snapshot' as const, servedFromSnapshot: true, snapshotAgeMs: 300_000, tokens: [] },
+        arbitrage: { ...previous.outcomes[0].arbitrage, expectedProfit: 0, roiPct: 0 },
+      }],
+      platformDiagnostics: {
+        kalshi: { status: 'fresh' as const, count: 1 },
+        polymarket: { status: 'partial' as const, count: 1, reason: 'one exact token timed out' },
+      },
+    };
+
+    const merged = mergeQuickPricesResult(previous, incoming);
+
+    expect(merged.outcomes[0]).toMatchObject({
+      polymarketStale: true,
+      polymarketRefresh: { status: 'timed_out', source: 'saved-market-snapshot', snapshotAgeMs: 300_000 },
+      arbitrage: { expectedProfit: 0, roiPct: 0, strategy: 'Unavailable — stale outcome data' },
+    });
+  });
+
   it('prevents response A from updating market B after rapid selection', () => {
     const owner = createQuickPricesRequestOwner();
     const requestA = owner.begin('market-a');

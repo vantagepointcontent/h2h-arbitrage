@@ -8,6 +8,7 @@ interface Props {
   market: { id: string; eventTitle?: string; title?: string; category?: string; expiryDate?: string; kalshiUrl: string; polymarketUrl: string };
   outcomes: Array<Record<string, any>>;
   scannedAt?: string | null;
+  refreshStatus?: "complete" | "partial" | "failed";
   loading: boolean;
   refreshing: boolean;
   favorite: boolean;
@@ -28,20 +29,23 @@ const metricTooltips: Record<string, string> = {
   'Best net ROI': 'Highest net ROI % across all matched outcomes, after deducting trading fees from both platforms',
   'Best net profit': 'Highest expected dollar profit across all matched outcomes, net of fees',
   'Max executable': 'Maximum dollar stake that can be filled given current orderbook depth on both platforms',
-  'Data age': 'Seconds since the last price refresh for this market',
+  'PM price age': 'Age of the oldest latest-valid Polymarket outcome price. Partial means one or more exact token books did not refresh.',
 };
 const usd = (n: number | null) => n == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 
 export function MarketWorkspaceHeader(props: Props) {
   const [menu, setMenu] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  // Seed deterministically for SSR; the effect installs the live clock after hydration.
+  const [now, setNow] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const metrics = selectMarketDecisionMetrics(props.outcomes);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1_000); return () => clearInterval(id); }, []);
   useEffect(() => { const close = (event: MouseEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenu(false); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, []);
   const scanMs = props.scannedAt ? Date.parse(props.scannedAt) : NaN;
-  const age = Number.isFinite(scanMs) ? `${Math.max(0, Math.round((now - scanMs) / 1000))}s` : "—";
+  const ageSeconds = Number.isFinite(scanMs) ? `${Math.max(0, Math.round((now - scanMs) / 1000))}s` : "—";
+  const age = props.refreshStatus === "partial" ? `Partial · ${ageSeconds}`
+    : props.refreshStatus === "failed" ? `Failed · ${ageSeconds}` : ageSeconds;
   const title = props.market.eventTitle || props.market.title || "Selected market";
   return <section aria-label="Active market workspace" className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
     <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:p-4">
@@ -53,7 +57,7 @@ export function MarketWorkspaceHeader(props: Props) {
         <button onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-label="Toggle market summary" className="ml-auto rounded p-1 text-[var(--text-muted)] lg:hidden"><ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} /></button>
       </div>
       <div className={`${expanded ? "grid" : "hidden"} grid-cols-2 gap-1.5 lg:grid lg:grid-cols-4`}>
-        {[['Best net ROI', metrics.bestNetRoi == null ? '—' : `${metrics.bestNetRoi.toFixed(2)}%`],['Best net profit',usd(metrics.bestNetProfit)],['Max executable',usd(metrics.maxExecutableStake)],['Data age',age]].map(([label,value]) => <div key={label} title={metricTooltips[label]} className="min-w-[112px] rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{label}</div><div className="mt-0.5 text-xs font-bold tabular-nums text-[var(--text-primary)]">{value}</div></div>)}
+        {[['Best net ROI', metrics.bestNetRoi == null ? '—' : `${metrics.bestNetRoi.toFixed(2)}%`],['Best net profit',usd(metrics.bestNetProfit)],['Max executable',usd(metrics.maxExecutableStake)],['PM price age',age]].map(([label,value]) => <div key={label} title={metricTooltips[label]} className="min-w-[112px] rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{label}</div><div className="mt-0.5 text-xs font-bold tabular-nums text-[var(--text-primary)]">{value}</div></div>)}
       </div>
       <div className="flex items-center gap-2">
         <button onClick={props.onRefresh} disabled={props.loading} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--status-positive)] px-3 text-xs font-bold text-black disabled:opacity-50 lg:flex-none">{props.loading || props.refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>} Refresh prices</button>

@@ -189,6 +189,7 @@ describe('WS-107 liveResult persistence', () => {
 
     const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
     expect(got.lastScanResult).toMatchObject({
+      scannedAt: '2026-08-12T19:12:45.296Z',
       matchedCount: 2, matchStatus: 'unavailable', matchError: 'Polymarket unavailable',
     });
   });

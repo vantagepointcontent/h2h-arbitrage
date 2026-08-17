@@ -6,6 +6,7 @@ import { rateLimiters } from '@/lib/rate-limiter';
 import { finiteDecimal } from '@/lib/market-price';
 import { normalizePolymarketResolution } from './settlement-resolution';
 import { isPriceAlignedToTick } from './venue-constraints';
+import { correlationId } from './correlation';
 
 export interface ClobMarket {
   condition_id: string;
@@ -29,6 +30,37 @@ export interface ClobBook {
   tick_size: string;
   neg_risk?: boolean;
   last_trade_price?: string;
+}
+
+export type ClobBookFetchStatus = 'success' | 'timeout' | 'error' | 'unavailable';
+
+export interface ClobBookFetchDiagnostic {
+  tokenId: string;
+  status: ClobBookFetchStatus;
+  attemptCount: number;
+  queueWaitMs: number;
+  upstreamLatencyMs: number;
+  totalLatencyMs: number;
+  deadlineSource: 'per-token' | 'refresh-budget' | 'none';
+  upstreamStatus?: number;
+  reason?: string;
+  observedAt?: string;
+}
+
+export interface ClobBooksDetailedResult {
+  books: Map<string, ClobBook | null>;
+  diagnostics: Map<string, ClobBookFetchDiagnostic>;
+  metrics: {
+    tokenCount: number;
+    successCount: number;
+    timeoutCount: number;
+    errorCount: number;
+    unavailableCount: number;
+    retryCount: number;
+    queueWaitMs: number;
+    upstreamLatencyMs: number;
+    durationMs: number;
+  };
 }
 
 const CLOB_RETRIES = 2;
@@ -230,6 +262,165 @@ export async function fetchClobBook(
   } finally {
     clobSemaphore.release();
   }
+}
+
+function exactClobBook(value: unknown, tokenId: string): ClobBook | null {
+  if (!value || typeof value !== 'object') return null;
+  const book = value as ClobBook;
+  const levelsAreValid = (levels: unknown): levels is ClobBook['bids'] =>
+    Array.isArray(levels) && levels.every((level) => level != null && typeof level === 'object'
+      && typeof (level as { price?: unknown }).price === 'string'
+      && typeof (level as { size?: unknown }).size === 'string');
+  return book.asset_id === tokenId && levelsAreValid(book.bids) && levelsAreValid(book.asks) ? book : null;
+}
+
+/** Fetch exact token books independently so one slow book cannot suppress siblings. */
+export async function fetchClobBooksDetailed(
+  tokenIds: string[],
+  options?: {
+    bypassCache?: boolean;
+    concurrency?: number;
+    maxAttempts?: number;
+    requestTimeoutMs?: number;
+    retryBackoffMs?: number;
+    totalDeadlineMs?: number;
+  },
+): Promise<ClobBooksDetailedResult> {
+  const uniqueIds = [...new Set(tokenIds.filter((tokenId) => tokenId.trim() !== ''))];
+  const books = new Map<string, ClobBook | null>();
+  const diagnostics = new Map<string, ClobBookFetchDiagnostic>();
+  const startedAt = performance.now();
+  const enqueuedAt = new Map(uniqueIds.map((tokenId) => [tokenId, performance.now()]));
+  const concurrency = Math.max(1, Math.min(10, Math.floor(options?.concurrency ?? 4)));
+  const maxAttempts = Math.max(1, Math.min(3, Math.floor(options?.maxAttempts ?? 2)));
+  const requestTimeoutMs = Math.max(100, Math.min(10_000, Math.floor(options?.requestTimeoutMs ?? 3_500)));
+  const retryBackoffMs = Math.max(0, Math.min(2_000, Math.floor(options?.retryBackoffMs ?? 250)));
+  const totalDeadlineMs = Math.max(requestTimeoutMs, Math.min(30_000, Math.floor(options?.totalDeadlineMs ?? 12_000)));
+  const deadlineAt = startedAt + totalDeadlineMs;
+  let cursor = 0;
+
+  const fetchOne = async (tokenId: string): Promise<void> => {
+    const tokenStartedAt = performance.now();
+    let queueWaitMs = Math.max(0, Math.round(tokenStartedAt - (enqueuedAt.get(tokenId) ?? tokenStartedAt)));
+    if (!options?.bypassCache) {
+      const cached = getCachedBook(tokenId);
+      if (cached !== undefined) {
+        books.set(tokenId, cached);
+        diagnostics.set(tokenId, {
+          tokenId, status: cached ? 'success' : 'unavailable', attemptCount: 0,
+          queueWaitMs, upstreamLatencyMs: 0, totalLatencyMs: 0, deadlineSource: 'none',
+          ...(cached ? { observedAt: new Date().toISOString() } : { reason: 'cached unavailable book' }),
+        });
+        return;
+      }
+    }
+
+    let upstreamLatencyMs = 0;
+    let lastStatus: number | undefined;
+    let lastReason = 'Polymarket order book unavailable';
+    let finalStatus: ClobBookFetchStatus = 'error';
+    let deadlineSource: ClobBookFetchDiagnostic['deadlineSource'] = 'none';
+    let attemptCount = 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const backoffMs = attempt > 1 ? retryBackoffMs * (attempt - 1) : 0;
+      if (deadlineAt - performance.now() <= backoffMs) {
+        finalStatus = 'timeout';
+        deadlineSource = 'refresh-budget';
+        lastReason = `refresh budget ${totalDeadlineMs}ms exhausted`;
+        break;
+      }
+      if (backoffMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+      const semaphoreWaitStartedAt = performance.now();
+      await clobSemaphore.acquire();
+      queueWaitMs += Math.max(0, Math.round(performance.now() - semaphoreWaitStartedAt));
+      const remainingMs = deadlineAt - performance.now();
+      if (remainingMs <= 0) {
+        clobSemaphore.release();
+        finalStatus = 'timeout';
+        deadlineSource = 'refresh-budget';
+        lastReason = `refresh budget ${totalDeadlineMs}ms exhausted`;
+        break;
+      }
+      attemptCount = attempt;
+      const attemptStartedAt = performance.now();
+      let successfulBook: ClobBook | null = null;
+      try {
+        const timeoutMs = Math.max(1, Math.min(requestTimeoutMs, Math.floor(remainingMs)));
+        // This path owns its exact-token retry accounting. Do not wrap it in
+        // the generic rate limiter, whose internal retries would be invisible
+        // to per-token attempt metrics and could duplicate successful work.
+        const response = await fetch(
+          `https://clob.polymarket.com/book?token_id=${encodeURIComponent(tokenId)}&_t=${Date.now()}`,
+          {
+            headers: { 'Accept': 'application/json', 'User-Agent': 'h2h-arbitrage/1.0', 'Accept-Encoding': 'gzip, deflate' },
+            cache: 'no-store', signal: AbortSignal.timeout(timeoutMs),
+          },
+        );
+        lastStatus = response.status;
+        if (response.ok) {
+          successfulBook = exactClobBook(await response.json(), tokenId);
+          if (!successfulBook) {
+            finalStatus = 'unavailable';
+            lastReason = 'empty, malformed, or mismatched token book';
+          }
+        } else {
+          lastReason = `HTTP ${response.status}`;
+          finalStatus = response.status === 404 ? 'unavailable' : 'error';
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        const name = error instanceof Error ? error.name : '';
+        const timedOut = name === 'AbortError' || name === 'TimeoutError' || /timed out|timeout/i.test(message);
+        finalStatus = timedOut ? 'timeout' : 'error';
+        deadlineSource = timedOut ? 'per-token' : 'none';
+        lastReason = message || (timedOut ? 'request timed out' : 'request failed');
+      } finally {
+        upstreamLatencyMs += Math.max(0, Math.round(performance.now() - attemptStartedAt));
+        clobSemaphore.release();
+      }
+      if (successfulBook) {
+        books.set(tokenId, successfulBook);
+        setCachedBook(tokenId, successfulBook);
+        diagnostics.set(tokenId, {
+          tokenId, status: 'success', attemptCount, queueWaitMs, upstreamLatencyMs,
+          totalLatencyMs: Math.max(0, Math.round(performance.now() - tokenStartedAt)),
+          deadlineSource: 'per-token', upstreamStatus: lastStatus, observedAt: new Date().toISOString(),
+        });
+        return;
+      }
+      const retryable = finalStatus === 'timeout' || lastStatus === 429 || (lastStatus != null && lastStatus >= 500);
+      if (!retryable) break;
+    }
+    books.set(tokenId, null);
+    diagnostics.set(tokenId, {
+      tokenId, status: finalStatus, attemptCount, queueWaitMs, upstreamLatencyMs,
+      totalLatencyMs: Math.max(0, Math.round(performance.now() - tokenStartedAt)), deadlineSource,
+      ...(lastStatus != null ? { upstreamStatus: lastStatus } : {}), reason: lastReason,
+    });
+  };
+
+  const worker = async () => {
+    while (cursor < uniqueIds.length) await fetchOne(uniqueIds[cursor++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, uniqueIds.length) }, () => worker()));
+  const values = [...diagnostics.values()];
+  const metrics = {
+    tokenCount: uniqueIds.length,
+    successCount: values.filter((value) => value.status === 'success').length,
+    timeoutCount: values.filter((value) => value.status === 'timeout').length,
+    errorCount: values.filter((value) => value.status === 'error').length,
+    unavailableCount: values.filter((value) => value.status === 'unavailable').length,
+    retryCount: values.reduce((sum, value) => sum + Math.max(0, value.attemptCount - 1), 0),
+    queueWaitMs: values.reduce((sum, value) => sum + value.queueWaitMs, 0),
+    upstreamLatencyMs: values.reduce((sum, value) => sum + value.upstreamLatencyMs, 0),
+    durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+  };
+  console.info(JSON.stringify({
+    event: 'polymarket_clob_token_refresh', correlationId: correlationId.current ?? null, metrics, tokens: values,
+  }));
+  return { books, diagnostics, metrics };
 }
 
 /**

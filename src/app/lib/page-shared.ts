@@ -514,8 +514,11 @@ export interface ScanResult {
   platformWarnings?: string[];
   refreshStatus?: 'complete' | 'partial' | 'failed';
   retryable?: boolean;
+  _priceDataObservedAt?: string | null;
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string };
+  pmRefresh?: import('@/lib/quick-prices').QuickPmRefresh;
   platformDiagnostics?: Record<'kalshi' | 'polymarket', {
-    status: 'fresh' | 'empty' | 'failed';
+    status: 'fresh' | 'partial' | 'empty' | 'failed';
     count: number;
     reason?: string;
   }>;
@@ -539,7 +542,9 @@ export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResul
     if (!fresh && !kalshiFailed && !polymarketFailed) return null;
     const kalshi = kalshiFailed ? old.kalshi : fresh?.kalshi ?? null;
     const polymarket = polymarketFailed ? old.polymarket : fresh?.polymarket ?? null;
-    const stale = kalshiFailed || polymarketFailed;
+    const kalshiOutcomeStale = kalshiFailed || fresh?.kalshiStale === true;
+    const polymarketOutcomeStale = polymarketFailed || fresh?.polymarketStale === true;
+    const stale = kalshiOutcomeStale || polymarketOutcomeStale;
     const arbitrage = stale
       ? {
           ...(fresh?.arbitrage ?? old.arbitrage),
@@ -550,7 +555,7 @@ export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResul
           pmStake: 0,
           maxCapital: 0,
           depthVerified: false,
-          strategy: 'Unavailable — stale platform data',
+          strategy: 'Unavailable — stale outcome data',
         }
       : fresh?.arbitrage ?? old.arbitrage;
     return {
@@ -559,8 +564,8 @@ export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResul
       kalshi,
       polymarket,
       arbitrage,
-      kalshiStale: kalshiFailed,
-      polymarketStale: polymarketFailed,
+      kalshiStale: kalshiOutcomeStale,
+      polymarketStale: polymarketOutcomeStale,
     };
   }).filter((outcome): outcome is UnifiedOutcome => outcome !== null);
   return { ...previous, ...incoming, outcomes };
