@@ -29,6 +29,7 @@ interface StoredPriceSnapshot {
   ageMs: number | null;
   executableDepthMicros?: number | null;
   failureReason?: string | null;
+  markFailureReason?: string | null;
 }
 
 interface BotPosition {
@@ -83,6 +84,9 @@ interface BotPosition {
   currentPricePmCents: number | null;
   currentPriceSnapshots?: { kalshi: StoredPriceSnapshot; polymarket: StoredPriceSnapshot };
   currentValueCents: number | null;
+  indicativeValueMicrocents?: number | null;
+  indicativePnlMicrocents?: number | null;
+  indicativeBuyCostMicrocents?: number | null;
   kalshiGrossProceedsMicrocents: number | null;
   pmGrossProceedsMicrocents: number | null;
   kalshiNetProceedsCents: number | null;
@@ -132,18 +136,23 @@ function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
   const observedAt = Date.parse(position.lastValuationAt);
   if (!Number.isFinite(observedAt)) return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: malformed quote timestamp' };
   const warning = position.valuationFailureReason?.trim()
-    || (now - observedAt > VALUATION_STALE_MS ? 'Stale executable quote' : null);
+    || (now - observedAt > VALUATION_STALE_MS ? 'Stale last-scanned mark' : null);
   const openCostCents = Number.isSafeInteger(position.remainingOpenCostCents)
     ? position.remainingOpenCostCents!
     : position.totalCostCents;
-  const pnlCents = (position.realizedPnlCents ?? 0) + position.currentValueCents - openCostCents;
+  const hasIndicativeExactPnl = Number.isSafeInteger(position.indicativePnlMicrocents);
+  const pnlCents = hasIndicativeExactPnl
+    ? Math.round(position.indicativePnlMicrocents! / 1_000_000)
+    : (position.realizedPnlCents ?? 0) + position.currentValueCents - openCostCents;
   return {
     available: true,
     fresh: warning == null,
     warning,
     currentValueCents: position.currentValueCents,
     pnlCents,
-    roiBps: openCostCents > 0 ? Math.round((pnlCents * 10_000) / openCostCents) : null,
+    roiBps: hasIndicativeExactPnl && Number.isSafeInteger(position.unrealizedRoiBps)
+      ? position.unrealizedRoiBps
+      : openCostCents > 0 ? Math.round((pnlCents * 10_000) / openCostCents) : null,
   };
 }
 
@@ -567,7 +576,7 @@ export default function BotTraderPanel() {
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div title="Cumulative fee-inclusive cost of open exposure"><MetricCard label="Deployed" value={performance.capital.deployedCents == null ? 'Unavailable' : formatCents(performance.capital.deployedCents)} valueClass={performance.capital.deployedCents == null ? 'text-[var(--status-warning)]' : ''} /></div>
-        <MetricCard label="Executable value" value={formatCents(performance.capital.currentCents)} valueClass={performance.capital.excludedOpenCostCents > 0 ? 'text-[var(--status-warning)]' : ''} />
+        <MetricCard label="Indicative value" value={formatCents(performance.capital.currentCents)} valueClass={performance.capital.excludedOpenCostCents > 0 ? 'text-[var(--status-warning)]' : ''} />
         <MetricCard label="Held to resolution" value={formatCents(performance.capital.heldToResolutionCents)} />
         <div title="Unrealized return on remaining open cost"><MetricCard label="Portfolio ROI" value={performance.pnl.roiBps == null ? 'Unavailable' : formatBps(performance.pnl.roiBps, true)} valueClass={performance.pnl.roiBps == null ? 'text-[var(--status-warning)]' : pnlClass(performance.pnl.roiBps)} /></div>
       </div>
@@ -579,8 +588,8 @@ export default function BotTraderPanel() {
 
       <div className={`rounded-lg border px-3 py-2 text-xs ${quoteIssueCount > 0 ? 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 text-[var(--status-warning)]' : 'border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--text-secondary)]'}`}>
         {quoteIssueCount > 0
-          ? `${performance.valuation.stale} stale executable quote${performance.valuation.stale === 1 ? '' : 's'} · ${performance.valuation.unavailable} unavailable · ${performance.valuation.pendingSettlement} pending settlement verification. Totals include only valued positions; ${formatCents(performance.capital.excludedOpenCostCents)} of unavailable open buy cost is excluded, never treated as zero.`
-          : `Executable quotes fresh for ${performance.valuation.fresh} open position${performance.valuation.fresh === 1 ? '' : 's'}${performance.valuation.asOf ? ` · oldest executable mark ${new Date(performance.valuation.asOf).toLocaleString()}` : ''}.`}
+          ? `${performance.valuation.stale} stale indicative mark${performance.valuation.stale === 1 ? '' : 's'} · ${performance.valuation.unavailable} unavailable · ${performance.valuation.pendingSettlement} pending settlement verification. Stale last-scanned marks remain included; ${formatCents(performance.capital.excludedOpenCostCents)} of unavailable open buy cost is excluded, never treated as zero.`
+          : `Indicative marks fresh for ${performance.valuation.fresh} open position${performance.valuation.fresh === 1 ? '' : 's'}${performance.valuation.asOf ? ` · oldest last-scanned mark ${new Date(performance.valuation.asOf).toLocaleString()}` : ''}.`}
       </div>
 
       <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
@@ -593,7 +602,7 @@ export default function BotTraderPanel() {
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={(value: number) => formatCents(value)} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
               <Bar dataKey="deployedCents" name="Deployed" fill="var(--text-secondary)" />
-              <Bar dataKey="currentCents" name="Executable value" fill="var(--status-info)" />
+              <Bar dataKey="currentCents" name="Indicative value" fill="var(--status-info)" />
               <Bar dataKey="heldToResolutionCents" name="Held to resolution" fill="var(--platform-polymarket)" />
               <Bar dataKey="realizedCents" name="Realized P&L" fill="var(--status-positive)" />
               <Bar dataKey="unrealizedCents" name="Unrealized P&L" fill="var(--status-warning)" />
@@ -604,7 +613,7 @@ export default function BotTraderPanel() {
 
       <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Persisted exact-leg executable bids · click a row for provenance and depth</div></div>
+          <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Persisted exact-leg last-scanned marks · indicative only, not executable close proceeds</div></div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
               {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
@@ -616,7 +625,7 @@ export default function BotTraderPanel() {
 
         <div className="overflow-x-auto" data-testid="bot-positions-scroll">
           <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Total dollars spent on both legs" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Current market value of both legs" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Profit or loss at current prices" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Unrealized return as a percentage" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Immutable persisted trade entry cost" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Indicative value from exact-leg last-scanned prices; not executable liquidation proceeds" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Indicative last-scanned Current Value minus persisted Buy Cost" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Indicative last-scanned P&L divided by persisted Buy Cost" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedPositions.map((position) => {
                 const isExpanded = expanded.has(position.id);
@@ -634,10 +643,10 @@ export default function BotTraderPanel() {
                   : `Buy Cost unavailable: ${position.entryCostFailureReason || 'Authoritative entry fill or fee evidence is incomplete'}`;
                 const openMark = position.status === 'open' ? openPositionMark(position) : null;
                 const pnl = position.status === 'open'
-                  ? (openMark?.available && openMark.fresh && entryCostAvailable ? openMark.pnlCents : null)
+                  ? (openMark?.available && entryCostAvailable ? openMark.pnlCents : null)
                   : entryCostAvailable ? position.realizedPnlCents : null;
                 const roiBps = position.status === 'open'
-                  ? (openMark?.available && openMark.fresh && entryCostAvailable ? openMark.roiBps : null)
+                  ? (openMark?.available && entryCostAvailable ? openMark.roiBps : null)
                   : entryCostAvailable && hasVerifiedTerminalAccounting(position) ? positionRoiBps(position) : null;
                 const openUnavailableLabel = openMark && !openMark.available ? openMark.label : null;
                 const staleValuationLabel = openMark?.available && !openMark.fresh ? openMark.warning : null;
@@ -680,8 +689,8 @@ export default function BotTraderPanel() {
                     <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`}>{valueUnavailableLabel ?? staleValuationLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`}>{valueUnavailableLabel ?? staleValuationLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market ROI'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
@@ -730,7 +739,7 @@ export default function BotTraderPanel() {
                             <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
                             <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
-                            <div className="text-[10px] font-medium text-[var(--text-secondary)]">One-share executable bid · depth {snapshot.executableDepthMicros == null ? 'unavailable' : `${(snapshot.executableDepthMicros / 1_000_000).toFixed(6)} shares`}{snapshot.failureReason ? ` · ${snapshot.failureReason}` : ''}</div>
+                            <div className="text-[10px] font-medium text-[var(--text-secondary)]">Indicative last-scanned mark; not executable liquidation proceeds{snapshot.markFailureReason ? ` · ${snapshot.markFailureReason}` : ''}{snapshot.failureReason ? ` · Separate close evidence: ${snapshot.failureReason}` : ''}</div>
                           </div>;
                         })}
                       </div>

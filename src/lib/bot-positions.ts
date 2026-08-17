@@ -187,6 +187,12 @@ export interface BotPosition {
   currentPriceKalshiCents: number | null;
   currentPricePmCents: number | null;
   currentValueCents: number | null;
+  /** Indicative last-scanned mark in millionths of one cent (API overlay only). */
+  indicativeValueMicrocents?: number | null;
+  /** Indicative mark-to-market P&L in millionths of one cent (API overlay only). */
+  indicativePnlMicrocents?: number | null;
+  /** Immutable persisted Buy Cost used for indicative ROI, in millionths of one cent. */
+  indicativeBuyCostMicrocents?: number | null;
   kalshiGrossProceedsMicrocents: number | null;
   pmGrossProceedsMicrocents: number | null;
   kalshiNetProceedsCents: number | null;
@@ -2846,12 +2852,24 @@ function heldPayoutCents(position: BotPosition): number {
 
 export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): BotPerformanceSummary {
   const total = (values: number[]) => values.reduce((sum, value) => sum + value, 0);
+  const roundMicrocents = (value: number) => {
+    if (!Number.isSafeInteger(value)) throw new Error('Indicative aggregate exceeds safe integer range');
+    const numerator = BigInt(value);
+    const absolute = numerator < 0n ? -numerator : numerator;
+    const rounded = (absolute + 500_000n) / 1_000_000n;
+    return Number(numerator < 0n ? -rounded : rounded);
+  };
+  const exactValueMicrocents = (position: BotPosition) => position.indicativeValueMicrocents
+    ?? position.currentValueCents! * 1_000_000;
+  const exactUnrealizedMicrocents = (position: BotPosition) => position.indicativePnlMicrocents
+    ?? (position.currentValueCents! - deployedCostCents(position)) * 1_000_000;
   const nowMs = now.getTime();
   const open = rows.filter((position) => position.status === 'open');
   const verifiedSettled = rows.filter(hasVerifiedTerminalAccounting);
   const unverifiedSettled = rows.filter((position) => isTerminalPosition(position) && !hasVerifiedTerminalAccounting(position));
   const mark = (position: BotPosition) => botPositionMark(position, nowMs);
   const freshOpen = open.filter((position) => mark(position) === 'fresh');
+  const markedOpen = open.filter((position) => mark(position) !== 'unavailable');
   const stale = open.filter((position) => mark(position) === 'stale').length;
   const unavailable = open.filter((position) => mark(position) === 'unavailable').length;
   const unavailableEntryCosts = rows.filter((position) => !hasAvailableEntryCost(position)).length;
@@ -2860,19 +2878,23 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     ...verifiedSettled.map((position) => position.realizedPnlCents!),
     ...open.map((position) => position.realizedPnlCents ?? 0),
   ]);
-  const valuedOpen = freshOpen.filter(hasAvailableEntryCost);
+  const valuedOpen = markedOpen.filter(hasAvailableEntryCost);
+  const exactOpenValueMicrocents = total(markedOpen.map(exactValueMicrocents));
+  const exactOpenUnrealizedMicrocents = total(valuedOpen.map(exactUnrealizedMicrocents));
   const unrealizedCents = open.length > 0 && valuedOpen.length === 0
     ? null
-    : total(valuedOpen.map((position) => position.currentValueCents! - deployedCostCents(position)));
+    : roundMicrocents(exactOpenUnrealizedMicrocents);
   const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
   const deployedCents = allEntryCostsAvailable ? total(rows.map(deployedCostCents)) : null;
-  const currentCents = total(freshOpen.map((position) => position.currentValueCents!))
-    + total(verifiedSettled.map((position) => position.resolutionPayoutCents!));
+  const currentCents = roundMicrocents(exactOpenValueMicrocents
+    + total(verifiedSettled.map((position) => position.resolutionPayoutCents!)) * 1_000_000);
   const valuedCostCents = total(valuedOpen.map(deployedCostCents))
     + total(verifiedSettled.map((position) => position.totalCostCents));
-  const excludedOpenCostCents = total(open.filter((position) => mark(position) !== 'fresh' || !hasAvailableEntryCost(position)).map(deployedCostCents));
-  const oldestFreshMs = freshOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
+  const excludedOpenCostCents = total(open.filter((position) => mark(position) === 'unavailable' || !hasAvailableEntryCost(position)).map(deployedCostCents));
+  const oldestMarkedMs = markedOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
   const dates = new Map<string, BotPerformanceSummary['entryCohorts'][number] & { incomplete: boolean }>();
+  const exactCurrentByDate = new Map<string, number>();
+  const exactUnrealizedByDate = new Map<string, number>();
   for (const position of rows) {
     const openedAt = new Date(position.openedAt);
     const date = [openedAt.getFullYear(), String(openedAt.getMonth() + 1).padStart(2, '0'), String(openedAt.getDate()).padStart(2, '0')].join('-');
@@ -2884,14 +2906,17 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     if (position.status === 'open') {
       point.realizedCents += position.realizedPnlCents ?? 0;
       point.heldToResolutionCents += heldPayoutCents(position);
-      if (mark(position) === 'fresh') {
-        point.currentCents! += position.currentValueCents!;
+      if (mark(position) !== 'unavailable') {
+        exactCurrentByDate.set(date, (exactCurrentByDate.get(date) ?? 0) + exactValueMicrocents(position));
         point.unrealizedCents = !hasAvailableEntryCost(position) || point.unrealizedCents == null
           ? null
-          : point.unrealizedCents + position.currentValueCents! - deployedCostCents(position);
+          : point.unrealizedCents;
+        if (point.unrealizedCents != null) {
+          exactUnrealizedByDate.set(date, (exactUnrealizedByDate.get(date) ?? 0) + exactUnrealizedMicrocents(position));
+        }
       }
     } else if (hasVerifiedTerminalAccounting(position)) {
-      point.currentCents! += position.resolutionPayoutCents!;
+      exactCurrentByDate.set(date, (exactCurrentByDate.get(date) ?? 0) + position.resolutionPayoutCents! * 1_000_000);
       point.realizedCents += position.realizedPnlCents!;
     } else {
       point.incomplete = true;
@@ -2900,8 +2925,10 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   }
   const entryCohorts = [...dates.values()].sort((a, b) => a.date.localeCompare(b.date)).map(({ incomplete, ...point }) => ({
     ...point,
-    currentCents: incomplete ? null : point.currentCents,
-    unrealizedCents: incomplete ? null : point.unrealizedCents,
+    currentCents: incomplete ? null : roundMicrocents(exactCurrentByDate.get(point.date) ?? 0),
+    unrealizedCents: incomplete || point.unrealizedCents == null
+      ? null
+      : roundMicrocents(exactUnrealizedByDate.get(point.date) ?? 0),
   }));
   return {
     positionIds: rows.map((position) => position.id),
@@ -2916,14 +2943,22 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       realizedCents,
       unrealizedCents,
       totalCents,
-      roiBps: totalCents == null || valuedCostCents <= 0 ? null : Math.round(totalCents * 10_000 / valuedCostCents),
+      roiBps: totalCents == null || valuedCostCents <= 0 ? null : (() => {
+        const exactOpenCost = valuedOpen.reduce((sum, position) => sum
+          + (position.indicativeBuyCostMicrocents ?? deployedCostCents(position) * 1_000_000), 0);
+        const terminalCost = total(verifiedSettled.map((position) => position.totalCostCents)) * 1_000_000;
+        const denominator = exactOpenCost + terminalCost;
+        return denominator <= 0 ? null : Math.round(
+          (exactOpenUnrealizedMicrocents + realizedCents * 1_000_000) * 10_000 / denominator,
+        );
+      })(),
     },
     valuation: {
       fresh: freshOpen.length,
       stale,
       unavailable,
       pendingSettlement: unverifiedSettled.length,
-      asOf: Number.isFinite(oldestFreshMs) ? new Date(oldestFreshMs).toISOString() : null,
+      asOf: Number.isFinite(oldestMarkedMs) ? new Date(oldestMarkedMs).toISOString() : null,
     },
     entryCohorts,
   };

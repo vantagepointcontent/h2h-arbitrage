@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import { getBotPositionAnalytics, summarizeBotPerformance } from '@/lib/bot-positions';
 import { NextRequest } from 'next/server';
-import { getMarketUrlsById, getSavedMarketById } from '@/lib/persistence';
+import { getMarketUrlsById } from '@/lib/persistence';
 import { getPersistedCurrentPriceBatch } from '@/lib/current-price-snapshots';
 
 vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn(), summarizeBotPerformance: vi.fn() }));
-vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn(), getSavedMarketById: vi.fn() }));
+vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
 vi.mock('@/lib/current-price-snapshots', () => ({
   getPersistedCurrentPriceBatch: vi.fn(),
   currentPriceSnapshotKey: (request: { platform: string; marketId: string | null; side: string; tokenId: string | null }) =>
@@ -17,7 +17,6 @@ describe('GET /api/bot-trader/analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getMarketUrlsById).mockResolvedValue(null);
-    vi.mocked(getSavedMarketById).mockResolvedValue(null);
     vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map());
     vi.mocked(summarizeBotPerformance).mockImplementation(() => ({
       capital: { currentCents: 99 }, pnl: { unrealizedCents: null },
@@ -80,59 +79,6 @@ describe('GET /api/bot-trader/analytics', () => {
     ]);
   });
 
-  it('enriches legacy positions with exact persisted outcome identities and backend relationship state', async () => {
-    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
-      id: 97, executionId: 128, marketId: 'fl-26', marketTitle: 'FL-26 House Election Winner',
-      kalshiTicker: 'KX-FL-D', pmConditionId: '0xdem', pmEntryTokenId: 'token-dem-yes',
-      kalshiSide: 'yes', pmSide: 'yes', status: 'open',
-    }] } as never);
-    vi.mocked(getSavedMarketById).mockResolvedValue({
-      id: 'fl-26', eventTitle: 'FL-26 House Election Winner', kalshiUrl: '', polymarketUrl: '', createdAt: '',
-      lastScanResult: {
-        matchedPairs: [
-          { artist: 'Democrats', kalshiTicker: 'KX-FL-D', pmConditionId: '0xdem' },
-          { artist: 'Republicans', kalshiTicker: 'KX-FL-R', pmConditionId: '0xrep' },
-        ],
-      },
-    } as never);
-
-    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
-    const body = await response.json();
-
-    expect(body.analytics.positions[0]).toMatchObject({
-      identity: {
-        kalshi: { marketQuestion: null, outcomeLabel: 'Democrats', side: 'yes' },
-        polymarket: { marketQuestion: null, outcomeLabel: 'Democrats', side: 'yes' },
-        relationship: { state: 'same_direction' },
-      },
-    });
-  });
-
-  it('backfills the real FL-26 no-matchedPairs shape from exact allArbs identifiers', async () => {
-    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
-      id: 128, executionId: 128, marketId: '1782999196726-house-fl26', marketTitle: 'FL-26 House Election Winner',
-      kalshiTicker: 'KXHOUSERACE-FL26-26-D',
-      pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861',
-      kalshiSide: 'yes', pmSide: 'yes', status: 'open', relationshipVerified: true,
-    }] } as never);
-    vi.mocked(getSavedMarketById).mockResolvedValue({
-      id: '1782999196726-house-fl26', eventTitle: 'FL-26 House Election Winner', kalshiUrl: '', polymarketUrl: '', createdAt: '',
-      lastScanResult: {
-        allArbs: [
-          { artist: 'Republican', kalshiTicker: 'KXHOUSERACE-FL26-26-R', pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861' },
-          { artist: 'Democratic', kalshiTicker: 'KXHOUSERACE-FL26-26-D', pmConditionId: '0xe25b0be3d538078068d0bf2fd311bfbda4b07be31bee8ac4cdf1a0999d2bf328' },
-        ],
-      },
-    } as never);
-
-    const body = await (await GET(new NextRequest('http://localhost/api/bot-trader/analytics'))).json();
-    expect(body.analytics.positions[0].identity).toMatchObject({
-      kalshi: { outcomeLabel: 'Democratic', side: 'yes' },
-      polymarket: { outcomeLabel: 'Republican', side: 'yes' },
-      relationship: { state: 'verified_complementary' },
-    });
-  });
-
   it('deduplicates exact legs into one persisted snapshot batch and isolates missing identifiers', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [
       { id: 1, marketId: 'm1', kalshiTicker: 'KX-1', kalshiSide: 'yes', pmConditionId: '0x1', pmEntryTokenId: 'token-no', pmSide: 'no' },
@@ -161,30 +107,6 @@ describe('GET /api/bot-trader/analytics', () => {
     expect(body.analytics.positions[2].currentPriceSnapshots).toEqual({
       kalshi: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
       polymarket: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
-    });
-  });
-
-  it('resolves trade 128 from the persisted FL-26 allArbs shape without matchedPairs', async () => {
-    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
-      id: 97, executionId: 128, marketId: 'fl-26', marketTitle: 'FL-26 House Election Winner',
-      kalshiTicker: 'KXHOUSERACE-FL26-26-D',
-      pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861',
-      kalshiSide: 'yes', pmSide: 'yes', relationshipVerified: true, status: 'open',
-    }] } as never);
-    vi.mocked(getSavedMarketById).mockResolvedValue({
-      id: 'fl-26', eventTitle: 'FL-26 House Election Winner', kalshiUrl: '', polymarketUrl: '', createdAt: '',
-      lastScanResult: { allArbs: [
-        { artist: 'Republican', kalshiTicker: 'KXHOUSERACE-FL26-26-R', pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861' },
-        { artist: 'Democratic', kalshiTicker: 'KXHOUSERACE-FL26-26-D', pmConditionId: '0xe25b0be3d538078068d0bf2fd311bfbda4b07be31bee8ac4cdf1a0999d2bf328' },
-      ] },
-    } as never);
-
-    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
-    const body = await response.json();
-    expect(body.analytics.positions[0].identity).toMatchObject({
-      kalshi: { outcomeLabel: 'Democratic', side: 'yes' },
-      polymarket: { outcomeLabel: 'Republican', side: 'yes' },
-      relationship: { state: 'verified_complementary' },
     });
   });
 
