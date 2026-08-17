@@ -17,6 +17,18 @@ import type { PropositionRelationship } from './proposition-identity';
 
 export interface UnifiedOutcome {
   artist: string;
+  kalshiStale?: boolean;
+  polymarketStale?: boolean;
+  polymarketRefresh?: {
+    conditionId: string;
+    outcome: string;
+    status: 'refreshed' | 'timed_out' | 'error' | 'unavailable';
+    observedAt: string | null;
+    source: 'live-clob' | 'saved-market-snapshot' | null;
+    servedFromSnapshot: boolean;
+    snapshotAgeMs: number | null;
+    reason?: string;
+  };
   kalshi: {
     ticker: string;
     yesBid: number;

@@ -79,68 +79,29 @@ function debugLog(...args: unknown[]) {
 }
 
 // Global concurrency limiter for CLOB requests
-interface SemaphoreWaiter {
-  resolve: (acquired: boolean) => void;
-  settled: boolean;
-  timer?: ReturnType<typeof setTimeout>;
-  signal?: AbortSignal;
-  onAbort?: () => void;
-}
-
 class Semaphore {
   private active = 0;
-  private queue: SemaphoreWaiter[] = [];
+  private queue: (() => void)[] = [];
 
   constructor(private max: number) {}
 
-  async acquire(options?: { deadlineAt?: number; signal?: AbortSignal }): Promise<boolean> {
-    if (options?.signal?.aborted) return false;
-    const remainingMs = options?.deadlineAt == null
-      ? null
-      : options.deadlineAt - performance.now();
-    if (remainingMs != null && remainingMs <= 0) return false;
+  async acquire(): Promise<void> {
     if (this.active < this.max) {
       this.active++;
-      return true;
+      return;
     }
-    return new Promise<boolean>(resolve => {
-      const waiter: SemaphoreWaiter = {
-        resolve,
-        settled: false,
-        signal: options?.signal,
-      };
-      const cancel = () => {
-        if (waiter.settled) return;
-        const index = this.queue.indexOf(waiter);
-        if (index >= 0) this.queue.splice(index, 1);
-        this.settle(waiter, false);
-      };
-      waiter.onAbort = cancel;
-      if (remainingMs != null) waiter.timer = setTimeout(cancel, remainingMs);
-      options?.signal?.addEventListener('abort', cancel, { once: true });
-      this.queue.push(waiter);
+    return new Promise<void>(resolve => {
+      this.queue.push(resolve);
     });
   }
 
   release(): void {
     this.active--;
-    let next = this.queue.shift();
-    while (next) {
-      if (this.settle(next, true)) return;
-      next = this.queue.shift();
+    const next = this.queue.shift();
+    if (next) {
+      this.active++;
+      next();
     }
-  }
-
-  private settle(waiter: SemaphoreWaiter, acquired: boolean): boolean {
-    if (waiter.settled) return false;
-    waiter.settled = true;
-    if (waiter.timer) clearTimeout(waiter.timer);
-    if (waiter.signal && waiter.onAbort) {
-      waiter.signal.removeEventListener('abort', waiter.onAbort);
-    }
-    if (acquired) this.active++;
-    waiter.resolve(acquired);
-    return true;
   }
 }
 
@@ -372,14 +333,8 @@ export async function fetchClobBooksDetailed(
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
       const semaphoreWaitStartedAt = performance.now();
-      const acquired = await clobSemaphore.acquire({ deadlineAt });
+      await clobSemaphore.acquire();
       queueWaitMs += Math.max(0, Math.round(performance.now() - semaphoreWaitStartedAt));
-      if (!acquired) {
-        finalStatus = 'timeout';
-        deadlineSource = 'refresh-budget';
-        lastReason = `refresh budget ${totalDeadlineMs}ms exhausted`;
-        break;
-      }
       const remainingMs = deadlineAt - performance.now();
       if (remainingMs <= 0) {
         clobSemaphore.release();

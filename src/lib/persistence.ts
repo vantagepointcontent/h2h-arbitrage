@@ -1822,7 +1822,9 @@ async function prepareCanonicalMatchResult(
       ...(previous ?? incoming),
       matchStatus: incoming.matchStatus,
       matchError: incoming.matchError,
-      scannedAt: incoming.scannedAt,
+      // unavailable/refreshing describes an attempt, not a successful price
+      // observation. Retained allArbs must retain their original age.
+      scannedAt: previous?.scannedAt ?? incoming.scannedAt,
       publicationGeneration: incoming.publicationGeneration,
       matchedCount: previous?.matchedCount ?? incoming.matchedCount,
       matchedPairs: previous?.matchedPairs ?? incoming.matchedPairs ?? [],
