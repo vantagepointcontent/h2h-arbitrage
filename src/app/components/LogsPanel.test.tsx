@@ -39,7 +39,7 @@ describe('LogsPanel', () => {
     expect(screen.queryByText('Internal Arb')).toBeNull();
   });
 
-  it('shows scan ROI, lazy current executable ROI, ROI Declined, and Profit in that order', async () => {
+  it('shows scan ROI, lazy current executable ROI, and Profit in that order', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
@@ -57,35 +57,8 @@ describe('LogsPanel', () => {
     expect(await screen.findByText('-1.23%')).toBeTruthy();
     const headers = Array.from(document.querySelectorAll('thead th')).map((header) => header.textContent?.trim());
     const roiIndex = headers.findIndex((label) => label?.startsWith('ROI %'));
-    expect(headers.slice(roiIndex, roiIndex + 4).map((label) => label?.replace(/[▲▼]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'ROI Declined?', 'Profit']);
-    expect(document.querySelector('th[title="TRUE when scan-time ROI is greater than Current ROI."]')).toBeTruthy();
-    const declinedBadge = screen.getByLabelText('ROI Declined? TRUE');
-    expect(declinedBadge.textContent).toBe('TRUE');
-    expect(declinedBadge.className).toContain('text-amber-300');
+    expect(headers.slice(roiIndex, roiIndex + 3).map((label) => label?.replace(/[▲▼]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'Profit']);
     expect(screen.getByText('-1.23%').className).toContain('text-[#8A9BA8]');
-    expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/logs/current-prices')).toBe(false);
-  });
-
-  it('renders FALSE with an accessible reason when a comparison input is unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
-      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'never_scanned' }] }) });
-      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
-      return Promise.resolve({ json: async () => [] });
-    }));
-
-    render(createElement(LogsPanel));
-
-    await screen.findByText('Never scanned');
-    const badge = screen.getByLabelText('ROI Declined? FALSE');
-    expect(badge.textContent).toBe('FALSE');
-    expect(badge.getAttribute('title')).toMatch(/Current ROI is unavailable: Never scanned/);
-    expect(badge.getAttribute('tabindex')).toBe('0');
-    const reasonId = badge.getAttribute('aria-describedby');
-    expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId!)?.textContent).toMatch(/Current ROI is unavailable: Never scanned/);
-    expect(badge.className).toContain('text-[#A8B8C4]');
   });
 
   it.each([
@@ -480,7 +453,7 @@ describe('LogsPanel', () => {
     expect(screen.getByText('+102.70%')).toBeTruthy();
     expect(screen.queryByText('+23.40%')).toBeNull();
     expect(screen.getByTestId('logs-table-scroll').className).toContain('overflow-x-auto');
-    expect(document.querySelector('table')?.className).toContain('min-w-[1240px]');
+    expect(document.querySelector('table')?.className).toContain('min-w-[1160px]');
     expect(document.querySelector('thead th')?.className).toContain('sticky');
     expect(document.querySelector('tbody td')?.className).toContain('sticky');
     expect(screen.getByRole('button', { name: 'Refresh' }).className).toContain('min-h-11');

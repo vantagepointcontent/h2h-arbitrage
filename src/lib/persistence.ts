@@ -9,7 +9,12 @@ import { boundedZeroArbRetentionDays, scanRetentionDeleteSql } from './scan-rete
 import { calculateOutcomeContingentApy, type OutcomeContingentApy, type SettlementTiming } from './settlement-apy';
 import { botEntryEvidenceErrors } from './bot-entry-recovery';
 import { findLatestSqliteBackup } from './sqlite-backup-discovery.mjs';
-import type { BotLegRelationshipState } from './bot-leg-identity';
+import {
+  legacyUnverifiableEnvelope,
+  parseCalculationEnvelope,
+  validateCalculationEnvelope,
+  type CalculationEnvelope,
+} from './calculation-envelope';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -65,7 +70,8 @@ async function initDb(): Promise<void> {
       apy_unavailable_reason TEXT,
       arb_valid       INTEGER NOT NULL DEFAULT 1,
       arb_invalidation_reason TEXT,
-      scan_status     TEXT    NOT NULL DEFAULT 'completed'
+      scan_status     TEXT    NOT NULL DEFAULT 'completed',
+      calculation_envelope TEXT
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -81,9 +87,14 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN arb_valid INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE scan_results ADD COLUMN arb_invalidation_reason TEXT`,
     `ALTER TABLE scan_results ADD COLUMN scan_status TEXT NOT NULL DEFAULT 'completed'`,
+    `ALTER TABLE scan_results ADD COLUMN calculation_envelope TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
+  await c.execute({
+    sql: `UPDATE scan_results SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
+    args: [JSON.stringify(legacyUnverifiableEnvelope('legacy scan result'))],
+  });
   await c.execute(`UPDATE scan_results
     SET arb_valid = 0,
         arb_invalidation_reason = 'legacy_internal_yes_yes_directional_duplication',
@@ -449,6 +460,8 @@ export async function saveScanResult(
     arbType?: 'cross' | 'direct' | 'internal';
     expiryAt?: string | null;
     outcomeApy?: OutcomeContingentApy;
+    calculationEnvelope?: CalculationEnvelope | null;
+    calculationEnvelope?: CalculationEnvelope | null;
   },
 ): Promise<{ id: number }> {
   await ensureDb();
@@ -460,14 +473,17 @@ export async function saveScanResult(
   const snapshot = financiallyValid
     ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
     : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
+  const calculationEnvelope = result.calculationEnvelope == null
+    ? legacyUnverifiableEnvelope(`scan result ${marketId}`)
+    : validateCalculationEnvelope(result.calculationEnvelope);
   const row = await c.execute({
     sql: `INSERT INTO scan_results
       (market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
        kalshi_url, polymarket_url, arb_type, expiry_at, days_to_expiry,
-       apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason, calculation_envelope)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
       canonicalRoi,
@@ -491,6 +507,7 @@ export async function saveScanResult(
       snapshot.unavailableReason,
       financiallyValid ? 1 : 0,
       audit.reason,
+      JSON.stringify(calculationEnvelope),
     ],
   });
   return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
@@ -653,7 +670,7 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                 arb_type, arb_valid, arb_invalidation_reason
+                 arb_type, arb_valid, arb_invalidation_reason, calculation_envelope
           FROM scan_results${pageWhere}
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
     args: [...pageArgs, limit],
@@ -860,7 +877,7 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                   arb_type, arb_valid, arb_invalidation_reason, raw_result
+                   arb_type, arb_valid, arb_invalidation_reason, raw_result, calculation_envelope
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],
@@ -1235,17 +1252,9 @@ export interface LastScanResult {
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
+  calculationEnvelope?: CalculationEnvelope;
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
     artist: string;
-    kalshiMarketQuestion?: string | null;
-    pmMarketQuestion?: string | null;
-    kalshiOutcomeLabel?: string | null;
-    pmOutcomeLabel?: string | null;
-    relationshipVerified?: boolean;
-    relationshipState?: BotLegRelationshipState;
-    relationshipExplanation?: string | null;
-    kalshiSide?: 'yes' | 'no';
-    pmSide?: 'yes' | 'no';
     roiPct: number;
     expectedProfit: number;
     strategy: string;
@@ -1290,6 +1299,7 @@ export interface LastScanResult {
     buyPrice?: number;
     sellPlatform?: string | null;
     sellPrice?: number;
+    calculationEnvelope?: CalculationEnvelope;
     fees?: {
       kalshiFee: number;
       pmFee: number;
@@ -1396,9 +1406,22 @@ function sanitizeSavedArbResult(result: LastScanResult | null): LastScanResult |
       ? candidate.arbType : null;
     const audit = auditArbClassification(candidate.strategy, declared);
     return audit.valid && audit.canonicalType !== null;
-  });
+  }).map((candidate) => ({
+    ...candidate,
+    calculationEnvelope: parseCalculationEnvelope(
+      candidate.calculationEnvelope,
+      `saved opportunity ${candidate.artist}`,
+    ),
+  }));
   const topAudit = auditArbClassification(result.strategy, result.arbType ?? null);
-  if (topAudit.valid && topAudit.canonicalType !== null) return { ...result, allArbs };
+  if (topAudit.valid && topAudit.canonicalType !== null) return {
+    ...result,
+    calculationEnvelope: parseCalculationEnvelope(
+      result.calculationEnvelope ?? allArbs[0]?.calculationEnvelope,
+      'saved scan summary',
+    ),
+    allArbs,
+  };
   const best = allArbs.reduce<(typeof allArbs)[number] | null>(
     (current, candidate) => !current || candidate.roiPct > current.roiPct ? candidate : current,
     null,
@@ -1408,6 +1431,10 @@ function sanitizeSavedArbResult(result: LastScanResult | null): LastScanResult |
     bestRoiPct: best?.roiPct ?? 0,
     bestProfit: best?.expectedProfit ?? 0,
     strategy: best?.strategy ?? 'No arb',
+    calculationEnvelope: parseCalculationEnvelope(
+      result.calculationEnvelope ?? best?.calculationEnvelope,
+      'saved scan summary',
+    ),
     arbType: best?.arbType === 'cross' || best?.arbType === 'direct' || best?.arbType === 'internal' ? best.arbType : null,
     allArbs,
   };
@@ -1786,9 +1813,7 @@ async function prepareCanonicalMatchResult(
       ...(previous ?? incoming),
       matchStatus: incoming.matchStatus,
       matchError: incoming.matchError,
-      // unavailable/refreshing describes an attempt, not a successful price
-      // observation. Retained allArbs must retain their original age.
-      scannedAt: previous?.scannedAt ?? incoming.scannedAt,
+      scannedAt: incoming.scannedAt,
       publicationGeneration: incoming.publicationGeneration,
       matchedCount: previous?.matchedCount ?? incoming.matchedCount,
       matchedPairs: previous?.matchedPairs ?? incoming.matchedPairs ?? [],
@@ -2036,8 +2061,8 @@ async function ensureExecutionsTable(): Promise<void> {
       estimated_profit REAL    NOT NULL DEFAULT 0,
       steps            TEXT,
       bot_entry_evidence TEXT,
-      proposition_relationship TEXT,
-      selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL)
+      selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
+      calculation_envelope TEXT
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
@@ -2050,7 +2075,10 @@ async function ensureExecutionsTable(): Promise<void> {
   try { await c.execute(`ALTER TABLE executions ADD COLUMN selection_method TEXT`); } catch { /* column already exists */ }
   // BUG-157: immutable two-leg fill and fee authority captured by BotTrader.
   try { await c.execute(`ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`); } catch { /* column already exists */ }
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN proposition_relationship TEXT`); } catch { /* column already exists */ }
+  await c.execute({
+    sql: `UPDATE executions SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
+    args: [JSON.stringify(legacyUnverifiableEnvelope('legacy execution', 'execution'))],
+  });
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
   _executionsReady = true;
 }
@@ -2071,7 +2099,8 @@ export interface ExecutionRecord {
   source?: 'manual' | 'bot';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
   botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
-  propositionRelationship?: import('./proposition-identity').PropositionRelationship | null;
+  calculationEnvelope?: CalculationEnvelope;
+  calculationEnvelope?: CalculationEnvelope;
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<number> {
@@ -2089,10 +2118,16 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
   }
   await ensureExecutionsTable();
   const c = getClient();
+  const resultEnvelope = e.result && typeof e.result === 'object' && !Array.isArray(e.result)
+    ? (e.result as Record<string, unknown>).calculationEnvelope
+    : null;
+  const calculationEnvelope = e.calculationEnvelope ?? (resultEnvelope != null
+    ? validateCalculationEnvelope(resultEnvelope)
+    : legacyUnverifiableEnvelope(`execution ${e.arbId}`, 'execution'));
   const res = await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, proposition_relationship)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          RETURNING id`,
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, calculation_envelope)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
       e.strategy ?? null,
@@ -2104,7 +2139,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.source ?? 'manual',
       e.source === 'bot' ? (e.selectionMethod ?? null) : null,
       e.botEntryEvidence != null ? JSON.stringify(e.botEntryEvidence) : null,
-      e.propositionRelationship != null ? JSON.stringify(e.propositionRelationship) : null,
+      JSON.stringify(validateCalculationEnvelope(calculationEnvelope)),
     ],
   });
   return Number((res.rows as any[])[0]?.id ?? 0);
@@ -2132,6 +2167,22 @@ export async function getExecutions(
   return (res.rows as any[]).map((r) => rowToExecutionRecord(r));
 }
 
+/** Read only the immutable calculation envelopes needed to enrich position APIs. */
+export async function getExecutionCalculationEnvelopes(ids: number[]): Promise<Map<number, CalculationEnvelope>> {
+  await ensureExecutionsTable();
+  const uniqueIds = [...new Set(ids)].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 1000);
+  if (uniqueIds.length === 0) return new Map();
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const result = await getClient().execute({
+    sql: `SELECT id, calculation_envelope FROM executions WHERE id IN (${placeholders})`,
+    args: uniqueIds,
+  });
+  return new Map(result.rows.map((row) => {
+    const id = Number(row.id);
+    return [id, parseCalculationEnvelope(row.calculation_envelope, `execution ${id}`)] as const;
+  }));
+}
+
 function rowToExecutionRecord(r: any): ExecutionRecord {
   return {
     id: Number(r.id),
@@ -2149,7 +2200,7 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     source: (r.source ?? 'manual') as 'manual' | 'bot',
     selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
     botEntryEvidence: r.bot_entry_evidence ? JSON.parse(String(r.bot_entry_evidence)) : null,
-    propositionRelationship: r.proposition_relationship ? JSON.parse(String(r.proposition_relationship)) : null,
+    calculationEnvelope: parseCalculationEnvelope(r.calculation_envelope, `execution ${r.id}`),
   };
 }
 
@@ -2211,25 +2262,58 @@ async function ensureClosedPositionsTable(): Promise<void> {
       market_title     TEXT    NOT NULL,
       platform         TEXT    NOT NULL,
       side             TEXT    NOT NULL,
-      size             REAL    NOT NULL DEFAULT 0,
+      size             REAL,
       entry_price      REAL    NOT NULL DEFAULT 0,
-      exit_price       REAL    NOT NULL DEFAULT 0,
-      realized_pnl     REAL    NOT NULL DEFAULT 0,
-      roi_pct          REAL    NOT NULL DEFAULT 0,
+      exit_price       REAL,
+      realized_pnl     REAL,
+      roi_pct          REAL,
       opened_at        TEXT,
       closed_at        TEXT    NOT NULL,
       duration_secs    INTEGER,
       pair_id          TEXT,
-      fees_paid        REAL    NOT NULL DEFAULT 0,
+      fees_paid        REAL,
       ticker           TEXT,
       condition_id     TEXT,
       execution_mode   TEXT    NOT NULL DEFAULT 'live',
-      raw_data         TEXT
+      raw_data         TEXT,
+      calculation_envelope TEXT
     )`);
-  const columns = await c.execute(`PRAGMA table_info(closed_positions)`);
+  let columns = await c.execute(`PRAGMA table_info(closed_positions)`);
   if (!(columns.rows as any[]).some((row) => String(row.name) === 'execution_mode')) {
     await c.execute(`ALTER TABLE closed_positions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'live'`);
   }
+  if (!(columns.rows as Array<{ name: unknown }>).some((row) => String(row.name) === 'calculation_envelope')) {
+    await c.execute(`ALTER TABLE closed_positions ADD COLUMN calculation_envelope TEXT`);
+  }
+  columns = await c.execute(`PRAGMA table_info(closed_positions)`);
+  const nullableFinancialColumns = new Set(['size', 'exit_price', 'realized_pnl', 'roi_pct', 'fees_paid']);
+  const requiresNullableMigration = columns.rows.some((row) => (
+    nullableFinancialColumns.has(String(row.name)) && Number(row.notnull) === 1
+  ));
+  if (requiresNullableMigration) {
+    await c.batch([
+      `DROP TABLE IF EXISTS closed_positions_nullable`,
+      `CREATE TABLE closed_positions_nullable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, market_title TEXT NOT NULL, platform TEXT NOT NULL,
+        side TEXT NOT NULL, size REAL, entry_price REAL NOT NULL DEFAULT 0,
+        exit_price REAL, realized_pnl REAL, roi_pct REAL, opened_at TEXT, closed_at TEXT NOT NULL,
+        duration_secs INTEGER, pair_id TEXT, fees_paid REAL, ticker TEXT, condition_id TEXT,
+        execution_mode TEXT NOT NULL DEFAULT 'live', raw_data TEXT, calculation_envelope TEXT
+      )`,
+      `INSERT INTO closed_positions_nullable
+        (id, market_title, platform, side, size, entry_price, exit_price, realized_pnl, roi_pct,
+         opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, execution_mode, raw_data, calculation_envelope)
+       SELECT id, market_title, platform, side, size, entry_price, exit_price, realized_pnl, roi_pct,
+         opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, execution_mode, raw_data, calculation_envelope
+       FROM closed_positions`,
+      `DROP TABLE closed_positions`,
+      `ALTER TABLE closed_positions_nullable RENAME TO closed_positions`,
+    ], 'write');
+  }
+  await c.execute({
+    sql: `UPDATE closed_positions SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
+    args: [JSON.stringify(legacyUnverifiableEnvelope('legacy closed position', 'position'))],
+  });
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_closed_at ON closed_positions(closed_at DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_closed_positions_pair_id ON closed_positions(pair_id)`);
   _closedPositionsReady = true;
@@ -2240,20 +2324,21 @@ export interface ClosedPosition {
   marketTitle: string;
   platform: 'kalshi' | 'polymarket';
   side: 'YES' | 'NO';
-  size: number;
+  size: number | null;
   entryPrice: number;
-  exitPrice: number;
-  realizedPnl: number;
-  roiPct: number;
+  exitPrice: number | null;
+  realizedPnl: number | null;
+  roiPct: number | null;
   openedAt?: string | null;
   closedAt: string;
   durationSecs?: number | null;
   pairId?: string | null;
-  feesPaid?: number;
+  feesPaid?: number | null;
   ticker?: string | null;
   conditionId?: string | null;
   executionMode?: 'live' | 'paper';
   rawData?: unknown;
+  calculationEnvelope?: CalculationEnvelope;
 }
 
 export async function persistClosedPosition(cp: ClosedPosition): Promise<void> {
@@ -2262,19 +2347,22 @@ export async function persistClosedPosition(cp: ClosedPosition): Promise<void> {
   await c.execute({
     sql: `INSERT INTO closed_positions
       (market_title, platform, side, size, entry_price, exit_price, realized_pnl, roi_pct,
-       opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, execution_mode, raw_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       opened_at, closed_at, duration_secs, pair_id, fees_paid, ticker, condition_id, execution_mode, raw_data, calculation_envelope)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       cp.marketTitle, cp.platform, cp.side, cp.size,
       cp.entryPrice, cp.exitPrice, cp.realizedPnl, cp.roiPct,
       cp.openedAt ?? null, cp.closedAt,
       cp.durationSecs ?? null,
       cp.pairId ?? null,
-      cp.feesPaid ?? 0,
+      cp.feesPaid ?? null,
       cp.ticker ?? null,
       cp.conditionId ?? null,
       cp.executionMode ?? 'live',
       cp.rawData != null ? JSON.stringify(cp.rawData) : null,
+      JSON.stringify(cp.calculationEnvelope == null
+        ? legacyUnverifiableEnvelope(`closed position ${cp.pairId ?? cp.marketTitle}`, 'position')
+        : validateCalculationEnvelope(cp.calculationEnvelope)),
     ],
   });
 }
@@ -2291,20 +2379,21 @@ export async function getClosedPositions(limit = 500): Promise<ClosedPosition[]>
     marketTitle: String(r.market_title),
     platform: String(r.platform) as 'kalshi' | 'polymarket',
     side: String(r.side) as 'YES' | 'NO',
-    size: Number(r.size),
+    size: r.size != null ? Number(r.size) : null,
     entryPrice: Number(r.entry_price),
-    exitPrice: Number(r.exit_price),
-    realizedPnl: Number(r.realized_pnl),
-    roiPct: Number(r.roi_pct),
+    exitPrice: r.exit_price != null ? Number(r.exit_price) : null,
+    realizedPnl: r.realized_pnl != null ? Number(r.realized_pnl) : null,
+    roiPct: r.roi_pct != null ? Number(r.roi_pct) : null,
     openedAt: r.opened_at ?? null,
     closedAt: String(r.closed_at),
     durationSecs: r.duration_secs != null ? Number(r.duration_secs) : null,
     pairId: r.pair_id ?? null,
-    feesPaid: Number(r.fees_paid ?? 0),
+    feesPaid: r.fees_paid != null ? Number(r.fees_paid) : null,
     ticker: r.ticker ?? null,
     conditionId: r.condition_id ?? null,
     executionMode: String(r.execution_mode ?? 'live') as 'live' | 'paper',
     rawData: r.raw_data ? JSON.parse(String(r.raw_data)) : undefined,
+    calculationEnvelope: parseCalculationEnvelope(r.calculation_envelope, `closed position ${r.id}`),
   }));
 }
 

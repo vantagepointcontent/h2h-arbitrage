@@ -111,6 +111,10 @@ export interface ExecutionRequest {
   /** Whether at least one share was available at the best ask price when the
    *  opportunity was detected.  When false, the best-price step shows a warning. */
   bestPriceFound?: boolean;
+  /** Immutable fee, book, quantity, and net-P&L authority supplied by the scanner. */
+  calculationEnvelope?: import('./calculation-envelope').CalculationEnvelope;
+  /** Strategy label echoed into the durable execution log. */
+  strategy?: string;
 }
 
 export type StepStatus = 'success' | 'pending' | 'failed' | 'partial' | 'skipped';

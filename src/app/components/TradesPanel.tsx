@@ -335,7 +335,10 @@ export default function TradesPanel() {
     }
   }, [methodFilter, methodSort]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    load();
+  }, [load]);
 
   /** Fetch timeline for a trade from the separate endpoint (fallback if steps not inline). */
   const loadTimeline = useCallback(async (tradeId: number, arbId: string) => {
