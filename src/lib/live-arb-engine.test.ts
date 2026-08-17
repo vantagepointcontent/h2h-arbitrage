@@ -16,6 +16,12 @@ import {
 } from './clob-ws';
 import { applyKalshiWsMessage, applyPmWsUpdates } from './ws-book-apply';
 import { buildExecutionRequest, liveArbResultToBotInput } from './bot-trader';
+import type { PropositionRelationship } from './proposition-identity';
+
+vi.mock('./proposition-registry', () => ({
+  resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
+  findCanonicalPropositionRelationship: () => null,
+}));
 
 const outcome = {
   artist: 'Example',
@@ -32,6 +38,30 @@ const outcome = {
   crossOutcomeMutuallyExclusiveVerified: true,
   crossOutcomeExhaustiveVerified: true,
   pmConditionId: `0x${'1'.repeat(64)}`,
+  propositionRelationship: {
+    schemaVersion: 1 as const,
+    state: 'verified_complementary' as const,
+    verificationSource: 'authoritative_platform_metadata' as const,
+    verifiedAt: '2026-08-17T12:00:00.000Z',
+    parentEventId: 'example-event',
+    resolutionRuleId: 'example-event-rules-v1',
+    exhaustivePayoutStates: ['example', 'not example'],
+    humanLabel: 'Kalshi YES Example ↔ Polymarket NO Example',
+    legs: {
+      kalshi: {
+        platform: 'kalshi' as const, platformMarketId: 'KX-BUG-096', parentEventId: 'example-event',
+        selectedOutcome: 'example', contractSide: 'yes' as const, payoutState: 'example',
+        eventPayoutStates: ['example', 'not example'], resolutionRuleId: 'example-event-rules-v1',
+        humanLabel: 'Kalshi YES — Example', marketQuestion: 'Will Example happen?', tokenId: null,
+      },
+      polymarket: {
+        platform: 'polymarket' as const, platformMarketId: `0x${'1'.repeat(64)}`, parentEventId: 'example-event',
+        selectedOutcome: 'example', contractSide: 'no' as const, payoutState: 'not example',
+        eventPayoutStates: ['example', 'not example'], resolutionRuleId: 'example-event-rules-v1',
+        humanLabel: 'Polymarket NO — Example', marketQuestion: 'Will Example happen?', tokenId: '1002',
+      },
+    },
+  },
   pmFeesEnabled: true,
   pmFeeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 },
 };

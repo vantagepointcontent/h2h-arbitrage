@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "description": "Human-reviewed, exact cross-venue proposition relationships allowed for BotTrader execution. Fuzzy/title matching must never populate this registry.",
+  "relationships": []
+}

@@ -9,6 +9,12 @@ import {
   type PersistedBotScan,
 } from './bot-scan-consumer';
 import { buildExecutionRequest, type BotExecutionResult, type BotSettings } from './bot-trader';
+import type { PropositionRelationship } from './proposition-identity';
+
+vi.mock('./proposition-registry', () => ({
+  resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
+  findCanonicalPropositionRelationship: () => null,
+}));
 import { walkExecutableBook } from './executable-book';
 
 function settings(overrides: Partial<BotSettings> = {}): BotSettings {
@@ -27,7 +33,7 @@ function settings(overrides: Partial<BotSettings> = {}): BotSettings {
 }
 
 function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate {
-  return {
+  const result: BotScanCandidate = {
     outcome: 'Team A',
     kalshiMarketQuestion: 'Will Team A win on Kalshi?',
     pmMarketQuestion: 'Will Team A win on Polymarket?',
@@ -46,6 +52,8 @@ function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate 
     pmStake: 50,
     kalshiTicker: 'KXTEST-A',
     pmConditionId: 'pm-condition-a',
+    pmYesTokenId: 'pm-yes-token',
+    pmNoTokenId: 'pm-no-token',
     kalshiYesAsk: 0.45,
     kalshiNoAsk: 0.56,
     pmYesAsk: 0.49,
@@ -62,6 +70,29 @@ function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate 
     expiryDate: '2026-08-18T00:00:00.000Z',
     ...overrides,
   };
+  if (overrides.propositionRelationship === undefined) {
+    const states = ['team a', 'not team a'];
+    result.propositionRelationship = {
+      schemaVersion: 1, state: 'verified_complementary', verificationSource: 'authoritative_platform_metadata',
+      verifiedAt: '2026-08-11T12:00:00.000Z', parentEventId: 'event-1',
+      resolutionRuleId: 'event-1-rules-v1', exhaustivePayoutStates: states,
+      humanLabel: 'Kalshi YES Team A ↔ Polymarket NO Team A',
+      legs: {
+        kalshi: {
+          platform: 'kalshi', platformMarketId: result.kalshiTicker, parentEventId: 'event-1',
+          selectedOutcome: 'team a', contractSide: 'yes', payoutState: 'team a', eventPayoutStates: states,
+          resolutionRuleId: 'event-1-rules-v1', humanLabel: 'Kalshi YES — Team A', marketQuestion: 'Will Team A win?', tokenId: null,
+        },
+        polymarket: {
+          platform: 'polymarket', platformMarketId: result.pmConditionId, parentEventId: 'event-1',
+          selectedOutcome: 'team a', contractSide: 'no', payoutState: 'not team a', eventPayoutStates: states,
+          resolutionRuleId: 'event-1-rules-v1', humanLabel: 'Polymarket NO — Team A', marketQuestion: 'Will Team A win?',
+          tokenId: result.pmNoTokenId!,
+        },
+      },
+    };
+  }
+  return result;
 }
 
 function executableQuote(price: number) {
@@ -498,7 +529,6 @@ describe('durable BotTrader scan consumer', () => {
     h.deps.reportModeBlock = vi.fn(async () => ({
       reason: 'Production execution blocked: live credentials missing',
       alertDurable: true,
-      alertError: null,
     }));
 
     await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({

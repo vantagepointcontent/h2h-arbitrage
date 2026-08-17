@@ -6,6 +6,7 @@ import logger from './logger';
 import { auditArbClassification } from './arb-types';
 import type { BotLegRelationshipState } from './bot-leg-identity';
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
+import type { PropositionRelationship } from './proposition-identity';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
 export type BotScanDecisionState =
@@ -41,6 +42,7 @@ export interface BotScanCandidate {
   kalshiSide?: 'yes' | 'no';
   pmSide?: 'yes' | 'no';
   strategy: string;
+  propositionRelationship?: PropositionRelationship | null;
   roiPct: number;
   apyPct?: number | null;
   expectedProfit: number;
@@ -172,6 +174,7 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     kalshiSide: item.kalshiSide,
     pmSide: item.pmSide,
     strategy: item.strategy,
+    propositionRelationship: item.propositionRelationship ?? null,
     roiPct: item.roiPct,
     apyPct: item.apyPct ?? null,
     expectedProfit: item.expectedProfit,
@@ -779,6 +782,9 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     kalshiSide: row.kalshiSide === 'yes' || row.kalshiSide === 'no' ? row.kalshiSide : undefined,
     pmSide: row.pmSide === 'yes' || row.pmSide === 'no' ? row.pmSide : undefined,
     strategy: row.strategy,
+    propositionRelationship: row.propositionRelationship && typeof row.propositionRelationship === 'object'
+      ? row.propositionRelationship as PropositionRelationship
+      : null,
     roiPct: row.roiPct,
     apyPct: finite(row.apyPct) ? row.apyPct : null,
     expectedProfit: row.expectedProfit,

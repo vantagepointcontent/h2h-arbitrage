@@ -13,16 +13,10 @@ import { calculateScanApy, type ScanApyUnavailableReason } from './scan-apy';
 import { isPriceAlignedToTick } from './venue-constraints';
 import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quote';
 import { getPolymarketCategoryFeeRateBps, resolvePolymarketFeeRateBps } from './polymarket-fees';
-import type { BotLegRelationshipState } from './bot-leg-identity';
+import type { PropositionRelationship } from './proposition-identity';
 
 export interface UnifiedOutcome {
   artist: string;
-  /** Exact venue contract questions captured from platform payloads. */
-  kalshiMarketQuestion?: string | null;
-  pmMarketQuestion?: string | null;
-  /** Exact venue-provided outcome labels; never derived from the shared display name. */
-  kalshiOutcomeLabel?: string | null;
-  pmOutcomeLabel?: string | null;
   kalshi: {
     ticker: string;
     yesBid: number;
@@ -112,15 +106,6 @@ export interface UnifiedOutcome {
     sellPrice: number;
     /** Exact Polymarket parent identity selected by cross-outcome strategies. */
     pmConditionId?: string;
-    /** Exact structured leg identity selected by this strategy. */
-    selectedKalshiOutcomeLabel?: string | null;
-    selectedPmOutcomeLabel?: string | null;
-    selectedKalshiMarketQuestion?: string | null;
-    selectedPmMarketQuestion?: string | null;
-    selectedKalshiSide?: 'yes' | 'no';
-    selectedPmSide?: 'yes' | 'no';
-    selectedRelationshipState?: BotLegRelationshipState;
-    selectedRelationshipExplanation?: string | null;
     /** True when ROI exceeds the sanity threshold AND depth on some leg was
      *  unknown/assumed-infinite — almost certainly a phantom quote on an
      *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
@@ -146,6 +131,7 @@ export interface UnifiedOutcome {
   source: 'auto' | 'manual';
   /** True only when matching supplied explicit rule-alignment evidence. */
   resolutionRulesAligned?: boolean;
+  propositionRelationship?: PropositionRelationship | null;
   /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
   negRisk?: boolean;
   /** True when this outcome is a virtual cross-outcome arbitrage row */
@@ -575,8 +561,6 @@ export function calculateArbitrageMax(
   let buyPrice = 0;
   let sellPlatform: 'kalshi' | 'polymarket' | null = null;
   let sellPrice = 0;
-  let selectedKalshiSide: 'yes' | 'no' = 'yes';
-  let selectedPmSide: 'yes' | 'no' = 'no';
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
   let hasCandidate = false;
   let bestUnexecutableQuote: {
@@ -681,8 +665,6 @@ export function calculateArbitrageMax(
         buyPrice = kYes;
         sellPlatform = 'polymarket';
         sellPrice = pNo;
-        selectedKalshiSide = 'yes';
-        selectedPmSide = 'no';
         feeInfo = {
           kalshiFee: fees.kalshiFee,
           pmFee: fees.pmFee,
@@ -746,8 +728,6 @@ export function calculateArbitrageMax(
         buyPrice = pYes;
         sellPlatform = 'kalshi';
         sellPrice = kNo;
-        selectedKalshiSide = 'no';
-        selectedPmSide = 'yes';
         feeInfo = {
           kalshiFee: fees.kalshiFee,
           pmFee: fees.pmFee,
@@ -864,8 +844,6 @@ export function calculateArbitrageMax(
     depthVerified: true,
     requestedContracts,
     executionStatus: 'executable',
-    selectedKalshiSide,
-    selectedPmSide,
   };
 }
 
@@ -911,10 +889,6 @@ export function calculateBestArbitrageForOutcome(
     category,
     maxCapital,
   );
-  if (best.arbType === 'direct' && current.polymarket.binaryVerified === true) {
-    best.selectedRelationshipState = 'verified_complementary';
-    best.selectedRelationshipExplanation = 'Canonical matcher verification for opposite sides of the exact binary proposition.';
-  }
 
   // BUG-142: an Internal arb is complementary YES + NO on one authoritative
   // binary contract. Each leg needs positive executable depth and its own fee.
@@ -1048,14 +1022,6 @@ export function calculateBestArbitrageForOutcome(
             sellPlatform: 'polymarket',
             sellPrice: pYesB,
             pmConditionId: complement.polymarket.conditionId,
-            selectedKalshiOutcomeLabel: current.kalshiOutcomeLabel ?? null,
-            selectedPmOutcomeLabel: complement.pmOutcomeLabel ?? null,
-            selectedKalshiMarketQuestion: current.kalshiMarketQuestion ?? null,
-            selectedPmMarketQuestion: complement.pmMarketQuestion ?? null,
-            selectedKalshiSide: 'yes',
-            selectedPmSide: 'yes',
-            selectedRelationshipState: 'verified_complementary',
-            selectedRelationshipExplanation: 'Canonical matcher verification for mutually exclusive and exhaustive exact outcomes.',
             fees: {
               kalshiFee: fees.kalshiFee,
               pmFee: fees.pmFee,
@@ -1492,7 +1458,7 @@ export function matchOutcomes(
     kalshiMap.set(name, km);
   }
 
-  const pmOutcomes: { title: string; outcomeLabel: string | null; yesPrice: number; noPrice: number; market: PMMarket }[] = [];
+  const pmOutcomes: { title: string; yesPrice: number; noPrice: number; market: PMMarket }[] = [];
   const pmSeenNames = new Map<string, string>(); // normalized -> first raw title
   for (const pm of pmMarkets) {
     const { outcomes, prices } = parseOutcomes(pm);
@@ -1513,7 +1479,6 @@ export function matchOutcomes(
       }
       pmOutcomes.push({
         title: enrichedTitle,
-        outcomeLabel: pm.groupItemTitle?.trim() || null,
         yesPrice: prices[0] || 0,
         noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
         market: pm,
@@ -1533,7 +1498,6 @@ export function matchOutcomes(
       }
       pmOutcomes.push({
         title,
-        outcomeLabel: null,
         yesPrice: prices[0] || 0,
         noPrice: prices[1] !== undefined ? prices[1] : (1 - (prices[0] || 0)),
         market: pm,
@@ -1552,7 +1516,6 @@ export function matchOutcomes(
       }
       pmOutcomes.push({
         title,
-        outcomeLabel: outcomes[i]?.trim() || null,
         yesPrice: prices[i] || 0,
         noPrice: prices.length > i + 1 ? prices[i + 1] : (1 - prices[i]),
         market: pm,
@@ -1577,10 +1540,6 @@ export function matchOutcomes(
       const pmShape = buildPmArbShape(pmo.market, expiryDate);
       matched.push({
         artist: stripBetTypePrefix(getKalshiName(exact)),
-        kalshiMarketQuestion: exact.title?.trim() || null,
-        pmMarketQuestion: pmo.market.question?.trim() || null,
-        kalshiOutcomeLabel: exact.yes_sub_title?.trim() || null,
-        pmOutcomeLabel: pmo.outcomeLabel,
         kalshi,
         polymarket: pmShape,
         arbitrage: placeholderArb,
@@ -1617,10 +1576,6 @@ export function matchOutcomes(
       const displayName = stripBetTypePrefix(getKalshiName(bestKm));
       matched.push({
         artist: displayName,
-        kalshiMarketQuestion: bestKm.title?.trim() || null,
-        pmMarketQuestion: pmo.market.question?.trim() || null,
-        kalshiOutcomeLabel: bestKm.yes_sub_title?.trim() || null,
-        pmOutcomeLabel: pmo.outcomeLabel,
         kalshi,
         polymarket: pmShape,
         arbitrage: placeholderArb,
@@ -1637,8 +1592,6 @@ export function matchOutcomes(
     if (!usedKalshi.has(km.ticker)) {
       matched.push({
         artist: stripBetTypePrefix(getKalshiName(km)),
-        kalshiMarketQuestion: km.title?.trim() || null,
-        kalshiOutcomeLabel: km.yes_sub_title?.trim() || null,
         kalshi: buildKalshiArbShape(km),
         polymarket: null,
         arbitrage: noArbResult,
@@ -1654,8 +1607,6 @@ export function matchOutcomes(
       const pmShape = buildPmArbShape(pmo.market, expiryDate);
       matched.push({
         artist: stripBetTypePrefix(pmo.title) || 'Unknown',
-        pmMarketQuestion: pmo.market.question?.trim() || null,
-        pmOutcomeLabel: pmo.outcomeLabel,
         kalshi: null,
         polymarket: pmShape,
         arbitrage: noArbResult,
@@ -1730,10 +1681,6 @@ export function applyManualMatches(
       // Previously this concatenated both platform names ("KalshiName + PMName")
       // which cluttered the display. The PM name alone is sufficient.
       artist: outcomes[pIdx].artist,
-      kalshiMarketQuestion: outcomes[kIdx].kalshiMarketQuestion ?? null,
-      pmMarketQuestion: outcomes[pIdx].pmMarketQuestion ?? null,
-      kalshiOutcomeLabel: outcomes[kIdx].kalshiOutcomeLabel ?? null,
-      pmOutcomeLabel: outcomes[pIdx].pmOutcomeLabel ?? null,
       kalshi,
       polymarket: pmShape,
       arbitrage: noArbResult,

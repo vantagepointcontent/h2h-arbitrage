@@ -1178,6 +1178,14 @@ describe('BotPositionStore', () => {
       pmConditionId: '0xdef',
       kalshiEntryFeeMultiplierPpm: null,
     } as never)).rejects.toThrow(/entry fee configuration/i);
+    await expect(store.create({
+      ...created,
+      id: undefined,
+      kalshiTicker: 'KXTEST3',
+      pmConditionId: '0x123',
+      propositionRelationship: { schemaVersion: 1 },
+      propositionRelationshipState: 'verified_complementary',
+    } as never)).rejects.toThrow(/not canonically bound/i);
 
     const columnsClient = createClient({ url: dbUrl });
     const columns = await columnsClient.execute('PRAGMA table_info(bot_positions)');
@@ -1196,6 +1204,7 @@ describe('BotPositionStore', () => {
       'pm_exit_fee_rebate_rate_ppm', 'pm_exit_order_base_fee_bps',
       'pm_exit_order_fee_source', 'pm_exit_order_fee_version',
       'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
+      'proposition_relationship_json', 'proposition_relationship_state', 'proposition_relationship_warning',
     ]));
   });
 
