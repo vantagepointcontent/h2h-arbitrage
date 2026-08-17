@@ -2728,10 +2728,12 @@ function hasVerifiedTerminalAccounting(position: BotPosition): boolean {
       - position.remainingOpenCostCents === position.realizedPnlCents;
 }
 
-function deployedCostCents(position: BotPosition): number {
-  return position.status === 'open' && Number.isSafeInteger(position.remainingOpenCostCents)
-    ? position.remainingOpenCostCents
-    : position.totalCostCents;
+function analyticsBuyCostCents(position: BotPosition): number {
+  return position.indicativeBuyCostMicrocents != null
+    ? position.totalCostCents
+    : position.status === 'open' && Number.isSafeInteger(position.remainingOpenCostCents)
+      ? position.remainingOpenCostCents
+      : position.totalCostCents;
 }
 
 function heldPayoutCents(position: BotPosition): number {
@@ -2754,7 +2756,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const exactValueMicrocents = (position: BotPosition) => position.indicativeValueMicrocents
     ?? position.currentValueCents! * 1_000_000;
   const exactUnrealizedMicrocents = (position: BotPosition) => position.indicativePnlMicrocents
-    ?? (position.currentValueCents! - deployedCostCents(position)) * 1_000_000;
+    ?? (position.currentValueCents! - analyticsBuyCostCents(position)) * 1_000_000;
   const nowMs = now.getTime();
   const open = rows.filter((position) => position.status === 'open');
   const verifiedSettled = rows.filter(hasVerifiedTerminalAccounting);
@@ -2766,9 +2768,13 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const unavailable = open.filter((position) => mark(position) === 'unavailable').length;
   const unavailableEntryCosts = rows.filter((position) => !hasAvailableEntryCost(position)).length;
   const allEntryCostsAvailable = unavailableEntryCosts === 0;
+  // A BUG-160 indicative P&L already compares the remaining mark with immutable
+  // original Buy Cost. Add partial-close realized P&L only for legacy executable
+  // valuations, where P&L still uses remaining basis.
   const realizedCents = total([
     ...verifiedSettled.map((position) => position.realizedPnlCents!),
-    ...open.map((position) => position.realizedPnlCents ?? 0),
+    ...open.filter((position) => position.indicativePnlMicrocents == null)
+      .map((position) => position.realizedPnlCents ?? 0),
   ]);
   const valuedOpen = markedOpen.filter(hasAvailableEntryCost);
   const exactOpenValueMicrocents = total(markedOpen.map(exactValueMicrocents));
@@ -2777,12 +2783,12 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     ? null
     : roundMicrocents(exactOpenUnrealizedMicrocents);
   const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
-  const deployedCents = allEntryCostsAvailable ? total(rows.map(deployedCostCents)) : null;
+  const deployedCents = allEntryCostsAvailable ? total(rows.map(analyticsBuyCostCents)) : null;
   const currentCents = roundMicrocents(exactOpenValueMicrocents
     + total(verifiedSettled.map((position) => position.resolutionPayoutCents!)) * 1_000_000);
-  const valuedCostCents = total(valuedOpen.map(deployedCostCents))
+  const valuedCostCents = total(valuedOpen.map(analyticsBuyCostCents))
     + total(verifiedSettled.map((position) => position.totalCostCents));
-  const excludedOpenCostCents = total(open.filter((position) => mark(position) === 'unavailable' || !hasAvailableEntryCost(position)).map(deployedCostCents));
+  const excludedOpenCostCents = total(open.filter((position) => mark(position) === 'unavailable' || !hasAvailableEntryCost(position)).map(analyticsBuyCostCents));
   const oldestMarkedMs = markedOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
   const dates = new Map<string, BotPerformanceSummary['entryCohorts'][number] & { incomplete: boolean }>();
   const exactCurrentByDate = new Map<string, number>();
@@ -2793,10 +2799,12 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     const point = dates.get(date) ?? { date, deployedCents: 0, currentCents: 0, heldToResolutionCents: 0, realizedCents: 0, unrealizedCents: 0, trades: 0, incomplete: false };
     point.deployedCents = point.deployedCents == null || !hasAvailableEntryCost(position)
       ? null
-      : point.deployedCents + deployedCostCents(position);
+      : point.deployedCents + analyticsBuyCostCents(position);
     point.trades += 1;
     if (position.status === 'open') {
-      point.realizedCents += position.realizedPnlCents ?? 0;
+      if (position.indicativePnlMicrocents == null) {
+        point.realizedCents += position.realizedPnlCents ?? 0;
+      }
       point.heldToResolutionCents += heldPayoutCents(position);
       if (mark(position) !== 'unavailable') {
         exactCurrentByDate.set(date, (exactCurrentByDate.get(date) ?? 0) + exactValueMicrocents(position));
@@ -2837,7 +2845,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       totalCents,
       roiBps: totalCents == null || valuedCostCents <= 0 ? null : (() => {
         const exactOpenCost = valuedOpen.reduce((sum, position) => sum
-          + (position.indicativeBuyCostMicrocents ?? deployedCostCents(position) * 1_000_000), 0);
+          + (position.indicativeBuyCostMicrocents ?? analyticsBuyCostCents(position) * 1_000_000), 0);
         const terminalCost = total(verifiedSettled.map((position) => position.totalCostCents)) * 1_000_000;
         const denominator = exactOpenCost + terminalCost;
         return denominator <= 0 ? null : Math.round(
@@ -2885,7 +2893,7 @@ export function summarizeBotPositions(rows: BotPosition[], now = new Date()) {
   const performance = summarizeBotPerformance(rows, now);
   const allEntryCostsAvailable = rows.every(hasAvailableEntryCost);
   const deployedCapitalCents = allEntryCostsAvailable
-    ? totalNumbers(rows.map(deployedCostCents))
+    ? totalNumbers(rows.map(analyticsBuyCostCents))
     : null;
   const apyValues = rows.flatMap((position) => {
     if (!position.expiryDate) return [];
@@ -2931,8 +2939,8 @@ export async function getBotPositionAnalytics(options: {
   const settled = positions.filter(hasVerifiedTerminalAccounting);
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
   const score = (position: BotPosition) => position.status === 'open'
-    ? (position.realizedPnlCents ?? 0)
-      + (position.currentValueCents ?? deployedCostCents(position)) - deployedCostCents(position)
+    ? (position.indicativePnlMicrocents == null ? position.realizedPnlCents ?? 0 : 0)
+      + (position.currentValueCents ?? analyticsBuyCostCents(position)) - analyticsBuyCostCents(position)
     : hasVerifiedTerminalAccounting(position) ? position.realizedPnlCents! : 0;
   const ranked = positions.filter((position) => position.status === 'open'
     ? botPositionMark(position, now.getTime()) === 'fresh'
