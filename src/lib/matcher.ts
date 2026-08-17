@@ -13,7 +13,7 @@ import { calculateScanApy, type ScanApyUnavailableReason } from './scan-apy';
 import { isPriceAlignedToTick } from './venue-constraints';
 import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quote';
 import { getPolymarketCategoryFeeRateBps, resolvePolymarketFeeRateBps } from './polymarket-fees';
-import type { PropositionRelationship } from './proposition-identity';
+import type { BotLegRelationshipState } from './bot-leg-identity';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -23,18 +23,6 @@ export interface UnifiedOutcome {
   /** Exact venue-provided outcome labels; never derived from the shared display name. */
   kalshiOutcomeLabel?: string | null;
   pmOutcomeLabel?: string | null;
-  kalshiStale?: boolean;
-  polymarketStale?: boolean;
-  polymarketRefresh?: {
-    conditionId: string;
-    outcome: string;
-    status: 'refreshed' | 'timed_out' | 'error' | 'unavailable';
-    observedAt: string | null;
-    source: 'live-clob' | 'saved-market-snapshot' | null;
-    servedFromSnapshot: boolean;
-    snapshotAgeMs: number | null;
-    reason?: string;
-  };
   kalshi: {
     ticker: string;
     yesBid: number;
@@ -124,6 +112,15 @@ export interface UnifiedOutcome {
     sellPrice: number;
     /** Exact Polymarket parent identity selected by cross-outcome strategies. */
     pmConditionId?: string;
+    /** Exact structured leg identity selected by this strategy. */
+    selectedKalshiOutcomeLabel?: string | null;
+    selectedPmOutcomeLabel?: string | null;
+    selectedKalshiMarketQuestion?: string | null;
+    selectedPmMarketQuestion?: string | null;
+    selectedKalshiSide?: 'yes' | 'no';
+    selectedPmSide?: 'yes' | 'no';
+    selectedRelationshipState?: BotLegRelationshipState;
+    selectedRelationshipExplanation?: string | null;
     /** True when ROI exceeds the sanity threshold AND depth on some leg was
      *  unknown/assumed-infinite — almost certainly a phantom quote on an
      *  illiquid book, not a fillable arb. Excluded from stats/alerts. */
@@ -149,7 +146,6 @@ export interface UnifiedOutcome {
   source: 'auto' | 'manual';
   /** True only when matching supplied explicit rule-alignment evidence. */
   resolutionRulesAligned?: boolean;
-  propositionRelationship?: PropositionRelationship | null;
   /** True when this PM market is neg-risk (independent YES/NO, not complementary) */
   negRisk?: boolean;
   /** True when this outcome is a virtual cross-outcome arbitrage row */
@@ -579,6 +575,8 @@ export function calculateArbitrageMax(
   let buyPrice = 0;
   let sellPlatform: 'kalshi' | 'polymarket' | null = null;
   let sellPrice = 0;
+  let selectedKalshiSide: 'yes' | 'no' = 'yes';
+  let selectedPmSide: 'yes' | 'no' = 'no';
   let feeInfo: UnifiedOutcome['arbitrage']['fees'] = undefined;
   let hasCandidate = false;
   let bestUnexecutableQuote: {
@@ -683,6 +681,8 @@ export function calculateArbitrageMax(
         buyPrice = kYes;
         sellPlatform = 'polymarket';
         sellPrice = pNo;
+        selectedKalshiSide = 'yes';
+        selectedPmSide = 'no';
         feeInfo = {
           kalshiFee: fees.kalshiFee,
           pmFee: fees.pmFee,
@@ -746,6 +746,8 @@ export function calculateArbitrageMax(
         buyPrice = pYes;
         sellPlatform = 'kalshi';
         sellPrice = kNo;
+        selectedKalshiSide = 'no';
+        selectedPmSide = 'yes';
         feeInfo = {
           kalshiFee: fees.kalshiFee,
           pmFee: fees.pmFee,
@@ -862,6 +864,8 @@ export function calculateArbitrageMax(
     depthVerified: true,
     requestedContracts,
     executionStatus: 'executable',
+    selectedKalshiSide,
+    selectedPmSide,
   };
 }
 
@@ -907,6 +911,10 @@ export function calculateBestArbitrageForOutcome(
     category,
     maxCapital,
   );
+  if (best.arbType === 'direct' && current.polymarket.binaryVerified === true) {
+    best.selectedRelationshipState = 'verified_complementary';
+    best.selectedRelationshipExplanation = 'Canonical matcher verification for opposite sides of the exact binary proposition.';
+  }
 
   // BUG-142: an Internal arb is complementary YES + NO on one authoritative
   // binary contract. Each leg needs positive executable depth and its own fee.
@@ -1040,6 +1048,14 @@ export function calculateBestArbitrageForOutcome(
             sellPlatform: 'polymarket',
             sellPrice: pYesB,
             pmConditionId: complement.polymarket.conditionId,
+            selectedKalshiOutcomeLabel: current.kalshiOutcomeLabel ?? null,
+            selectedPmOutcomeLabel: complement.pmOutcomeLabel ?? null,
+            selectedKalshiMarketQuestion: current.kalshiMarketQuestion ?? null,
+            selectedPmMarketQuestion: complement.pmMarketQuestion ?? null,
+            selectedKalshiSide: 'yes',
+            selectedPmSide: 'yes',
+            selectedRelationshipState: 'verified_complementary',
+            selectedRelationshipExplanation: 'Canonical matcher verification for mutually exclusive and exhaustive exact outcomes.',
             fees: {
               kalshiFee: fees.kalshiFee,
               pmFee: fees.pmFee,

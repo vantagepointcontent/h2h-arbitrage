@@ -10,6 +10,7 @@ import {
   type KalshiFeeType as AuthoritativeKalshiFeeType,
 } from './kalshi-fee-quote';
 import { calculatePolymarketFeeMicrousd } from './polymarket-fees';
+import type { BotLegRelationshipState } from './bot-leg-identity';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -95,6 +96,12 @@ export interface BotPosition {
   kalshiTicker: string | null;
   pmConditionId: string | null;
   strategy: string | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  relationshipState?: BotLegRelationshipState | null;
+  relationshipExplanation?: string | null;
   /** Persisted canonical backend verification for the exact selected legs. */
   relationshipVerified: boolean;
   kalshiSide: BotPositionSide;
@@ -231,6 +238,7 @@ export type CreateBotPosition = Omit<BotPosition,
   'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource' |
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
   'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' | 'relationshipVerified' |
+  'kalshiMarketQuestion' | 'pmMarketQuestion' | 'kalshiOutcomeLabel' | 'pmOutcomeLabel' | 'relationshipState' | 'relationshipExplanation' |
   'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt'
 > & {
   expectedRoiBps?: number | null;
@@ -239,6 +247,12 @@ export type CreateBotPosition = Omit<BotPosition,
   kalshiEntryCalculatedFeeCents?: number;
   kalshiEntryChargedFeeCents?: number | null;
   relationshipVerified?: boolean;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  relationshipState?: BotLegRelationshipState | null;
+  relationshipExplanation?: string | null;
 };
 
 export interface ExecutableBidLevel {
@@ -1022,6 +1036,13 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
     pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
     strategy: row.strategy != null ? String(row.strategy) : null,
+    kalshiMarketQuestion: row.kalshi_market_question != null ? String(row.kalshi_market_question) : null,
+    pmMarketQuestion: row.pm_market_question != null ? String(row.pm_market_question) : null,
+    kalshiOutcomeLabel: row.kalshi_outcome_label != null ? String(row.kalshi_outcome_label) : null,
+    pmOutcomeLabel: row.pm_outcome_label != null ? String(row.pm_outcome_label) : null,
+    relationshipState: ['verified_complementary', 'same_direction', 'invalid', 'legacy_unknown'].includes(String(row.relationship_state))
+      ? String(row.relationship_state) as BotLegRelationshipState : null,
+    relationshipExplanation: row.relationship_explanation != null ? String(row.relationship_explanation) : null,
     relationshipVerified: Number(row.relationship_verified) === 1,
     kalshiSide: String(row.kalshi_side) as BotPositionSide,
     pmSide: String(row.pm_side) as BotPositionSide,
@@ -1328,6 +1349,12 @@ export class BotPositionStore {
         kalshi_ticker TEXT,
         pm_condition_id TEXT,
         strategy TEXT,
+        kalshi_market_question TEXT,
+        pm_market_question TEXT,
+        kalshi_outcome_label TEXT,
+        pm_outcome_label TEXT,
+        relationship_state TEXT,
+        relationship_explanation TEXT,
         relationship_verified INTEGER NOT NULL DEFAULT 0 CHECK (relationship_verified IN (0, 1)),
         kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
         pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
@@ -1453,6 +1480,12 @@ export class BotPositionStore {
       kalshi_ticker: 'TEXT',
       pm_condition_id: 'TEXT',
       strategy: 'TEXT',
+      kalshi_market_question: 'TEXT',
+      pm_market_question: 'TEXT',
+      kalshi_outcome_label: 'TEXT',
+      pm_outcome_label: 'TEXT',
+      relationship_state: 'TEXT',
+      relationship_explanation: 'TEXT',
       kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
       pm_side: "TEXT NOT NULL DEFAULT 'no'",
       buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
@@ -1762,11 +1795,12 @@ export class BotPositionStore {
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method,
           entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at,
-          relationship_verified
+          relationship_verified, kalshi_market_question, pm_market_question,
+          kalshi_outcome_label, pm_outcome_label, relationship_state, relationship_explanation
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -1802,6 +1836,9 @@ export class BotPositionStore {
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
           0, 1, 'bot_position_create', input.openedAt, input.relationshipVerified ? 1 : 0,
+          input.kalshiMarketQuestion ?? null, input.pmMarketQuestion ?? null,
+          input.kalshiOutcomeLabel ?? null, input.pmOutcomeLabel ?? null, input.relationshipState ?? null,
+          input.relationshipExplanation ?? null,
         ],
       });
     } catch (error) {
@@ -2270,6 +2307,12 @@ export interface BotPositionInput {
   /** Authoritative Polymarket charged fee in integer millionths of USDC. */
   pmChargedFeeMicrousd?: number;
   relationshipVerified?: boolean;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  relationshipState?: BotLegRelationshipState | null;
+  relationshipExplanation?: string | null;
 }
 
 export function calculateBotPositionEntryCost(input: {
@@ -2587,6 +2630,12 @@ export async function recordBotPosition(
     pmConditionId: input.pmConditionId,
     strategy: input.strategy,
     relationshipVerified: input.relationshipVerified ?? false,
+    kalshiMarketQuestion: input.kalshiMarketQuestion ?? null,
+    pmMarketQuestion: input.pmMarketQuestion ?? null,
+    kalshiOutcomeLabel: input.kalshiOutcomeLabel ?? null,
+    pmOutcomeLabel: input.pmOutcomeLabel ?? null,
+    relationshipState: input.relationshipState ?? null,
+    relationshipExplanation: input.relationshipExplanation ?? null,
     kalshiSide: input.kalshiSide,
     pmSide: input.pmSide,
     buyPriceKalshiCents,

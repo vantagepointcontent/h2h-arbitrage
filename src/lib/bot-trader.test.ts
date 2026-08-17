@@ -13,45 +13,9 @@ import type { UnifiedOutcome } from './matcher';
 import type { BotScanCandidate, PersistedBotScan } from './bot-scan-consumer';
 import { walkExecutableBook } from './executable-book';
 import { orderbookState } from './orderbook-state';
-import type { PropositionRelationship } from './proposition-identity';
-
-vi.mock('./proposition-registry', () => ({
-  resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
-  findCanonicalPropositionRelationship: () => null,
-}));
 
 const TEST_PM_CONDITION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const TEST_PM_NO_TOKEN_ID = '38424385756462253442221613485727105608987714090195314133724025202573806948368';
-
-function verifiedRelationship(pmSide: 'yes' | 'no' = 'no'): PropositionRelationship {
-  const states = ['team a', 'not team a'];
-  return {
-    schemaVersion: 1,
-    state: 'verified_complementary',
-    verificationSource: 'authoritative_platform_metadata',
-    verifiedAt: new Date().toISOString(),
-    parentEventId: 'event-1',
-    resolutionRuleId: 'event-1-rules-v1',
-    exhaustivePayoutStates: states,
-    humanLabel: 'Kalshi Team A ↔ Polymarket opposite payout',
-    legs: {
-      kalshi: {
-        platform: 'kalshi', platformMarketId: 'KXTEST-A', parentEventId: 'event-1',
-        selectedOutcome: 'team a', contractSide: 'yes', payoutState: 'team a',
-        eventPayoutStates: states, resolutionRuleId: 'event-1-rules-v1',
-        humanLabel: 'Kalshi YES — Team A', marketQuestion: 'Will Team A win?', tokenId: null,
-      },
-      polymarket: {
-        platform: 'polymarket', platformMarketId: TEST_PM_CONDITION_ID, parentEventId: 'event-1',
-        selectedOutcome: pmSide === 'yes' ? 'not team a' : 'team a', contractSide: pmSide,
-        payoutState: 'not team a', eventPayoutStates: states, resolutionRuleId: 'event-1-rules-v1',
-        humanLabel: `Polymarket ${pmSide.toUpperCase()} — opposite payout`,
-        marketQuestion: pmSide === 'yes' ? 'Will someone other than Team A win?' : 'Will Team A win?',
-        tokenId: pmSide === 'yes' ? 'yes-token' : TEST_PM_NO_TOKEN_ID,
-      },
-    },
-  };
-}
 
 vi.mock('./bot-action-log', () => ({
   appendBotActionLog: vi.fn(async () => 1),
@@ -103,6 +67,15 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     pairId: 'pair-1',
     marketTitle: 'Test Market',
     outcome: 'Team A',
+    kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+    pmMarketQuestion: 'Will Team A win on Polymarket?',
+    kalshiOutcomeLabel: 'Team A',
+    pmOutcomeLabel: 'Team A',
+    relationshipVerified: true,
+    relationshipState: 'verified_complementary',
+    relationshipExplanation: 'Canonical matcher verification for exact legs.',
+    kalshiSide: 'yes',
+    pmSide: 'no',
     strategy: 'Buy YES Kalshi + NO PM',
     roiPct: 3.0,
     apyPct: 0,
@@ -111,8 +84,6 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     pmStake: 50,
     kalshiTicker: 'KXTEST-A',
     pmConditionId: TEST_PM_CONDITION_ID,
-    pmYesTokenId: 'yes-token',
-    pmNoTokenId: TEST_PM_NO_TOKEN_ID,
     kalshiYesAsk: 0.45,
     kalshiNoAsk: 0.58,
     pmYesAsk: 0.55,
@@ -127,7 +98,6 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     pmNoTickSize: 0.01,
     expiryDate: farFuture,
     category: 'Politics',
-    propositionRelationship: verifiedRelationship(),
     ...overrides,
   };
   const quote = (price: number | null | undefined, depth: number | undefined) => {
@@ -220,6 +190,10 @@ describe('buildExecutionRequest Polymarket identity', () => {
 function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome {
   return {
     artist: 'Team A',
+    kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+    pmMarketQuestion: 'Will Team A win on Polymarket?',
+    kalshiOutcomeLabel: 'Kalshi Team A',
+    pmOutcomeLabel: 'Polymarket Team A',
     kalshi: {
       ticker: 'KXTEST-A',
       yesBid: 0.44,
@@ -258,6 +232,10 @@ function makeUnifiedOutcome(overrides?: Partial<UnifiedOutcome>): UnifiedOutcome
       sellPlatform: 'polymarket',
       sellPrice: 0.52,
       arbType: 'direct',
+      selectedKalshiSide: 'yes',
+      selectedPmSide: 'no',
+      selectedRelationshipState: 'verified_complementary',
+      selectedRelationshipExplanation: 'Canonical matcher verification for exact legs.',
     },
     source: 'auto',
     ...overrides,
@@ -391,7 +369,7 @@ describe('evaluateBotTrade', () => {
   });
 
   it('rejects unknown strategy text instead of silently buying YES Kalshi + NO PM', () => {
-    const ev = evaluateBotTrade(makeInput({ strategy: 'mystery strategy' }), baseSettings());
+    const ev = evaluateBotTrade(makeInput({ strategy: 'mystery strategy', kalshiSide: undefined, pmSide: undefined }), baseSettings());
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('Unsupported strategy');
   });
@@ -402,7 +380,8 @@ describe('evaluateBotTrade', () => {
         strategy: 'Buy YES both sides: Kalshi A + PM B',
         crossOutcomeMutuallyExclusiveVerified: true,
         crossOutcomeExhaustiveVerified: true,
-        propositionRelationship: verifiedRelationship('yes'),
+        kalshiSide: 'yes',
+        pmSide: 'yes',
         kalshiYesAsk: 0.42,
         pmYesAsk: 0.55,
       }),
@@ -417,6 +396,8 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(
       makeInput({
         strategy: 'Buy YES both sides: Kalshi A + PM B',
+        kalshiSide: 'yes',
+        pmSide: 'yes',
         kalshiYesAsk: null,
       }),
       baseSettings(),
@@ -440,7 +421,8 @@ describe('buildExecutionRequest', () => {
       strategy: 'Buy YES both sides: Kalshi Republican + PM Democratic',
       crossOutcomeMutuallyExclusiveVerified: true,
       crossOutcomeExhaustiveVerified: true,
-      propositionRelationship: verifiedRelationship('yes'),
+      kalshiSide: 'yes',
+      pmSide: 'yes',
       kalshiYesAsk: 0.40,
       pmYesAsk: 0.52,
       kalshiStake: 40,
@@ -450,27 +432,6 @@ describe('buildExecutionRequest', () => {
     expect(req?.kalshiOrder).toMatchObject({ outcome: 'yes', price: 0.40, contracts: 1, size: 0.40 });
     expect(req?.polymarketOrder).toMatchObject({ outcome: 'yes', price: 0.52, contracts: 1, size: 0.52 });
     expect(req?.estimatedProfit).toBeCloseTo(0.08, 8);
-  });
-
-  it('fails closed when canonical relationship metadata is missing', () => {
-    const input = makeInput();
-    delete input.propositionRelationship;
-    expect(evaluateBotTrade(input, baseSettings()).reason).toContain('server-owned canonical proposition registry');
-    expect(buildExecutionRequest(input)).toBeNull();
-  });
-
-  it('rejects same-direction YES+YES even when legacy booleans say verified', () => {
-    const propositionRelationship = verifiedRelationship('yes');
-    propositionRelationship.legs.polymarket.selectedOutcome = 'team a';
-    propositionRelationship.legs.polymarket.payoutState = 'team a';
-    const input = makeInput({
-      strategy: 'Buy YES both sides: Kalshi Team A + PM Team A',
-      crossOutcomeMutuallyExclusiveVerified: true,
-      crossOutcomeExhaustiveVerified: true,
-      propositionRelationship,
-    });
-    expect(evaluateBotTrade(input, baseSettings())).toMatchObject({ shouldTrade: false });
-    expect(buildExecutionRequest(input)).toBeNull();
   });
 
   it('uses the selected NO ask on PM and never substitutes the YES ask', () => {
@@ -544,8 +505,14 @@ describe('unifiedOutcomeToBotInput', () => {
     expect(input.pairId).toBe('pair-1');
     expect(input.marketTitle).toBe('Test Market');
     expect(input.outcome).toBe('Team A');
+    expect(input.kalshiMarketQuestion).toBe('Will Team A win on Kalshi?');
+    expect(input.pmMarketQuestion).toBe('Will Team A win on Polymarket?');
     expect(input.kalshiTicker).toBe('KXTEST-A');
     expect(input.pmConditionId).toBe('pm-condition-a');
+    expect(input.kalshiOutcomeLabel).toBe('Kalshi Team A');
+    expect(input.pmOutcomeLabel).toBe('Polymarket Team A');
+    expect(input.kalshiSide).toBe('yes');
+    expect(input.pmSide).toBe('no');
     expect(input.pmYesDepth).toBe(60);
   });
 
@@ -564,6 +531,35 @@ describe('unifiedOutcomeToBotInput', () => {
     });
     const input = unifiedOutcomeToBotInput('pair-1', 'Test Market', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), o);
     expect(input.kalshiYesDepth).toBe(1200);
+  });
+
+  it('maps exact structured cross-outcome leg identity without parsing strategy text', () => {
+    const o = makeUnifiedOutcome({
+      arbitrage: {
+        ...makeUnifiedOutcome().arbitrage,
+        arbType: 'cross',
+        selectedKalshiOutcomeLabel: 'Kalshi Democratic Party',
+        selectedPmOutcomeLabel: 'Polymarket Republican Party',
+        selectedKalshiMarketQuestion: 'Will Democrats win on Kalshi?',
+        selectedPmMarketQuestion: 'Will Republicans win on Polymarket?',
+
+        selectedRelationshipState: 'verified_complementary',
+        selectedRelationshipExplanation: 'Canonical matcher verification for exact cross-outcome legs.',
+        selectedKalshiSide: 'yes',
+        selectedPmSide: 'yes',
+      },
+    });
+
+    const input = unifiedOutcomeToBotInput('fl-26', 'FL-26 House Election Winner', undefined, o);
+    expect(input).toMatchObject({
+      kalshiOutcomeLabel: 'Kalshi Democratic Party',
+      pmOutcomeLabel: 'Polymarket Republican Party',
+      kalshiMarketQuestion: 'Will Democrats win on Kalshi?',
+      pmMarketQuestion: 'Will Republicans win on Polymarket?',
+      relationshipVerified: true,
+      kalshiSide: 'yes',
+      pmSide: 'yes',
+    });
   });
 });
 
@@ -667,11 +663,23 @@ describe('maybeExecuteBotTrade safety', () => {
         executionMode: 'paper',
         pmConditionId: TEST_PM_CONDITION_ID,
         pmSide: 'no',
+        kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+        pmMarketQuestion: 'Will Team A win on Polymarket?',
+        kalshiOutcomeLabel: 'Team A',
+        pmOutcomeLabel: 'Team A',
+        relationshipState: 'verified_complementary',
       }),
       expect.objectContaining({
         polymarket: expect.objectContaining({ tokenId: TEST_PM_NO_TOKEN_ID }),
       }),
     );
+    const messages = await import('./bot-trader-messages');
+    expect(messages.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      messageText: expect.stringContaining('Will Team A win on Kalshi?'),
+    }));
+    expect(messages.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      messageText: expect.stringContaining('Will Team A win on Polymarket?'),
+    }));
   });
 
   it('does not publish a successful paper trade when canonical position persistence fails', async () => {
@@ -833,39 +841,6 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.executed).toBe(false);
     expect(result.reason).toMatch(/fee authority/i);
     expect(persistence.persistExecution).not.toHaveBeenCalled();
-  });
-
-  it('preserves a registry-resolved canonical relationship through the execution alert path', async () => {
-    const canonicalRelationship = verifiedRelationship();
-    vi.doMock('./proposition-registry', () => ({
-      resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
-      findCanonicalPropositionRelationship: () => canonicalRelationship,
-    }));
-    const messages = await import('./bot-trader-messages');
-    const { maybeExecuteBotTrade } = await import('./bot-trader');
-    const input = makeInput();
-    delete input.propositionRelationship;
-    const runtimeState = (await import('./orderbook-state')).orderbookState;
-    runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
-      tickSizeCents: 1,
-      minimumOrderQuantityMicros: 1_000_000,
-      depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
-    });
-    runtimeState.setBook(TEST_PM_NO_TOKEN_ID, [], [{ price: 0.52, quantity: 1 }], 0, {
-      tickSizeCents: 1,
-      minimumOrderQuantityMicros: 1_000_000,
-      depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
-    });
-
-    const result = await maybeExecuteBotTrade(input);
-
-    expect(result.executed, JSON.stringify(result)).toBe(true);
-    expect(messages.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
-      messageText: expect.stringContaining(canonicalRelationship.humanLabel),
-    }));
-    const messageText = vi.mocked(messages.createBotMessage).mock.calls.at(-1)?.[0].messageText;
-    expect(messageText).toContain(canonicalRelationship.legs.kalshi.humanLabel);
-    expect(messageText).toContain(canonicalRelationship.legs.polymarket.humanLabel);
   });
 });
 

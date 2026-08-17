@@ -15,6 +15,7 @@ import {
   validateCalculationEnvelope,
   type CalculationEnvelope,
 } from './calculation-envelope';
+import type { BotLegRelationshipState } from './bot-leg-identity';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1254,6 +1255,15 @@ export interface LastScanResult {
   calculationEnvelope?: CalculationEnvelope;
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
     artist: string;
+    kalshiMarketQuestion?: string | null;
+    pmMarketQuestion?: string | null;
+    kalshiOutcomeLabel?: string | null;
+    pmOutcomeLabel?: string | null;
+    relationshipVerified?: boolean;
+    relationshipState?: BotLegRelationshipState;
+    relationshipExplanation?: string | null;
+    kalshiSide?: 'yes' | 'no';
+    pmSide?: 'yes' | 'no';
     roiPct: number;
     expectedProfit: number;
     strategy: string;
