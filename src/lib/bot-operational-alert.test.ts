@@ -64,9 +64,15 @@ describe('Ragnar production-readiness operational alerts', () => {
     await expect(sendBotExecutionAlert({
       ...input,
       strategy: 'Buy YES Kalshi + NO PM',
+      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+      pmMarketQuestion: 'Will Team A win on Polymarket?',
       kalshiOutcomeLabel: '<Team A>',
       pmOutcomeLabel: '<Team A>',
+      kalshiSide: 'yes',
+      pmSide: 'no',
       relationshipVerified: true,
+      relationshipState: 'verified_complementary',
+      relationshipExplanation: 'Canonical matcher verification for the exact selected legs.',
       roiPct: 3,
       expectedProfit: 0.03,
       kalshiStake: 0.45,
@@ -81,7 +87,7 @@ describe('Ragnar production-readiness operational alerts', () => {
     expect(mocks.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
       tradeId: 'trade:unhedged',
       status: 'pending',
-      messageText: expect.stringMatching(/Kalshi:<\/b> &lt;Team A&gt; — YES[\s\S]*Polymarket:<\/b> &lt;Team A&gt; — NO[\s\S]*Verified complementary/),
+      messageText: expect.stringMatching(/Kalshi question:<\/b> Will Team A win on Kalshi\?[\s\S]*Kalshi:<\/b> &lt;Team A&gt; — YES[\s\S]*Polymarket question:<\/b> Will Team A win on Polymarket\?[\s\S]*Polymarket:<\/b> &lt;Team A&gt; — NO[\s\S]*Verified complementary[\s\S]*Canonical matcher verification for the exact selected legs/),
     }));
     expect(mocks.updateBotMessage).toHaveBeenCalledWith(42, {
       status: 'failed',
