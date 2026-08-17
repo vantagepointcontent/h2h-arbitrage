@@ -95,6 +95,8 @@ export interface BotPosition {
   kalshiTicker: string | null;
   pmConditionId: string | null;
   strategy: string | null;
+  /** Persisted canonical backend verification for the exact selected legs. */
+  relationshipVerified: boolean;
   kalshiSide: BotPositionSide;
   pmSide: BotPositionSide;
   buyPriceKalshiCents: number;
@@ -228,7 +230,7 @@ export type CreateBotPosition = Omit<BotPosition,
   'kalshiLiquidationValueCents' | 'pmLiquidationValueCents' |
   'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource' |
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
-  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' |
+  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' | 'relationshipVerified' |
   'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt'
 > & {
   expectedRoiBps?: number | null;
@@ -236,6 +238,7 @@ export type CreateBotPosition = Omit<BotPosition,
   unitId?: string | null;
   kalshiEntryCalculatedFeeCents?: number;
   kalshiEntryChargedFeeCents?: number | null;
+  relationshipVerified?: boolean;
 };
 
 export interface ExecutableBidLevel {
@@ -1019,6 +1022,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
     pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
     strategy: row.strategy != null ? String(row.strategy) : null,
+    relationshipVerified: Number(row.relationship_verified) === 1,
     kalshiSide: String(row.kalshi_side) as BotPositionSide,
     pmSide: String(row.pm_side) as BotPositionSide,
     buyPriceKalshiCents: Number(row.buy_price_kalshi),
@@ -1324,6 +1328,7 @@ export class BotPositionStore {
         kalshi_ticker TEXT,
         pm_condition_id TEXT,
         strategy TEXT,
+        relationship_verified INTEGER NOT NULL DEFAULT 0 CHECK (relationship_verified IN (0, 1)),
         kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
         pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
         buy_price_kalshi INTEGER NOT NULL,
@@ -1522,6 +1527,7 @@ export class BotPositionStore {
       pm_exit_fee_observed_at: 'TEXT',
       pm_exit_fee_version: 'TEXT',
       status: "TEXT NOT NULL DEFAULT 'open'",
+      relationship_verified: 'INTEGER NOT NULL DEFAULT 0',
       opened_at: "TEXT NOT NULL DEFAULT ''",
       expiry_date: 'TEXT',
       settled_at: 'TEXT',
@@ -1755,11 +1761,12 @@ export class BotPositionStore {
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method,
-          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at
+          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at,
+          relationship_verified
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -1794,7 +1801,7 @@ export class BotPositionStore {
           input.openedAt,
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
-          0, 1, 'bot_position_create', input.openedAt,
+          0, 1, 'bot_position_create', input.openedAt, input.relationshipVerified ? 1 : 0,
         ],
       });
     } catch (error) {
@@ -2262,6 +2269,7 @@ export interface BotPositionInput {
   pmChargedFeeCents?: number;
   /** Authoritative Polymarket charged fee in integer millionths of USDC. */
   pmChargedFeeMicrousd?: number;
+  relationshipVerified?: boolean;
 }
 
 export function calculateBotPositionEntryCost(input: {
@@ -2578,6 +2586,7 @@ export async function recordBotPosition(
     kalshiTicker: input.kalshiTicker,
     pmConditionId: input.pmConditionId,
     strategy: input.strategy,
+    relationshipVerified: input.relationshipVerified ?? false,
     kalshiSide: input.kalshiSide,
     pmSide: input.pmSide,
     buyPriceKalshiCents,

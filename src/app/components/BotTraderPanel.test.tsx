@@ -39,6 +39,15 @@ const positions = [{
   marketTitle: 'Trump 2026',
   kalshiTicker: 'KXTRUMP-26',
   pmConditionId: '0xabc',
+  pmEntryTokenId: 'pm-token-no',
+  identity: {
+    kalshi: { marketQuestion: 'Will Trump win in 2026?', outcomeLabel: 'Trump', side: 'yes', metadataStatus: 'available' },
+    polymarket: { marketQuestion: 'Will Trump win in 2026?', outcomeLabel: 'Trump', side: 'no', metadataStatus: 'available' },
+    relationship: {
+      state: 'verified_complementary', label: 'Verified complementary',
+      explanation: 'The exact persisted legs select opposite YES/NO sides of the same matched proposition.',
+    },
+  },
   kalshiUrl: 'https://kalshi.com/markets/kxtrump-26',
   polymarketUrl: 'https://polymarket.com/event/trump-2026',
   strategy: 'Buy YES K + NO PM',
@@ -397,11 +406,76 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000000¢ exact fill');
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
-    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi YES Current PriceSaved$0.47');
-    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket NO Current PriceStale$0.55');
+    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi Trump · YES Current PriceSaved$0.47');
+    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket Trump · NO Current PriceStale$0.55');
     expect(screen.getAllByText(/Indicative last-scanned mark; not executable liquidation proceeds/)).toHaveLength(2);
     expect(screen.getByTestId('kalshi-fee-authority').textContent).toContain('quadratic:1000000:v1');
     expect(screen.getByTestId('polymarket-fee-authority').textContent).toContain('token-fee-rate:400');
+  });
+
+  it('shows exact outcome identity and side consistently in the row, detail, and responsive cards', async () => {
+    stubInitialFetch();
+    render(<BotTraderPanel />);
+
+    const row = (await screen.findByText('Trump 2026')).closest('tr')!;
+    expect(row.textContent).toContain('Kalshi: Trump — YES');
+    expect(row.textContent).toContain('Polymarket: Trump — NO');
+    expect(row.textContent).toContain('Verified complementary');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByTestId('kalshi-leg-identity').textContent)
+      .toContain('Will Trump win in 2026?Verified complementaryTrumpContract side YES');
+    expect(screen.getByTestId('polymarket-leg-identity').textContent)
+      .toContain('Will Trump win in 2026?Verified complementaryTrumpContract side NO');
+    expect(screen.getByTestId('polymarket-leg-provenance').textContent).toContain('pm-token-no');
+    expect(screen.getByTestId('position-leg-identity-grid').className).toContain('lg:grid-cols-2');
+    expect(screen.getAllByText('Verified complementary')[0].getAttribute('aria-label')).toContain('opposite YES/NO sides');
+  });
+
+  it('shows a precise missing state and never substitutes YES for an absent outcome label', async () => {
+    const legacy = {
+      ...positions[0],
+      identity: {
+        kalshi: { marketQuestion: 'Legacy question', outcomeLabel: null, side: 'yes', metadataStatus: 'missing' },
+        polymarket: { marketQuestion: 'Legacy question', outcomeLabel: null, side: 'yes', metadataStatus: 'missing' },
+        relationship: {
+          state: 'legacy_unknown', label: 'Legacy / unknown',
+          explanation: 'Outcome metadata missing for one or both exact persisted leg identifiers; no relationship was inferred.',
+        },
+      },
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [legacy] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const row = (await screen.findByText('Trump 2026')).closest('tr')!;
+    expect(row.textContent).toContain('Kalshi: Outcome metadata missing — YES');
+    expect(row.textContent).toContain('Polymarket: Outcome metadata missing — YES');
+    expect(row.textContent).not.toContain('Kalshi: YES — YES');
+  });
+
+  it('keeps an exact resolved outcome visible when only the venue question is missing', async () => {
+    const partial = {
+      ...positions[0],
+      identity: {
+        ...positions[0].identity,
+        kalshi: { marketQuestion: null, outcomeLabel: 'Trump', side: 'yes', metadataStatus: 'missing' },
+      },
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [partial] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const row = (await screen.findByText('Trump 2026')).closest('tr')!;
+    expect(row.textContent).toContain('Kalshi: Trump — YES');
   });
 
   it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {

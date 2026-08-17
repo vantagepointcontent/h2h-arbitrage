@@ -93,6 +93,11 @@ export interface BotTradeInput {
   marketTitle: string;
   /** Outcome name/artist used in the arb */
   outcome: string;
+  /** Exact selected outcome labels; contract side is captured separately. */
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  /** Canonical backend verification for the exact selected leg relationship. */
+  relationshipVerified?: boolean;
   strategy: string;
   roiPct: number;
   apyPct?: number | null;
@@ -491,6 +496,43 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
 
   // Never guess from unknown strategy text: that can buy the opposite contract.
   return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
+}
+
+function botTradeLegIdentity(input: BotTradeInput) {
+  const legs = pickLegPrices(input.strategy, input);
+  const kalshiOutcome = input.kalshiOutcomeLabel?.trim() || null;
+  const pmOutcome = input.pmOutcomeLabel?.trim() || null;
+  const base = {
+    kalshi: { outcomeLabel: kalshiOutcome, side: legs.kalshiOutcome },
+    polymarket: { outcomeLabel: pmOutcome, side: legs.pmOutcome },
+  };
+  if (!legs.supported || !kalshiOutcome || !pmOutcome) return {
+    ...base,
+    relationship: { state: 'legacy_unknown', label: 'Legacy / unknown', explanation: 'Outcome metadata missing; no relationship was inferred.' },
+  } as const;
+  const sameOutcome = kalshiOutcome.toLocaleLowerCase() === pmOutcome.toLocaleLowerCase();
+  const sameSide = legs.kalshiOutcome === legs.pmOutcome;
+  if (sameOutcome && sameSide) return {
+    ...base,
+    relationship: { state: 'same_direction', label: 'Same-direction', explanation: 'Both legs select the same outcome and side.' },
+  } as const;
+  if (input.relationshipVerified === true
+      && ((sameOutcome && !sameSide) || (!sameOutcome && sameSide))) return {
+    ...base,
+    relationship: { state: 'verified_complementary', label: 'Verified complementary', explanation: 'The persisted exact legs are verified complementary propositions.' },
+  } as const;
+  if (input.relationshipVerified !== true) return {
+    ...base,
+    relationship: { state: 'legacy_unknown', label: 'Legacy / unknown', explanation: 'Exact outcomes are available, but no persisted backend relationship verification exists; no relationship was inferred.' },
+  } as const;
+  return {
+    ...base,
+    relationship: { state: 'invalid', label: 'Invalid relationship', explanation: 'The persisted exact legs are not a verified complementary pair.' },
+  } as const;
+}
+
+function escapeTelegramHtml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 export function getAuthoritativeMatchedFill(result: {
@@ -1108,6 +1150,7 @@ export async function maybeExecuteBotTrade(
           kalshiTicker: input.kalshiTicker ?? null,
           pmConditionId: execReq.pmConditionId ?? null,
           strategy: input.strategy,
+          relationshipVerified: input.relationshipVerified,
           kalshiSide: entryLegs.kalshiOutcome,
           pmSide: entryLegs.pmOutcome,
           kalshiPrice: fill.kalshiPrice,
@@ -1143,7 +1186,7 @@ export async function maybeExecuteBotTrade(
     persistenceError,
   });
   await log('result', publication.reason, publication.executed ? 'passed' : 'failed', {
-    requestPayload: execReq,
+    requestPayload: { ...execReq, legIdentity: botTradeLegIdentity(input) },
     responsePayload: result,
     errorReason: publication.executed ? null : (persistenceError ?? result.error ?? publication.reason),
     durationMs: executionDurationMs,
@@ -1196,17 +1239,22 @@ export async function sendBotExecutionAlert(
   const emoji = result.unhedged ? '🚨' : dryRun ? '🤖' : '🦾';
   const modeLabel = dryRun ? 'PAPER' : 'PRODUCTION';
   const status = result.unhedged ? 'UNHEDGED EXPOSURE' : result.success ? 'placed' : 'attempted';
+  const identity = botTradeLegIdentity(input);
+  const kalshiOutcome = escapeTelegramHtml(identity.kalshi.outcomeLabel ?? 'Outcome metadata missing');
+  const pmOutcome = escapeTelegramHtml(identity.polymarket.outcomeLabel ?? 'Outcome metadata missing');
 
   const text = [
     `${emoji} <b>BotTrader ${status} — ${modeLabel}</b>`,
     '',
-    `<b>Market:</b> ${input.marketTitle}`,
-    `<b>Outcome:</b> ${input.outcome}`,
-    `<b>Strategy:</b> ${input.strategy}`,
+    `<b>Market:</b> ${escapeTelegramHtml(input.marketTitle)}`,
+    `<b>Kalshi:</b> ${kalshiOutcome} — ${identity.kalshi.side.toUpperCase()}`,
+    `<b>Polymarket:</b> ${pmOutcome} — ${identity.polymarket.side.toUpperCase()}`,
+    `<b>Relationship:</b> ${identity.relationship.label} — ${identity.relationship.explanation}`,
+    `<b>Strategy:</b> ${escapeTelegramHtml(input.strategy)}`,
     `<b>ROI:</b> ${roiPct.toFixed(2)}%`,
     `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
     `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,
-    ...(result.error ? [`<b>Error:</b> ${result.error}`] : []),
+    ...(result.error ? [`<b>Error:</b> ${escapeTelegramHtml(result.error)}`] : []),
     ...(result.unhedged ? ['<b>Action:</b> Immediate exposure reconciliation required'] : []),
   ].join('\n');
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
@@ -1258,7 +1306,7 @@ export async function sendBotOperationalAlert(
 ): Promise<{ durable: boolean; delivered: boolean; error?: string }> {
   const config = await getConfigResolved();
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
-  const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${input.marketTitle}\n<b>Outcome:</b> ${input.outcome}\n<b>Remediation:</b> ${reason}`;
+  const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${escapeTelegramHtml(input.marketTitle)}\n<b>Outcome:</b> ${escapeTelegramHtml(input.outcome)}\n<b>Remediation:</b> ${escapeTelegramHtml(reason)}`;
   let messageId: number;
   try {
     messageId = await createBotMessage({
@@ -1299,6 +1347,9 @@ export function unifiedOutcomeToBotInput(
     pairId,
     marketTitle,
     outcome: outcome.artist,
+    kalshiOutcomeLabel: outcome.artist,
+    pmOutcomeLabel: a.arbType === 'direct' ? outcome.artist : null,
+    relationshipVerified: a.arbType === 'direct' && outcome.polymarket?.binaryVerified === true,
     strategy: a.strategy,
     roiPct: a.roiPct,
     apyPct: a.apyPct ?? null,
@@ -1333,6 +1384,10 @@ export function liveArbResultToBotInput(
     pairId,
     marketTitle,
     outcome: result.artist,
+    kalshiOutcomeLabel: result.kalshiOutcomeLabel ?? null,
+    pmOutcomeLabel: result.pmOutcomeLabel ?? null,
+    relationshipVerified: result.arbType === 'direct'
+      || (result.crossOutcomeMutuallyExclusiveVerified === true && result.crossOutcomeExhaustiveVerified === true),
     strategy: result.strategy,
     roiPct: result.roiPct,
     apyPct: null,

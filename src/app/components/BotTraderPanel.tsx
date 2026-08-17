@@ -6,12 +6,19 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
+  Copy,
+  Download,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
+import {
+  exportBotPositionIdentitiesCsv,
+  type BotLegRelationshipState,
+  type BotPositionIdentity,
+} from '@/lib/bot-leg-identity';
 
 type PositionStatus = 'open' | 'settled' | 'closed';
 type PositionFilter = 'all' | 'open' | 'settled';
@@ -39,6 +46,8 @@ interface BotPosition {
   marketTitle: string;
   kalshiTicker: string | null;
   pmConditionId: string | null;
+  pmEntryTokenId?: string | null;
+  identity: BotPositionIdentity;
   kalshiUrl: string | null;
   polymarketUrl: string | null;
   strategy: string | null;
@@ -313,6 +322,53 @@ function StatusBadge({ status }: { status: PositionStatus }) {
   return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>{status}</span>;
 }
 
+const RELATIONSHIP_STYLES: Record<BotLegRelationshipState, string> = {
+  verified_complementary: 'border-[var(--status-info)]/40 bg-[var(--status-info)]/10 text-[var(--status-info)]',
+  same_direction: 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 text-[var(--status-warning)]',
+  invalid: 'border-[var(--status-negative)]/40 bg-[var(--status-negative)]/10 text-[var(--status-negative)]',
+  legacy_unknown: 'border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[var(--text-secondary)]',
+};
+
+function RelationshipBadge({ identity }: { identity: BotPositionIdentity }) {
+  return <span aria-label={`${identity.relationship.label}: ${identity.relationship.explanation}`} className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase ${RELATIONSHIP_STYLES[identity.relationship.state]}`}>{identity.relationship.label}</span>;
+}
+
+function outcomeLabel(identity: BotPositionIdentity['kalshi']): string {
+  return identity.outcomeLabel ?? 'Outcome metadata missing';
+}
+
+function CopyableId({ label, value, testId }: { label: string; value: string | null | undefined; testId?: string }) {
+  return <div data-testid={testId}>
+    <span className="text-[var(--text-secondary)]">{label}</span>
+    <div className="flex items-start gap-1">
+      <code className="min-w-0 flex-1 select-text break-all font-mono text-[var(--text-primary)]">{value || '—'}</code>
+      {value && <button type="button" aria-label={`Copy ${label}`} onClick={() => void navigator.clipboard?.writeText(value)} className="flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--text-primary)]"><Copy className="h-3 w-3" /></button>}
+    </div>
+  </div>;
+}
+
+function withIdentityFallback(position: BotPosition): BotPosition {
+  if (position.identity) return position;
+  const missing = (side: 'yes' | 'no') => ({
+    marketQuestion: null,
+    outcomeLabel: null,
+    side,
+    metadataStatus: 'missing' as const,
+  });
+  return {
+    ...position,
+    identity: {
+      kalshi: missing(position.kalshiSide),
+      polymarket: missing(position.pmSide),
+      relationship: {
+        state: 'legacy_unknown',
+        label: 'Legacy / unknown',
+        explanation: 'Outcome metadata missing for one or both exact persisted leg identifiers; no relationship was inferred.',
+      },
+    },
+  };
+}
+
 export default function BotTraderPanel() {
   const [view, setView] = useState<'analytics' | 'logs' | 'messages'>('analytics');
 
@@ -349,7 +405,7 @@ export default function BotTraderPanel() {
       if (!statusRes.ok) throw new Error(statusData.error || 'Failed to load bot status');
       if (!analyticsRes.ok || !analyticsData.success) throw new Error(analyticsData.error || 'Failed to load performance analytics');
       if (requestId !== requestIdRef.current) return;
-      setPositions(analyticsData.analytics.positions ?? []);
+      setPositions((analyticsData.analytics.positions ?? []).map(withIdentityFallback));
       setStatus(statusData);
       setAnalytics(analyticsData.analytics);
     } catch (cause) {
@@ -420,6 +476,16 @@ export default function BotTraderPanel() {
       setSortKey(next);
       setSortDirection('desc');
     }
+  };
+
+  const exportPositions = () => {
+    const csv = exportBotPositionIdentitiesCsv(sortedPositions);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bot-positions-${modeFilter}-${range}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const saveSetting = async (key: 'bot.enabled' | 'bot.mode' | 'bot.selectionMethod', value: boolean | 'paper' | 'production' | 'roi' | 'apy' | 'hybrid', confirmation?: 'PRODUCTION') => {
@@ -609,6 +675,7 @@ export default function BotTraderPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
           <div><div className="text-sm font-semibold text-[var(--text-primary)]">Positions</div><div className="text-[10px] text-[var(--text-secondary)]">Persisted exact-leg last-scanned marks · indicative only, not executable close proceeds</div></div>
           <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={exportPositions} disabled={sortedPositions.length === 0} className="flex min-h-11 items-center gap-1 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)] disabled:opacity-50"><Download className="h-3.5 w-3.5" /> Export identities CSV</button>
             <div className="flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] p-0.5" aria-label="Position status filter">
               {(['all', 'open', 'settled'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs capitalize ${filter === value ? 'bg-[var(--status-positive)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{value}</button>)}
             </div>
@@ -673,9 +740,9 @@ export default function BotTraderPanel() {
                 return [
                   <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></td>
+                    <td className="max-w-72 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 space-y-0.5 text-[9px] font-normal text-[var(--text-secondary)]"><div className="truncate">Kalshi: <strong className="text-[var(--text-primary)]">{outcomeLabel(position.identity.kalshi)}</strong> — {position.identity.kalshi.side.toUpperCase()}</div><div className="truncate">Polymarket: <strong className="text-[var(--text-primary)]">{outcomeLabel(position.identity.polymarket)}</strong> — {position.identity.polymarket.side.toUpperCase()}</div><div className="flex flex-wrap items-center gap-2">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">Kalshi market</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM market</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div></div></td>
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
-                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
+                    <td className="max-w-52 px-2 py-2 text-[var(--text-secondary)]"><RelationshipBadge identity={position.identity} /><div className="mt-1 truncate text-[9px]">{position.strategy || '—'}</div></td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
@@ -685,9 +752,19 @@ export default function BotTraderPanel() {
                   </tr>,
                   isExpanded && <tr key={`detail-${position.id}`}>
                     <td colSpan={10} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
+                      <div data-testid="position-leg-identity-grid" className="grid gap-2 lg:grid-cols-2">
+                        {([
+                          ['kalshi', 'Kalshi', position.identity.kalshi],
+                          ['polymarket', 'Polymarket', position.identity.polymarket],
+                        ] as const).map(([platform, platformLabel, leg]) => <div key={platform} data-testid={`${platform}-leg-identity`} className="rounded border border-[var(--border-strong)] bg-[var(--surface-panel)] px-3 py-2 text-xs">
+                          <div className="flex flex-wrap items-start justify-between gap-2"><div><div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{platformLabel} market/question</div><div className="font-medium text-[var(--text-primary)]">{leg.marketQuestion || 'Market question metadata missing'}</div></div><RelationshipBadge identity={position.identity} /></div>
+                          <div className={`mt-2 text-sm font-semibold ${leg.metadataStatus === 'missing' ? 'text-[var(--status-warning)]' : 'text-[var(--text-primary)]'}`}>{outcomeLabel(leg)}</div>
+                          <div className="mt-0.5 text-[10px] text-[var(--text-secondary)]">Contract side <strong className="text-[var(--text-primary)]">{leg.side.toUpperCase()}</strong></div>
+                        </div>)}
+                      </div>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
-                        <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
-                        <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>
+                        <CopyableId label="Kalshi ticker" value={position.kalshiTicker} />
+                        <div data-testid="polymarket-leg-provenance"><CopyableId label="PM condition ID" value={position.pmConditionId} /><CopyableId label="PM token ID" value={position.pmEntryTokenId} /></div>
                         <div><span className="text-[var(--text-secondary)]">Buy Price</span><div>{entryCostAvailable && position.kalshiEntryGrossMicrocents != null && position.pmEntryGrossMicrocents != null
                           ? <>{position.kalshiSide.toUpperCase()} {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} K · {position.pmSide.toUpperCase()} {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} PM</>
                           : <span className="text-[var(--status-warning)]">Unavailable — authoritative fill evidence missing</span>}</div></div>
@@ -700,13 +777,13 @@ export default function BotTraderPanel() {
                       ) : (
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {outcomeLabel(position.identity.kalshi)} <span className="text-[var(--text-secondary)]">· {position.kalshiSide.toUpperCase()} entry</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
                             {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {outcomeLabel(position.identity.polymarket)} <span className="text-[var(--text-secondary)]">· {position.pmSide.toUpperCase()} entry</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                             {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
@@ -723,7 +800,7 @@ export default function BotTraderPanel() {
                           const platformLabel = platform === 'kalshi' ? 'Kalshi' : 'Polymarket';
                           const side = platform === 'kalshi' ? position.kalshiSide : position.pmSide;
                           return <div key={platform} data-testid={`${platform}-stored-current-price`} className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {outcomeLabel(position.identity[platform])} <span className="text-[var(--text-secondary)]">· {side.toUpperCase()} Current Price</span></span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
                             <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
                             <div className="text-[10px] font-medium text-[var(--text-secondary)]">Indicative last-scanned mark; not executable liquidation proceeds{snapshot.markFailureReason ? ` · ${snapshot.markFailureReason}` : ''}{snapshot.failureReason ? ` · Separate close evidence: ${snapshot.failureReason}` : ''}</div>

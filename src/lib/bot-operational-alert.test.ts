@@ -34,13 +34,13 @@ describe('Ragnar production-readiness operational alerts', () => {
   });
 
   it('persists the exact production blocker even when Telegram is not configured', async () => {
-    await expect(sendBotOperationalAlert(input, 'Configure valid live credentials', 'scan:41:production-blocked'))
+    await expect(sendBotOperationalAlert({ ...input, marketTitle: '<Blocked>' }, 'Configure <valid> credentials', 'scan:41:production-blocked'))
       .resolves.toEqual({ durable: true, delivered: false, error: 'Telegram not configured' });
     expect(mocks.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
       tradeId: 'scan:41:production-blocked',
       status: 'failed',
       errorReason: 'Telegram not configured',
-      messageText: expect.stringContaining('Configure valid live credentials'),
+      messageText: expect.stringMatching(/&lt;Blocked&gt;[\s\S]*Configure &lt;valid&gt; credentials/),
     }));
     expect(mocks.sendTelegramMessage).not.toHaveBeenCalled();
   });
@@ -64,6 +64,9 @@ describe('Ragnar production-readiness operational alerts', () => {
     await expect(sendBotExecutionAlert({
       ...input,
       strategy: 'Buy YES Kalshi + NO PM',
+      kalshiOutcomeLabel: '<Team A>',
+      pmOutcomeLabel: '<Team A>',
+      relationshipVerified: true,
       roiPct: 3,
       expectedProfit: 0.03,
       kalshiStake: 0.45,
@@ -78,7 +81,7 @@ describe('Ragnar production-readiness operational alerts', () => {
     expect(mocks.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
       tradeId: 'trade:unhedged',
       status: 'pending',
-      messageText: expect.stringMatching(/UNHEDGED|Leg B disappeared/),
+      messageText: expect.stringMatching(/Kalshi:<\/b> &lt;Team A&gt; — YES[\s\S]*Polymarket:<\/b> &lt;Team A&gt; — NO[\s\S]*Verified complementary/),
     }));
     expect(mocks.updateBotMessage).toHaveBeenCalledWith(42, {
       status: 'failed',

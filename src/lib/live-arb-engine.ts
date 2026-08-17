@@ -12,6 +12,9 @@ import { resolvePolymarketFeeRateBps } from './polymarket-fees';
 
 export interface LiveArbResult {
   artist: string;
+  /** Exact selected venue outcomes; separate from YES/NO contract side. */
+  kalshiOutcomeLabel?: string;
+  pmOutcomeLabel?: string;
   kalshiYesAsk: number | null;
   kalshiNoAsk: number | null;
   kalshiYesDepth: number;
@@ -359,6 +362,8 @@ function computeSingleOutcome(
 
   return {
     artist,
+    kalshiOutcomeLabel: artist,
+    pmOutcomeLabel: artist,
     kalshiYesAsk,
     kalshiNoAsk,
     kalshiYesDepth,
@@ -674,6 +679,8 @@ export function computeAllLiveArbitrages(
       );
       if (fees.worstCaseNetProfit > cur.expectedProfit) {
         cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
+        cur.kalshiOutcomeLabel = cur.artist;
+        cur.pmOutcomeLabel = comp.artist;
         cur.arbType = 'cross';
         cur.roiPct = effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0;
         cur.expectedProfit = fees.worstCaseNetProfit;
