@@ -13,6 +13,15 @@ import type { PropositionRelationship } from './proposition-identity';
 
 export interface LiveArbResult {
   artist: string;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  /** Exact selected venue outcomes; separate from YES/NO contract side. */
+  kalshiOutcomeLabel?: string;
+  pmOutcomeLabel?: string;
+  kalshiSide?: 'yes' | 'no';
+  pmSide?: 'yes' | 'no';
+  relationshipState?: 'verified_complementary' | 'same_direction' | 'invalid' | 'legacy_unknown';
+  relationshipExplanation?: string;
   kalshiYesAsk: number | null;
   kalshiNoAsk: number | null;
   kalshiYesDepth: number;
@@ -94,6 +103,10 @@ export interface LiveArbResult {
 /** A single matched outcome for live scanning. */
 export interface LiveMatchedOutcome {
   artist: string;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
   kalshiTicker: string;
   pmYesTokenId: string;
   pmNoTokenId: string;
@@ -134,7 +147,7 @@ function computeSingleOutcome(
   capital: number,
   category?: string,
 ): LiveArbResult {
-  const { artist, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified,
+  const { artist, kalshiMarketQuestion, pmMarketQuestion, kalshiOutcomeLabel, pmOutcomeLabel, kalshiTicker, pmYesTokenId, pmNoTokenId, pmConditionId, pmBinaryVerified,
     pmYesMinOrderSize, pmNoMinOrderSize, pmYesTickSize, pmNoTickSize,
     pmFeesEnabled, pmFeeSchedule,
     crossOutcomeMutuallyExclusiveVerified, crossOutcomeExhaustiveVerified, kalshiFeeAuthority } = outcome;
@@ -365,6 +378,10 @@ function computeSingleOutcome(
 
   return {
     artist,
+    kalshiMarketQuestion: kalshiMarketQuestion?.trim() || null,
+    pmMarketQuestion: pmMarketQuestion?.trim() || null,
+    kalshiOutcomeLabel: kalshiOutcomeLabel?.trim() || undefined,
+    pmOutcomeLabel: pmOutcomeLabel?.trim() || undefined,
     kalshiYesAsk,
     kalshiNoAsk,
     kalshiYesDepth,
@@ -683,7 +700,14 @@ export function computeAllLiveArbitrages(
       );
       if (fees.worstCaseNetProfit > cur.expectedProfit) {
         cur.strategy = `Buy YES both sides: Kalshi ${cur.artist} + PM ${comp.artist}`;
+        cur.kalshiOutcomeLabel = cur.kalshiOutcomeLabel?.trim() || undefined;
+        cur.pmOutcomeLabel = comp.pmOutcomeLabel?.trim() || undefined;
+        cur.pmMarketQuestion = comp.pmMarketQuestion?.trim() || null;
         cur.arbType = 'cross';
+        cur.kalshiSide = 'yes';
+        cur.pmSide = 'yes';
+        cur.relationshipState = 'verified_complementary';
+        cur.relationshipExplanation = 'Canonical matcher verification for mutually exclusive and exhaustive exact outcomes.';
         cur.roiPct = effectiveCapital > 0 ? (fees.worstCaseNetProfit / effectiveCapital) * 100 : 0;
         cur.expectedProfit = fees.worstCaseNetProfit;
         cur.kalshiStake = kalshiStake;
