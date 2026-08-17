@@ -102,6 +102,12 @@ export interface BotTradeInput {
   marketTitle: string;
   /** Outcome name/artist used in the arb */
   outcome: string;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  relationshipState?: string | null;
+  relationshipExplanation?: string | null;
   strategy: string;
   /** Immutable proof that the exact purchased contracts are complementary. */
   propositionRelationship?: PropositionRelationship | null;
@@ -1264,21 +1270,30 @@ export async function sendBotExecutionAlert(
   const modeLabel = dryRun ? 'PAPER' : 'PRODUCTION';
   const status = result.unhedged ? 'UNHEDGED EXPOSURE' : result.success ? 'placed' : 'attempted';
 
+  const escapeTelegramHtml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const relationship = input.propositionRelationship;
+  const kalshiLabel = input.kalshiOutcomeLabel ?? relationship?.legs.kalshi.selectedOutcome ?? 'Outcome metadata missing';
+  const pmLabel = input.pmOutcomeLabel ?? relationship?.legs.polymarket.selectedOutcome ?? 'Outcome metadata missing';
+  const relationshipLabel = relationship?.humanLabel ?? (input.relationshipState === 'verified_complementary' ? 'Verified complementary' : input.relationshipState ?? 'Legacy / unknown');
+  const relationshipExplanation = input.relationshipExplanation ?? (relationship ? 'Canonical registry verification for the exact selected legs.' : 'Canonical relationship evidence was not persisted.');
   const text = [
     `${emoji} <b>BotTrader ${status} — ${modeLabel}</b>`,
     '',
-    `<b>Market:</b> ${input.marketTitle}`,
-    `<b>Outcome:</b> ${input.outcome}`,
-    `<b>Strategy:</b> ${input.strategy}`,
-    ...(input.propositionRelationship ? [
-      `<b>Relationship:</b> ${input.propositionRelationship.humanLabel}`,
-      `<b>Kalshi leg:</b> ${input.propositionRelationship.legs.kalshi.humanLabel}`,
-      `<b>Polymarket leg:</b> ${input.propositionRelationship.legs.polymarket.humanLabel}`,
+    `<b>Market:</b> ${escapeTelegramHtml(input.marketTitle)}`,
+    `<b>Kalshi question:</b> ${escapeTelegramHtml(input.kalshiMarketQuestion ?? 'Market question metadata missing')}`,
+    `<b>Kalshi:</b> ${escapeTelegramHtml(kalshiLabel)} — ${(relationship?.legs.kalshi.contractSide ?? 'yes').toUpperCase()}`,
+    `<b>Polymarket question:</b> ${escapeTelegramHtml(input.pmMarketQuestion ?? 'Market question metadata missing')}`,
+    `<b>Polymarket:</b> ${escapeTelegramHtml(pmLabel)} — ${(relationship?.legs.polymarket.contractSide ?? 'no').toUpperCase()}`,
+    `<b>Relationship:</b> ${escapeTelegramHtml(relationshipLabel)} — ${escapeTelegramHtml(relationshipExplanation)}`,
+    ...(relationship ? [
+      `<b>Canonical Kalshi leg:</b> ${escapeTelegramHtml(relationship.legs.kalshi.humanLabel)}`,
+      `<b>Canonical Polymarket leg:</b> ${escapeTelegramHtml(relationship.legs.polymarket.humanLabel)}`,
     ] : []),
+    `<b>Strategy:</b> ${escapeTelegramHtml(input.strategy)}`,
     `<b>ROI:</b> ${roiPct.toFixed(2)}%`,
     `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
     `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,
-    ...(result.error ? [`<b>Error:</b> ${result.error}`] : []),
+    ...(result.error ? [`<b>Error:</b> ${escapeTelegramHtml(result.error)}`] : []),
     ...(result.unhedged ? ['<b>Action:</b> Immediate exposure reconciliation required'] : []),
   ].join('\n');
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
@@ -1330,7 +1345,8 @@ export async function sendBotOperationalAlert(
 ): Promise<{ durable: boolean; delivered: boolean; error?: string }> {
   const config = await getConfigResolved();
   const chatId = config?.botTraderChatId || config?.chatId || process.env.TELEGRAM_BOT_TRADER_CHAT_ID || process.env.TELEGRAM_CHAT_ID || null;
-  const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${input.marketTitle}\n<b>Outcome:</b> ${input.outcome}\n<b>Remediation:</b> ${reason}`;
+  const escapeTelegramHtml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const text = `🚨 <b>Ragnar production execution blocked</b>\n\n<b>Market:</b> ${escapeTelegramHtml(input.marketTitle)}\n<b>Outcome:</b> ${escapeTelegramHtml(input.outcome)}\n<b>Remediation:</b> ${escapeTelegramHtml(reason)}`;
   let messageId: number;
   try {
     messageId = await createBotMessage({
