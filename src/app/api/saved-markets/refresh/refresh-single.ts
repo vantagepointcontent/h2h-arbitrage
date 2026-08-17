@@ -263,6 +263,15 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       const selectedPmLeg = withArbitrage.find(candidate => candidate.polymarket?.conditionId === selectedPmConditionId)?.polymarket ?? o.polymarket;
       return {
       artist: o.artist,
+      kalshiMarketQuestion: o.arbitrage!.selectedKalshiMarketQuestion ?? o.kalshiMarketQuestion ?? null,
+      pmMarketQuestion: o.arbitrage!.selectedPmMarketQuestion ?? o.pmMarketQuestion ?? null,
+      kalshiOutcomeLabel: o.arbitrage!.selectedKalshiOutcomeLabel ?? o.kalshiOutcomeLabel ?? null,
+      pmOutcomeLabel: o.arbitrage!.selectedPmOutcomeLabel ?? o.pmOutcomeLabel ?? null,
+      relationshipVerified: o.arbitrage!.selectedRelationshipState === 'verified_complementary',
+      relationshipState: o.arbitrage!.selectedRelationshipState,
+      relationshipExplanation: o.arbitrage!.selectedRelationshipExplanation ?? null,
+      kalshiSide: o.arbitrage!.selectedKalshiSide,
+      pmSide: o.arbitrage!.selectedPmSide,
       roiPct: o.arbitrage!.roiPct,
       expectedProfit: o.arbitrage!.expectedProfit,
       strategy: o.arbitrage!.strategy,

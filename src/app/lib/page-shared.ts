@@ -286,6 +286,15 @@ export interface LastScanResult {
   priceResolved?: boolean; // BUG-05b: at least one outcome at 99/1 extremes
   allArbs?: {
     artist: string;
+    kalshiMarketQuestion?: string | null;
+    pmMarketQuestion?: string | null;
+    kalshiOutcomeLabel?: string | null;
+    pmOutcomeLabel?: string | null;
+    relationshipVerified?: boolean;
+    relationshipState?: import('@/lib/bot-leg-identity').BotLegRelationshipState;
+    relationshipExplanation?: string | null;
+    kalshiSide?: 'yes' | 'no';
+    pmSide?: 'yes' | 'no';
     roiPct: number;
     expectedProfit: number;
     strategy: string;
@@ -378,6 +387,15 @@ export interface SavedMarket {
     priceResolved?: boolean;
     allArbs?: {
       artist: string;
+      kalshiMarketQuestion?: string | null;
+      pmMarketQuestion?: string | null;
+      kalshiOutcomeLabel?: string | null;
+      pmOutcomeLabel?: string | null;
+      relationshipVerified?: boolean;
+      relationshipState?: import('@/lib/bot-leg-identity').BotLegRelationshipState;
+      relationshipExplanation?: string | null;
+      kalshiSide?: 'yes' | 'no';
+      pmSide?: 'yes' | 'no';
       roiPct: number;
       expectedProfit: number;
       strategy: string;

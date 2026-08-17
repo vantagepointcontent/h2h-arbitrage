@@ -189,6 +189,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         identity: buildBotLegIdentity(position, market ? {
           eventTitle: market.eventTitle,
           matchedPairs: market.lastScanResult?.matchedPairs,
+          allArbs: market.lastScanResult?.allArbs,
           mutuallyExclusiveVerified: persistedRelationshipVerified,
           exhaustiveVerified: persistedRelationshipVerified,
         } : null),

@@ -1014,6 +1014,12 @@ describe('BotPositionStore', () => {
       pmConditionId: '0xabc',
       strategy: 'Buy YES Kalshi + NO PM',
       relationshipVerified: true,
+      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+      pmMarketQuestion: 'Will Team A win on Polymarket?',
+      kalshiOutcomeLabel: 'Team A',
+      pmOutcomeLabel: 'Team A',
+      relationshipState: 'verified_complementary',
+      relationshipExplanation: 'The exact persisted legs select opposite contract sides.',
       kalshiSide: 'yes',
       pmSide: 'no',
       buyPriceKalshiCents: 45,
@@ -1075,6 +1081,14 @@ describe('BotPositionStore', () => {
     expect(created.dryRun).toBe(true);
     expect(created.selectionMethod).toBe('hybrid');
     expect(created.relationshipVerified).toBe(true);
+    expect(created).toMatchObject({
+      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+      pmMarketQuestion: 'Will Team A win on Polymarket?',
+      kalshiOutcomeLabel: 'Team A',
+      pmOutcomeLabel: 'Team A',
+      relationshipState: 'verified_complementary',
+      relationshipExplanation: 'The exact persisted legs select opposite contract sides.',
+    });
     expect(created.kalshiEntryFeeMultiplierPpm).toBe(1_000_000);
     expect(created.pmEntryFeeRateBps).toBe(400);
     expect(created.pmEntryTokenId).toBe('pm-no-token');

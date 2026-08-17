@@ -232,6 +232,10 @@ describe('POST /api/scan saved-market lifecycle', () => {
     mocks.calculateAllArbitrages.mockReturnValue([
       {
         artist: 'Candidate A',
+        kalshiMarketQuestion: 'Will Candidate A win on Kalshi?',
+        pmMarketQuestion: 'Will Candidate A win on Polymarket?',
+        kalshiOutcomeLabel: 'Kalshi Candidate A',
+        pmOutcomeLabel: 'Polymarket Candidate A',
         kalshi: { ticker: 'KXTX07-A', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 500, noAskDepth: 500 },
         polymarket: { conditionId: 'pm-a', yesPrice: 0.42, noPrice: 0.58, askDepth: 500, noAskDepth: 500 },
         arbitrage: {
@@ -272,9 +276,21 @@ describe('POST /api/scan saved-market lifecycle', () => {
       'scan_api',
     );
     const calls = mocks.persistAndConsumeBotScan.mock.calls as unknown as Array<[string, {
-      raw?: { allArbs?: Array<{ fees?: unknown }> };
+      raw?: { allArbs?: Array<{
+        fees?: unknown;
+        kalshiMarketQuestion?: string | null;
+        pmMarketQuestion?: string | null;
+        kalshiOutcomeLabel?: string | null;
+        pmOutcomeLabel?: string | null;
+      }> };
     }, string]>;
     const persisted = calls.at(-1)?.[1];
     expect(persisted?.raw?.allArbs?.[0]?.fees).toEqual({ kalshiFee: 0.5, pmFee: 0.5 });
+    expect(persisted?.raw?.allArbs?.[0]).toMatchObject({
+      kalshiMarketQuestion: 'Will Candidate A win on Kalshi?',
+      pmMarketQuestion: 'Will Candidate A win on Polymarket?',
+      kalshiOutcomeLabel: 'Kalshi Candidate A',
+      pmOutcomeLabel: 'Polymarket Candidate A',
+    });
   });
 });

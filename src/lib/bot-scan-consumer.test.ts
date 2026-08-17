@@ -29,6 +29,15 @@ function settings(overrides: Partial<BotSettings> = {}): BotSettings {
 function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate {
   return {
     outcome: 'Team A',
+    kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+    pmMarketQuestion: 'Will Team A win on Polymarket?',
+    kalshiOutcomeLabel: 'Team A',
+    pmOutcomeLabel: 'Team A',
+    relationshipVerified: true,
+    relationshipState: 'verified_complementary',
+    relationshipExplanation: 'Canonical matcher verification for exact legs.',
+    kalshiSide: 'yes',
+    pmSide: 'no',
     strategy: 'Buy YES Kalshi + NO PM',
     roiPct: 5,
     apyPct: 25,
@@ -237,7 +246,18 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.events.map((event) => event.state)).toEqual(['received', 'placement_attempted', 'placed']);
     expect(h.deps.execute).toHaveBeenCalledTimes(1);
     expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'paper');
-    expect(h.deps.execute).toHaveBeenCalledWith(expect.objectContaining({ reservationMode: 'paper' }));
+    expect(h.deps.execute).toHaveBeenCalledWith(expect.objectContaining({
+      reservationMode: 'paper',
+      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
+      pmMarketQuestion: 'Will Team A win on Polymarket?',
+      kalshiOutcomeLabel: 'Team A',
+      pmOutcomeLabel: 'Team A',
+      relationshipVerified: true,
+      relationshipState: 'verified_complementary',
+      relationshipExplanation: 'Canonical matcher verification for exact legs.',
+      kalshiSide: 'yes',
+      pmSide: 'no',
+    }));
     expect(result.placementCount).toBe(1);
   });
 

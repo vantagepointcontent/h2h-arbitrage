@@ -19,6 +19,8 @@ import { buildExecutionRequest, liveArbResultToBotInput } from './bot-trader';
 
 const outcome = {
   artist: 'Example',
+  kalshiMarketQuestion: 'Will Example win on Kalshi?',
+  pmMarketQuestion: 'Will Example win on Polymarket?',
   kalshiTicker: 'KX-BUG-096',
   pmYesTokenId: '1001',
   pmNoTokenId: '1002',
@@ -36,6 +38,8 @@ const outcome = {
 
 const complement = {
   artist: 'Complement',
+  kalshiMarketQuestion: 'Will Complement win on Kalshi?',
+  pmMarketQuestion: 'Will Complement win on Polymarket?',
   kalshiTicker: 'KX-BUG-101-COMP',
   pmYesTokenId: '2001',
   pmNoTokenId: '2002',
@@ -88,6 +92,8 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
     const result = computeAllLiveArbitrages([outcome], 1000)[0];
 
     expect(result.stale).toBe(true);
+    expect(result.kalshiMarketQuestion).toBe('Will Example win on Kalshi?');
+    expect(result.pmMarketQuestion).toBe('Will Example win on Polymarket?');
     expect(result.kalshiYesAsk).toBe(0.42);
     expect(result.pmYesAsk).toBe(0.40);
     expect(result.roiPct).toBe(0);

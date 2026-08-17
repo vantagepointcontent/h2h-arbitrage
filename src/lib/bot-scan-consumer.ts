@@ -4,6 +4,7 @@ import { evaluateBotTrade, getBotExecutionReadiness, getBotSettings, maybeExecut
 import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 import { auditArbClassification } from './arb-types';
+import type { BotLegRelationshipState } from './bot-leg-identity';
 import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
@@ -30,6 +31,15 @@ export interface BotScanFees {
 export interface BotScanCandidate {
   candidateIndex?: number;
   outcome: string;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  relationshipVerified?: boolean;
+  relationshipState?: BotLegRelationshipState;
+  relationshipExplanation?: string | null;
+  kalshiSide?: 'yes' | 'no';
+  pmSide?: 'yes' | 'no';
   strategy: string;
   roiPct: number;
   apyPct?: number | null;
@@ -152,6 +162,15 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     pairId: scan.marketId,
     marketTitle: scan.marketTitle,
     outcome: item.outcome,
+    kalshiMarketQuestion: item.kalshiMarketQuestion ?? null,
+    pmMarketQuestion: item.pmMarketQuestion ?? null,
+    kalshiOutcomeLabel: item.kalshiOutcomeLabel ?? null,
+    pmOutcomeLabel: item.pmOutcomeLabel ?? null,
+    relationshipVerified: item.relationshipVerified === true,
+    relationshipState: item.relationshipState,
+    relationshipExplanation: item.relationshipExplanation ?? null,
+    kalshiSide: item.kalshiSide,
+    pmSide: item.pmSide,
     strategy: item.strategy,
     roiPct: item.roiPct,
     apyPct: item.apyPct ?? null,
@@ -747,6 +766,18 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
   if (!audit.valid || audit.canonicalType !== 'direct') return null;
   return {
     outcome: row.artist,
+    kalshiMarketQuestion: typeof row.kalshiMarketQuestion === 'string' ? row.kalshiMarketQuestion : null,
+    pmMarketQuestion: typeof row.pmMarketQuestion === 'string' ? row.pmMarketQuestion : null,
+    kalshiOutcomeLabel: typeof row.kalshiOutcomeLabel === 'string' ? row.kalshiOutcomeLabel : null,
+    pmOutcomeLabel: typeof row.pmOutcomeLabel === 'string' ? row.pmOutcomeLabel : null,
+    relationshipVerified: row.relationshipVerified === true,
+    relationshipState: row.relationshipState === 'verified_complementary'
+      || row.relationshipState === 'same_direction'
+      || row.relationshipState === 'invalid'
+      || row.relationshipState === 'legacy_unknown' ? row.relationshipState : undefined,
+    relationshipExplanation: typeof row.relationshipExplanation === 'string' ? row.relationshipExplanation : null,
+    kalshiSide: row.kalshiSide === 'yes' || row.kalshiSide === 'no' ? row.kalshiSide : undefined,
+    pmSide: row.pmSide === 'yes' || row.pmSide === 'no' ? row.pmSide : undefined,
     strategy: row.strategy,
     roiPct: row.roiPct,
     apyPct: finite(row.apyPct) ? row.apyPct : null,

@@ -9,6 +9,7 @@ import { boundedZeroArbRetentionDays, scanRetentionDeleteSql } from './scan-rete
 import { calculateOutcomeContingentApy, type OutcomeContingentApy, type SettlementTiming } from './settlement-apy';
 import { botEntryEvidenceErrors } from './bot-entry-recovery';
 import { findLatestSqliteBackup } from './sqlite-backup-discovery.mjs';
+import type { BotLegRelationshipState } from './bot-leg-identity';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1236,6 +1237,15 @@ export interface LastScanResult {
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
   allArbs?: {               // ALL positive arbitrage opportunities in this scan
     artist: string;
+    kalshiMarketQuestion?: string | null;
+    pmMarketQuestion?: string | null;
+    kalshiOutcomeLabel?: string | null;
+    pmOutcomeLabel?: string | null;
+    relationshipVerified?: boolean;
+    relationshipState?: BotLegRelationshipState;
+    relationshipExplanation?: string | null;
+    kalshiSide?: 'yes' | 'no';
+    pmSide?: 'yes' | 'no';
     roiPct: number;
     expectedProfit: number;
     strategy: string;

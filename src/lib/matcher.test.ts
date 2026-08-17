@@ -494,10 +494,16 @@ describe('getClobAskDepths', () => {
 
 describe('matchOutcomes', () => {
   it('matchar exakt identiska namn', () => {
-    const km = [{ ticker: 'KXTRUMP', event_ticker: 'KXTRUMP', title: 'Will Trump win?', yes_bid_dollars: '0.40', yes_ask_dollars: '0.45', no_bid_dollars: '0.55', no_ask_dollars: '0.60' }];
-    const pm = [{ id: 'pm1', conditionId: 'c1', question: 'Trump Win?', outcomes: '["Yes","No"]', outcomePrices: '["0.50","0.50"]', active: true, closed: false, slug: 'trump' }];
+    const km = [{ ticker: 'KXTRUMP', event_ticker: 'KXTRUMP', title: 'Will Trump win?', yes_sub_title: 'Donald Trump', no_sub_title: 'Not Donald Trump', yes_bid_dollars: '0.40', yes_ask_dollars: '0.45', no_bid_dollars: '0.55', no_ask_dollars: '0.60' }];
+    const pm = [{ id: 'pm1', conditionId: 'c1', question: 'Trump Win?', groupItemTitle: 'Donald Trump', outcomes: '["Yes","No"]', outcomePrices: '["0.50","0.50"]', active: true, closed: false, slug: 'trump' }];
     const r = matchOutcomes(km as any, pm as any, 'Trump Win?', 1000, new Date(Date.now() + 86400000 * 30).toISOString());
     expect(r.length).toBeGreaterThan(0);
+    expect(r.find((outcome) => outcome.kalshi && outcome.polymarket)).toMatchObject({
+      kalshiMarketQuestion: 'Will Trump win?',
+      pmMarketQuestion: 'Trump Win?',
+      kalshiOutcomeLabel: 'Donald Trump',
+      pmOutcomeLabel: 'Donald Trump',
+    });
   });
 
   it('returnerar unmatched om inga likheter', () => {

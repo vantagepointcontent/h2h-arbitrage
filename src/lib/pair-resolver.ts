@@ -198,6 +198,10 @@ export async function resolvePair(kalshiUrl: string, pmUrl: string, capital: num
 
     liveMatched.push({
       artist: o.artist,
+      kalshiMarketQuestion: o.kalshiMarketQuestion ?? null,
+      pmMarketQuestion: o.pmMarketQuestion ?? null,
+      kalshiOutcomeLabel: o.kalshiOutcomeLabel ?? null,
+      pmOutcomeLabel: o.pmOutcomeLabel ?? null,
       kalshiTicker: o.kalshi!.ticker,
       pmConditionId: cid,
       pmYesTokenId: tokens.yes,
