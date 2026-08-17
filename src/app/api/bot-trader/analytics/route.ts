@@ -12,8 +12,8 @@ import {
 
 function missingSnapshot(status: 'missing_identifier' | 'never_saved'): PersistedPriceSnapshot {
   return {
-    status, priceCents: null, source: null, observedAt: null, ageMs: null,
-    executableDepthMicros: null, failureReason: null,
+    status, priceCents: null, priceMicrocents: null, source: null, observedAt: null, ageMs: null,
+    executableDepthMicros: null, failureReason: null, markFailureReason: null,
   };
 }
 
@@ -23,77 +23,112 @@ function polymarketToken(position: BotPosition): string | null {
 }
 
 function exactLegBlocker(platform: 'Kalshi' | 'Polymarket', snapshot: PersistedPriceSnapshot): string {
-  if (snapshot.failureReason) return snapshot.failureReason;
   if (snapshot.status === 'missing_identifier') return `${platform} exact market identifier is missing`;
   if (snapshot.status === 'side_mismatch') return `${platform} exact held side/token snapshot is missing`;
-  if (snapshot.status === 'never_saved') return `${platform} exact executable market has never been recorded`;
-  if (snapshot.status === 'stale') return `${platform} persisted executable quote is stale`;
-  return `${platform} one-share executable bid is unavailable`;
+  if (snapshot.status === 'never_saved') return `${platform} exact held-side scan snapshot has never been recorded`;
+  return `${platform} last-scanned price is unavailable`;
 }
 
-function applyPersistedExecutableValuation(
+function roundedRatio(numerator: bigint, denominator: bigint): number {
+  const negative = numerator < 0n;
+  const absolute = negative ? -numerator : numerator;
+  const rounded = (absolute + denominator / 2n) / denominator;
+  const value = Number(negative ? -rounded : rounded);
+  if (!Number.isSafeInteger(value)) throw new Error('Indicative mark exceeds safe integer range');
+  return value;
+}
+
+function snapshotMicrocents(snapshot: PersistedPriceSnapshot): number | null {
+  if (Number.isSafeInteger(snapshot.priceMicrocents)
+    && snapshot.priceMicrocents! >= 0 && snapshot.priceMicrocents! <= 100_000_000) {
+    return snapshot.priceMicrocents!;
+  }
+  return Number.isSafeInteger(snapshot.priceCents)
+    && snapshot.priceCents! >= 0 && snapshot.priceCents! <= 100
+    ? snapshot.priceCents! * 1_000_000
+    : null;
+}
+
+function applyPersistedIndicativeValuation(
   position: BotPosition,
   kalshi: PersistedPriceSnapshot,
   polymarket: PersistedPriceSnapshot,
 ): BotPosition {
   if (position.status !== 'open') return position;
-  const currentPriceKalshiCents = Number.isSafeInteger(kalshi.priceCents) ? kalshi.priceCents : position.currentPriceKalshiCents;
-  const currentPricePmCents = Number.isSafeInteger(polymarket.priceCents) ? polymarket.priceCents : position.currentPricePmCents;
-
-  const executable = (snapshot: PersistedPriceSnapshot) =>
+  const available = (snapshot: PersistedPriceSnapshot) =>
     (snapshot.status === 'available' || snapshot.status === 'stale')
-    && Number.isSafeInteger(snapshot.priceCents)
-    && Number.isSafeInteger(snapshot.executableDepthMicros)
-    && snapshot.executableDepthMicros! >= 1_000_000
+    && snapshotMicrocents(snapshot) != null
     && snapshot.observedAt != null && Number.isFinite(Date.parse(snapshot.observedAt));
-  if (!executable(kalshi) || !executable(polymarket)) {
-    if (position.currentValueCents != null) {
-      return { ...position, currentPriceKalshiCents, currentPricePmCents };
-    }
+  if (!available(kalshi) || !available(polymarket)) {
     const blockers = [
-      ...(!executable(kalshi) ? [exactLegBlocker('Kalshi', kalshi)] : []),
-      ...(!executable(polymarket) ? [exactLegBlocker('Polymarket', polymarket)] : []),
+      ...(!available(kalshi) ? [exactLegBlocker('Kalshi', kalshi)] : []),
+      ...(!available(polymarket) ? [exactLegBlocker('Polymarket', polymarket)] : []),
     ];
     return {
       ...position,
-      currentPriceKalshiCents,
-      currentPricePmCents,
+      currentPriceKalshiCents: available(kalshi) ? kalshi.priceCents : null,
+      currentPricePmCents: available(polymarket) ? polymarket.priceCents : null,
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
       valuationStatus: 'unavailable',
       valuationFailureReason: blockers.join('; '),
     };
   }
 
-  const currentValueCents = kalshi.priceCents! + polymarket.priceCents!;
+  const kalshiQuantity = position.remainingSharesKalshi;
+  const pmQuantity = position.remainingSharesPm;
+  if (!Number.isSafeInteger(kalshiQuantity) || kalshiQuantity < 0
+    || !Number.isSafeInteger(pmQuantity) || pmQuantity < 0) {
+    return {
+      ...position,
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      valuationStatus: 'unavailable',
+      valuationFailureReason: 'Persisted held quantity is unavailable',
+    };
+  }
+  const indicativeValueMicrocents = Number(
+    BigInt(snapshotMicrocents(kalshi)!) * BigInt(kalshiQuantity)
+      + BigInt(snapshotMicrocents(polymarket)!) * BigInt(pmQuantity),
+  );
+  if (!Number.isSafeInteger(indicativeValueMicrocents)) throw new Error('Indicative current value exceeds safe integer range');
+  const currentValueCents = roundedRatio(BigInt(indicativeValueMicrocents), 1_000_000n);
   const lastValuationAt = [kalshi.observedAt!, polymarket.observedAt!].sort()[0];
   const stale = kalshi.status === 'stale' || polymarket.status === 'stale';
   const valuationFailureReason = stale
-    ? [
-      ...(kalshi.status === 'stale' ? [exactLegBlocker('Kalshi', kalshi)] : []),
-      ...(polymarket.status === 'stale' ? [exactLegBlocker('Polymarket', polymarket)] : []),
-    ].join('; ')
+    ? [kalshi, polymarket].filter((snapshot) => snapshot.status === 'stale').map((snapshot) => {
+      const platform = snapshot === kalshi ? 'Kalshi' : 'Polymarket';
+      const age = snapshot.ageMs == null ? 'unknown age' : `${Math.floor(snapshot.ageMs / 60_000)}m old`;
+      const failure = snapshot.markFailureReason ? `; ${snapshot.markFailureReason}` : '';
+      return `${platform} Stale last-scanned mark (${age}, ${snapshot.source ?? 'unknown source'}${failure})`;
+    }).join('; ')
     : null;
-  const entryAvailable = position.remainingSharesKalshi === 1 && position.remainingSharesPm === 1
-    && position.entryCostStatus === 'available'
-    && Number.isSafeInteger(position.remainingOpenCostCents);
-  const unrealizedPnlCents = entryAvailable
-    ? (position.realizedPnlCents ?? 0) + currentValueCents - position.remainingOpenCostCents
-    : null;
-  const unrealizedRoiBps = unrealizedPnlCents != null && position.remainingOpenCostCents > 0
-    ? Math.round((unrealizedPnlCents * 10_000) / position.remainingOpenCostCents)
+  // BUG-160 defines Buy Cost as immutable persisted entry cost. Do not switch
+  // this mark-to-market formula to remaining basis or executable close cost.
+  const buyCostMicrocents = Number.isSafeInteger(position.totalCostMicrousd) && position.totalCostMicrousd! >= 0
+    ? position.totalCostMicrousd! * 100
+    : Number.isSafeInteger(position.totalCostCents) && position.totalCostCents >= 0
+      ? position.totalCostCents * 1_000_000
+      : null;
+  const entryAvailable = position.entryCostStatus === 'available'
+    && buyCostMicrocents != null && Number.isSafeInteger(buyCostMicrocents);
+  const indicativePnlMicrocents = entryAvailable ? indicativeValueMicrocents - buyCostMicrocents : null;
+  const unrealizedPnlCents = indicativePnlMicrocents == null
+    ? null
+    : roundedRatio(BigInt(indicativePnlMicrocents), 1_000_000n);
+  const unrealizedRoiBps = indicativePnlMicrocents != null && buyCostMicrocents! > 0
+    ? roundedRatio(BigInt(indicativePnlMicrocents) * 10_000n, BigInt(buyCostMicrocents!))
     : null;
   return {
     ...position,
     currentPriceKalshiCents: kalshi.priceCents,
     currentPricePmCents: polymarket.priceCents,
     currentValueCents,
-    kalshiLiquidationValueCents: kalshi.priceCents,
-    pmLiquidationValueCents: polymarket.priceCents,
-    kalshiValuationDepth: 1,
-    pmValuationDepth: 1,
-    kalshiQuoteTimestamp: kalshi.observedAt,
-    pmQuoteTimestamp: polymarket.observedAt,
-    kalshiQuoteSource: kalshi.source,
-    pmQuoteSource: polymarket.source,
+    indicativeValueMicrocents,
+    ...(buyCostMicrocents == null ? {} : { indicativeBuyCostMicrocents: buyCostMicrocents }),
+    ...(indicativePnlMicrocents == null ? {} : { indicativePnlMicrocents }),
     lastValuationAt,
     valuationStatus: stale ? 'stale' : 'current',
     valuationFailureReason,
@@ -141,7 +176,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const kalshiSnapshot = snapshotFor({ platform: 'kalshi', marketId: position.kalshiTicker, side: position.kalshiSide, tokenId: null });
       const polymarketSnapshot = snapshotFor({ platform: 'polymarket', marketId: position.pmConditionId, side: position.pmSide, tokenId: polymarketToken(position) });
       return {
-        ...applyPersistedExecutableValuation(position, kalshiSnapshot, polymarketSnapshot),
+        ...applyPersistedIndicativeValuation(position, kalshiSnapshot, polymarketSnapshot),
         kalshiUrl: position.marketId ? urlByMarket.get(position.marketId)?.kalshiUrl ?? null : null,
         polymarketUrl: position.marketId ? urlByMarket.get(position.marketId)?.polymarketUrl ?? null : null,
         currentPriceSnapshots: { kalshi: kalshiSnapshot, polymarket: polymarketSnapshot },

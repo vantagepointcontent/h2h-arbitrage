@@ -110,7 +110,7 @@ describe('GET /api/bot-trader/analytics', () => {
     });
   });
 
-  it('derives independent one-share current value from exact persisted executable bids', async () => {
+  it('derives independent one-share current value from exact persisted scan marks', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({
       positions: [{
         id: 9, marketId: 'm9', kalshiTicker: 'KX-9', kalshiSide: 'no',
@@ -139,8 +139,7 @@ describe('GET /api/bot-trader/analytics', () => {
       currentPriceKalshiCents: 45,
       currentPricePmCents: 54,
       currentValueCents: 99,
-      kalshiLiquidationValueCents: 45,
-      pmLiquidationValueCents: 54,
+
       lastValuationAt: '2026-08-14T12:00:00.000Z',
       valuationStatus: 'current',
       valuationFailureReason: null,
@@ -151,6 +150,50 @@ describe('GET /api/bot-trader/analytics', () => {
       expect.objectContaining({ id: 9, currentValueCents: 99, unrealizedPnlCents: null }),
     ], expect.any(Date));
     expect(body.analytics.performance).toEqual({ capital: { currentCents: 99 }, pnl: { unrealizedCents: null } });
+  });
+
+  it('uses stale low-depth indicative snapshots and full stored precision for P&L and ROI', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({
+      positions: [{
+        id: 10, marketId: 'm10', kalshiTicker: 'KX-10', kalshiSide: 'yes',
+        pmConditionId: '0x10', pmEntryTokenId: 'token-no', pmSide: 'no',
+        remainingSharesKalshi: 1, remainingSharesPm: 1, remainingOpenCostCents: 97,
+        totalCostCents: 97, totalCostMicrousd: 970_000,
+        status: 'open', entryCostStatus: 'available', currentValueCents: null,
+        unrealizedPnlCents: null, realizedPnlCents: null,
+      }],
+      performance: { valuation: { fresh: 0, stale: 0, unavailable: 1 } },
+      openPositions: { count: 1, unrealizedPnlCents: null },
+      averageRoi: { atTradeBps: 500, currentBps: null },
+    } as never);
+    vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map([
+      ['kalshi|kx-10|yes|', {
+        status: 'stale', priceCents: 46, priceMicrocents: 45_500_100,
+        executableDepthMicros: 0, source: 'saved-market-full-scan',
+        observedAt: '2026-08-17T10:00:00.000Z', ageMs: 7_200_000,
+        failureReason: 'Kalshi YES executable bid unavailable',
+      }],
+      ['polymarket|0x10|no|token-no', {
+        status: 'stale', priceCents: 54, priceMicrocents: 54_449_900,
+        executableDepthMicros: 250_000, source: 'saved-market-full-scan',
+        observedAt: '2026-08-17T10:01:00.000Z', ageMs: 7_140_000,
+        failureReason: 'Polymarket NO executable depth 0.25 is below one share',
+      }],
+    ]));
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+    expect(body.analytics.positions[0]).toMatchObject({
+      currentValueCents: 100,
+      indicativeValueMicrocents: 99_950_000,
+      unrealizedPnlCents: 3,
+      indicativePnlMicrocents: 2_950_000,
+      unrealizedRoiBps: 304,
+      valuationStatus: 'stale',
+      lastValuationAt: '2026-08-17T10:00:00.000Z',
+    });
+    expect(body.analytics.positions[0].valuationFailureReason).toContain('Stale');
+    expect(body.analytics.positions[0].valuationFailureReason).not.toContain('depth');
   });
 
   it('returns an actionable retry message when the analytics store is unavailable', async () => {

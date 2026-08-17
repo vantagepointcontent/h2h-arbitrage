@@ -189,6 +189,21 @@ describe('summarizeBotPositions', () => {
 });
 
 describe('summarizeBotPerformance', () => {
+  it('includes stale indicative marks in portfolio totals while retaining stale coverage', () => {
+    const result = summarizeBotPerformance([
+      openPosition({
+        totalCostCents: 97,
+        currentValueCents: 100,
+        lastValuationAt: '2026-08-17T10:00:00.000Z',
+      }),
+    ], new Date('2026-08-17T12:00:00.000Z'));
+
+    expect(result.capital).toMatchObject({ currentCents: 100, excludedOpenCostCents: 0 });
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 3, totalCents: 3, roiBps: 309 });
+    expect(result.valuation).toMatchObject({ fresh: 0, stale: 1, unavailable: 0 });
+    expect(result.entryCohorts[0]).toMatchObject({ currentCents: 100, unrealizedCents: 3 });
+  });
+
   it('does not treat a legacy position with unavailable authoritative entry cost as zero deployed capital', () => {
     const result = summarizeBotPerformance([
       openPosition({
@@ -209,7 +224,7 @@ describe('summarizeBotPerformance', () => {
     expect(result.entryCohorts[0].unrealizedCents).toBeNull();
   });
 
-  it('uses one fee-inclusive population for cards and chart while suppressing stale executable marks', () => {
+  it('uses one fee-inclusive population for cards and chart while retaining stale indicative marks', () => {
     const rows = [
       openPosition({ id: 1, openedAt: '2026-08-10T13:00:00.000Z', totalCostCents: 978, currentValueCents: 1022, lastValuationAt: '2026-08-11T13:55:00.000Z', expectedPayoutCents: 1000 }),
       openPosition({ id: 2, openedAt: '2026-08-10T14:00:00.000Z', totalCostCents: 900, currentValueCents: 950, lastValuationAt: '2026-08-11T13:00:00.000Z', expectedPayoutCents: 1000 }),
@@ -217,13 +232,31 @@ describe('summarizeBotPerformance', () => {
     ];
 
     const result = summarizeBotPerformance(rows, new Date('2026-08-11T14:00:00.000Z'));
-    expect(result.capital).toEqual({ deployedCents: 2828, currentCents: 2022, heldToResolutionCents: 2000, excludedOpenCostCents: 900 });
-    expect(result.pnl).toEqual({ realizedCents: 50, unrealizedCents: 44, totalCents: 94, roiBps: 488 });
-    expect(result.valuation).toEqual({ fresh: 1, stale: 1, unavailable: 0, pendingSettlement: 0, asOf: '2026-08-11T13:55:00.000Z' });
+    expect(result.capital).toEqual({ deployedCents: 2828, currentCents: 2972, heldToResolutionCents: 2000, excludedOpenCostCents: 0 });
+    expect(result.pnl).toEqual({ realizedCents: 50, unrealizedCents: 94, totalCents: 144, roiBps: 509 });
+    expect(result.valuation).toEqual({ fresh: 1, stale: 1, unavailable: 0, pendingSettlement: 0, asOf: '2026-08-11T13:00:00.000Z' });
     expect(result.entryCohorts).toEqual([
-      { date: '2026-08-10', deployedCents: 1878, currentCents: 1022, heldToResolutionCents: 2000, realizedCents: 0, unrealizedCents: 44, trades: 2 },
+      { date: '2026-08-10', deployedCents: 1878, currentCents: 1972, heldToResolutionCents: 2000, realizedCents: 0, unrealizedCents: 94, trades: 2 },
       { date: '2026-08-11', deployedCents: 950, currentCents: 1000, heldToResolutionCents: 0, realizedCents: 50, unrealizedCents: 0, trades: 1 },
     ]);
+  });
+
+  it('rounds indicative portfolio and cohort totals only after aggregating exact marks', () => {
+    const rows = [1, 2].map((id) => openPosition({
+      id,
+      openedAt: '2026-08-10T13:00:00.000Z',
+      totalCostCents: 97,
+      currentValueCents: 99,
+      indicativeValueMicrocents: 99_490_000,
+      indicativeBuyCostMicrocents: 97_000_000,
+      indicativePnlMicrocents: 2_490_000,
+      lastValuationAt: '2026-08-11T13:55:00.000Z',
+    }));
+
+    const result = summarizeBotPerformance(rows, new Date('2026-08-11T14:00:00.000Z'));
+    expect(result.capital.currentCents).toBe(199);
+    expect(result.pnl).toMatchObject({ unrealizedCents: 5, totalCents: 5, roiBps: 257 });
+    expect(result.entryCohorts[0]).toMatchObject({ currentCents: 199, unrealizedCents: 5 });
   });
 
   it('distinguishes unavailable marks and does not treat unverified settlement as realized', () => {

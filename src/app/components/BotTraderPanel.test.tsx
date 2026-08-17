@@ -182,10 +182,10 @@ describe('BotTraderPanel', () => {
 
     await screen.findByText('Trump 2026');
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('Deployed$0.97');
-    expect(screen.getByText('Executable value').parentElement?.textContent).toBe('Executable value$1.02');
+    expect(screen.getByText('Indicative value').parentElement?.textContent).toBe('Indicative value$1.02');
     expect(screen.getByText('Held to resolution').parentElement?.textContent).toBe('Held to resolution$1.00');
     expect(screen.getByText('Portfolio ROI').parentElement?.textContent).toBe('Portfolio ROI+5.2%');
-    expect(screen.getByText(/Executable quotes fresh for 1 open position/)).toBeTruthy();
+    expect(screen.getByText(/Indicative marks fresh for 1 open position/)).toBeTruthy();
     expect(screen.getByRole('img', { name: 'BotTrader current performance by entry date chart' })).toBeTruthy();
   });
 
@@ -254,8 +254,8 @@ describe('BotTraderPanel', () => {
     }));
     render(<BotTraderPanel />);
 
-    expect(await screen.findByText(/1 stale executable quote/)).toBeTruthy();
-    expect(screen.getByText('Executable value').parentElement?.textContent).toBe('Executable value$0.00');
+    expect(await screen.findByText(/1 stale indicative mark/)).toBeTruthy();
+    expect(screen.getByText('Indicative value').parentElement?.textContent).toBe('Indicative value$0.00');
     expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized$0.00');
     expect(screen.getByText(/\$0\.97 of unavailable open buy cost is excluded/)).toBeTruthy();
     expect(screen.getByText('No verified BotTrader executions in this range.')).toBeTruthy();
@@ -313,7 +313,7 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
   });
 
-  it('maps buy cost, executable current value, P&L, and percentage ROI into their labelled columns', async () => {
+  it('maps buy cost, indicative current value, P&L, and percentage ROI into their labelled columns', async () => {
     vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     stubInitialFetch();
     render(<BotTraderPanel />);
@@ -329,7 +329,7 @@ describe('BotTraderPanel', () => {
     expect(cells[7]).toBe('+5.2%');
   });
 
-  it('shows stale open marks explicitly and does not invent zero P&L or ROI', async () => {
+  it('keeps indicative P&L and ROI visible for stale marks', async () => {
     vi.setSystemTime(new Date('2026-08-11T14:00:01.000Z'));
     stubInitialFetch();
     render(<BotTraderPanel />);
@@ -338,8 +338,9 @@ describe('BotTraderPanel', () => {
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
     expect(cells[4]).toBe('$0.97');
     expect(cells[5]).toBe('$1.02 · Stale');
-    expect(cells[6]).toBe('Stale executable quote');
-    expect(cells[7]).toBe('Stale executable quote');
+    expect(cells[6]).toBe('+$0.05');
+    expect(cells[7]).toBe('+5.2%');
+    expect(cells[6]).not.toContain('executable');
   });
 
   it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
@@ -398,7 +399,7 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
     expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi YES Current PriceSaved$0.47');
     expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket NO Current PriceStale$0.55');
-    expect(screen.getAllByText(/One-share executable bid/)).toHaveLength(2);
+    expect(screen.getAllByText(/Indicative last-scanned mark; not executable liquidation proceeds/)).toHaveLength(2);
     expect(screen.getByTestId('kalshi-fee-authority').textContent).toContain('quadratic:1000000:v1');
     expect(screen.getByTestId('polymarket-fee-authority').textContent).toContain('token-fee-rate:400');
   });
@@ -554,7 +555,7 @@ describe('BotTraderPanel', () => {
     expect(screen.queryByText('Paper open profit')).toBeNull();
     expect(screen.getByText('Verified trades').parentElement?.textContent).toBe('Verified trades1');
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('Deployed$1.00');
-    expect(screen.getByText('Executable value').parentElement?.textContent).toBe('Executable value$0.80');
+    expect(screen.getByText('Indicative value').parentElement?.textContent).toBe('Indicative value$0.80');
     expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized-$0.20');
     expect(screen.getByText('Realized').parentElement?.textContent).toBe('Realized$0.00');
     expect(screen.getByText('Total P&L').parentElement?.textContent).toBe('Total P&L-$0.20');
