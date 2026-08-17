@@ -259,6 +259,35 @@ describe('summarizeBotPerformance', () => {
     expect(result.entryCohorts[0]).toMatchObject({ currentCents: 199, unrealizedCents: 5 });
   });
 
+  it('reconciles a reduced open position from immutable Buy Cost across row, cards, ROI, and cohort', () => {
+    const result = summarizeBotPerformance([
+      openPosition({
+        totalCostCents: 300,
+        remainingOpenCostCents: 100,
+        realizedPnlCents: 5,
+        currentValueCents: 110,
+        indicativeValueMicrocents: 110_000_000,
+        indicativeBuyCostMicrocents: 300_000_000,
+        indicativePnlMicrocents: -190_000_000,
+        lastValuationAt: '2026-08-11T13:55:00.000Z',
+      }),
+    ], new Date('2026-08-11T14:00:00.000Z'));
+
+    expect(result.capital).toMatchObject({ deployedCents: 300, currentCents: 110 });
+    expect(result.pnl).toEqual({
+      realizedCents: 0,
+      unrealizedCents: -190,
+      totalCents: -190,
+      roiBps: -6333,
+    });
+    expect(result.entryCohorts[0]).toMatchObject({
+      deployedCents: 300,
+      currentCents: 110,
+      realizedCents: 0,
+      unrealizedCents: -190,
+    });
+  });
+
   it('distinguishes unavailable marks and does not treat unverified settlement as realized', () => {
     const result = summarizeBotPerformance([
       openPosition({ currentValueCents: null, lastValuationAt: null }),
