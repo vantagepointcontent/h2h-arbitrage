@@ -1013,6 +1013,7 @@ describe('BotPositionStore', () => {
       kalshiTicker: 'KXTEST',
       pmConditionId: '0xabc',
       strategy: 'Buy YES Kalshi + NO PM',
+      relationshipVerified: true,
       kalshiSide: 'yes',
       pmSide: 'no',
       buyPriceKalshiCents: 45,
@@ -1073,6 +1074,7 @@ describe('BotPositionStore', () => {
     expect(created.lastValuationAt).toBeNull();
     expect(created.dryRun).toBe(true);
     expect(created.selectionMethod).toBe('hybrid');
+    expect(created.relationshipVerified).toBe(true);
     expect(created.kalshiEntryFeeMultiplierPpm).toBe(1_000_000);
     expect(created.pmEntryFeeRateBps).toBe(400);
     expect(created.pmEntryTokenId).toBe('pm-no-token');

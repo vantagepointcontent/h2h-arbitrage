@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import { getBotPositionAnalytics, summarizeBotPerformance } from '@/lib/bot-positions';
 import { NextRequest } from 'next/server';
-import { getMarketUrlsById } from '@/lib/persistence';
+import { getMarketUrlsById, getSavedMarketById } from '@/lib/persistence';
 import { getPersistedCurrentPriceBatch } from '@/lib/current-price-snapshots';
 
 vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn(), summarizeBotPerformance: vi.fn() }));
-vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
+vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn(), getSavedMarketById: vi.fn() }));
 vi.mock('@/lib/current-price-snapshots', () => ({
   getPersistedCurrentPriceBatch: vi.fn(),
   currentPriceSnapshotKey: (request: { platform: string; marketId: string | null; side: string; tokenId: string | null }) =>
@@ -17,6 +17,7 @@ describe('GET /api/bot-trader/analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getMarketUrlsById).mockResolvedValue(null);
+    vi.mocked(getSavedMarketById).mockResolvedValue(null);
     vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map());
     vi.mocked(summarizeBotPerformance).mockImplementation(() => ({
       capital: { currentCents: 99 }, pnl: { unrealizedCents: null },
@@ -77,6 +78,34 @@ describe('GET /api/bot-trader/analytics', () => {
       expect.objectContaining({ id: 1, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' }),
       expect.objectContaining({ id: 2, marketId: 'market-1', kalshiUrl: 'https://kalshi.test/market', polymarketUrl: 'https://pm.test/event' }),
     ]);
+  });
+
+  it('enriches legacy positions with exact persisted outcome identities and backend relationship state', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
+      id: 97, executionId: 128, marketId: 'fl-26', marketTitle: 'FL-26 House Election Winner',
+      kalshiTicker: 'KX-FL-D', pmConditionId: '0xdem', pmEntryTokenId: 'token-dem-yes',
+      kalshiSide: 'yes', pmSide: 'yes', status: 'open',
+    }] } as never);
+    vi.mocked(getSavedMarketById).mockResolvedValue({
+      id: 'fl-26', eventTitle: 'FL-26 House Election Winner', kalshiUrl: '', polymarketUrl: '', createdAt: '',
+      lastScanResult: {
+        matchedPairs: [
+          { artist: 'Democrats', kalshiTicker: 'KX-FL-D', pmConditionId: '0xdem' },
+          { artist: 'Republicans', kalshiTicker: 'KX-FL-R', pmConditionId: '0xrep' },
+        ],
+      },
+    } as never);
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    const body = await response.json();
+
+    expect(body.analytics.positions[0]).toMatchObject({
+      identity: {
+        kalshi: { marketQuestion: null, outcomeLabel: 'Democrats', side: 'yes' },
+        polymarket: { marketQuestion: null, outcomeLabel: 'Democrats', side: 'yes' },
+        relationship: { state: 'same_direction' },
+      },
+    });
   });
 
   it('deduplicates exact legs into one persisted snapshot batch and isolates missing identifiers', async () => {

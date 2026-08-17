@@ -10,16 +10,6 @@ import {
   type KalshiFeeType as AuthoritativeKalshiFeeType,
 } from './kalshi-fee-quote';
 import { calculatePolymarketFeeMicrousd } from './polymarket-fees';
-import {
-  validatePropositionRelationship,
-  type PropositionRelationship,
-  type PropositionRelationshipState,
-} from './proposition-identity';
-import { historicalPropositionAudit } from './bot-proposition-audit';
-import {
-  findCanonicalPropositionRelationship,
-  resolveCanonicalPropositionRelationship,
-} from './proposition-registry';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -105,9 +95,8 @@ export interface BotPosition {
   kalshiTicker: string | null;
   pmConditionId: string | null;
   strategy: string | null;
-  propositionRelationship?: PropositionRelationship | null;
-  propositionRelationshipState?: PropositionRelationshipState;
-  propositionRelationshipWarning?: string | null;
+  /** Persisted canonical backend verification for the exact selected legs. */
+  relationshipVerified: boolean;
   kalshiSide: BotPositionSide;
   pmSide: BotPositionSide;
   buyPriceKalshiCents: number;
@@ -241,18 +230,15 @@ export type CreateBotPosition = Omit<BotPosition,
   'kalshiLiquidationValueCents' | 'pmLiquidationValueCents' |
   'kalshiQuoteTimestamp' | 'pmQuoteTimestamp' | 'kalshiQuoteSource' | 'pmQuoteSource' |
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
-  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' |
-  'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt' |
-  'propositionRelationship' | 'propositionRelationshipState' | 'propositionRelationshipWarning'
+  'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' | 'relationshipVerified' |
+  'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt'
 > & {
   expectedRoiBps?: number | null;
   expectedApyBps?: number | null;
   unitId?: string | null;
   kalshiEntryCalculatedFeeCents?: number;
   kalshiEntryChargedFeeCents?: number | null;
-  propositionRelationship?: PropositionRelationship | null;
-  propositionRelationshipState?: PropositionRelationshipState;
-  propositionRelationshipWarning?: string | null;
+  relationshipVerified?: boolean;
 };
 
 export interface ExecutableBidLevel {
@@ -1011,35 +997,8 @@ export function calculatePositionValuation(
   return base;
 }
 
-function parsePropositionRelationship(value: unknown): PropositionRelationship | null {
-  if (typeof value !== 'string' || value.length === 0) return null;
-  try {
-    const parsed = JSON.parse(value) as PropositionRelationship;
-    if (!validatePropositionRelationship(parsed).valid) return null;
-    return resolveCanonicalPropositionRelationship(parsed);
-  } catch {
-    return null;
-  }
-}
-
 function rowToPosition(row: Record<string, unknown>): BotPosition {
   const executionMode: BotPositionExecutionMode = row.execution_mode === 'live' ? 'live' : 'paper';
-  const historicalAudit = historicalPropositionAudit(Number(row.execution_id), {
-    positionId: Number(row.id),
-    openedAt: String(row.opened_at),
-    kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
-    pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
-    pmTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
-    kalshiSide: String(row.kalshi_side),
-    pmSide: String(row.pm_side),
-  });
-  const storedRelationship = parsePropositionRelationship(row.proposition_relationship_json);
-  const storedRelationshipInvalid = typeof row.proposition_relationship_json === 'string'
-    && row.proposition_relationship_json.length > 0
-    && storedRelationship == null;
-  const storedVerifiedWithoutRelationship = row.proposition_relationship_state === 'verified_complementary'
-    && storedRelationship == null;
-  const auditedInvalid = storedRelationship == null && historicalAudit?.classification === 'confirmed_invalid';
   const kalshiEntryFills = parseEntryFills(row.kalshi_entry_fills_json);
   const pmEntryFills = parseEntryFills(row.pm_entry_fills_json);
   const entryCostAvailable = row.entry_cost_status === 'available'
@@ -1063,21 +1022,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
     pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
     strategy: row.strategy != null ? String(row.strategy) : null,
-    propositionRelationship: storedRelationship,
-    propositionRelationshipState: (auditedInvalid
-      ? 'same_direction_invalid'
-      : storedRelationshipInvalid || storedVerifiedWithoutRelationship
-      ? 'invalid_metadata'
-      : row.proposition_relationship_state != null
-      ? String(row.proposition_relationship_state)
-      : 'unknown') as PropositionRelationshipState,
-    propositionRelationshipWarning: auditedInvalid
-      ? historicalAudit.reason
-      : storedRelationshipInvalid || storedVerifiedWithoutRelationship
-      ? 'Persisted canonical proposition metadata is malformed or no longer validates'
-      : row.proposition_relationship_warning != null
-      ? String(row.proposition_relationship_warning)
-      : 'Legacy/unknown: canonical proposition relationship was not captured at entry',
+    relationshipVerified: Number(row.relationship_verified) === 1,
     kalshiSide: String(row.kalshi_side) as BotPositionSide,
     pmSide: String(row.pm_side) as BotPositionSide,
     buyPriceKalshiCents: Number(row.buy_price_kalshi),
@@ -1383,9 +1328,7 @@ export class BotPositionStore {
         kalshi_ticker TEXT,
         pm_condition_id TEXT,
         strategy TEXT,
-        proposition_relationship_json TEXT,
-        proposition_relationship_state TEXT NOT NULL DEFAULT 'unknown',
-        proposition_relationship_warning TEXT,
+        relationship_verified INTEGER NOT NULL DEFAULT 0 CHECK (relationship_verified IN (0, 1)),
         kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
         pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
         buy_price_kalshi INTEGER NOT NULL,
@@ -1510,9 +1453,6 @@ export class BotPositionStore {
       kalshi_ticker: 'TEXT',
       pm_condition_id: 'TEXT',
       strategy: 'TEXT',
-      proposition_relationship_json: 'TEXT',
-      proposition_relationship_state: "TEXT NOT NULL DEFAULT 'unknown'",
-      proposition_relationship_warning: 'TEXT',
       kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
       pm_side: "TEXT NOT NULL DEFAULT 'no'",
       buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
@@ -1587,6 +1527,7 @@ export class BotPositionStore {
       pm_exit_fee_observed_at: 'TEXT',
       pm_exit_fee_version: 'TEXT',
       status: "TEXT NOT NULL DEFAULT 'open'",
+      relationship_verified: 'INTEGER NOT NULL DEFAULT 0',
       opened_at: "TEXT NOT NULL DEFAULT ''",
       expiry_date: 'TEXT',
       settled_at: 'TEXT',
@@ -1766,20 +1707,6 @@ export class BotPositionStore {
         || !input.kalshiEntryFills?.length || !input.pmEntryFills?.length)) {
       throw new Error('Live bot positions require immutable per-venue entry fill evidence');
     }
-    let canonicalRelationship: PropositionRelationship | null = null;
-    if (input.propositionRelationship || input.propositionRelationshipState === 'verified_complementary') {
-      canonicalRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship);
-      const selectedCanonical = findCanonicalPropositionRelationship({
-        kalshiTicker: input.kalshiTicker,
-        pmConditionId: input.pmConditionId,
-        pmTokenId: input.pmEntryTokenId,
-        kalshiSide: input.kalshiSide,
-        pmSide: input.pmSide,
-      });
-      if (!canonicalRelationship || canonicalRelationship !== selectedCanonical) {
-        throw new Error('Bot position relationship is not canonically bound to the exact selected contracts');
-      }
-    }
     if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId, input.executionMode)) {
       throw new Error('An open bot position already exists for this market pair');
     }
@@ -1806,9 +1733,8 @@ export class BotPositionStore {
       ?? roiBps(input.expectedProfitCents, input.totalCostCents);
 
     let result;
-    const transaction = await this.client.transaction('write');
     try {
-      result = await transaction.execute({
+      result = await this.client.execute({
         sql: `INSERT INTO bot_positions (
           execution_id, execution_mode, market_id, market_title, kalshi_ticker, pm_condition_id,
           strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
@@ -1835,11 +1761,12 @@ export class BotPositionStore {
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method,
-          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at
+          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at,
+          relationship_verified
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -1874,30 +1801,14 @@ export class BotPositionStore {
           input.openedAt,
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
-          0, 1, 'bot_position_create', input.openedAt,
+          0, 1, 'bot_position_create', input.openedAt, input.relationshipVerified ? 1 : 0,
         ],
       });
-      const insertedId = Number(result.lastInsertRowid ?? 0);
-      if (canonicalRelationship || input.propositionRelationshipState || input.propositionRelationshipWarning) {
-        await transaction.execute({
-          sql: `UPDATE bot_positions SET proposition_relationship_json = ?, proposition_relationship_state = ?, proposition_relationship_warning = ? WHERE id = ?`,
-          args: [
-            canonicalRelationship ? JSON.stringify(canonicalRelationship) : null,
-            canonicalRelationship ? 'verified_complementary' : 'unknown',
-            canonicalRelationship ? null : input.propositionRelationshipWarning ?? null,
-            insertedId,
-          ],
-        });
-      }
-      await transaction.commit();
     } catch (error) {
-      await transaction.rollback().catch(() => undefined);
       if (String(error).includes('UNIQUE constraint failed')) {
         throw new Error('An open bot position already exists for this market pair');
       }
       throw error;
-    } finally {
-      transaction.close();
     }
     const id = Number(result.lastInsertRowid ?? 0);
     const created = await this.getById(id);
@@ -2342,7 +2253,6 @@ export interface BotPositionInput {
   kalshiTicker: string | null;
   pmConditionId: string | null;
   strategy: string;
-  propositionRelationship?: PropositionRelationship | null;
   kalshiSide: BotPositionSide;
   pmSide: BotPositionSide;
   kalshiPrice: number;
@@ -2359,6 +2269,7 @@ export interface BotPositionInput {
   pmChargedFeeCents?: number;
   /** Authoritative Polymarket charged fee in integer millionths of USDC. */
   pmChargedFeeMicrousd?: number;
+  relationshipVerified?: boolean;
 }
 
 export function calculateBotPositionEntryCost(input: {
@@ -2615,14 +2526,6 @@ export async function recordBotPosition(
   input: BotPositionInput,
   feeAuthority: AuthoritativeBotFeeConfig,
 ): Promise<void> {
-  const propositionValidation = validatePropositionRelationship(input.propositionRelationship);
-  if (!propositionValidation.valid) {
-    throw new Error(`Refusing to persist unverified cross-platform position: ${propositionValidation.reason}`);
-  }
-  const canonicalRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship);
-  if (!canonicalRelationship) {
-    throw new Error('Refusing to persist cross-platform position absent from the server-owned canonical proposition registry');
-  }
   assertPolymarketEconomicFeeAuthority(feeAuthority);
   if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
   if (!input.kalshiTicker || !input.pmConditionId) throw new Error('Missing venue identifiers for authoritative fee lookup');
@@ -2683,9 +2586,7 @@ export async function recordBotPosition(
     kalshiTicker: input.kalshiTicker,
     pmConditionId: input.pmConditionId,
     strategy: input.strategy,
-    propositionRelationship: canonicalRelationship,
-    propositionRelationshipState: 'verified_complementary',
-    propositionRelationshipWarning: null,
+    relationshipVerified: input.relationshipVerified ?? false,
     kalshiSide: input.kalshiSide,
     pmSide: input.pmSide,
     buyPriceKalshiCents,
