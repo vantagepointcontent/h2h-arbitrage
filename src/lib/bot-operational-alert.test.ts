@@ -21,6 +21,7 @@ vi.mock('./telegram-alerts', async (importOriginal) => {
 });
 
 import { sendBotExecutionAlert, sendBotOperationalAlert } from './bot-trader';
+import type { PropositionRelationship } from './proposition-identity';
 
 const input = { pairId: 'pair-1', marketTitle: 'Blocked market', outcome: 'Team A' };
 
@@ -93,5 +94,50 @@ describe('Ragnar production-readiness operational alerts', () => {
       status: 'failed',
       errorReason: 'Telegram rate limited',
     });
+  });
+
+  it('persists canonical relationship and exact leg labels in execution alerts', async () => {
+    const states = ['democratic', 'republican'];
+    const propositionRelationship: PropositionRelationship = {
+      schemaVersion: 1,
+      state: 'verified_complementary',
+      verificationSource: 'manually_verified_ids',
+      verifiedAt: '2026-08-17T13:50:00.000Z',
+      parentEventId: 'fl-26-2026-party',
+      resolutionRuleId: 'fl-26-2026-party-rules-v1',
+      exhaustivePayoutStates: states,
+      humanLabel: 'Kalshi Democratic YES ↔ Polymarket Republican YES',
+      legs: {
+        kalshi: {
+          platform: 'kalshi', platformMarketId: 'KXHOUSERACE-FL26-26-D', parentEventId: 'fl-26-2026-party',
+          selectedOutcome: 'democratic', contractSide: 'yes', payoutState: 'democratic', eventPayoutStates: states,
+          resolutionRuleId: 'fl-26-2026-party-rules-v1', humanLabel: 'Kalshi YES — Democratic',
+          marketQuestion: 'Will a Democrat win FL-26?', tokenId: null,
+        },
+        polymarket: {
+          platform: 'polymarket', platformMarketId: '0xcondition', parentEventId: 'fl-26-2026-party',
+          selectedOutcome: 'republican', contractSide: 'yes', payoutState: 'republican', eventPayoutStates: states,
+          resolutionRuleId: 'fl-26-2026-party-rules-v1', humanLabel: 'Polymarket YES — Republican',
+          marketQuestion: 'Will a Republican win FL-26?', tokenId: 'pm-token',
+        },
+      },
+    };
+
+    await sendBotExecutionAlert({
+      ...input,
+      strategy: 'legacy display strategy',
+      propositionRelationship,
+      roiPct: 3,
+      expectedProfit: 0.03,
+      kalshiStake: 0.45,
+      pmStake: 0.52,
+    }, { success: true, unhedged: false }, true, 3, 'trade:canonical-alert');
+
+    expect(mocks.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      messageText: expect.stringContaining('Kalshi Democratic YES ↔ Polymarket Republican YES'),
+    }));
+    const messageText = mocks.createBotMessage.mock.calls[0][0].messageText as string;
+    expect(messageText).toContain('Kalshi YES — Democratic');
+    expect(messageText).toContain('Polymarket YES — Republican');
   });
 });

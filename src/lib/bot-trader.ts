@@ -1062,6 +1062,7 @@ export async function maybeExecuteBotTrade(
     execReq.estimatedProfit = economics.expectedProfit;
     executionInput = {
       ...input,
+      propositionRelationship: canonicalRelationship,
       expectedProfit: economics.expectedProfit,
       roiPct: economics.roiPct,
       apyPct: economics.apyPct ?? undefined,
@@ -1269,6 +1270,11 @@ export async function sendBotExecutionAlert(
     `<b>Market:</b> ${input.marketTitle}`,
     `<b>Outcome:</b> ${input.outcome}`,
     `<b>Strategy:</b> ${input.strategy}`,
+    ...(input.propositionRelationship ? [
+      `<b>Relationship:</b> ${input.propositionRelationship.humanLabel}`,
+      `<b>Kalshi leg:</b> ${input.propositionRelationship.legs.kalshi.humanLabel}`,
+      `<b>Polymarket leg:</b> ${input.propositionRelationship.legs.polymarket.humanLabel}`,
+    ] : []),
     `<b>ROI:</b> ${roiPct.toFixed(2)}%`,
     `<b>Profit:</b> $${input.expectedProfit.toFixed(2)}`,
     `<b>Stake:</b> $${(input.kalshiStake + input.pmStake).toFixed(2)}`,

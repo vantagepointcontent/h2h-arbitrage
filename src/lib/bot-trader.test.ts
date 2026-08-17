@@ -834,6 +834,39 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.reason).toMatch(/fee authority/i);
     expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
+
+  it('preserves a registry-resolved canonical relationship through the execution alert path', async () => {
+    const canonicalRelationship = verifiedRelationship();
+    vi.doMock('./proposition-registry', () => ({
+      resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
+      findCanonicalPropositionRelationship: () => canonicalRelationship,
+    }));
+    const messages = await import('./bot-trader-messages');
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const input = makeInput();
+    delete input.propositionRelationship;
+    const runtimeState = (await import('./orderbook-state')).orderbookState;
+    runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.kalshiYesExecutableQuote!.depthTimestamp!,
+    });
+    runtimeState.setBook(TEST_PM_NO_TOKEN_ID, [], [{ price: 0.52, quantity: 1 }], 0, {
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: input.pmNoExecutableQuote!.depthTimestamp!,
+    });
+
+    const result = await maybeExecuteBotTrade(input);
+
+    expect(result.executed, JSON.stringify(result)).toBe(true);
+    expect(messages.createBotMessage).toHaveBeenCalledWith(expect.objectContaining({
+      messageText: expect.stringContaining(canonicalRelationship.humanLabel),
+    }));
+    const messageText = vi.mocked(messages.createBotMessage).mock.calls.at(-1)?.[0].messageText;
+    expect(messageText).toContain(canonicalRelationship.legs.kalshi.humanLabel);
+    expect(messageText).toContain(canonicalRelationship.legs.polymarket.humanLabel);
+  });
 });
 
 describe('BotTrader durable success publication', () => {
