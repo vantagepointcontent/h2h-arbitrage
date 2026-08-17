@@ -259,35 +259,6 @@ describe('summarizeBotPerformance', () => {
     expect(result.entryCohorts[0]).toMatchObject({ currentCents: 199, unrealizedCents: 5 });
   });
 
-  it('reconciles a reduced open position from immutable Buy Cost across row, cards, ROI, and cohort', () => {
-    const result = summarizeBotPerformance([
-      openPosition({
-        totalCostCents: 300,
-        remainingOpenCostCents: 100,
-        realizedPnlCents: 5,
-        currentValueCents: 110,
-        indicativeValueMicrocents: 110_000_000,
-        indicativeBuyCostMicrocents: 300_000_000,
-        indicativePnlMicrocents: -190_000_000,
-        lastValuationAt: '2026-08-11T13:55:00.000Z',
-      }),
-    ], new Date('2026-08-11T14:00:00.000Z'));
-
-    expect(result.capital).toMatchObject({ deployedCents: 300, currentCents: 110 });
-    expect(result.pnl).toEqual({
-      realizedCents: 0,
-      unrealizedCents: -190,
-      totalCents: -190,
-      roiBps: -6333,
-    });
-    expect(result.entryCohorts[0]).toMatchObject({
-      deployedCents: 300,
-      currentCents: 110,
-      realizedCents: 0,
-      unrealizedCents: -190,
-    });
-  });
-
   it('distinguishes unavailable marks and does not treat unverified settlement as realized', () => {
     const result = summarizeBotPerformance([
       openPosition({ currentValueCents: null, lastValuationAt: null }),
@@ -1013,13 +984,6 @@ describe('BotPositionStore', () => {
       kalshiTicker: 'KXTEST',
       pmConditionId: '0xabc',
       strategy: 'Buy YES Kalshi + NO PM',
-      relationshipVerified: true,
-      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
-      pmMarketQuestion: 'Will Team A win on Polymarket?',
-      kalshiOutcomeLabel: 'Team A',
-      pmOutcomeLabel: 'Team A',
-      relationshipState: 'verified_complementary',
-      relationshipExplanation: 'The exact persisted legs select opposite contract sides.',
       kalshiSide: 'yes',
       pmSide: 'no',
       buyPriceKalshiCents: 45,
@@ -1080,15 +1044,6 @@ describe('BotPositionStore', () => {
     expect(created.lastValuationAt).toBeNull();
     expect(created.dryRun).toBe(true);
     expect(created.selectionMethod).toBe('hybrid');
-    expect(created.relationshipVerified).toBe(true);
-    expect(created).toMatchObject({
-      kalshiMarketQuestion: 'Will Team A win on Kalshi?',
-      pmMarketQuestion: 'Will Team A win on Polymarket?',
-      kalshiOutcomeLabel: 'Team A',
-      pmOutcomeLabel: 'Team A',
-      relationshipState: 'verified_complementary',
-      relationshipExplanation: 'The exact persisted legs select opposite contract sides.',
-    });
     expect(created.kalshiEntryFeeMultiplierPpm).toBe(1_000_000);
     expect(created.pmEntryFeeRateBps).toBe(400);
     expect(created.pmEntryTokenId).toBe('pm-no-token');
@@ -1178,14 +1133,6 @@ describe('BotPositionStore', () => {
       pmConditionId: '0xdef',
       kalshiEntryFeeMultiplierPpm: null,
     } as never)).rejects.toThrow(/entry fee configuration/i);
-    await expect(store.create({
-      ...created,
-      id: undefined,
-      kalshiTicker: 'KXTEST3',
-      pmConditionId: '0x123',
-      propositionRelationship: { schemaVersion: 1 },
-      propositionRelationshipState: 'verified_complementary',
-    } as never)).rejects.toThrow(/not canonically bound/i);
 
     const columnsClient = createClient({ url: dbUrl });
     const columns = await columnsClient.execute('PRAGMA table_info(bot_positions)');
@@ -1204,7 +1151,6 @@ describe('BotPositionStore', () => {
       'pm_exit_fee_rebate_rate_ppm', 'pm_exit_order_base_fee_bps',
       'pm_exit_order_fee_source', 'pm_exit_order_fee_version',
       'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
-      'proposition_relationship_json', 'proposition_relationship_state', 'proposition_relationship_warning',
     ]));
   });
 

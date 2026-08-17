@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBotPositionAnalytics, summarizeBotPerformance, type BotPosition } from '@/lib/bot-positions';
 import { clientSafeError } from '@/lib/error-handler';
 import { DASHBOARD_RANGES, type DashboardRange } from '@/lib/dashboard-request';
-import { getMarketUrlsById, getSavedMarketById, type SavedMarket } from '@/lib/persistence';
-import { buildBotLegIdentity } from '@/lib/bot-leg-identity';
+import { getMarketUrlsById } from '@/lib/persistence';
 import {
   currentPriceSnapshotKey,
   getPersistedCurrentPriceBatch,
@@ -158,7 +157,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       range: range as DashboardRange,
     });
     const urlByMarket = new Map<string, Awaited<ReturnType<typeof getMarketUrlsById>>>();
-    const metadataByMarket = new Map<string, SavedMarket | null>();
     const positions = analytics.positions ?? [];
     const marketIds = [...new Set(positions.map((position) => position.marketId).filter((id): id is string => Boolean(id)))];
     const legRequests = positions.flatMap((position): PriceSnapshotRequest[] => [
@@ -168,12 +166,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const deduplicatedLegs = [...new Map(legRequests.map((leg) => [currentPriceSnapshotKey(leg), leg])).values()];
     const [, priceSnapshots] = await Promise.all([
       Promise.all(marketIds.map(async (marketId) => {
-        const [urls, market] = await Promise.all([
-          getMarketUrlsById(marketId),
-          getSavedMarketById(marketId),
-        ]);
-        urlByMarket.set(marketId, urls);
-        metadataByMarket.set(marketId, market);
+        urlByMarket.set(marketId, await getMarketUrlsById(marketId));
       })),
       getPersistedCurrentPriceBatch(deduplicatedLegs),
     ]);
@@ -182,17 +175,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const enrichedPositions = positions.map((position) => {
       const kalshiSnapshot = snapshotFor({ platform: 'kalshi', marketId: position.kalshiTicker, side: position.kalshiSide, tokenId: null });
       const polymarketSnapshot = snapshotFor({ platform: 'polymarket', marketId: position.pmConditionId, side: position.pmSide, tokenId: polymarketToken(position) });
-      const market = position.marketId ? metadataByMarket.get(position.marketId) : null;
-      const persistedRelationshipVerified = position.relationshipVerified === true;
       return {
         ...applyPersistedIndicativeValuation(position, kalshiSnapshot, polymarketSnapshot),
-        identity: buildBotLegIdentity(position, market ? {
-          eventTitle: market.eventTitle,
-          matchedPairs: market.lastScanResult?.matchedPairs,
-          allArbs: market.lastScanResult?.allArbs,
-          mutuallyExclusiveVerified: persistedRelationshipVerified,
-          exhaustiveVerified: persistedRelationshipVerified,
-        } : null),
         kalshiUrl: position.marketId ? urlByMarket.get(position.marketId)?.kalshiUrl ?? null : null,
         polymarketUrl: position.marketId ? urlByMarket.get(position.marketId)?.polymarketUrl ?? null : null,
         currentPriceSnapshots: { kalshi: kalshiSnapshot, polymarket: polymarketSnapshot },
