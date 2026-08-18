@@ -15,8 +15,6 @@ import { OpportunityQueue } from "./opportunities/OpportunityQueue";
 import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
 import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
-import { parseCalculationEnvelope, type CalculationEnvelope } from "@/lib/calculation-envelope";
-import { CalculationProvenance } from "./CalculationProvenance";
 import {
   ARB_ALERTS_STORAGE_KEY,
   type ArbAlert,
@@ -52,7 +50,6 @@ interface Outcome {
       worstCaseNetProfit: number;
       kalshiFeeAuthority?: KalshiFeeAuthority;
     };
-    calculationEnvelope?: CalculationEnvelope;
   };
 }
 
@@ -301,9 +298,6 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
           const apy = o.arbitrage.apyPct;
           const hasCanonicalApy = typeof apy === 'number' && Number.isFinite(apy);
           const scenarioApy = o.arbitrage.outcomeApy;
-          const calculationEnvelope = o.arbitrage.calculationEnvelope
-            ? parseCalculationEnvelope(o.arbitrage.calculationEnvelope, `opportunity ${o.artist}`)
-            : null;
 
           const distributionKey = `${idx}-${o.artist}`;
           const adjusted = distributions[distributionKey];
@@ -312,17 +306,10 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
           // so it must remain manual-only rather than silently clipping the two
           // orders back to the smaller shared contract count.
           const isDirectionalSplit = adjusted != null && adjusted.splitPct !== 50;
-          const envelopeExecutable = calculationEnvelope
-            ? calculationEnvelope.status === 'executable'
-              && (calculationEnvelope.totals.netPnlMicros ?? 0) > 0
-              && calculationEnvelope.requestedQuantityMicros === 1_000_000
-              && calculationEnvelope.executableQuantityMicros === 1_000_000
-            : true;
           const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious
             && o.kalshi?.ticker && o.polymarket?.conditionId
             && !isDirectionalSplit
-            && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0))
-            && envelopeExecutable;
+            && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0));
           const displayProfit = adjusted?.worstCaseNetProfit ?? o.arbitrage.expectedProfit;
           const displayRoi = adjusted
             ? (displayProfit / adjusted.totalStake) * 100
@@ -370,18 +357,9 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                     APY {apy.toFixed(0)}%
                   </span>
                 )}
-                {!hasCanonicalApy && !calculationEnvelope && (
+                {!hasCanonicalApy && (
                   <span className="text-[10px] text-[#8A9BA8]" title={`APY unavailable: ${(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>
                     APY unavailable: {(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}
-                  </span>
-                )}
-                {calculationEnvelope && (
-                  <CalculationProvenance envelope={calculationEnvelope} compact />
-                )}
-                {!calculationEnvelope && (
-                  <span className="text-[10px] text-[#facc15]" data-testid="legacy-provenance">
-                    <span>Legacy / unverifiable</span>
-                    <span className="text-[#8A9BA8]"> — predates the versioned fee and executable-book calculation envelope.</span>
                   </span>
                 )}
                 {activeAlert && (

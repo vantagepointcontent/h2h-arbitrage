@@ -6,10 +6,10 @@
 import { useState, useEffect } from "react";
 import { Zap, ShieldAlert, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { formatPrice } from "@/app/lib/page-shared";
-import type { CalculationEnvelope } from "@/lib/calculation-envelope";
-import { CalculationProvenance } from "./CalculationProvenance";
-
-const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 5 });
+import { calcKalshiFee, calcPolymarketFee, getPolymarketTheta } from "@/lib/matcher";
+import { isExecutableQuoteConsistent, type ExecutableBookQuote } from "@/lib/executable-book";
+import { isPriceAlignedToTick } from "@/lib/venue-constraints";
+import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
 
 interface ArbLeg {
   platform: "kalshi" | "polymarket";
@@ -19,49 +19,39 @@ interface ArbLeg {
   side: "buy";
   outcome: "yes" | "no";
   size: number;
+  contracts: 1;
+  minimumOrderSize: number;
+  tickSize: number;
   price: number;
   orderType: "limit";
+  executableQuote: ExecutableBookQuote;
+  kalshiFeeQuote?: import("@/lib/kalshi-fee-quote").KalshiFeeQuote;
 }
 
 export interface ExecutableArb {
   arbId: string;
   marketTitle: string;
+  pmConditionId: string;
   outcome: string;
   strategy: string;
   roiPct: number;
   expectedProfit: number;
-  expectedProfitMicros: number;
-  grossProfitMicros: number;
-  totalFeesMicros: number;
-  /** Canonical contract quantity. Calculation-envelope v1 supports exactly one share per leg. */
+  /** Whole matched contracts, capped to the smaller selected live ask level. */
   shares: number;
   /** The active constraint on this 1:1 hedge; shown before any confirmation. */
   limitingConstraint: string;
+  executionStatus: 'executable' | 'non_executable';
+  executionBlocker?: string;
   kalshiOrder: ArbLeg;
   polymarketOrder: ArbLeg;
   /** ISO timestamp when the opportunity was last scanned/detected. */
   scanTime?: string;
   /** Whether at least one share was available at the best ask on both legs. */
   bestPriceFound?: boolean;
-  calculationEnvelope: CalculationEnvelope;
 }
 
 /** Build an executable request from a live arb row, or null when the
  *  strategy isn't a simple two-leg arb (cross-outcome combos excluded). */
-interface ExecutionResult {
-  success?: boolean;
-  dryRun?: boolean;
-  result?: {
-    rollbackExecuted?: boolean;
-    unhedged?: boolean;
-    actualProfit?: number;
-    netExposure?: number;
-    kalshiResult?: { platform?: string; status?: string; filledSize?: number; filledPrice?: number; error?: string };
-    polymarketResult?: { platform?: string; status?: string; filledSize?: number; filledPrice?: number; error?: string };
-  };
-  error?: string;
-}
-
 export function buildExecutableArb(o: {
   artist: string;
   strategy: string;
@@ -73,85 +63,132 @@ export function buildExecutableArb(o: {
   kalshiNoAsk: number | null;
   pmYesAsk: number | null;
   pmNoAsk: number | null;
+  kalshiYesExecutableQuote?: ExecutableBookQuote;
+  kalshiNoExecutableQuote?: ExecutableBookQuote;
+  pmYesExecutableQuote?: ExecutableBookQuote;
+  pmNoExecutableQuote?: ExecutableBookQuote;
   /** Contracts available at the exact displayed effective ask level. */
   kalshiYesAskShares?: number;
   kalshiNoAskShares?: number;
   pmYesAskShares?: number;
   pmNoAskShares?: number;
+  pmYesMinOrderSize?: number | null;
+  pmNoMinOrderSize?: number | null;
+  pmYesTickSize?: number | null;
+  pmNoTickSize?: number | null;
   /** Missing or stale books are never safe to execute against. */
   stale?: boolean;
   kalshiTicker?: string;
+  pmConditionId?: string;
   pmYesTokenId?: string;
   pmNoTokenId?: string;
   category?: string;
+  kalshiFeeAuthority?: KalshiFeeAuthority;
   /** ISO timestamp when the opportunity was last scanned/detected. */
   scanTime?: string;
   /** True only when every leg has a verified positive ask depth. */
   depthVerified?: boolean;
-  calculationEnvelope?: CalculationEnvelope;
 }, marketTitle: string): ExecutableArb | null {
-  const envelope = o.calculationEnvelope;
-  if (!envelope || envelope.status !== 'executable'
-    || envelope.requestedQuantityMicros !== 1_000_000
-    || envelope.executableQuantityMicros !== 1_000_000
-    || envelope.totals.grossCostMicros == null
-    || envelope.totals.grossCostMicros <= 0
-    || envelope.totals.grossProfitMicros == null
-    || envelope.totals.totalFeesMicros == null
-    || envelope.totals.netPnlMicros == null) return null;
-  if (!o.kalshiTicker) return null;
+  if (!o.kalshiTicker || !o.pmConditionId) return null;
   let kOutcome: "yes" | "no";
+  let kPrice: number | null;
   let pmOutcome: "yes" | "no";
+  let pmPrice: number | null;
   let pmToken: string | undefined;
+  let kalshiQuote: ExecutableBookQuote | undefined;
+  let pmQuote: ExecutableBookQuote | undefined;
+  let pmMinimumOrderSize: number | null | undefined;
+  let pmTickSize: number | null | undefined;
 
   if (o.strategy === "Buy YES Kalshi + NO PM") {
-    kOutcome = "yes";
-    pmOutcome = "no"; pmToken = o.pmNoTokenId;
+    kOutcome = "yes"; kPrice = o.kalshiYesAsk; kalshiQuote = o.kalshiYesExecutableQuote;
+    pmOutcome = "no"; pmPrice = o.pmNoAsk; pmToken = o.pmNoTokenId; pmQuote = o.pmNoExecutableQuote;
+    pmMinimumOrderSize = o.pmNoMinOrderSize; pmTickSize = o.pmNoTickSize;
   } else if (o.strategy === "Buy YES PM + NO Kalshi") {
-    kOutcome = "no";
-    pmOutcome = "yes"; pmToken = o.pmYesTokenId;
+    kOutcome = "no"; kPrice = o.kalshiNoAsk; kalshiQuote = o.kalshiNoExecutableQuote;
+    pmOutcome = "yes"; pmPrice = o.pmYesAsk; pmToken = o.pmYesTokenId; pmQuote = o.pmYesExecutableQuote;
+    pmMinimumOrderSize = o.pmYesMinOrderSize; pmTickSize = o.pmYesTickSize;
   } else {
     return null; // cross-outcome / No arb — not executable from this button
   }
-  if (!pmToken || o.stale) return null;
-  const kalshiLeg = envelope.legs.find((leg) => leg.venue.toLowerCase() === 'kalshi');
-  const pmLeg = envelope.legs.find((leg) => leg.venue.toLowerCase() === 'polymarket');
-  if (!kalshiLeg || !pmLeg
-    || kalshiLeg.instrumentId.toLowerCase() !== o.kalshiTicker.toLowerCase()
-    || pmLeg.instrumentId.toLowerCase() !== pmToken.toLowerCase()
-    || kalshiLeg.side !== kOutcome || pmLeg.side !== pmOutcome
-    || kalshiLeg.action !== 'buy' || pmLeg.action !== 'buy'
-    || kalshiLeg.requestedQuantityMicros !== 1_000_000 || pmLeg.requestedQuantityMicros !== 1_000_000
-    || kalshiLeg.executableQuantityMicros !== 1_000_000 || pmLeg.executableQuantityMicros !== 1_000_000
-    || kalshiLeg.vwapPriceMicros == null || pmLeg.vwapPriceMicros == null) return null;
-  const canonicalKalshiPrice = kalshiLeg.vwapPriceMicros / 1_000_000;
-  const canonicalPmPrice = pmLeg.vwapPriceMicros / 1_000_000;
-  const expectedProfit = envelope.totals.netPnlMicros / 1_000_000;
-  const canonicalRoiPct = (envelope.totals.netPnlMicros / envelope.totals.grossCostMicros) * 100;
+  if (kPrice == null || pmPrice == null || !pmToken || o.stale) return null;
+  if (kPrice <= 0 || pmPrice <= 0 || o.kalshiStake <= 0 || o.pmStake <= 0) return null;
+  const oneShareMicros = 1_000_000;
+  if (!isExecutableQuoteConsistent(kalshiQuote, 'buy', oneShareMicros)
+      || !isExecutableQuoteConsistent(pmQuote, 'buy', oneShareMicros)) return null;
+
+  const kalshiVwap = kalshiQuote.vwapPriceMicroCents! / 100_000_000;
+  const pmVwap = pmQuote.vwapPriceMicroCents! / 100_000_000;
+  const kalshiLimit = kalshiQuote.limitPriceMicroCents! / 100_000_000;
+  const pmLimit = pmQuote.limitPriceMicroCents! / 100_000_000;
+
+  const kAvailable = kOutcome === 'yes' ? o.kalshiYesAskShares : o.kalshiNoAskShares;
+  const pmAvailable = pmOutcome === 'yes' ? o.pmYesAskShares : o.pmNoAskShares;
+
+  // Current execution policy is exactly one matched share. The quote itself
+  // proves that the full share is available across the walked ladder.
+  const constraints = [
+    { label: "Kalshi allocation", value: o.kalshiStake / kPrice },
+    { label: "Polymarket allocation", value: o.pmStake / pmPrice },
+    { label: "Kalshi live depth", value: kAvailable! },
+    { label: "Polymarket live depth", value: pmAvailable! },
+  ];
+  const limitingConstraint = constraints.reduce((lowest, constraint) =>
+    constraint.value < lowest.value ? constraint : lowest,
+  ).label;
+  const shares = 1;
+  const executionBlocker = !Number.isFinite(kAvailable) || kAvailable! < shares
+    ? `Kalshi ${kOutcome.toUpperCase()} top-of-book depth cannot fill requested 1 contract`
+    : !Number.isFinite(pmAvailable) || pmAvailable! < shares
+      ? `Polymarket ${pmOutcome.toUpperCase()} top-of-book depth cannot fill requested 1 share`
+      : !Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0
+    ? `Polymarket ${pmOutcome.toUpperCase()} minimum order is unavailable`
+    : pmMinimumOrderSize! > shares
+      ? `Polymarket ${pmOutcome.toUpperCase()} minimum order is ${pmMinimumOrderSize} shares; requested 1 share`
+      : !Number.isFinite(pmTickSize) || pmTickSize! <= 0
+        ? `Polymarket ${pmOutcome.toUpperCase()} tick size is unavailable`
+      : !isPriceAlignedToTick(pmLimit, pmTickSize!)
+        ? `Polymarket ${pmOutcome.toUpperCase()} limit ${pmLimit} is not aligned to tick size ${pmTickSize}`
+        : undefined;
+  const resolvedLimitingConstraint = executionBlocker ?? limitingConstraint;
+
+  // The scanner's full-book profit is no longer valid after a top-level depth
+  // cap. Reprice the exact whole-share order shown in this modal, net of venue
+  // fees, so the confirmation and submitted request describe the same trade.
+  const kalshiCost = kalshiVwap;
+  const pmCost = pmVwap;
+  const totalCost = kalshiCost + pmCost;
+  const fees = calcKalshiFee(shares, kalshiVwap, o.kalshiFeeAuthority)
+    + calcPolymarketFee(shares, pmVwap, getPolymarketTheta(o.category));
+  const expectedProfit = shares - totalCost - fees;
+  const roiPct = totalCost > 0 ? (expectedProfit / totalCost) * 100 : 0;
 
   return {
     arbId: `${Date.now().toString(36)}-${o.artist.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
     marketTitle,
+    pmConditionId: o.pmConditionId,
     outcome: o.artist,
     strategy: o.strategy,
-    roiPct: canonicalRoiPct,
+    roiPct,
     expectedProfit,
-    expectedProfitMicros: envelope.totals.netPnlMicros,
-    grossProfitMicros: envelope.totals.grossProfitMicros,
-    totalFeesMicros: envelope.totals.totalFeesMicros,
-    shares: 1,
-    limitingConstraint: "canonical one-share envelope",
+    shares,
+    limitingConstraint: resolvedLimitingConstraint,
+    executionStatus: executionBlocker ? 'non_executable' : 'executable',
+    ...(executionBlocker ? { executionBlocker } : {}),
     kalshiOrder: {
       platform: "kalshi", marketId: o.kalshiTicker, ticker: o.kalshiTicker,
-      side: "buy", outcome: kOutcome, size: canonicalKalshiPrice, price: canonicalKalshiPrice, orderType: "limit",
+      side: "buy", outcome: kOutcome, size: kalshiCost, contracts: 1,
+      minimumOrderSize: 1, tickSize: 0.01,
+      price: kalshiLimit, orderType: "limit", executableQuote: kalshiQuote,
     },
     polymarketOrder: {
       platform: "polymarket", marketId: pmToken, conditionId: pmToken,
-      side: "buy", outcome: pmOutcome, size: canonicalPmPrice, price: canonicalPmPrice, orderType: "limit",
+      side: "buy", outcome: pmOutcome, size: pmCost, contracts: 1,
+      minimumOrderSize: pmMinimumOrderSize ?? 0, tickSize: pmTickSize ?? 0,
+      price: pmLimit, orderType: "limit", executableQuote: pmQuote,
     },
     scanTime: o.scanTime,
     bestPriceFound: o.depthVerified === true,
-    calculationEnvelope: envelope,
   };
 }
 
@@ -170,10 +207,60 @@ export function getExecutionGateMessage(gates: GateInfo | null): string {
   return 'REAL MODE — this will place REAL limit orders on both platforms with REAL money.';
 }
 
+interface LedgerSummary {
+  grossSpreadCents: number | null;
+  totalEntryFeesCents: number;
+  totalExitFeesCents: number;
+  netPnlCents: number | null;
+  estimatedNetPnlCents?: number | null;
+  feesEstimated: boolean;
+  status: 'reconciled' | 'reconciliation-required';
+  fees?: Array<{ stage: 'entry' | 'exit'; source: 'charged' | 'estimated' }>;
+}
+
+interface ExecutionApiResponse {
+  success: boolean;
+  dryRun: boolean;
+  result?: {
+    kalshiResult?: { platform: string; status: string; filledSize?: number; filledPrice?: number; error?: string };
+    polymarketResult?: { platform: string; status: string; filledSize?: number; filledPrice?: number; error?: string };
+    cashLedger?: LedgerSummary;
+    actualProfit?: number;
+    netExposure?: number;
+    rollbackExecuted?: boolean;
+    unhedged?: boolean;
+  };
+}
+
+/** Stable manual-modal projection of the persisted integer-cent ledger. */
+export function getExecutionLedgerRows(ledger: LedgerSummary): Array<{ label: string; value: string }> {
+  const money = (cents: number) => `${cents < 0 ? '-' : ''}$${(Math.abs(cents) / 100).toFixed(2)}`;
+  const feeSource = (stage: 'entry' | 'exit') => {
+    const stageFees = ledger.fees?.filter((fee) => fee.stage === stage) ?? [];
+    if (stageFees.length === 0) return ledger.feesEstimated ? 'estimated' : 'charged';
+    return stageFees.some((fee) => fee.source === 'estimated') ? 'estimated' : 'charged';
+  };
+  return [
+    { label: 'Actual gross spread', value: ledger.grossSpreadCents == null ? 'Unknown' : money(ledger.grossSpreadCents) },
+    { label: `Entry fees (${feeSource('entry')})`, value: money(-ledger.totalEntryFeesCents) },
+    { label: `Exit fees (${feeSource('exit')})`, value: money(-ledger.totalExitFeesCents) },
+    ...(ledger.status !== 'reconciled' && ledger.estimatedNetPnlCents != null ? [{
+      label: 'Estimated net P&L (not actual)',
+      value: money(ledger.estimatedNetPnlCents),
+    }] : []),
+    {
+      label: 'Actual net P&L',
+      value: ledger.status === 'reconciled' && ledger.netPnlCents != null
+        ? money(ledger.netPnlCents)
+        : 'Reconciliation required',
+    },
+  ];
+}
+
 export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose: () => void }) {
   const [gates, setGates] = useState<GateInfo | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<ExecutionResult | null>(null);
+  const [result, setResult] = useState<ExecutionApiResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -198,6 +285,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           request: {
             arbId: arb.arbId,
             marketTitle: arb.marketTitle,
+            pmConditionId: arb.pmConditionId,
             kalshiOrder: arb.kalshiOrder,
             polymarketOrder: arb.polymarketOrder,
             estimatedProfit: arb.expectedProfit,
@@ -206,13 +294,12 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             dryRun: false, // server ORs with settings — settings dryRun still wins
             scanTime: arb.scanTime,
             bestPriceFound: arb.bestPriceFound,
-            calculationEnvelope: arb.calculationEnvelope,
           },
         }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || `HTTP ${res.status}`);
-      else setResult(data as ExecutionResult);
+      else setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -221,7 +308,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
   };
 
   const isReal = gates ? !gates.killSwitch && !gates.dryRun : false;
-  const fmt = (n: number) => USD.format(n);
+  const fmt = (n: number) => `$${n.toFixed(2)}`;
   const formatShares = (shares: number) => `${shares.toLocaleString()} shares`;
 
   return (
@@ -257,11 +344,9 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             </div>
             <div className="px-3 py-2 flex justify-between">
               <span className="text-[#8A9BA8]">Est. net profit</span>
-              <span className={`font-mono font-bold ${arb.expectedProfit >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}`}>{fmt(arb.expectedProfit)} ({arb.roiPct.toFixed(2)}%)</span>
+              <span className="font-mono font-bold text-[#5DBE81]">{fmt(arb.expectedProfit)} ({arb.roiPct.toFixed(2)}%)</span>
             </div>
           </div>
-
-          <CalculationProvenance envelope={arb.calculationEnvelope} />
 
           {gates && isReal && !gates.credsReady && (
             <div className="p-2 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs">
@@ -270,6 +355,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           )}
 
           {error && <div className="p-2 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs">{error}</div>}
+          {arb.executionBlocker && <div className="p-2 rounded-lg border border-red-800 bg-red-950/40 text-red-400 text-xs">{arb.executionBlocker}</div>}
 
           {result && (
             <div className="rounded-lg bg-[#0E1621] border border-[#182533] divide-y divide-[#182533] text-xs">
@@ -290,12 +376,19 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
                   </div>
                 );
               })}
-              {result.result?.actualProfit != null && (
-                <div className="px-3 py-2 flex justify-between">
-                  <span className="text-[#8A9BA8]">Actual profit</span>
-                  <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
-                </div>
-              )}
+              {result.result?.cashLedger
+                ? getExecutionLedgerRows(result.result.cashLedger).map((row) => (
+                  <div key={row.label} className="px-3 py-2 flex justify-between">
+                    <span className="text-[#8A9BA8]">{row.label}</span>
+                    <span className="font-mono font-bold text-[#5DBE81]">{row.value}</span>
+                  </div>
+                ))
+                : result.result?.actualProfit != null && (
+                  <div className="px-3 py-2 flex justify-between">
+                    <span className="text-[#8A9BA8]">Actual net P&amp;L (legacy)</span>
+                    <span className="font-mono font-bold text-[#5DBE81]">{fmt(result.result.actualProfit)}</span>
+                  </div>
+                )}
               {result.result?.netExposure != null && result.result.netExposure > 0 && (
                 <div className="px-3 py-2 flex justify-between">
                   <span className="text-[#8A9BA8]">Net exposure</span>
@@ -330,7 +423,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
           {!result && (
             <button
               onClick={run}
-              disabled={busy || !gates || (!gates.dryRun && gates.killSwitch)}
+              disabled={busy || arb.executionStatus !== 'executable' || !gates || (!gates.dryRun && gates.killSwitch)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
             >
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

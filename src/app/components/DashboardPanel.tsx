@@ -315,7 +315,6 @@ export default function DashboardPanel() {
   }, [range]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     fetchData();
   }, [fetchData]);
 

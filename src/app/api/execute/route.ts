@@ -17,88 +17,39 @@ import { getExecutionMode, setSettings } from '@/lib/settings';
 import { applyEmergencyStop, executionModeToDryRun } from '@/lib/execution-mode';
 import { persistExecution } from '@/lib/persistence';
 import logger from '@/lib/logger';
-import { validateCalculationEnvelope, type CalculationLeg } from '@/lib/calculation-envelope';
+import {
+  fetchClobBook,
+  fetchClobMarket,
+  validateOneShareBookOrder,
+  type ClobMarket,
+} from '@/lib/polymarket-clob';
+import { calculateKalshiFeeQuote, resolveKalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
 
-const MANUAL_ENVELOPE_MAX_AGE_MS = 30_000;
-const MANUAL_ENVELOPE_MAX_FUTURE_SKEW_MS = 5_000;
-const MANUAL_FEE_AUTHORITY_MAX_AGE_MS = 86_400_000;
-
-function requireFreshTimestamp(value: string | null, label: string, nowMs: number, maxAgeMs = MANUAL_ENVELOPE_MAX_AGE_MS): void {
-  if (!value) throw new Error(`${label} is unavailable`);
-  const observedMs = Date.parse(value);
-  if (!Number.isFinite(observedMs)) throw new Error(`${label} is invalid`);
-  if (observedMs > nowMs + MANUAL_ENVELOPE_MAX_FUTURE_SKEW_MS) throw new Error(`${label} is in the future`);
-  if (nowMs - observedMs > maxAgeMs) throw new Error(`${label} is stale`);
-}
-
-function requireMatchingLeg(
-  leg: CalculationLeg | undefined,
-  venue: 'kalshi' | 'polymarket',
-  instrumentId: string | undefined,
-  outcome: 'yes' | 'no',
-): CalculationLeg {
-  if (!leg) throw new Error(`canonical ${venue} leg is missing`);
-  if (!instrumentId || leg.instrumentId.toLowerCase() !== instrumentId.toLowerCase()) {
-    throw new Error(`canonical ${venue} instrument mismatch`);
-  }
-  if (leg.side !== outcome) throw new Error(`canonical ${venue} outcome mismatch`);
-  if (leg.outcomeId.toLowerCase() !== outcome) throw new Error(`canonical ${venue} outcome ID mismatch`);
-  if (leg.action !== 'buy') throw new Error(`canonical ${venue} action must be buy`);
-  return leg;
-}
-
-/** Fail closed before venue I/O; quantities, prices, and P&L come from the canonical one-share ledger. */
-export function canonicalizeManualExecutionRequest(request: ExecutionRequest, nowMs = Date.now()): ExecutionRequest {
-  if (!request.calculationEnvelope) throw new Error('calculation envelope is required');
-  const envelope = validateCalculationEnvelope(request.calculationEnvelope);
-  if (envelope.scope !== 'opportunity' || envelope.status !== 'executable') {
-    throw new Error(`calculation envelope is not executable (${envelope.status})`);
-  }
-  if (envelope.requestedQuantityMicros !== 1_000_000 || envelope.executableQuantityMicros !== 1_000_000) {
-    throw new Error('manual execution requires exactly one matched share');
-  }
-  if (envelope.legs.length !== 2
-    || envelope.legs.filter((leg) => leg.venue.toLowerCase() === 'kalshi').length !== 1
-    || envelope.legs.filter((leg) => leg.venue.toLowerCase() === 'polymarket').length !== 1) {
-    throw new Error('manual execution requires exactly one Kalshi leg and one Polymarket leg');
-  }
-  const netPnlMicros = envelope.totals.netPnlMicros;
-  if (netPnlMicros == null) throw new Error('canonical net P&L is unavailable');
-  requireFreshTimestamp(envelope.calculatedAt, 'calculation envelope', nowMs);
-
-  const kalshiLeg = requireMatchingLeg(
-    envelope.legs.find((leg) => leg.venue.toLowerCase() === 'kalshi'),
-    'kalshi',
-    request.kalshiOrder.ticker,
-    request.kalshiOrder.outcome,
-  );
-  const polymarketLeg = requireMatchingLeg(
-    envelope.legs.find((leg) => leg.venue.toLowerCase() === 'polymarket'),
-    'polymarket',
-    request.polymarketOrder.conditionId,
-    request.polymarketOrder.outcome,
-  );
-  requireFreshTimestamp(kalshiLeg.bookObservedAt, 'Kalshi book observation', nowMs);
-  requireFreshTimestamp(polymarketLeg.bookObservedAt, 'Polymarket book observation', nowMs);
-  requireFreshTimestamp(kalshiLeg.fee.schedule?.observedAt ?? null, 'Kalshi fee authority', nowMs, MANUAL_FEE_AUTHORITY_MAX_AGE_MS);
-  requireFreshTimestamp(polymarketLeg.fee.schedule?.observedAt ?? null, 'Polymarket fee authority', nowMs, MANUAL_FEE_AUTHORITY_MAX_AGE_MS);
-  const kalshiVwapMicros = kalshiLeg.vwapPriceMicros;
-  const polymarketVwapMicros = polymarketLeg.vwapPriceMicros;
-  if (kalshiVwapMicros == null || polymarketVwapMicros == null) {
-    throw new Error('canonical VWAP is unavailable');
+function resolveBinaryOutcomeTokens(
+  market: ClobMarket | null,
+  expectedConditionId: string,
+): { yes: string; no: string } | null {
+  if (!market || typeof market.condition_id !== 'string'
+      || market.condition_id.toLowerCase() !== expectedConditionId.toLowerCase()
+      || !Array.isArray(market.tokens) || market.tokens.length !== 2) {
+    return null;
   }
 
-  const kalshiPrice = kalshiVwapMicros / 1_000_000;
-  const polymarketPrice = polymarketVwapMicros / 1_000_000;
-  return {
-    ...request,
-    calculationEnvelope: envelope,
-    estimatedProfit: netPnlMicros / 1_000_000,
-    scanTime: envelope.calculatedAt ?? undefined,
-    bestPriceFound: true,
-    kalshiOrder: { ...request.kalshiOrder, contracts: 1, price: kalshiPrice, size: kalshiPrice },
-    polymarketOrder: { ...request.polymarketOrder, contracts: 1, price: polymarketPrice, size: polymarketPrice },
-  };
+  const byOutcome: { yes: string[]; no: string[] } = { yes: [], no: [] };
+  for (const candidate of market.tokens as unknown[]) {
+    if (!candidate || typeof candidate !== 'object') return null;
+    const tokenId = (candidate as { token_id?: unknown }).token_id;
+    const outcome = (candidate as { outcome?: unknown }).outcome;
+    if (typeof tokenId !== 'string' || !tokenId.trim() || typeof outcome !== 'string') return null;
+    const normalizedOutcome = outcome.toLowerCase();
+    if (normalizedOutcome !== 'yes' && normalizedOutcome !== 'no') return null;
+    byOutcome[normalizedOutcome].push(tokenId.trim());
+  }
+
+  if (byOutcome.yes.length !== 1 || byOutcome.no.length !== 1 || byOutcome.yes[0] === byOutcome.no[0]) {
+    return null;
+  }
+  return { yes: byOutcome.yes[0], no: byOutcome.no[0] };
 }
 
 /**
@@ -174,12 +125,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!request || !request.kalshiOrder || !request.polymarketOrder) {
         return NextResponse.json({ error: 'Missing execution request' }, { status: 400 });
       }
-      let canonicalRequest: ExecutionRequest;
-      try {
-        canonicalRequest = canonicalizeManualExecutionRequest(request);
-      } catch (error) {
-        return NextResponse.json({ error: clientSafeError(error) }, { status: 400 });
-      }
 
       // The server-side mode is the sole authority. Request/env dry-run flags
       // cannot bypass or alter it.
@@ -190,8 +135,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { status: 403 },
         );
       }
-      const effective: ExecutionRequest = {
-        ...canonicalRequest,
+      const kalshiTicker = request.kalshiOrder.ticker ?? request.kalshiOrder.marketId;
+      const contracts = request.kalshiOrder.contracts ?? request.kalshiOrder.size / request.kalshiOrder.price;
+      const feeAuthority = await resolveKalshiFeeAuthority(kalshiTicker);
+      const kalshiFeeQuote = calculateKalshiFeeQuote(feeAuthority, 'taker', [{
+        fills: [{ priceCents: request.kalshiOrder.price * 100, contracts }],
+      }]);
+      let effective: ExecutionRequest = {
+        ...request,
+        kalshiOrder: { ...request.kalshiOrder, contracts, kalshiFeeQuote },
         dryRun: executionModeToDryRun(mode),
       };
 
@@ -204,6 +156,52 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             { status: 403 },
           );
         }
+        const pmConditionId = typeof effective.pmConditionId === 'string'
+          ? effective.pmConditionId.trim()
+          : '';
+        const pmTokenId = typeof effective.polymarketOrder.conditionId === 'string'
+          ? effective.polymarketOrder.conditionId.trim()
+          : '';
+        const pmOutcome = effective.polymarketOrder.outcome;
+        const parentMarket = pmConditionId
+          ? await fetchClobMarket(pmConditionId, { bypassCache: true })
+          : null;
+        const outcomeTokens = resolveBinaryOutcomeTokens(parentMarket, pmConditionId);
+        if (!outcomeTokens) {
+          return NextResponse.json(
+            { error: 'Polymarket parent token mapping is invalid' },
+            { status: 409 },
+          );
+        }
+        if ((pmOutcome !== 'yes' && pmOutcome !== 'no') || outcomeTokens[pmOutcome] !== pmTokenId) {
+          return NextResponse.json(
+            { error: `Polymarket ${String(pmOutcome).toUpperCase()} token does not match the parent market` },
+            { status: 409 },
+          );
+        }
+        const authoritativeBook = pmTokenId
+          ? await fetchClobBook(pmTokenId, { bypassCache: true })
+          : null;
+        const constraint = validateOneShareBookOrder(
+          authoritativeBook,
+          pmTokenId,
+          effective.polymarketOrder.price,
+        );
+        if (!constraint.valid) {
+          return NextResponse.json(
+            { error: constraint.blocker ?? 'Polymarket one-share constraint validation failed' },
+            { status: 409 },
+          );
+        }
+        effective = {
+          ...effective,
+          kalshiOrder: { ...effective.kalshiOrder, minimumOrderSize: 1, tickSize: 0.01 },
+          polymarketOrder: {
+            ...effective.polymarketOrder,
+            minimumOrderSize: constraint.minimumOrderSize!,
+            tickSize: constraint.tickSize!,
+          },
+        };
       }
 
       logger.info('[execute] MANUAL execution requested', {
@@ -214,6 +212,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
 
       const result = await executeArb(effective);
+      if (result.kalshiResult.filledContracts != null && result.kalshiResult.filledPrice != null) {
+        const evidence = result.kalshiResult.venueEvidence;
+        const actualFills = evidence?.fills?.length
+          ? evidence.fills.map((fill) => ({
+            priceCents: fill.price * 100,
+            contracts: fill.quantity,
+            liquidityRole: fill.liquidityRole,
+          }))
+          : [{
+            priceCents: result.kalshiResult.filledPrice * 100,
+            contracts: result.kalshiResult.filledContracts,
+            liquidityRole: evidence?.liquidityRole,
+          }];
+        const defaultLiquidity = evidence?.liquidityRole ?? 'taker';
+        result.kalshiFeeQuote = calculateKalshiFeeQuote(feeAuthority, defaultLiquidity, [{
+          fills: actualFills,
+          chargedFeeCents: evidence?.chargedFeeCents ?? result.kalshiResult.chargedFeeCents,
+        }]);
+      } else {
+        result.kalshiFeeQuote = kalshiFeeQuote;
+      }
+      // TRADES-001: durable copy — in-memory auditLog dies on restart
+      await persistExecution({
+        timestamp: new Date().toISOString(),
+        arbId: effective.arbId,
+        marketTitle: effective.marketTitle,
+        dryRun: effective.dryRun,
+        success: result.success,
+        strategy: (effective as ExecutionRequest & { strategy?: string }).strategy ?? null,
+        kalshiOrder: effective.kalshiOrder,
+        polymarketOrder: effective.polymarketOrder,
+        result,
+        estimatedProfit: effective.estimatedProfit,
+        steps: result.steps,
+      });
+      // A terminal response is only publishable after the exact ledger is durable.
       logExecution({
         timestamp: new Date().toISOString(),
         arbId: effective.arbId,
@@ -224,35 +258,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         result,
         estimatedProfit: effective.estimatedProfit,
       });
-      // TRADES-001: durable copy — in-memory auditLog dies on restart
-      try {
-        await persistExecution({
-          timestamp: new Date().toISOString(),
-          arbId: effective.arbId,
-          marketTitle: effective.marketTitle,
-          dryRun: effective.dryRun,
-          success: result.success,
-          strategy: effective.strategy ?? null,
-          kalshiOrder: effective.kalshiOrder,
-          polymarketOrder: effective.polymarketOrder,
-          result,
-          estimatedProfit: effective.estimatedProfit,
-          steps: result.steps,
-          calculationEnvelope: effective.calculationEnvelope
-            ? { ...effective.calculationEnvelope, scope: 'execution' }
-            : undefined,
-        });
-      } catch (error) {
-        logger.error('[execute] execution completed but durable persistence failed', { error: String(error), arbId: effective.arbId });
-        return NextResponse.json({
-          success: false,
-          executionCompleted: true,
-          error: 'Execution completed, but its durable audit record could not be saved. Preserve the returned venue result and escalate immediately.',
-          result,
-          dryRun: effective.dryRun,
-          mode,
-        }, { status: 500 });
-      }
 
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun, mode });
     }
@@ -311,7 +316,12 @@ async function testKalshiConnection(): Promise<{ ok: boolean; detail: string }> 
     if (res.ok) return { ok: true, detail: `Connected (HTTP ${res.status})` };
     if (res.status === 401 || res.status === 403) {
       const data = await res.json().catch(() => ({}));
-      return { ok: false, detail: `Auth rejected: ${(typeof data === 'object' && data && typeof (data as Record<string, unknown>).error === 'object' && (data as Record<string, unknown>).error && typeof ((data as Record<string, unknown>).error as Record<string, unknown>).message === 'string' ? ((data as Record<string, unknown>).error as Record<string, unknown>).message : res.status)}` };
+      const errorMessage = typeof data === 'object' && data !== null
+        && 'error' in data && typeof data.error === 'object' && data.error !== null
+        && 'message' in data.error && typeof data.error.message === 'string'
+        ? data.error.message
+        : String(res.status);
+      return { ok: false, detail: `Auth rejected: ${errorMessage}` };
     }
     return { ok: false, detail: `HTTP ${res.status}` };
   } catch (err) {
