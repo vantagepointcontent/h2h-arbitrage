@@ -24,8 +24,10 @@ export function parseBoundedNumber(value, fallback, minimum, maximum, integer = 
 }
 
 export function adaptiveScanTimeoutMs(stats, baseTimeoutMs, retryTimeoutMs, floorMs, multiplier = 3) {
-  const retrying = (stats?.consecFails ?? 0) > 0 || (stats?.trips ?? 0) > 0;
-  const ceiling = retrying ? retryTimeoutMs : baseTimeoutMs;
+  const needsExtendedBudget = (stats?.consecFails ?? 0) > 0
+    || (stats?.trips ?? 0) > 0
+    || (stats?.avgMs ?? 0) * multiplier > baseTimeoutMs;
+  const ceiling = needsExtendedBudget ? retryTimeoutMs : baseTimeoutMs;
   if (!stats?.avgMs) return ceiling;
   return Math.min(ceiling, Math.max(floorMs, Math.round(stats.avgMs * multiplier)));
 }

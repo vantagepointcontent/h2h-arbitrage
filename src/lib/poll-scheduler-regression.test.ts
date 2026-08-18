@@ -30,6 +30,7 @@ describe('BUG-150 recurring saved-market fairness', () => {
   it('extends only retrying markets without inflating the normal SLA capacity budget', () => {
     expect(adaptiveScanTimeoutMs(null, 21_000, 30_000, 18_000)).toBe(21_000);
     expect(adaptiveScanTimeoutMs({ avgMs: 12_000, consecFails: 1, trips: 0 }, 21_000, 30_000, 18_000)).toBe(30_000);
+    expect(adaptiveScanTimeoutMs({ avgMs: 9_000, consecFails: 0, trips: 0 }, 21_000, 30_000, 18_000)).toBe(27_000);
     expect(adaptiveScanTimeoutMs({ avgMs: 4_000, consecFails: 0, trips: 0 }, 21_000, 30_000, 18_000)).toBe(18_000);
   });
 
