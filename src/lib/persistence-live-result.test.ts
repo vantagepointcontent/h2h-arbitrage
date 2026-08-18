@@ -151,6 +151,28 @@ describe('WS-107 liveResult persistence', () => {
     expect(got.lastMatchedAt).toBeTruthy();
   });
 
+  it('persists concurrent canonical scan publications without transaction commit exhaustion', async () => {
+    const markets = await Promise.all(Array.from({ length: 12 }, async (_, index) => persistence.addSavedMarket({
+      kalshiUrl: `https://kalshi.com/markets/concurrent-${index}`,
+      polymarketUrl: `https://polymarket.com/event/concurrent-${index}`,
+      eventTitle: `Concurrent publication ${index}`,
+      category: '',
+      expiryDate: null,
+    })));
+
+    await expect(Promise.all(markets.map(async (market, index) => {
+      const generation = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+      return persistence.updateSavedMarketScanResult(market.id, makeScan({
+        bestRoiPct: index,
+        publicationGeneration: generation,
+        matchedCount: 0,
+        matchedPairs: [],
+        matchStatus: 'confirmed_zero',
+        allArbs: [],
+      }));
+    }))).resolves.toEqual(Array(12).fill(true));
+  });
+
   it('does not let an older completed scan overwrite a newer canonical match summary', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/order', polymarketUrl: 'https://polymarket.com/event/order',

@@ -1689,21 +1689,16 @@ export async function reserveSavedMarketPublication(
   await ensureMarketsMigrated();
   return withSqliteBusyRetry(async () => {
     const column = channel === 'scan' ? 'scan_publication_generation' : 'live_publication_generation';
-    const c = getClient();
-    const tx = await c.transaction('write');
-    try {
-      const updated = await tx.execute({
-        sql: `UPDATE saved_markets SET ${column} = ${column} + 1 WHERE id = ? RETURNING ${column}`,
-        args: [id],
-      });
-      if (!updated.rows[0]) throw new Error(`Saved market ${id} not found while reserving ${channel} publication`);
-      const generation = Number(updated.rows[0][column]);
-      await tx.commit();
-      return generation;
-    } catch (error) {
-      await tx.rollback().catch(() => {});
-      throw error;
-    }
+    // UPDATE ... RETURNING is already one atomic SQLite statement. Wrapping it
+    // in @libsql/client's transaction object allowed concurrent statements on
+    // the shared connection to survive until COMMIT and fail with
+    // "SQL statements in progress" under production scan bursts.
+    const updated = await getClient().execute({
+      sql: `UPDATE saved_markets SET ${column} = ${column} + 1 WHERE id = ? RETURNING ${column}`,
+      args: [id],
+    });
+    if (!updated.rows[0]) throw new Error(`Saved market ${id} not found while reserving ${channel} publication`);
+    return Number(updated.rows[0][column]);
   });
 }
 
@@ -1712,38 +1707,46 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   // main race: concurrent scans clobbering each other's lastScanResult.
   await ensureMarketsMigrated();
   const c = getClient();
-  const tx = await c.transaction('write');
-  try {
-    const current = await tx.execute({
-      sql: 'SELECT last_scan_result, scan_publication_generation FROM saved_markets WHERE id = ?', args: [id],
-    });
-    if (!current.rows[0]) { await tx.rollback(); return false; }
-    const previous = current.rows[0].last_scan_result
-      ? JSON.parse(String(current.rows[0].last_scan_result)) as LastScanResult
+  const current = await c.execute({
+    sql: 'SELECT last_scan_result, scan_publication_generation FROM saved_markets WHERE id = ?', args: [id],
+  });
+  if (!current.rows[0]) return false;
+  const previousRaw = current.rows[0].last_scan_result == null ? null : String(current.rows[0].last_scan_result);
+  const previous = previousRaw
+      ? JSON.parse(previousRaw) as LastScanResult
       : null;
-    if (result.publicationGeneration != null
-      && result.publicationGeneration !== Number(current.rows[0].scan_publication_generation)) {
-      await tx.rollback();
-      return false;
-    }
-    if (isStaleMatchPublication(previous, result)) {
-      await tx.rollback();
-      return false;
-    }
-    const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan', tx);
-    if (!prepared) { await tx.rollback(); return false; }
-    const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
-    await tx.execute({
+  const generation = Number(current.rows[0].scan_publication_generation);
+  if (result.publicationGeneration != null && result.publicationGeneration !== generation) return false;
+  if (isStaleMatchPublication(previous, result)) return false;
+  const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan');
+  if (!prepared) return false;
+  const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
+  const dependencies = prepared.matchDependencies ?? [];
+  const dependencyGuard = dependencies.length > 0
+    ? `AND NOT EXISTS (
+         SELECT 1 FROM json_each(?) dependency
+         LEFT JOIN coupling_states coupling
+           ON coupling.coupling_key = json_extract(dependency.value, '$.couplingKey')
+         WHERE coupling.coupling_key IS NULL
+            OR coupling.state = 'deleted'
+            OR coupling.revision <> json_extract(dependency.value, '$.couplingRevision')
+       )`
+    : '';
+  const updated = await c.execute({
       sql: `UPDATE saved_markets SET last_scan_result = ?,
               expiry_date = CASE WHEN ? THEN ? ELSE expiry_date END,
-              last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?`,
-      args: [JSON.stringify(prepared), expiryDate !== undefined ? 1 : 0, expiryDate ?? null, matchedNow, id],
-    });
-    await tx.commit();
-  } catch (error) {
-    await tx.rollback().catch(() => {});
-    throw error;
-  }
+              last_matched_at = COALESCE(?, last_matched_at)
+            WHERE id = ?
+              AND scan_publication_generation = ?
+              AND last_scan_result IS ?
+              ${dependencyGuard}`,
+      args: [
+        JSON.stringify(prepared), expiryDate !== undefined ? 1 : 0, expiryDate ?? null, matchedNow,
+        id, generation, previousRaw,
+        ...(dependencies.length > 0 ? [JSON.stringify(dependencies)] : []),
+      ],
+  });
+  if (updated.rowsAffected === 0) return false;
   invalidateMarketsCache();
   mirrorMarketsToJsonThrottled();
   return true;
@@ -1778,7 +1781,6 @@ async function prepareCanonicalMatchResult(
   incoming: LastScanResult,
   previous: LastScanResult | null,
   source: string,
-  executor: import('./coupling-store').CouplingExecutor,
 ): Promise<LastScanResult | null> {
   incoming = sanitizeSavedArbResult(incoming) ?? incoming;
   if (incoming.matchStatus === 'unavailable' || incoming.matchStatus === 'refreshing') {
@@ -1806,9 +1808,9 @@ async function prepareCanonicalMatchResult(
   const store = await import('./coupling-store');
   const dependencies = incoming.matchDependencies;
   if (dependencies) {
-    if (dependencies.length !== pairs.length || !await store.areCouplingDependenciesEligible(dependencies, executor)) return null;
+    if (dependencies.length !== pairs.length || !await store.areCouplingDependenciesEligible(dependencies)) return null;
   } else {
-    const captured = await store.captureCouplingDependenciesWithExecutor(pairs, source, executor);
+    const captured = await store.captureCouplingDependencies(pairs, source);
     if (captured.length !== pairs.length) return null;
     return { ...incoming, matchedCount: pairs.length, matchedPairs: pairs, matchDependencies: captured };
   }
@@ -1876,36 +1878,42 @@ export const LIVE_RESULT_TTL_MS = parseLiveResultTtlMs(process.env.H2H_LIVE_RESU
 export async function updateSavedMarketLiveResult(id: string, result: LastScanResult): Promise<void> {
   await ensureMarketsMigrated();
   const c = getClient();
-  const tx = await c.transaction('write');
-  try {
-    const current = await tx.execute({
-      sql: 'SELECT live_result, live_publication_generation FROM saved_markets WHERE id = ?', args: [id],
-    });
-    if (!current.rows[0]) { await tx.rollback(); return; }
-    const previous = current.rows[0].live_result
-      ? JSON.parse(String(current.rows[0].live_result)) as LastScanResult
+  const current = await c.execute({
+    sql: 'SELECT live_result, live_publication_generation FROM saved_markets WHERE id = ?', args: [id],
+  });
+  if (!current.rows[0]) return;
+  const previousRaw = current.rows[0].live_result == null ? null : String(current.rows[0].live_result);
+  const previous = previousRaw
+      ? JSON.parse(previousRaw) as LastScanResult
       : null;
-    if (result.publicationGeneration != null
-      && result.publicationGeneration !== Number(current.rows[0].live_publication_generation)) {
-      await tx.rollback();
-      return;
-    }
-    if (isStaleMatchPublication(previous, result)) {
-      await tx.rollback();
-      return;
-    }
-    const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_live', tx);
-    if (!prepared) { await tx.rollback(); return; }
-    const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
-    await tx.execute({
-      sql: 'UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at) WHERE id = ?',
-      args: [JSON.stringify(prepared), matchedNow, id],
-    });
-    await tx.commit();
-  } catch (error) {
-    await tx.rollback().catch(() => {});
-    throw error;
-  }
+  const generation = Number(current.rows[0].live_publication_generation);
+  if (result.publicationGeneration != null && result.publicationGeneration !== generation) return;
+  if (isStaleMatchPublication(previous, result)) return;
+  const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_live');
+  if (!prepared) return;
+  const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
+  const dependencies = prepared.matchDependencies ?? [];
+  const dependencyGuard = dependencies.length > 0
+    ? `AND NOT EXISTS (
+         SELECT 1 FROM json_each(?) dependency
+         LEFT JOIN coupling_states coupling
+           ON coupling.coupling_key = json_extract(dependency.value, '$.couplingKey')
+         WHERE coupling.coupling_key IS NULL
+            OR coupling.state = 'deleted'
+            OR coupling.revision <> json_extract(dependency.value, '$.couplingRevision')
+       )`
+    : '';
+  await c.execute({
+    sql: `UPDATE saved_markets SET live_result = ?, last_matched_at = COALESCE(?, last_matched_at)
+          WHERE id = ?
+            AND live_publication_generation = ?
+            AND live_result IS ?
+            ${dependencyGuard}`,
+    args: [
+      JSON.stringify(prepared), matchedNow, id, generation, previousRaw,
+      ...(dependencies.length > 0 ? [JSON.stringify(dependencies)] : []),
+    ],
+  });
   invalidateMarketsCache();
 }
 

@@ -109,8 +109,10 @@ function snapshot(row: Record<string, unknown>): CouplingSnapshot {
 
 export async function areCouplingDependenciesEligible(
   dependencies: readonly CouplingDependency[],
-  executor: CouplingExecutor,
+  executor?: CouplingExecutor,
 ): Promise<boolean> {
+  await ensureCouplingStore(executor);
+  const target = executor ?? getClient();
   if (dependencies.length === 0) return false;
   const seen = new Set<string>();
   for (const dependency of dependencies) {
@@ -121,7 +123,7 @@ export async function areCouplingDependenciesEligible(
       || dependency.kalshiTicker !== normalized.kalshiTicker
       || dependency.pmConditionId !== normalized.pmConditionId
       || !Number.isSafeInteger(dependency.couplingRevision)) return false;
-    const result = await executor.execute({
+    const result = await target.execute({
       sql: `SELECT state, revision FROM coupling_states WHERE coupling_key = ?`,
       args: [dependency.couplingKey],
     });
