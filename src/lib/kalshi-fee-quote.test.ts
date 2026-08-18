@@ -1,13 +1,41 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertFreshKalshiFeeAuthority,
   calculateKalshiFeeQuote,
+  resolveKalshiFeeAuthoritiesForMarkets,
   resolveKalshiFeeAuthority,
 } from './kalshi-fee-quote';
 
 const observedAt = '2026-08-14T12:00:00.000Z';
 
 describe('authoritative Kalshi fee quote service', () => {
+  it('resolves one authoritative fee chain per event and assigns it to every matched market', async () => {
+    const markets: Array<{ ticker: string; event_ticker: string; feeAuthority?: unknown }> = [
+      { ticker: 'KXTEST-A', event_ticker: 'KXTEST-EVENT' },
+      { ticker: 'KXTEST-B', event_ticker: 'KXTEST-EVENT' },
+      { ticker: 'KXOTHER-A', event_ticker: 'KXOTHER-EVENT' },
+    ];
+    const resolve = async (ticker: string) => ({
+      marketTicker: ticker,
+      eventTicker: ticker.startsWith('KXTEST') ? 'KXTEST-EVENT' : 'KXOTHER-EVENT',
+      seriesTicker: ticker.startsWith('KXTEST') ? 'KXTEST' : 'KXOTHER',
+      feeType: 'quadratic' as const,
+      feeMultiplierPpm: 1_000_000,
+      source: 'authoritative-test',
+      observedAt,
+      version: 'v1',
+    });
+    const resolver = vi.fn(resolve);
+
+    await resolveKalshiFeeAuthoritiesForMarkets(markets, new Set(markets.map((market) => market.ticker)), resolver);
+
+    expect(resolver).toHaveBeenCalledTimes(2);
+    expect(markets.map((market) => market.feeAuthority)).toMatchObject([
+      { marketTicker: 'KXTEST-A', eventTicker: 'KXTEST-EVENT' },
+      { marketTicker: 'KXTEST-B', eventTicker: 'KXTEST-EVENT' },
+      { marketTicker: 'KXOTHER-A', eventTicker: 'KXOTHER-EVENT' },
+    ]);
+  });
   it('resolves market -> event -> series and applies a standard multiplier', async () => {
     const authority = await resolveKalshiFeeAuthority('KXTEST-YES', {
       observedAt,

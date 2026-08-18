@@ -113,6 +113,8 @@ module.exports = {
         NODE_ENV: 'production',
         H2H_SCAN_SUPERVISOR_INTERVAL_MS: '60000',
         H2H_DISK_RECOVERY_FREE_BYTES: '21000000000',
+        TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+        TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
       },
       log_file: '/home/scott/.pm2/logs/h2h-scan-supervisor.log',
       error_file: '/home/scott/.pm2/logs/h2h-scan-supervisor-error.log',

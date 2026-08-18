@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { executeFullScan } from '../src/app/api/scan/scan-execution';
 import { buildRateLimiterMetricRecords } from '../src/lib/rate-limiter-capture';
 import { rateLimiters, snapshotRateLimiterMetrics } from '../src/lib/rate-limiter';
+import { getSqliteContentionMetrics } from '../src/lib/sqlite-write-retry';
 
 interface RunMessage {
   type: 'run';
@@ -44,9 +45,15 @@ process.on('message', async (message: RunMessage) => {
     const response = await executeFullScan(request);
     const telemetry = buildRateLimiterMetricRecords('full-scan-worker', snapshotRateLimiterMetrics());
     for (const limiter of Object.values(rateLimiters)) limiter.resetMetrics();
-    publishAndExit({ type: 'result', jobId: message.jobId, response: await serializeResponse(response), telemetry }, 0);
+    publishAndExit({
+      type: 'result',
+      jobId: message.jobId,
+      response: await serializeResponse(response),
+      telemetry,
+      sqliteContention: getSqliteContentionMetrics(),
+    }, 0);
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
-    publishAndExit({ type: 'error', jobId: message.jobId, error: text }, 1);
+    publishAndExit({ type: 'error', jobId: message.jobId, error: text, sqliteContention: getSqliteContentionMetrics() }, 1);
   }
 });

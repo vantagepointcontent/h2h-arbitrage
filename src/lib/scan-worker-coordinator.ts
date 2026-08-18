@@ -80,6 +80,9 @@ export interface ScanWorkerMetrics {
   timedOutJobs: number;
   lastDurationMs: number | null;
   maxDurationMs: number;
+  sqliteBusyRetries: number;
+  sqliteExhaustedWrites: number;
+  sqliteLastBusyAt: string | null;
 }
 
 export function resolveScanWorkerPath(
@@ -141,6 +144,9 @@ export class ScanWorkerCoordinator {
     timedOutJobs: 0,
     lastDurationMs: null,
     maxDurationMs: 0,
+    sqliteBusyRetries: 0,
+    sqliteExhaustedWrites: 0,
+    sqliteLastBusyAt: null,
   };
 
   constructor(options: ScanWorkerCoordinatorOptions = {}) {
@@ -182,7 +188,13 @@ export class ScanWorkerCoordinator {
         response?: ScanWorkerResponse;
         error?: string;
         telemetry?: RateLimiterMetricRecord[];
+        sqliteContention?: { busyRetries?: number; exhaustedWrites?: number; lastBusyAt?: string | null };
       };
+      if (envelope.sqliteContention) {
+        this.metrics.sqliteBusyRetries += Math.max(0, Number(envelope.sqliteContention.busyRetries) || 0);
+        this.metrics.sqliteExhaustedWrites += Math.max(0, Number(envelope.sqliteContention.exhaustedWrites) || 0);
+        if (envelope.sqliteContention.lastBusyAt) this.metrics.sqliteLastBusyAt = envelope.sqliteContention.lastBusyAt;
+      }
       if (envelope.type === 'result' && envelope.response) {
         void this.acceptTelemetry(job.id, envelope.telemetry ?? [])
           .then(() => this.finish(job, null, envelope.response))
@@ -196,10 +208,19 @@ export class ScanWorkerCoordinator {
     worker.on('error', (error) => this.finish(job, new ScanWorkerError(error.message, 'SCAN_WORKER_FAILED')));
     worker.on('exit', (code, exitSignal) => {
       if (!job.settled) {
-        this.finish(job, new ScanWorkerError(
-          `Scan worker exited before publishing (code=${code ?? 'null'}, signal=${exitSignal ?? 'none'})`,
-          'SCAN_WORKER_FAILED',
-        ));
+        const failExitedWorker = () => {
+          if (job.settled) return;
+          this.finish(job, new ScanWorkerError(
+            `Scan worker exited before publishing (code=${code ?? 'null'}, signal=${exitSignal ?? 'none'})`,
+            'SCAN_WORKER_FAILED',
+          ));
+        };
+        // process.send's callback confirms the child flushed to the IPC pipe,
+        // but Node can emit the parent's clean exit event before dispatching
+        // that already-buffered message. Give only clean exits a tiny delivery
+        // grace; crashes/signals still fail immediately.
+        if (code === 0 && !exitSignal) setTimeout(failExitedWorker, 25).unref?.();
+        else failExitedWorker();
       }
     });
     job.timer = setTimeout(() => {

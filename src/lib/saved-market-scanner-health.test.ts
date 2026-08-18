@@ -47,6 +47,53 @@ describe('saved-market scanner lifecycle supervision', () => {
     expect(assessSavedMarketScannerHealth(healthy)).toMatchObject({ state: 'healthy', degradedReason: null });
   });
 
+  it('keeps a persistent overdue failed subset degraded across otherwise successful cycles', () => {
+    const result = assessSavedMarketScannerHealth({
+      ...healthy,
+      pollerHealth: {
+        ...healthy.pollerHealth,
+        successCount: 24,
+        failureCount: 0,
+        openBreakers: 0,
+        queue: {
+          eligibleCount: 483,
+          dueCount: 0,
+          overdueCount: 13,
+          failedCount: 13,
+          oldestSuccessAgeMs: 115_019_708,
+        },
+      },
+      scheduler: {
+        readable: true,
+        entries: [{
+          lastAttemptAt: '2026-08-18T14:59:45.000Z',
+          lastSuccessAt: '2026-08-17T07:03:00.292Z',
+          failureReason: 'HTTP 500: Scan worker exited before returning a result',
+          inProgress: false,
+        }],
+      },
+    });
+
+    expect(result).toMatchObject({
+      state: 'degraded',
+      degradedReason: 'overdue_failures',
+      detail: expect.stringContaining('13 overdue market(s)'),
+      queue: { failedCount: 13, oldestSuccessAgeMs: 115_019_708 },
+    });
+    expect(result.detail).toContain('Scan worker exited before returning a result');
+  });
+
+  it('treats missing or malformed telemetry source state as degraded', () => {
+    expect(assessSavedMarketScannerHealth({
+      ...healthy,
+      telemetry: { readable: false, error: 'Unexpected token at byte 4' },
+    })).toMatchObject({
+      state: 'degraded',
+      degradedReason: 'telemetry_source_unusable',
+      detail: 'Unexpected token at byte 4',
+    });
+  });
+
   it.each([
     ['worker crash or PM2/server restart', { pollerHealth: { ...healthy.pollerHealth, heartbeatAt: '2026-08-18T14:50:00.000Z' } }, 'poller_heartbeat_stale'],
     ['release promotion with an old poller generation', { expectedSchedulerVersion: 'bug-165-v1', pollerHealth: { ...healthy.pollerHealth, schedulerVersion: 'bug-150-v1' } }, 'poller_version_mismatch'],

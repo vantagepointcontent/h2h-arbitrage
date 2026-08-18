@@ -9,6 +9,19 @@ function latest(entries, key) {
     .at(-1) ?? null;
 }
 
+function failureSummary(entries) {
+  const counts = new Map();
+  for (const entry of entries) {
+    if (typeof entry?.failureReason !== 'string' || entry.failureReason.length === 0) continue;
+    counts.set(entry.failureReason, (counts.get(entry.failureReason) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 3)
+    .map(([reason, count]) => `${count}× ${reason}`)
+    .join('; ');
+}
+
 export function deriveScannerQueue(entries, now = Date.now(), freshnessSlaMs = 60 * 60_000) {
   let dueCount = 0;
   let overdueCount = 0;
@@ -94,8 +107,14 @@ export function assessSavedMarketScannerHealth(input) {
   if (input.disk?.allowed === false) {
     return degraded('disk_capacity', input.disk.reason ?? 'Disk capacity gate is closed');
   }
+  if (input.sqlite?.readable === false) {
+    return degraded('sqlite_source_unusable', input.sqlite.error ?? 'SQLite contention metrics are unavailable');
+  }
   if ((input.sqlite?.exhaustedWrites ?? 0) > 0) {
     return degraded('sqlite_contention', `${input.sqlite.exhaustedWrites} SQLite scanner write(s) exhausted retry budget`);
+  }
+  if (input.telemetry?.readable === false) {
+    return degraded('telemetry_source_unusable', input.telemetry.error ?? 'Worker telemetry health is missing or malformed');
   }
   if ((poller.openBreakers ?? 0) > 0 && (queue.overdueCount ?? 0) > 0) {
     return degraded('breaker_backlog', `${poller.openBreakers} open breaker(s) are holding ${queue.overdueCount} overdue market(s)`);
@@ -110,6 +129,13 @@ export function assessSavedMarketScannerHealth(input) {
   if ((poller.failureCount ?? 0) >= 3) {
     const reasons = [...new Set((poller.errors ?? []).map((error) => error.error).filter(Boolean))];
     return degraded('upstream_failures', `Recurring scans are repeatedly failing: ${reasons.join(', ') || 'unknown failure'}`);
+  }
+  if ((queue.overdueCount ?? 0) > 0) {
+    const reasons = failureSummary(entries);
+    return degraded(
+      'overdue_failures',
+      `${queue.overdueCount} overdue market(s) remain outside the freshness SLA${reasons ? `: ${reasons}` : ''}`,
+    );
   }
   if (input.telemetry?.error || (input.telemetry?.pendingSnapshots ?? 0) > 0) {
     return degraded('telemetry_degraded', input.telemetry?.error ?? `${input.telemetry.pendingSnapshots} telemetry snapshot(s) pending`);

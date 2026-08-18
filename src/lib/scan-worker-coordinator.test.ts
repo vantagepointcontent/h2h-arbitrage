@@ -101,6 +101,38 @@ describe('ScanWorkerCoordinator', () => {
     expect(coordinator.snapshot()).toMatchObject({ completedJobs: 1, failedJobs: 0 });
   });
 
+  it('accepts a flushed IPC result that arrives immediately after a clean worker exit', async () => {
+    const pending = coordinator.run('market-a', { body: '{}' });
+
+    workers[0].emit('exit', 0, null);
+    workers[0].emit('message', {
+      type: 'result',
+      response: { status: 200, headers: {}, body: '{"fullScanPersisted":true}' },
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      status: 200,
+      body: '{"fullScanPersisted":true}',
+    });
+    expect(coordinator.snapshot()).toMatchObject({ completedJobs: 1, failedJobs: 0 });
+  });
+
+  it('aggregates exhausted SQLite writes reported by disposable scan workers', async () => {
+    const pending = coordinator.run('market-a', { body: '{}' });
+    workers[0].emit('message', {
+      type: 'result',
+      response: { status: 200, headers: {}, body: '{}' },
+      sqliteContention: { busyRetries: 9, exhaustedWrites: 2, lastBusyAt: '2026-08-18T16:00:00.000Z' },
+    });
+
+    await pending;
+    expect(coordinator.snapshot()).toMatchObject({
+      sqliteBusyRetries: 9,
+      sqliteExhaustedWrites: 2,
+      sqliteLastBusyAt: '2026-08-18T16:00:00.000Z',
+    });
+  });
+
   it('preserves overload semantics for a different market at capacity', async () => {
     const active = coordinator.run('market-a', { body: '{}' });
 

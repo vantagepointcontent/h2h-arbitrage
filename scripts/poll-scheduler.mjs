@@ -32,7 +32,7 @@ export function classifyScanHttpFailure(status, body = {}, retryAfter = null, no
       : null;
   const retrySeconds = Number(retryAfter);
   return {
-    error: `HTTP ${status}${errorCode ? ` (${errorCode})` : ''}`,
+    error: `HTTP ${status}${errorCode ? ` (${errorCode})` : text ? `: ${text.slice(0, 240)}` : ''}`,
     errorCode,
     countsTowardBreaker: errorCode === null,
     retryAt: Number.isFinite(retrySeconds) && retrySeconds >= 0 ? now + retrySeconds * 1_000 : null,

@@ -36,6 +36,31 @@ export interface KalshiFeeQuote extends KalshiFeeAuthority {
   fillCount: number;
 }
 
+interface FeeAuthorityMarket {
+  ticker: string;
+  event_ticker: string;
+  feeAuthority?: KalshiFeeAuthority;
+}
+
+export async function resolveKalshiFeeAuthoritiesForMarkets(
+  markets: FeeAuthorityMarket[],
+  matchedTickers: Set<string>,
+  resolve: (ticker: string) => Promise<KalshiFeeAuthority> = resolveKalshiFeeAuthority,
+): Promise<void> {
+  const grouped = new Map<string, FeeAuthorityMarket[]>();
+  for (const market of markets) {
+    if (!matchedTickers.has(market.ticker)) continue;
+    const key = market.event_ticker?.trim() || market.ticker;
+    const group = grouped.get(key) ?? [];
+    group.push(market);
+    grouped.set(key, group);
+  }
+  await Promise.all([...grouped.values()].map(async (group) => {
+    const authority = await resolve(group[0].ticker);
+    for (const market of group) market.feeAuthority = { ...authority, marketTicker: market.ticker };
+  }));
+}
+
 /** Compatibility-only authority for legacy pure calculations. Production
  * surfaces must replace this with resolveKalshiFeeAuthority() output. Keeping
  * the schedule constant here prevents divergent hard-coded 7% implementations. */

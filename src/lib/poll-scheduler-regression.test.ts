@@ -36,6 +36,11 @@ describe('BUG-150 recurring saved-market fairness', () => {
       .toMatchObject({ countsTowardBreaker: false, errorCode: 'SCAN_CAPACITY', retryAt: 3_000 });
     expect(classifyScanHttpFailure(503, { error: 'venue unavailable' }, null, 1_000))
       .toMatchObject({ countsTowardBreaker: true, errorCode: null });
+    expect(classifyScanHttpFailure(500, { error: 'Scan worker exited before returning a result' }, null, 1_000))
+      .toMatchObject({
+        error: 'HTTP 500: Scan worker exited before returning a result',
+        countsTowardBreaker: true,
+      });
 
     const state = buildSchedulerState([market(1)], {}, 1_000, 60 * 60_000);
     markAttemptStarted(state['001'], 1_000);

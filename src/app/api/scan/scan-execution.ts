@@ -12,7 +12,7 @@ import {
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
 import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
-import { resolveKalshiFeeAuthority } from '@/lib/kalshi-fee-quote';
+import { resolveKalshiFeeAuthoritiesForMarkets } from '@/lib/kalshi-fee-quote';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
@@ -256,12 +256,7 @@ export async function executeFullScan(request: NextRequest) {
     const matchedKalshiTickers = [...new Set(preliminaryOutcomes.flatMap((outcome) =>
       outcome.kalshi?.ticker ? [outcome.kalshi.ticker] : []))];
     if (matchedKalshiTickers.length > 0) {
-      const authorities = await Promise.all(matchedKalshiTickers.map(async (ticker) => [
-        ticker,
-        await resolveKalshiFeeAuthority(ticker),
-      ] as const));
-      const authorityByTicker = new Map(authorities);
-      for (const market of kalshiMarkets) market.feeAuthority = authorityByTicker.get(market.ticker);
+      await resolveKalshiFeeAuthoritiesForMarkets(kalshiMarkets, new Set(matchedKalshiTickers));
     }
     const conditionIds = selectMatchedClobConditionIds(preliminaryOutcomes);
     let clobMap: Map<string, any>;
