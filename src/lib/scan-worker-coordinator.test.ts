@@ -101,10 +101,11 @@ describe('ScanWorkerCoordinator', () => {
     expect(coordinator.snapshot()).toMatchObject({ completedJobs: 1, failedJobs: 0 });
   });
 
-  it('accepts a flushed IPC result that arrives immediately after a clean worker exit', async () => {
+  it('accepts a large flushed IPC result that deserializes after a clean worker exit', async () => {
     const pending = coordinator.run('market-a', { body: '{}' });
 
     workers[0].emit('exit', 0, null);
+    await vi.advanceTimersByTimeAsync(500);
     workers[0].emit('message', {
       type: 'result',
       response: { status: 200, headers: {}, body: '{"fullScanPersisted":true}' },

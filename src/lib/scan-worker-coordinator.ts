@@ -219,7 +219,7 @@ export class ScanWorkerCoordinator {
         // but Node can emit the parent's clean exit event before dispatching
         // that already-buffered message. Give only clean exits a tiny delivery
         // grace; crashes/signals still fail immediately.
-        if (code === 0 && !exitSignal) setTimeout(failExitedWorker, 25).unref?.();
+        if (code === 0 && !exitSignal) setTimeout(failExitedWorker, 5_000).unref?.();
         else failExitedWorker();
       }
     });

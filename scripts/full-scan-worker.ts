@@ -27,8 +27,10 @@ function publishAndExit(message: unknown, exitCode: number): void {
   if (!process.send) {
     process.exit(exitCode);
   }
-  process.send(message, () => {
-    process.disconnect?.();
+  const fallback = setTimeout(() => process.exit(exitCode), 5_000);
+  process.send(message, (error) => {
+    if (!error) return;
+    clearTimeout(fallback);
     process.exit(exitCode);
   });
 }
