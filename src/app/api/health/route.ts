@@ -24,11 +24,29 @@ async function readPollerHealth(): Promise<PollerHealthSnapshot | null> {
   }
 }
 
+async function readFullScanHealth(): Promise<Record<string, unknown> | null> {
+  try {
+    const value: unknown = JSON.parse(await readFile(
+      path.join(process.cwd(), 'data', 'saved-market-scanner-health.json'),
+      'utf8',
+    ));
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   try {
     recovery ??= recoverInterruptedScanPublications();
     await recovery;
-    const [markets, pollerSnapshot] = await Promise.all([getSavedMarkets(), readPollerHealth()]);
+    const [markets, pollerSnapshot, fullScanHealth] = await Promise.all([
+      getSavedMarkets(),
+      readPollerHealth(),
+      readFullScanHealth(),
+    ]);
     const pollerStatus = classifyPollerHealth(pollerSnapshot);
     return NextResponse.json({
       status: 'ok',
@@ -40,6 +58,7 @@ export async function GET() {
       scanWorkers: getScanWorkerMetrics(),
       quickPrices: getQuickPricesMetrics(),
       sqliteContention: getSqliteContentionMetrics(),
+      fullScanHealth,
       savedMarketScheduler: {
         ...pollerStatus,
         status: pollerSnapshot?.status ?? null,

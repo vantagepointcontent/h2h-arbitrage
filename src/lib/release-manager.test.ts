@@ -31,6 +31,7 @@ async function artifact(base: string, commit: string, buildId: string) {
   await writeFile(path.join(dir, 'prerender-manifest.json'), JSON.stringify({ version: 4 }));
   await writeFile(path.join(dir, 'required-server-files.json'), JSON.stringify({ version: 1, files: ['server/chunks/runtime.js'] }));
   await writeFile(path.join(dir, 'ragnar-consumer.mjs'), 'export {};\n');
+  await writeFile(path.join(dir, 'full-scan-worker.cjs'), 'module.exports = {};\n');
   await writeFile(path.join(dir, 'static', buildId, '_buildManifest.js'), `self.__BUILD=${JSON.stringify(buildId)}`);
   await writeFile(path.join(dir, 'static', 'chunks', 'app.js'), `self.__COMMIT=${JSON.stringify(commit)}`);
   await writeFile(path.join(dir, 'server', 'chunks', 'runtime.js'), `exports.commit=${JSON.stringify(commit)}`);
@@ -64,6 +65,8 @@ describe('isolated production releases', () => {
     expect(health).toContain('H2H_BUILD_ID');
     expect(ecosystem).toContain("name: 'h2h-release-monitor'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
+    expect(await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8'))
+      .toMatch(/h2h-arbitrage[\s\S]+h2h-poller[\s\S]+h2h-scan-supervisor/);
   });
 
   it('materializes detached dependencies and preserves generated runtime package aliases', async () => {
@@ -92,6 +95,7 @@ for (const relative of ['static/build-test', 'static/chunks', 'server/chunks']) 
 for (const file of ['build-manifest.json', 'routes-manifest.json', 'prerender-manifest.json', 'required-server-files.json']) fs.writeFileSync(path.join('.next', file), '{}');
 fs.writeFileSync(path.join('.next', 'BUILD_ID'), 'build-test\\n');
 fs.writeFileSync(path.join('.next', 'ragnar-consumer.mjs'), 'export {};\\n');
+fs.writeFileSync(path.join('.next', 'full-scan-worker.cjs'), 'module.exports = {};\\n');
 fs.writeFileSync(path.join('.next', 'static', 'chunks', 'app.js'), 'app');
 fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.exports=e=>e.y("fixture-package-aaaaaaaaaaaaaaaa")');
 `);
@@ -225,6 +229,21 @@ fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.e
     const target = identity.releaseDir ?? active;
     await writeFile(path.join(target, '.next', 'static', 'chunks', 'app.js'), 'mutated');
     await expect(api.verifyActiveRelease(repo)).rejects.toThrow(/drift|integrity/i);
+  });
+
+  it('rejects a release that silently drops the recurring full-scan worker bundle', async () => {
+    const api = await manager();
+    const repo = await root();
+    const broken = await artifact(repo, 'f'.repeat(40), 'missing-worker');
+    const { rm } = await import('node:fs/promises');
+    await rm(path.join(broken, 'full-scan-worker.cjs'));
+
+    await expect(api.sealCandidate({
+      repoRoot: repo,
+      artifactDir: broken,
+      commit: 'f'.repeat(40),
+      runId: 'missing-worker',
+    })).rejects.toThrow(/full-scan-worker/i);
   });
 
   it('serializes promotion against cleanup while leaving the prior active release readable', async () => {

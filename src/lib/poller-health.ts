@@ -1,4 +1,4 @@
-export const EXPECTED_POLLER_SCHEDULER_VERSION = 'bug-150-v1';
+export const EXPECTED_POLLER_SCHEDULER_VERSION = 'bug-165-v1';
 export const POLLER_STALE_AFTER_MS = 3 * 60_000;
 
 export interface PollerHealthSnapshot {

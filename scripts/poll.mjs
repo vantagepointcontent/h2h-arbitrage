@@ -2,7 +2,7 @@
 // Run via: pm2 start scripts/poll.mjs --name h2h-poller
 
 const BASE_URL = process.env.H2H_BASE_URL || 'http://100.86.7.30:3000';
-const SCHEDULER_VERSION = 'bug-150-v1';
+const SCHEDULER_VERSION = 'bug-165-v1';
 let POLL_CONCURRENCY;
 let FRESHNESS_SLA_MS;
 // Base wake-up interval. Poller wakes this often to check which markets are due.
@@ -43,6 +43,7 @@ const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json',
 const fs = await import('fs');
 const {
   buildSchedulerState,
+  classifyScanHttpFailure,
   completeAttempt,
   hasNewerSuccessfulMarketScan,
   isEligibleMarket,
@@ -403,7 +404,14 @@ async function scanMarket(market) {
     const durationMs = Date.now() - started;
     if (!res.ok) {
       clearTimeout(timer);
-      return { ok: false, durationMs, error: `HTTP ${res.status}` };
+      const text = await res.text();
+      let body = {};
+      try { body = JSON.parse(text); } catch { body = { error: text }; }
+      return {
+        ok: false,
+        durationMs,
+        ...classifyScanHttpFailure(res.status, body, res.headers.get('retry-after')),
+      };
     }
     const result = await res.json();
     clearTimeout(timer);
@@ -684,11 +692,14 @@ async function pollOnce() {
       scanDurations.push(scan.durationMs || 0);
 
       if (!scan.ok || !scan.result || scan.result.fullScanPersisted !== true) {
-        const breakerRetryAt = scanStats.get(market.id)?.cooldownUntil;
+        const breakerRetryAt = scan.countsTowardBreaker === false
+          ? scan.retryAt
+          : scanStats.get(market.id)?.cooldownUntil;
         completeAttempt(schedulerState[market.id], {
           ok: false,
           error: scan.error || 'Scan completed but durable saved-market publication failed',
           retryAt: breakerRetryAt,
+          retryWithoutPenalty: scan.countsTowardBreaker === false,
         }, Date.now(), FRESHNESS_SLA_MS);
         const saved = await saveMarketSchedulerState(market.id, { phase: 'terminal', leaseToken: lease.token });
         if (!saved) {
@@ -697,7 +708,7 @@ async function pollOnce() {
           return;
         }
         health.failureCount += 1;
-        recordScanOutcome(market.id, false, scan.durationMs);
+        if (scan.countsTowardBreaker !== false) recordScanOutcome(market.id, false, scan.durationMs);
         const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
         health.errors.push(err);
         console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);

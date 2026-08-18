@@ -44,7 +44,7 @@ export function markAttemptStarted(
 ): void;
 export function completeAttempt(
   item: SchedulerItem,
-  outcome: { ok: boolean; error?: string; retryAt?: number },
+  outcome: { ok: boolean; error?: string; retryAt?: number; retryWithoutPenalty?: boolean },
   now?: number,
   freshnessSlaMs?: number,
   requestedIntervalMs?: number,

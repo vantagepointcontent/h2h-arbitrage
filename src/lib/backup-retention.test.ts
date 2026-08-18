@@ -29,6 +29,28 @@ describe('backup retention', () => {
     expect(plan.keep.map((item) => item.name)).toEqual(expect.arrayContaining(['protected-old', 'newest', 'second', 'third']));
   });
 
+  it('reclaims recent unprotected backups under capacity pressure without sacrificing the rollback floor', () => {
+    const candidates = [
+      { name: 'protected', modifiedAtMs: 1, bytes: 900 },
+      { name: 'newest', modifiedAtMs: 5, bytes: 100 },
+      { name: 'second', modifiedAtMs: 4, bytes: 100 },
+      { name: 'recent-large', modifiedAtMs: 3, bytes: 800 },
+      { name: 'recent-small', modifiedAtMs: 2, bytes: 300 },
+    ];
+
+    const plan = planBackupRetention(candidates, {
+      now: 10,
+      maxAgeDays: 14,
+      keepNewest: 2,
+      protectedNames: new Set(['protected']),
+      requiredReclaimBytes: 700,
+    });
+
+    expect(plan.delete.map((item) => item.name)).toEqual(['recent-small', 'recent-large']);
+    expect(plan.reclaimableBytes).toBe(1_100);
+    expect(plan.keep.map((item) => item.name)).toEqual(['newest', 'second', 'protected']);
+  });
+
   it('does not delete an eligible regular backup file held open by a process', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'backup-retention-open-'));
     const backupRoot = path.join(root, 'backups');

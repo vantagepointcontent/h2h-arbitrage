@@ -23,9 +23,18 @@ describe('operator capacity gates', () => {
     expect(ecosystem).toContain("name: 'h2h-storage-retention'");
     expect(ecosystem).toContain("args: '--live --daemon'");
     expect(ecosystem).toContain("cron_restart: '30 3 * * *'");
+    expect(ecosystem).toContain("name: 'h2h-scan-supervisor'");
+    expect(ecosystem).toContain("script: './scripts/scan-supervisor.mjs'");
     const monitor = await readFile(path.join(root, 'scripts', 'disk-capacity-monitor.mjs'), 'utf8');
     const retention = await readFile(path.join(root, 'scripts', 'storage-retention.mjs'), 'utf8');
+    const supervisor = await readFile(path.join(root, 'scripts', 'scan-supervisor.mjs'), 'utf8');
+    const healthRoute = await readFile(path.join(root, 'src', 'app', 'api', 'health', 'route.ts'), 'utf8');
     expect(monitor).toContain("process.env.pm_id !== undefined");
     expect(retention).toContain("process.env.pm_id !== undefined");
+    expect(supervisor).toContain('assessSavedMarketScannerHealth');
+    expect(supervisor).toContain("'h2h-poller'");
+    expect(supervisor).toContain('.corrupt.');
+    expect(healthRoute).toContain('saved-market-scanner-health.json');
+    expect(healthRoute).toContain('fullScanHealth');
   });
 });

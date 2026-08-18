@@ -27,6 +27,7 @@ const MANIFEST = 'release-manifest.json';
 const REQUIRED_FILES = [
   'BUILD_ID',
   'DEPLOY_COMMIT',
+  'full-scan-worker.cjs',
   'build-manifest.json',
   'routes-manifest.json',
   'prerender-manifest.json',
@@ -392,6 +393,9 @@ async function restartAndVerify(repoRoot, expected, options = {}) {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   if (!healthy) throw new Error(`PM2 restarted but release health was not accepted: ${lastError}`);
+  await execFileAsync('pm2', [
+    'start', 'ecosystem.config.js', '--only', 'h2h-poller,h2h-scan-supervisor', '--update-env',
+  ], { cwd: repoRoot });
   await execFileAsync('pm2', ['start', 'ecosystem.config.js', '--only', 'h2h-release-monitor', '--update-env'], { cwd: repoRoot });
   await execFileAsync('pm2', ['save'], { cwd: repoRoot });
 }

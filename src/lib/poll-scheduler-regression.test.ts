@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSchedulerState,
+  classifyScanHttpFailure,
   completeAttempt,
   markAttemptStarted,
   selectDueMarkets,
@@ -24,6 +25,29 @@ function market(index: number): Market {
 }
 
 describe('BUG-150 recurring saved-market fairness', () => {
+  it('does not poison per-market breakers when the global disk gate or scanner capacity is closed', () => {
+    expect(classifyScanHttpFailure(503, { code: 'DISK_CAPACITY' }, '60', 1_000)).toEqual({
+      error: 'HTTP 503 (DISK_CAPACITY)',
+      errorCode: 'DISK_CAPACITY',
+      countsTowardBreaker: false,
+      retryAt: 61_000,
+    });
+    expect(classifyScanHttpFailure(503, { error: 'Scanner is at capacity.' }, '2', 1_000))
+      .toMatchObject({ countsTowardBreaker: false, errorCode: 'SCAN_CAPACITY', retryAt: 3_000 });
+    expect(classifyScanHttpFailure(503, { error: 'venue unavailable' }, null, 1_000))
+      .toMatchObject({ countsTowardBreaker: true, errorCode: null });
+
+    const state = buildSchedulerState([market(1)], {}, 1_000, 60 * 60_000);
+    markAttemptStarted(state['001'], 1_000);
+    completeAttempt(state['001'], {
+      ok: false,
+      error: 'HTTP 503 (DISK_CAPACITY)',
+      retryAt: 61_000,
+      retryWithoutPenalty: true,
+    }, 1_000, 60 * 60_000);
+    expect(state['001']).toMatchObject({ retryCount: 0, nextDueAt: new Date(61_000).toISOString() });
+  });
+
   it('advances beyond a failed first batch across all 496 eligible markets', () => {
     const now = Date.parse('2026-08-14T10:00:00Z');
     const markets = Array.from({ length: 496 }, (_, index) => market(index));

@@ -52,11 +52,13 @@ export async function enforceBackupRetention(options = {}) {
       name: entry.name,
       path: path.join(backupRoot, entry.name),
       modifiedAtMs: (await lstat(path.join(backupRoot, entry.name))).mtimeMs,
+      bytes: await bytes(path.join(backupRoot, entry.name)),
     })));
   const plan = planBackupRetention(candidates, {
     maxAgeDays: policy.maxAgeDays,
     keepNewest: policy.keepNewest,
     protectedNames: new Set(policy.protectedNames),
+    requiredReclaimBytes: options.requiredReclaimBytes,
   });
 
   const events = [];
@@ -87,7 +89,15 @@ export async function enforceBackupRetention(options = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  enforceBackupRetention({ live: process.argv.includes('--live') })
+  const requiredFreeIndex = process.argv.indexOf('--required-free-bytes');
+  let requiredReclaimBytes;
+  if (requiredFreeIndex >= 0) {
+    const requiredFreeBytes = Number(process.argv[requiredFreeIndex + 1]);
+    const { bavail, bsize } = await import('node:fs/promises')
+      .then(({ statfs }) => statfs('/', { bigint: true }));
+    requiredReclaimBytes = Math.max(0, requiredFreeBytes - Number(bavail * bsize));
+  }
+  enforceBackupRetention({ live: process.argv.includes('--live'), requiredReclaimBytes })
     .then((result) => console.log(JSON.stringify(result)))
     .catch((error) => {
       console.error(error instanceof Error ? error.message : String(error));

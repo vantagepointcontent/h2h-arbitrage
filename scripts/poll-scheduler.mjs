@@ -23,6 +23,22 @@ export function parseBoundedNumber(value, fallback, minimum, maximum, integer = 
   return integer ? Math.floor(bounded) : bounded;
 }
 
+export function classifyScanHttpFailure(status, body = {}, retryAfter = null, now = Date.now()) {
+  const text = typeof body?.error === 'string' ? body.error : '';
+  const errorCode = body?.code === 'DISK_CAPACITY'
+    ? 'DISK_CAPACITY'
+    : status === 503 && /scanner is at capacity/i.test(text)
+      ? 'SCAN_CAPACITY'
+      : null;
+  const retrySeconds = Number(retryAfter);
+  return {
+    error: `HTTP ${status}${errorCode ? ` (${errorCode})` : ''}`,
+    errorCode,
+    countsTowardBreaker: errorCode === null,
+    retryAt: Number.isFinite(retrySeconds) && retrySeconds >= 0 ? now + retrySeconds * 1_000 : null,
+  };
+}
+
 export function minimumConcurrencyForSla(eligibleCount, timeoutMs, freshnessSlaMs) {
   if (!Number.isFinite(eligibleCount) || eligibleCount <= 0) return 1;
   const timeout = positiveFinite(timeoutMs, 60_000);
@@ -138,6 +154,11 @@ export function completeAttempt(item, outcome, now = Date.now(), freshnessSlaMs 
     return;
   }
 
+  if (outcome.retryWithoutPenalty) {
+    item.failureReason = outcome.error || 'Scheduled scan paused by a global scanner dependency.';
+    item.nextDueAt = iso(Math.max(now + 1_000, positiveFinite(outcome.retryAt, now + RETRY_BASE_MS)));
+    return;
+  }
   item.retryCount += 1;
   item.failureReason = outcome.error || 'Scheduled scan failed without an error reason.';
   const backoff = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, item.retryCount - 1));
