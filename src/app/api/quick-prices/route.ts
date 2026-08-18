@@ -69,6 +69,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     }
 
     const coordinated = await quickPricesCoordinator.run(`${marketId}|${capital}`, async () => {
+      const taskAttemptedAt = new Date().toISOString();
       let taskPersistenceWarning: string | undefined;
       let taskPublicationGeneration: number | null = null;
       try {
@@ -112,7 +113,11 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       await persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(result.outcomes ?? [], {
         kalshi: result._kalshiFetchedAt,
         polymarket: result._pmFetchedAt,
-      }, 'saved-market-quick-refresh').filter((snapshot) =>
+      }, 'saved-market-quick-refresh', {
+        attemptedAt: taskAttemptedAt,
+        generation: taskPublicationGeneration ?? 0,
+        scope: marketId,
+      }).filter((snapshot) =>
         freshPlatforms.has(snapshot.platform)
         || (snapshot.platform === 'polymarket' && freshPmConditions.has(snapshot.marketId.toLowerCase()))));
       if (taskPublicationGeneration != null) {

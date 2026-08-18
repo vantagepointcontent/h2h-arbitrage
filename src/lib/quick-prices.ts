@@ -40,6 +40,7 @@ import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { getSavedMarketById } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
+import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import type { UnmatchedKalshi, UnmatchedPolymarket } from '@/app/lib/page-shared';
 import { resolveMarketDomain } from './market-classification';
@@ -196,12 +197,16 @@ type SavedPmQuote = {
 /** Enrich exact matched token books independently and retain scoped failures. */
 async function enrichQuickPmMarketsWithClobPricesDetailed(
   markets: PMMarket[],
+  matchedConditionIds: string[],
   savedQuotes: SavedPmQuote[] = [],
   savedObservedAt: string | null = null,
 ): Promise<{ markets: PMMarket[]; refresh: QuickPmRefresh; metrics: ClobBooksDetailedResult['metrics'] }> {
-  const clobMarkets = markets.map(quickClobMarket);
-  const tokenIds = clobMarkets.flatMap((clob) =>
-    clob ? clob.tokens.map((token) => token.token_id) : []);
+  const selectedConditions = new Set(matchedConditionIds.map((conditionId) => conditionId.trim().toLowerCase()));
+  const clobMarkets = markets.map((market) => selectedConditions.has(market.conditionId.trim().toLowerCase())
+    ? quickClobMarket(market)
+    : null);
+  const tokenIds = [...new Set(clobMarkets.flatMap((clob) =>
+    clob ? clob.tokens.map((token) => token.token_id) : []))];
   const detailed = await fetchClobBooksDetailed(tokenIds, {
     bypassCache: true, concurrency: 4, maxAttempts: 2,
     requestTimeoutMs: 3_500, retryBackoffMs: 250, totalDeadlineMs: 12_000,
@@ -212,6 +217,7 @@ async function enrichQuickPmMarketsWithClobPricesDetailed(
   const refreshOutcomes: QuickPmOutcomeRefresh[] = [];
 
   const enriched = markets.map((market, index) => {
+    if (!selectedConditions.has(market.conditionId.trim().toLowerCase())) return market;
     const clob = clobMarkets[index];
     if (!clob) {
       refreshOutcomes.push({
@@ -423,6 +429,18 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   const pmRawCount = (pmEvent?.markets || []).length;
   const pmMarketsRaw = chooseBestPmStructure(pmEvent?.markets || [], kalshiMarkets, eventTitle);
   const pmFilteredCount = pmMarketsRaw.length;
+  // Preserve the full PM structure for matching/manual-match UI, but restrict
+  // expensive exact-token reads to cross-platform pairs identified from the
+  // durable matcher inputs. This mirrors the BUG-114 full-scan selection path.
+  const preliminaryOutcomes = applyManualMatches(
+    matchOutcomes(kalshiMarkets, pmMarketsRaw, eventTitle, capital, expiryDate),
+    manualMatches,
+    kalshiMarkets,
+    pmMarketsRaw,
+    capital,
+    expiryDate,
+  );
+  const matchedPmConditionIds = selectMatchedClobConditionIds(preliminaryOutcomes);
 
   const clobStartedAt = performance.now();
   const emptyClobMetrics: ClobBooksDetailedResult['metrics'] = {
@@ -431,6 +449,7 @@ export async function quickPricesScan(marketId: string, capital = 1000): Promise
   };
   const pmEnrichment = await enrichQuickPmMarketsWithClobPricesDetailed(
     pmMarketsRaw,
+    matchedPmConditionIds,
     market.lastScanResult?.allArbs ?? [],
     market.lastScanResult?.scannedAt ?? null,
   ).catch((error: unknown) => {

@@ -44,24 +44,43 @@ vi.mock('@/lib/settings', () => ({ getSetting: vi.fn(async () => null) }));
 vi.mock('./market-classification', () => ({ resolveMarketDomain: () => 'other' }));
 vi.mock('@/app/lib/page-shared', () => ({ computePriceResolved: () => false }));
 vi.mock('@/lib/matcher', () => ({
-  matchOutcomes: (kalshi: Array<{ title?: string }>, pm: Array<{ question?: string; conditionId?: string; outcomePrices?: string }>) => [
-    ...kalshi.map((market, index) => ({
-      artist: market.title ?? `Kalshi ${index}`,
-      kalshi: { ticker: `K-${index}`, yesAsk: 0.4, noAsk: 0.6 },
-      polymarket: null,
-      arbitrage: { roiPct: 0 },
-    })),
-    ...pm.map((market, index) => ({
-      artist: market.question ?? `Polymarket ${index}`,
-      kalshi: null,
-      polymarket: {
-        conditionId: market.conditionId ?? `P-${index}`, marketId: market.conditionId ?? `P-${index}`,
-        yesPrice: Number(JSON.parse(market.outcomePrices ?? '[0,0]')[0]),
-        noPrice: Number(JSON.parse(market.outcomePrices ?? '[0,0]')[1]),
-      },
-      arbitrage: { roiPct: 0 },
-    })),
-  ],
+  matchOutcomes: (
+    kalshi: Array<{ title?: string }>,
+    pm: Array<{ question?: string; conditionId?: string; outcomePrices?: string }>,
+  ) => {
+    const matchedPm = new Set<number>();
+    const outcomes = kalshi.map((market, index) => {
+      const pmIndex = pm.findIndex((candidate, candidateIndex) =>
+        !matchedPm.has(candidateIndex)
+        && candidate.question?.trim().toLowerCase() === market.title?.trim().toLowerCase());
+      const pmMarket = pmIndex >= 0 ? pm[pmIndex] : null;
+      if (pmIndex >= 0) matchedPm.add(pmIndex);
+      return {
+        artist: market.title ?? `Kalshi ${index}`,
+        kalshi: { ticker: `K-${index}`, yesAsk: 0.4, noAsk: 0.6 },
+        polymarket: pmMarket ? {
+          conditionId: pmMarket.conditionId ?? `P-${pmIndex}`,
+          marketId: pmMarket.conditionId ?? `P-${pmIndex}`,
+          yesPrice: Number(JSON.parse(pmMarket.outcomePrices ?? '[0,0]')[0]),
+          noPrice: Number(JSON.parse(pmMarket.outcomePrices ?? '[0,0]')[1]),
+        } : null,
+        arbitrage: { roiPct: 0 },
+      };
+    });
+    return [
+      ...outcomes,
+      ...pm.flatMap((market, index) => matchedPm.has(index) ? [] : [{
+        artist: market.question ?? `Polymarket ${index}`,
+        kalshi: null,
+        polymarket: {
+          conditionId: market.conditionId ?? `P-${index}`, marketId: market.conditionId ?? `P-${index}`,
+          yesPrice: Number(JSON.parse(market.outcomePrices ?? '[0,0]')[0]),
+          noPrice: Number(JSON.parse(market.outcomePrices ?? '[0,0]')[1]),
+        },
+        arbitrage: { roiPct: 0 },
+      }]),
+    ];
+  },
   applyManualMatches: (outcomes: unknown[]) => outcomes,
   calculateAllArbitrages: (outcomes: unknown[]) => outcomes,
   attachOutcomeContingentApy: (outcomes: unknown[]) => outcomes,
@@ -148,7 +167,53 @@ describe('quickPricesScan bounded platform failures', () => {
     expect(Object.values(result.refreshMetrics.latencyMs).every((value) => value >= 0)).toBe(true);
   });
 
+  it('fetches each exact token only for matched outcomes while retaining unrelated structure', async () => {
+    const matched = {
+      ...pmMarket,
+      id: 'pm-matched', conditionId: 'condition-matched', question: 'Matched outcome',
+      clobTokenIds: '["yes-matched","no-matched"]',
+    };
+    mocks.fetchKalshiEventMarkets.mockResolvedValue([{ title: 'Matched outcome' }]);
+    mocks.fetchPolymarketEvent.mockResolvedValue({
+      id: 'event-1', title: 'PM title', endDate: '2026-12-31T00:00:00Z', active: true, closed: false,
+      markets: [
+        matched,
+        { ...pmMarket, id: 'pm-unrelated-1', conditionId: 'condition-unrelated-1', question: 'Unrelated one', clobTokenIds: '["yes-unrelated-1","no-unrelated-1"]' },
+        { ...pmMarket, id: 'pm-unrelated-2', conditionId: 'condition-unrelated-2', question: 'Unrelated two', clobTokenIds: '["yes-unrelated-2","no-unrelated-2"]' },
+      ],
+    });
+    mocks.fetchClobBooksDetailed.mockResolvedValue({
+      books: new Map([
+        ['yes-matched', { asset_id: 'yes-matched', bids: [], asks: [{ price: '0.42', size: '100' }] }],
+        ['no-matched', { asset_id: 'no-matched', bids: [], asks: [{ price: '0.59', size: '100' }] }],
+      ]),
+      diagnostics: new Map([
+        ['yes-matched', { tokenId: 'yes-matched', status: 'success', attemptCount: 1, queueWaitMs: 0, upstreamLatencyMs: 1, totalLatencyMs: 1, deadlineSource: 'per-token', observedAt: '2026-08-17T14:00:00.000Z' }],
+        ['no-matched', { tokenId: 'no-matched', status: 'success', attemptCount: 2, queueWaitMs: 0, upstreamLatencyMs: 2, totalLatencyMs: 2, deadlineSource: 'per-token', observedAt: '2026-08-17T14:00:00.000Z' }],
+      ]),
+      metrics: { tokenCount: 2, successCount: 2, timeoutCount: 0, errorCount: 0, unavailableCount: 0, retryCount: 1, queueWaitMs: 0, upstreamLatencyMs: 3, durationMs: 2 },
+    });
+
+    const result = await quickPricesScan('saved-1');
+
+    expect(mocks.fetchClobBooksDetailed).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchClobBooksDetailed).toHaveBeenCalledWith(
+      ['yes-matched', 'no-matched'],
+      expect.objectContaining({ maxAttempts: 2 }),
+    );
+    expect(result.matchedCount).toBe(1);
+    expect(result.pmCount).toBe(3);
+    expect(result.pmRefresh.outcomes).toEqual([
+      expect.objectContaining({ conditionId: 'condition-matched', status: 'refreshed' }),
+    ]);
+    expect(result.refreshMetrics.clob).toMatchObject({ tokenCount: 2, retryCount: 1 });
+  });
+
   it('scopes a token timeout without discarding successful sibling outcomes', async () => {
+    mocks.fetchKalshiEventMarkets.mockResolvedValue([
+      { title: 'PM outcome' },
+      { title: 'PM outcome 2' },
+    ]);
     mocks.getSavedMarketById.mockResolvedValue({
       id: 'saved-1', eventTitle: 'Saved title', category: 'entertainment', expiryDate: '2026-12-31T00:00:00Z',
       kalshiUrl: 'https://kalshi.com/markets/test/test/kxtest-26', polymarketUrl: 'https://polymarket.com/event/pm-test',
@@ -179,7 +244,7 @@ describe('quickPricesScan bounded platform failures', () => {
 
     const result = await quickPricesScan('saved-1');
 
-    expect(result.kalshiCount).toBe(1);
+    expect(result.kalshiCount).toBe(2);
     expect(result.pmCount).toBe(2);
     expect(result.platformWarnings[0]).toContain('1 of 2 Polymarket outcomes refreshed');
     expect(result.platformWarnings[0]).toContain('PM outcome');
