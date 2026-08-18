@@ -94,6 +94,26 @@ describe('saved-market scanner lifecycle supervision', () => {
     });
   });
 
+  it('recovers from cumulative SQLite exhaustion after the contention window is quiet', () => {
+    expect(assessSavedMarketScannerHealth({
+      ...healthy,
+      sqlite: {
+        exhaustedWrites: 24,
+        lastExhaustedAt: '2026-08-18T14:44:59.999Z',
+      },
+      sqliteContentionWindowMs: 15 * 60_000,
+    })).toMatchObject({ state: 'healthy', degradedReason: null });
+
+    expect(assessSavedMarketScannerHealth({
+      ...healthy,
+      sqlite: {
+        exhaustedWrites: 24,
+        lastExhaustedAt: '2026-08-18T14:59:59.999Z',
+      },
+      sqliteContentionWindowMs: 15 * 60_000,
+    })).toMatchObject({ state: 'degraded', degradedReason: 'sqlite_contention' });
+  });
+
   it('does not restart a live owner during the terminal-persistence lease grace window', () => {
     expect(assessSavedMarketScannerHealth({
       ...healthy,

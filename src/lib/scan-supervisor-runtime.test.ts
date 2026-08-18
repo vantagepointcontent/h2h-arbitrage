@@ -83,6 +83,28 @@ describe('saved-market scan supervisor runtime inspection', () => {
     });
   });
 
+  it('clears cumulative SQLite contention after the bounded recovery window', async () => {
+    const result = await inspectSavedMarketScanner({
+      now,
+      healthSnapshot: {
+        sqliteContention: {
+          busyRetries: 100,
+          exhaustedWrites: 21,
+          lastBusyAt: '2026-08-18T16:00:00.000Z',
+          lastExhaustedAt: '2026-08-18T16:00:00.000Z',
+        },
+        scanWorkers: {
+          sqliteBusyRetries: 30,
+          sqliteExhaustedWrites: 3,
+          sqliteLastBusyAt: '2026-08-18T16:05:00.000Z',
+          sqliteLastExhaustedAt: '2026-08-18T16:05:00.000Z',
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ state: 'healthy', degradedReason: null });
+  });
+
   it('reports malformed telemetry JSON as an unusable source instead of healthy', async () => {
     mocks.readFile.mockImplementation(async (file: string) => {
       if (String(file).endsWith('scan-worker-telemetry-health.json')) return '{not-json';

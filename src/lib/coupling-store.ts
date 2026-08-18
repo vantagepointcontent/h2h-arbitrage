@@ -4,6 +4,7 @@ import { createClient, type Client, type Transaction } from '@libsql/client';
 const SQLITE_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
 let client: Client | null = null;
 let initialized = false;
+let initializationPromise: Promise<void> | null = null;
 
 export type CouplingExecutor = Pick<Client, 'execute'> | Pick<Transaction, 'execute'>;
 
@@ -34,8 +35,6 @@ export interface CanonicalManualMatch {
 function getClient(): Client {
   if (!client) {
     client = createClient({ url: `file:${SQLITE_PATH}` });
-    void client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
-    void client.execute('PRAGMA journal_mode = WAL').catch(() => {});
   }
   return client;
 }
@@ -52,9 +51,17 @@ export function couplingKey(kalshiTicker: string, pmConditionId: string): string
   return `v1:kalshi:${normalized.kalshiTicker}|polymarket:${normalized.pmConditionId}`;
 }
 
-export async function ensureCouplingStore(executor: CouplingExecutor = getClient()): Promise<void> {
-  if (executor === getClient() && initialized) return;
-  await executor.execute(`CREATE TABLE IF NOT EXISTS coupling_states (
+export async function ensureCouplingStore(executor?: CouplingExecutor): Promise<void> {
+  if (initialized) return;
+  if (!initializationPromise) {
+    const target = executor ?? getClient();
+    initializationPromise = (async () => {
+      // Disposable full-scan workers used to start a second client with
+      // fire-and-forget PRAGMAs while their publication transaction was open.
+      // Await only the connection-local timeout and coalesce schema checks so
+      // no background statement can collide with the authoritative commit.
+      if (!executor) await target.execute('PRAGMA busy_timeout = 5000');
+      await target.execute(`CREATE TABLE IF NOT EXISTS coupling_states (
     coupling_key TEXT PRIMARY KEY,
     kalshi_ticker TEXT NOT NULL,
     pm_condition_id TEXT NOT NULL,
@@ -67,8 +74,8 @@ export async function ensureCouplingStore(executor: CouplingExecutor = getClient
     updated_at TEXT NOT NULL,
     UNIQUE(kalshi_ticker, pm_condition_id)
   )`);
-  await executor.execute('CREATE INDEX IF NOT EXISTS idx_coupling_states_manual_match ON coupling_states(manual_match_id)');
-  await executor.execute(`CREATE TABLE IF NOT EXISTS manual_matches (
+      await target.execute('CREATE INDEX IF NOT EXISTS idx_coupling_states_manual_match ON coupling_states(manual_match_id)');
+      await target.execute(`CREATE TABLE IF NOT EXISTS manual_matches (
     id TEXT PRIMARY KEY,
     kalshi_ticker TEXT NOT NULL,
     pm_condition_id TEXT NOT NULL,
@@ -80,8 +87,14 @@ export async function ensureCouplingStore(executor: CouplingExecutor = getClient
     created_at TEXT NOT NULL,
     UNIQUE(kalshi_ticker, pm_condition_id)
   )`);
-  try { await executor.execute(`ALTER TABLE manual_matches ADD COLUMN orientation TEXT NOT NULL DEFAULT 'same'`); } catch { /* already migrated */ }
-  if (executor === getClient()) initialized = true;
+      try { await target.execute(`ALTER TABLE manual_matches ADD COLUMN orientation TEXT NOT NULL DEFAULT 'same'`); } catch { /* already migrated */ }
+      initialized = true;
+    })().catch((error) => {
+      initializationPromise = null;
+      throw error;
+    });
+  }
+  await initializationPromise;
 }
 
 function snapshot(row: Record<string, unknown>): CouplingSnapshot {

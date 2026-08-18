@@ -1,6 +1,7 @@
 const DEFAULT_HEARTBEAT_STALE_MS = 180_000;
 const DEFAULT_PROGRESS_STALE_MS = 60 * 60_000;
 const DEFAULT_STALE_LEASE_GRACE_MS = 30_000;
+const DEFAULT_SQLITE_CONTENTION_WINDOW_MS = 15 * 60_000;
 
 function latest(entries, key) {
   return entries
@@ -111,7 +112,10 @@ export function assessSavedMarketScannerHealth(input) {
   if (input.sqlite?.readable === false) {
     return degraded('sqlite_source_unusable', input.sqlite.error ?? 'SQLite contention metrics are unavailable');
   }
-  if ((input.sqlite?.exhaustedWrites ?? 0) > 0) {
+  const lastSqliteExhaustionMs = Date.parse(input.sqlite?.lastExhaustedAt ?? '');
+  const sqliteContentionRecent = !Number.isFinite(lastSqliteExhaustionMs)
+    || now - lastSqliteExhaustionMs <= (input.sqliteContentionWindowMs ?? DEFAULT_SQLITE_CONTENTION_WINDOW_MS);
+  if ((input.sqlite?.exhaustedWrites ?? 0) > 0 && sqliteContentionRecent) {
     return degraded('sqlite_contention', `${input.sqlite.exhaustedWrites} SQLite scanner write(s) exhausted retry budget`);
   }
   if (input.telemetry?.readable === false) {

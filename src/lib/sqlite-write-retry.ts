@@ -2,6 +2,7 @@ export interface SqliteContentionMetrics {
   busyRetries: number;
   exhaustedWrites: number;
   lastBusyAt: string | null;
+  lastExhaustedAt: string | null;
 }
 
 interface RetryOptions {
@@ -13,6 +14,7 @@ let metrics: SqliteContentionMetrics = {
   busyRetries: 0,
   exhaustedWrites: 0,
   lastBusyAt: null,
+  lastExhaustedAt: null,
 };
 
 function sqliteCode(error: unknown): string {
@@ -50,6 +52,7 @@ export async function withSqliteBusyRetry<T>(
       metrics.lastBusyAt = new Date().toISOString();
       if (attempt >= maxAttempts) {
         metrics.exhaustedWrites += 1;
+        metrics.lastExhaustedAt = metrics.lastBusyAt;
         throw error;
       }
       metrics.busyRetries += 1;
@@ -62,6 +65,6 @@ export async function withSqliteBusyRetry<T>(
 
 export function getSqliteContentionMetrics(reset = false): SqliteContentionMetrics {
   const snapshot = { ...metrics };
-  if (reset) metrics = { busyRetries: 0, exhaustedWrites: 0, lastBusyAt: null };
+  if (reset) metrics = { busyRetries: 0, exhaustedWrites: 0, lastBusyAt: null, lastExhaustedAt: null };
   return snapshot;
 }

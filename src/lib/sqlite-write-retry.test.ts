@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSqliteContentionMetrics, withSqliteBusyRetry } from './sqlite-write-retry';
 
 describe('withSqliteBusyRetry', () => {
   beforeEach(() => getSqliteContentionMetrics(true));
+  afterEach(() => vi.useRealTimers());
 
   it('retries SQLITE_BUSY with a bounded policy and records contention', async () => {
     let attempts = 0;
@@ -24,5 +25,19 @@ describe('withSqliteBusyRetry', () => {
       throw new Error('bad input');
     })).rejects.toThrow('bad input');
     expect(attempts).toBe(1);
+  });
+
+  it('timestamps exhausted writes so health can recover after a quiet window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-18T18:00:00.000Z'));
+
+    await expect(withSqliteBusyRetry(async () => {
+      throw Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' });
+    }, { maxAttempts: 1, baseDelayMs: 0 })).rejects.toThrow('database is locked');
+
+    expect(getSqliteContentionMetrics()).toMatchObject({
+      exhaustedWrites: 1,
+      lastExhaustedAt: '2026-08-18T18:00:00.000Z',
+    });
   });
 });

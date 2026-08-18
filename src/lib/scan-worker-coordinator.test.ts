@@ -123,7 +123,12 @@ describe('ScanWorkerCoordinator', () => {
     workers[0].emit('message', {
       type: 'result',
       response: { status: 200, headers: {}, body: '{}' },
-      sqliteContention: { busyRetries: 9, exhaustedWrites: 2, lastBusyAt: '2026-08-18T16:00:00.000Z' },
+      sqliteContention: {
+        busyRetries: 9,
+        exhaustedWrites: 2,
+        lastBusyAt: '2026-08-18T16:00:00.000Z',
+        lastExhaustedAt: '2026-08-18T15:59:59.000Z',
+      },
     });
 
     await pending;
@@ -131,6 +136,7 @@ describe('ScanWorkerCoordinator', () => {
       sqliteBusyRetries: 9,
       sqliteExhaustedWrites: 2,
       sqliteLastBusyAt: '2026-08-18T16:00:00.000Z',
+      sqliteLastExhaustedAt: '2026-08-18T15:59:59.000Z',
     });
   });
 

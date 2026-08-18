@@ -142,12 +142,16 @@ export async function inspectSavedMarketScanner(options = {}) {
   const applicationHealth = await readApplicationHealth(options);
   const applicationSqlite = applicationHealth?.sqliteContention;
   const workerSqlite = applicationHealth?.scanWorkers;
+  const exhaustionTimes = [applicationSqlite?.lastExhaustedAt, workerSqlite?.sqliteLastExhaustedAt]
+    .filter((value) => Number.isFinite(Date.parse(value)))
+    .sort();
   const sqlite = applicationSqlite
     ? {
       readable: applicationSqlite.readable !== false,
       busyRetries: (Number(applicationSqlite.busyRetries) || 0) + (Number(workerSqlite?.sqliteBusyRetries) || 0),
       exhaustedWrites: (Number(applicationSqlite.exhaustedWrites) || 0) + (Number(workerSqlite?.sqliteExhaustedWrites) || 0),
       lastBusyAt: workerSqlite?.sqliteLastBusyAt ?? applicationSqlite.lastBusyAt ?? null,
+      lastExhaustedAt: exhaustionTimes.at(-1) ?? null,
     }
     : { readable: false, error: 'Application health did not expose sqliteContention metrics' };
   let scheduler;

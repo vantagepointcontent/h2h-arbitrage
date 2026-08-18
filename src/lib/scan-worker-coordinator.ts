@@ -83,6 +83,7 @@ export interface ScanWorkerMetrics {
   sqliteBusyRetries: number;
   sqliteExhaustedWrites: number;
   sqliteLastBusyAt: string | null;
+  sqliteLastExhaustedAt: string | null;
 }
 
 export function resolveScanWorkerPath(
@@ -147,6 +148,7 @@ export class ScanWorkerCoordinator {
     sqliteBusyRetries: 0,
     sqliteExhaustedWrites: 0,
     sqliteLastBusyAt: null,
+    sqliteLastExhaustedAt: null,
   };
 
   constructor(options: ScanWorkerCoordinatorOptions = {}) {
@@ -188,12 +190,13 @@ export class ScanWorkerCoordinator {
         response?: ScanWorkerResponse;
         error?: string;
         telemetry?: RateLimiterMetricRecord[];
-        sqliteContention?: { busyRetries?: number; exhaustedWrites?: number; lastBusyAt?: string | null };
+        sqliteContention?: { busyRetries?: number; exhaustedWrites?: number; lastBusyAt?: string | null; lastExhaustedAt?: string | null };
       };
       if (envelope.sqliteContention) {
         this.metrics.sqliteBusyRetries += Math.max(0, Number(envelope.sqliteContention.busyRetries) || 0);
         this.metrics.sqliteExhaustedWrites += Math.max(0, Number(envelope.sqliteContention.exhaustedWrites) || 0);
         if (envelope.sqliteContention.lastBusyAt) this.metrics.sqliteLastBusyAt = envelope.sqliteContention.lastBusyAt;
+        if (envelope.sqliteContention.lastExhaustedAt) this.metrics.sqliteLastExhaustedAt = envelope.sqliteContention.lastExhaustedAt;
       }
       if (envelope.type === 'result' && envelope.response) {
         void this.acceptTelemetry(job.id, envelope.telemetry ?? [])
