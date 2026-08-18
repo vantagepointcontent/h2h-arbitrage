@@ -32,6 +32,7 @@ describe('operator capacity gates', () => {
     expect(monitor).toContain("process.env.pm_id !== undefined");
     expect(retention).toContain("process.env.pm_id !== undefined");
     expect(supervisor).toContain('assessSavedMarketScannerHealth');
+    expect(supervisor).toContain("process.env.pm_id !== undefined");
     expect(supervisor).toContain("'h2h-poller'");
     expect(supervisor).toContain('.corrupt.');
     expect(healthRoute).toContain('saved-market-scanner-health.json');

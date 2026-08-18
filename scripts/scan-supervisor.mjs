@@ -63,7 +63,7 @@ export async function inspectSavedMarketScanner(options = {}) {
   });
   let recoveryAction = null;
   if (result.degradedReason === 'disk_capacity') {
-    const target = Number(process.env.H2H_DISK_RECOVERY_FREE_BYTES) || 17_000_000_000;
+    const target = Number(process.env.H2H_DISK_RECOVERY_FREE_BYTES) || 21_000_000_000;
     const requiredReclaimBytes = Math.max(0, target - diskSnapshot.freeBytes);
     if (requiredReclaimBytes > 0 && now - lastRetentionAt >= RETENTION_COOLDOWN_MS) {
       const retention = await enforceBackupRetention({ root: ROOT, live: true, requiredReclaimBytes });
@@ -95,4 +95,5 @@ async function main() {
   } while (daemon);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main();
+if ((process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  || process.env.pm_id !== undefined) void main();
