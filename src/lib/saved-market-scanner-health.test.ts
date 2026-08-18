@@ -94,6 +94,20 @@ describe('saved-market scanner lifecycle supervision', () => {
     });
   });
 
+  it('does not restart a live owner during the terminal-persistence lease grace window', () => {
+    expect(assessSavedMarketScannerHealth({
+      ...healthy,
+      scheduler: {
+        readable: true,
+        entries: [{
+          inProgress: true,
+          leaseExpiresAt: '2026-08-18T14:59:50.000Z',
+          leaseToken: 'finishing-worker',
+        }],
+      },
+    })).toMatchObject({ state: 'healthy', degradedReason: null, restartRecommended: false });
+  });
+
   it.each([
     ['worker crash or PM2/server restart', { pollerHealth: { ...healthy.pollerHealth, heartbeatAt: '2026-08-18T14:50:00.000Z' } }, 'poller_heartbeat_stale'],
     ['release promotion with an old poller generation', { expectedSchedulerVersion: 'bug-165-v1', pollerHealth: { ...healthy.pollerHealth, schedulerVersion: 'bug-150-v1' } }, 'poller_version_mismatch'],

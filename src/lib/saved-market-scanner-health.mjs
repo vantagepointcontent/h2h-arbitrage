@@ -1,5 +1,6 @@
 const DEFAULT_HEARTBEAT_STALE_MS = 180_000;
 const DEFAULT_PROGRESS_STALE_MS = 60 * 60_000;
+const DEFAULT_STALE_LEASE_GRACE_MS = 30_000;
 
 function latest(entries, key) {
   return entries
@@ -97,7 +98,7 @@ export function assessSavedMarketScannerHealth(input) {
   }
   const staleLease = entries.find((entry) => entry?.inProgress
     && Number.isFinite(Date.parse(entry.leaseExpiresAt))
-    && Date.parse(entry.leaseExpiresAt) <= now);
+    && Date.parse(entry.leaseExpiresAt) + (input.staleLeaseGraceMs ?? DEFAULT_STALE_LEASE_GRACE_MS) <= now);
   if (staleLease) return degraded('stale_lease', `Expired scanner lease ${staleLease.leaseToken ?? 'unknown'} remains in progress`, true);
 
   const heartbeatAt = Date.parse(poller?.heartbeatAt ?? '');
