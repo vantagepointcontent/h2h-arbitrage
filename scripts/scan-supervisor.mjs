@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { enforceBackupRetention } from './backup-retention.mjs';
 import { evaluateDiskCapacity, readDiskCapacitySnapshot } from '../src/lib/disk-capacity.mjs';
-import { assessSavedMarketScannerHealth } from '../src/lib/saved-market-scanner-health.mjs';
+import { assessSavedMarketScannerHealth, deriveScannerQueue } from '../src/lib/saved-market-scanner-health.mjs';
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,14 +37,30 @@ export async function inspectSavedMarketScanner(options = {}) {
   const active = path.join(ROOT, '.h2h-releases', 'active');
   const manifest = await readJson(path.join(active, 'release-manifest.json'), {});
   const workerPath = path.join(active, '.next', 'full-scan-worker.cjs');
-  const pollerHealth = await readJson(path.join(DATA, 'poller-health.json'));
+  let pollerHealth = await readJson(path.join(DATA, 'poller-health.json'));
   const telemetry = await readJson(path.join(DATA, 'scan-worker-telemetry-health.json'), {});
   let scheduler;
+  let schedulerState = {};
   try {
     const value = JSON.parse(await readFile(SCHEDULER_FILE, 'utf8'));
-    scheduler = { readable: value && typeof value === 'object' && !Array.isArray(value), entries: Object.values(value ?? {}) };
+    schedulerState = value ?? {};
+    scheduler = { readable: value && typeof value === 'object' && !Array.isArray(value), entries: Object.values(schedulerState) };
   } catch (error) {
     scheduler = { readable: false, entries: [], error: error instanceof Error ? error.message : String(error) };
+  }
+  if (scheduler.readable && !pollerHealth?.queue) {
+    const markets = await readJson(path.join(DATA, 'saved-markets.json'), []);
+    const eligibleEntries = markets
+      .filter((market) => market?.kalshiUrl && market?.polymarketUrl)
+      .filter((market) => !market.expiryDate
+        || Date.parse(market.expiryDate) > now
+        || market.lastScanResult?.priceResolved === false)
+      .map((market) => schedulerState[market.id])
+      .filter(Boolean);
+    pollerHealth = {
+      ...pollerHealth,
+      queue: deriveScannerQueue(eligibleEntries, now, Number(pollerHealth?.freshnessSlaMs) || 60 * 60_000),
+    };
   }
   const diskSnapshot = await readDiskCapacitySnapshot('/');
   const disk = evaluateDiskCapacity('scan', diskSnapshot, {

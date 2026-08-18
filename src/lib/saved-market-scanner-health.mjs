@@ -9,6 +9,32 @@ function latest(entries, key) {
     .at(-1) ?? null;
 }
 
+export function deriveScannerQueue(entries, now = Date.now(), freshnessSlaMs = 60 * 60_000) {
+  let dueCount = 0;
+  let overdueCount = 0;
+  let failedCount = 0;
+  let inProgressCount = 0;
+  let oldestSuccessAgeMs = 0;
+  for (const entry of entries) {
+    const inProgress = entry?.inProgress === true;
+    if (inProgress) inProgressCount += 1;
+    else if (Date.parse(entry?.nextDueAt ?? '') <= now) dueCount += 1;
+    if (entry?.failureReason) failedCount += 1;
+    const successAt = Date.parse(entry?.lastSuccessAt ?? '');
+    const age = Number.isFinite(successAt) ? Math.max(0, now - successAt) : freshnessSlaMs + 1;
+    if (age > freshnessSlaMs) overdueCount += 1;
+    oldestSuccessAgeMs = Math.max(oldestSuccessAgeMs, age);
+  }
+  return {
+    eligibleCount: entries.length,
+    dueCount,
+    overdueCount,
+    failedCount,
+    inProgressCount,
+    oldestSuccessAgeMs,
+  };
+}
+
 export function assessSavedMarketScannerHealth(input) {
   const now = Number.isFinite(input.now) ? input.now : Date.now();
   const poller = input.pollerHealth ?? null;

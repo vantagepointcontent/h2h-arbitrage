@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessSavedMarketScannerHealth } from './saved-market-scanner-health.mjs';
+import { assessSavedMarketScannerHealth, deriveScannerQueue } from './saved-market-scanner-health.mjs';
 
 const now = Date.parse('2026-08-18T15:00:00.000Z');
 const healthy = {
@@ -28,6 +28,21 @@ const healthy = {
 };
 
 describe('saved-market scanner lifecycle supervision', () => {
+  it('derives queue truth from scheduler state while a new cycle has not published its queue yet', () => {
+    expect(deriveScannerQueue([
+      { nextDueAt: '2026-08-18T14:00:00.000Z', lastSuccessAt: '2026-08-18T13:00:00.000Z', failureReason: 'HTTP 500', inProgress: false },
+      { nextDueAt: '2026-08-18T16:00:00.000Z', lastSuccessAt: '2026-08-18T14:59:30.000Z', failureReason: null, inProgress: false },
+      { nextDueAt: '2026-08-18T14:00:00.000Z', lastSuccessAt: null, failureReason: null, inProgress: true },
+    ], now, 3_600_000)).toEqual({
+      eligibleCount: 3,
+      dueCount: 1,
+      overdueCount: 2,
+      failedCount: 1,
+      inProgressCount: 1,
+      oldestSuccessAgeMs: 7_200_000,
+    });
+  });
+
   it('keeps price-feed connectivity outside full-scan health and reports a healthy progressing scanner', () => {
     expect(assessSavedMarketScannerHealth(healthy)).toMatchObject({ state: 'healthy', degradedReason: null });
   });
