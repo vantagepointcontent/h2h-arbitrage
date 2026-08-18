@@ -36,7 +36,6 @@ import {
   recordBotPosition,
   type AuthoritativeBotFeeConfig,
   type BotPositionExecutionMode,
-  type BotPositionSide,
 } from './bot-positions';
 import { sendTelegramMessage, getConfigResolved, isPausedResolved } from './telegram-alerts';
 import { appendBotActionLog, type BotActionStatus } from './bot-action-log';
@@ -44,7 +43,6 @@ import { createBotMessage, updateBotMessage, type BotMessageType } from './bot-t
 import logger from './logger';
 import type { BotSelectionMethod } from './bot-candidate-selection';
 import { calculateKalshiFeeQuote, type KalshiFeeAuthority } from './kalshi-fee-quote';
-import type { BotLegRelationshipState } from './bot-leg-identity';
 import {
   buildExecutionEvidence,
   isAnalyticsEligible,
@@ -98,13 +96,6 @@ export interface BotTradeInput {
   /** Exact selected outcome labels; contract side is captured separately. */
   kalshiOutcomeLabel?: string | null;
   pmOutcomeLabel?: string | null;
-  kalshiMarketQuestion?: string | null;
-  pmMarketQuestion?: string | null;
-  /** Exact structured contract sides selected by the arbitrage engine. */
-  kalshiSide?: BotPositionSide;
-  pmSide?: BotPositionSide;
-  relationshipState?: BotLegRelationshipState;
-  relationshipExplanation?: string | null;
   /** Canonical backend verification for the exact selected leg relationship. */
   relationshipVerified?: boolean;
   strategy: string;
@@ -463,17 +454,47 @@ function pickLegPrices(strategy: string, input: BotTradeInput): {
   pmOutcome: 'yes' | 'no';
   supported: boolean;
 } {
-  if (input.kalshiSide && input.pmSide) {
+  const strategyLower = (strategy || '').toLowerCase();
+
+  // Cross-outcome: buy YES on both platforms.
+  if (strategyLower.includes('both sides')) {
     return {
-      kalshiPrice: input.kalshiSide === 'yes' ? input.kalshiYesAsk ?? null : input.kalshiNoAsk ?? null,
-      pmPrice: input.pmSide === 'yes' ? input.pmYesAsk ?? null : input.pmNoAsk ?? null,
-      kalshiOutcome: input.kalshiSide,
-      pmOutcome: input.pmSide,
+      kalshiPrice: input.kalshiYesAsk ?? null,
+      pmPrice: input.pmYesAsk ?? null,
+      kalshiOutcome: 'yes',
+      pmOutcome: 'yes',
       supported: true,
     };
   }
-  void strategy;
-  // Fail closed: execution identity must come from canonical structured sides.
+
+  // Same-platform internal arbs are not bot-tradeable (they require two Kalshi
+  // or two PM orders on related outcomes; we only support two-leg cross-platform
+  // for the bot's initial release).
+  if (strategyLower.startsWith('same-platform')) {
+    return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'yes', supported: false };
+  }
+
+  if (strategyLower.includes('yes kalshi')) {
+    return {
+      kalshiPrice: input.kalshiYesAsk ?? null,
+      pmPrice: input.pmNoAsk ?? null,
+      kalshiOutcome: 'yes',
+      pmOutcome: 'no',
+      supported: true,
+    };
+  }
+
+  if (strategyLower.includes('yes pm')) {
+    return {
+      kalshiPrice: input.kalshiNoAsk ?? null,
+      pmPrice: input.pmYesAsk ?? null,
+      kalshiOutcome: 'no',
+      pmOutcome: 'yes',
+      supported: true,
+    };
+  }
+
+  // Never guess from unknown strategy text: that can buy the opposite contract.
   return { kalshiPrice: null, pmPrice: null, kalshiOutcome: 'yes', pmOutcome: 'no', supported: false };
 }
 
@@ -485,24 +506,29 @@ function botTradeLegIdentity(input: BotTradeInput) {
     kalshi: { outcomeLabel: kalshiOutcome, side: legs.kalshiOutcome },
     polymarket: { outcomeLabel: pmOutcome, side: legs.pmOutcome },
   };
-  if (!legs.supported || !kalshiOutcome || !pmOutcome || !input.relationshipState) return {
+  if (!legs.supported || !kalshiOutcome || !pmOutcome) return {
     ...base,
     relationship: { state: 'legacy_unknown', label: 'Legacy / unknown', explanation: 'Outcome metadata missing; no relationship was inferred.' },
   } as const;
-  const labels: Record<BotLegRelationshipState, string> = {
-    verified_complementary: 'Verified complementary',
-    same_direction: 'Same-direction',
-    invalid: 'Invalid relationship',
-    legacy_unknown: 'Legacy / unknown',
-  };
+  const sameOutcome = kalshiOutcome.toLocaleLowerCase() === pmOutcome.toLocaleLowerCase();
+  const sameSide = legs.kalshiOutcome === legs.pmOutcome;
+  if (sameOutcome && sameSide) return {
+    ...base,
+    relationship: { state: 'same_direction', label: 'Same-direction', explanation: 'Both legs select the same outcome and side.' },
+  } as const;
+  if (input.relationshipVerified === true
+      && ((sameOutcome && !sameSide) || (!sameOutcome && sameSide))) return {
+    ...base,
+    relationship: { state: 'verified_complementary', label: 'Verified complementary', explanation: 'The persisted exact legs are verified complementary propositions.' },
+  } as const;
+  if (input.relationshipVerified !== true) return {
+    ...base,
+    relationship: { state: 'legacy_unknown', label: 'Legacy / unknown', explanation: 'Exact outcomes are available, but no persisted backend relationship verification exists; no relationship was inferred.' },
+  } as const;
   return {
     ...base,
-    relationship: {
-      state: input.relationshipState,
-      label: labels[input.relationshipState],
-      explanation: input.relationshipExplanation?.trim() || 'Canonical backend relationship state persisted for the exact selected legs.',
-    },
-  };
+    relationship: { state: 'invalid', label: 'Invalid relationship', explanation: 'The persisted exact legs are not a verified complementary pair.' },
+  } as const;
 }
 
 function escapeTelegramHtml(value: string): string {
@@ -579,8 +605,9 @@ export function evaluateBotTrade(
 
   const legs = pickLegPrices(input.strategy, input);
   if (!legs.supported) reasons.push(`Unsupported strategy: ${input.strategy || '(empty)'}`);
-  if (input.relationshipState !== 'verified_complementary') {
-    reasons.push('Canonical complementary relationship evidence is unavailable');
+  if (input.strategy.startsWith('Buy YES both sides:')
+      && (input.crossOutcomeMutuallyExclusiveVerified !== true || input.crossOutcomeExhaustiveVerified !== true)) {
+    reasons.push('Cross-outcome resolution evidence is unavailable');
   }
   if (legs.kalshiPrice == null || legs.pmPrice == null) {
     reasons.push('Missing tradeable ask price on one or both legs');
@@ -886,13 +913,7 @@ export async function maybeExecuteBotTrade(
   }).catch((error) => logger.warn('[bot-trader] action log failed', { tradeId, step, error: String(error) }));
 
   await log('detection', `Scan found arb: ROI ${input.roiPct.toFixed(2)}%, APY ${(input.apyPct ?? 0).toFixed(2)}%, ${input.marketTitle}`, 'passed', {
-    requestPayload: {
-      pairId: input.pairId,
-      outcome: input.outcome,
-      strategy: input.strategy,
-      venueQuestions: { kalshi: input.kalshiMarketQuestion ?? null, polymarket: input.pmMarketQuestion ?? null },
-      legIdentity: botTradeLegIdentity(input),
-    },
+    requestPayload: { pairId: input.pairId, outcome: input.outcome, strategy: input.strategy },
   });
   const settings = await getBotSettings();
 
@@ -1121,7 +1142,6 @@ export async function maybeExecuteBotTrade(
         ? liveEvidenceToBotPositionFill(performanceEvidence)
         : getAuthoritativeMatchedFill(result);
       if (entryLegs.kalshiPrice != null && entryLegs.pmPrice != null && fill) {
-        const identity = botTradeLegIdentity(input);
         await recordBotPosition({
           executionId,
           executionMode,
@@ -1131,12 +1151,6 @@ export async function maybeExecuteBotTrade(
           pmConditionId: execReq.pmConditionId ?? null,
           strategy: input.strategy,
           relationshipVerified: input.relationshipVerified,
-          kalshiMarketQuestion: input.kalshiMarketQuestion ?? null,
-          pmMarketQuestion: input.pmMarketQuestion ?? null,
-          kalshiOutcomeLabel: identity.kalshi.outcomeLabel,
-          pmOutcomeLabel: identity.polymarket.outcomeLabel,
-          relationshipState: identity.relationship.state,
-          relationshipExplanation: identity.relationship.explanation,
           kalshiSide: entryLegs.kalshiOutcome,
           pmSide: entryLegs.pmOutcome,
           kalshiPrice: fill.kalshiPrice,
@@ -1233,9 +1247,7 @@ export async function sendBotExecutionAlert(
     `${emoji} <b>BotTrader ${status} — ${modeLabel}</b>`,
     '',
     `<b>Market:</b> ${escapeTelegramHtml(input.marketTitle)}`,
-    `<b>Kalshi question:</b> ${escapeTelegramHtml(input.kalshiMarketQuestion ?? 'Market question metadata missing')}`,
     `<b>Kalshi:</b> ${kalshiOutcome} — ${identity.kalshi.side.toUpperCase()}`,
-    `<b>Polymarket question:</b> ${escapeTelegramHtml(input.pmMarketQuestion ?? 'Market question metadata missing')}`,
     `<b>Polymarket:</b> ${pmOutcome} — ${identity.polymarket.side.toUpperCase()}`,
     `<b>Relationship:</b> ${identity.relationship.label} — ${identity.relationship.explanation}`,
     `<b>Strategy:</b> ${escapeTelegramHtml(input.strategy)}`,
@@ -1335,15 +1347,9 @@ export function unifiedOutcomeToBotInput(
     pairId,
     marketTitle,
     outcome: outcome.artist,
-    kalshiMarketQuestion: a.selectedKalshiMarketQuestion ?? outcome.kalshiMarketQuestion ?? null,
-    pmMarketQuestion: a.selectedPmMarketQuestion ?? outcome.pmMarketQuestion ?? null,
-    kalshiOutcomeLabel: a.selectedKalshiOutcomeLabel ?? outcome.kalshiOutcomeLabel ?? null,
-    pmOutcomeLabel: a.selectedPmOutcomeLabel ?? outcome.pmOutcomeLabel ?? null,
-    relationshipVerified: a.selectedRelationshipState === 'verified_complementary',
-    relationshipState: a.selectedRelationshipState,
-    relationshipExplanation: a.selectedRelationshipExplanation ?? null,
-    kalshiSide: a.selectedKalshiSide,
-    pmSide: a.selectedPmSide,
+    kalshiOutcomeLabel: outcome.artist,
+    pmOutcomeLabel: a.arbType === 'direct' ? outcome.artist : null,
+    relationshipVerified: a.arbType === 'direct' && outcome.polymarket?.binaryVerified === true,
     strategy: a.strategy,
     roiPct: a.roiPct,
     apyPct: a.apyPct ?? null,
@@ -1378,15 +1384,10 @@ export function liveArbResultToBotInput(
     pairId,
     marketTitle,
     outcome: result.artist,
-    kalshiMarketQuestion: result.kalshiMarketQuestion ?? null,
-    pmMarketQuestion: result.pmMarketQuestion ?? null,
     kalshiOutcomeLabel: result.kalshiOutcomeLabel ?? null,
     pmOutcomeLabel: result.pmOutcomeLabel ?? null,
-    relationshipVerified: result.relationshipState === 'verified_complementary',
-    relationshipState: result.relationshipState,
-    relationshipExplanation: result.relationshipExplanation ?? null,
-    kalshiSide: result.kalshiSide,
-    pmSide: result.pmSide,
+    relationshipVerified: result.arbType === 'direct'
+      || (result.crossOutcomeMutuallyExclusiveVerified === true && result.crossOutcomeExhaustiveVerified === true),
     strategy: result.strategy,
     roiPct: result.roiPct,
     apyPct: null,

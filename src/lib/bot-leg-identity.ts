@@ -25,10 +25,6 @@ interface PositionIdentitySource {
   marketTitle?: string | null;
   kalshiMarketQuestion?: string | null;
   pmMarketQuestion?: string | null;
-  kalshiOutcomeLabel?: string | null;
-  pmOutcomeLabel?: string | null;
-  relationshipState?: BotLegRelationshipState | null;
-  relationshipExplanation?: string | null;
   kalshiTicker?: string | null;
   pmConditionId?: string | null;
   kalshiSide: 'yes' | 'no';
@@ -44,32 +40,8 @@ interface PersistedMarketIdentityMetadata {
     kalshiTicker?: string | null;
     pmConditionId?: string | null;
   }> | null;
-  allArbs?: Array<{
-    artist?: string | null;
-    kalshiTicker?: string | null;
-    pmConditionId?: string | null;
-    kalshiMarketQuestion?: string | null;
-    pmMarketQuestion?: string | null;
-  }> | null;
   mutuallyExclusiveVerified?: boolean;
   exhaustiveVerified?: boolean;
-}
-
-function canonicalRelationship(
-  state: BotLegRelationshipState,
-  persistedExplanation?: string | null,
-): BotPositionIdentity['relationship'] {
-  const explanation = persistedExplanation?.trim();
-  switch (state) {
-    case 'verified_complementary':
-      return { state, label: 'Verified complementary', explanation: explanation || 'The backend canonically verified the exact persisted legs as complementary propositions.' };
-    case 'same_direction':
-      return { state, label: 'Same-direction', explanation: explanation || 'The backend canonically classified the exact persisted legs as the same-direction proposition.' };
-    case 'invalid':
-      return { state, label: 'Invalid relationship', explanation: explanation || 'The backend canonically classified the exact persisted leg relationship as invalid.' };
-    default:
-      return { state, label: 'Legacy / unknown', explanation: explanation || 'No canonical persisted relationship state is available; no relationship was inferred.' };
-  }
 }
 
 const normalize = (value: string | null | undefined) => value?.trim().toLocaleLowerCase() ?? '';
@@ -88,39 +60,19 @@ function uniqueOutcome(
   return labels.length === 1 ? labels[0] : null;
 }
 
-function uniqueMetadataValue(
-  rows: NonNullable<PersistedMarketIdentityMetadata['allArbs']>,
-  key: 'kalshiTicker' | 'pmConditionId',
-  identifier: string | null | undefined,
-  valueKey: 'kalshiMarketQuestion' | 'pmMarketQuestion',
-): string | null {
-  const target = normalize(identifier);
-  if (!target) return null;
-  const values = [...new Set(rows
-    .filter((row) => normalize(row[key]) === target)
-    .map((row) => row[valueKey]?.trim())
-    .filter((value): value is string => Boolean(value)))];
-  return values.length === 1 ? values[0] : null;
-}
-
 export function buildBotLegIdentity(
   position: PositionIdentitySource,
   metadata: PersistedMarketIdentityMetadata | null | undefined,
 ): BotPositionIdentity {
-  const pairs = [...(metadata?.matchedPairs ?? []), ...(metadata?.allArbs ?? [])];
+  const pairs = metadata?.matchedPairs ?? [];
   // A shared event title is not a venue contract question. Only expose exact,
   // explicitly persisted per-venue questions; never manufacture one by fallback.
-  const arbs = metadata?.allArbs ?? [];
   const kalshiQuestion = position.kalshiMarketQuestion?.trim()
-    || uniqueMetadataValue(arbs, 'kalshiTicker', position.kalshiTicker, 'kalshiMarketQuestion')
     || metadata?.kalshiMarketQuestion?.trim() || null;
   const pmQuestion = position.pmMarketQuestion?.trim()
-    || uniqueMetadataValue(arbs, 'pmConditionId', position.pmConditionId, 'pmMarketQuestion')
     || metadata?.pmMarketQuestion?.trim() || null;
-  const kalshiOutcome = position.kalshiOutcomeLabel?.trim()
-    || uniqueOutcome(pairs, 'kalshiTicker', position.kalshiTicker);
-  const pmOutcome = position.pmOutcomeLabel?.trim()
-    || uniqueOutcome(pairs, 'pmConditionId', position.pmConditionId);
+  const kalshiOutcome = uniqueOutcome(pairs, 'kalshiTicker', position.kalshiTicker);
+  const pmOutcome = uniqueOutcome(pairs, 'pmConditionId', position.pmConditionId);
   const kalshi: BotLegIdentity = {
     marketQuestion: kalshiQuestion,
     outcomeLabel: kalshiOutcome,
@@ -133,14 +85,6 @@ export function buildBotLegIdentity(
     side: position.pmSide,
     metadataStatus: pmOutcome && pmQuestion ? 'available' : 'missing',
   };
-
-  if (position.relationshipState) {
-    return {
-      kalshi,
-      polymarket,
-      relationship: canonicalRelationship(position.relationshipState, position.relationshipExplanation),
-    };
-  }
 
   if (!kalshiOutcome || !pmOutcome) {
     return {
