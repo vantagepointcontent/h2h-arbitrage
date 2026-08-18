@@ -461,7 +461,6 @@ export async function saveScanResult(
     expiryAt?: string | null;
     outcomeApy?: OutcomeContingentApy;
     calculationEnvelope?: CalculationEnvelope | null;
-    calculationEnvelope?: CalculationEnvelope | null;
   },
 ): Promise<{ id: number }> {
   await ensureDb();
@@ -2042,6 +2041,25 @@ export async function appendScanHistory(entry: ScanHistoryEntry): Promise<void> 
 // auto-execute's in-memory auditLog is lost on every pm2 restart; this
 // table is the durable record backing the Trades page.
 
+export async function migrateExecutionsSchema(
+  c: ReturnType<typeof createClient>,
+): Promise<void> {
+  // Migration order matters: CREATE TABLE IF NOT EXISTS never alters an existing table.
+  for (const ddl of [
+    `ALTER TABLE executions ADD COLUMN steps TEXT`,
+    `ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`,
+    `ALTER TABLE executions ADD COLUMN selection_method TEXT`,
+    `ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`,
+    `ALTER TABLE executions ADD COLUMN calculation_envelope TEXT`,
+  ]) {
+    try { await c.execute(ddl); } catch { /* column already exists */ }
+  }
+  await c.execute({
+    sql: `UPDATE executions SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
+    args: [JSON.stringify(legacyUnverifiableEnvelope('legacy execution', 'execution'))],
+  });
+}
+
 let _executionsReady = false;
 async function ensureExecutionsTable(): Promise<void> {
   if (_executionsReady) return;
@@ -2066,19 +2084,7 @@ async function ensureExecutionsTable(): Promise<void> {
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
-  // Migration: add steps column if missing (existing DBs)
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN steps TEXT`); } catch { /* column already exists */ }
-  // FEAT-040: add source column for manual vs bot execution tracking
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`); } catch { /* column already exists */ }
-  // DATA-003: immutable attribution captured when BotTrader selects a trade.
-  // Existing rows remain NULL: historical intent must never be guessed.
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN selection_method TEXT`); } catch { /* column already exists */ }
-  // BUG-157: immutable two-leg fill and fee authority captured by BotTrader.
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`); } catch { /* column already exists */ }
-  await c.execute({
-    sql: `UPDATE executions SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
-    args: [JSON.stringify(legacyUnverifiableEnvelope('legacy execution', 'execution'))],
-  });
+  await migrateExecutionsSchema(c);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
   _executionsReady = true;
 }
@@ -2099,7 +2105,6 @@ export interface ExecutionRecord {
   source?: 'manual' | 'bot';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
   botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
-  calculationEnvelope?: CalculationEnvelope;
   calculationEnvelope?: CalculationEnvelope;
 }
 
@@ -2282,7 +2287,7 @@ async function ensureClosedPositionsTable(): Promise<void> {
   if (!(columns.rows as any[]).some((row) => String(row.name) === 'execution_mode')) {
     await c.execute(`ALTER TABLE closed_positions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'live'`);
   }
-  if (!(columns.rows as Array<{ name: unknown }>).some((row) => String(row.name) === 'calculation_envelope')) {
+  if (!columns.rows.some((row) => String(row.name) === 'calculation_envelope')) {
     await c.execute(`ALTER TABLE closed_positions ADD COLUMN calculation_envelope TEXT`);
   }
   columns = await c.execute(`PRAGMA table_info(closed_positions)`);
