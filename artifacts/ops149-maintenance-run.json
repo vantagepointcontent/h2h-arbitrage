@@ -1,0 +1,84 @@
+{
+  "mode": "sweep",
+  "dryRun": false,
+  "disk": {
+    "totalBytes": 82069934080,
+    "usedBytes": 68013600768,
+    "freeBytes": 14056333312,
+    "usagePct": 83,
+    "freeGb": 14.056333312
+  },
+  "candidateCount": 522,
+  "protected": 0,
+  "pruneCaches": 0,
+  "removeWorktree": 0,
+  "bytesReclaimed": 0,
+  "metrics": {
+    "ts": "2026-08-18T14:16:17.360Z",
+    "dryRun": false,
+    "mode": "sweep",
+    "disk": {
+      "totalBytes": 82069934080,
+      "usedBytes": 68013600768,
+      "freeBytes": 14056333312,
+      "usagePct": 83,
+      "freeGb": 14.056333312
+    },
+    "activeWorktreeBytes": 0,
+    "terminalWorktreeBytes": 0,
+    "buildCacheBytesReclaimed": 0,
+    "scratchWorkspaceBytes": 0,
+    "cleanupSuccesses": 0,
+    "cleanupFailures": 0,
+    "candidateCount": 522,
+    "protectedCount": 0,
+    "prunedCount": 0,
+    "removedCount": 0,
+    "oldestTerminalWorkspace": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_2f665a87",
+    "oldestTerminalMtime": "2026-08-07T18:41:43.370Z"
+  },
+  "log": "data/workspace-cleanup.jsonl",
+  "metricsLog": "data/workspace-cleanup-metrics.jsonl"
+}
+{
+  "mode": "lifecycle",
+  "dryRun": false,
+  "disk": {
+    "totalBytes": 82069934080,
+    "usedBytes": 68013768704,
+    "freeBytes": 14056165376,
+    "usagePct": 83,
+    "freeGb": 14.056165376
+  },
+  "candidateCount": 522,
+  "protected": 0,
+  "pruneCaches": 0,
+  "removeWorktree": 0,
+  "bytesReclaimed": 0,
+  "metrics": {
+    "ts": "2026-08-18T14:16:21.585Z",
+    "dryRun": false,
+    "mode": "lifecycle",
+    "disk": {
+      "totalBytes": 82069934080,
+      "usedBytes": 68013768704,
+      "freeBytes": 14056165376,
+      "usagePct": 83,
+      "freeGb": 14.056165376
+    },
+    "activeWorktreeBytes": 0,
+    "terminalWorktreeBytes": 0,
+    "buildCacheBytesReclaimed": 0,
+    "scratchWorkspaceBytes": 0,
+    "cleanupSuccesses": 0,
+    "cleanupFailures": 0,
+    "candidateCount": 522,
+    "protectedCount": 0,
+    "prunedCount": 0,
+    "removedCount": 0,
+    "oldestTerminalWorkspace": "/home/scott/.hermes/kanban/boards/h2h-arbitrage/workspaces/t_2f665a87",
+    "oldestTerminalMtime": "2026-08-07T18:41:43.370Z"
+  },
+  "log": "data/workspace-cleanup.jsonl",
+  "metricsLog": "data/workspace-cleanup-metrics.jsonl"
+}
