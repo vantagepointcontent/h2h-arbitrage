@@ -23,6 +23,51 @@ const metadata = {
 };
 
 describe('buildBotLegIdentity', () => {
+  it('uses immutable persisted identity and canonical relationship without consulting mutable scan metadata', () => {
+    const identity = buildBotLegIdentity({
+      ...position,
+      kalshiMarketQuestion: 'Will Democrats win FL-26?',
+      pmMarketQuestion: 'Will Republicans win FL-26?',
+      kalshiOutcomeLabel: 'Democrats',
+      pmOutcomeLabel: 'Republicans',
+      relationshipState: 'verified_complementary',
+      relationshipExplanation: 'Execution-time matcher verified the exact propositions as complementary.',
+    }, {
+      ...metadata,
+      matchedPairs: [{ artist: 'Changed later', kalshiTicker: 'KX-FL-D', pmConditionId: '0xdem' }],
+    });
+
+    expect(identity).toMatchObject({
+      kalshi: { marketQuestion: 'Will Democrats win FL-26?', outcomeLabel: 'Democrats', side: 'yes' },
+      polymarket: { marketQuestion: 'Will Republicans win FL-26?', outcomeLabel: 'Republicans', side: 'yes' },
+      relationship: {
+        state: 'verified_complementary',
+        explanation: 'Execution-time matcher verified the exact propositions as complementary.',
+      },
+    });
+  });
+
+  it('backfills legacy exact identifiers from allArbs when matchedPairs is absent', () => {
+    const identity = buildBotLegIdentity({
+      ...position,
+      kalshiTicker: 'KXHOUSERACE-FL26-26-D',
+      pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861',
+    }, {
+      mutuallyExclusiveVerified: true,
+      exhaustiveVerified: true,
+      allArbs: [
+        { artist: 'Republican', kalshiTicker: 'KXHOUSERACE-FL26-26-R', pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861' },
+        { artist: 'Democratic', kalshiTicker: 'KXHOUSERACE-FL26-26-D', pmConditionId: '0xe25b0be3d538078068d0bf2fd311bfbda4b07be31bee8ac4cdf1a0999d2bf328' },
+      ],
+    });
+
+    expect(identity).toMatchObject({
+      kalshi: { outcomeLabel: 'Democratic' },
+      polymarket: { outcomeLabel: 'Republican' },
+      relationship: { state: 'verified_complementary' },
+    });
+  });
+
   it('marks YES/YES on opposite verified propositions as complementary', () => {
     expect(buildBotLegIdentity(
       { ...position, pmConditionId: '0xrep' },
@@ -72,6 +117,38 @@ describe('buildBotLegIdentity', () => {
     expect(identity.kalshi).toMatchObject({ marketQuestion: null, outcomeLabel: 'Democrats', metadataStatus: 'missing' });
     expect(identity.polymarket).toMatchObject({ marketQuestion: null, outcomeLabel: 'Democrats', metadataStatus: 'missing' });
     expect(identity.relationship.state).toBe('same_direction');
+  });
+
+  it('backfills trade 128 from exact persisted allArbs identifiers when matchedPairs is absent', () => {
+    const identity = buildBotLegIdentity({
+      ...position,
+      kalshiTicker: 'KXHOUSERACE-FL26-26-D',
+      pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861',
+    }, {
+      allArbs: [
+        { artist: 'Republican', kalshiTicker: 'KXHOUSERACE-FL26-26-R', pmConditionId: '0x2d0d0159d0edd3511bf1aeef4ef53a74b0ef2dadcfc6b1019aa31ce74b664861' },
+        { artist: 'Democratic', kalshiTicker: 'KXHOUSERACE-FL26-26-D', pmConditionId: '0xe25b0be3d538078068d0bf2fd311bfbda4b07be31bee8ac4cdf1a0999d2bf328' },
+      ],
+      mutuallyExclusiveVerified: true,
+      exhaustiveVerified: true,
+    });
+    expect(identity).toMatchObject({
+      kalshi: { outcomeLabel: 'Democratic', side: 'yes' },
+      polymarket: { outcomeLabel: 'Republican', side: 'yes' },
+      relationship: { state: 'verified_complementary' },
+    });
+  });
+
+  it('uses immutable persisted identity and canonical relationship before mutable scan metadata', () => {
+    const identity = buildBotLegIdentity({
+      ...position,
+      kalshiOutcomeLabel: 'Persisted Democrats',
+      pmOutcomeLabel: 'Persisted Republicans',
+      relationshipState: 'invalid',
+    }, metadata);
+    expect(identity.kalshi.outcomeLabel).toBe('Persisted Democrats');
+    expect(identity.polymarket.outcomeLabel).toBe('Persisted Republicans');
+    expect(identity.relationship.state).toBe('invalid');
   });
 
   it('marks a backend-verified but non-complementary proposition/side pairing invalid', () => {
