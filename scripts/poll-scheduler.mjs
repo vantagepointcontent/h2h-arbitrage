@@ -23,6 +23,18 @@ export function parseBoundedNumber(value, fallback, minimum, maximum, integer = 
   return integer ? Math.floor(bounded) : bounded;
 }
 
+export function adaptiveScanTimeoutMs(stats, baseTimeoutMs, retryTimeoutMs, floorMs, multiplier = 3) {
+  const retrying = (stats?.consecFails ?? 0) > 0 || (stats?.trips ?? 0) > 0;
+  const ceiling = retrying ? retryTimeoutMs : baseTimeoutMs;
+  if (!stats?.avgMs) return ceiling;
+  return Math.min(ceiling, Math.max(floorMs, Math.round(stats.avgMs * multiplier)));
+}
+
+export function freshnessSafeInterval(requestedIntervalMs, freshnessSlaMs, wakeMs) {
+  const safeSlaInterval = Math.max(1_000, freshnessSlaMs - Math.max(0, wakeMs) * 2);
+  return Math.max(1_000, Math.min(requestedIntervalMs, safeSlaInterval));
+}
+
 export function classifyScanHttpFailure(status, body = {}, retryAfter = null, now = Date.now()) {
   const text = typeof body?.error === 'string' ? body.error : '';
   const errorCode = body?.code === 'DISK_CAPACITY'

@@ -31,7 +31,7 @@ module.exports = {
         // capacity aligned with poller concurrency so recurring scans are not
         // rejected in capacity bursts while still bounding CPU/memory.
         H2H_SCAN_CONCURRENCY: '3',
-        H2H_SCAN_WORKER_TIMEOUT_MS: '21000',
+        H2H_SCAN_WORKER_TIMEOUT_MS: '30000',
         H2H_POLL_CONCURRENCY: '3',
         H2H_SCAN_TIMEOUT_MS: '21000',
         // Full per-outcome scan diagnostics overwhelm the event loop under the
@@ -85,6 +85,7 @@ module.exports = {
         // finish publication before the poller aborts their requests.
         H2H_SCAN_MIN_TIMEOUT_MS: '18000',
         H2H_SCAN_TIMEOUT_MS: '21000',
+        H2H_RETRY_SCAN_TIMEOUT_MS: '30000',
         H2H_API_TOKEN: process.env.H2H_API_TOKEN
       },
 

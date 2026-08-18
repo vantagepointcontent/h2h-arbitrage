@@ -42,9 +42,11 @@ const LEASE_DIRECTORY = process.env.H2H_SAVED_MARKET_LEASE_DIRECTORY || new URL(
 const ADAPTIVE_CONFIG_FILE = new URL('../src/data/adaptive-refresh-config.json', import.meta.url).pathname;
 const fs = await import('fs');
 const {
+  adaptiveScanTimeoutMs,
   buildSchedulerState,
   classifyScanHttpFailure,
   completeAttempt,
+  freshnessSafeInterval,
   hasNewerSuccessfulMarketScan,
   isEligibleMarket,
   markAttemptStarted,
@@ -154,6 +156,13 @@ const TIMEOUT_FLOOR_MS = parseBoundedNumber(
   true,
 );
 const TIMEOUT_MULTIPLIER = 3;
+const RETRY_SCAN_TIMEOUT_MS = parseBoundedNumber(
+  process.env.H2H_RETRY_SCAN_TIMEOUT_MS,
+  30_000,
+  SCAN_TIMEOUT_MS,
+  300_000,
+  true,
+);
 const BREAKER_THRESHOLD = 3;          // consecutive failures to trip
 const BREAKER_BASE_COOLDOWN_MS = 5 * 60_000;
 const BREAKER_MAX_COOLDOWN_MS = 60 * 60_000;
@@ -237,8 +246,13 @@ function getStats(marketId) {
 
 function adaptiveTimeoutMs(marketId) {
   const s = scanStats.get(marketId);
-  if (!s || !s.avgMs) return SCAN_TIMEOUT_MS; // no history yet — full headroom
-  return Math.min(SCAN_TIMEOUT_MS, Math.max(TIMEOUT_FLOOR_MS, Math.round(s.avgMs * TIMEOUT_MULTIPLIER)));
+  return adaptiveScanTimeoutMs(
+    s,
+    SCAN_TIMEOUT_MS,
+    RETRY_SCAN_TIMEOUT_MS,
+    TIMEOUT_FLOOR_MS,
+    TIMEOUT_MULTIPLIER,
+  );
 }
 
 function recordScanOutcome(marketId, ok, durationMs) {
@@ -716,7 +730,8 @@ async function pollOnce() {
       }
 
       const requestedInterval = adaptiveEnabled ? getAdaptiveIntervalMs(market, adaptiveConfig) : FRESHNESS_SLA_MS;
-      completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, requestedInterval);
+      const scheduledInterval = freshnessSafeInterval(requestedInterval, FRESHNESS_SLA_MS, POLL_WAKE_MS);
+      completeAttempt(schedulerState[market.id], { ok: true }, Date.now(), FRESHNESS_SLA_MS, scheduledInterval);
       const saved = await saveMarketSchedulerState(market.id, { phase: 'terminal', leaseToken: lease.token });
       if (!saved) {
         health.skippedCount += 1;

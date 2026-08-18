@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adaptiveScanTimeoutMs,
   buildSchedulerState,
   classifyScanHttpFailure,
   completeAttempt,
+  freshnessSafeInterval,
   markAttemptStarted,
   selectDueMarkets,
 } from '../../scripts/poll-scheduler.mjs';
@@ -25,6 +27,17 @@ function market(index: number): Market {
 }
 
 describe('BUG-150 recurring saved-market fairness', () => {
+  it('extends only retrying markets without inflating the normal SLA capacity budget', () => {
+    expect(adaptiveScanTimeoutMs(null, 21_000, 30_000, 18_000)).toBe(21_000);
+    expect(adaptiveScanTimeoutMs({ avgMs: 12_000, consecFails: 1, trips: 0 }, 21_000, 30_000, 18_000)).toBe(30_000);
+    expect(adaptiveScanTimeoutMs({ avgMs: 4_000, consecFails: 0, trips: 0 }, 21_000, 30_000, 18_000)).toBe(18_000);
+  });
+
+  it('schedules successful scans before the SLA boundary by two wake intervals', () => {
+    expect(freshnessSafeInterval(3_600_000, 3_600_000, 60_000)).toBe(3_480_000);
+    expect(freshnessSafeInterval(300_000, 3_600_000, 60_000)).toBe(300_000);
+  });
+
   it('does not poison per-market breakers when the global disk gate or scanner capacity is closed', () => {
     expect(classifyScanHttpFailure(503, { code: 'DISK_CAPACITY' }, '60', 1_000)).toEqual({
       error: 'HTTP 503 (DISK_CAPACITY)',

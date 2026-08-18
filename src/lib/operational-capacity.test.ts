@@ -25,6 +25,11 @@ describe('operator capacity gates', () => {
     expect(ecosystem).toContain("cron_restart: '30 3 * * *'");
     expect(ecosystem).toContain("name: 'h2h-scan-supervisor'");
     expect(ecosystem).toContain("script: './scripts/scan-supervisor.mjs'");
+    expect(ecosystem).toContain("H2H_SCAN_CONCURRENCY: '3'");
+    expect(ecosystem).toContain("H2H_SCAN_WORKER_TIMEOUT_MS: '30000'");
+    expect(ecosystem).toContain("H2H_POLL_CONCURRENCY: '3'");
+    expect(ecosystem).toContain("H2H_SCAN_TIMEOUT_MS: '21000'");
+    expect(ecosystem).toContain("H2H_RETRY_SCAN_TIMEOUT_MS: '30000'");
     const monitor = await readFile(path.join(root, 'scripts', 'disk-capacity-monitor.mjs'), 'utf8');
     const retention = await readFile(path.join(root, 'scripts', 'storage-retention.mjs'), 'utf8');
     const supervisor = await readFile(path.join(root, 'scripts', 'scan-supervisor.mjs'), 'utf8');
