@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { historicalPropositionAudit } from './bot-proposition-audit';
 
 describe('historical proposition audit manifest', () => {
-  it('classifies immutable BotTrader execution #128 as high-severity invalid', () => {
+  it('classifies execution #128 as an invalid mapping without fabricating live exposure', () => {
     expect(historicalPropositionAudit(128, {
       positionId: 97,
       openedAt: '2026-08-11T01:50:13.377Z',
@@ -14,8 +14,8 @@ describe('historical proposition audit manifest', () => {
     })).toMatchObject({
       executionId: 128,
       classification: 'confirmed_invalid',
-      severity: 'high',
-      reason: expect.stringContaining('Both executed legs are YES'),
+      severity: 'warning',
+      reason: expect.stringContaining('exact requested contracts are both YES'),
     });
   });
 

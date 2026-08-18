@@ -2090,13 +2090,11 @@ async function ensureExecutionsTable(): Promise<void> {
       steps            TEXT,
       bot_entry_evidence TEXT,
       selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
-      proposition_relationship TEXT,
       calculation_envelope TEXT
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
   await migrateExecutionsSchema(c);
-  try { await c.execute(`ALTER TABLE executions ADD COLUMN proposition_relationship TEXT`); } catch { /* column already exists */ }
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
   _executionsReady = true;
 }
@@ -2118,7 +2116,6 @@ export interface ExecutionRecord {
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
   botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
   calculationEnvelope?: CalculationEnvelope;
-  propositionRelationship?: import('./proposition-identity').PropositionRelationship | null;
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<number> {
@@ -2143,8 +2140,8 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
     ? validateCalculationEnvelope(resultEnvelope)
     : legacyUnverifiableEnvelope(`execution ${e.arbId}`, 'execution'));
   const res = await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, proposition_relationship, calculation_envelope)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, calculation_envelope)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
@@ -2157,7 +2154,6 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.source ?? 'manual',
       e.source === 'bot' ? (e.selectionMethod ?? null) : null,
       e.botEntryEvidence != null ? JSON.stringify(e.botEntryEvidence) : null,
-      e.propositionRelationship != null ? JSON.stringify(e.propositionRelationship) : null,
       JSON.stringify(validateCalculationEnvelope(calculationEnvelope)),
     ],
   });
@@ -2220,7 +2216,6 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
     botEntryEvidence: r.bot_entry_evidence ? JSON.parse(String(r.bot_entry_evidence)) : null,
     calculationEnvelope: parseCalculationEnvelope(r.calculation_envelope, `execution ${r.id}`),
-    propositionRelationship: r.proposition_relationship ? JSON.parse(String(r.proposition_relationship)) : null,
   };
 }
 

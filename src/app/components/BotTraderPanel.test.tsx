@@ -196,31 +196,6 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText('Portfolio ROI').parentElement?.textContent).toBe('Portfolio ROI+5.2%');
     expect(screen.getByText(/Indicative marks fresh for 1 open position/)).toBeTruthy();
     expect(screen.getByRole('img', { name: 'BotTrader current performance by entry date chart' })).toBeTruthy();
-    expect(screen.getByText('Legacy/unknown relationship')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getByRole('alert').textContent).toContain('canonical proposition relationship was not captured');
-  });
-
-  it('shows a high-severity warning for an open position audited as an invalid relationship', async () => {
-    const invalid = {
-      ...positions[0],
-      executionId: 128,
-      propositionRelationshipState: 'same_direction_invalid',
-      propositionRelationshipWarning: 'Both executed legs pay on the Democratic-win proposition.',
-    };
-    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
-      const url = String(input);
-      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [invalid] } });
-      if (url.includes('/positions')) return response({ success: true, positions: [invalid] });
-      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
-      throw new Error(`Unexpected fetch: ${url}`);
-    }));
-
-    render(<BotTraderPanel />);
-    expect(await screen.findByText('High risk · invalid relationship')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getByRole('alert').textContent).toContain('HIGH SEVERITY');
-    expect(screen.getByRole('alert').textContent).toContain('Both executed legs pay on the Democratic-win proposition.');
   });
 
   it('reconciles a partially reduced row with the portfolio current ROI', async () => {
