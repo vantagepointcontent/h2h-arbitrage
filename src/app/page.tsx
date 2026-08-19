@@ -2192,7 +2192,14 @@ export default function Home() {
                       const market = savedMarkets.find((item) => item.id === activeMarketId);
                       if (!market) return null;
                       const apy = getMarketApySummary(market);
-                      const hasQuickOverlay = market.liveResult != null && apy.quickObservedAt != null;
+                      const quickObservedAt = result._priceDataObservedAt ?? null;
+                      const quickBest = quickObservedAt
+                        ? [...(result.outcomes ?? [])].filter((outcome) =>
+                            outcome.arbitrage.strategy !== "No arb" && Number.isFinite(outcome.arbitrage.roiPct),
+                          ).sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct || a.artist.localeCompare(b.artist))[0]
+                        : null;
+                      const quickApyPct = typeof quickBest?.arbitrage.apyPct === "number" && Number.isFinite(quickBest.arbitrage.apyPct)
+                        ? quickBest.arbitrage.apyPct : null;
                       return (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[11px] text-[var(--text-secondary)]" data-testid="selected-market-apy-provenance">
                           <span title="This full-precision persisted value controls Saved Markets APY sorting.">
@@ -2200,10 +2207,10 @@ export default function Home() {
                             {apy.observedAt ? ` · ${formatRelativeTime(apy.observedAt)}` : ""}
                             {apy.revision != null ? ` · revision ${apy.revision}` : ""}
                           </span>
-                          {hasQuickOverlay && (
+                          {quickObservedAt && (
                             <span title="Current quick APY is contextual and does not reorder Saved Markets.">
-                              Current quick APY: <strong className="text-[var(--text-primary)]">{apy.quickApyPct == null ? "Unavailable" : formatPercent(apy.quickApyPct)}</strong>
-                              {apy.quickObservedAt ? ` · ${formatRelativeTime(apy.quickObservedAt)}` : ""}
+                              Current quick APY: <strong className="text-[var(--text-primary)]">{quickApyPct == null ? "Unavailable" : formatPercent(quickApyPct)}</strong>
+                              {` · ${formatRelativeTime(quickObservedAt)}`}
                             </span>
                           )}
                           <span className="text-[var(--text-faint)]">Saved Markets sorts by persisted scan APY.</span>
