@@ -6,6 +6,7 @@ import {
   normalizePolymarketRedeemablePosition,
   normalizePolymarketRedemptionCredit,
   reconcileBotPositionSettlements,
+  settlementCandidateKind,
   type SettlementExecutionRecord,
 } from './bot-settlement-reconciler';
 
@@ -154,6 +155,17 @@ describe('live settlement credit normalization', () => {
 });
 
 describe('reconcileBotPositionSettlements', () => {
+  it('does not quarantine evidence-incomplete positions before expiry without terminal venue evidence', () => {
+    expect(settlementCandidateKind({ ...position, expiryDate: '2026-10-01T00:00:00.000Z' }, null, Date.parse('2026-08-19T12:00:00.000Z')))
+      .toBe('skip');
+    expect(settlementCandidateKind({ ...position, expiryDate: '2026-08-01T00:00:00.000Z' }, null, Date.parse('2026-08-19T12:00:00.000Z')))
+      .toBe('immediate');
+    expect(settlementCandidateKind({ ...position, expiryDate: null }, null, Date.parse('2026-08-19T12:00:00.000Z')))
+      .toBe('probe');
+    expect(settlementCandidateKind(position, 'settlement_unresolved', Date.parse('2026-08-19T12:00:00.000Z')))
+      .toBe('immediate');
+  });
+
   it('persists fail-closed legacy backfill without making venue calls', async () => {
     const persist = vi.fn(async () => true);
     const fetchKalshiResolution = vi.fn();

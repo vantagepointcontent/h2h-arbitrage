@@ -5,6 +5,7 @@ import {
   reconcileSettlementLifecycle,
   type ReconciledSettlementLeg,
   type SettlementExecutionLegEvidence,
+  type SettlementPositionState,
   type SettlementResolutionObservation,
 } from './bot-settlement';
 import { BotSettlementStore } from './bot-settlement-store';
@@ -451,6 +452,33 @@ async function defaultPmResolution(leg: SettlementExecutionLegEvidence): Promise
   };
 }
 
+export function settlementCandidateKind(
+  position: BotPosition,
+  priorState: SettlementPositionState | null,
+  observedMs: number,
+): 'immediate' | 'probe' | 'skip' {
+  if (priorState != null && priorState !== 'open') return 'immediate';
+  const expiryMs = Date.parse(position.expiryDate ?? '');
+  if (!Number.isFinite(expiryMs)) return 'probe';
+  return expiryMs <= observedMs ? 'immediate' : 'skip';
+}
+
+async function hasAnyTerminalVenue(position: BotPosition): Promise<boolean> {
+  const [{ fetchKalshiMarket }, { fetchClobMarket }] = await Promise.all([
+    import('./kalshi'),
+    import('./polymarket-clob'),
+  ]);
+  const [kalshi, polymarket] = await Promise.allSettled([
+    position.kalshiTicker ? fetchKalshiMarket(position.kalshiTicker) : null,
+    position.pmConditionId ? fetchClobMarket(position.pmConditionId) : null,
+  ]);
+  const kalshiTerminal = kalshi.status === 'fulfilled' && kalshi.value != null
+    && normalizeKalshiResolution(kalshi.value).verified;
+  const pmTerminal = polymarket.status === 'fulfilled' && polymarket.value != null
+    && normalizePolymarketResolution(polymarket.value).verified;
+  return kalshiTerminal || pmTerminal;
+}
+
 export async function runBotSettlementReconciler(observedAt = new Date().toISOString()): Promise<{
   scanned: number; persisted: number; settled: number; unresolved: number; errors: Array<{ id: number; error: string }>;
 }> {
@@ -464,6 +492,7 @@ export async function runBotSettlementReconciler(observedAt = new Date().toISOSt
     const openPositions = positions.filter((position) => position.status === 'open');
     const prior = await settlementStore.getByPositionIds(openPositions.map((position) => position.id));
     const immediate: BotPosition[] = [];
+    const terminalProbes: BotPosition[] = [];
     const venueCandidates: BotPosition[] = [];
     const observedMs = Date.parse(observedAt);
     for (const position of openPositions) {
@@ -471,7 +500,9 @@ export async function runBotSettlementReconciler(observedAt = new Date().toISOSt
       const exact = evidence.every((leg) => leg.exposureState !== 'unknown'
         && leg.marketId != null && leg.outcomeId != null && leg.orderId != null);
       if (!exact) {
-        immediate.push(position);
+        const kind = settlementCandidateKind(position, prior.get(position.id)?.positionState ?? null, observedMs);
+        if (kind === 'immediate') immediate.push(position);
+        else if (kind === 'probe') terminalProbes.push(position);
         continue;
       }
       const expiryMs = Date.parse(position.expiryDate ?? '');
@@ -480,6 +511,13 @@ export async function runBotSettlementReconciler(observedAt = new Date().toISOSt
         venueCandidates.push(position);
       }
     }
+    const probeWorkers = Array.from({ length: Math.min(8, terminalProbes.length) }, async (_, workerIndex) => {
+      for (let index = workerIndex; index < terminalProbes.length; index += 8) {
+        const position = terminalProbes[index];
+        if (await hasAnyTerminalVenue(position)) immediate.push(position);
+      }
+    });
+    await Promise.all(probeWorkers);
     venueCandidates.sort((left, right) => {
       const leftAt = prior.get(left.id)?.reconciledAt ?? '';
       const rightAt = prior.get(right.id)?.reconciledAt ?? '';
