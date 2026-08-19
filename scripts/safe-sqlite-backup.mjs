@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, open, readFile, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdir, open, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@libsql/client';
 import { assertDiskCapacity } from '../src/lib/disk-capacity.mjs';
 
 async function sha256(file) {
-  return createHash('sha256').update(await readFile(file)).digest('hex');
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 async function assertAbsent(file) {
