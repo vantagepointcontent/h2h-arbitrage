@@ -712,6 +712,7 @@ export async function executeFullScan(request: NextRequest) {
       _kalshiFetchedAt: new Date().toISOString(),
       _pmFetchedAt: new Date().toISOString(),
       fullScanPersisted,
+      publicationGeneration: fullScanPersisted ? publicationGeneration : null,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

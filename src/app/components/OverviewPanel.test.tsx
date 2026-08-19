@@ -94,6 +94,9 @@ describe.each([
     const saved = marketWithOpportunity('apy', 'Canonical APY market');
     const baseArb = saved.lastScanResult?.allArbs?.[0];
     if (!baseArb || !saved.lastScanResult) throw new Error('fixture must contain an opportunity');
+    saved.canonicalApyPct = 12.34;
+    saved.canonicalApyObservedAt = '2026-08-16T00:00:00.000Z';
+    saved.canonicalApySource = 'full_scan';
     saved.lastScanResult.allArbs = [{
       ...baseArb, apyPct: 12.34,
       outcomeApy: {

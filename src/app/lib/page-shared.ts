@@ -282,6 +282,7 @@ export interface LastScanResult {
   matchStatus?: 'not_scanned' | 'refreshing' | 'unavailable' | 'confirmed_zero' | 'matched';
   matchError?: string;
   matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
+  publicationGeneration?: number;
   pmClosed?: boolean; // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean; // BUG-05b: at least one outcome at 99/1 extremes
   allArbs?: {
@@ -380,6 +381,7 @@ export interface SavedMarket {
     matchStatus?: LastScanResult['matchStatus'];
     matchError?: string;
     matchedPairs?: LastScanResult['matchedPairs'];
+    publicationGeneration?: number;
     kalshiCount?: number;
     pmCount?: number;
     matchedCount?: number;
@@ -407,6 +409,12 @@ export interface SavedMarket {
       outcomeApy?: OutcomeContingentApy;
     }[];
   } | null;
+  canonicalApyPct?: number | null;
+  canonicalApyUnavailableReason?: string | null;
+  canonicalApyOutcome?: string | null;
+  canonicalApyObservedAt?: string | null;
+  canonicalApySource?: 'full_scan' | null;
+  canonicalApyRevision?: number | null;
 }
 
 export interface MarketApySummary {
@@ -414,11 +422,17 @@ export interface MarketApySummary {
   scenarioApyPct: { kalshi: number; polymarket: number } | null;
   sortApyPct: number | null;
   unavailableReason: string | null;
+  observedAt: string | null;
+  source: 'full_scan' | null;
+  revision: number | null;
+  quickApyPct: number | null;
+  quickObservedAt: string | null;
 }
 
 /** Read scan-time APY only; never re-annualize from the saved market's generic expiry. */
 export function getMarketApySummary(market: SavedMarket): MarketApySummary {
-  const arbs = market.liveResult?.allArbs ?? market.lastScanResult?.allArbs ?? [];
+  const detailArbs = market.liveResult?.allArbs ?? market.lastScanResult?.allArbs ?? [];
+  const arbs = market.lastScanResult?.allArbs ?? [];
   const best = arbs.reduce<(typeof arbs)[number] | null>(
     (current, arb) => !current || arb.roiPct > current.roiPct ? arb : current,
     null,
@@ -429,13 +443,75 @@ export function getMarketApySummary(market: SavedMarket): MarketApySummary {
   const scenarios = outcomeApy?.apyPct == null && kalshi != null && polymarket != null
     ? { kalshi, polymarket }
     : null;
-  const scalarApyPct = best?.apyPct ?? null;
+  const quickBest = detailArbs.reduce<(typeof detailArbs)[number] | null>(
+    (current, arb) => !current || arb.roiPct > current.roiPct ? arb : current,
+    null,
+  );
+  const scalarApyPct = typeof market.canonicalApyPct === 'number' && Number.isFinite(market.canonicalApyPct)
+    ? market.canonicalApyPct : null;
   return {
     scalarApyPct,
     scenarioApyPct: scenarios,
     sortApyPct: scalarApyPct,
-    unavailableReason: scalarApyPct == null ? (best?.apyUnavailableReason ?? null) : null,
+    unavailableReason: scalarApyPct == null
+      ? (market.canonicalApyUnavailableReason ?? 'canonical_apy_unavailable') : null,
+    observedAt: market.canonicalApyObservedAt ?? null,
+    source: market.canonicalApySource ?? null,
+    revision: Number.isSafeInteger(market.canonicalApyRevision) ? market.canonicalApyRevision! : null,
+    quickApyPct: typeof quickBest?.apyPct === 'number' && Number.isFinite(quickBest.apyPct)
+      ? quickBest.apyPct : null,
+    quickObservedAt: market.liveResult?.scannedAt ?? null,
   };
+}
+
+/** Total deterministic order for compact persisted APY. Finite values always
+ * precede unavailable values; display rounding never participates. */
+export function compareSavedMarketApy(
+  a: SavedMarket,
+  b: SavedMarket,
+  direction: 'asc' | 'desc',
+): number {
+  const av = typeof a.canonicalApyPct === 'number' && Number.isFinite(a.canonicalApyPct)
+    ? a.canonicalApyPct : null;
+  const bv = typeof b.canonicalApyPct === 'number' && Number.isFinite(b.canonicalApyPct)
+    ? b.canonicalApyPct : null;
+  if (av == null && bv != null) return 1;
+  if (av != null && bv == null) return -1;
+  if (av != null && bv != null && av !== bv) return direction === 'asc' ? av - bv : bv - av;
+  const title = a.eventTitle.localeCompare(b.eventTitle);
+  return title !== 0 ? title : a.id.localeCompare(b.id);
+}
+
+/** Merge delayed list/detail hydration without allowing an older publication
+ * to roll back a newer local full-scan APY or result. */
+export function mergeSavedMarketHydration(current: SavedMarket, incoming: SavedMarket): SavedMarket {
+  const rank = (observedAt: string | null | undefined, revision: number | null | undefined): [number, number] => {
+    const parsed = observedAt ? Date.parse(observedAt) : NaN;
+    return [Number.isFinite(parsed) ? parsed : -Infinity, Number.isSafeInteger(revision) ? revision! : -Infinity];
+  };
+  const newer = (left: [number, number], right: [number, number]) =>
+    left[0] > right[0] || (left[0] === right[0] && left[1] > right[1]);
+  const merged: SavedMarket = { ...current, ...incoming };
+  if (newer(
+    rank(current.canonicalApyObservedAt, current.canonicalApyRevision),
+    rank(incoming.canonicalApyObservedAt, incoming.canonicalApyRevision),
+  )) {
+    merged.canonicalApyPct = current.canonicalApyPct ?? null;
+    merged.canonicalApyUnavailableReason = current.canonicalApyUnavailableReason ?? null;
+    merged.canonicalApyOutcome = current.canonicalApyOutcome ?? null;
+    merged.canonicalApyObservedAt = current.canonicalApyObservedAt ?? null;
+    merged.canonicalApySource = current.canonicalApySource ?? null;
+    merged.canonicalApyRevision = current.canonicalApyRevision ?? null;
+  }
+  if (newer(
+    rank(current.lastScanResult?.scannedAt, current.lastScanResult?.publicationGeneration),
+    rank(incoming.lastScanResult?.scannedAt, incoming.lastScanResult?.publicationGeneration),
+  )) merged.lastScanResult = current.lastScanResult;
+  if (newer(
+    rank(current.liveResult?.scannedAt, current.liveResult?.publicationGeneration),
+    rank(incoming.liveResult?.scannedAt, incoming.liveResult?.publicationGeneration),
+  )) merged.liveResult = current.liveResult;
+  return merged;
 }
 
 /**
@@ -467,7 +543,7 @@ export function getSavedMarketLastSuccessAt(market: SavedMarket): string | null 
 
 export function applyDurableFullScanToSavedMarket(
   market: SavedMarket,
-  scan: Pick<ScanResult, 'outcomes' | 'kalshiCount' | 'pmCount' | 'matchedCount'> & { fullScanPersisted?: boolean },
+  scan: Pick<ScanResult, 'outcomes' | 'kalshiCount' | 'pmCount' | 'matchedCount'> & { fullScanPersisted?: boolean; publicationGeneration?: number },
   scannedAt: string,
 ): SavedMarket {
   const liveResult = {
@@ -478,11 +554,25 @@ export function applyDurableFullScanToSavedMarket(
     matchedCount: scan.matchedCount,
   };
   if (scan.fullScanPersisted !== true) return { ...market, liveResult };
+  const canonical = scan.outcomes.filter((outcome) =>
+    outcome.arbitrage.strategy !== 'No arb'
+    && Number.isFinite(outcome.arbitrage.roiPct)
+    && Number.isFinite(outcome.arbitrage.expectedProfit),
+  ).sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct || a.artist.localeCompare(b.artist))[0];
+  const canonicalApyPct = typeof canonical?.arbitrage.apyPct === 'number' && Number.isFinite(canonical.arbitrage.apyPct)
+    ? canonical.arbitrage.apyPct : null;
   const freshnessSlaMs = market.scheduler?.freshnessSlaMs ?? 60 * 60_000;
   const scannedAtMs = Date.parse(scannedAt);
   const nextDueAt = new Date(scannedAtMs + freshnessSlaMs).toISOString();
   return {
     ...market,
+    canonicalApyPct,
+    canonicalApyUnavailableReason: canonicalApyPct == null
+      ? (canonical?.arbitrage.apyUnavailableReason ?? (canonical ? 'canonical_apy_unavailable' : 'no_canonical_arbitrage')) : null,
+    canonicalApyOutcome: canonical?.artist ?? null,
+    canonicalApyObservedAt: canonical?.arbitrage.outcomeApy?.observedAt ?? scannedAt,
+    canonicalApySource: 'full_scan',
+    canonicalApyRevision: Number.isSafeInteger(scan.publicationGeneration) ? scan.publicationGeneration! : null,
     scheduler: {
       ...market.scheduler,
       lastSuccessAt: scannedAt,
@@ -514,6 +604,8 @@ export interface ScanResult {
   platformWarnings?: string[];
   refreshStatus?: 'complete' | 'partial' | 'failed';
   retryable?: boolean;
+  fullScanPersisted?: boolean;
+  publicationGeneration?: number;
   _priceDataObservedAt?: string | null;
   refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string };
   pmRefresh?: import('@/lib/quick-prices').QuickPmRefresh;

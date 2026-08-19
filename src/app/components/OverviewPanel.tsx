@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Check, Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 
-import { OverviewSort, SavedMarket, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
+import { OverviewSort, SavedMarket, compareSavedMarketApy, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
@@ -113,13 +113,13 @@ function OverviewPanelInner({
   useEffect(() => { onLoad(); }, []);
   const [renderedAt] = useState(() => Date.now());
 
-  const getMarketApy = (m: SavedMarket): number => getMarketApySummary(m).sortApyPct ?? 0;
+  const getMarketApy = (m: SavedMarket): number | null => getMarketApySummary(m).sortApyPct;
 
   // Helper: check if a market's numeric value is missing (shows as "—")
   const hasNoValue = (m: SavedMarket, field: OverviewSort): boolean => {
     switch (field) {
       case "roi": return (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) === 0;
-      case "apy": return getMarketApy(m) === 0;
+      case "apy": return getMarketApy(m) == null;
       case "profit": return (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0) === 0;
       case "matched": return getCanonicalMatchState(m).status === 'not_scanned';
       case "arbs": {
@@ -160,7 +160,7 @@ function OverviewPanelInner({
       return mul * (ra - rb);
     }
     if (sort === "apy") {
-      return mul * (getMarketApy(a) - getMarketApy(b));
+      return compareSavedMarketApy(a, b, sortDir);
     }
     if (sort === "profit") {
       const pa = a.liveResult?.bestProfit ?? a.lastScanResult?.bestProfit ?? 0;

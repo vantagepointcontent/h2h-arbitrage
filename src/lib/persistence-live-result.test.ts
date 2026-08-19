@@ -114,6 +114,33 @@ describe('WS-107 liveResult persistence', () => {
     expect(got.liveResult!.bestRoiPct).toBe(9.9);
   });
 
+  it('keeps canonical full-scan APY immutable across newer sparse live updates', async () => {
+    const m = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/canonical-apy', polymarketUrl: 'https://polymarket.com/event/canonical-apy',
+      eventTitle: 'Canonical APY', category: '', expiryDate: null,
+    });
+    const scanGeneration = await persistence.reserveSavedMarketPublication(m.id, 'scan');
+    await persistence.updateSavedMarketScanResult(m.id, makeScan({
+      publicationGeneration: scanGeneration,
+      matchStatus: 'matched',
+      allArbs: [{ artist: 'MD-01', roiPct: 12, expectedProfit: 12, strategy: 'Buy YES Kalshi + NO PM', apyPct: 29.959508018509656 }],
+    }));
+    const liveGeneration = await persistence.reserveSavedMarketPublication(m.id, 'live');
+    await persistence.updateSavedMarketLiveResult(m.id, makeScan({
+      publicationGeneration: liveGeneration,
+      matchStatus: 'matched',
+      scannedAt: new Date().toISOString(),
+      allArbs: [{ artist: 'MD-01', roiPct: 13, expectedProfit: 13, strategy: 'Buy YES Kalshi + NO PM', apyPct: 99 }],
+    }));
+
+    const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
+    expect(got.canonicalApyPct).toBe(29.959508018509656);
+    expect(got.canonicalApyOutcome).toBe('MD-01');
+    expect(got.canonicalApySource).toBe('full_scan');
+    expect(got.canonicalApyRevision).toBe(scanGeneration);
+    expect(got.liveResult?.allArbs?.[0]?.apyPct).toBe(99);
+  });
+
   it('stale liveResult (older than TTL) is dropped on read → poller fallback', async () => {
     const m = await persistence.addSavedMarket({
       kalshiUrl: 'https://kalshi.com/markets/z', polymarketUrl: 'https://polymarket.com/event/z',

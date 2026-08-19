@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
-import { SavedMarket, formatPercent, getMarketApySummary, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
+import { SavedMarket, compareSavedMarketApy, formatPercent, getMarketApySummary, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 
@@ -162,6 +162,7 @@ function MarketSidebarInner({
 }) {
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [sidebarCategory, setSidebarCategory] = useState<string>("all");
+  const [renderedAt] = useState(() => Date.now());
 
   // UI-012: derive category options from categories actually present in saved
   // markets. The static CATEGORIES list ('economics', 'technology', …) didn't
@@ -189,8 +190,6 @@ function MarketSidebarInner({
   }, []);
 
   // Filter + sort (memoized — PERF-P0: avoid re-running over 400+ markets on every parent render)
-  const marketApy = (market: SavedMarket) => getMarketApySummary(market).sortApyPct ?? 0;
-
   const filtered = useMemo(() => markets.filter((m) => {
     // BUG-05b2: use smart expiry — in-play markets (trading prices) are NOT expired
     const isExpired = isMarketExpired(m);
@@ -198,7 +197,7 @@ function MarketSidebarInner({
 
     if (expiryFilter !== "all") {
       if (!m.expiryDate) return false;
-      const days = (new Date(m.expiryDate).getTime() - Date.now()) / 86400000;
+      const days = (new Date(m.expiryDate).getTime() - renderedAt) / 86400000;
       if (expiryFilter === "lte7" && days > 7) return false;
       if (expiryFilter === "lte14" && days > 14) return false;
       if (expiryFilter === "lte30" && days > 30) return false;
@@ -225,9 +224,7 @@ function MarketSidebarInner({
       return mul * (ra - rb);
     }
     if (sort === "apy") {
-      const aa = marketApy(a);
-      const ab = marketApy(b);
-      return mul * (aa - ab);
+      return compareSavedMarketApy(a, b, sortDir);
     }
     if (sort === "scanned") {
       // desc = stalest first (longest since last scan), asc = most recent first
@@ -236,7 +233,7 @@ function MarketSidebarInner({
       return mul * (sa - sb);
     }
     return 0;
-  }), [markets, showExpired, expiryFilter, sidebarCategory, sidebarSearch, sidebarFavoritesOnly, favoriteIds, showArbOnly, sort, sortDir]);
+  }), [markets, showExpired, expiryFilter, sidebarCategory, sidebarSearch, sidebarFavoritesOnly, favoriteIds, showArbOnly, sort, sortDir, renderedAt]);
 
   return (
     <>
@@ -301,7 +298,7 @@ function MarketSidebarInner({
                     className={`px-1.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
                       sort === "apy" ? "bg-[var(--status-positive)]/15 text-[var(--status-positive)] ring-1 ring-[var(--status-positive)]/30" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
                     }`}
-                    title="Sort by canonical compounded APY from persisted ROI and days to expiry"
+                    title="Sort by full-precision canonical APY from the newest persisted successful full scan. Live/quick APY does not control this order."
                   >
                     APY{sort === "apy" && (sortDir === "asc" ? " ↑" : " ↓")} <ApyHeaderInfo />
                   </button>
@@ -407,7 +404,7 @@ function MarketSidebarInner({
                 {filtered.map((m) => {
                   const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
                   const apySummary = getMarketApySummary(m);
-                  const apy = apySummary.sortApyPct ?? 0;
+                  const apy = apySummary.sortApyPct;
                   const isActive = activeId === m.id;
                   const lastSuccessfulScanAt = getSavedMarketLastSuccessAt(m);
                   return (
@@ -420,7 +417,7 @@ function MarketSidebarInner({
                       className={`group flex items-center gap-2 pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
                         isActive ? "bg-[var(--status-positive)]/10 ring-1 ring-[var(--status-positive)]/30" : "hover:bg-[var(--border-subtle)]"
                       }`}
-                      title={`Last successful full scan: ${formatTimeAgo(lastSuccessfulScanAt)}`}
+                      title={`Last successful full scan: ${formatTimeAgo(lastSuccessfulScanAt)}. Persisted scan APY: ${apy == null ? 'unavailable' : formatPercent(apy)}${apySummary.observedAt ? ` observed ${formatTimeAgo(apySummary.observedAt)}` : ''}${apySummary.revision != null ? `, revision ${apySummary.revision}` : ''}.`}
                     >
                       <button
                         onClick={(e) => {
@@ -463,7 +460,7 @@ function MarketSidebarInner({
                             {roi > 0 ? "+" : ""}{formatPercent(roi)}
                           </span>
                         )}
-                        {apy > 0 ? (
+                        {apy != null ? (
                           <span className="text-[10px] text-[var(--text-secondary)] ml-1">({formatPercent(apy)})</span>
                         ) : apySummary.unavailableReason ? (
                           <span className="text-[9px] text-[var(--text-secondary)] ml-1" title={`APY unavailable: ${apySummary.unavailableReason.replaceAll('_', ' ')}`}>(APY unavailable)</span>

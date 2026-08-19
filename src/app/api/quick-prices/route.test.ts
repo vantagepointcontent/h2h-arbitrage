@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/quick-prices', () => ({ quickPricesScan: mocks.quickPricesScan }));
 vi.mock('@/lib/persistence', () => ({
-  reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
+  reconcileSavedMarketLiveSummary: mocks.reconcileSavedMarketMatchSummary,
   reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
 }));
 vi.mock('@/lib/current-price-snapshots', () => ({
@@ -74,6 +74,7 @@ describe('POST /api/quick-prices diagnostics', () => {
     expect(repeatedResponse.status).toBe(200);
     expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1);
     expect(mocks.reserveSavedMarketPublication).toHaveBeenCalledTimes(1);
+    expect(mocks.reserveSavedMarketPublication).toHaveBeenCalledWith('mlb-steals', 'live');
     expect(repeatedResponse.headers.get('x-quick-prices-deduplicated')).toBe('true');
   });
 

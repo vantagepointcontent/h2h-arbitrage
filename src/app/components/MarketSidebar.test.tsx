@@ -54,6 +54,7 @@ describe.each([
     const saved: SavedMarket = {
       id: 'market-apy', eventTitle: 'Canonical APY market', kalshiUrl: 'k', polymarketUrl: 'p',
       createdAt: '2026-08-13T18:00:00Z', expiryDate: '2027-01-01T00:00:00.000Z',
+      canonicalApyPct: 12.34, canonicalApyObservedAt: '2026-08-16T00:00:00.000Z', canonicalApySource: 'full_scan',
       lastScanResult: { bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-16T00:00:00.000Z', allArbs: [] },
     };
     saved.lastScanResult = {

@@ -262,6 +262,12 @@ const openapi = {
       SavedMarket: {
         type: 'object', additionalProperties: true,
         properties: {
+          canonicalApyPct: { type: ['number', 'null'], description: 'Canonical compact APY percentage from the newest persisted successful full scan.' },
+          canonicalApyUnavailableReason: { type: ['string', 'null'] },
+          canonicalApyOutcome: { type: ['string', 'null'] },
+          canonicalApyObservedAt: { type: ['string', 'null'], format: 'date-time' },
+          canonicalApySource: { type: ['string', 'null'], enum: ['full_scan', null] },
+          canonicalApyRevision: { type: ['integer', 'null'] },
           lastScanResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
           liveResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
         },

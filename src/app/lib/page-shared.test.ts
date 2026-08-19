@@ -8,6 +8,8 @@ import {
   getCanonicalMatchState,
   formatCanonicalMatchState,
   getMarketApySummary,
+  compareSavedMarketApy,
+  mergeSavedMarketHydration,
   getSavedMarketLastSuccessAt,
   getSavedMarketScheduleView,
   mergeSavedMarketMatchRefresh,
@@ -268,6 +270,8 @@ describe('canonical market APY summary', () => {
     });
     const marketWithScenarios = {
       id: 'market', kalshiUrl: '', polymarketUrl: '', eventTitle: 'Market', createdAt: '',
+      canonicalApyPct: 5.26, canonicalApyObservedAt: '2026-08-14T00:00:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 9,
       lastScanResult: { bestRoiPct: 1, bestProfit: 1, strategy: 'Direct', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T00:00:00Z', allArbs: [{
         artist: 'A', roiPct: 1, expectedProfit: 1, strategy: 'Direct', apyPct: 5.26, daysToExpiry: 71,
         outcomeApy: { observedAt: '2026-08-14T00:00:00Z', apyPct: null, unavailableReason: 'outcome_contingent' as const, scenarioA: scenario('kalshi', 2.5, '2027-01-01T00:00:00Z'), scenarioB: scenario('polymarket', 4.5, '2026-11-01T00:00:00Z'), kalshi: null, polymarket: null },
@@ -280,11 +284,46 @@ describe('canonical market APY summary', () => {
       unavailableReason: null,
     });
 
-    marketWithScenarios.lastScanResult!.allArbs![0].apyPct = null;
+    marketWithScenarios.canonicalApyPct = null;
+    marketWithScenarios.canonicalApyUnavailableReason = 'missing_expiry';
     expect(getMarketApySummary(marketWithScenarios)).toMatchObject({
       scalarApyPct: null,
       scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
       sortApyPct: null,
+    });
+  });
+
+  it('sorts full precision deterministically with unavailable values last', () => {
+    const saved = (id: string, eventTitle: string, canonicalApyPct: number | null): SavedMarket => ({
+      id, eventTitle, canonicalApyPct, kalshiUrl: '', polymarketUrl: '', createdAt: '',
+    });
+    const rows = [
+      saved('null', 'Unavailable', null),
+      saved('rounded-low', 'NCAA', 29.723101937298058),
+      saved('negative', 'Negative', -1),
+      saved('rounded-high', 'MD-01', 29.959508018509656),
+      saved('zero', 'Zero', 0),
+      saved('tie-b', 'B tie', 10),
+      saved('tie-a', 'A tie', 10),
+    ];
+    expect([...rows].sort((a, b) => compareSavedMarketApy(a, b, 'desc')).map((row) => row.id)).toEqual([
+      'rounded-high', 'rounded-low', 'tie-a', 'tie-b', 'zero', 'negative', 'null',
+    ]);
+    expect([...rows].sort((a, b) => compareSavedMarketApy(a, b, 'asc')).at(-1)?.id).toBe('null');
+  });
+
+  it('fences delayed hydration from rolling back a newer canonical revision', () => {
+    const base: SavedMarket = { id: 'm', eventTitle: 'Market', kalshiUrl: '', polymarketUrl: '', createdAt: '' };
+    const current: SavedMarket = {
+      ...base, canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:30:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 12,
+    };
+    const delayed: SavedMarket = {
+      ...base, eventTitle: 'Server title', canonicalApyPct: 29.7,
+      canonicalApyObservedAt: '2026-08-19T14:29:00Z', canonicalApySource: 'full_scan', canonicalApyRevision: 11,
+    };
+    expect(mergeSavedMarketHydration(current, delayed)).toMatchObject({
+      eventTitle: 'Server title', canonicalApyPct: 30, canonicalApyRevision: 12,
     });
   });
 });

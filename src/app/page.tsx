@@ -100,11 +100,11 @@ import {
   getStoredCustomTitles, setCustomTitle,
   removeCustomTitle, MAX_CUSTOM_TITLE_LEN, getStoredMfAutoRefresh, persistMfAutoRefresh,
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
-  applyDurableFullScanToSavedMarket, formatCurrency, formatPercent, formatExpiry, timeUntilExpiry, isMarketExpired,
+  applyDurableFullScanToSavedMarket, formatCurrency, formatPercent, formatExpiry, formatRelativeTime, timeUntilExpiry, isMarketExpired,
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
-  selectSavedMarketPriceCache,
+  selectSavedMarketPriceCache, getMarketApySummary, mergeSavedMarketHydration,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -758,9 +758,13 @@ export default function Home() {
         setLastUpdated(new Date(scannedAt));
         setLastScanTimestamp(scannedAt);
         if (scannedMarketId && Array.isArray(data.outcomes)) {
-          setSavedMarkets((previous) => previous.map((market) => market.id === scannedMarketId
-            ? applyDurableFullScanToSavedMarket(market, data, scannedAt)
-            : market));
+          setSavedMarkets((previous) => {
+            const next = previous.map((market) => market.id === scannedMarketId
+              ? applyDurableFullScanToSavedMarket(market, data, scannedAt)
+              : market);
+            savedMarketsRef.current = next;
+            return next;
+          });
         }
         // Record initial prices for change detection
         const prices = new Map<string, { kYes: number; pYes: number }>();
@@ -812,8 +816,15 @@ export default function Home() {
       const res = await fetch("/api/saved-markets?fields=basic");
       if (res.ok) {
         const data = await res.json();
-        setSavedMarkets(data.markets || []);
-        return data.markets || [];
+        const incoming: SavedMarket[] = data.markets || [];
+        const currentById = new Map(savedMarketsRef.current.map((market) => [market.id, market]));
+        const merged = incoming.map((market) => {
+          const current = currentById.get(market.id);
+          return current ? mergeSavedMarketHydration(current, market) : market;
+        });
+        savedMarketsRef.current = merged;
+        setSavedMarkets(merged);
+        return merged;
       }
     } catch { /* ignore */ }
     return [];
@@ -2177,6 +2188,28 @@ export default function Home() {
                     )}
 
                     {/* Outcome table — expanded log/detail area */}
+                    {marketWorkspaceTab === "prices" && activeMarketId && (() => {
+                      const market = savedMarkets.find((item) => item.id === activeMarketId);
+                      if (!market) return null;
+                      const apy = getMarketApySummary(market);
+                      const hasQuickOverlay = market.liveResult != null && apy.quickObservedAt != null;
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[11px] text-[var(--text-secondary)]" data-testid="selected-market-apy-provenance">
+                          <span title="This full-precision persisted value controls Saved Markets APY sorting.">
+                            Persisted scan APY: <strong className="text-[var(--text-primary)]">{apy.scalarApyPct == null ? "Unavailable" : formatPercent(apy.scalarApyPct)}</strong>
+                            {apy.observedAt ? ` · ${formatRelativeTime(apy.observedAt)}` : ""}
+                            {apy.revision != null ? ` · revision ${apy.revision}` : ""}
+                          </span>
+                          {hasQuickOverlay && (
+                            <span title="Current quick APY is contextual and does not reorder Saved Markets.">
+                              Current quick APY: <strong className="text-[var(--text-primary)]">{apy.quickApyPct == null ? "Unavailable" : formatPercent(apy.quickApyPct)}</strong>
+                              {apy.quickObservedAt ? ` · ${formatRelativeTime(apy.quickObservedAt)}` : ""}
+                            </span>
+                          )}
+                          <span className="text-[var(--text-faint)]">Saved Markets sorts by persisted scan APY.</span>
+                        </div>
+                      );
+                    })()}
                     {marketWorkspaceTab === "prices" && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
                         {/* Filter toggles */}

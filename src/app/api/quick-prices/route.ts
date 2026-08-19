@@ -5,7 +5,7 @@ import { parseJsonObject } from '@/lib/request-json';
 import { parseScanCapital } from '@/lib/scan-request';
 import { scanRateLimiter, getScanClientKey } from '@/lib/scan-rate-limit';
 import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
-import { reconcileSavedMarketMatchSummary, reserveSavedMarketPublication } from '@/lib/persistence';
+import { reconcileSavedMarketLiveSummary, reserveSavedMarketPublication } from '@/lib/persistence';
 import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
 import { QuickPricesCoordinatorError, quickPricesCoordinator } from '@/lib/quick-prices-coordinator';
 
@@ -73,8 +73,8 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       let taskPersistenceWarning: string | undefined;
       let taskPublicationGeneration: number | null = null;
       try {
-        taskPublicationGeneration = await reserveSavedMarketPublication(marketId!, 'scan');
-        await reconcileSavedMarketMatchSummary(marketId!, {
+        taskPublicationGeneration = await reserveSavedMarketPublication(marketId!, 'live');
+        await reconcileSavedMarketLiveSummary(marketId!, {
           matchedCount: 0,
           matchStatus: 'refreshing',
           matchError: undefined,
@@ -93,7 +93,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       } catch (scanError: unknown) {
         if (taskPublicationGeneration != null) {
           const msg = clientSafeError(scanError, errorFallback(scanError), { path: '/api/quick-prices' });
-          await reconcileSavedMarketMatchSummary(marketId!, {
+          await reconcileSavedMarketLiveSummary(marketId!, {
             matchedCount: 0,
             matchStatus: 'unavailable',
             matchError: msg,
@@ -121,7 +121,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
         freshPlatforms.has(snapshot.platform)
         || (snapshot.platform === 'polymarket' && freshPmConditions.has(snapshot.marketId.toLowerCase()))));
       if (taskPublicationGeneration != null) {
-        await reconcileSavedMarketMatchSummary(marketId!, {
+        await reconcileSavedMarketLiveSummary(marketId!, {
           matchedCount: result.matchedCount,
           matchStatus: result.matchStatus,
           matchError: result.matchError,
@@ -184,7 +184,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     const msg = clientSafeError(err, fallback, { path: '/api/quick-prices' });
     const status = errorStatus || (msg.includes('timed out') ? 504 : 500);
     if (marketId && publicationGeneration != null) {
-      await reconcileSavedMarketMatchSummary(marketId, {
+      await reconcileSavedMarketLiveSummary(marketId, {
         matchedCount: 0,
         matchStatus: 'unavailable',
         matchError: msg,

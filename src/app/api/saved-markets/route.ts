@@ -74,6 +74,12 @@ export async function GET(request: NextRequest) {
           polymarketUrl: m.polymarketUrl,
           expiryDate: m.expiryDate,
           scheduler: m.scheduler,
+          canonicalApyPct: m.canonicalApyPct ?? null,
+          canonicalApyUnavailableReason: m.canonicalApyUnavailableReason ?? null,
+          canonicalApyOutcome: m.canonicalApyOutcome ?? null,
+          canonicalApyObservedAt: m.canonicalApyObservedAt ?? null,
+          canonicalApySource: m.canonicalApySource ?? null,
+          canonicalApyRevision: m.canonicalApyRevision ?? null,
           lastScanResult: ls ? {
             bestRoiPct: ls.bestRoiPct ?? 0,
             bestProfit: ls.bestProfit ?? 0,

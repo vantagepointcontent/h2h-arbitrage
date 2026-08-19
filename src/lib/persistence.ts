@@ -221,6 +221,15 @@ async function initDb(): Promise<void> {
     // completions cannot publish in arrival order.
     `ALTER TABLE saved_markets ADD COLUMN scan_publication_generation INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE saved_markets ADD COLUMN live_publication_generation INTEGER NOT NULL DEFAULT 0`,
+    // BUG-169: authoritative compact APY from full scans only. Keeping this
+    // outside live_result prevents quick/watcher refreshes from reordering the
+    // persisted Saved Markets list.
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_pct REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_unavailable_reason TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_outcome TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_observed_at TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_source TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_apy_revision INTEGER`,
     // FEAT-3: retain legacy URL columns during the N-platform migration.
     `ALTER TABLE saved_markets ADD COLUMN platform_links TEXT`,
   ]) {
@@ -1335,6 +1344,13 @@ export interface SavedMarket {
    *  liveResult ?? lastScanResult. Core fields required, rest optional so the
    *  client-side SavedMarket (page-shared.ts) stays structurally assignable. */
   liveResult?: (Pick<LastScanResult, 'bestRoiPct' | 'bestProfit' | 'strategy' | 'scannedAt'> & Partial<LastScanResult>) | null;
+  /** Canonical compact APY from the newest authoritative successful full scan. */
+  canonicalApyPct?: number | null;
+  canonicalApyUnavailableReason?: string | null;
+  canonicalApyOutcome?: string | null;
+  canonicalApyObservedAt?: string | null;
+  canonicalApySource?: 'full_scan' | null;
+  canonicalApyRevision?: number | null;
   // AUTO-002: lifecycle
   archived?: boolean;
   archivedAt?: string | null;
@@ -1399,6 +1415,15 @@ function rowToMarket(r: any): SavedMarket {
     favorite: Boolean(Number(r.favorite ?? 0)),
     lastScanResult,
     liveResult,
+    canonicalApyPct: r.canonical_apy_pct != null && Number.isFinite(Number(r.canonical_apy_pct))
+      ? Number(r.canonical_apy_pct) : null,
+    canonicalApyUnavailableReason: r.canonical_apy_unavailable_reason != null
+      ? String(r.canonical_apy_unavailable_reason) : null,
+    canonicalApyOutcome: r.canonical_apy_outcome != null ? String(r.canonical_apy_outcome) : null,
+    canonicalApyObservedAt: r.canonical_apy_observed_at != null ? String(r.canonical_apy_observed_at) : null,
+    canonicalApySource: r.canonical_apy_source === 'full_scan' ? 'full_scan' : null,
+    canonicalApyRevision: r.canonical_apy_revision != null && Number.isSafeInteger(Number(r.canonical_apy_revision))
+      ? Number(r.canonical_apy_revision) : null,
     archived: Boolean(Number(r.archived ?? 0)),
     archivedAt: r.archived_at != null ? String(r.archived_at) : null,
     archiveReason: r.archive_reason != null ? String(r.archive_reason) : null,
@@ -1713,6 +1738,47 @@ function isStaleMatchPublication(previous: LastScanResult | null, incoming: Last
   return matchPublicationAuthority(incoming) < matchPublicationAuthority(previous);
 }
 
+interface CanonicalSavedMarketApy {
+  value: number | null;
+  unavailableReason: string | null;
+  outcome: string | null;
+  observedAt: string | null;
+}
+
+/** Extract the compact scalar from the same full-scan candidate that owns the
+ * persisted best ROI. Never recompute APY from current ROI/time-to-expiry. */
+export function canonicalSavedMarketApy(result: LastScanResult): CanonicalSavedMarketApy {
+  const observedAt = typeof result.scannedAt === 'string' && Number.isFinite(Date.parse(result.scannedAt))
+    ? result.scannedAt : null;
+  const candidates = (result.allArbs ?? []).filter((candidate) =>
+    candidate.strategy !== 'No arb'
+    && Number.isFinite(candidate.roiPct)
+    && Number.isFinite(candidate.expectedProfit),
+  );
+  const best = candidates.reduce<(typeof candidates)[number] | null>((current, candidate) => {
+    if (!current) return candidate;
+    if (candidate.roiPct !== current.roiPct) return candidate.roiPct > current.roiPct ? candidate : current;
+    return candidate.artist.localeCompare(current.artist) < 0 ? candidate : current;
+  }, null);
+  if (!best) {
+    return { value: null, unavailableReason: 'no_canonical_arbitrage', outcome: null, observedAt };
+  }
+  if (typeof best.apyPct !== 'number' || !Number.isFinite(best.apyPct)) {
+    return {
+      value: null,
+      unavailableReason: best.apyUnavailableReason ?? 'canonical_apy_unavailable',
+      outcome: best.artist,
+      observedAt: best.outcomeApy?.observedAt ?? observedAt,
+    };
+  }
+  return {
+    value: best.apyPct,
+    unavailableReason: null,
+    outcome: best.artist,
+    observedAt: best.outcomeApy?.observedAt ?? observedAt,
+  };
+}
+
 export type SavedMarketPublicationChannel = 'scan' | 'live';
 
 /** Reserve a producer generation before network work begins. */
@@ -1754,6 +1820,8 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   if (isStaleMatchPublication(previous, result)) return false;
   const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan');
   if (!prepared) return false;
+  const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
+  const canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0
@@ -1769,13 +1837,25 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   const updated = await c.execute({
       sql: `UPDATE saved_markets SET last_scan_result = ?,
               expiry_date = CASE WHEN ? THEN ? ELSE expiry_date END,
-              last_matched_at = COALESCE(?, last_matched_at)
+              last_matched_at = COALESCE(?, last_matched_at),
+              canonical_apy_pct = CASE WHEN ? THEN ? ELSE canonical_apy_pct END,
+              canonical_apy_unavailable_reason = CASE WHEN ? THEN ? ELSE canonical_apy_unavailable_reason END,
+              canonical_apy_outcome = CASE WHEN ? THEN ? ELSE canonical_apy_outcome END,
+              canonical_apy_observed_at = CASE WHEN ? THEN ? ELSE canonical_apy_observed_at END,
+              canonical_apy_source = CASE WHEN ? THEN 'full_scan' ELSE canonical_apy_source END,
+              canonical_apy_revision = CASE WHEN ? THEN ? ELSE canonical_apy_revision END
             WHERE id = ?
               AND scan_publication_generation = ?
               AND last_scan_result IS ?
               ${dependencyGuard}`,
       args: [
         JSON.stringify(prepared), expiryDate !== undefined ? 1 : 0, expiryDate ?? null, matchedNow,
+        successfulFullScan ? 1 : 0, canonicalApy?.value ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.unavailableReason ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.outcome ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.observedAt ?? null,
+        successfulFullScan ? 1 : 0,
+        successfulFullScan ? 1 : 0, result.publicationGeneration ?? null,
         id, generation, previousRaw,
         ...(dependencies.length > 0 ? [JSON.stringify(dependencies)] : []),
       ],
@@ -1873,6 +1953,59 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
     const updated = await getSavedMarketById(String(row.id));
     if (JSON.stringify(updated?.lastScanResult?.matchDependencies ?? null) !== before) reconciled++;
   }
+  // BUG-169: repair compact APY summaries from the newest durable scan ledger
+  // row. scan_results is written only by completed full scans; quick refreshes
+  // must not participate. Do not derive APY from current ROI/TTE.
+  const apyRows = await c.execute(`
+    WITH ranked AS (
+      SELECT r.*,
+             ROW_NUMBER() OVER (PARTITION BY r.market_id ORDER BY r.scanned_at DESC, r.id DESC) AS rank
+      FROM scan_results r
+      WHERE r.arb_valid = 1
+    )
+    SELECT market_id, scanned_at, strategy, apy_pct, apy_unavailable_reason,
+           positive_arb_count, raw_result
+    FROM ranked WHERE rank = 1
+  `);
+  for (const row of apyRows.rows as unknown as Array<Record<string, unknown>>) {
+    const observedAt = typeof row.scanned_at === 'string' && Number.isFinite(Date.parse(row.scanned_at))
+      ? row.scanned_at : null;
+    if (!observedAt) continue;
+    const parsedApy = row.apy_pct == null ? null : Number(row.apy_pct);
+    const hasArb = String(row.strategy ?? '') !== 'No arb'
+      && (Number(row.positive_arb_count ?? 0) > 0 || (parsedApy != null && Number.isFinite(parsedApy)));
+    const value = hasArb && parsedApy != null && Number.isFinite(parsedApy) ? parsedApy : null;
+    const unavailableReason = value == null
+      ? (typeof row.apy_unavailable_reason === 'string' && row.apy_unavailable_reason
+          ? row.apy_unavailable_reason : hasArb ? 'canonical_apy_unavailable' : 'no_canonical_arbitrage')
+      : null;
+    let outcome: string | null = null;
+    if (typeof row.raw_result === 'string') {
+      try {
+        const raw = JSON.parse(row.raw_result) as { allArbs?: Array<{ artist?: unknown; roiPct?: unknown }> };
+        const best = (raw.allArbs ?? []).filter((candidate) =>
+          typeof candidate.artist === 'string' && Number.isFinite(Number(candidate.roiPct)),
+        ).sort((a, b) => Number(b.roiPct) - Number(a.roiPct)
+          || String(a.artist).localeCompare(String(b.artist)))[0];
+        outcome = typeof best?.artist === 'string' ? best.artist : null;
+      } catch { /* scalar ledger fields remain authoritative */ }
+    }
+    const repaired = await c.execute({
+      sql: `UPDATE saved_markets
+            SET canonical_apy_pct = ?, canonical_apy_unavailable_reason = ?,
+                canonical_apy_outcome = ?, canonical_apy_observed_at = ?,
+                canonical_apy_source = 'full_scan', canonical_apy_revision = NULL
+            WHERE id = ?
+              AND (canonical_apy_observed_at IS NULL OR canonical_apy_observed_at < ?
+                   OR (canonical_apy_observed_at = ? AND canonical_apy_source IS NULL))`,
+      args: [value, unavailableReason, outcome, observedAt, String(row.market_id), observedAt, observedAt],
+    });
+    reconciled += repaired.rowsAffected;
+  }
+  if (reconciled > 0) {
+    invalidateMarketsCache();
+    mirrorMarketsToJsonThrottled();
+  }
   matchSummaryBackfillComplete = true;
   return reconciled;
 }
@@ -1886,6 +2019,19 @@ export async function reconcileSavedMarketMatchSummary(
     kalshiCount: 0, pmCount: 0, allArbs: [], ...summary,
   };
   await updateSavedMarketScanResult(id, fallback);
+}
+
+/** Quick-price status belongs to the fenced live channel. It must never
+ * replace the authoritative full-scan economics or compact APY snapshot. */
+export async function reconcileSavedMarketLiveSummary(
+  id: string,
+  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>,
+): Promise<void> {
+  const fallback: LastScanResult = {
+    bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: summary.matchedCount,
+    kalshiCount: 0, pmCount: 0, allArbs: [], ...summary,
+  };
+  await updateSavedMarketLiveResult(id, fallback);
 }
 
 // WS-107: watcher-written real-time result ─────────────────────────
