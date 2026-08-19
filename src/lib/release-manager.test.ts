@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -152,6 +152,9 @@ fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.e
     ]);
     await api.promoteRelease({ repoRoot: repo, candidateDir: candidateA, restart: false });
     const activeBefore = await api.readActiveIdentity(repo);
+    const orphanBuild = path.join(repo, '.h2h-releases', 'builds', 'orphan');
+    await mkdir(orphanBuild, { recursive: true });
+    await writeFile(path.join(orphanBuild, 'builder.json'), JSON.stringify({ pid: 99999999, startedAt: '2020-01-01T00:00:00.000Z' }));
 
     await Promise.all([
       api.cleanupReleases({ repoRoot: repo, now: Date.now() + 86_400_000, candidateMaxAgeMs: 1 }),
@@ -162,6 +165,7 @@ fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.e
     expect(await api.readActiveIdentity(repo)).toEqual(activeBefore);
     expect((await api.verifyRelease(candidateA)).commit).toBe('a'.repeat(40));
     expect((await api.verifyRelease(candidateB)).commit).toBe('b'.repeat(40));
+    await expect(access(orphanBuild)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('blocks builds and promotions before they breach reserved disk headroom', async () => {

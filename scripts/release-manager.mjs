@@ -530,6 +530,24 @@ export async function cleanupReleases({
         }
       }
     }
+    const buildBase = path.join(root, 'builds');
+    await mkdir(buildBase, { recursive: true });
+    for (const name of await readdir(buildBase)) {
+      const item = path.join(buildBase, name);
+      try {
+        const builder = JSON.parse(await readFile(path.join(item, 'builder.json'), 'utf8'));
+        const age = now - Date.parse(builder.startedAt);
+        if (age <= candidateMaxAgeMs || await isSameProcess(builder)) continue;
+        await rm(item, { recursive: true, force: true });
+        removed.push(item);
+      } catch {
+        const age = now - (await stat(item)).mtimeMs;
+        if (age > candidateMaxAgeMs) {
+          await rm(item, { recursive: true, force: true });
+          removed.push(item);
+        }
+      }
+    }
     await appendEvent(repoRoot, { type: 'cleanup', removed });
     return { removed, protected: [...protectedPaths] };
   });
@@ -646,7 +664,11 @@ async function main() {
   else if (command === 'rollback') result = await rollbackRelease({ repoRoot, restart: options.restart });
   else if (command === 'verify-active' || command === 'status') result = await verifyActiveRelease(repoRoot);
   else if (command === 'monitor') result = await monitorActiveRelease({ repoRoot, intervalMs: Number(options.intervalMs ?? 60_000) });
-  else if (command === 'cleanup') result = await cleanupReleases({ repoRoot, keepReleases: Number(options.keep ?? DEFAULT_KEEP_RELEASES) });
+  else if (command === 'cleanup') result = await cleanupReleases({
+    repoRoot,
+    keepReleases: Number(options.keep ?? DEFAULT_KEEP_RELEASES),
+    candidateMaxAgeMs: Number(options.candidateMaxAgeMs ?? DEFAULT_CANDIDATE_MAX_AGE_MS),
+  });
   else throw new Error('Usage: release-manager.mjs build|promote|rollback|verify-active|monitor|status|cleanup [options]');
   console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
 }
