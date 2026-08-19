@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BotPosition } from './bot-positions';
 import {
   buildSettlementExecutionEvidence,
+  normalizeKalshiSettlementCredit,
+  normalizePolymarketRedeemablePosition,
+  normalizePolymarketRedemptionCredit,
   reconcileBotPositionSettlements,
   type SettlementExecutionRecord,
 } from './bot-settlement-reconciler';
@@ -65,10 +68,88 @@ describe('buildSettlementExecutionEvidence', () => {
         polymarketResult: { status: 'partial', filledContracts: null, orderId: 'p-unknown' },
       },
     });
-    expect(failed.map((leg) => leg.exposureState)).toEqual(['failed', 'unknown']);
+    expect(failed.map((leg) => leg.exposureState)).toEqual(['unknown', 'unknown']);
+
+    const provenNoExposure = buildSettlementExecutionEvidence({
+      ...position,
+      remainingSharesKalshi: 0,
+    }, {
+      ...execution,
+      success: false,
+      result: {
+        ...execution.result,
+        success: false,
+        kalshiResult: { status: 'failed', filledContracts: 0, orderId: 'k-fail' },
+      },
+    });
+    expect(provenNoExposure[0].exposureState).toBe('failed');
 
     const live = buildSettlementExecutionEvidence({ ...position, executionMode: 'live' }, { ...execution, dryRun: false });
     expect(live.every((leg) => leg.exposureState === 'unknown')).toBe(true);
+  });
+});
+
+describe('live settlement credit normalization', () => {
+  it('accepts an exact Kalshi settlement credit and rejects aggregate exposure that cannot be allocated', () => {
+    const leg = { ...buildSettlementExecutionEvidence(position, execution)[0], mode: 'live' as const };
+    expect(normalizeKalshiSettlementCredit({ settlements: [{
+      ticker: position.kalshiTicker,
+      market_result: 'yes',
+      yes_count_fp: '1.00',
+      yes_total_cost_dollars: '0.4400',
+      no_count_fp: '0.00',
+      no_total_cost_dollars: '0.0000',
+      revenue: 100,
+      settled_time: '2026-08-20T09:00:00.000Z',
+      fee_cost: '0.0000',
+    }] }, leg, 'yes')).toEqual({
+      creditState: 'credited',
+      creditedAt: '2026-08-20T09:00:00.000Z',
+      settlementFeeCents: 0,
+      sourceVersion: 'settlement:2026-08-20T09:00:00.000Z:yes:1.00:0.00:100:0.0000',
+    });
+    expect(normalizeKalshiSettlementCredit({ settlements: [{
+      ticker: position.kalshiTicker,
+      market_result: 'yes', yes_count_fp: '2.00', no_count_fp: '0.00',
+      revenue: 200, settled_time: '2026-08-20T09:00:00.000Z', fee_cost: '0.0000',
+    }] }, leg, 'yes')).toBeNull();
+  });
+
+  it('accepts only an exact Polymarket redemption cash flow for the held token', () => {
+    const leg = { ...buildSettlementExecutionEvidence(position, execution)[1], mode: 'live' as const };
+    expect(normalizePolymarketRedemptionCredit([{
+      proxyWallet: '0x0000000000000000000000000000000000000001',
+      timestamp: 1_776_931_200,
+      conditionId: position.pmConditionId,
+      type: 'REDEEM',
+      size: 1,
+      usdcSize: 1,
+      transactionHash: '0xredeem',
+      asset: position.pmEntryTokenId,
+    }], leg, 'no')).toEqual({
+      creditState: 'credited',
+      creditedAt: '2026-04-23T08:00:00.000Z',
+      settlementFeeCents: 0,
+      sourceVersion: 'redeem:0xredeem:1776931200:1:1',
+    });
+    expect(normalizePolymarketRedemptionCredit([{
+      timestamp: 1_776_931_200, conditionId: position.pmConditionId, type: 'REDEEM',
+      size: 1, usdcSize: 1, transactionHash: '0xwrong', asset: 'other-token',
+    }], leg, 'no')).toBeNull();
+  });
+
+  it('keeps an exact resolved Polymarket token separate while it is only redeemable', () => {
+    const leg = { ...buildSettlementExecutionEvidence(position, execution)[1], mode: 'live' as const };
+    expect(normalizePolymarketRedeemablePosition([{
+      asset: position.pmEntryTokenId,
+      conditionId: position.pmConditionId,
+      size: 1,
+      redeemable: true,
+    }], leg)).toEqual({
+      creditState: 'redeemable',
+      settlementFeeCents: 0,
+      sourceVersion: `redeemable:${position.pmConditionId}:${position.pmEntryTokenId}:1`,
+    });
   });
 });
 
@@ -139,5 +220,50 @@ describe('reconcileBotPositionSettlements', () => {
       observedAt: '2026-08-19T12:00:02.000Z', venueTimeoutMs: 5,
     });
     expect(result.errors).toEqual([{ id: 46, error: 'Kalshi settlement lookup timed out' }]);
+  });
+
+  it('settles only the authoritative remaining exposure after an early partial close', async () => {
+    const reduced = {
+      ...position,
+      sharesKalshi: 3,
+      sharesPm: 3,
+      remainingSharesKalshi: 1,
+      remainingSharesPm: 1,
+      totalCostCents: 288,
+      remainingOpenCostCents: 96,
+      realizedPnlCents: 5,
+    };
+    const filledThree = {
+      ...execution,
+      kalshiOrder: { ...execution.kalshiOrder, contracts: 3 },
+      polymarketOrder: { ...execution.polymarketOrder, contracts: 3 },
+      result: {
+        ...execution.result,
+        kalshiResult: { status: 'filled', filledContracts: 3, orderId: 'dry-k' },
+        polymarketResult: { status: 'filled', filledContracts: 3, orderId: 'dry-p' },
+      },
+    };
+    const persist = vi.fn(async () => true);
+    await reconcileBotPositionSettlements({
+      positions: [reduced],
+      loadExecution: async () => filledThree,
+      fetchKalshiResolution: async () => ({
+        venue: 'kalshi', marketId: position.kalshiTicker!, outcomeId: `${position.kalshiTicker}:YES`,
+        winningSide: 'yes', resolvedAt: '2026-08-19T12:00:00.000Z',
+        source: 'kalshi_market_settlement', sourceVersion: 'settled:1',
+      }),
+      fetchPmResolution: async () => ({
+        venue: 'polymarket', marketId: position.pmConditionId!, outcomeId: position.pmEntryTokenId!,
+        winningSide: 'yes', resolvedAt: '2026-08-19T12:00:01.000Z',
+        source: 'polymarket_clob_market', sourceVersion: 'closed:true:yes',
+      }),
+      persist,
+      observedAt: '2026-08-19T12:00:02.000Z',
+    });
+
+    expect(persist).toHaveBeenCalledWith(46, expect.objectContaining({
+      positionState: 'settled', grossSettlementProceedsCents: 100,
+      netSettlementProceedsCents: 100, realizedPnlCents: 9,
+    }));
   });
 });

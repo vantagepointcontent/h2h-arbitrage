@@ -40,6 +40,8 @@ export interface SettlementExecutionLegEvidence {
   side: SettlementSide;
   requestedQuantity: number;
   filledQuantity: number | null;
+  /** Authoritative quantity still exposed after any verified close events. */
+  remainingQuantity?: number | null;
   orderId: string | null;
   fillIds: string[];
   exposureState: SettlementExposureState;
@@ -57,6 +59,7 @@ export interface SettlementResolutionObservation {
   creditState?: 'redeemable' | 'redeemed' | 'credited';
   creditedAt?: string;
   settlementFeeCents?: number;
+  creditFailureReason?: string;
 }
 
 export interface ReconciledSettlementLeg extends SettlementExecutionLegEvidence {
@@ -107,15 +110,39 @@ function assertSafeNonNegativeInteger(value: unknown, label: string): asserts va
 }
 
 function hasNoRemainingExposure(leg: SettlementExecutionLegEvidence): boolean {
-  return leg.exposureState === 'zero_fill'
+  return leg.remainingQuantity === 0
+    || leg.exposureState === 'zero_fill'
     || leg.exposureState === 'failed'
     || leg.exposureState === 'rolled_back'
     || leg.exposureState === 'closed';
 }
 
+function exposedQuantity(leg: SettlementExecutionLegEvidence): number | null {
+  return leg.remainingQuantity === undefined ? leg.filledQuantity : leg.remainingQuantity;
+}
+
+function sameLegEvidence(
+  prior: ReconciledSettlementLeg,
+  leg: SettlementExecutionLegEvidence,
+): boolean {
+  return prior.venue === leg.venue
+    && prior.mode === leg.mode
+    && prior.marketId === leg.marketId
+    && prior.outcomeId === leg.outcomeId
+    && prior.side === leg.side
+    && prior.requestedQuantity === leg.requestedQuantity
+    && prior.filledQuantity === leg.filledQuantity
+    && exposedQuantity(prior) === exposedQuantity(leg)
+    && prior.orderId === leg.orderId
+    && prior.exposureState === leg.exposureState
+    && prior.fillIds.length === leg.fillIds.length
+    && prior.fillIds.every((fillId, index) => fillId === leg.fillIds[index]);
+}
+
 function unresolvedLeg(leg: SettlementExecutionLegEvidence, reason: string): ReconciledSettlementLeg {
   return {
     ...leg,
+    remainingQuantity: exposedQuantity(leg),
     lifecycleState: 'unresolved',
     resolutionWinningSide: null,
     resolutionDetectedAt: null,
@@ -134,6 +161,7 @@ function unresolvedLeg(leg: SettlementExecutionLegEvidence, reason: string): Rec
 function openLeg(leg: SettlementExecutionLegEvidence): ReconciledSettlementLeg {
   return {
     ...leg,
+    remainingQuantity: exposedQuantity(leg),
     lifecycleState: 'open',
     resolutionWinningSide: null,
     resolutionDetectedAt: null,
@@ -156,6 +184,7 @@ function failedLeg(
 ): ReconciledSettlementLeg {
   return {
     ...(prior ?? openLeg(leg)),
+    remainingQuantity: exposedQuantity(leg),
     lifecycleState: 'failed',
     payoutEntitlementCents: null,
     settlementFeeCents: null,
@@ -187,7 +216,7 @@ function reconcileResolvedLeg(
   executionMode: SettlementExecutionMode,
   observedAt: string,
 ): ReconciledSettlementLeg {
-  const quantity = leg.filledQuantity!;
+  const quantity = exposedQuantity(leg)!;
   const payoutEntitlementCents = leg.side === observation.winningSide ? quantity * 100 : 0;
   assertSafeNonNegativeInteger(payoutEntitlementCents, `${leg.venue} payout entitlement`);
   const settlementFeeCents = observation.settlementFeeCents ?? 0;
@@ -200,6 +229,7 @@ function reconcileResolvedLeg(
   if (payoutEntitlementCents === 0) {
     return {
       ...leg,
+      remainingQuantity: exposedQuantity(leg),
       lifecycleState: 'reconciled',
       resolutionWinningSide: observation.winningSide,
       resolutionDetectedAt: observation.resolvedAt,
@@ -218,6 +248,7 @@ function reconcileResolvedLeg(
   if (executionMode === 'paper') {
     return {
       ...leg,
+      remainingQuantity: exposedQuantity(leg),
       lifecycleState: 'reconciled',
       resolutionWinningSide: observation.winningSide,
       resolutionDetectedAt: observation.resolvedAt,
@@ -244,6 +275,7 @@ function reconcileResolvedLeg(
   const cashAvailableAt = creditState === 'credited' ? observation.creditedAt ?? null : null;
   return {
     ...leg,
+    remainingQuantity: exposedQuantity(leg),
     lifecycleState,
     resolutionWinningSide: observation.winningSide,
     resolutionDetectedAt: observation.resolvedAt,
@@ -257,7 +289,8 @@ function reconcileResolvedLeg(
     failureReason: creditState === 'credited' && cashAvailableAt == null
       ? 'Authoritative credit timestamp is missing'
       : creditState === 'pending'
-        ? 'Resolved; awaiting authoritative venue redemption or credit evidence'
+        ? observation.creditFailureReason
+          ?? 'Resolved; awaiting authoritative venue redemption or credit evidence'
         : null,
     reconciledAt: lifecycleState === 'reconciled' ? observedAt : null,
   };
@@ -266,6 +299,7 @@ function reconcileResolvedLeg(
 function noExposureLeg(leg: SettlementExecutionLegEvidence, observedAt: string): ReconciledSettlementLeg {
   return {
     ...leg,
+    remainingQuantity: exposedQuantity(leg) ?? 0,
     lifecycleState: 'reconciled',
     resolutionWinningSide: null,
     resolutionDetectedAt: null,
@@ -294,6 +328,20 @@ export function reconcileSettlementLifecycle(input: ReconcileSettlementInput): S
   }
 
   const priorByVenue = new Map(input.priorLegs?.map((leg) => [leg.venue, leg]));
+  const stickyConflict = input.priorLegs?.find((leg) => leg.lifecycleState === 'failed'
+    && leg.failureReason?.toLowerCase().includes('conflicting authoritative resolution'));
+  if (stickyConflict && input.priorLegs?.length === 2
+    && input.legs.every((leg) => {
+      const prior = priorByVenue.get(leg.venue);
+      return prior != null && sameLegEvidence(prior, leg);
+    })) {
+    return {
+      positionState: 'settlement_unresolved', legs: input.priorLegs,
+      grossSettlementProceedsCents: null, netSettlementProceedsCents: null,
+      realizedPnlCents: null, realizedRoiBps: null, cashAvailableAt: null,
+      failureReason: stickyConflict.failureReason, reconciledAt: input.observedAt,
+    };
+  }
   const resolvedByVenue = new Map<SettlementVenue, SettlementResolutionObservation | null>();
   let conflictReason: string | null = null;
 
@@ -330,21 +378,31 @@ export function reconcileSettlementLifecycle(input: ReconcileSettlementInput): S
 
   const legs = input.legs.map((leg): ReconciledSettlementLeg => {
     if (hasNoRemainingExposure(leg)) return noExposureLeg(leg, input.observedAt);
+    const remainingQuantity = exposedQuantity(leg);
     if (leg.exposureState === 'unknown' || leg.filledQuantity == null
       || !Number.isSafeInteger(leg.filledQuantity) || leg.filledQuantity <= 0
+      || remainingQuantity == null || !Number.isSafeInteger(remainingQuantity)
+      || remainingQuantity <= 0 || remainingQuantity > leg.filledQuantity
       || !leg.marketId?.trim() || !leg.outcomeId?.trim() || !leg.orderId?.trim()
       || leg.fillIds.length === 0) {
       return unresolvedLeg(leg, EXACT_LEG_EVIDENCE_MISSING);
     }
-    if (leg.mode !== input.executionMode || leg.requestedQuantity !== leg.filledQuantity) {
+    const fillStateValid = leg.exposureState === 'filled'
+      ? leg.requestedQuantity === leg.filledQuantity
+      : leg.exposureState === 'partial_fill'
+        && leg.filledQuantity < leg.requestedQuantity;
+    if (leg.mode !== input.executionMode || !fillStateValid) {
       return unresolvedLeg(leg, 'Settlement unresolved — execution mode or filled quantity evidence conflicts');
     }
     const observation = resolvedByVenue.get(leg.venue);
     const prior = priorByVenue.get(leg.venue);
+    if (!observation && prior?.resolutionWinningSide && sameLegEvidence(prior, leg)
+      && prior.lifecycleState !== 'failed' && prior.lifecycleState !== 'unresolved') {
+      return prior;
+    }
     if (observation && prior?.resolutionWinningSide === observation.winningSide
       && prior.resolutionSourceVersion === observation.sourceVersion
-      && prior.marketId === leg.marketId && prior.outcomeId === leg.outcomeId
-      && prior.side === leg.side && prior.filledQuantity === leg.filledQuantity
+      && sameLegEvidence(prior, leg)
       && prior.lifecycleState === 'reconciled') {
       return prior;
     }

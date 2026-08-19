@@ -3298,6 +3298,7 @@ export async function pollOpenBotPositions(dependencies?: {
   fetchFeeConfig?: typeof fetchAuthoritativeBotFeeConfig;
   observedAt?: string;
   positionStore?: BotPositionStore;
+  loadSettlementStates?: (positionIds: number[]) => Promise<Map<number, SettlementPositionState>>;
 }): Promise<{ updated: number; settled: number; errors: Array<{ id: number; error: string }> }> {
   const [{ fetchKalshiMarket }, { fetchClobMarket, fetchClobBook, extractClobBidPrices }] = await Promise.all([
     import('./kalshi'),
@@ -3413,7 +3414,26 @@ export async function pollOpenBotPositions(dependencies?: {
     };
   });
   const positionStore = dependencies?.positionStore ?? store();
-  const open = await positionStore.listAllOpen();
+  const candidates = await positionStore.listAllOpen();
+  let settlementStates: Map<number, SettlementPositionState>;
+  if (dependencies?.loadSettlementStates) {
+    settlementStates = await dependencies.loadSettlementStates(candidates.map((position) => position.id));
+  } else if (dependencies?.positionStore) {
+    settlementStates = new Map();
+  } else {
+    const { BotSettlementStore } = await import('./bot-settlement-store');
+    const settlementStore = new BotSettlementStore();
+    try {
+      const settlements = await settlementStore.getByPositionIds(candidates.map((position) => position.id));
+      settlementStates = new Map([...settlements].map(([id, result]) => [id, result.positionState]));
+    } finally {
+      settlementStore.close();
+    }
+  }
+  const open = candidates.filter((position) => {
+    const state = settlementStates.get(position.id);
+    return state == null || state === 'open' || state === 'partially_settled';
+  });
   const valuationAttemptedAt = dependencies?.observedAt ?? new Date().toISOString();
   let updated = 0;
   let settled = 0;

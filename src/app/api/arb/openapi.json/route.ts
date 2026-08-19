@@ -48,8 +48,8 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.2.0',
-    description: 'Scanner and saved-market contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
+    version: '1.3.0',
+    description: 'Scanner, saved-market, and BotTrader settlement contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
     '/api/scan': {
@@ -77,7 +77,11 @@ const openapi = {
     '/api/logs': { get: { summary: 'Read scans with calculation envelopes', responses: { '200': { description: 'Scan log rows' } } } },
     '/api/executions': { get: { summary: 'Read executions with calculation envelopes', responses: { '200': { description: 'Execution records' } } } },
     '/api/positions': { get: { summary: 'Read positions with calculation provenance', responses: { '200': { description: 'Position records' } } } },
-    '/api/bot-trader/positions': { get: { summary: 'Read bot positions joined to execution envelopes', responses: { '200': { description: 'Bot position records' } } } },
+    '/api/bot-trader/positions': { get: { summary: 'Read bot positions joined to execution and settlement ledgers', responses: { '200': {
+      description: 'Bot position records with authoritative per-leg settlement state',
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/BotPositionPage' } } },
+    } } } },
+
   },
   components: {
     schemas: {
@@ -115,6 +119,70 @@ const openapi = {
       },
       CalculationEnvelopeCarrier: { type: 'object', required: ['calculationEnvelope'], properties: { calculationEnvelope: { $ref: '#/components/schemas/CalculationEnvelope' } } },
       LegacyCalculationBlocker: { type: 'object', required: ['code', 'message'], properties: { code: { const: 'legacy_missing_calculation_authority' }, message: nullableString } },
+      BotSettlementLeg: {
+        type: 'object', additionalProperties: false,
+        required: [
+          'venue', 'marketId', 'outcomeId', 'side', 'requestedQuantity', 'filledQuantity',
+          'remainingQuantity', 'orderId', 'fillIds', 'exposureState', 'mode', 'lifecycleState',
+          'resolutionWinningSide', 'resolutionDetectedAt', 'resolutionSource',
+          'resolutionSourceVersion', 'payoutEntitlementCents', 'settlementFeeCents',
+          'netSettlementProceedsCents', 'creditState', 'cashAvailableAt', 'failureReason', 'reconciledAt',
+        ],
+        properties: {
+          venue: { type: 'string', enum: ['kalshi', 'polymarket'] },
+          marketId: nullableString,
+          outcomeId: nullableString,
+          side: { type: 'string', enum: ['yes', 'no'] },
+          requestedQuantity: { type: 'integer', minimum: 0 },
+          filledQuantity: nullableInteger,
+          remainingQuantity: nullableInteger,
+          orderId: nullableString,
+          fillIds: { type: 'array', items: { type: 'string' } },
+          exposureState: { type: 'string', enum: ['filled', 'partial_fill', 'zero_fill', 'failed', 'rolled_back', 'closed', 'unknown'] },
+          mode: { type: 'string', enum: ['paper', 'live'] },
+          lifecycleState: { type: 'string', enum: ['open', 'resolution_detected', 'settlement_pending', 'redeemable', 'settled', 'redeemed', 'reconciled', 'failed', 'unresolved'] },
+          resolutionWinningSide: { type: ['string', 'null'], enum: ['yes', 'no', null] },
+          resolutionDetectedAt: { type: ['string', 'null'], format: 'date-time' },
+          resolutionSource: nullableString,
+          resolutionSourceVersion: nullableString,
+          payoutEntitlementCents: nullableInteger,
+          settlementFeeCents: nullableInteger,
+          netSettlementProceedsCents: nullableInteger,
+          creditState: { type: 'string', enum: ['pending', 'redeemable', 'redeemed', 'credited', 'simulated_credited', 'not_applicable'] },
+          cashAvailableAt: { type: ['string', 'null'], format: 'date-time' },
+          failureReason: nullableString,
+          reconciledAt: { type: ['string', 'null'], format: 'date-time' },
+        },
+      },
+      BotPositionSettlementProjection: {
+        type: 'object', additionalProperties: true,
+        properties: {
+
+          settlementState: { type: 'string', enum: ['open', 'partially_settled', 'settlement_pending', 'settlement_unresolved', 'settled'] },
+          settlementLegs: { type: 'array', items: { $ref: '#/components/schemas/BotSettlementLeg' } },
+          settlementGrossProceedsCents: nullableInteger,
+          settlementNetProceedsCents: nullableInteger,
+          settlementFailureReason: nullableString,
+          settlementCashAvailableAt: { type: ['string', 'null'], format: 'date-time' },
+          settlementReconciledAt: { type: ['string', 'null'], format: 'date-time' },
+          realizedPnlCents: nullableInteger,
+          realizedRoiBps: nullableInteger,
+        },
+      },
+
+      BotPositionPage: {
+        type: 'object', additionalProperties: true,
+        required: ['success', 'count', 'marketCount', 'markets', 'nextCursor', 'positions'],
+        properties: {
+          success: { type: 'boolean', const: true },
+          count: { type: 'integer', minimum: 0 },
+          marketCount: { type: 'integer', minimum: 0 },
+          markets: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          nextCursor: nullableString,
+          positions: { type: 'array', items: { $ref: '#/components/schemas/BotPositionSettlementProjection' } },
+        },
+      },
+
       SettlementTimingSource: timingSource,
       EarlyDetermination: {
         type: 'object', required: ['eligible', 'condition', 'source'], additionalProperties: false,

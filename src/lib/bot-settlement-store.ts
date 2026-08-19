@@ -41,6 +41,10 @@ function parseFillIds(value: unknown): string[] {
   }
 }
 
+function legRemainingQuantity(leg: ReconciledSettlementLeg): number | null {
+  return leg.remainingQuantity === undefined ? leg.filledQuantity : leg.remainingQuantity;
+}
+
 function rowToLeg(row: Record<string, unknown>): ReconciledSettlementLeg {
   return {
     venue: String(row.venue) as SettlementVenue,
@@ -49,6 +53,7 @@ function rowToLeg(row: Record<string, unknown>): ReconciledSettlementLeg {
     side: String(row.side) as SettlementSide,
     requestedQuantity: Number(row.requested_quantity),
     filledQuantity: asNullableNumber(row.filled_quantity),
+    remainingQuantity: asNullableNumber(row.remaining_quantity) ?? asNullableNumber(row.filled_quantity),
     orderId: asNullableString(row.order_id),
     fillIds: parseFillIds(row.fill_ids_json),
     exposureState: String(row.exposure_state) as SettlementExposureState,
@@ -106,6 +111,7 @@ export class BotSettlementStore {
       side TEXT NOT NULL CHECK (side IN ('yes', 'no')),
       requested_quantity INTEGER NOT NULL,
       filled_quantity INTEGER,
+      remaining_quantity INTEGER,
       order_id TEXT,
       fill_ids_json TEXT NOT NULL,
       exposure_state TEXT NOT NULL,
@@ -123,6 +129,10 @@ export class BotSettlementStore {
       reconciled_at TEXT,
       PRIMARY KEY (position_id, venue)
     )`);
+    const legColumns = await this.client.execute('PRAGMA table_info(bot_position_settlement_legs)');
+    if (!legColumns.rows.some((row) => String(row.name) === 'remaining_quantity')) {
+      await this.client.execute('ALTER TABLE bot_position_settlement_legs ADD COLUMN remaining_quantity INTEGER');
+    }
     await this.client.execute('CREATE INDEX IF NOT EXISTS idx_bot_position_settlements_state ON bot_position_settlements(position_state, reconciled_at)');
   }
 
@@ -140,11 +150,20 @@ export class BotSettlementStore {
     const transaction = await this.client.transaction('write');
     try {
       const existing = await transaction.execute({
-        sql: 'SELECT reconciled_at FROM bot_position_settlements WHERE position_id = ?',
+        sql: 'SELECT position_state, reconciled_at FROM bot_position_settlements WHERE position_id = ?',
         args: [positionId],
       });
       const existingAt = existing.rows[0]?.reconciled_at;
-      if (existingAt != null && String(existingAt) > result.reconciledAt) {
+      const existingState = existing.rows[0]?.position_state == null
+        ? null
+        : String(existing.rows[0].position_state) as SettlementPositionState;
+      const terminalDowngrade = existingState === 'settlement_unresolved'
+        ? result.positionState !== 'settlement_unresolved'
+        : existingState === 'settled'
+          ? result.positionState !== 'settled' && result.positionState !== 'settlement_unresolved'
+          : (existingState === 'partially_settled' || existingState === 'settlement_pending')
+            && result.positionState === 'open';
+      if ((existingAt != null && String(existingAt) >= result.reconciledAt) || terminalDowngrade) {
         await transaction.rollback();
         return false;
       }
@@ -173,16 +192,17 @@ export class BotSettlementStore {
         await transaction.execute({
           sql: `INSERT INTO bot_position_settlement_legs (
             position_id, venue, execution_mode, market_id, outcome_id, side,
-            requested_quantity, filled_quantity, order_id, fill_ids_json,
+            requested_quantity, filled_quantity, remaining_quantity, order_id, fill_ids_json,
             exposure_state, lifecycle_state, resolution_winning_side,
             resolution_detected_at, resolution_source, resolution_source_version,
             payout_entitlement_cents, settlement_fee_cents, net_settlement_proceeds_cents,
             credit_state, cash_available_at, failure_reason, reconciled_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(position_id, venue) DO UPDATE SET
             execution_mode = excluded.execution_mode, market_id = excluded.market_id,
             outcome_id = excluded.outcome_id, side = excluded.side,
             requested_quantity = excluded.requested_quantity, filled_quantity = excluded.filled_quantity,
+            remaining_quantity = excluded.remaining_quantity,
             order_id = excluded.order_id, fill_ids_json = excluded.fill_ids_json,
             exposure_state = excluded.exposure_state, lifecycle_state = excluded.lifecycle_state,
             resolution_winning_side = excluded.resolution_winning_side,
@@ -196,7 +216,8 @@ export class BotSettlementStore {
             failure_reason = excluded.failure_reason, reconciled_at = excluded.reconciled_at`,
           args: [
             positionId, leg.venue, leg.mode, leg.marketId, leg.outcomeId, leg.side,
-            leg.requestedQuantity, leg.filledQuantity, leg.orderId, JSON.stringify(leg.fillIds),
+            leg.requestedQuantity, leg.filledQuantity, legRemainingQuantity(leg),
+            leg.orderId, JSON.stringify(leg.fillIds),
             leg.exposureState, leg.lifecycleState, leg.resolutionWinningSide,
             leg.resolutionDetectedAt, leg.resolutionSource, leg.resolutionSourceVersion,
             leg.payoutEntitlementCents, leg.settlementFeeCents, leg.netSettlementProceedsCents,
@@ -296,7 +317,8 @@ export function applySettlementProjection(
     const openValue = result.legs.reduce((sum, leg) => {
       if (leg.lifecycleState !== 'open') return sum;
       const price = leg.venue === 'kalshi' ? position.currentPriceKalshiCents : position.currentPricePmCents;
-      return price == null || leg.filledQuantity == null ? Number.NaN : sum + price * leg.filledQuantity;
+      const quantity = legRemainingQuantity(leg);
+      return price == null || quantity == null ? Number.NaN : sum + price * quantity;
     }, 0);
     const currentValueCents = Number.isSafeInteger(openValue) ? terminalProceeds(result) + openValue : null;
     const unrealizedPnlCents = currentValueCents == null ? null : currentValueCents - position.totalCostCents;

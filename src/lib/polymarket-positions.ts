@@ -47,6 +47,8 @@ export interface PolymarketPosition {
   endDate: string;
   /** Negative risk market */
   negativeRisk: boolean;
+  /** Resolved outcome tokens awaiting an on-chain redemption. */
+  redeemable: boolean;
   /** Proxy wallet address */
   proxyWallet: string;
 }
@@ -84,7 +86,7 @@ interface PmPositionRaw {
  * Polymarket Data API expects the EOA address (not proxy).
  * However, positions are stored under the proxy wallet. We try both.
  */
-async function getWalletAddress(): Promise<string | null> {
+export async function getPolymarketWalletAddress(): Promise<string | null> {
   const pk = process.env.POLYMARKET_PRIVATE_KEY;
   if (!pk) return null;
 
@@ -98,7 +100,7 @@ async function getWalletAddress(): Promise<string | null> {
 }
 
 export async function getPolymarketPositions(): Promise<PolymarketPosition[]> {
-  const address = await getWalletAddress();
+  const address = await getPolymarketWalletAddress();
   if (!address) {
     throw new Error('Polymarket positions require POLYMARKET_PRIVATE_KEY env var');
   }
@@ -147,6 +149,7 @@ export async function getPolymarketPositions(): Promise<PolymarketPosition[]> {
     oppositeOutcome: p.oppositeOutcome,
     endDate: p.endDate,
     negativeRisk: p.negativeRisk,
+    redeemable: p.redeemable === true,
     proxyWallet: p.proxyWallet,
   }));
 }

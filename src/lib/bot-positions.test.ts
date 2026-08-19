@@ -1910,6 +1910,28 @@ function authoritativePmFee(rateBps: number, observedAt: string) {
 }
 
 describe('pollOpenBotPositions fail-closed valuation', () => {
+  it('does not issue ordinary quote calls for terminal or settlement-pending ledger legs', async () => {
+    const fetchKalshi = vi.fn();
+    const fetchPmBids = vi.fn();
+    const positionStore = {
+      listAllOpen: async () => [openPosition({ id: 1 })],
+      updateValuation: vi.fn(),
+      clearOpenValuation: vi.fn(),
+    } as unknown as BotPositionStore;
+
+    const result = await pollOpenBotPositions({
+      positionStore,
+      loadSettlementStates: async () => new Map([[1, 'settled']]),
+      fetchKalshi,
+      fetchPmBids,
+      observedAt: '2026-08-19T12:00:00.000Z',
+    });
+
+    expect(result).toEqual({ updated: 0, settled: 0, errors: [] });
+    expect(fetchKalshi).not.toHaveBeenCalled();
+    expect(fetchPmBids).not.toHaveBeenCalled();
+  });
+
   it('bounds position refresh concurrency so a large ledger cannot overflow venue queues', async () => {
     let active = 0;
     let peak = 0;

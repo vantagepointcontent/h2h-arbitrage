@@ -141,6 +141,43 @@ describe('reconcileSettlementLifecycle', () => {
     expect(conflict.legs.every((leg) => leg.lifecycleState === 'failed')).toBe(true);
   });
 
+  it('preserves authoritative terminal evidence when a later venue poll is incomplete', () => {
+    const settled = reconcileSettlementLifecycle({
+      positionId: 11, executionMode: 'paper', buyCostCents: 96,
+      realizedPnlBeforeSettlementCents: 0, legs: paperLegs(), resolutions: resolutions('kalshi'),
+      observedAt: '2026-08-19T12:00:02.000Z',
+    });
+    const incomplete = reconcileSettlementLifecycle({
+      positionId: 11, executionMode: 'paper', buyCostCents: 96,
+      realizedPnlBeforeSettlementCents: 0, legs: paperLegs(), resolutions: [],
+      priorLegs: settled.legs, observedAt: '2026-08-19T12:01:00.000Z',
+    });
+
+    expect(incomplete).toEqual(settled);
+  });
+
+  it('keeps a detected authoritative conflict sticky until explicit reconciliation', () => {
+    const settled = reconcileSettlementLifecycle({
+      positionId: 11, executionMode: 'paper', buyCostCents: 96,
+      realizedPnlBeforeSettlementCents: 0, legs: paperLegs(), resolutions: resolutions('kalshi'),
+      observedAt: '2026-08-19T12:00:02.000Z',
+    });
+    const conflict = reconcileSettlementLifecycle({
+      positionId: 11, executionMode: 'paper', buyCostCents: 96,
+      realizedPnlBeforeSettlementCents: 0, legs: paperLegs(), resolutions: resolutions('polymarket'),
+      priorLegs: settled.legs, observedAt: '2026-08-19T12:01:00.000Z',
+    });
+    const repeatedOriginal = reconcileSettlementLifecycle({
+      positionId: 11, executionMode: 'paper', buyCostCents: 96,
+      realizedPnlBeforeSettlementCents: 0, legs: paperLegs(), resolutions: resolutions('kalshi'),
+      priorLegs: conflict.legs, observedAt: '2026-08-19T12:02:00.000Z',
+    });
+
+    expect(repeatedOriginal.positionState).toBe('settlement_unresolved');
+    expect(repeatedOriginal.realizedPnlCents).toBeNull();
+    expect(repeatedOriginal.failureReason).toMatch(/conflicting authoritative resolution/i);
+  });
+
   it('is idempotent for duplicate observations', () => {
     const first = reconcileSettlementLifecycle({
       positionId: 12, executionMode: 'paper', buyCostCents: 96,

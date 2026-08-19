@@ -1,6 +1,7 @@
 import path from 'node:path';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { createClient } from '@libsql/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BotSettlementStore, applySettlementProjection } from './bot-settlement-store';
 import { reconcileSettlementLifecycle, type SettlementExecutionLegEvidence } from './bot-settlement';
@@ -40,8 +41,8 @@ describe('BotSettlementStore', () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-store-'));
     dirs.push(dir);
     const store = new BotSettlementStore(`file:${path.join(dir, 'test.db')}`);
-    await store.persist(1, settlement());
-    await store.persist(1, settlement());
+    await expect(store.persist(1, settlement())).resolves.toBe(true);
+    await expect(store.persist(1, settlement())).resolves.toBe(false);
 
     await expect(store.getByPositionIds([1])).resolves.toEqual(new Map([[1, settlement()]]));
     await expect(store.countRows()).resolves.toEqual({ positions: 1, legs: 2 });
@@ -59,6 +60,21 @@ describe('BotSettlementStore', () => {
     store.close();
   });
 
+  it('does not let a later incomplete poll downgrade a settled ledger', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-terminal-fence-'));
+    dirs.push(dir);
+    const store = new BotSettlementStore(`file:${path.join(dir, 'test.db')}`);
+    await store.persist(1, settlement());
+    const incomplete = reconcileSettlementLifecycle({
+      positionId: 1, executionMode: 'paper', buyCostCents: 96, realizedPnlBeforeSettlementCents: 0,
+      legs, resolutions: [], observedAt: '2026-08-19T12:05:02.000Z',
+    });
+
+    await expect(store.persist(1, incomplete)).resolves.toBe(false);
+    expect((await store.getByPositionIds([1])).get(1)?.positionState).toBe('settled');
+    store.close();
+  });
+
   it('serializes concurrent ledger writers on one SQLite client', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-concurrent-'));
     dirs.push(dir);
@@ -66,6 +82,18 @@ describe('BotSettlementStore', () => {
     await Promise.all(Array.from({ length: 20 }, (_, index) => store.persist(index + 1, settlement(index + 1))));
     await expect(store.countRows()).resolves.toEqual({ positions: 20, legs: 40 });
     store.close();
+  });
+
+  it('applies the checked-in settlement migrations sequentially on a fresh database', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-migrations-'));
+    dirs.push(dir);
+    const client = createClient({ url: `file:${path.join(dir, 'test.db')}` });
+    const migrationDir = path.join(process.cwd(), 'src', 'migrations');
+    await client.executeMultiple(await readFile(path.join(migrationDir, '20260819_001_create_bot_position_settlement_ledger.sql'), 'utf8'));
+    await client.executeMultiple(await readFile(path.join(migrationDir, '20260819_002_add_bot_settlement_remaining_quantity.sql'), 'utf8'));
+    const columns = await client.execute('PRAGMA table_info(bot_position_settlement_legs)');
+    expect(columns.rows.filter((row) => String(row.name) === 'remaining_quantity')).toHaveLength(1);
+    client.close();
   });
 });
 
