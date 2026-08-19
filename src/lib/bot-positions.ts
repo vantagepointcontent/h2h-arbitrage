@@ -15,7 +15,7 @@ import {
   type PropositionRelationship,
   type PropositionRelationshipState,
 } from './proposition-identity';
-import { historicalAuditLegMetadata, historicalPropositionAudit } from './bot-proposition-audit';
+import { historicalAuditLegMetadata, historicalAuditPmEntryToken, historicalPropositionAudit } from './bot-proposition-audit';
 import type { ReconciledSettlementLeg, SettlementPositionState } from './bot-settlement';
 import {
   findCanonicalPropositionRelationship,
@@ -1083,6 +1083,9 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     && !outcomeIdentityVerified;
   const auditedInvalid = !outcomeIdentityVerified && historicalAudit?.classification === 'confirmed_invalid';
   const auditedLegMetadata = historicalAuditLegMetadata(historicalAudit);
+  const auditedPmEntryToken = historicalAuditPmEntryToken(historicalAudit);
+  const exactHeldIdentityVerified = outcomeIdentityVerified
+    || (auditedInvalid && auditedLegMetadata != null && auditedPmEntryToken != null);
   const kalshiEntryFills = parseEntryFills(row.kalshi_entry_fills_json);
   const pmEntryFills = parseEntryFills(row.pm_entry_fills_json);
   const entryCostAvailable = row.entry_cost_status === 'available'
@@ -1114,10 +1117,10 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
       ? canonicalEntryRelationship!.legs.kalshi.payoutState : auditedLegMetadata?.kalshiOutcomeLabel ?? null,
     pmOutcomeLabel: outcomeIdentityVerified
       ? canonicalEntryRelationship!.legs.polymarket.payoutState : auditedLegMetadata?.pmOutcomeLabel ?? null,
-    outcomeIdentityStatus: outcomeIdentityVerified ? 'verified' : 'unresolved',
+    outcomeIdentityStatus: exactHeldIdentityVerified ? 'verified' : 'unresolved',
     outcomeIdentitySource: row.outcome_identity_source != null ? String(row.outcome_identity_source) : null,
     outcomeIdentityRecordedAt: row.outcome_identity_recorded_at != null ? String(row.outcome_identity_recorded_at) : null,
-    outcomeIdentityFailureReason: outcomeIdentityVerified
+    outcomeIdentityFailureReason: exactHeldIdentityVerified
       ? null
       : row.outcome_identity_failure_reason != null
         ? String(row.outcome_identity_failure_reason)
@@ -1180,7 +1183,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiEntryFeeSource: row.kalshi_entry_fee_source != null ? String(row.kalshi_entry_fee_source) : null,
     kalshiEntryFeeObservedAt: row.kalshi_entry_fee_observed_at != null ? String(row.kalshi_entry_fee_observed_at) : null,
     kalshiEntryFeeVersion: row.kalshi_entry_fee_version != null ? String(row.kalshi_entry_fee_version) : null,
-    pmEntryTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
+    pmEntryTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : auditedPmEntryToken,
     pmEntryFeeRateBps: row.pm_entry_fee_rate_bps != null ? Number(row.pm_entry_fee_rate_bps) : null,
     pmEntryFeesEnabled: row.pm_entry_fees_enabled === 1 ? true : row.pm_entry_fees_enabled === 0 ? false : null,
     pmEntryFeeSchedule: rowPolymarketFeeSchedule(row, 'pm_entry'),

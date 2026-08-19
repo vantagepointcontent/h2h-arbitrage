@@ -13695,10 +13695,20 @@
       "buyPriceKalshiCents": 8,
       "buyPricePmCents": 12,
       "pmEntryTokenId": null,
-      "classification": "unresolved_legacy",
-      "severity": "warning",
-      "reason": "Legacy row predates canonical proposition identity; labels and strategy text are not settlement proof.",
-      "evidence": null,
+      "classification": "confirmed_invalid",
+      "severity": "high",
+      "reason": "Immutable execution 179 bought Democratic YES on both venues; the persisted strategy label claiming Polymarket Republican is incorrect and must not control valuation.",
+      "evidence": {
+        "kalshi": {
+          "question": "Will Democratic win the House race for MO-03?",
+          "payoutState": "Democratic Party wins MO-03"
+        },
+        "polymarket": {
+          "question": "Will the Democratic Party win the MO-03 House seat?",
+          "payoutState": "Democratic Party wins MO-03",
+          "tokenId": "27237659461749395126949339507775498287619143517476509888079639110706576460737"
+        }
+      },
       "executionEnvelope": {
         "mode": "paper",
         "dryRun": true,

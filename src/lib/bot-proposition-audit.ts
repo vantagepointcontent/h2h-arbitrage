@@ -62,3 +62,10 @@ export function historicalAuditLegMetadata(entry: HistoricalPropositionAuditEntr
     pmOutcomeLabel: pmOutcome,
   };
 }
+
+/** Exact held PM token proven by a fingerprinted immutable execution audit. */
+export function historicalAuditPmEntryToken(entry: HistoricalPropositionAuditEntry | null): string | null {
+  if (entry?.classification !== 'confirmed_invalid') return null;
+  const tokenId = entry.evidence?.polymarket?.tokenId?.trim();
+  return tokenId && /^\d+$/.test(tokenId) ? tokenId : null;
+}

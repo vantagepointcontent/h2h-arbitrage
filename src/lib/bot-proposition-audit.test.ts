@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { historicalAuditLegMetadata, historicalPropositionAudit } from './bot-proposition-audit';
+import { historicalAuditLegMetadata, historicalAuditPmEntryToken, historicalPropositionAudit } from './bot-proposition-audit';
 
 describe('historical proposition audit manifest', () => {
   it('classifies execution #128 as an invalid mapping without fabricating live exposure', () => {
@@ -55,5 +55,27 @@ describe('historical proposition audit manifest', () => {
       kalshiOutcomeLabel: 'republican',
       pmOutcomeLabel: 'republican',
     });
+  });
+
+  it('binds MO-03 to the exact Democratic YES token actually bought, not the Republican label', () => {
+    const audit = historicalPropositionAudit(179, {
+      positionId: 140,
+      openedAt: '2026-08-11T07:13:22.252Z',
+      kalshiTicker: 'KXHOUSERACE-MO03-26-D',
+      pmConditionId: '0x9041a41d6d08dc9282a5e135b0e2504d7c4950883e772a5942f17b607e354ca4',
+      pmTokenId: null,
+      kalshiSide: 'yes',
+      pmSide: 'yes',
+    });
+    expect(audit).toMatchObject({ classification: 'confirmed_invalid', severity: 'high' });
+    expect(historicalAuditLegMetadata(audit)).toEqual({
+      kalshiMarketQuestion: 'Will Democratic win the House race for MO-03?',
+      pmMarketQuestion: 'Will the Democratic Party win the MO-03 House seat?',
+      kalshiOutcomeLabel: 'Democratic Party wins MO-03',
+      pmOutcomeLabel: 'Democratic Party wins MO-03',
+    });
+    expect(historicalAuditPmEntryToken(audit)).toBe(
+      '27237659461749395126949339507775498287619143517476509888079639110706576460737',
+    );
   });
 });
