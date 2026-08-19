@@ -14,6 +14,7 @@ import { isPriceAlignedToTick } from './venue-constraints';
 import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quote';
 import { getPolymarketCategoryFeeRateBps, resolvePolymarketFeeRateBps } from './polymarket-fees';
 import type { PropositionRelationship } from './proposition-identity';
+import type { CalculationEnvelope } from './calculation-envelope';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -134,6 +135,8 @@ export interface UnifiedOutcome {
     requestedContracts?: 1;
     executionStatus?: 'executable' | 'non_executable' | 'unavailable';
     executionBlocker?: string;
+    /** Versioned, integer-minor-unit calculation and provenance contract. */
+    calculationEnvelope?: CalculationEnvelope;
     /** Fee-adjusted profit per winning platform for the buy side */
     fees?: {
       kalshiFee: number;

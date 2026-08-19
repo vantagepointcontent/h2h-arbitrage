@@ -27,6 +27,7 @@
 import { auditArbClassification, classifyArbType, type ArbType } from './arb-types';
 import type { ScanApyUnavailableReason } from './scan-apy';
 import type { KalshiFeeAuthority } from './kalshi-fee-quote';
+import { formatScaledMoney, parseCalculationEnvelope, type CalculationEnvelope } from './calculation-envelope';
 export type { ArbType } from './arb-types';
 
 /**
@@ -54,6 +55,8 @@ export interface ArbAlertInput {
   expectedProfit: number;
   strategy: string;
   totalStake?: number;
+  /** Immutable fee, depth, rounding, and P&L provenance for this alert. */
+  calculationEnvelope?: CalculationEnvelope;
   /** Outcome name — enables the episode-persistence filter (ALERT-001). */
   outcome?: string;
   /** Explicit arb type — if omitted, derived from strategy via classifyArbType(). */
@@ -216,6 +219,7 @@ function buildPersistenceLine(score: number | undefined): string {
   return score != null ? `\n🛡️ Persistence: <b>${score}</b>/100` : '';
 }
 
+
 /** Build the deep-link shared by all formatters. */
 function buildDeepLink(id: string | undefined): string {
   return id ? `\n🔗 <a href="http://100.86.7.30:3000/?view=scan&id=${encodeURIComponent(id)}">View Scan</a>` : '';
@@ -234,6 +238,38 @@ function formatCanonicalApyLine(arb: ArbAlertInput): string | null {
   return arb.apyUnavailableReason
     ? `📊 APY unavailable: ${escapeHtml(arb.apyUnavailableReason.replaceAll('_', ' '))}`
     : null;
+}
+
+function telegramMoney(value: number | null): string {
+  if (value == null) return 'Unavailable';
+  const exact = formatScaledMoney(value);
+  return exact.startsWith('-') ? `-$${exact.slice(1)}` : `$${exact}`;
+}
+
+function telegramQuantity(value: number | null): string {
+  if (value == null) return 'Unavailable';
+  const exact = formatScaledMoney(value);
+  return `${exact} share${value === 1_000_000 ? '' : 's'}`;
+}
+
+function calculationEnvelopeLines(rawEnvelope: CalculationEnvelope | undefined, context: string): string[] {
+  const envelope = parseCalculationEnvelope(rawEnvelope, context);
+  const lines = [
+    `🧾 Calculation v${envelope.version}: <b>${envelope.status}</b>`,
+    `Requested: ${telegramQuantity(envelope.requestedQuantityMicros)} · Executable: ${telegramQuantity(envelope.executableQuantityMicros)}`,
+    `Gross: ${telegramMoney(envelope.totals.grossProfitMicros)} · Fees: ${telegramMoney(envelope.totals.totalFeesMicros)} · Net: ${telegramMoney(envelope.totals.netPnlMicros)}`,
+    `Calculated: ${envelope.calculatedAt ?? 'Unavailable'}`,
+  ];
+  if (envelope.blocker) lines.push(`Blocked: ${escapeHtml(envelope.blocker.message)} (${escapeHtml(envelope.blocker.code)})`);
+  for (const leg of envelope.legs) {
+    const phase = leg.action === 'sell' ? 'exit' : 'entry';
+    const fee = leg.fee.amountMicros == null ? 'unavailable' : telegramMoney(leg.fee.amountMicros);
+    const schedule = leg.fee.schedule
+      ? `${escapeHtml(leg.fee.schedule.source)}@${escapeHtml(leg.fee.schedule.version)} observed ${leg.fee.schedule.observedAt}`
+      : 'authority unavailable';
+    lines.push(`${escapeHtml(leg.venue)} ${leg.side.toUpperCase()}: ${leg.fee.basis} ${phase} fee ${fee} · ${schedule} · Book: ${leg.bookObservedAt ?? 'Unavailable'}`);
+  }
+  return lines;
 }
 
 /**
@@ -367,6 +403,13 @@ export function shouldAlert(
   config: TelegramAlertConfig,
   now: number = Date.now(),
 ): { shouldAlert: boolean; reason?: string } {
+  const calculationEnvelope = parseCalculationEnvelope(arb.calculationEnvelope, `Telegram alert ${arb.marketId}`);
+  if (calculationEnvelope.status !== 'executable') {
+    return {
+      shouldAlert: false,
+      reason: `Calculation is ${calculationEnvelope.status}: ${calculationEnvelope.blocker?.code ?? 'unknown'}`,
+    };
+  }
   if (arb.roiPct <= 0) {
     return { shouldAlert: false, reason: 'ROI is not positive' };
   }

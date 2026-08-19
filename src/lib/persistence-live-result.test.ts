@@ -72,6 +72,14 @@ describe('WS-107 liveResult persistence', () => {
     expect(got.liveResult!.bestRoiPct).toBe(5.5);
     expect(got.liveResult!.strategy).toBe('Buy YES Kalshi + NO PM');
     expect(got.liveResult!.allArbs).toHaveLength(1);
+    expect(got.liveResult!.allArbs![0].calculationEnvelope).toMatchObject({
+      status: 'legacy_unverifiable',
+      totals: { totalFeesMicros: null, netPnlMicros: null },
+    });
+    expect(got.liveResult!.calculationEnvelope).toMatchObject({
+      status: 'legacy_unverifiable',
+      totals: { totalFeesMicros: null, netPnlMicros: null },
+    });
   });
 
   it('invalidates legacy Internal results before saved-market persistence', async () => {

@@ -11,6 +11,39 @@ const timingSource = {
   ],
 } as const;
 
+const nullableInteger = { type: ['integer', 'null'] } as const;
+const nullableString = { type: ['string', 'null'] } as const;
+
+const calculationEnvelopeSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['version', 'scope', 'status', 'blocker', 'calculatedAt', 'requestedQuantityMicros', 'executableQuantityMicros', 'legs', 'totals', 'rounding'],
+  properties: {
+    version: { type: 'integer', const: 1 },
+    scope: { type: 'string', enum: ['opportunity', 'execution', 'position'] },
+    status: { type: 'string', enum: ['executable', 'non_executable', 'unavailable', 'legacy_unverifiable'] },
+    blocker: { anyOf: [
+      { type: 'null' },
+      { type: 'object', additionalProperties: false, required: ['code', 'message'], properties: { code: { type: 'string' }, message: { type: 'string' } } },
+    ] },
+    calculatedAt: { type: ['string', 'null'], format: 'date-time' },
+    requestedQuantityMicros: nullableInteger,
+    executableQuantityMicros: nullableInteger,
+    legs: { type: 'array', items: { $ref: '#/components/schemas/CalculationLeg' } },
+    totals: { $ref: '#/components/schemas/CalculationTotals' },
+    rounding: {
+      type: 'object', additionalProperties: false,
+      required: ['moneyScale', 'priceScale', 'quantityScale', 'mode'],
+      properties: {
+        moneyScale: { type: 'integer', const: 1_000_000 },
+        priceScale: { type: 'integer', const: 1_000_000 },
+        quantityScale: { type: 'integer', const: 1_000_000 },
+        mode: { type: 'string', const: 'venue_rules_then_sum' },
+      },
+    },
+  },
+} as const;
+
 const openapi = {
   openapi: '3.1.0',
   info: {
@@ -41,9 +74,47 @@ const openapi = {
         },
       },
     },
+    '/api/logs': { get: { summary: 'Read scans with calculation envelopes', responses: { '200': { description: 'Scan log rows' } } } },
+    '/api/executions': { get: { summary: 'Read executions with calculation envelopes', responses: { '200': { description: 'Execution records' } } } },
+    '/api/positions': { get: { summary: 'Read positions with calculation provenance', responses: { '200': { description: 'Position records' } } } },
+    '/api/bot-trader/positions': { get: { summary: 'Read bot positions joined to execution envelopes', responses: { '200': { description: 'Bot position records' } } } },
   },
   components: {
     schemas: {
+      CalculationEnvelope: calculationEnvelopeSchema,
+      CalculationTotals: {
+        type: 'object', additionalProperties: false,
+        required: ['grossCostMicros', 'grossPayoutMicros', 'grossProfitMicros', 'totalFeesMicros', 'netPnlMicros'],
+        properties: {
+          grossCostMicros: nullableInteger, grossPayoutMicros: nullableInteger,
+          grossProfitMicros: nullableInteger, totalFeesMicros: nullableInteger, netPnlMicros: nullableInteger,
+        },
+      },
+      CalculationLeg: {
+        type: 'object', additionalProperties: false,
+        required: ['venue', 'instrumentId', 'outcomeId', 'side', 'action', 'requestedQuantityMicros', 'executableQuantityMicros', 'bookObservedAt', 'fillLevels', 'vwapPriceMicros', 'fee'],
+        properties: {
+          venue: { type: 'string' }, instrumentId: { type: 'string' }, outcomeId: { type: 'string' },
+          side: { type: 'string', enum: ['yes', 'no'] }, action: { type: 'string', enum: ['buy', 'sell'] },
+          requestedQuantityMicros: nullableInteger, executableQuantityMicros: nullableInteger,
+          bookObservedAt: { type: ['string', 'null'], format: 'date-time' },
+          fillLevels: { type: 'array', items: { type: 'object', required: ['priceMicros', 'quantityMicros'], properties: { priceMicros: { type: 'integer' }, quantityMicros: { type: 'integer' } } } },
+          vwapPriceMicros: nullableInteger,
+          fee: {
+            type: 'object', required: ['amountMicros', 'basis', 'schedule'],
+            properties: {
+              amountMicros: nullableInteger,
+              basis: { type: 'string', enum: ['calculated', 'charged', 'unavailable'] },
+              schedule: { anyOf: [
+                { type: 'null' },
+                { type: 'object', required: ['source', 'version', 'observedAt', 'ratePpm'], properties: { source: { type: 'string' }, version: { type: 'string' }, observedAt: { type: 'string', format: 'date-time' }, ratePpm: { type: 'integer', minimum: 0 } } },
+              ] },
+            },
+          },
+        },
+      },
+      CalculationEnvelopeCarrier: { type: 'object', required: ['calculationEnvelope'], properties: { calculationEnvelope: { $ref: '#/components/schemas/CalculationEnvelope' } } },
+      LegacyCalculationBlocker: { type: 'object', required: ['code', 'message'], properties: { code: { const: 'legacy_missing_calculation_authority' }, message: nullableString } },
       SettlementTimingSource: timingSource,
       EarlyDetermination: {
         type: 'object', required: ['eligible', 'condition', 'source'], additionalProperties: false,
@@ -105,6 +176,7 @@ const openapi = {
           expiryAt: { type: ['string', 'null'], format: 'date-time', description: 'Canonical persisted expiry used for daysToExpiry and the visible Days to expiry value.' },
           apyUnavailableReason: { type: ['string', 'null'], enum: ['invalid_roi', 'invalid_scan_timestamp', 'missing_expiry', 'invalid_expiry', 'non_positive_tte', null] },
           outcomeApy: { $ref: '#/components/schemas/OutcomeContingentApy' },
+          calculationEnvelope: { $ref: '#/components/schemas/CalculationEnvelope' },
         },
       },
       Outcome: {

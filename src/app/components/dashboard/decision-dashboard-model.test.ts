@@ -45,4 +45,11 @@ describe("decision dashboard model", () => {
       { id: "b", marketTitle: "B", pairedState: "unpaired", totalCost: 40, oneLegExposure: 40, breakdown: { totalNetPnl: -1, totalFees: 1 } },
     ])).toEqual({ netPnl: 2, fees: 3, capitalDeployed: 140, netExposure: 95, paired: 1 });
   });
+
+  it("keeps portfolio P&L and fees unavailable when any position lacks authority", () => {
+    expect(summarizePortfolio([
+      { id: "a", marketTitle: "A", pairedState: "paired", totalCost: 100, breakdown: { totalNetPnl: 3, totalFees: 2 } },
+      { id: "b", marketTitle: "B", pairedState: "paired", totalCost: 40, breakdown: { totalNetPnl: null, totalFees: null } },
+    ])).toEqual({ netPnl: null, fees: null, capitalDeployed: 140, netExposure: 0, paired: 2 });
+  });
 });

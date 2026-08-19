@@ -26,7 +26,7 @@ describe('UI-040 explanatory tooltips', () => {
     expect(trades).toContain('Execution state: filled, pending, cancelled, or failed');
 
     const positions = read('OpenPositionsPanel.tsx');
-    expect(positions).toContain('Unrealized profit or loss after estimated exit fees');
+    expect(positions).toContain('Gross unrealized profit or loss; canonical net P&L remains unavailable until charged exit fees arrive');
     expect(positions).toContain('Available orderbook liquidity for closing the position');
   });
 });

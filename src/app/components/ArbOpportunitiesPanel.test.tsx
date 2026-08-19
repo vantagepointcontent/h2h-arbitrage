@@ -3,6 +3,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
+import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
 import { ArbOpportunitiesPanel } from './ArbOpportunitiesPanel';
 
 const outcomeApy = {
@@ -46,6 +47,7 @@ function renderPanel(apyPct: number | null, apyUnavailableReason: 'missing_expir
         apyPct,
         apyUnavailableReason,
         outcomeApy,
+        calculationEnvelope: apyPct == null ? null : executableEnvelopeFixture,
         kalshiStake: 50,
         pmStake: 50,
         maxCapital: 100,

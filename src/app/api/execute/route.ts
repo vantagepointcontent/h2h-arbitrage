@@ -246,6 +246,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         result,
         estimatedProfit: effective.estimatedProfit,
         steps: result.steps,
+        calculationEnvelope: effective.calculationEnvelope
+          ? { ...effective.calculationEnvelope, scope: 'execution' }
+          : undefined,
       });
       // A terminal response is only publishable after the exact ledger is durable.
       logExecution({
@@ -258,6 +261,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         result,
         estimatedProfit: effective.estimatedProfit,
       });
+
 
       return NextResponse.json({ success: result.success, result, dryRun: effective.dryRun, mode });
     }

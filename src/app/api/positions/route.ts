@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clientSafeError } from '@/lib/error-handler';
 import { getExecutionMode } from '@/lib/settings';
 import logger from '@/lib/logger';
-import { calcPolymarketFee, getPolymarketTheta } from '@/lib/matcher';
 import { derivePositionRisk } from '@/lib/position-risk';
-import { calculateKalshiFeeQuote, resolveKalshiFeeAuthority, type KalshiFeeQuote } from '@/lib/kalshi-fee-quote';
+import { legacyUnverifiableEnvelope } from '@/lib/calculation-envelope';
+import {
+  CALCULATION_ENVELOPE_VERSION,
+  MONEY_SCALE,
+  PRICE_SCALE,
+  QUANTITY_SCALE,
+  validateCalculationEnvelope,
+  type CalculationEnvelope,
+  type CalculationLeg,
+  type FeeScheduleAuthority,
+} from '@/lib/calculation-envelope';
+import { isAuthoritativeVenueEvidence, type VenueExecutionEvidence } from '@/lib/execution-evidence';
 
 /**
  * Open Positions API.
@@ -39,12 +49,10 @@ interface KalshiPositionDto {
   realizedPnl: number;
   lastPrice: number;
   // Fee-adjusted (net) fields
-  feesPaid: number;       // estimated fees paid at entry (USD)
-  netUnrealizedPnl: number; // unrealizedPnl - exitFees
-  netRoiPct: number;      // net ROI %
-  exitFees: number;       // estimated fees to sell at current price (USD)
-  entryFeeQuote: KalshiFeeQuote;
-  exitFeeQuote: KalshiFeeQuote;
+  feesPaid: null;
+  netUnrealizedPnl: null;
+  netRoiPct: null;
+  exitFees: null;
   // Arb pair linkage
   pairId: string | null;  // shared with the opposite leg if part of an arb pair
 }
@@ -67,10 +75,10 @@ interface PmPositionDto {
   endDate: string;
   negativeRisk: boolean;
   // Fee-adjusted (net) fields
-  feesPaid: number;       // estimated fees paid at entry (USD)
-  netCashPnl: number;     // cashPnl - exitFees
-  netPercentPnl: number;  // net %
-  exitFees: number;       // estimated fees to sell at current price (USD)
+  feesPaid: null;
+  netCashPnl: null;
+  netPercentPnl: null;
+  exitFees: null;
   // Arb pair linkage
   pairId: string | null;  // shared with the opposite leg if part of an arb pair
 }
@@ -83,10 +91,10 @@ interface RoiBreakdown {
     currentPrice: number;
     size: number;
     grossPnl: number;
-    feesPaid: number;   // entry fees
-    exitFees: number;   // estimated exit fees
-    netPnl: number;     // grossPnl - exitFees (entry fees already in cost basis)
-    roiPct: number;     // net ROI %
+    feesPaid: null;
+    exitFees: null;
+    netPnl: null;
+    roiPct: null;
   } | null;
   legB: {
     platform: string;
@@ -95,15 +103,15 @@ interface RoiBreakdown {
     currentPrice: number;
     size: number;
     grossPnl: number;
-    feesPaid: number;
-    exitFees: number;
-    netPnl: number;
-    roiPct: number;
+    feesPaid: null;
+    exitFees: null;
+    netPnl: null;
+    roiPct: null;
   } | null;
   totalGrossPnl: number;
-  totalFees: number;     // entry + exit fees for both legs
-  totalNetPnl: number;
-  totalRoiPct: number;   // net ROI %
+  totalFees: null;
+  totalNetPnl: null;
+  totalRoiPct: null;
 }
 
 interface PairedPosition {
@@ -116,6 +124,221 @@ interface PairedPosition {
   totalUnrealizedPnl: number;  // gross
   totalRoiPct: number;         // net ROI %
   breakdown: RoiBreakdown;
+}
+
+interface ExitFeeAuthority {
+  kalshi: { feeMultiplierPpm: number; source: string; observedAt: string; version: string };
+  polymarket: { feeRateBps: number; source: string; observedAt: string; version: string };
+}
+
+interface ExitOrderResult {
+  status?: unknown;
+  orderId?: unknown;
+  filledCount?: unknown;
+  evidence?: unknown;
+  venueEvidence?: unknown;
+}
+
+const NULL_TOTALS = {
+  grossCostMicros: null,
+  grossPayoutMicros: null,
+  grossProfitMicros: null,
+  totalFeesMicros: null,
+  netPnlMicros: null,
+} as const;
+
+function toScaledInteger(value: number, scale: number, label: string): number {
+  if (!Number.isFinite(value)) throw new Error(`${label} is not finite`);
+  const scaled = Math.round(value * scale);
+  if (!Number.isSafeInteger(scaled)) throw new Error(`${label} exceeds safe integer range`);
+  return scaled;
+}
+
+function currentPositionLegs(position: PairedPosition, observedAt: string): CalculationLeg[] {
+  const legs: CalculationLeg[] = [];
+  if (position.kalshi) {
+    legs.push({
+      venue: 'kalshi', instrumentId: position.kalshi.ticker, outcomeId: position.kalshi.ticker,
+      side: position.kalshi.side.toLowerCase() as 'yes' | 'no', action: 'sell',
+      requestedQuantityMicros: toScaledInteger(position.kalshi.size, QUANTITY_SCALE, 'Kalshi position quantity'),
+      executableQuantityMicros: null, bookObservedAt: observedAt, fillLevels: [], vwapPriceMicros: null,
+      fee: { basis: 'unavailable', amountMicros: null, schedule: null },
+    });
+  }
+  if (position.polymarket) {
+    legs.push({
+      venue: 'polymarket', instrumentId: position.polymarket.asset, outcomeId: position.polymarket.conditionId,
+      side: position.polymarket.side.toLowerCase() as 'yes' | 'no', action: 'sell',
+      requestedQuantityMicros: toScaledInteger(position.polymarket.size, QUANTITY_SCALE, 'Polymarket position quantity'),
+      executableQuantityMicros: null, bookObservedAt: observedAt, fillLevels: [], vwapPriceMicros: null,
+      fee: { basis: 'unavailable', amountMicros: null, schedule: null },
+    });
+  }
+  return legs;
+}
+
+function unavailablePositionEnvelope(position: PairedPosition, observedAt: string): CalculationEnvelope {
+  const legs = currentPositionLegs(position, observedAt);
+  const quantities = new Set(legs.map((leg) => leg.requestedQuantityMicros));
+  return validateCalculationEnvelope({
+    version: CALCULATION_ENVELOPE_VERSION,
+    scope: 'position',
+    status: 'unavailable',
+    blocker: {
+      code: 'account_feed_missing_fee_authority',
+      message: 'Current account positions do not include charged entry fees or executable exit-depth fee authority',
+    },
+    calculatedAt: observedAt,
+    requestedQuantityMicros: quantities.size === 1 ? legs[0]?.requestedQuantityMicros ?? null : null,
+    executableQuantityMicros: null,
+    legs,
+    totals: { ...NULL_TOTALS },
+    rounding: { moneyScale: MONEY_SCALE, priceScale: PRICE_SCALE, quantityScale: QUANTITY_SCALE, mode: 'venue_rules_then_sum' },
+  });
+}
+
+function chargedFeeSchedule(venue: 'kalshi' | 'polymarket', authority: ExitFeeAuthority): FeeScheduleAuthority {
+  if (venue === 'kalshi') {
+    return {
+      source: authority.kalshi.source,
+      version: authority.kalshi.version,
+      observedAt: authority.kalshi.observedAt,
+      ratePpm: Math.round(70_000 * authority.kalshi.feeMultiplierPpm / 1_000_000),
+    };
+  }
+  return {
+    source: authority.polymarket.source,
+    version: authority.polymarket.version,
+    observedAt: authority.polymarket.observedAt,
+    ratePpm: authority.polymarket.feeRateBps * 100,
+  };
+}
+
+function evidenceFillLevels(evidence: VenueExecutionEvidence) {
+  const fills = evidence.fills ?? [{ quantity: evidence.filledQuantity, price: evidence.fillPrice }];
+  return fills.map((fill) => ({
+    priceMicros: toScaledInteger(fill.price, PRICE_SCALE, `${evidence.venue} fill price`),
+    quantityMicros: toScaledInteger(fill.quantity, QUANTITY_SCALE, `${evidence.venue} fill quantity`),
+  }));
+}
+
+function roundedVwap(fillLevels: Array<{ priceMicros: number; quantityMicros: number }>): number {
+  const quantity = fillLevels.reduce((sum, fill) => sum + BigInt(fill.quantityMicros), 0n);
+  const weighted = fillLevels.reduce(
+    (sum, fill) => sum + BigInt(fill.priceMicros) * BigInt(fill.quantityMicros),
+    0n,
+  );
+  return Number((weighted + quantity / 2n) / quantity);
+}
+
+function venueRoundedPayoutMicros(fillLevels: Array<{ priceMicros: number; quantityMicros: number }>): number {
+  return fillLevels.reduce((sum, fill) => (
+    sum + Number((BigInt(fill.priceMicros) * BigInt(fill.quantityMicros) + 500_000n) / 1_000_000n)
+  ), 0);
+}
+
+export function buildExitCalculationEnvelope(
+  position: PairedPosition,
+  results: { kalshi?: unknown; polymarket?: unknown },
+  errors: { kalshi?: string; polymarket?: string },
+  authority: ExitFeeAuthority | null,
+  calculatedAt: string,
+): CalculationEnvelope {
+  const descriptors = [
+    position.kalshi ? {
+      venue: 'kalshi' as const,
+      instrumentId: position.kalshi.ticker,
+      outcomeId: position.kalshi.ticker,
+      side: position.kalshi.side.toLowerCase() as 'yes' | 'no',
+      size: position.kalshi.size,
+      entryCost: position.kalshi.totalCost,
+      rawEvidence: errors.kalshi ? null : (results.kalshi as { evidence?: unknown } | undefined)?.evidence,
+    } : null,
+    position.polymarket ? {
+      venue: 'polymarket' as const,
+      instrumentId: position.polymarket.asset,
+      outcomeId: position.polymarket.conditionId,
+      side: position.polymarket.side.toLowerCase() as 'yes' | 'no',
+      size: position.polymarket.size,
+      entryCost: position.polymarket.initialValue,
+      rawEvidence: errors.polymarket ? null : (results.polymarket as { venueEvidence?: unknown } | undefined)?.venueEvidence,
+    } : null,
+  ].filter((value) => value !== null);
+
+  const legs: CalculationLeg[] = descriptors.map((descriptor) => {
+    const evidence = isAuthoritativeVenueEvidence(descriptor.rawEvidence)
+      && descriptor.rawEvidence.venue === descriptor.venue
+      ? descriptor.rawEvidence
+      : null;
+    const fillLevels = evidence ? evidenceFillLevels(evidence) : [];
+    return {
+      venue: descriptor.venue,
+      instrumentId: descriptor.instrumentId,
+      outcomeId: descriptor.outcomeId,
+      side: descriptor.side,
+      action: 'sell',
+      requestedQuantityMicros: toScaledInteger(descriptor.size, QUANTITY_SCALE, `${descriptor.venue} requested quantity`),
+      executableQuantityMicros: evidence
+        ? toScaledInteger(evidence.filledQuantity, QUANTITY_SCALE, `${descriptor.venue} filled quantity`)
+        : null,
+      bookObservedAt: evidence?.venueTimestamp ?? null,
+      fillLevels,
+      vwapPriceMicros: fillLevels.length > 0 ? roundedVwap(fillLevels) : null,
+      fee: evidence && authority ? {
+        basis: 'charged',
+        amountMicros: evidence.chargedFeeCents * 10_000,
+        schedule: chargedFeeSchedule(descriptor.venue, authority),
+      } : { basis: 'unavailable', amountMicros: null, schedule: null },
+    };
+  });
+
+  const requested = new Set(legs.map((leg) => leg.requestedQuantityMicros));
+  const executable = new Set(legs.map((leg) => leg.executableQuantityMicros));
+  const complete = descriptors.length === 2 && legs.length === 2
+    && !errors.kalshi && !errors.polymarket
+    && authority !== null && requested.size === 1 && executable.size === 1
+    && !executable.has(null)
+    && legs.every((leg) => leg.executableQuantityMicros === leg.requestedQuantityMicros && leg.fee.basis === 'charged');
+
+  if (!complete) {
+    return validateCalculationEnvelope({
+      version: CALCULATION_ENVELOPE_VERSION,
+      scope: 'position',
+      status: 'unavailable',
+      blocker: {
+        code: 'missing_charged_exit_authority',
+        message: 'One or more submitted exit legs lack correlated venue fill, charged-fee, or fee-schedule authority',
+      },
+      calculatedAt,
+      requestedQuantityMicros: requested.size === 1 ? legs[0]?.requestedQuantityMicros ?? null : null,
+      executableQuantityMicros: null,
+      legs,
+      totals: { ...NULL_TOTALS },
+      rounding: { moneyScale: MONEY_SCALE, priceScale: PRICE_SCALE, quantityScale: QUANTITY_SCALE, mode: 'venue_rules_then_sum' },
+    });
+  }
+
+  const grossCostMicros = descriptors.reduce(
+    (sum, descriptor) => sum + toScaledInteger(descriptor.entryCost, MONEY_SCALE, `${descriptor.venue} entry cost`),
+    0,
+  );
+  const grossPayoutMicros = legs.reduce((sum, leg) => sum + venueRoundedPayoutMicros(leg.fillLevels), 0);
+  const totalFeesMicros = legs.reduce((sum, leg) => sum + leg.fee.amountMicros!, 0);
+  const grossProfitMicros = grossPayoutMicros - grossCostMicros;
+  const netPnlMicros = grossProfitMicros - totalFeesMicros;
+
+  return validateCalculationEnvelope({
+    version: CALCULATION_ENVELOPE_VERSION,
+    scope: 'position',
+    status: 'executable',
+    blocker: null,
+    calculatedAt,
+    requestedQuantityMicros: legs[0].requestedQuantityMicros,
+    executableQuantityMicros: legs[0].executableQuantityMicros,
+    legs,
+    totals: { grossCostMicros, grossPayoutMicros, grossProfitMicros, totalFeesMicros, netPnlMicros },
+    rounding: { moneyScale: MONEY_SCALE, priceScale: PRICE_SCALE, quantityScale: QUANTITY_SCALE, mode: 'venue_rules_then_sum' },
+  });
 }
 
 // ── GET: fetch all positions ──
@@ -146,6 +369,7 @@ export async function GET(): Promise<NextResponse> {
     const enriched = paired.map((position) => ({
       ...position,
       ...derivePositionRisk(position),
+      calculationEnvelope: unavailablePositionEnvelope(position, quoteTimestamp),
       quoteTimestamps: {
         kalshi: position.kalshi ? quoteTimestamp : null,
         polymarket: position.polymarket ? quoteTimestamp : null,
@@ -224,6 +448,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Open position has no executable server quote' }, { status: 409 });
     }
 
+    let exitFeeAuthority: ExitFeeAuthority | null = null;
+    if (verifiedKalshi && verifiedPolymarket) {
+      try {
+        const { fetchAuthoritativeBotFeeConfig } = await import('@/lib/bot-positions');
+        exitFeeAuthority = await fetchAuthoritativeBotFeeConfig({
+          kalshiTicker: verifiedKalshi.ticker,
+          pmConditionId: verifiedPolymarket.conditionId,
+          pmTokenId: verifiedPolymarket.asset,
+          pmSide: verifiedPolymarket.side.toLowerCase() as 'yes' | 'no',
+        });
+      } catch (error) {
+        logger.warn('[positions] current exit fee authority unavailable', { error: String(error) });
+      }
+    }
+
     // Compatibility shapes for the existing order/audit path. Every executable
     // field below comes from the verified account snapshot, not request JSON.
     const kalshi = verifiedKalshi ? {
@@ -240,7 +479,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       openedAt: null as string | null,
     } : null;
 
-    const results: { kalshi?: any; polymarket?: any } = {};
+    const results: { kalshi?: ExitOrderResult; polymarket?: ExitOrderResult } = {};
     const errors: { kalshi?: string; polymarket?: string } = {};
 
     // Close Kalshi leg: place SELL order
@@ -281,6 +520,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const success = !errors.kalshi && !errors.polymarket;
     const partialFill = (errors.kalshi && !errors.polymarket) || (!errors.kalshi && errors.polymarket);
+    const closedAt = new Date().toISOString();
+    const calculationEnvelope = buildExitCalculationEnvelope(
+      verifiedPair,
+      results,
+      errors,
+      exitFeeAuthority,
+      closedAt,
+    );
 
     // Persist both the execution audit record and one immutable closed-position
     // record per successfully submitted leg. The latter powers full realized-P&L
@@ -288,36 +535,51 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (success || partialFill) {
       try {
         const { persistExecution, persistClosedPosition } = await import('@/lib/persistence');
-        const closedAt = new Date().toISOString();
-        const netLegPnl = (leg: any, grossPnl: number) => grossPnl - Number(leg?.exitFees ?? 0);
-        const totalRealizedPnl =
-          (kalshi && !errors.kalshi ? netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)) : 0)
-          + (polymarket && !errors.polymarket ? netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)) : 0);
+        const canonicalNetPnl = calculationEnvelope.status === 'executable'
+          ? calculationEnvelope.totals.netPnlMicros! / MONEY_SCALE
+          : null;
+        const legAccounting = (venue: 'kalshi' | 'polymarket', entryCost: number) => {
+          if (calculationEnvelope.status !== 'executable') return null;
+          const leg = calculationEnvelope.legs.find((candidate) => candidate.venue === venue);
+          if (!leg || leg.vwapPriceMicros == null || leg.executableQuantityMicros == null || leg.fee.amountMicros == null) return null;
+          if (leg.executableQuantityMicros !== leg.requestedQuantityMicros) return null;
+          const payoutMicros = venueRoundedPayoutMicros(leg.fillLevels);
+          const realizedPnl = (payoutMicros - toScaledInteger(entryCost, MONEY_SCALE, `${venue} entry cost`) - leg.fee.amountMicros) / MONEY_SCALE;
+          return { leg, realizedPnl, exitPrice: leg.vwapPriceMicros / PRICE_SCALE, exitFee: leg.fee.amountMicros / MONEY_SCALE };
+        };
+        const kalshiAccounting = kalshi ? legAccounting('kalshi', kalshi.totalCost) : null;
+        const polymarketAccounting = polymarket ? legAccounting('polymarket', polymarket.totalCost) : null;
+        const closedSize = (venue: 'kalshi' | 'polymarket') => {
+          const leg = calculationEnvelope.legs.find((candidate) => candidate.venue === venue);
+          return leg?.executableQuantityMicros == null ? null : leg.executableQuantityMicros / QUANTITY_SCALE;
+        };
 
         const closedRecords = [
           kalshi && !errors.kalshi ? {
             marketTitle: kalshi.title ?? 'Unknown', platform: 'kalshi' as const, side: kalshi.side,
-            size: Number(kalshi.size), entryPrice: Number(kalshi.entryPrice ?? 0),
-            exitPrice: Number(kalshi.exitPrice ?? kalshi.priceCents / 100),
-            realizedPnl: netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)),
-            roiPct: Number(kalshi.totalCost ?? 0) > 0
-              ? netLegPnl(kalshi, Number(kalshi.unrealizedPnl ?? 0)) / Number(kalshi.totalCost) * 100 : 0,
+            size: closedSize('kalshi'), entryPrice: Number(kalshi.entryPrice),
+            exitPrice: kalshiAccounting?.exitPrice ?? null,
+            realizedPnl: kalshiAccounting?.realizedPnl ?? null,
+            roiPct: kalshiAccounting && kalshi.totalCost > 0 ? kalshiAccounting.realizedPnl / kalshi.totalCost * 100 : null,
             openedAt: kalshi.openedAt ?? null, closedAt,
             durationSecs: kalshi.openedAt ? Math.max(0, Math.floor((Date.parse(closedAt) - Date.parse(kalshi.openedAt)) / 1000)) : null,
-            pairId: body.pairId ?? null, feesPaid: Number(kalshi.feesPaid ?? 0) + Number(kalshi.exitFees ?? 0),
+            pairId: body.pairId ?? null, feesPaid: kalshiAccounting?.exitFee ?? null,
             ticker: kalshi.ticker, executionMode: 'live' as const,
+            rawData: results.kalshi,
+            calculationEnvelope,
           } : null,
           polymarket && !errors.polymarket ? {
             marketTitle: polymarket.title ?? 'Unknown', platform: 'polymarket' as const, side: polymarket.side,
-            size: Number(polymarket.size), entryPrice: Number(polymarket.entryPrice ?? 0),
-            exitPrice: Number(polymarket.exitPrice ?? polymarket.price),
-            realizedPnl: netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)),
-            roiPct: Number(polymarket.totalCost ?? 0) > 0
-              ? netLegPnl(polymarket, Number(polymarket.cashPnl ?? 0)) / Number(polymarket.totalCost) * 100 : 0,
+            size: closedSize('polymarket'), entryPrice: Number(polymarket.entryPrice),
+            exitPrice: polymarketAccounting?.exitPrice ?? null,
+            realizedPnl: polymarketAccounting?.realizedPnl ?? null,
+            roiPct: polymarketAccounting && polymarket.totalCost > 0 ? polymarketAccounting.realizedPnl / polymarket.totalCost * 100 : null,
             openedAt: polymarket.openedAt ?? null, closedAt,
             durationSecs: polymarket.openedAt ? Math.max(0, Math.floor((Date.parse(closedAt) - Date.parse(polymarket.openedAt)) / 1000)) : null,
-            pairId: body.pairId ?? null, feesPaid: Number(polymarket.feesPaid ?? 0) + Number(polymarket.exitFees ?? 0),
+            pairId: body.pairId ?? null, feesPaid: polymarketAccounting?.exitFee ?? null,
             conditionId: polymarket.conditionId, executionMode: 'live' as const,
+            rawData: results.polymarket,
+            calculationEnvelope,
           } : null,
         ].filter(Boolean);
         await Promise.all(closedRecords.map((record) => persistClosedPosition(record!)));
@@ -354,9 +616,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               status: results.polymarket.status,
               orderId: results.polymarket.orderId,
             } : undefined,
-            actualProfit: totalRealizedPnl,
+            actualProfit: canonicalNetPnl,
+            calculationEnvelope,
           },
-          estimatedProfit: totalRealizedPnl,
+          // The legacy column is NOT NULL. Persist a compatibility zero only in
+          // that column; consumers must authorize P&L from calculationEnvelope.
+          estimatedProfit: canonicalNetPnl ?? 0,
+          calculationEnvelope: { ...calculationEnvelope, scope: 'execution' },
         }).catch(e => logger.warn('[positions] persistExecution failed', { error: String(e) }));
       } catch {
         // non-fatal
@@ -367,6 +633,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       success,
       partialFill,
       results,
+      calculationEnvelope,
       errors: Object.keys(errors).length > 0 ? errors : undefined,
     });
   } catch (err) {
@@ -379,21 +646,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
   const { getKalshiPositions } = await import('@/lib/kalshi-positions');
   const positions = await getKalshiPositions();
-  return Promise.all(positions.map(async (p) => {
+  return positions.map((p) => {
     const size = Math.abs(p.position);
     const entryPrice = p.totalCost / Math.max(size, 1);
     const currentPrice = p.position > 0 ? p.currentYesBid : p.currentNoBid;
-    const authority = await resolveKalshiFeeAuthority(p.ticker);
-    const entryFeeQuote = calculateKalshiFeeQuote(authority, 'taker', [{
-      fills: [{ contracts: size, priceCents: entryPrice * 100 }],
-    }]);
-    const exitFeeQuote = calculateKalshiFeeQuote(authority, 'taker', [{
-      fills: [{ contracts: size, priceCents: currentPrice * 100 }],
-    }]);
-    const feesPaid = entryFeeQuote.effectiveFeeCents / 100;
-    const exitFees = exitFeeQuote.effectiveFeeCents / 100;
-    const netUnrealizedPnl = p.unrealizedPnl - exitFees;
-    const netRoiPct = p.totalCost > 0 ? (netUnrealizedPnl / p.totalCost) * 100 : 0;
     return {
       platform: 'kalshi' as const,
       ticker: p.ticker,
@@ -410,29 +666,21 @@ async function fetchKalshiPositions(): Promise<KalshiPositionDto[]> {
       roiPct: p.roiPct,
       realizedPnl: p.realizedPnl,
       lastPrice: p.lastPrice,
-      feesPaid,
-      netUnrealizedPnl,
-      netRoiPct,
-      exitFees,
-      entryFeeQuote,
-      exitFeeQuote,
+      feesPaid: null,
+      netUnrealizedPnl: null,
+      netRoiPct: null,
+      exitFees: null,
       reportedFeesPaidCents: p.reportedFeesPaidCents,
-      pairId: null,  // populated by pairPositions()
+      pairId: null,
     };
-  }));
+  });
 }
 
 async function fetchPmPositions(): Promise<PmPositionDto[]> {
   const { getPolymarketPositions } = await import('@/lib/polymarket-positions');
   const positions = await getPolymarketPositions();
   return positions.map(p => {
-    // Entry fees: theta * shares * entryPrice * (1-entryPrice)
-    const entryTheta = getPolymarketTheta(); // default category
-    const feesPaid = calcPolymarketFee(p.size, p.avgPrice, entryTheta);
-    // Exit fees: selling at current price
-    const exitFees = calcPolymarketFee(p.size, p.curPrice, entryTheta);
-    const netCashPnl = p.cashPnl - exitFees;
-    const netPercentPnl = p.initialValue > 0 ? (netCashPnl / p.initialValue) * 100 : 0;
+
     return {
       platform: 'polymarket' as const,
       asset: p.asset,
@@ -450,10 +698,10 @@ async function fetchPmPositions(): Promise<PmPositionDto[]> {
       percentPnl: p.percentPnl,
       endDate: p.endDate,
       negativeRisk: p.negativeRisk,
-      feesPaid,
-      netCashPnl,
-      netPercentPnl,
-      exitFees,
+      feesPaid: null,
+      netCashPnl: null,
+      netPercentPnl: null,
+      exitFees: null,
       pairId: null,  // populated by pairPositions()
     };
   });
@@ -491,12 +739,7 @@ function buildBreakdown(
   } : null;
 
   const totalGrossPnl = (legA?.grossPnl ?? 0) + (legB?.grossPnl ?? 0);
-  const totalFees = (legA?.feesPaid ?? 0) + (legA?.exitFees ?? 0) + (legB?.feesPaid ?? 0) + (legB?.exitFees ?? 0);
-  const totalNetPnl = (legA?.netPnl ?? 0) + (legB?.netPnl ?? 0);
-  const totalCost = (k?.totalCost ?? 0) + (p?.initialValue ?? 0);
-  const totalRoiPct = totalCost > 0 ? (totalNetPnl / totalCost) * 100 : 0;
-
-  return { legA, legB, totalGrossPnl, totalFees, totalNetPnl, totalRoiPct };
+  return { legA, legB, totalGrossPnl, totalFees: null, totalNetPnl: null, totalRoiPct: null };
 }
 
 /**
@@ -536,7 +779,8 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
         totalValue: k.currentValue + p.currentValue,
         totalCost: k.totalCost + p.initialValue,
         totalUnrealizedPnl: k.unrealizedPnl + p.cashPnl,
-        totalRoiPct: breakdown.totalRoiPct,
+        totalRoiPct: (k.totalCost + p.initialValue) > 0
+          ? ((k.unrealizedPnl + p.cashPnl) / (k.totalCost + p.initialValue)) * 100 : 0,
         breakdown,
       });
     } else {
@@ -551,7 +795,7 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
         totalValue: k.currentValue,
         totalCost: k.totalCost,
         totalUnrealizedPnl: k.unrealizedPnl,
-        totalRoiPct: breakdown.totalRoiPct,
+        totalRoiPct: k.totalCost > 0 ? (k.unrealizedPnl / k.totalCost) * 100 : 0,
         breakdown,
       });
     }
@@ -571,7 +815,7 @@ function pairPositions(kalshi: KalshiPositionDto[], pm: PmPositionDto[]): Paired
       totalValue: p.currentValue,
       totalCost: p.initialValue,
       totalUnrealizedPnl: p.cashPnl,
-      totalRoiPct: breakdown.totalRoiPct,
+      totalRoiPct: p.initialValue > 0 ? (p.cashPnl / p.initialValue) * 100 : 0,
       breakdown,
     });
   }

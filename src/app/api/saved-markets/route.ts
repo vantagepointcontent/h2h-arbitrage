@@ -103,11 +103,16 @@ export async function GET(request: NextRequest) {
               kalshiStake: a.kalshiStake ?? null,
               pmStake: a.pmStake ?? null,
               totalStake: a.totalStake ?? a.maxCapital ?? null,
+              calculationEnvelope: a.calculationEnvelope,
               fees: a.fees ? {
-                kalshiFee: a.fees.kalshiFee ?? 0,
-                polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? 0,
-                totalFees: a.fees.totalFees ?? ((a.fees.kalshiFee ?? 0) + (a.fees.polymarketFee ?? a.fees.pmFee ?? 0)),
-                worstCaseNetProfit: a.fees.worstCaseNetProfit ?? a.expectedProfit ?? 0,
+                kalshiFee: a.fees.kalshiFee ?? null,
+                polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? null,
+                totalFees: a.fees.totalFees ?? (
+                  a.fees.kalshiFee != null && (a.fees.polymarketFee ?? a.fees.pmFee) != null
+                    ? a.fees.kalshiFee + (a.fees.polymarketFee ?? a.fees.pmFee)!
+                    : null
+                ),
+                worstCaseNetProfit: a.fees.worstCaseNetProfit ?? null,
                 kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
               } : undefined,
             })),
@@ -139,11 +144,16 @@ export async function GET(request: NextRequest) {
                   kalshiStake: a.kalshiStake ?? null,
                   pmStake: a.pmStake ?? null,
                   totalStake: a.totalStake ?? a.maxCapital ?? null,
+                  calculationEnvelope: a.calculationEnvelope,
                   fees: a.fees ? {
-                    kalshiFee: a.fees.kalshiFee ?? 0,
-                    polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? 0,
-                    totalFees: a.fees.totalFees ?? ((a.fees.kalshiFee ?? 0) + (a.fees.polymarketFee ?? a.fees.pmFee ?? 0)),
-                    worstCaseNetProfit: a.fees.worstCaseNetProfit ?? a.expectedProfit ?? 0,
+                    kalshiFee: a.fees.kalshiFee ?? null,
+                    polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? null,
+                    totalFees: a.fees.totalFees ?? (
+                      a.fees.kalshiFee != null && (a.fees.polymarketFee ?? a.fees.pmFee) != null
+                        ? a.fees.kalshiFee + (a.fees.polymarketFee ?? a.fees.pmFee)!
+                        : null
+                    ),
+                    worstCaseNetProfit: a.fees.worstCaseNetProfit ?? null,
                     kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
                   } : undefined,
                 }))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closedPositionRow, escapeTradeCsv, executionRows } from './trade-export';
+import { TRADE_EXPORT_HEADERS, closedPositionRow, escapeTradeCsv, executionRows } from './trade-export';
 
 describe('trade export', () => {
   it('emits one row per live execution leg and excludes paper trades', () => {
@@ -16,7 +16,9 @@ describe('trade export', () => {
     expect(executionRows({ ...base, dryRun: true })).toEqual([]);
     const rows = executionRows({ ...base, dryRun: false });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual(['2026-08-08T10:00:01.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual', '', '', '', '', '']);
+    expect(rows[0]?.slice(0, 12)).toEqual(['2026-08-08T10:00:01.000Z', 'Kalshi', 'Event, winner', 'K-1', 'YES', 9, 0.41, 0.12, '', 'arb-1', 'filled', 'Manual']);
+    expect(rows[0]).toHaveLength(TRADE_EXPORT_HEADERS.length);
+    expect(rows[0]?.[TRADE_EXPORT_HEADERS.indexOf('Calculation Status')]).toBe('legacy_unverifiable');
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: 'apy' })[0]?.[11]).toBe('apy');
     expect(executionRows({ ...base, dryRun: false, source: 'bot', selectionMethod: null })[0]?.[11]).toBe('Legacy/Unknown');
   });
@@ -33,7 +35,8 @@ describe('trade export', () => {
           version: 'quadratic:1000000:v1', calculatedFeeCents: 2, chargedFeeCents: 1 },
       },
     };
-    expect(executionRows(execution as never)[0]?.slice(-5)).toEqual([
+    const row = executionRows(execution as never)[0]!;
+    expect(row.slice(TRADE_EXPORT_HEADERS.indexOf('Fee Source'), TRADE_EXPORT_HEADERS.indexOf('Fee Source') + 5)).toEqual([
       'kalshi-series:KX', '2026-08-08T10:00:00.000Z', 'quadratic:1000000:v1', 2, 1,
     ]);
   });
@@ -101,5 +104,17 @@ describe('trade export', () => {
     expect(escapeTradeCsv('=SUM(A1:A2)')).toBe("'=SUM(A1:A2)");
     expect(escapeTradeCsv('Event, winner')).toBe('"Event, winner"');
     expect(escapeTradeCsv(0.41)).toBe('0.41');
+  });
+
+  it('exports unavailable closed financials as blank rather than zero', () => {
+    const row = closedPositionRow({
+      marketTitle: 'Evidence unavailable', platform: 'polymarket', side: 'NO', size: null,
+      entryPrice: 0.4, exitPrice: null, realizedPnl: null, roiPct: null,
+      closedAt: '2026-08-08T11:00:00Z', feesPaid: null, pairId: 'arb-unavailable',
+    });
+
+    expect(row[5]).toBe('');
+    expect(row[8]).toBe('');
+    expect(row[TRADE_EXPORT_HEADERS.indexOf('Calculation Status')]).toBe('legacy_unverifiable');
   });
 });

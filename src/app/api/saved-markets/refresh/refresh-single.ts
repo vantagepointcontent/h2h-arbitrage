@@ -332,6 +332,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       buyPrice: o.arbitrage!.buyPrice,
       sellPlatform: o.arbitrage!.sellPlatform,
       sellPrice: o.arbitrage!.sellPrice,
+      calculationEnvelope: o.arbitrage!.calculationEnvelope,
       fees: o.arbitrage!.fees,
     };
     }),

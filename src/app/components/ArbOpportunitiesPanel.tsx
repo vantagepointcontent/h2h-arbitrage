@@ -15,6 +15,8 @@ import { OpportunityQueue } from "./opportunities/OpportunityQueue";
 import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 import { ShareStakeCalculator } from "./ShareStakeCalculator";
 import type { KalshiFeeAuthority } from "@/lib/kalshi-fee-quote";
+import { parseCalculationEnvelope, type CalculationEnvelope } from "@/lib/calculation-envelope";
+import { CalculationProvenance } from "./CalculationProvenance";
 import {
   ARB_ALERTS_STORAGE_KEY,
   type ArbAlert,
@@ -42,6 +44,7 @@ interface Outcome {
     buyPrice?: number;
     sellPlatform?: 'kalshi' | 'polymarket' | null;
     sellPrice?: number;
+    calculationEnvelope?: CalculationEnvelope | null;
     fees?: {
       kalshiFee: number;
       pmFee: number;
@@ -298,6 +301,9 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
           const apy = o.arbitrage.apyPct;
           const hasCanonicalApy = typeof apy === 'number' && Number.isFinite(apy);
           const scenarioApy = o.arbitrage.outcomeApy;
+          const calculationEnvelope = o.arbitrage.calculationEnvelope
+            ? parseCalculationEnvelope(o.arbitrage.calculationEnvelope, `opportunity ${o.artist}`)
+            : null;
 
           const distributionKey = `${idx}-${o.artist}`;
           const adjusted = distributions[distributionKey];
@@ -306,14 +312,25 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
           // so it must remain manual-only rather than silently clipping the two
           // orders back to the smaller shared contract count.
           const isDirectionalSplit = adjusted != null && adjusted.splitPct !== 50;
-          const canExecute = marketTitle && o.arbitrage.roiPct > 0 && !(o.arbitrage as any).suspicious
+          const envelopeExecutable = calculationEnvelope
+            ? calculationEnvelope.status === 'executable'
+              && (calculationEnvelope.totals.netPnlMicros ?? 0) > 0
+              && calculationEnvelope.requestedQuantityMicros === 1_000_000
+              && calculationEnvelope.executableQuantityMicros === 1_000_000
+            : false;
+          const canonicalNetMicros = calculationEnvelope?.totals.netPnlMicros ?? null;
+          const canonicalCostMicros = calculationEnvelope?.totals.grossCostMicros ?? null;
+          const canExecute = marketTitle && (canonicalNetMicros ?? 0) > 0 && !(o.arbitrage as any).suspicious
             && o.kalshi?.ticker && o.polymarket?.conditionId
             && !isDirectionalSplit
-            && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0));
-          const displayProfit = adjusted?.worstCaseNetProfit ?? o.arbitrage.expectedProfit;
-          const displayRoi = adjusted
-            ? (displayProfit / adjusted.totalStake) * 100
-            : o.arbitrage.roiPct;
+            && (!adjusted || (adjusted.kalshiStake > 0 && adjusted.pmStake > 0))
+            && envelopeExecutable;
+          const displayProfit = canonicalNetMicros != null
+            ? canonicalNetMicros / 1_000_000
+            : null;
+          const displayRoi = canonicalNetMicros != null && canonicalCostMicros != null && canonicalCostMicros > 0
+            ? (canonicalNetMicros / canonicalCostMicros) * 100
+            : null;
           const alertKey = makeArbAlertKey({
             artist: o.artist,
             strategy: o.arbitrage.strategy,
@@ -321,7 +338,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
             pmConditionId: o.polymarket?.conditionId,
           });
           const activeAlert = alerts[alertKey];
-          const alertHit = isAlertThresholdHit(displayRoi, activeAlert);
+          const alertHit = displayRoi != null && isAlertThresholdHit(displayRoi, activeAlert);
           const kalshiPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
             ? o.kalshi?.yesAsk : o.kalshi?.noAsk;
           const pmPrice = o.arbitrage.strategy === 'Buy YES Kalshi + NO PM'
@@ -333,7 +350,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                 roiPct: o.arbitrage.roiPct, kalshiPrice, pmPrice,
               })
             : null;
-          const supportsDistribution = !breakdown.isCross
+          const supportsDistribution = displayProfit != null && !breakdown.isCross
             && (o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
             && kalshiPrice != null && kalshiPrice > 0 && kalshiPrice < 1
             && pmPrice != null && pmPrice > 0 && pmPrice < 1
@@ -347,19 +364,25 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                 {marketId && <ArbDecayCurve marketId={marketId} outcome={o.artist} compact />}
                 <div className="flex-1" />
                 <span className="text-xs font-bold text-[#5DBE81]" title="ROI (net of fees)">
-                  {displayRoi.toFixed(2)}%
+                  {displayRoi == null ? 'Unavailable' : `${displayRoi.toFixed(2)}%`}
                 </span>
                 <span className="text-xs text-[#5DBE81]" title="Expected profit (net of fees)">
-                  {formatCurrency(displayProfit)}
+                  {displayProfit == null ? 'Unavailable' : formatCurrency(displayProfit)}
                 </span>
-                {hasCanonicalApy && (
+                {calculationEnvelope?.status === 'executable' && hasCanonicalApy && (
                   <span className="text-[10px] text-[#8A9BA8]" title="Annualized ROI">
                     APY {apy.toFixed(0)}%
                   </span>
                 )}
-                {!hasCanonicalApy && (
+                {!hasCanonicalApy && !calculationEnvelope && (
                   <span className="text-[10px] text-[#8A9BA8]" title={`APY unavailable: ${(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}`}>
                     APY unavailable: {(o.arbitrage.apyUnavailableReason ?? 'unknown').replaceAll('_', ' ')}
+                  </span>
+                )}
+                {!calculationEnvelope && (
+                  <span className="rounded border border-[#8A9BA8]/30 bg-[#8A9BA8]/10 px-2 py-1 text-[10px] text-[#8A9BA8]">
+                    Legacy calculation provenance unavailable
+                    <span className="text-[#8A9BA8]"> — predates the versioned fee and executable-book calculation envelope.</span>
                   </span>
                 )}
                 {activeAlert && (
@@ -380,7 +403,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                         polymarketStake: adjusted?.pmStake ?? o.arbitrage.pmStake ?? 0,
                         kalshiFee: o.arbitrage.fees?.kalshiFee,
                         polymarketFee: o.arbitrage.fees?.pmFee,
-                        netProfit: displayProfit,
+                        netProfit: displayProfit!,
                       }));
                     }}
                     className="inline-flex min-h-11 items-center gap-1 rounded border border-[#5DBE81]/30 px-3 py-2 text-[10px] font-semibold text-[#5DBE81] hover:bg-[#5DBE81]/10"
@@ -420,7 +443,10 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                   ))}
                 </div>
               )}
-              <div className="mt-2 flex items-stretch gap-2 flex-wrap sm:items-center">
+              {calculationEnvelope && <div className="mt-2">
+                <CalculationProvenance envelope={calculationEnvelope} compact />
+              </div>}
+              {calculationEnvelope?.status === 'executable' && <div className="mt-2 flex items-stretch gap-2 flex-wrap sm:items-center">
                 {activeAlert ? (
                   <button
                     onClick={() => clearAlert(alertKey)}
@@ -453,7 +479,7 @@ export function ArbOpportunitiesPanel({ outcomes, marketId, formatCurrency, cate
                     </button>
                   </>
                 )}
-              </div>
+              </div>}
               {(o.arbitrage.strategy === 'Buy YES Kalshi + NO PM' || o.arbitrage.strategy === 'Buy YES PM + NO Kalshi')
                 && kalshiPrice != null && pmPrice != null && (
                 <ShareStakeCalculator

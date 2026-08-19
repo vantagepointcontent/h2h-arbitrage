@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
           best_roi_pct: live.bestRoiPct,
           best_profit: live.bestProfit,
           strategy: live.strategy || '',
+          calculationEnvelope: live.calculationEnvelope,
           positive_arb_count: positiveArbCount,
           scanned_at: live.scannedAt || '',
         };

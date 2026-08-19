@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
 
 const mocks = vi.hoisted(() => ({
   queryScanHistory: vi.fn(),
@@ -35,6 +36,7 @@ const persistedRow = {
   apy_pct: 1825,
   apy_unavailable_reason: null,
   raw_result: null,
+  calculation_envelope: JSON.stringify(executableEnvelopeFixture),
 };
 
 describe('Logs scan-time APY serialization', () => {
@@ -55,6 +57,12 @@ describe('Logs scan-time APY serialization', () => {
       days_to_expiry: 0.5,
       expiry_at: '2026-08-13T00:00:00.000Z',
       apy_unavailable_reason: null,
+      calculation_envelope: {
+        version: 1,
+        status: 'executable',
+        requestedQuantityMicros: 1_000_000,
+        totals: { totalFeesMicros: 28_560, netPnlMicros: -8_560 },
+      },
     });
   });
 
@@ -147,6 +155,14 @@ describe('Logs scan-time APY serialization', () => {
     expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('');
     expect(values[columns.indexOf('Days to Expiry')]).toBe('0.5');
     expect(values[columns.indexOf('Expiry At')]).toBe('2026-08-13T00:00:00.000Z');
+    expect(values[columns.indexOf('Calculation Version')]).toBe('1');
+    expect(values[columns.indexOf('Calculation Status')]).toBe('executable');
+    expect(values[columns.indexOf('Requested Quantity')]).toBe('1');
+    expect(values[columns.indexOf('Executable Quantity')]).toBe('1');
+    expect(values[columns.indexOf('Gross Cost ($)')]).toBe('0.98');
+    expect(values[columns.indexOf('Total Fees ($)')]).toBe('0.02856');
+    expect(values[columns.indexOf('Net P&L ($)')]).toBe('-0.00856');
+    expect(csv).toContain('pm-no-token-1');
   });
 
   it('exports Current ROI and ROI Declined from full-precision persisted values', async () => {

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotPositionMarkets } from '@/lib/bot-positions';
 import { clientSafeError } from '@/lib/error-handler';
-import { getMarketUrlsById } from '@/lib/persistence';
+import { getExecutionCalculationEnvelopes, getMarketUrlsById } from '@/lib/persistence';
+import { legacyUnverifiableEnvelope } from '@/lib/calculation-envelope';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -29,11 +30,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       limit,
       cursor,
     });
+    const executionIds = page.markets.flatMap((market) => market.executions.map((execution) => execution.executionId));
+    const calculationEnvelopes = await getExecutionCalculationEnvelopes(executionIds);
     const markets = await Promise.all(page.markets.map(async (market) => {
       const urls = market.marketId ? await getMarketUrlsById(market.marketId) : null;
       const kalshiUrl = urls?.kalshiUrl ?? null;
       const polymarketUrl = urls?.polymarketUrl ?? null;
-      const executions = market.executions.map((execution) => ({ ...execution, kalshiUrl, polymarketUrl }));
+      const executions = market.executions.map((execution) => ({
+        ...execution,
+        kalshiUrl,
+        polymarketUrl,
+        calculationEnvelope: calculationEnvelopes.get(execution.executionId)
+          ?? legacyUnverifiableEnvelope(`bot position execution ${execution.executionId}`, 'position'),
+      }));
       const activeUnits = executions.filter((execution) => execution.status === 'open' || execution.status === 'partially_closed').length;
       return { ...market, kalshiUrl, polymarketUrl, activeUnits, maxUnitsPerMarket: 3, executions, entries: executions };
     }));

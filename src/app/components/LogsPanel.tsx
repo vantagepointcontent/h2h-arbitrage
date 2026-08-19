@@ -22,6 +22,8 @@ import {
   type QuotePlatform,
 } from "@/lib/log-price-comparison";
 import { compareRoiDecline } from "@/lib/roi-declined";
+import { parseCalculationEnvelope } from "@/lib/calculation-envelope";
+import { CalculationProvenance } from "./CalculationProvenance";
 
 interface LogEntry {
   id: number;
@@ -47,6 +49,7 @@ interface LogEntry {
   arb_type: ArbType | null;
   arb_valid: 0 | 1;
   arb_invalidation_reason: string | null;
+  calculation_envelope?: unknown;
 }
 
 type ArbTypeFilter = "all" | ArbType;
@@ -964,14 +967,20 @@ function LogRow({
   fmtTime: (s: string) => string;
   savedMarkets: Map<string, { title: string; expiryDate?: string | null }>;
 }) {
-  const scanTimeRoi = typeof log.best_roi_pct === 'number' && Number.isFinite(log.best_roi_pct) ? log.best_roi_pct : null;
+  const scanEnvelope = parseCalculationEnvelope(log.calculation_envelope, `scan log ${log.id}`);
+  const scanNetMicros = scanEnvelope.status === 'executable' ? scanEnvelope.totals.netPnlMicros : null;
+  const scanCostMicros = scanEnvelope.status === 'executable' ? scanEnvelope.totals.grossCostMicros : null;
+  const scanRoiPct = scanNetMicros != null && scanCostMicros != null && scanCostMicros > 0
+    ? scanNetMicros / scanCostMicros * 100
+    : null;
+  const scanTimeRoi = scanRoiPct;
   const roiColor = scanTimeRoi == null ? "text-[#8A9BA8]" : scanTimeRoi > 0 ? "text-[#5DBE81]" : scanTimeRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbIsValid = log.arb_valid !== 0;
   const arbTypeMeta = arbIsValid
     ? (log.arb_type ? ARB_TYPES[log.arb_type] : getArbTypeMeta(log.strategy))
     : null;
-  const apy = logApyPct(log);
+  const apy = scanEnvelope.status === 'executable' ? logApyPct(log) : null;
   const currentRoiValue = currentRoi.status === 'available'
     && typeof currentRoi.roiPct === 'number'
     && Number.isFinite(currentRoi.roiPct)
@@ -1116,7 +1125,7 @@ function LogRow({
           </span>
           <span id={roiDeclineDescriptionId} className="sr-only">{roiDeclineTitle}</span>
         </td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{fmtUsd(log.best_profit)}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{scanNetMicros == null ? 'Unavailable' : fmtUsd(scanNetMicros / 1_000_000)}</td>
         <td
           className={`px-3 py-2 text-right text-xs font-mono ${apy != null ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
           title={apy == null ? `APY unavailable: ${log.apy_unavailable_reason ?? 'unknown reason'}` : 'APY captured at scan time'}
@@ -1125,7 +1134,7 @@ function LogRow({
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.total_stake ? fmtUsd(log.total_stake) : "\u2014"}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{scanCostMicros == null ? 'Unavailable' : fmtUsd(scanCostMicros / 1_000_000)}</td>
         <td className="px-3 py-2 text-center">
           <button
             onClick={handleNavigate}
@@ -1157,11 +1166,17 @@ function LogRow({
               </div>
             ) : rawArbs.length > 0 ? (
               <div className="space-y-2">
+                <CalculationProvenance envelope={scanEnvelope} compact />
                 <div className="text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide mb-2">Arbitrage Opportunities ({rawArbs.length})</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {rawArbs.map((rawArb, i) => {
                     const arb = rawArb as Record<string, unknown>;
-                    const arbFees = (arb.fees ?? {}) as Record<string, unknown>;
+                    const arbEnvelope = parseCalculationEnvelope(arb.calculationEnvelope, `scan opportunity ${log.id}`);
+                    const arbNetMicros = arbEnvelope.status === 'executable' ? arbEnvelope.totals.netPnlMicros : null;
+                    const arbCostMicros = arbEnvelope.status === 'executable' ? arbEnvelope.totals.grossCostMicros : null;
+                    const arbRoiPct = arbNetMicros != null && arbCostMicros != null && arbCostMicros > 0
+                      ? arbNetMicros / arbCostMicros * 100
+                      : null;
                     return (
                     <div key={i} className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-1">
                       <div className="flex items-center justify-between">
@@ -1176,21 +1191,17 @@ function LogRow({
                               </span>
                             ) : null;
                           })()}
-                          <span className={`text-xs font-mono font-semibold ${Number(arb.roiPct) > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
-                            {fmtPct(Number(arb.roiPct))}
+                          <span className={`text-xs font-mono font-semibold ${arbRoiPct == null ? "text-[#8A9BA8]" : arbRoiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
+                            {arbRoiPct == null ? 'Unavailable' : fmtPct(arbRoiPct)}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-[#8A9BA8]">
-                        <span>Profit: <span className="text-[#facc15] font-mono">{fmtUsd(Number(arb.expectedProfit))}</span></span>
+                        <span>Profit: <span className="text-[#facc15] font-mono">{arbNetMicros == null ? 'Unavailable' : fmtUsd(arbNetMicros / 1_000_000)}</span></span>
                         <span>{String(arb.strategy)}</span>
                       </div>
-                      <HistoricalCurrentPriceComparison arb={arb} cache={comparisonCache} />
-                      {arb.fees && (
-                        <div className="text-[10px] text-[#8A9BA8] mt-1 pt-1 border-t border-[#182533]">
-                          Fees — <img src="/kalshi-icon.png" alt="Kalshi" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(Number(arbFees.kalshiFee ?? 0))} · <img src="/polymarket-icon.png" alt="Polymarket" className="inline w-3 h-3 rounded-sm" /> {fmtUsd(Number(arbFees.pmFee ?? 0))} · Net: {fmtUsd(Number(arbFees.worstCaseNetProfit ?? arbFees.netProfitIfKalshiWins ?? 0))}
-                        </div>
-                      )}
+                      {arbEnvelope.status === 'executable' && <HistoricalCurrentPriceComparison arb={arb} cache={comparisonCache} />}
+                      <CalculationProvenance envelope={arbEnvelope} compact />
                     </div>
                     );
                   })}

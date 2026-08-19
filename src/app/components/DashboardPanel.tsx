@@ -15,11 +15,13 @@ import {
   DollarSign,
   HardDrive,
 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { LifecycleStatsPanel } from "./LifecycleStatsPanel";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DecisionCommandCenter } from "./dashboard/DecisionCommandCenter";
+import { parseCalculationEnvelope, type CalculationEnvelope } from "@/lib/calculation-envelope";
+import { CalculationProvenance } from "./CalculationProvenance";
 
 const ArbTimingPanel = dynamic(() => import("./ArbTimingPanel"), {
   loading: () => (
@@ -85,6 +87,7 @@ interface ActiveArb {
   strategy: string;
   positive_arb_count: number;
   scanned_at: string;
+  calculationEnvelope?: CalculationEnvelope | null;
 }
 
 interface MarketCoverageItem {
@@ -148,15 +151,17 @@ interface CapacityData {
 interface DailyPnlSummary {
   date: string;
   timezone: string;
-  realizedPnl: number;
-  unrealizedPnl: number;
-  totalPnl: number;
+  realizedPnl: number | null;
+  unrealizedPnl: number | null;
+  totalPnl: number | null;
   totalTrades: number;
-  winRatePct: number;
+  winRatePct: number | null;
+  verifiedClosedTrades: number;
+  unavailableClosedPositions: number;
   totalVolume: number;
   platforms: {
-    kalshi: { realizedPnl: number; volume: number };
-    polymarket: { realizedPnl: number; volume: number };
+    kalshi: { realizedPnl: number | null; volume: number };
+    polymarket: { realizedPnl: number | null; volume: number };
   };
 }
 
@@ -190,6 +195,7 @@ const fmtUsd = (n: number) =>
     currency: "USD",
     maximumFractionDigits: 2,
   });
+const fmtOptionalUsd = (n: number | null) => n == null ? 'Unavailable' : fmtUsd(n);
 
 const fmtBytes = (n: number) => {
   if (n <= 0) return "0 B";
@@ -315,6 +321,7 @@ export default function DashboardPanel() {
   }, [range]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     fetchData();
   }, [fetchData]);
 
@@ -402,9 +409,9 @@ export default function DashboardPanel() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
             {[
-              ["Total P&L", fmtUsd(dailyPnl.totalPnl), dailyPnl.totalPnl],
-              ["Realized", fmtUsd(dailyPnl.realizedPnl), dailyPnl.realizedPnl],
-              ["Unrealized", fmtUsd(dailyPnl.unrealizedPnl), dailyPnl.unrealizedPnl],
+              ["Total P&L", fmtOptionalUsd(dailyPnl.totalPnl), dailyPnl.totalPnl],
+              ["Realized", fmtOptionalUsd(dailyPnl.realizedPnl), dailyPnl.realizedPnl],
+              ["Unrealized", fmtOptionalUsd(dailyPnl.unrealizedPnl), dailyPnl.unrealizedPnl],
             ].map(([label, value, amount]) => (
               <div key={String(label)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">{String(label)}</div>
@@ -417,7 +424,7 @@ export default function DashboardPanel() {
             </div>
             <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
               <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Win rate</div>
-              <div className="text-sm font-semibold tabular-nums">{dailyPnl.winRatePct.toFixed(1)}%</div>
+              <div className="text-sm font-semibold tabular-nums">{dailyPnl.winRatePct == null ? 'Unavailable' : `${dailyPnl.winRatePct.toFixed(1)}%`}</div>
             </div>
             <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-workspace)] px-3 py-2">
               <div className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Volume</div>
@@ -425,8 +432,9 @@ export default function DashboardPanel() {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--text-secondary)]">
-            <span>Kalshi: <b className="text-white">{fmtUsd(dailyPnl.platforms.kalshi.volume)}</b> volume · <b className={dailyPnl.platforms.kalshi.realizedPnl >= 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}>{fmtUsd(dailyPnl.platforms.kalshi.realizedPnl)}</b> realized</span>
-            <span>Polymarket: <b className="text-white">{fmtUsd(dailyPnl.platforms.polymarket.volume)}</b> volume · <b className={dailyPnl.platforms.polymarket.realizedPnl >= 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}>{fmtUsd(dailyPnl.platforms.polymarket.realizedPnl)}</b> realized</span>
+            <span>Kalshi: <b className="text-white">{fmtUsd(dailyPnl.platforms.kalshi.volume)}</b> volume · <b>{fmtOptionalUsd(dailyPnl.platforms.kalshi.realizedPnl)}</b> realized</span>
+            <span>Polymarket: <b className="text-white">{fmtUsd(dailyPnl.platforms.polymarket.volume)}</b> volume · <b>{fmtOptionalUsd(dailyPnl.platforms.polymarket.realizedPnl)}</b> realized</span>
+            {dailyPnl.unavailableClosedPositions > 0 && <span className="text-[var(--status-warning)]">{dailyPnl.unavailableClosedPositions} close record(s) excluded: financial evidence unavailable</span>}
           </div>
         </div>
       )}
@@ -1091,15 +1099,23 @@ export default function DashboardPanel() {
                   </thead>
                   <tbody>
                     {data!.topActiveArbs.map((arb) => {
+                      const envelope = parseCalculationEnvelope(arb.calculationEnvelope, `dashboard opportunity ${arb.market_id}`);
+                      const netPnlMicros = envelope.status === 'executable' ? envelope.totals.netPnlMicros : null;
+                      const grossCostMicros = envelope.status === 'executable' ? envelope.totals.grossCostMicros : null;
+                      const canonicalRoiPct = netPnlMicros != null && grossCostMicros != null && grossCostMicros > 0
+                        ? netPnlMicros / grossCostMicros * 100
+                        : null;
                       const roiColor =
-                        arb.best_roi_pct >= 5
+                        canonicalRoiPct == null
+                          ? "text-[var(--text-secondary)]"
+                          : canonicalRoiPct >= 5
                           ? "text-[var(--status-positive)]"
-                          : arb.best_roi_pct >= 0
+                          : canonicalRoiPct >= 0
                             ? "text-[var(--status-warning)]"
                             : "text-[var(--status-negative)]";
                       return (
+                        <Fragment key={arb.id}>
                         <tr
-                          key={arb.id}
                           className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-workspace)]/50 transition-colors cursor-pointer"
                           onClick={() =>
                             (window.location.href = `/?view=scan&id=${encodeURIComponent(arb.market_id)}`)
@@ -1117,10 +1133,10 @@ export default function DashboardPanel() {
                             <CompactStrategyDisplay strategy={arb.strategy} />
                           </td>
                           <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`}>
-                            {fmtPct(arb.best_roi_pct)}
+                            {canonicalRoiPct == null ? 'Unavailable' : fmtPct(canonicalRoiPct)}
                           </td>
                           <td className="px-3 py-2 text-right text-xs font-mono text-[var(--status-warning)]">
-                            {fmtUsd(arb.best_profit)}
+                            {netPnlMicros == null ? 'Unavailable' : fmtUsd(netPnlMicros / 1_000_000)}
                           </td>
                           <td className="px-3 py-2 text-right text-xs font-mono text-[var(--status-positive)]">
                             {arb.positive_arb_count}
@@ -1129,6 +1145,12 @@ export default function DashboardPanel() {
                             {fmtTime(arb.scanned_at)}
                           </td>
                         </tr>
+                        <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-workspace)]/30">
+                          <td colSpan={6} className="px-3 py-2">
+                            <CalculationProvenance envelope={envelope} compact />
+                          </td>
+                        </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>

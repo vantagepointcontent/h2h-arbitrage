@@ -25,9 +25,9 @@ import {
   Wallet,
   ChevronRight,
   AlertTriangle,
-  Info,
   Minus,
 } from 'lucide-react';
+import { MONEY_SCALE, parseCalculationEnvelope } from '@/lib/calculation-envelope';
 
 const OpenPositionsPanel = dynamic(() => import('./OpenPositionsPanel'), { ssr: false });
 
@@ -55,12 +55,13 @@ interface ExecutionRecord {
     rollbackExecuted?: boolean;
     unhedged?: boolean;
     netExposure?: number;
-    actualProfit?: number;
+    actualProfit?: number | null;
     executionTimeMs?: number;
     steps?: ExecutionStep[];
     alerts?: { level: 'warning' | 'error' | 'info'; message: string; leg?: string; action?: string }[];
   } | null;
   estimatedProfit: number;
+  calculationEnvelope?: unknown;
   source?: 'manual' | 'bot';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
 }
@@ -70,26 +71,42 @@ interface ClosedPositionRecord {
   marketTitle: string;
   platform: 'kalshi' | 'polymarket';
   side: 'YES' | 'NO';
-  size: number;
+  size: number | null;
   entryPrice: number;
-  exitPrice: number;
-  realizedPnl: number;
-  roiPct: number;
+  exitPrice: number | null;
+  realizedPnl: number | null;
+  roiPct: number | null;
   openedAt?: string | null;
   closedAt: string;
   durationSecs?: number | null;
-  feesPaid: number;
+  feesPaid: number | null;
   executionMode?: 'live' | 'paper';
 }
 
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
+const fmtOptionalUsd = (n: number | null) => n == null ? 'Unavailable' : fmtUsd(n);
+const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+function canonicalNetPnlMicros(t: ExecutionRecord): number | null {
+  const envelope = parseCalculationEnvelope(t.calculationEnvelope, `execution ${t.id}`);
+  if (envelope.scope !== 'execution' || envelope.status !== 'executable') return null;
+  // V1 sell envelopes do not carry independently reproducible entry-cost basis.
+  // Do not promote them to canonical history P&L until that provenance is versioned.
+  if (envelope.legs.length !== 2 || envelope.legs.some((leg) => leg.action !== 'buy')) return null;
+  return envelope.totals.netPnlMicros;
+}
+
+function fmtCanonicalUsd(micros: number | null): string {
+  return micros == null ? 'Unavailable' : USD.format(micros / MONEY_SCALE);
+}
 
 /** Derive a human-readable trade status from the execution record. */
-function tradeStatus(t: ExecutionRecord): 'filled' | 'pending' | 'cancelled' | 'failed' {
+function tradeStatus(t: ExecutionRecord): 'filled' | 'pending' | 'cancelled' | 'failed' | 'unavailable' {
   if (!t.success && t.dryRun) return 'failed';
   if (!t.success) return 'failed';
   // Dry-run successful = simulated fill
   if (t.dryRun) return 'filled';
+  if (canonicalNetPnlMicros(t) == null) return 'unavailable';
   // Real orders: check result sub-statuses
   const k = t.result?.kalshiResult?.status;
   const p = t.result?.polymarketResult?.status;
@@ -106,6 +123,7 @@ function StatusBadge({ status }: { status: string }) {
     pending:  { cls: 'bg-amber-500/15 text-amber-400', icon: <Clock className="w-3 h-3" /> },
     cancelled:{ cls: 'bg-[#8A9BA8]/15 text-[#8A9BA8]', icon: <Ban className="w-3 h-3" /> },
     failed:   { cls: 'bg-[#ef4444]/15 text-[#ef4444]', icon: <XCircle className="w-3 h-3" /> },
+    unavailable: { cls: 'bg-[#8A9BA8]/15 text-[#8A9BA8]', icon: <AlertTriangle className="w-3 h-3" /> },
   };
   const s = map[status] ?? map.failed;
   return (
@@ -182,6 +200,9 @@ function ExecutionTimeline({
   const isUnhedged = Boolean(trade.result?.unhedged);
   const rollbackExecuted = Boolean(trade.result?.rollbackExecuted);
   const actualProfit = trade.result?.actualProfit;
+  const actualProfitMicros = trade.dryRun
+    ? (actualProfit != null && Number.isFinite(actualProfit) ? Math.round(actualProfit * MONEY_SCALE) : null)
+    : canonicalNetPnlMicros(trade);
   const netExposure = trade.result?.netExposure;
 
   return (
@@ -234,13 +255,13 @@ function ExecutionTimeline({
                 </span>
               </div>
               {/* Optional metadata detail line */}
-              {step.metadata && (step.metadata as Record<string, unknown>).filledSize != null && (step.metadata as Record<string, unknown>).requestedSize != null && (
+              {Boolean(step.metadata && (step.metadata as Record<string, unknown>).filledSize != null && (step.metadata as Record<string, unknown>).requestedSize != null) && (
                 <div className="text-[10px] text-[#5E6875] mt-0.5 ml-[168px]">
                   Fill ratio: {(((Number((step.metadata as Record<string, unknown>).filledSize) / Number((step.metadata as Record<string, unknown>).requestedSize))) * 100).toFixed(1)}%
                 </div>
               )}
               {/* Alert label prefix */}
-              {step.metadata && (step.metadata as Record<string, unknown>).isAlert && (
+              {Boolean(step.metadata && (step.metadata as Record<string, unknown>).isAlert) && (
                 <div className="flex items-start gap-1.5 mt-0.5">
                   <span className="text-[10px] uppercase text-[#5E6875] mr-1">Alert</span>
                   <span className="text-xs text-[#FFFFFF]">{step.description}</span>
@@ -280,15 +301,15 @@ function ExecutionTimeline({
               {(executionTimeMs / 1000).toFixed(2)}s
             </span>
           </span>
-          {actualProfit != null && (
+          {(!trade.dryRun || actualProfitMicros != null) && (
             <span className="flex items-center gap-1.5">
               <span className="text-[#5E6875] uppercase">Actual P&L:</span>
               <span
                 className={`font-mono tabular-nums font-medium ${
-                  actualProfit >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'
+                  actualProfitMicros == null ? 'text-[#8A9BA8]' : actualProfitMicros >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'
                 }`}
               >
-                {fmtUsd(actualProfit)}
+                {fmtCanonicalUsd(actualProfitMicros)}
               </span>
             </span>
           )}
@@ -335,7 +356,10 @@ export default function TradesPanel() {
     }
   }, [methodFilter, methodSort]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    load();
+  }, [load]);
 
   /** Fetch timeline for a trade from the separate endpoint (fallback if steps not inline). */
   const loadTimeline = useCallback(async (tradeId: number, arbId: string) => {
@@ -417,13 +441,15 @@ export default function TradesPanel() {
   const visible = trades.filter((t) => {
     if (filter === 'all') return true;
     if (filter === 'pending') return tradeStatus(t) === 'pending';
-    if (filter === 'real') return !t.dryRun;
+    if (filter === 'real') return !t.dryRun && canonicalNetPnlMicros(t) != null;
     if (filter === 'dry') return t.dryRun;
     return true;
   });
 
-  const realTrades = trades.filter((t) => !t.dryRun && t.success);
-  const totalEstProfit = realTrades.reduce((s, t) => s + (t.estimatedProfit || 0), 0);
+  const realTrades = trades.filter((t) => !t.dryRun && t.success && canonicalNetPnlMicros(t) != null);
+  const totalNetPnlMicros = realTrades.length > 0
+    ? realTrades.reduce((sum, trade) => sum + canonicalNetPnlMicros(trade)!, 0)
+    : null;
   const pendingCount = trades.filter((t) => tradeStatus(t) === 'pending').length;
   const unhedgedCount = trades.filter((t) => t.result?.unhedged).length;
   const unhedgedExposure = trades
@@ -513,8 +539,8 @@ export default function TradesPanel() {
                   <td className="px-4 py-3 text-xs text-[#8A9BA8] whitespace-nowrap">{new Date(position.closedAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-xs text-[#FFFFFF] max-w-[220px] truncate" title={position.marketTitle}>{position.marketTitle}</td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap"><span className={position.platform === 'kalshi' ? 'text-[#5DBE81]' : 'text-[#a78bfa]'}>{position.platform === 'kalshi' ? 'Kalshi' : 'Polymarket'}</span><span className="text-[#8A9BA8]"> · {position.side}</span></td>
-                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.size.toFixed(2)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.entryPrice.toFixed(3)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.exitPrice.toFixed(3)}</td>
-                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{fmtUsd(position.feesPaid)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.realizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtUsd(position.realizedPnl)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.roiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{position.roiPct.toFixed(2)}%</td>
+                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.size == null ? 'Unavailable' : position.size.toFixed(2)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.entryPrice.toFixed(3)}</td><td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{position.exitPrice == null ? 'Unavailable' : position.exitPrice.toFixed(3)}</td>
+                  <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] tabular-nums">{fmtOptionalUsd(position.feesPaid)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.realizedPnl == null ? 'text-[#8A9BA8]' : position.realizedPnl >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtOptionalUsd(position.realizedPnl)}</td><td className={`px-4 py-3 text-xs text-right font-medium tabular-nums ${position.roiPct == null ? 'text-[#8A9BA8]' : position.roiPct >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{position.roiPct == null ? 'Unavailable' : `${position.roiPct.toFixed(2)}%`}</td>
                   <td className="px-4 py-3 text-xs text-right text-[#8A9BA8] whitespace-nowrap">{position.durationSecs == null ? 'Unknown' : position.durationSecs < 3600 ? `${Math.round(position.durationSecs / 60)}m` : `${(position.durationSecs / 3600).toFixed(1)}h`}</td><td className="px-4 py-3 text-center"><span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#facc15]/20 text-[#facc15]">{position.executionMode ?? 'live'}</span></td>
                 </tr>)}</tbody>
               </table>
@@ -528,7 +554,7 @@ export default function TradesPanel() {
               <div className="text-lg font-bold text-[#FFFFFF]">{trades.length}</div>
             </div>
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-              <div className="text-[10px] uppercase text-[#8A9BA8]">Real (successful)</div>
+              <div className="text-[10px] uppercase text-[#8A9BA8]">Real (verified)</div>
               <div className="text-lg font-bold text-[#5DBE81]">{realTrades.length}</div>
             </div>
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
@@ -536,8 +562,8 @@ export default function TradesPanel() {
               <div className="text-lg font-bold text-amber-400">{pendingCount}</div>
             </div>
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
-              <div className="text-[10px] uppercase text-[#8A9BA8]">Est. net P&L (real)</div>
-              <div className={`text-lg font-bold ${totalEstProfit >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtUsd(totalEstProfit)}</div>
+              <div className="text-[10px] uppercase text-[#8A9BA8]">Canonical net P&amp;L (real)</div>
+              <div className={`text-lg font-bold ${totalNetPnlMicros == null ? 'text-[#8A9BA8]' : totalNetPnlMicros >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>{fmtCanonicalUsd(totalNetPnlMicros)}</div>
             </div>
           </div>
 
@@ -699,12 +725,12 @@ export default function TradesPanel() {
                                       )}
                                     </div>
                                   </td>
-                                  <td rowSpan={legs.length} className={`px-4 py-3 text-xs text-right font-medium align-top ${t.estimatedProfit >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
-                                    {fmtUsd(t.estimatedProfit)}
+                                  <td rowSpan={legs.length} className={`px-4 py-3 text-xs text-right font-medium align-top ${canonicalNetPnlMicros(t) == null ? 'text-[#8A9BA8]' : canonicalNetPnlMicros(t)! >= 0 ? 'text-[#5DBE81]' : 'text-[#ef4444]'}`}>
+                                    {fmtCanonicalUsd(canonicalNetPnlMicros(t))}
                                   </td>
                                   <td rowSpan={legs.length} className="px-4 py-3 text-center align-top">
                                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${t.dryRun ? 'bg-[#8A9BA8]/15 text-[#8A9BA8]' : 'bg-[#facc15]/20 text-[#facc15]'}`}>
-                                      {t.dryRun ? 'Dry' : 'Real'}
+                                      {t.dryRun ? 'Dry' : 'Live'}
                                     </span>
                                   </td>
                                   <td rowSpan={legs.length} className="px-4 py-3 text-center align-top">

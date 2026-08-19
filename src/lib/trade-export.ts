@@ -1,9 +1,16 @@
 import type { ClosedPosition, ExecutionRecord } from './persistence';
+import { formatScaledMoney, parseCalculationEnvelope, type CalculationEnvelope } from './calculation-envelope';
 
 export const TRADE_EXPORT_HEADERS = [
   'Timestamp', 'Platform', 'Event Name', 'Market Name', 'Side', 'Shares',
   'Price', 'Fees', 'Realized P&L', 'Arb ID', 'Status', 'Method',
   'Fee Source', 'Fee Observed At', 'Fee Version', 'Fee Calculated Cents', 'Fee Charged Cents',
+  'Calculation Version', 'Calculation Status', 'Calculation Blocker Code', 'Calculation Blocker',
+  'Requested Quantity', 'Executable Quantity', 'Instrument ID', 'Outcome ID',
+  'Book Observed At', 'Fill Levels JSON', 'VWAP Price', 'Fee Basis', 'Fee Amount',
+  'Fee Source', 'Fee Version', 'Fee Observed At', 'Fee Rate PPM',
+  'Gross Cost', 'Gross Payout', 'Gross Profit', 'Total Fees', 'Net P&L',
+  'Rounding JSON', 'Calculation Envelope JSON',
 ] as const;
 
 export type TradeExportRow = readonly (string | number)[];
@@ -13,6 +20,28 @@ type ExportValueRecord = Record<string, unknown>;
 function finite(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalFinite(value: unknown): number | '' {
+  if (value == null || value === '') return '';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : '';
+}
+
+function envelopeColumns(envelope: CalculationEnvelope, venue?: string): TradeExportRow {
+  const leg = venue ? envelope.legs.find((candidate) => candidate.venue.toLowerCase() === venue.toLowerCase()) : undefined;
+  return [
+    envelope.version, envelope.status, envelope.blocker?.code ?? '', envelope.blocker?.message ?? '',
+    formatScaledMoney(envelope.requestedQuantityMicros), formatScaledMoney(envelope.executableQuantityMicros),
+    leg?.instrumentId ?? '', leg?.outcomeId ?? '', leg?.bookObservedAt ?? '',
+    leg ? JSON.stringify(leg.fillLevels) : '', formatScaledMoney(leg?.vwapPriceMicros ?? null),
+    leg?.fee.basis ?? '', formatScaledMoney(leg?.fee.amountMicros ?? null),
+    leg?.fee.schedule?.source ?? '', leg?.fee.schedule?.version ?? '', leg?.fee.schedule?.observedAt ?? '',
+    leg?.fee.schedule?.ratePpm ?? '',
+    formatScaledMoney(envelope.totals.grossCostMicros), formatScaledMoney(envelope.totals.grossPayoutMicros),
+    formatScaledMoney(envelope.totals.grossProfitMicros), formatScaledMoney(envelope.totals.totalFeesMicros),
+    formatScaledMoney(envelope.totals.netPnlMicros), JSON.stringify(envelope.rounding), JSON.stringify(envelope),
+  ];
 }
 
 export function escapeTradeCsv(value: unknown): string {
@@ -28,6 +57,7 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
   const kalshiQuote = result.kalshiFeeQuote && typeof result.kalshiFeeQuote === 'object'
     ? result.kalshiFeeQuote as ExportValueRecord
     : null;
+  const envelope = parseCalculationEnvelope(execution.calculationEnvelope, `execution ${execution.id ?? execution.arbId}`);
   return ([
     ['Kalshi', execution.kalshiOrder, result.kalshiResult],
     ['Polymarket', execution.polymarketOrder, result.polymarketResult],
@@ -68,7 +98,8 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
       new Date(timestamp).toISOString(), platform,
       execution.marketTitle, marketName, String(order.outcome ?? '').toUpperCase(),
       filledSize, filledPrice,
-      fee, '', execution.arbId, status,
+      fee,
+      '', execution.arbId, status,
       execution.source === 'bot' ? (execution.selectionMethod ?? 'Legacy/Unknown') : 'Manual',
       platform === 'Kalshi' ? String(kalshiQuote?.source ?? '') : '',
       platform === 'Kalshi' ? String(kalshiQuote?.observedAt ?? '') : '',
@@ -77,23 +108,27 @@ export function executionRows(execution: ExecutionRecord): TradeExportRow[] {
         ? Number(kalshiQuote?.calculatedFeeCents) : '',
       platform === 'Kalshi' && Number.isSafeInteger(kalshiQuote?.chargedFeeCents)
         ? Number(kalshiQuote?.chargedFeeCents) : '',
+      ...envelopeColumns(envelope, platform),
     ] satisfies TradeExportRow];
   });
 }
 
 export function closedPositionRow(position: ClosedPosition): TradeExportRow {
+  const envelope = parseCalculationEnvelope(position.calculationEnvelope, `closed position ${position.id ?? position.pairId ?? ''}`);
+  const calculationLeg = envelope.legs.find((candidate) => candidate.venue === position.platform);
   return [
     new Date(position.closedAt).toISOString(),
     position.platform === 'kalshi' ? 'Kalshi' : 'Polymarket',
     position.marketTitle,
     position.ticker ?? position.conditionId ?? position.marketTitle,
     position.side,
-    finite(position.size),
+    optionalFinite(position.size),
     finite(position.entryPrice),
-    finite(position.feesPaid),
-    finite(position.realizedPnl),
+    calculationLeg?.fee.amountMicros != null ? formatScaledMoney(calculationLeg.fee.amountMicros) : '',
+    optionalFinite(position.realizedPnl),
     position.pairId ?? '',
     'closed', 'Manual', '', '', '', '', '',
+    ...envelopeColumns(envelope, position.platform),
   ];
 }
 

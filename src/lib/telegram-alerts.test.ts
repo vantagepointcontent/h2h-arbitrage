@@ -36,6 +36,7 @@ import {
   ArbAlertInput,
   TelegramAlertConfig,
 } from './telegram-alerts';
+import { executableEnvelopeFixture } from './test-fixtures/calculation-envelope';
 
 // ─── Test fixtures ────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ const baseArb: ArbAlertInput = {
   expectedProfit: 52.30,
   strategy: 'Buy YES Kalshi + NO PM',
   totalStake: 1000,
+  calculationEnvelope: executableEnvelopeFixture,
 };
 
 const baseConfig: TelegramAlertConfig = {
@@ -85,6 +87,15 @@ describe('telegram-alerts', () => {
       const result = shouldAlert(baseArb, baseConfig);
       expect(result.shouldAlert).toBe(true);
       expect(result.reason).toBeUndefined();
+    });
+
+    it('refuses an alert when canonical fee and book authority is missing', () => {
+      const result = shouldAlert({ ...baseArb, calculationEnvelope: undefined }, baseConfig);
+
+      expect(result).toEqual({
+        shouldAlert: false,
+        reason: 'Calculation is legacy_unverifiable: legacy_missing_calculation_authority',
+      });
     });
 
     it('returns false when ROI is not positive', () => {

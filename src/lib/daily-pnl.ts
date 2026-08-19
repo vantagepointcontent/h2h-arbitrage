@@ -14,14 +14,14 @@ interface ExecutionLike {
 interface ClosedPositionLike {
   closedAt: string;
   platform: Platform;
-  realizedPnl: number;
-  size: number;
+  realizedPnl: number | null;
+  size: number | null;
   entryPrice: number;
   pairId?: string | null;
 }
 
 interface PositionLike {
-  breakdown?: { totalNetPnl?: number } | null;
+  breakdown?: { totalNetPnl?: number | null } | null;
 }
 
 function easternDateKey(value: Date | string): string {
@@ -81,7 +81,7 @@ export function summarizeDailyPnl({
   );
   const closedToday = closedPositions.filter((entry) => easternDateKey(entry.closedAt) === date);
 
-  const platforms = {
+  const platforms: Record<Platform, { realizedPnl: number | null; volume: number }> = {
     kalshi: { realizedPnl: 0, volume: 0 },
     polymarket: { realizedPnl: 0, volume: 0 },
   };
@@ -89,19 +89,30 @@ export function summarizeDailyPnl({
     platforms.kalshi.volume += executionLegVolume(entry, 'kalshi');
     platforms.polymarket.volume += executionLegVolume(entry, 'polymarket');
   }
-  for (const entry of closedToday) {
-    platforms[entry.platform].realizedPnl += finite(entry.realizedPnl);
+  for (const platform of ['kalshi', 'polymarket'] as const) {
+    const platformRows = closedToday.filter((entry) => entry.platform === platform);
+    platforms[platform].realizedPnl = platformRows.some((entry) => entry.realizedPnl == null)
+      ? null
+      : platformRows.reduce((sum, entry) => sum + finite(entry.realizedPnl), 0);
   }
 
-  const realizedPnl = closedToday.reduce((sum, entry) => sum + finite(entry.realizedPnl), 0);
-  const unrealizedPnl = positions.reduce((sum, entry) => sum + finite(entry.breakdown?.totalNetPnl), 0);
-  const closedTrades = new Map<string, number>();
+  const unavailableClosedPositions = closedToday.filter((entry) => entry.realizedPnl == null).length;
+  const realizedPnl = unavailableClosedPositions > 0
+    ? null
+    : closedToday.reduce((sum, entry) => sum + finite(entry.realizedPnl), 0);
+  const unrealizedPnl = positions.some((entry) => entry.breakdown?.totalNetPnl == null)
+    ? null
+    : positions.reduce((sum, entry) => sum + finite(entry.breakdown?.totalNetPnl), 0);
+  const closedTrades = new Map<string, Array<number | null>>();
   closedToday.forEach((entry, index) => {
     // Legs sharing pairId are one trade. Unpaired positions remain individual trades.
     const key = entry.pairId ? `pair:${entry.pairId}` : `leg:${index}`;
-    closedTrades.set(key, (closedTrades.get(key) ?? 0) + finite(entry.realizedPnl));
+    closedTrades.set(key, [...(closedTrades.get(key) ?? []), entry.realizedPnl]);
   });
-  const wins = [...closedTrades.values()].filter((netPnl) => netPnl > 0).length;
+  const verifiedClosedTrades = [...closedTrades.values()]
+    .filter((legs) => legs.every((value) => value != null))
+    .map((legs) => legs.reduce((sum, value) => sum + finite(value), 0));
+  const wins = verifiedClosedTrades.filter((netPnl) => netPnl > 0).length;
   const totalVolume = platforms.kalshi.volume + platforms.polymarket.volume;
 
   return {
@@ -109,9 +120,11 @@ export function summarizeDailyPnl({
     timezone: TIMEZONE,
     realizedPnl,
     unrealizedPnl,
-    totalPnl: realizedPnl + unrealizedPnl,
+    totalPnl: realizedPnl == null || unrealizedPnl == null ? null : realizedPnl + unrealizedPnl,
     totalTrades: liveExecutions.length,
-    winRatePct: closedTrades.size ? (wins / closedTrades.size) * 100 : 0,
+    winRatePct: closedTrades.size === 0 ? 0 : verifiedClosedTrades.length ? (wins / verifiedClosedTrades.length) * 100 : null,
+    verifiedClosedTrades: verifiedClosedTrades.length,
+    unavailableClosedPositions,
     totalVolume,
     platforms,
   };

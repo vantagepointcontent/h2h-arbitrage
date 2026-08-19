@@ -1,6 +1,6 @@
 export type AttentionItem = { id: string; severity: 1 | 2 | 3; title: string; detail: string; category: "execution" | "position" | "platform" };
 
-type Position = { id: string; marketTitle: string; pairedState?: string; attentionReasons?: string[]; breakdown?: { totalNetPnl?: number; totalFees?: number }; totalCost?: number; oneLegExposure?: number };
+type Position = { id: string; marketTitle: string; pairedState?: string; attentionReasons?: string[]; breakdown?: { totalNetPnl?: number | null; totalFees?: number | null }; totalCost?: number; oneLegExposure?: number };
 type Execution = { id?: number; arbId?: string; marketTitle?: string; timestamp?: string; success?: boolean; result?: { unhedged?: boolean; rollbackExecuted?: boolean; netExposure?: number; kalshiResult?: unknown; polymarketResult?: unknown } | null };
 type AttentionContext = {
   nowMs?: number;
@@ -47,10 +47,10 @@ export function buildAttentionQueue(
 
 export function summarizePortfolio(positions: Position[]) {
   return positions.reduce((summary, position) => ({
-    netPnl: summary.netPnl + (position.breakdown?.totalNetPnl ?? 0),
-    fees: summary.fees + (position.breakdown?.totalFees ?? 0),
+    netPnl: summary.netPnl == null || position.breakdown?.totalNetPnl == null ? null : summary.netPnl + position.breakdown.totalNetPnl,
+    fees: summary.fees == null || position.breakdown?.totalFees == null ? null : summary.fees + position.breakdown.totalFees,
     capitalDeployed: summary.capitalDeployed + (position.totalCost ?? 0),
     netExposure: summary.netExposure + (position.oneLegExposure ?? 0),
     paired: summary.paired + (position.pairedState === "paired" ? 1 : 0),
-  }), { netPnl: 0, fees: 0, capitalDeployed: 0, netExposure: 0, paired: 0 });
+  }), { netPnl: 0 as number | null, fees: 0 as number | null, capitalDeployed: 0, netExposure: 0, paired: 0 });
 }

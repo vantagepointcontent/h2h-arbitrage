@@ -663,6 +663,7 @@ export async function executeFullScan(request: NextRequest) {
             arbType: (o.arbitrage as any).arbType,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
             fees: o.arbitrage!.fees,
+            calculationEnvelope: o.arbitrage!.calculationEnvelope,
           }));
           // Fire-and-forget — don't block scan response on Telegram
           sendBatchAlerts(alertArbs).catch(err => {

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
+import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
 import DashboardPanel from './DashboardPanel';
 
 afterEach(() => {
@@ -26,6 +27,7 @@ describe('DashboardPanel mobile table support', () => {
           strategy: 'Buy YES Kalshi + NO PM',
           positive_arb_count: 1,
           scanned_at: '2026-07-29T00:00:00.000Z',
+          calculationEnvelope: executableEnvelopeFixture,
         }],
         marketCoverage: [],
         profitTimeline: [],
@@ -42,5 +44,10 @@ describe('DashboardPanel mobile table support', () => {
     expect(document.querySelector('[data-testid="dashboard-top-arbs-scroll"] table')?.className).toContain('min-w-[800px]');
     expect(screen.getByTestId('dashboard-top-arb-market-header').className).toContain('sticky');
     expect(screen.getByTestId('dashboard-top-arb-market-cell').className).toContain('sticky');
+    expect(screen.getByRole('region', { name: 'Canonical calculation provenance' })).toBeTruthy();
+    expect(screen.getByText('Executable')).toBeTruthy();
+    expect(screen.queryByText('$2.50')).toBeNull();
+    expect(screen.getByText('-$0.01')).toBeTruthy();
+    expect(document.querySelector('[data-testid="calculation-provenance"]')?.className).toContain('overflow-x-auto');
   });
 });

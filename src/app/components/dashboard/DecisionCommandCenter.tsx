@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { buildAttentionQueue, summarizePortfolio, type AttentionItem } from "./decision-dashboard-model";
 
 type Snapshot = { queue: AttentionItem[]; portfolio: ReturnType<typeof summarizePortfolio>; positionCount: number; monitoringInactive?: boolean; error?: string };
-const usd = (value: number) => value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+const usd = (value: number | null) => value == null ? "Unavailable" : value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
 export function DecisionCommandCenter() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);

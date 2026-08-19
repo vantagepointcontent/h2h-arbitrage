@@ -6,14 +6,16 @@
  * and allows closing both legs simultaneously via SELL orders.
  */
 
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Loader2, RefreshCw, TrendingUp, TrendingDown, X, AlertTriangle,
+  Loader2, RefreshCw, TrendingUp, AlertTriangle,
   LogOut, ArrowUpDown, ArrowUp, ArrowDown, Wallet,
 } from 'lucide-react';
 import { PlatformIcon } from '@/lib/platforms/PlatformIcon';
 import { DataTable, EmptyState, Metric } from '@/components/ui';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { parseCalculationEnvelope, type CalculationEnvelope } from '@/lib/calculation-envelope';
+import { CalculationProvenance } from './CalculationProvenance';
 
 /** Compute exit fees from the authoritative server quotes returned with each leg. */
 function computeExitFees(pair: PairedPosition): { kalshiFee: number; pmFee: number; totalFees: number } {
@@ -40,10 +42,10 @@ interface KalshiPositionDto {
   roiPct: number;
   realizedPnl: number;
   lastPrice: number;
-  feesPaid: number;
-  netUnrealizedPnl: number;
-  netRoiPct: number;
-  exitFees: number;
+  feesPaid: number | null;
+  netUnrealizedPnl: number | null;
+  netRoiPct: number | null;
+  exitFees: number | null;
 }
 
 interface PmPositionDto {
@@ -63,10 +65,10 @@ interface PmPositionDto {
   percentPnl: number;
   endDate: string;
   negativeRisk: boolean;
-  feesPaid: number;
-  netCashPnl: number;
-  netPercentPnl: number;
-  exitFees: number;
+  feesPaid: number | null;
+  netCashPnl: number | null;
+  netPercentPnl: number | null;
+  exitFees: number | null;
 }
 
 interface LegBreakdown {
@@ -76,19 +78,19 @@ interface LegBreakdown {
   currentPrice: number;
   size: number;
   grossPnl: number;
-  feesPaid: number;
-  exitFees: number;
-  netPnl: number;
-  roiPct: number;
+  feesPaid: number | null;
+  exitFees: number | null;
+  netPnl: number | null;
+  roiPct: number | null;
 }
 
 interface RoiBreakdown {
   legA: LegBreakdown | null;
   legB: LegBreakdown | null;
   totalGrossPnl: number;
-  totalFees: number;
-  totalNetPnl: number;
-  totalRoiPct: number;
+  totalFees: number | null;
+  totalNetPnl: number | null;
+  totalRoiPct: number | null;
 }
 
 interface PairedPosition {
@@ -103,11 +105,12 @@ interface PairedPosition {
   breakdown: RoiBreakdown;
   pairedState: 'paired' | 'unpaired';
   expiry: string | null;
-  netExitValue: number;
+  netExitValue: number | null;
   oneLegExposure: number;
   exitLiquidityRisk: 'unverified';
   attentionReasons: string[];
   quoteTimestamps: { kalshi: string | null; polymarket: string | null };
+  calculationEnvelope?: CalculationEnvelope | null;
 }
 
 interface PositionsResponse {
@@ -117,8 +120,9 @@ interface PositionsResponse {
   cash?: { kalshi: number | null; polymarket: number | null; total: number; complete: boolean };
 }
 
-const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
-const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+const fmtUsd = (n: number | null) => n == null ? 'Unavailable' : `$${n.toFixed(2)}`;
+const fmtPct = (n: number | null) => n == null ? 'Unavailable' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+const fmtFee = (n: number | null) => n == null ? 'Unavailable' : `−${fmtUsd(n)}`;
 const fmtPrice = (n: number) => `${(n * 100).toFixed(1)}¢`;
 const fmtExpiry = (value: string | null) => {
   if (!value) return 'Unknown';
@@ -153,7 +157,7 @@ export default function OpenPositionsPanel() {
   const [sortField, setSortField] = useState<SortField>('market');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [exiting, setExiting] = useState<string | null>(null);
-  const [exitResult, setExitResult] = useState<{ id: string; success: boolean; pnl?: number; error?: string } | null>(null);
+  const [exitResult, setExitResult] = useState<{ id: string; success: boolean; envelope?: CalculationEnvelope; error?: string } | null>(null);
   const [confirmExit, setConfirmExit] = useState<PairedPosition | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -232,51 +236,10 @@ export default function OpenPositionsPanel() {
     setExiting(pair.id);
     setExitResult(null);
     try {
-      const fees = computeExitFees(pair);
-      const body: any = { action: 'exit', pairId: pair.id };
-      if (pair.kalshi) {
-        body.kalshi = {
-          ticker: pair.kalshi.ticker,
-          side: pair.kalshi.side,
-          size: pair.kalshi.size,
-          // Sell at current bid (price to sell immediately)
-          priceCents: Math.round(
-            (pair.kalshi.side === 'YES' ? pair.kalshi.currentPrice : pair.kalshi.currentPrice) * 100
-          ),
-          unrealizedPnl: pair.kalshi.unrealizedPnl,
-          title: pair.kalshi.title,
-          // Closed-position bookkeeping:
-          entryPrice: pair.kalshi.entryPrice,
-          exitPrice: pair.kalshi.currentPrice,
-          totalCost: pair.kalshi.totalCost,
-          feesPaid: pair.kalshi.feesPaid,
-          exitFees: fees.kalshiFee,
-        };
-      }
-      if (pair.polymarket) {
-        body.polymarket = {
-          asset: pair.polymarket.asset,
-          conditionId: pair.polymarket.conditionId,
-          outcome: pair.polymarket.outcome,
-          side: pair.polymarket.side,
-          size: pair.polymarket.size,
-          // Sell at current price
-          price: pair.polymarket.currentPrice,
-          cashPnl: pair.polymarket.cashPnl,
-          title: pair.polymarket.title,
-          // Closed-position bookkeeping:
-          entryPrice: pair.polymarket.entryPrice,
-          exitPrice: pair.polymarket.currentPrice,
-          totalCost: pair.polymarket.initialValue,
-          feesPaid: pair.polymarket.feesPaid,
-          exitFees: fees.pmFee,
-        };
-      }
-
       const res = await fetch('/api/positions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ action: 'exit', pairId: pair.id }),
       });
       const data = await res.json();
       if (!data.success && !data.partialFill) {
@@ -285,7 +248,7 @@ export default function OpenPositionsPanel() {
       setExitResult({
         id: pair.id,
         success: data.success,
-        pnl: pair.totalUnrealizedPnl,
+        envelope: parseCalculationEnvelope(data.calculationEnvelope, `exit position ${pair.id}`),
         error: data.errors ? Object.values(data.errors).filter(Boolean).join('; ') : undefined,
       });
       // Refresh positions after exit
@@ -349,7 +312,7 @@ export default function OpenPositionsPanel() {
 
       {/* Exit result toast */}
       {exitResult && (
-        <div className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
+        <div className={`space-y-2 rounded-lg border p-3 text-sm ${
           exitResult.success
             ? 'border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]'
             : 'border-[var(--status-negative)]/30 bg-[var(--status-negative)]/10 text-[var(--status-negative)]'
@@ -357,7 +320,7 @@ export default function OpenPositionsPanel() {
           {exitResult.success ? (
             <>
               <TrendingUp className="w-4 h-4" />
-              Position closed. Realized P&L: {fmtUsd(exitResult.pnl ?? 0)}
+              <span>Position exit submitted. Canonical net P&amp;L: {fmtUsd(exitResult.envelope?.totals.netPnlMicros == null ? null : exitResult.envelope.totals.netPnlMicros / 1_000_000)}</span>
             </>
           ) : (
             <>
@@ -365,7 +328,8 @@ export default function OpenPositionsPanel() {
               Exit failed: {exitResult.error}
             </>
           )}
-          <button onClick={() => setExitResult(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">
+          {exitResult.envelope && <CalculationProvenance envelope={exitResult.envelope} />}
+          <button onClick={() => setExitResult(null)} className="text-xs opacity-60 hover:opacity-100">
             dismiss
           </button>
         </div>
@@ -394,7 +358,13 @@ export default function OpenPositionsPanel() {
         <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Open positions" value={positions.length} hint={pairedCount > 0 ? `${pairedCount} arb pairs` : undefined} />
         <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Total value" value={fmtUsd(totalValue)} />
         <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Total cost" value={fmtUsd(totalCost)} />
-        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Unrealized P&L" value={fmtUsd(totalPnl)} hint={fmtPct(totalRoi)} tone={totalPnl >= 0 ? 'positive' : 'negative'} />
+        <Metric className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3" label="Gross unrealized P&L" value={fmtUsd(totalPnl)} hint={fmtPct(totalRoi)} tone={totalPnl >= 0 ? 'positive' : 'negative'} />
+      </div>
+
+      <div className="space-y-2">
+        {positions.map((pair) => pair.calculationEnvelope
+          ? <CalculationProvenance key={pair.id} envelope={pair.calculationEnvelope} compact />
+          : null)}
       </div>
 
       {/* Positions table */}
@@ -423,8 +393,8 @@ export default function OpenPositionsPanel() {
                 <th title="Current dollar value; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('value')}>
                   Value {renderSortIcon('value')}
                 </th>
-                <th title="Unrealized profit or loss after estimated exit fees; click to sort" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
-                  Net P&amp;L {renderSortIcon('roi')}
+                <th title="Gross unrealized profit or loss; canonical net P&L remains unavailable until charged exit fees arrive" className="text-right px-4 py-3 font-medium cursor-pointer hover:text-[var(--text-primary)]" onClick={() => toggleSort('roi')}>
+                  Gross P&amp;L {renderSortIcon('roi')}
                 </th>
                 <th title="Time remaining until the market resolves" className="text-right px-4 py-3 font-medium">Expiry</th>
                 <th title="Age of the latest price used for valuation" className="text-right px-4 py-3 font-medium">Quote age</th>
@@ -440,13 +410,10 @@ export default function OpenPositionsPanel() {
                   pair.polymarket ? { platform: 'Polymarket' as const, side: pair.polymarket.side, size: pair.polymarket.size, entry: pair.polymarket.entryPrice, current: pair.polymarket.currentPrice, value: pair.polymarket.currentValue, pnl: pair.polymarket.cashPnl, roi: pair.polymarket.percentPnl } : null,
                 ].filter(Boolean) as { platform: string; side: string; size: number; entry: number; current: number; value: number; pnl: number; roi: number }[];
 
-                const isPaired = pair.kalshi && pair.polymarket;
                 const rowSpan = legs.length;
 
                 return legs.map((leg, i) => {
-                  // Per-leg net ROI from the breakdown object
-                  const legBreakdown = i === 0 ? pair.breakdown.legA : pair.breakdown.legB;
-                  const legRoiPct = legBreakdown?.roiPct ?? leg.roi;
+                  const legRoiPct = leg.roi;
 
                   return (
                   <tr key={`${pair.id}-${i}`} className="hover:bg-[var(--surface-hover)]/50 transition-colors">
@@ -489,14 +456,14 @@ export default function OpenPositionsPanel() {
                     {i === 0 && (
                       <>
                         <td rowSpan={rowSpan} className={`px-4 py-3 text-xs text-right font-bold align-top whitespace-nowrap tabular-nums ${
-                          pair.breakdown.totalNetPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'
+                          pair.breakdown.totalGrossPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'
                         }`}>
                           <div className="flex flex-col items-end group/roi relative cursor-help">
-                            <span>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
+                            <span>{fmtUsd(pair.breakdown.totalGrossPnl)}</span>
                             <span className="text-[10px] font-normal opacity-80">{fmtPct(pair.totalRoiPct)}</span>
                             {/* Tooltip: breakdown on hover */}
                             <div className="absolute right-full top-0 mr-2 z-20 hidden group-hover/roi:block w-64 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] p-3 shadow-xl text-left whitespace-normal">
-                              <div className="text-[10px] uppercase text-[var(--text-secondary)] mb-2 font-semibold">ROI Breakdown (net of fees)</div>
+                              <div className="text-[10px] uppercase text-[var(--text-secondary)] mb-2 font-semibold">P&amp;L breakdown · fees fail closed</div>
                               {pair.breakdown.legA && (
                                 <div className="space-y-0.5 mb-2">
                                   <div className="text-[10px] text-[var(--status-positive)] font-medium">Leg A — {pair.breakdown.legA.platform} {pair.breakdown.legA.side}</div>
@@ -506,15 +473,15 @@ export default function OpenPositionsPanel() {
                                   </div>
                                   <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Entry fee</span>
-                                    <span>−{fmtUsd(pair.breakdown.legA.feesPaid)}</span>
+                                    <span>{fmtFee(pair.breakdown.legA.feesPaid)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Exit fee</span>
-                                    <span>−{fmtUsd(pair.breakdown.legA.exitFees)}</span>
+                                    <span>{fmtFee(pair.breakdown.legA.exitFees)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] pl-2 font-medium">
                                     <span className="text-[var(--text-secondary)]">Net P&L</span>
-                                    <span className={pair.breakdown.legA.netPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legA.netPnl)}</span>
+                                    <span>{fmtUsd(pair.breakdown.legA.netPnl)}</span>
                                   </div>
                                 </div>
                               )}
@@ -527,15 +494,15 @@ export default function OpenPositionsPanel() {
                                   </div>
                                   <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Entry fee</span>
-                                    <span>−{fmtUsd(pair.breakdown.legB.feesPaid)}</span>
+                                    <span>{fmtFee(pair.breakdown.legB.feesPaid)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] text-[var(--text-faint)] pl-2">
                                     <span>Exit fee</span>
-                                    <span>−{fmtUsd(pair.breakdown.legB.exitFees)}</span>
+                                    <span>{fmtFee(pair.breakdown.legB.exitFees)}</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] pl-2 font-medium">
                                     <span className="text-[var(--text-secondary)]">Net P&L</span>
-                                    <span className={pair.breakdown.legB.netPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.legB.netPnl)}</span>
+                                    <span>{fmtUsd(pair.breakdown.legB.netPnl)}</span>
                                   </div>
                                 </div>
                               )}
@@ -546,11 +513,11 @@ export default function OpenPositionsPanel() {
                                 </div>
                                 <div className="flex justify-between text-[10px] text-[var(--text-faint)]">
                                   <span>Total fees</span>
-                                  <span className="text-[var(--status-negative)]">−{fmtUsd(pair.breakdown.totalFees)}</span>
+                                  <span>{fmtFee(pair.breakdown.totalFees)}</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] font-bold">
                                   <span className="text-[var(--text-primary)]">Total net P&L</span>
-                                  <span className={pair.breakdown.totalNetPnl >= 0 ? 'text-[var(--status-positive)]' : 'text-[var(--status-negative)]'}>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
+                                  <span>{fmtUsd(pair.breakdown.totalNetPnl)}</span>
                                 </div>
                               </div>
                             </div>

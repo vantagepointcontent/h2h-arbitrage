@@ -15,7 +15,7 @@ export async function GET() {
       getPositions().catch(() => null),
     ]);
 
-    let positions: Array<{ breakdown?: { totalNetPnl?: number } }> = [];
+    let positions: Array<{ breakdown?: { totalNetPnl?: number | null } }> = [];
     if (positionsResponse?.ok) {
       const payload = await positionsResponse.json().catch(() => null);
       if (Array.isArray(payload?.positions)) positions = payload.positions;

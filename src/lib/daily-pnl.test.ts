@@ -77,6 +77,8 @@ describe('UI-025 daily P&L summary', () => {
       totalPnl: 0,
       totalTrades: 0,
       winRatePct: 0,
+      verifiedClosedTrades: 0,
+      unavailableClosedPositions: 0,
       totalVolume: 0,
       platforms: {
         kalshi: { realizedPnl: 0, volume: 0 },
@@ -97,5 +99,25 @@ describe('UI-025 daily P&L summary', () => {
     });
     expect(result.totalTrades).toBe(0);
     expect(result.totalVolume).toBe(0);
+  });
+
+  it('fails closed instead of coercing unavailable close and valuation P&L to zero', () => {
+    const result = summarizeDailyPnl({
+      now,
+      executions: [],
+      closedPositions: [
+        { closedAt: '2026-07-31T15:00:00.000Z', platform: 'kalshi', realizedPnl: 3, size: 2, entryPrice: 0.4, pairId: 'pair-unavailable' },
+        { closedAt: '2026-07-31T15:01:00.000Z', platform: 'polymarket', realizedPnl: null, size: 2, entryPrice: 0.5, pairId: 'pair-unavailable' },
+      ],
+      positions: [{ breakdown: { totalNetPnl: null } }],
+    });
+
+    expect(result.realizedPnl).toBeNull();
+    expect(result.unrealizedPnl).toBeNull();
+    expect(result.totalPnl).toBeNull();
+    expect(result.winRatePct).toBeNull();
+    expect(result.verifiedClosedTrades).toBe(0);
+    expect(result.unavailableClosedPositions).toBe(1);
+    expect(result.platforms.polymarket.realizedPnl).toBeNull();
   });
 });

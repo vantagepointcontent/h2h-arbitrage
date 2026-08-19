@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryScanHistory, getSavedMarkets } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseLogLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
+import { parseCalculationEnvelope } from '@/lib/calculation-envelope';
 
 /**
  * GET /api/logs
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
       delete listRow.raw_result;
       return {
         ...listRow,
+        calculation_envelope: parseCalculationEnvelope(r.calculation_envelope, `scan result ${r.id}`),
         market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
         category: categoryMap.get(r.market_id) ?? null,
       };

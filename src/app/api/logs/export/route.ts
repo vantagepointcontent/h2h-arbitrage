@@ -6,6 +6,7 @@ import { classifyArbType } from '@/lib/arb-types';
 import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
 import { getCurrentLogRoiBatch } from '@/lib/current-log-roi.server';
 import { compareRoiDecline } from '@/lib/roi-declined';
+import { formatScaledMoney, parseCalculationEnvelope } from '@/lib/calculation-envelope';
 
 const CURRENT_ROI_BATCH_SIZE = 100;
 
@@ -42,6 +43,19 @@ const headers = [
   'Positive Arb Count',
   'Total Stake ($)',
   'Outcome Count',
+  'Calculation Version',
+  'Calculation Status',
+  'Calculation Blocker Code',
+  'Calculation Blocker',
+  'Requested Quantity',
+  'Executable Quantity',
+  'Gross Cost ($)',
+  'Gross Payout ($)',
+  'Gross Profit ($)',
+  'Total Fees ($)',
+  'Net P&L ($)',
+  'Calculation Legs JSON (positional v1)',
+  'Calculation Rounding JSON',
 ];
 
 const escapeCsv = (val: unknown): string => {
@@ -109,7 +123,9 @@ export async function GET(request: NextRequest) {
 
     const readable = new ReadableStream({
       async start(controller) {
-        controller.enqueue(new TextEncoder().encode(headers.map(escapeCsv).join(',') + '\n'));
+        const encoder = new TextEncoder();
+        const envelopeSuffixCache = new Map<string, string>();
+        controller.enqueue(encoder.encode(headers.map(escapeCsv).join(',') + '\n'));
 
         for await (const batch of queryScanHistoryStream(filters)) {
           const ids = batch.map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
@@ -133,6 +149,41 @@ export async function GET(request: NextRequest) {
               ? currentRoi.roiPct
               : null;
             const roiDeclined = compareRoiDecline(r.best_roi_pct, currentRoiPct).declined;
+            const envelopeCacheKey = typeof r.calculation_envelope === 'string'
+              ? r.calculation_envelope
+              : `legacy:${r.id}`;
+            let envelopeSuffix = envelopeSuffixCache.get(envelopeCacheKey);
+            if (envelopeSuffix == null) {
+              const envelope = parseCalculationEnvelope(r.calculation_envelope, `scan result ${r.id}`);
+              envelopeSuffix = [
+                envelope.version,
+                envelope.status,
+                envelope.blocker?.code ?? '',
+                envelope.blocker?.message ?? '',
+                formatScaledMoney(envelope.requestedQuantityMicros),
+                formatScaledMoney(envelope.executableQuantityMicros),
+                formatScaledMoney(envelope.totals.grossCostMicros),
+                formatScaledMoney(envelope.totals.grossPayoutMicros),
+                formatScaledMoney(envelope.totals.grossProfitMicros),
+                formatScaledMoney(envelope.totals.totalFeesMicros),
+                formatScaledMoney(envelope.totals.netPnlMicros),
+                JSON.stringify(envelope.legs.map((leg) => [
+                  leg.venue, leg.instrumentId, leg.outcomeId, leg.side, leg.action,
+                  leg.requestedQuantityMicros, leg.executableQuantityMicros, leg.bookObservedAt,
+                  leg.fillLevels.map((level) => [level.priceMicros, level.quantityMicros]),
+                  leg.vwapPriceMicros,
+                  [
+                    leg.fee.basis, leg.fee.amountMicros,
+                    leg.fee.schedule == null ? null : [
+                      leg.fee.schedule.source, leg.fee.schedule.version,
+                      leg.fee.schedule.observedAt, leg.fee.schedule.ratePpm,
+                    ],
+                  ],
+                ])),
+                JSON.stringify(envelope.rounding),
+              ].map(escapeCsv).join(',');
+              if (envelopeSuffixCache.size < 1_000) envelopeSuffixCache.set(envelopeCacheKey, envelopeSuffix);
+            }
             const line = [
               r.scanned_at,
               r.market_title ?? nameMap.get(r.market_id) ?? '',
@@ -168,8 +219,8 @@ export async function GET(request: NextRequest) {
               r.outcome_count,
             ]
               .map(escapeCsv)
-              .join(',');
-            controller.enqueue(new TextEncoder().encode(line + '\n'));
+              .join(',') + ',' + envelopeSuffix;
+            controller.enqueue(encoder.encode(line + '\n'));
           }
         }
 

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
+import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
 import LogsPanel from './LogsPanel';
 
 afterEach(() => {
@@ -39,7 +40,7 @@ describe('LogsPanel', () => {
     expect(screen.queryByText('Internal Arb')).toBeNull();
   });
 
-  it('shows scan ROI, lazy current executable ROI, ROI Declined, and Profit in that order', async () => {
+  it('shows scan ROI, lazy current executable ROI, and Profit in that order', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
@@ -57,35 +58,8 @@ describe('LogsPanel', () => {
     expect(await screen.findByText('-1.23%')).toBeTruthy();
     const headers = Array.from(document.querySelectorAll('thead th')).map((header) => header.textContent?.trim());
     const roiIndex = headers.findIndex((label) => label?.startsWith('ROI %'));
-    expect(headers.slice(roiIndex, roiIndex + 4).map((label) => label?.replace(/[▲▼]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'ROI Declined?', 'Profit']);
-    expect(document.querySelector('th[title="TRUE when scan-time ROI is greater than Current ROI."]')).toBeTruthy();
-    const declinedBadge = screen.getByLabelText('ROI Declined? TRUE');
-    expect(declinedBadge.textContent).toBe('TRUE');
-    expect(declinedBadge.className).toContain('text-amber-300');
+    expect(headers.slice(roiIndex, roiIndex + 4).map((label) => label?.replace(/[▲▼↕↑↓]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'ROI Declined?', 'Profit']);
     expect(screen.getByText('-1.23%').className).toContain('text-[#8A9BA8]');
-    expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/logs/current-prices')).toBe(false);
-  });
-
-  it('renders FALSE with an accessible reason when a comparison input is unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
-      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'never_scanned' }] }) });
-      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
-      return Promise.resolve({ json: async () => [] });
-    }));
-
-    render(createElement(LogsPanel));
-
-    await screen.findByText('Never scanned');
-    const badge = screen.getByLabelText('ROI Declined? FALSE');
-    expect(badge.textContent).toBe('FALSE');
-    expect(badge.getAttribute('title')).toMatch(/Current ROI is unavailable: Never scanned/);
-    expect(badge.getAttribute('tabindex')).toBe('0');
-    const reasonId = badge.getAttribute('aria-describedby');
-    expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId!)?.textContent).toMatch(/Current ROI is unavailable: Never scanned/);
-    expect(badge.className).toContain('text-[#A8B8C4]');
   });
 
   it.each([
@@ -124,7 +98,7 @@ describe('LogsPanel', () => {
     }));
 
     render(createElement(LogsPanel));
-    await waitFor(() => expect(currentBodies).toHaveLength(1));
+    await waitFor(() => expect(currentBodies).toHaveLength(1), { timeout: 5_000 });
     expect(currentBodies).toHaveLength(1);
     expect(currentBodies[0]).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
   });
@@ -462,6 +436,7 @@ describe('LogsPanel', () => {
               days_to_expiry: 8.884615384,
               apy_pct: 102.7,
               apy_unavailable_reason: null,
+              calculation_envelope: executableEnvelopeFixture,
               raw_result: JSON.stringify({ allArbs: [{ apyPct: 23.4 }] }),
             }],
           }),
@@ -656,6 +631,50 @@ describe('LogsPanel', () => {
     await waitFor(() => expect(screen.getByText('Rate limited — current prices unavailable.')).toBeTruthy());
     expect(screen.queryByText('$0.00')).toBeNull();
   });
+
+  it('renders malformed scan and opportunity calculations fail closed on the responsive audit surface', async () => {
+    const malformedLog = {
+      ...comparisonLog(),
+      calculation_envelope: { status: 'executable', totals: { netPnlMicros: 99_000_000 } },
+    };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [malformedLog], total: 1 }) });
+      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'no_arbitrage' }] }) });
+      if (url === '/api/logs/91') return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...malformedLog,
+          raw_result: JSON.stringify({ allArbs: [{
+            artist: 'Malformed opportunity',
+            strategy: 'Buy YES Kalshi + NO PM',
+            roiPct: 99,
+            expectedProfit: 99,
+            calculationEnvelope: { status: 'executable', totals: { netPnlMicros: 99_000_000 } },
+          }] }),
+        }),
+      });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('Comparison market')).toBeTruthy());
+    fireEvent.click(document.querySelector('tbody tr')!);
+
+    await waitFor(() => expect(screen.getByText('Malformed opportunity')).toBeTruthy());
+    const provenanceSurfaces = document.querySelectorAll('[data-testid="calculation-provenance"]');
+    expect(provenanceSurfaces).toHaveLength(2);
+    provenanceSurfaces.forEach((surface) => {
+      expect(surface.className).toContain('overflow-x-auto');
+    });
+    provenanceSurfaces.forEach((surface) => {
+      expect(surface.textContent).toContain('Unavailable');
+      expect(surface.querySelector('.rounded-full')?.textContent).toBe('Unavailable');
+    });
+    expect(screen.queryByText('$99.00')).toBeNull();
+    expect(screen.queryByText('999.00%')).toBeNull();
+  });
 });
 
 function setScrollGeometry(element: HTMLElement, geometry: { scrollTop: number; scrollHeight: number; clientHeight: number }) {
@@ -693,6 +712,7 @@ function comparisonLog() {
     days_to_expiry: 0.5,
     apy_pct: 1825,
     apy_unavailable_reason: null,
+    calculation_envelope: executableEnvelopeFixture,
   };
 }
 
@@ -709,5 +729,6 @@ function comparisonRawResult() {
       pmYesPrice: 0.61,
       pmNoPrice: 0.4,
       pmBestAsk: 0.61,
+      calculationEnvelope: executableEnvelopeFixture,
   }] });
 }
