@@ -187,9 +187,13 @@ describe('GET /api/bot-trader/analytics', () => {
   it('values exact-token unresolved exposure while excluding it from verified-arbitrage totals', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
       id: 181, marketId: 'm181', kalshiTicker: 'KX-NY21-R', kalshiSide: 'yes',
-      pmConditionId: '0xdemocratic-question', pmEntryTokenId: 'democratic-no-token', pmSide: 'no',
+      pmConditionId: '0xdemocratic-question', pmEntryTokenId: null, pmSide: 'no',
       outcomeIdentityStatus: 'unresolved', outcomeIdentityFailureReason: 'Execution-time selected outcome was not persisted',
       relationshipValidity: 'unresolved_relationship', exposureIdentityStatus: 'exact_held_legs_proven',
+      legacyExposureVerdict: {
+        exposureIdentity: 'exact_held_legs_proven',
+        exactLegs: { polymarket: { tokenId: 'democratic-no-token' } },
+      },
       remainingSharesKalshi: 1, remainingSharesPm: 1, status: 'open', entryCostStatus: 'available',
       totalCostCents: 97, totalCostMicrousd: 970_000, currentValueCents: null, unrealizedPnlCents: null,
     }] } as never);

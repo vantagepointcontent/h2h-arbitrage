@@ -25,9 +25,15 @@ function missingSnapshot(status: 'missing_identifier' | 'never_saved'): Persiste
 }
 
 function polymarketToken(position: BotPosition): string | null {
-  // Only the execution-time entry token identifies the held contract. Exit
-  // fee metadata and legacy condition fields may have been populated later.
-  return position.pmEntryTokenId?.trim() || null;
+  // Prefer the original execution-time entry token. BUG-172 may also recover
+  // that exact held token from immutable execution/fill evidence without
+  // mutating the legacy entry record; the revision-fenced verdict is the only
+  // permitted fallback. Exit-fee and mutable current-market metadata remain
+  // non-authoritative for held-contract identity.
+  const entryToken = position.pmEntryTokenId?.trim();
+  if (entryToken) return entryToken;
+  if (position.legacyExposureVerdict?.exposureIdentity !== 'exact_held_legs_proven') return null;
+  return position.legacyExposureVerdict.exactLegs.polymarket.tokenId?.trim() || null;
 }
 
 function exactLegBlocker(platform: 'Kalshi' | 'Polymarket', snapshot: PersistedPriceSnapshot): string {
