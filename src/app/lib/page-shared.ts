@@ -481,6 +481,53 @@ export interface MarketApySummary {
   quickObservedAt: string | null;
 }
 
+export interface QuickApyProvenance {
+  apyPct: number | null;
+  observedAt: string | null;
+  status: 'complete' | 'partial' | 'failed' | 'stale' | 'unavailable';
+  reason: string | null;
+}
+
+/** A quick APY is executable only when the scoped refresh completed with fresh
+ * quotes from both venues. Partial/stale results keep their age and reason but
+ * never publish an implicit numeric zero. */
+export function getQuickApyProvenance(result: ScanResult): QuickApyProvenance {
+  const observedAt = result._priceDataObservedAt ?? null;
+  const diagnostics = Object.values(result.platformDiagnostics ?? {});
+  const diagnosticFailure = diagnostics.find((entry) => entry.status === 'failed' || entry.status === 'partial');
+  const hasStaleOutcome = result.outcomes.some((outcome) => outcome.kalshiStale === true || outcome.polymarketStale === true);
+  const status: QuickApyProvenance['status'] = result.refreshStatus === 'failed'
+    ? 'failed'
+    : result.refreshStatus === 'partial' || diagnosticFailure
+      ? 'partial'
+      : hasStaleOutcome
+        ? 'stale'
+        : result.refreshStatus === 'complete'
+          ? 'complete'
+          : 'unavailable';
+  const reason = diagnosticFailure?.reason
+    ?? (hasStaleOutcome ? 'One or more venue quotes are stale' : null)
+    ?? (status === 'failed' ? 'Quick refresh failed' : null)
+    ?? (status === 'partial' ? 'Quick refresh was partial' : null);
+  if (status !== 'complete' || !observedAt) return { apyPct: null, observedAt, status, reason };
+
+  const best = result.outcomes.filter((outcome) =>
+    outcome.arbitrage.strategy !== 'No arb'
+    && !outcome.arbitrage.strategy.startsWith('Unavailable')
+    && outcome.kalshiStale !== true
+    && outcome.polymarketStale !== true
+    && Number.isFinite(outcome.arbitrage.roiPct),
+  ).sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct || a.artist.localeCompare(b.artist))[0];
+  const apyPct = typeof best?.arbitrage.apyPct === 'number' && Number.isFinite(best.arbitrage.apyPct)
+    ? best.arbitrage.apyPct : null;
+  return {
+    apyPct,
+    observedAt,
+    status,
+    reason: apyPct == null ? 'No executable arbitrage APY in the quick refresh' : null,
+  };
+}
+
 /** Read scan-time APY only; never re-annualize from the saved market's generic expiry. */
 export function getMarketApySummary(market: SavedMarket): MarketApySummary {
   const detailArbs = market.liveResult?.allArbs ?? market.lastScanResult?.allArbs ?? [];
@@ -537,12 +584,20 @@ export function compareSavedMarketApy(
 /** Merge delayed list/detail hydration without allowing an older publication
  * to roll back a newer local full-scan APY or result. */
 export function mergeSavedMarketHydration(current: SavedMarket, incoming: SavedMarket): SavedMarket {
-  const rank = (observedAt: string | null | undefined, revision: number | null | undefined): [number, number] => {
+  const rank = (observedAt: string | null | undefined, revision: number | null | undefined) => {
     const parsed = observedAt ? Date.parse(observedAt) : NaN;
-    return [Number.isFinite(parsed) ? parsed : -Infinity, Number.isSafeInteger(revision) ? revision! : -Infinity];
+    return {
+      observedAt: Number.isFinite(parsed) ? parsed : -Infinity,
+      revision: Number.isSafeInteger(revision) ? revision! : null,
+    };
   };
-  const newer = (left: [number, number], right: [number, number]) =>
-    left[0] > right[0] || (left[0] === right[0] && left[1] > right[1]);
+  const newer = (left: ReturnType<typeof rank>, right: ReturnType<typeof rank>) => {
+    if (left.revision != null && right.revision != null && left.revision !== right.revision) {
+      return left.revision > right.revision;
+    }
+    if (left.observedAt !== right.observedAt) return left.observedAt > right.observedAt;
+    return (left.revision ?? -Infinity) > (right.revision ?? -Infinity);
+  };
   const merged: SavedMarket = { ...current, ...incoming };
   if (newer(
     rank(current.canonicalApyObservedAt, current.canonicalApyRevision),
@@ -694,7 +749,7 @@ export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResul
           ...(fresh?.arbitrage ?? old.arbitrage),
           expectedProfit: 0,
           roiPct: 0,
-          apyPct: 0,
+          apyPct: null,
           kalshiStake: 0,
           pmStake: 0,
           maxCapital: 0,

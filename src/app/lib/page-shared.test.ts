@@ -9,6 +9,7 @@ import {
   formatCanonicalMatchState,
   getMarketApySummary,
   compareSavedMarketApy,
+  getQuickApyProvenance,
   mergeSavedMarketHydration,
   getSavedMarketLastSuccessAt,
   getSavedMarketScheduleView,
@@ -261,6 +262,35 @@ describe("BUG-133 canonical saved-market match summaries", () => {
 });
 
 describe('canonical market APY summary', () => {
+  it('fails a partial zero-match quick refresh closed with explicit provenance', () => {
+    const quick = getQuickApyProvenance({
+      eventTitle: 'MD-01 House Election Winner',
+      kalshiCount: 0,
+      pmCount: 1,
+      matchedCount: 0,
+      refreshStatus: 'partial',
+      _priceDataObservedAt: '2026-08-19T17:41:41.000Z',
+      platformDiagnostics: {
+        kalshi: { status: 'failed', count: 0, reason: 'Kalshi timed out' },
+        polymarket: { status: 'fresh', count: 1 },
+      },
+      outcomes: [{
+        ...outcome(0, 0),
+        arbitrage: { ...outcome(0, 0).arbitrage, strategy: 'Unavailable — stale outcome data', apyPct: 0 },
+        kalshiStale: true,
+      }],
+      unmatchedKalshi: [],
+      unmatchedPolymarket: [],
+    });
+
+    expect(quick).toEqual({
+      apyPct: null,
+      observedAt: '2026-08-19T17:41:41.000Z',
+      status: 'partial',
+      reason: 'Kalshi timed out',
+    });
+  });
+
   it('uses persisted canonical APY while preserving both venue scenarios for detail', () => {
     const scenario = (winner: 'kalshi' | 'polymarket', apyPct: number, settlementAt: string) => ({
       label: winner === 'kalshi' ? 'scenario_a' as const : 'scenario_b' as const,
@@ -324,6 +354,38 @@ describe('canonical market APY summary', () => {
     };
     expect(mergeSavedMarketHydration(current, delayed)).toMatchObject({
       eventTitle: 'Server title', canonicalApyPct: 30, canonicalApyRevision: 12,
+    });
+  });
+
+  it('uses publication revision before a conflicting observation timestamp', () => {
+    const base: SavedMarket = { id: 'm', eventTitle: 'Market', kalshiUrl: '', polymarketUrl: '', createdAt: '' };
+    const current: SavedMarket = {
+      ...base, canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:29:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 12,
+    };
+    const delayed: SavedMarket = {
+      ...base, canonicalApyPct: 29.7, canonicalApyObservedAt: '2026-08-19T14:30:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 11,
+    };
+
+    expect(mergeSavedMarketHydration(current, delayed)).toMatchObject({
+      canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:29:00Z', canonicalApyRevision: 12,
+    });
+  });
+
+  it('preserves a newer legacy recovered observation when its revision is null', () => {
+    const base: SavedMarket = { id: 'm', eventTitle: 'Market', kalshiUrl: '', polymarketUrl: '', createdAt: '' };
+    const recovered: SavedMarket = {
+      ...base, canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:30:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: null,
+    };
+    const olderBoundRevision: SavedMarket = {
+      ...base, canonicalApyPct: 29.7, canonicalApyObservedAt: '2026-08-19T14:29:00Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 11,
+    };
+
+    expect(mergeSavedMarketHydration(recovered, olderBoundRevision)).toMatchObject({
+      canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:30:00Z', canonicalApyRevision: null,
     });
   });
 });

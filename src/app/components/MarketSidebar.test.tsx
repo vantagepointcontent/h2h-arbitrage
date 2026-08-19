@@ -218,3 +218,47 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     expect(screen.queryByText(/\{"/)).toBeNull();
   });
 });
+
+describe('BUG-169 complete Saved Markets APY pipeline', () => {
+  it('filters all 482 rows before sorting the complete result at full precision', () => {
+    const noop = vi.fn();
+    const markets = Array.from({ length: 482 }, (_, index): SavedMarket => {
+      const eligible = index % 2 === 0;
+      const canonicalApyPct = index === 2 ? 30.01 : index === 400 ? 30.04 : index / 1000;
+      return {
+        id: `market-${index.toString().padStart(3, '0')}`,
+        eventTitle: `${eligible ? 'Eligible' : 'Excluded'} Market ${index.toString().padStart(3, '0')}`,
+        category: eligible ? 'Politics' : 'Sports',
+        kalshiUrl: 'k',
+        polymarketUrl: 'p',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        canonicalApyPct,
+        canonicalApyObservedAt: '2026-08-19T14:00:00.000Z',
+        canonicalApySource: 'full_scan',
+      };
+    });
+
+    render(<MarketSidebar markets={markets} activeId="market-002" viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="apy" sortDir="desc" onToggleSort={noop}
+      timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={noop} listRefreshState={{ status: 'idle', message: null, observedAt: null, source: null, revision: null }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
+
+    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'Politics' } });
+    fireEvent.change(screen.getByPlaceholderText('Filter by name...'), { target: { value: 'Eligible' } });
+
+    expect(screen.getByText('Saved Markets (241/482)')).toBeTruthy();
+    const rendered = screen.getAllByText(/^Eligible Market /).map((node) => node.textContent);
+    const expected = markets
+      .filter((market) => market.category === 'Politics' && market.eventTitle.includes('Eligible'))
+      .sort((a, b) => (b.canonicalApyPct ?? -Infinity) - (a.canonicalApyPct ?? -Infinity))
+      .map((market) => market.eventTitle);
+    expect(rendered).toEqual(expected);
+    expect(rendered.slice(0, 2)).toEqual(['Eligible Market 400', 'Eligible Market 002']);
+    expect(screen.getAllByText('(30.0%)')).toHaveLength(2);
+  });
+});

@@ -90,6 +90,7 @@ import { saveSpread } from "@/lib/spreadHistory";
 
 
 import { MarketSidebar, type SavedMarketsListRefreshState } from "@/app/components/MarketSidebar";
+import { SelectedMarketApyProvenance } from "@/app/components/SelectedMarketApyProvenance";
 import { PlatformLinkInputs, type PlatformLinkInput } from "@/app/components/PlatformLinkInputs";
 // UI-005: code-split heavy view panels
 const OverviewPanel = dynamic(() => import("@/app/components/OverviewPanel").then(m => m.OverviewPanel), { ssr: false });
@@ -104,7 +105,7 @@ import {
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
-  selectSavedMarketPriceCache, normalizeSavedMarketsList, getMarketApySummary, mergeSavedMarketHydration,
+  selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -2159,31 +2160,7 @@ export default function Home() {
                     {marketWorkspaceTab === "prices" && activeMarketId && (() => {
                       const market = savedMarkets.find((item) => item.id === activeMarketId);
                       if (!market) return null;
-                      const apy = getMarketApySummary(market);
-                      const quickObservedAt = result._priceDataObservedAt ?? null;
-                      const quickBest = quickObservedAt
-                        ? [...(result.outcomes ?? [])].filter((outcome) =>
-                            outcome.arbitrage.strategy !== "No arb" && Number.isFinite(outcome.arbitrage.roiPct),
-                          ).sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct || a.artist.localeCompare(b.artist))[0]
-                        : null;
-                      const quickApyPct = typeof quickBest?.arbitrage.apyPct === "number" && Number.isFinite(quickBest.arbitrage.apyPct)
-                        ? quickBest.arbitrage.apyPct : null;
-                      return (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[11px] text-[var(--text-secondary)]" data-testid="selected-market-apy-provenance">
-                          <span title="This full-precision persisted value controls Saved Markets APY sorting.">
-                            Persisted scan APY: <strong className="text-[var(--text-primary)]">{apy.scalarApyPct == null ? "Unavailable" : formatPercent(apy.scalarApyPct)}</strong>
-                            {apy.observedAt ? ` · ${formatRelativeTime(apy.observedAt)}` : ""}
-                            {apy.revision != null ? ` · revision ${apy.revision}` : ""}
-                          </span>
-                          {quickObservedAt && (
-                            <span title="Current quick APY is contextual and does not reorder Saved Markets.">
-                              Current quick APY: <strong className="text-[var(--text-primary)]">{quickApyPct == null ? "Unavailable" : formatPercent(quickApyPct)}</strong>
-                              {` · ${formatRelativeTime(quickObservedAt)}`}
-                            </span>
-                          )}
-                          <span className="text-[var(--text-faint)]">Saved Markets sorts by persisted scan APY.</span>
-                        </div>
-                      );
+                      return <SelectedMarketApyProvenance market={market} result={result} />;
                     })()}
                     {marketWorkspaceTab === "prices" && (result?.matchedCount ?? 0) > 0 && result?.outcomes && (
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden overflow-x-auto" data-testid="outcome-table-scroll">
