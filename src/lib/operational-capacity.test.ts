@@ -25,6 +25,9 @@ describe('operator capacity gates', () => {
     expect(ecosystem).toContain("cron_restart: '30 3 * * *'");
     expect(ecosystem).toContain("name: 'h2h-scan-supervisor'");
     expect(ecosystem).toContain("script: './scripts/scan-supervisor.mjs'");
+    expect(ecosystem).toContain("name: 'h2h-db-maintenance'");
+    expect(ecosystem).toContain("script: './.h2h-releases/active/.next/db-maintenance.mjs'");
+    expect(ecosystem).toContain("H2H_CHECKPOINT_INTERVAL_MS: '300000'");
     expect(ecosystem).toContain("H2H_SCAN_CONCURRENCY: '3'");
     expect(ecosystem).toContain("H2H_SCAN_WORKER_TIMEOUT_MS: '30000'");
     expect(ecosystem).toContain("H2H_POLL_CONCURRENCY: '3'");
@@ -33,6 +36,8 @@ describe('operator capacity gates', () => {
     const monitor = await readFile(path.join(root, 'scripts', 'disk-capacity-monitor.mjs'), 'utf8');
     const retention = await readFile(path.join(root, 'scripts', 'storage-retention.mjs'), 'utf8');
     const supervisor = await readFile(path.join(root, 'scripts', 'scan-supervisor.mjs'), 'utf8');
+    const maintenance = await readFile(path.join(root, 'scripts', 'db-maintenance.mjs'), 'utf8');
+    const watcher = await readFile(path.join(root, 'scripts', 'ws-watcher.ts'), 'utf8');
     const healthRoute = await readFile(path.join(root, 'src', 'app', 'api', 'health', 'route.ts'), 'utf8');
     expect(monitor).toContain("process.env.pm_id !== undefined");
     expect(retention).toContain("process.env.pm_id !== undefined");
@@ -40,6 +45,9 @@ describe('operator capacity gates', () => {
     expect(supervisor).toContain("process.env.pm_id !== undefined");
     expect(supervisor).toContain("'h2h-poller'");
     expect(supervisor).toContain('.corrupt.');
+    expect(maintenance).toContain("checkpoint(db, 'PASSIVE')");
+    expect(maintenance).not.toContain('throw new Error(`SQLITE_BUSY during wal_checkpoint');
+    expect(watcher).toContain('withSqliteBusyRetry(() => syncSubscriptions())');
     expect(healthRoute).toContain('saved-market-scanner-health.json');
     expect(healthRoute).toContain('fullScanHealth');
   });

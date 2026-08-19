@@ -127,7 +127,7 @@ module.exports = {
     },
     {
       name: 'h2h-watcher',
-      script: './dist/ws-watcher.mjs',
+      script: './.h2h-releases/active/.next/ws-watcher.mjs',
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
@@ -156,7 +156,7 @@ module.exports = {
     },
     {
       name: 'h2h-valuer',
-      script: './dist/position-valuer.mjs',
+      script: './.h2h-releases/active/.next/position-valuer.mjs',
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
@@ -183,6 +183,31 @@ module.exports = {
       time_format: '[YYYY-MM-DD HH:mm:ss]',
 
       max_memory_restart: '256M'
+    },
+    {
+      name: 'h2h-db-maintenance',
+      script: './.h2h-releases/active/.next/db-maintenance.mjs',
+      cwd: '/home/scott/h2h-arbitrage',
+      instances: 1,
+      exec_mode: 'fork',
+      restart_delay: 5000,
+      max_restarts: Infinity,
+      min_uptime: 15000,
+      kill_timeout: 10000,
+      shutdown_listener: true,
+      env: {
+        NODE_ENV: 'production',
+        H2H_CHECKPOINT_INTERVAL_MS: '300000',
+        H2H_PRUNE_RETENTION_DAYS: '7',
+        H2H_PRUNE_HOUR_UTC: '5',
+      },
+      log_file: '/home/scott/.pm2/logs/h2h-db-maintenance.log',
+      error_file: '/home/scott/.pm2/logs/h2h-db-maintenance-error.log',
+      out_file: '/home/scott/.pm2/logs/h2h-db-maintenance-out.log',
+      merge_logs: true,
+      time: true,
+      time_format: '[YYYY-MM-DD HH:mm:ss]',
+      max_memory_restart: '128M',
     },
     {
       name: 'h2h-ragnar',

@@ -28,6 +28,11 @@ const REQUIRED_FILES = [
   'BUILD_ID',
   'DEPLOY_COMMIT',
   'full-scan-worker.cjs',
+  'ragnar-consumer.mjs',
+  'ws-watcher.mjs',
+  'position-valuer.mjs',
+  'db-maintenance.mjs',
+  'recover-bot-entry-evidence.mjs',
   'build-manifest.json',
   'routes-manifest.json',
   'prerender-manifest.json',
@@ -395,6 +400,9 @@ async function restartAndVerify(repoRoot, expected, options = {}) {
   if (!healthy) throw new Error(`PM2 restarted but release health was not accepted: ${lastError}`);
   await execFileAsync('pm2', [
     'start', 'ecosystem.config.js', '--only', 'h2h-poller,h2h-scan-supervisor', '--update-env',
+  ], { cwd: repoRoot });
+  await execFileAsync('pm2', [
+    'start', 'ecosystem.config.js', '--only', 'h2h-watcher,h2h-valuer,h2h-ragnar,h2h-db-maintenance', '--update-env',
   ], { cwd: repoRoot });
   await execFileAsync('pm2', ['start', 'ecosystem.config.js', '--only', 'h2h-release-monitor', '--update-env'], { cwd: repoRoot });
   await execFileAsync('pm2', ['save'], { cwd: repoRoot });

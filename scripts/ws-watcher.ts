@@ -29,6 +29,7 @@ import { SUSPICIOUS_ROI_PCT } from '@/lib/matcher';
 import { calculateOutcomeContingentApy } from '@/lib/settlement-apy';
 import { calculateScanApy } from '@/lib/scan-apy';
 import { reserveWatcherMatchPublication, type WatcherMatchPublication } from '@/lib/watcher-match-publication';
+import { withSqliteBusyRetry } from '@/lib/sqlite-write-retry';
 
 import logger from '@/lib/logger';
 
@@ -667,7 +668,11 @@ async function main(): Promise<void> {
 
   // Initial target refresh is incremental (warm restarts are seconds).
   await refreshWatchTargets().catch((err) => logger.warn('[watcher] initial target refresh failed', { err }));
-  await syncSubscriptions();
+  await withSqliteBusyRetry(() => syncSubscriptions()).catch((err) => {
+    degraded = true;
+    degradedSince = Date.now();
+    logger.warn('[watcher] initial subscription sync deferred after bounded SQLite retry', { err });
+  });
 
   setInterval(() => { syncSubscriptions().catch((err) => logger.warn('[watcher] tier sync failed', { err })); }, TIER_REFRESH_MS);
   setInterval(() => { refreshWatchTargets().catch((err) => logger.warn('[watcher] target refresh failed', { err })); }, TARGET_REFRESH_MS);

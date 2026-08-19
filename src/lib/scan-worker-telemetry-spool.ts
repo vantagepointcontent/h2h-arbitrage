@@ -46,6 +46,8 @@ const EMPTY_HEALTH: WorkerTelemetryWriteHealth = {
   error: null,
 };
 
+const DRAIN_BATCH_SIZE = 25;
+
 async function atomicJsonWrite(filePath: string, value: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
@@ -156,20 +158,25 @@ export class WorkerTelemetrySpool {
 
   private async drainOnce(): Promise<void> {
     const files = await this.refreshPendingHealth();
-    for (const fileName of files) {
-      const filePath = path.join(this.spoolDir, fileName);
+    for (let offset = 0; offset < files.length; offset += DRAIN_BATCH_SIZE) {
+      const batch = files.slice(offset, offset + DRAIN_BATCH_SIZE);
       this.health = { ...this.health, lastDrainAttemptAt: this.now().toISOString() };
       try {
-        const envelope = JSON.parse(await readFile(filePath, 'utf8')) as SpoolEnvelope;
-        if (envelope.version !== 1 || !Array.isArray(envelope.records)) {
-          throw new Error(`Malformed worker telemetry spool envelope: ${fileName}`);
+        const envelopes = await Promise.all(batch.map(async (fileName) => {
+          const envelope = JSON.parse(await readFile(path.join(this.spoolDir, fileName), 'utf8')) as SpoolEnvelope;
+          if (envelope.version !== 1 || !Array.isArray(envelope.records)) {
+            throw new Error(`Malformed worker telemetry spool envelope: ${fileName}`);
+          }
+          return envelope;
+        }));
+        await withSqliteBusyRetry(() => this.persist(envelopes.flatMap((envelope) => envelope.records)));
+        for (const fileName of batch) {
+          await rm(path.join(this.spoolDir, fileName));
         }
-        await withSqliteBusyRetry(() => this.persist(envelope.records));
-        await rm(filePath);
         this.health = {
           ...this.health,
           lastPersistedAt: this.now().toISOString(),
-          recoveredSnapshots: this.health.recoveredSnapshots + (this.health.error ? 1 : 0),
+          recoveredSnapshots: this.health.recoveredSnapshots + (this.health.error ? batch.length : 0),
           error: null,
         };
       } catch (error) {
@@ -181,7 +188,8 @@ export class WorkerTelemetrySpool {
           error: message,
         };
         logger.error('[scan-worker-telemetry-spool] drain failed; snapshot retained for retry', {
-          fileName,
+          fileName: batch[0],
+          batchSize: batch.length,
           error: message,
         });
         await this.refreshPendingHealth();

@@ -59,4 +59,23 @@ describe('WorkerTelemetrySpool', () => {
     await spool.drain();
     expect(persist).toHaveBeenCalledOnce();
   });
+
+  it('drains a bounded snapshot batch in one idempotent SQLite write', async () => {
+    const p = await paths();
+    const persist = vi.fn(async () => undefined);
+    const spool = new WorkerTelemetrySpool({ ...p, persist, autoDrain: false, autoRetry: false });
+    await spool.accept('job-1', [record('2026-08-16T18:31:00.000Z')]);
+    await spool.accept('job-2', [record('2026-08-16T18:32:00.000Z')]);
+    await spool.accept('job-3', [record('2026-08-16T18:33:00.000Z')]);
+
+    await spool.drain();
+
+    expect(persist).toHaveBeenCalledOnce();
+    expect(persist).toHaveBeenCalledWith([
+      record('2026-08-16T18:31:00.000Z'),
+      record('2026-08-16T18:32:00.000Z'),
+      record('2026-08-16T18:33:00.000Z'),
+    ]);
+    expect(await readdir(p.spoolDir)).toEqual([]);
+  });
 });

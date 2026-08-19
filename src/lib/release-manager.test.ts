@@ -32,6 +32,9 @@ async function artifact(base: string, commit: string, buildId: string) {
   await writeFile(path.join(dir, 'required-server-files.json'), JSON.stringify({ version: 1, files: ['server/chunks/runtime.js'] }));
   await writeFile(path.join(dir, 'ragnar-consumer.mjs'), 'export {};\n');
   await writeFile(path.join(dir, 'full-scan-worker.cjs'), 'module.exports = {};\n');
+  for (const file of ['ws-watcher.mjs', 'position-valuer.mjs', 'db-maintenance.mjs', 'recover-bot-entry-evidence.mjs']) {
+    await writeFile(path.join(dir, file), 'export {};\n');
+  }
   await writeFile(path.join(dir, 'static', buildId, '_buildManifest.js'), `self.__BUILD=${JSON.stringify(buildId)}`);
   await writeFile(path.join(dir, 'static', 'chunks', 'app.js'), `self.__COMMIT=${JSON.stringify(commit)}`);
   await writeFile(path.join(dir, 'server', 'chunks', 'runtime.js'), `exports.commit=${JSON.stringify(commit)}`);
@@ -56,6 +59,9 @@ describe('isolated production releases', () => {
     ]);
     expect(JSON.parse(packageJson).scripts.build).toContain('release-manager.mjs build');
     expect(JSON.parse(packageJson).scripts['build:raw']).toContain('build:ragnar');
+    expect(JSON.parse(packageJson).scripts['build:watcher']).toContain('${H2H_NEXT_DIST_DIR:-dist}/ws-watcher.mjs');
+    expect(JSON.parse(packageJson).scripts['build:valuer']).toContain('${H2H_NEXT_DIST_DIR:-dist}/position-valuer.mjs');
+    expect(JSON.parse(packageJson).scripts['build:maintenance']).toContain('${H2H_NEXT_DIST_DIR:-dist}/db-maintenance.mjs');
     expect(nextConfig).toContain('H2H_NEXT_DIST_DIR');
     expect(nextConfig).not.toMatch(/distDir:\s*['"]\.next['"]/);
     expect(startApp).toContain('release-manager.mjs verify-active');
@@ -65,8 +71,11 @@ describe('isolated production releases', () => {
     expect(health).toContain('H2H_BUILD_ID');
     expect(ecosystem).toContain("name: 'h2h-release-monitor'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
+    expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ws-watcher.mjs'");
+    expect(ecosystem).toContain("script: './.h2h-releases/active/.next/position-valuer.mjs'");
+    expect(ecosystem).toContain("script: './.h2h-releases/active/.next/db-maintenance.mjs'");
     expect(await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8'))
-      .toMatch(/h2h-arbitrage[\s\S]+h2h-poller[\s\S]+h2h-scan-supervisor/);
+      .toMatch(/h2h-arbitrage[\s\S]+h2h-poller[\s\S]+h2h-scan-supervisor[\s\S]+h2h-watcher[\s\S]+h2h-valuer[\s\S]+h2h-db-maintenance/);
   });
 
   it('materializes detached dependencies and preserves generated runtime package aliases', async () => {
@@ -96,6 +105,7 @@ for (const file of ['build-manifest.json', 'routes-manifest.json', 'prerender-ma
 fs.writeFileSync(path.join('.next', 'BUILD_ID'), 'build-test\\n');
 fs.writeFileSync(path.join('.next', 'ragnar-consumer.mjs'), 'export {};\\n');
 fs.writeFileSync(path.join('.next', 'full-scan-worker.cjs'), 'module.exports = {};\\n');
+for (const file of ['ws-watcher.mjs', 'position-valuer.mjs', 'db-maintenance.mjs', 'recover-bot-entry-evidence.mjs']) fs.writeFileSync(path.join('.next', file), 'export {};\\n');
 fs.writeFileSync(path.join('.next', 'static', 'chunks', 'app.js'), 'app');
 fs.writeFileSync(path.join('.next', 'server', 'chunks', 'runtime.js'), 'module.exports=e=>e.y("fixture-package-aaaaaaaaaaaaaaaa")');
 `);

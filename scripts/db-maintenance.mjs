@@ -24,10 +24,18 @@ async function checkpoint(db, mode) {
   const elapsed = Date.now() - before;
   const row = result.rows[0];
   log(`checkpoint(${mode}) done in ${elapsed}ms: busy=${row.busy} log=${row.log} checkpointed=${row.checkpointed}`);
-  if (row.busy !== 0) {
-    throw new Error(`SQLITE_BUSY during wal_checkpoint(${mode})`);
-  }
   return row;
+}
+
+async function boundedCheckpoint(db) {
+  // PASSIVE never waits for readers or takes the exclusive lock that a hot
+  // TRUNCATE checkpoint needs. Only attempt truncation after PASSIVE proves the
+  // complete logical WAL is already checkpointed; a race is observed on the
+  // next interval rather than crash-looping under PM2 every five seconds.
+  const row = await checkpoint(db, 'PASSIVE');
+  if (Number(row.busy) === 0 && Number(row.log) > 0 && Number(row.log) === Number(row.checkpointed)) {
+    await checkpoint(db, 'TRUNCATE');
+  }
 }
 
 async function prune(db) {
@@ -50,11 +58,9 @@ async function runMaintenance() {
     await db.execute('PRAGMA synchronous = NORMAL');
     await db.execute('PRAGMA wal_autocheckpoint = 1000');
 
-    await checkpoint(db, 'TRUNCATE');
-
     let nextPruneDate = '';
     while (true) {
-      await checkpoint(db, 'TRUNCATE');
+      await boundedCheckpoint(db);
 
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
