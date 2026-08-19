@@ -667,6 +667,12 @@ describe('maybeExecuteBotTrade safety', () => {
         executionMode: 'paper',
         pmConditionId: TEST_PM_CONDITION_ID,
         pmSide: 'no',
+        kalshiMarketQuestion: 'Will Team A win?',
+        pmMarketQuestion: 'Will Team A win?',
+        kalshiOutcomeLabel: 'team a',
+        pmOutcomeLabel: 'not team a',
+        outcomeIdentityStatus: 'verified',
+        outcomeIdentitySource: 'canonical_proposition_relationship_v1',
       }),
       expect.objectContaining({
         polymarket: expect.objectContaining({ tokenId: TEST_PM_NO_TOKEN_ID }),

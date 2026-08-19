@@ -215,7 +215,9 @@ export function buildBotLegIdentity(
 function csvCell(value: unknown): string {
   const raw = value == null ? '' : String(value);
   // RFC 4180 quoting alone does not prevent spreadsheet formula execution.
-  const text = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  // Numeric financial values (including losses) are safe cells; only
+  // untrusted strings need formula neutralization.
+  const text = typeof value === 'string' && /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -226,19 +228,113 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
   pmConditionId?: string | null;
   pmEntryTokenId?: string | null;
   identity: BotPositionIdentity;
+  buyPriceMicrocents?: number | null;
+  buyCostMicrocents?: number | null;
+  indicativeValueMicrocents?: number | null;
+  indicativePnlMicrocents?: number | null;
+  unrealizedRoiBps?: number | null;
+  valuationStatus?: 'current' | 'stale' | 'unavailable';
+  valuationFailureReason?: string | null;
+  lastValuationAt?: string | null;
+  settlementState?: string | null;
+  settlementGrossProceedsCents?: number | null;
+  settlementNetProceedsCents?: number | null;
+  settlementFailureReason?: string | null;
+  settlementCashAvailableAt?: string | null;
+  realizedPnlCents?: number | null;
+  realizedRoiBps?: number | null;
+  currentPriceSnapshots?: {
+    kalshi: {
+      identity: { platform: string; marketId: string | null; side: string; tokenId: string | null };
+      status: string; priceMicrocents?: number | null; priceCents: number | null;
+      source: string | null; observedAt: string | null;
+    };
+    polymarket: {
+      identity: { platform: string; marketId: string | null; side: string; tokenId: string | null };
+      status: string; priceMicrocents?: number | null; priceCents: number | null;
+      source: string | null; observedAt: string | null;
+    };
+  };
 }>): string {
   const headers = [
-    'Position ID', 'Execution ID', 'Kalshi Question', 'Kalshi Outcome', 'Kalshi Side', 'Kalshi Ticker',
+    'Row Type', 'Position ID', 'Execution ID', 'Kalshi Question', 'Kalshi Outcome', 'Kalshi Side', 'Kalshi Ticker',
     'Polymarket Question', 'Polymarket Outcome', 'Polymarket Side', 'PM Condition ID', 'PM Token ID',
     'Relationship State', 'Relationship Explanation',
+    'Buy Price Microcents', 'Buy Cost Microcents', 'Kalshi Current Price Microcents',
+    'PM Current Price Microcents', 'Current Value Microcents', 'P/L Microcents', 'ROI BPS',
+    'Valuation Included', 'Valuation Status', 'Valuation Failure Reason', 'Valuation As Of',
+    'Kalshi Snapshot Platform', 'Kalshi Snapshot Market ID', 'Kalshi Snapshot Side', 'Kalshi Snapshot Token ID',
+    'Kalshi Snapshot Status', 'Kalshi Snapshot Source', 'Kalshi Snapshot Observed At',
+    'PM Snapshot Platform', 'PM Snapshot Market ID', 'PM Snapshot Side', 'PM Snapshot Token ID',
+    'PM Snapshot Status', 'PM Snapshot Source', 'PM Snapshot Observed At',
+    'Settlement State', 'Gross Settlement Proceeds Cents', 'Net Settlement Proceeds Cents',
+    'Realized P/L Cents', 'Realized ROI BPS', 'Settlement Failure Reason', 'Cash Available At',
   ];
-  const rows = positions.map((position) => [
-    position.id, position.executionId,
+  const included = (position: (typeof positions)[number]) =>
+    (position.valuationStatus === 'current' || position.valuationStatus === 'stale')
+    && Number.isSafeInteger(position.buyPriceMicrocents)
+    && Number.isSafeInteger(position.buyCostMicrocents) && position.buyCostMicrocents! > 0
+    && Number.isSafeInteger(position.indicativeValueMicrocents)
+    && Number.isSafeInteger(position.indicativePnlMicrocents)
+    && Number.isSafeInteger(position.unrealizedRoiBps);
+  const snapshotPrice = (snapshot: NonNullable<(typeof positions)[number]['currentPriceSnapshots']>['kalshi'] | undefined) => {
+    if (!snapshot) return null;
+    if (Number.isSafeInteger(snapshot.priceMicrocents)) return snapshot.priceMicrocents!;
+    return snapshot.priceCents != null && Number.isSafeInteger(snapshot.priceCents)
+      ? snapshot.priceCents * 1_000_000 : null;
+  };
+  const snapshotCells = (snapshot: NonNullable<(typeof positions)[number]['currentPriceSnapshots']>['kalshi'] | undefined) => [
+    snapshot?.identity.platform, snapshot?.identity.marketId, snapshot?.identity.side.toUpperCase(),
+    snapshot?.identity.tokenId, snapshot?.status, snapshot?.source, snapshot?.observedAt,
+  ];
+  const rows = positions.map((position) => {
+    const valuationIncluded = included(position);
+    return [
+    'POSITION', position.id, position.executionId,
     position.identity.kalshi.marketQuestion, position.identity.kalshi.outcomeLabel,
     position.identity.kalshi.side.toUpperCase(), position.kalshiTicker,
     position.identity.polymarket.marketQuestion, position.identity.polymarket.outcomeLabel,
     position.identity.polymarket.side.toUpperCase(), position.pmConditionId, position.pmEntryTokenId,
     position.identity.relationship.state, position.identity.relationship.explanation,
-  ]);
-  return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    position.buyPriceMicrocents, position.buyCostMicrocents,
+    valuationIncluded ? snapshotPrice(position.currentPriceSnapshots?.kalshi) : null,
+    valuationIncluded ? snapshotPrice(position.currentPriceSnapshots?.polymarket) : null,
+    valuationIncluded ? position.indicativeValueMicrocents : null,
+    valuationIncluded ? position.indicativePnlMicrocents : null,
+    valuationIncluded ? position.unrealizedRoiBps : null,
+    valuationIncluded ? 'yes' : 'no', position.valuationStatus, position.valuationFailureReason,
+    valuationIncluded ? position.lastValuationAt : null,
+    ...snapshotCells(position.currentPriceSnapshots?.kalshi),
+    ...snapshotCells(position.currentPriceSnapshots?.polymarket),
+    position.settlementState, position.settlementGrossProceedsCents,
+    position.settlementNetProceedsCents, position.realizedPnlCents, position.realizedRoiBps,
+    position.settlementFailureReason, position.settlementCashAvailableAt,
+  ];
+  });
+  const valued = positions.filter(included);
+  const total = (key: 'buyPriceMicrocents' | 'buyCostMicrocents' | 'indicativeValueMicrocents' | 'indicativePnlMicrocents') =>
+    valued.reduce((sum, position) => sum + position[key]!, 0);
+  const totalBuyPrice = total('buyPriceMicrocents');
+  const totalBuyCost = total('buyCostMicrocents');
+  const totalValue = total('indicativeValueMicrocents');
+  const totalPnl = total('indicativePnlMicrocents');
+  const totalRoiBps = totalBuyCost > 0
+    ? Number((BigInt(totalPnl) * 10_000n + BigInt(totalPnl < 0 ? -totalBuyCost : totalBuyCost) / 2n) / BigInt(totalBuyCost))
+    : null;
+  const totalRow = [
+    'TOTAL', null, null, null, null, null, null, null, null, null, null, null,
+    null, `${valued.length} valued position(s); unavailable positions excluded`,
+    totalBuyPrice, totalBuyCost, null, null, totalValue, totalPnl, totalRoiBps,
+    null, null, null, null,
+    ...Array(14).fill(null),
+    null,
+    positions.filter((position) => position.settlementState === 'settled')
+      .reduce((sum, position) => sum + (position.settlementGrossProceedsCents ?? 0), 0),
+    positions.filter((position) => position.settlementState === 'settled')
+      .reduce((sum, position) => sum + (position.settlementNetProceedsCents ?? 0), 0),
+    positions.filter((position) => position.settlementState === 'settled')
+      .reduce((sum, position) => sum + (position.realizedPnlCents ?? 0), 0),
+    null, null, null,
+  ];
+  return [headers, ...rows, totalRow].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }

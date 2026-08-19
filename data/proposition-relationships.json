@@ -1,5 +1,53 @@
 {
   "schemaVersion": 1,
   "description": "Human-reviewed, exact cross-venue proposition relationships allowed for BotTrader execution. Fuzzy/title matching must never populate this registry.",
-  "relationships": []
+  "relationships": [
+    {
+      "schemaVersion": 1,
+      "state": "verified_complementary",
+      "verificationSource": "authoritative_platform_metadata",
+      "verifiedAt": "2026-08-19T14:44:00.000Z",
+      "parentEventId": "fia-f1-action-of-the-year-2026-franco-colapinto",
+      "resolutionRuleId": "fia-f1-action-of-the-year-2026-winner-v1",
+      "exhaustivePayoutStates": [
+        "Franco Colapinto wins",
+        "Franco Colapinto does not win"
+      ],
+      "humanLabel": "Franco Colapinto — 2026 FIA F1 Action of the Year",
+      "legs": {
+        "kalshi": {
+          "platform": "kalshi",
+          "platformMarketId": "KXF1ACTION-2026-COL",
+          "parentEventId": "fia-f1-action-of-the-year-2026-franco-colapinto",
+          "selectedOutcome": "Franco Colapinto wins",
+          "contractSide": "yes",
+          "payoutState": "Franco Colapinto wins",
+          "eventPayoutStates": [
+            "Franco Colapinto wins",
+            "Franco Colapinto does not win"
+          ],
+          "resolutionRuleId": "fia-f1-action-of-the-year-2026-winner-v1",
+          "humanLabel": "Kalshi YES — Franco Colapinto wins",
+          "marketQuestion": "Will Franco Colapinto win the FIA F1 Action of the Year award in the 2026 FIA (Fédération Internationale de l'Automobile) season?",
+          "tokenId": null
+        },
+        "polymarket": {
+          "platform": "polymarket",
+          "platformMarketId": "0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961",
+          "parentEventId": "fia-f1-action-of-the-year-2026-franco-colapinto",
+          "selectedOutcome": "Franco Colapinto wins",
+          "contractSide": "no",
+          "payoutState": "Franco Colapinto does not win",
+          "eventPayoutStates": [
+            "Franco Colapinto wins",
+            "Franco Colapinto does not win"
+          ],
+          "resolutionRuleId": "fia-f1-action-of-the-year-2026-winner-v1",
+          "humanLabel": "Polymarket NO — Franco Colapinto does not win",
+          "marketQuestion": "Will Franco Colapinto win the 2026 Action of the Year?",
+          "tokenId": "38424385756462253442221613485727105608987714090195314133724025202573806948368"
+        }
+      }
+    }
+  ]
 }

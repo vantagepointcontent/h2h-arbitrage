@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-17T15:08:20.007074Z",
+  "generatedAt": "2026-08-19T14:57:00.000Z",
   "sourceDatabase": "/home/scott/h2h-arbitrage/data/edgefinder.db",
   "immutableHistoryPolicy": "This audit classifies existing rows without updating executions or positions.",
   "counts": {
     "totalCrossPlatformPositions": 169,
     "confirmed_legitimate": 0,
-    "confirmed_invalid": 1,
-    "unresolved_legacy": 168,
+    "confirmed_invalid": 2,
+    "unresolved_legacy": 167,
     "openHighSeverity": 0,
     "actualExposureStates": {
       "no_executable_exposure": 169,
@@ -6609,10 +6609,33 @@
       "buyPriceKalshiCents": 28,
       "buyPricePmCents": 29,
       "pmEntryTokenId": null,
-      "classification": "unresolved_legacy",
+      "classification": "confirmed_invalid",
       "severity": "warning",
-      "reason": "Legacy row predates canonical proposition identity; labels and strategy text are not settlement proof.",
-      "evidence": null,
+      "reason": "Both exact requested contracts select Republican and use the YES side. The strategy label says PM Democratic, but immutable execution request token 68021205636604056509276509067526372089338487160185591169779941190006739682906 is the Polymarket Republican YES token.",
+      "evidence": {
+        "auditedAt": "2026-08-19T14:57:00.000Z",
+        "parentEvent": "2026 CO-08 U.S. House election winner party",
+        "exhaustivePayoutStates": [
+          "republican",
+          "democratic"
+        ],
+        "kalshi": {
+          "marketId": "HOUSECO8-26-R",
+          "question": "Will Republican win the House race for CO-8?",
+          "side": "yes",
+          "payoutState": "republican",
+          "rules": "Resolves Yes if the House member sworn in for CO-08 for the term beginning in 2027 is a member of the Republican Party.",
+          "source": "https://api.elections.kalshi.com/trade-api/v2/markets/HOUSECO8-26-R"
+        },
+        "polymarket": {
+          "conditionId": "0x52284e2210068126179495aa36b333b455be2973ada738f6bffad6061bb116a6",
+          "tokenId": "68021205636604056509276509067526372089338487160185591169779941190006739682906",
+          "question": "Will the Republican Party win the CO-08 House seat?",
+          "side": "yes",
+          "payoutState": "republican",
+          "source": "https://gamma-api.polymarket.com/markets?condition_ids=0x52284e2210068126179495aa36b333b455be2973ada738f6bffad6061bb116a6"
+        }
+      },
       "executionEnvelope": {
         "mode": "paper",
         "dryRun": true,

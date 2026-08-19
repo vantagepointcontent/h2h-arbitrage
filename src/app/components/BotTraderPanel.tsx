@@ -14,6 +14,7 @@ import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
 
 type PositionStatus = 'open' | 'settled' | 'closed';
+type SettlementState = 'open' | 'partially_settled' | 'settlement_pending' | 'settlement_unresolved' | 'settled';
 type PositionFilter = 'all' | 'open' | 'settled';
 type PositionModeFilter = 'paper' | 'production';
 type PerformanceMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
@@ -30,6 +31,7 @@ interface StoredPriceSnapshot {
   executableDepthMicros?: number | null;
   failureReason?: string | null;
   markFailureReason?: string | null;
+  identity?: { platform: 'kalshi' | 'polymarket'; marketId: string | null; side: 'yes' | 'no'; tokenId: string | null };
 }
 
 interface BotPosition {
@@ -42,6 +44,15 @@ interface BotPosition {
   kalshiUrl: string | null;
   polymarketUrl: string | null;
   strategy: string | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  outcomeIdentityStatus?: 'verified' | 'unresolved';
+  outcomeIdentitySource?: string | null;
+  outcomeIdentityRecordedAt?: string | null;
+  outcomeIdentityFailureReason?: string | null;
+  pmEntryTokenId?: string | null;
   propositionRelationship?: {
     humanLabel: string;
     legs: { kalshi: { humanLabel: string }; polymarket: { humanLabel: string } };
@@ -112,6 +123,21 @@ interface BotPosition {
   settlementSide: 'kalshi' | 'pm' | null;
   resolutionPayoutCents?: number | null;
   resolutionValidationStatus?: 'pending' | 'verified' | 'invalid';
+  settlementState?: SettlementState;
+  settlementGrossProceedsCents?: number | null;
+  settlementNetProceedsCents?: number | null;
+  settlementFailureReason?: string | null;
+  settlementCashAvailableAt?: string | null;
+  settlementReconciledAt?: string | null;
+  realizedRoiBps?: number | null;
+  settlementLegs?: Array<{
+    venue: 'kalshi' | 'polymarket'; lifecycleState: string; marketId: string | null;
+    outcomeId: string | null; side: 'yes' | 'no'; filledQuantity: number | null;
+    resolutionWinningSide: 'yes' | 'no' | null; resolutionDetectedAt: string | null;
+    resolutionSource: string | null; payoutEntitlementCents: number | null;
+    settlementFeeCents: number | null; netSettlementProceedsCents: number | null;
+    creditState: string; cashAvailableAt: string | null; failureReason: string | null;
+  }>;
   dryRun: boolean;
   selectionMethod: 'roi' | 'apy' | 'hybrid' | null;
 }
@@ -310,13 +336,27 @@ function MetricCard({ label, value, valueClass = '' }: { label: string; value: s
   );
 }
 
-function StatusBadge({ status }: { status: PositionStatus }) {
-  const styles: Record<PositionStatus, string> = {
+function StatusBadge({ position }: { position: BotPosition }) {
+  const styles: Record<PositionStatus | 'pending' | 'unresolved' | 'partial', string> = {
     open: 'bg-[var(--status-positive)]/15 text-[var(--status-positive)]',
     settled: 'bg-[var(--platform-polymarket)]/15 text-[var(--platform-polymarket)]',
     closed: 'bg-[var(--status-negative)]/15 text-[var(--status-negative)]',
+    pending: 'bg-[var(--status-warning)]/15 text-[var(--status-warning)]',
+    unresolved: 'bg-[var(--status-negative)]/15 text-[var(--status-negative)]',
+    partial: 'bg-[var(--status-warning)]/15 text-[var(--status-warning)]',
   };
-  return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[status]}`}>{status}</span>;
+  const state = position.settlementState;
+  const style = state === 'settlement_unresolved' ? 'unresolved'
+    : state === 'settlement_pending' ? 'pending'
+      : state === 'partially_settled' ? 'partial'
+        : position.status;
+  const label = state === 'settlement_unresolved' ? 'Settlement unresolved'
+    : state === 'settlement_pending' ? 'Settlement pending'
+      : state === 'partially_settled' ? 'Partially settled'
+        : state === 'settled' || position.status === 'settled'
+          ? `Settled${position.dryRun ? ' (paper)' : ''}`
+          : position.status;
+  return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[style]}`}>{label}</span>;
 }
 
 export default function BotTraderPanel() {
@@ -383,16 +423,16 @@ export default function BotTraderPanel() {
     };
   }, [load]);
 
-  const filteredPositions = useMemo(
-    () => {
-      const included = new Set(analytics?.performance.positionIds ?? []);
-      return positions.filter((position) =>
-        included.has(position.id)
-        && (filter === 'all'
-          || (filter === 'open' ? position.status === 'open' : position.status !== 'open')));
-    },
-    [analytics, filter, positions],
-  );
+  const filteredPositions = useMemo(() => {
+    const included = new Set(analytics?.performance.positionIds ?? []);
+    return positions.filter((position) => {
+      if (!included.has(position.id) || filter === 'all') return included.has(position.id);
+      const open = position.status === 'open' && (!position.settlementState
+        || position.settlementState === 'open'
+        || position.settlementState === 'partially_settled');
+      return filter === 'open' ? open : !open;
+    });
+  }, [analytics, filter, positions]);
 
   const sortedPositions = useMemo(() => filteredPositions.slice().sort((a, b) => {
     const sortablePnl = (position: BotPosition) => {
@@ -620,6 +660,7 @@ export default function BotTraderPanel() {
             </div>
             <label className="text-xs text-[var(--text-secondary)]">Sort <select aria-label="Sort positions" value={sortKey} onChange={(event) => changeSort(event.target.value as SortKey)} className="ml-1 min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-2 text-[var(--text-primary)]"><option value="openedAt">Opened</option><option value="pnl">P&amp;L</option><option value="roi">ROI</option></select></label>
             <button onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} className="min-h-11 rounded-lg border border-[var(--border-strong)] px-2 text-xs text-[var(--text-secondary)]" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>{sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
+            <a href={`/api/bot-trader/positions/export?method=${methodFilter}&mode=${modeFilter}&range=${range}`} className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-strong)] px-3 text-xs text-[var(--text-secondary)]">Export exact legs CSV</a>
           </div>
         </div>
 
@@ -686,12 +727,16 @@ export default function BotTraderPanel() {
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
                     <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div>{!relationshipVerified && <div className={`mt-1 text-[9px] font-bold uppercase ${relationshipHighSeverity ? 'text-[var(--status-negative)]' : 'text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'High risk · invalid relationship' : 'Legacy/unknown relationship'}</div>}</td>
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
-                    <td className="max-w-52 truncate px-2 py-2 text-[var(--text-secondary)]">{position.strategy || '—'}</td>
+                    <td className="max-w-52 px-2 py-2 text-[var(--text-secondary)]">
+                      {position.kalshiOutcomeLabel && position.pmOutcomeLabel
+                        ? <><div>Kalshi {position.kalshiOutcomeLabel} — {position.kalshiSide.toUpperCase()}</div><div>Polymarket {position.pmOutcomeLabel} — {position.pmSide.toUpperCase()}</div></>
+                        : <span className="text-[var(--status-warning)]">Held outcomes unresolved</span>}
+                    </td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market ROI'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
-                    <td className="px-2 py-2 text-center"><StatusBadge status={position.status} /></td>
+                    <td className="px-2 py-2 text-center"><StatusBadge position={position} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
                   isExpanded && <tr key={`detail-${position.id}`}>
@@ -701,6 +746,8 @@ export default function BotTraderPanel() {
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
                         <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
                         <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">PM held token</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmEntryTokenId || 'Unresolved'}</div></div>
+                        <div><span className="text-[var(--text-secondary)]">Held outcome identity</span><div className={position.outcomeIdentityStatus === 'verified' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{position.outcomeIdentityStatus === 'verified' ? `${position.kalshiOutcomeLabel} / ${position.pmOutcomeLabel}` : position.outcomeIdentityFailureReason || 'Immutable execution-time labels unavailable'}</div></div>
                         <div><span className="text-[var(--text-secondary)]">Buy Price</span><div>{entryCostAvailable && position.kalshiEntryGrossMicrocents != null && position.pmEntryGrossMicrocents != null
                           ? <>{position.kalshiSide.toUpperCase()} {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} K · {position.pmSide.toUpperCase()} {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} PM</>
                           : <span className="text-[var(--status-warning)]">Unavailable — authoritative fill evidence missing</span>}</div></div>
@@ -713,13 +760,13 @@ export default function BotTraderPanel() {
                       ) : (
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiOutcomeLabel ? `${position.kalshiOutcomeLabel} — ` : ''}{position.kalshiSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
                             {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmOutcomeLabel ? `${position.pmOutcomeLabel} — ` : ''}{position.pmSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                             {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
@@ -728,6 +775,20 @@ export default function BotTraderPanel() {
                           <div data-testid="entry-cost-reconciliation" className="text-[10px] text-[var(--text-secondary)] lg:col-span-2">Gross fills {formatExactMicrocents(position.kalshiEntryGrossMicrocents + position.pmEntryGrossMicrocents)} · {feeSplitAvailable ? <>Entry fees: Kalshi {formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} · Polymarket {formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)}.</> : <>Entry fees: {formatExactMicrocents(unallocatedEntryFeeCents * 1_000_000)} legacy aggregate; platform split unavailable.</>}{position.entryCostRoundingDeltaMicrocents ? ` Currency rounding delta: ${formatExactMicrocents(position.entryCostRoundingDeltaMicrocents)}.` : ' No currency rounding delta.'}{position.entryRecordSource ? ` Evidence: ${position.entryRecordSource}${position.entryRecordedAt ? ` at ${position.entryRecordedAt}` : ''}.` : ''}</div>
                         </div>
                       )}
+                      {position.settlementState && position.settlementState !== 'open' && <div className="mt-3 rounded border border-[var(--border-strong)] bg-[var(--surface-panel)] px-3 py-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[var(--text-primary)]">Settlement ledger</strong><span className="text-[var(--text-secondary)]">{position.dryRun ? 'Simulated paper settlement' : 'Authoritative live settlement'}</span></div>
+                        {position.settlementFailureReason && <div className="mt-2 font-semibold text-[var(--status-warning)]">{position.settlementFailureReason}</div>}
+                        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                          {(position.settlementLegs ?? []).map((leg) => <div key={leg.venue} data-testid={`${leg.venue}-settlement-leg`} className="rounded border border-[var(--border-subtle)] px-2 py-2">
+                            <div className="font-semibold capitalize text-[var(--text-primary)]">{leg.venue} {leg.side.toUpperCase()} · {leg.lifecycleState.replaceAll('_', ' ')}</div>
+                            <div className="break-all font-mono text-[9px] text-[var(--text-muted)]">{leg.marketId || 'missing market'}{leg.outcomeId ? ` · ${leg.outcomeId}` : ' · exact outcome missing'}</div>
+                            <div className="mt-1 text-[var(--text-secondary)]">{leg.filledQuantity == null ? 'Exposure unknown' : `${INTEGER.format(leg.filledQuantity)} filled`} · payout {leg.payoutEntitlementCents == null ? 'unavailable' : formatCents(leg.payoutEntitlementCents)} · fee {leg.settlementFeeCents == null ? 'unavailable' : formatCents(leg.settlementFeeCents)} · {leg.creditState.replaceAll('_', ' ')}</div>
+                            <div className="text-[10px] text-[var(--text-muted)]">{leg.resolutionSource || 'Resolution source unavailable'}{leg.resolutionDetectedAt ? ` · detected ${new Date(leg.resolutionDetectedAt).toLocaleString()}` : ''}{leg.cashAvailableAt ? ` · cash available ${new Date(leg.cashAvailableAt).toLocaleString()}` : ''}</div>
+                            {leg.failureReason && <div className="mt-1 text-[var(--status-warning)]">{leg.failureReason}</div>}
+                          </div>)}
+                        </div>
+                        <div className="mt-2 flex flex-wrap justify-between gap-2 border-t border-[var(--border-subtle)] pt-2"><span>Net settlement proceeds</span><strong>{position.settlementNetProceedsCents == null ? 'Pending reconciliation' : formatCents(position.settlementNetProceedsCents)}</strong></div>
+                      </div>}
                       <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2" aria-label="Persisted current price snapshots">
                         {(['kalshi', 'polymarket'] as const).map((platform) => {
                           const snapshot = position.currentPriceSnapshots?.[platform] ?? {
@@ -736,10 +797,11 @@ export default function BotTraderPanel() {
                           const platformLabel = platform === 'kalshi' ? 'Kalshi' : 'Polymarket';
                           const side = platform === 'kalshi' ? position.kalshiSide : position.pmSide;
                           return <div key={platform} data-testid={`${platform}-stored-current-price`} className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {platform === 'kalshi' ? (position.kalshiOutcomeLabel ? `${position.kalshiOutcomeLabel} — ` : '') : (position.pmOutcomeLabel ? `${position.pmOutcomeLabel} — ` : '')}{side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
                             <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
                             <div className="text-[10px] font-medium text-[var(--text-secondary)]">Indicative last-scanned mark; not executable liquidation proceeds{snapshot.markFailureReason ? ` · ${snapshot.markFailureReason}` : ''}{snapshot.failureReason ? ` · Separate close evidence: ${snapshot.failureReason}` : ''}</div>
+                            {snapshot.identity && <div className="mt-1 break-all font-mono text-[9px] text-[var(--text-muted)]">{snapshot.identity.marketId || 'missing market'} · {snapshot.identity.side.toUpperCase()}{snapshot.identity.tokenId ? ` · token ${snapshot.identity.tokenId}` : ''}</div>}
                           </div>;
                         })}
                       </div>

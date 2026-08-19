@@ -14,11 +14,13 @@ describe('authoritative settlement normalization', () => {
   });
 
   it('accepts only closed Polymarket metadata with exactly one explicit winner', () => {
-    expect(normalizePolymarketResolution({ closed: true, tokens: [
+    expect(normalizePolymarketResolution({ closed: true, active: false, tokens: [
       { outcome: 'Yes', winner: true }, { outcome: 'No', winner: false },
     ] })).toMatchObject({ verified: true, outcome: 'yes', yesPayoutCents: 100, noPayoutCents: 0 });
     for (const input of [
       { closed: false, tokens: [{ outcome: 'Yes', winner: true }, { outcome: 'No', winner: false }] },
+      { closed: true, tokens: [{ outcome: 'Yes', winner: true }, { outcome: 'No', winner: false }] },
+      { closed: true, active: true, tokens: [{ outcome: 'Yes', winner: true }, { outcome: 'No', winner: false }] },
       { closed: true, tokens: [{ outcome: 'Yes', winner: true }, { outcome: 'No' }] },
       { closed: true, tokens: [{ outcome: 'Yes', winner: true }, { outcome: 'No', winner: true }] },
       { closed: true, tokens: [{ outcome: 'Yes', winner: false }, { outcome: 'No', winner: false }] },

@@ -5,12 +5,18 @@
 // to the API/poller path.
 
 import { pollOpenBotPositions } from '../src/lib/bot-positions';
+import { runBotSettlementReconciler } from '../src/lib/bot-settlement-reconciler';
 
 const POLL_INTERVAL_MS = 2 * 60 * 1000;
 
 async function valuateOnce(): Promise<void> {
   const startedAt = new Date().toISOString();
   console.log(`[${startedAt}] Starting BotTrader position valuation cycle...`);
+  const settlement = await runBotSettlementReconciler(startedAt);
+  console.log(`[${new Date().toISOString()}] Settlement reconciliation — scanned:${settlement.scanned} persisted:${settlement.persisted} settled:${settlement.settled} unresolved:${settlement.unresolved} errors:${settlement.errors.length}`);
+  for (const error of settlement.errors) {
+    console.error(`[${new Date().toISOString()}] Position ${error.id} settlement unavailable: ${error.error}`);
+  }
   const result = await pollOpenBotPositions();
   console.log(`[${new Date().toISOString()}] Valuation complete — updated:${result.updated} settled:${result.settled} errors:${result.errors.length}`);
   for (const error of result.errors) {

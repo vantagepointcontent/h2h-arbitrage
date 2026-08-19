@@ -31,10 +31,42 @@ const selfAsserted: PropositionRelationship = {
 
 describe('canonical proposition registry', () => {
   it('does not trust well-formed candidate metadata that is absent from the server registry', () => {
-    expect(canonicalPropositionRelationshipCount()).toBe(0);
+    expect(canonicalPropositionRelationshipCount()).toBe(1);
     expect(resolveCanonicalPropositionRelationship(selfAsserted)).toBeNull();
     expect(findCanonicalPropositionRelationship({
       kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token', kalshiSide: 'yes', pmSide: 'no',
+    })).toBeNull();
+  });
+
+  it('resolves the independently verified F1 control identity by exact execution identifiers', () => {
+    const relationship = findCanonicalPropositionRelationship({
+      kalshiTicker: 'KXF1ACTION-2026-COL',
+      pmConditionId: '0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961',
+      pmTokenId: '38424385756462253442221613485727105608987714090195314133724025202573806948368',
+      kalshiSide: 'yes',
+      pmSide: 'no',
+    });
+    expect(relationship).toMatchObject({
+      verificationSource: 'authoritative_platform_metadata',
+      legs: {
+        kalshi: { selectedOutcome: 'Franco Colapinto wins', payoutState: 'Franco Colapinto wins' },
+        polymarket: { selectedOutcome: 'Franco Colapinto wins', payoutState: 'Franco Colapinto does not win' },
+      },
+    });
+  });
+
+  it('does not canonically bless the reported MO-03 or NY-21 rows without immutable outcome proof', () => {
+    expect(findCanonicalPropositionRelationship({
+      kalshiTicker: 'KXHOUSERACE-MO03-26-D',
+      pmConditionId: '0x9041a41d6d08dc9282a5e135b0e2504d7c4950883e772a5942f17b607e354ca4',
+      pmTokenId: '27237659461749395126949339507775498287619143517476509888079639110706576460737',
+      kalshiSide: 'yes', pmSide: 'yes',
+    })).toBeNull();
+    expect(findCanonicalPropositionRelationship({
+      kalshiTicker: 'KXHOUSERACE-NY21-26-R',
+      pmConditionId: '0x4f3d35bc886f93949cf06a73ffdd8d14210a1d06a136ebb506f5aa653514d970',
+      pmTokenId: '61536378782761462213691399252544797782501798493464719286188000407153618893171',
+      kalshiSide: 'yes', pmSide: 'no',
     })).toBeNull();
   });
 });

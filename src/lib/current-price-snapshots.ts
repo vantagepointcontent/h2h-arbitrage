@@ -321,6 +321,13 @@ export async function getPersistedCurrentPriceBatch(
       result.set(currentPriceSnapshotKey(request), unavailable('missing_identifier'));
       return false;
     }
+    // Polymarket parent + side is not an immutable held contract identity.
+    // A later scan may replace that side with another token under the same
+    // event, so valuation must always carry the execution-time token.
+    if (request.platform === 'polymarket' && !request.tokenId?.trim()) {
+      result.set(currentPriceSnapshotKey(request), unavailable('missing_identifier'));
+      return false;
+    }
     return true;
   });
 

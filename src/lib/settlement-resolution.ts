@@ -45,10 +45,12 @@ export function normalizeKalshiResolution(market: {
 
 export function normalizePolymarketResolution(market: {
   closed?: unknown;
+  active?: unknown;
   tokens?: unknown;
 }): SettlementResolution {
   const source = 'polymarket_clob_market' as const;
   if (market.closed !== true) return unverified(source, 'Polymarket market is not explicitly closed');
+  if (market.active !== false) return unverified(source, 'Polymarket market is not explicitly inactive');
   if (!Array.isArray(market.tokens)) return unverified(source, 'Polymarket outcome tokens are missing');
   const yesTokens = market.tokens.filter((token): token is { outcome: string; winner: boolean } =>
     typeof token === 'object' && token !== null && typeof (token as { outcome?: unknown }).outcome === 'string' && (token as { outcome: string }).outcome.toLowerCase() === 'yes');

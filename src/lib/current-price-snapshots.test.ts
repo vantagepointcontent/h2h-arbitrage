@@ -139,19 +139,21 @@ describe('persisted current-price snapshots', () => {
       { platform: 'kalshi', marketId: 'KX-EXACT', side: 'yes', tokenId: null },
       { platform: 'polymarket', marketId: '0xexact', side: 'no', tokenId: 'token-no' },
       { platform: 'polymarket', marketId: '0xexact', side: 'no', tokenId: 'token-yes' },
+      { platform: 'polymarket', marketId: '0xexact', side: 'no', tokenId: null },
       { platform: 'kalshi', marketId: 'never', side: 'yes', tokenId: null },
       { platform: 'kalshi', marketId: null, side: 'yes', tokenId: null },
     ] as const;
     const result = await snapshots.getPersistedCurrentPriceBatch([...requests], Date.parse('2026-08-14T12:16:00.000Z'));
 
-    expect(result.size).toBe(5);
+    expect(result.size).toBe(6);
     expect(result.get('kalshi|kx-exact|yes|')).toMatchObject({ status: 'stale', priceCents: 47, priceMicrocents: 47_000_000, executableDepthMicros: 2_000_000, source: 'saved-market-full-scan' });
     expect(result.get('polymarket|0xexact|no|token-no')).toMatchObject({ status: 'stale', priceCents: 55, priceMicrocents: 55_000_000, executableDepthMicros: 4_000_000 });
     expect(result.get('polymarket|0xexact|no|token-yes')).toMatchObject({ status: 'side_mismatch', priceCents: null });
+    expect(result.get('polymarket|0xexact|no|')).toMatchObject({ status: 'missing_identifier', priceCents: null });
     expect(result.get('kalshi|never|yes|')).toMatchObject({ status: 'never_saved', priceCents: null });
     expect(result.get('kalshi||yes|')).toMatchObject({ status: 'missing_identifier', priceCents: null });
     expect(snapshots.getCurrentPriceSnapshotMetrics()).toMatchObject({
-      readBatches: 1, writeBatches: 2, lastRequestedLegs: 6, lastUniqueLegs: 5,
+      readBatches: 1, writeBatches: 2, lastRequestedLegs: 7, lastUniqueLegs: 6,
     });
   });
 

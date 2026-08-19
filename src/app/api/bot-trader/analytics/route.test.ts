@@ -4,6 +4,7 @@ import { getBotPositionAnalytics, summarizeBotPerformance } from '@/lib/bot-posi
 import { NextRequest } from 'next/server';
 import { getMarketUrlsById } from '@/lib/persistence';
 import { getPersistedCurrentPriceBatch } from '@/lib/current-price-snapshots';
+import { enrichBotPositionsWithSettlementLedger } from '@/lib/bot-settlement-store';
 
 vi.mock('@/lib/bot-positions', () => ({ getBotPositionAnalytics: vi.fn(), summarizeBotPerformance: vi.fn() }));
 vi.mock('@/lib/persistence', () => ({ getMarketUrlsById: vi.fn() }));
@@ -12,12 +13,16 @@ vi.mock('@/lib/current-price-snapshots', () => ({
   currentPriceSnapshotKey: (request: { platform: string; marketId: string | null; side: string; tokenId: string | null }) =>
     `${request.platform}|${request.marketId?.toLowerCase() ?? ''}|${request.side}|${request.tokenId?.toLowerCase() ?? ''}`,
 }));
+vi.mock('@/lib/bot-settlement-store', () => ({
+  enrichBotPositionsWithSettlementLedger: vi.fn(async (positions: unknown[]) => positions),
+}));
 
 describe('GET /api/bot-trader/analytics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getMarketUrlsById).mockResolvedValue(null);
     vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map());
+    vi.mocked(enrichBotPositionsWithSettlementLedger).mockImplementation(async (positions) => positions as never);
     vi.mocked(summarizeBotPerformance).mockImplementation(() => ({
       capital: { currentCents: 99 }, pnl: { unrealizedCents: null },
     }) as never);
@@ -101,12 +106,38 @@ describe('GET /api/bot-trader/analytics', () => {
       { platform: 'polymarket', marketId: null, side: 'yes', tokenId: null },
     ]);
     expect(body.analytics.positions[0].currentPriceSnapshots).toEqual({
-      kalshi: expect.objectContaining({ status: 'available', priceCents: 47 }),
-      polymarket: expect.objectContaining({ status: 'stale', priceCents: 53 }),
+      kalshi: expect.objectContaining({ status: 'available', priceCents: 47, identity: { platform: 'kalshi', marketId: 'KX-1', side: 'yes', tokenId: null } }),
+      polymarket: expect.objectContaining({ status: 'stale', priceCents: 53, identity: { platform: 'polymarket', marketId: '0x1', side: 'no', tokenId: 'token-no' } }),
     });
     expect(body.analytics.positions[2].currentPriceSnapshots).toEqual({
       kalshi: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
       polymarket: expect.objectContaining({ status: 'missing_identifier', priceCents: null }),
+    });
+  });
+
+  it('never reconstructs an immutable held token from a later exit-fee token', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
+      id: 180, marketId: 'ny21', kalshiTicker: 'KX-NY21-R', kalshiSide: 'yes',
+      pmConditionId: '0xdemocratic-question', pmEntryTokenId: null,
+      pmExitTokenId: 'later-democratic-no-token', pmSide: 'no', status: 'open',
+      outcomeIdentityStatus: 'verified', kalshiOutcomeLabel: 'Republicans', pmOutcomeLabel: 'Republicans',
+      remainingSharesKalshi: 1, remainingSharesPm: 1, entryCostStatus: 'available', totalCostCents: 97,
+    }] } as never);
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/analytics'));
+    expect(response.status).toBe(200);
+    expect(getPersistedCurrentPriceBatch).toHaveBeenCalledWith(expect.arrayContaining([
+      { platform: 'polymarket', marketId: '0xdemocratic-question', side: 'no', tokenId: null },
+    ]));
+    expect(getPersistedCurrentPriceBatch).not.toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ tokenId: 'later-democratic-no-token' }),
+    ]));
+    const body = await response.json();
+    expect(body.analytics.positions[0]).toMatchObject({
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      valuationStatus: 'unavailable',
     });
   });
 
@@ -115,6 +146,7 @@ describe('GET /api/bot-trader/analytics', () => {
       positions: [{
         id: 9, marketId: 'm9', kalshiTicker: 'KX-9', kalshiSide: 'no',
         pmConditionId: '0x9', pmEntryTokenId: 'token-yes', pmExitTokenId: 'token-yes', pmSide: 'yes',
+        outcomeIdentityStatus: 'verified', kalshiOutcomeLabel: 'Outcome A', pmOutcomeLabel: 'Outcome B',
         remainingSharesKalshi: 1, remainingSharesPm: 1, remainingOpenCostCents: 95,
         status: 'open', entryCostStatus: 'unavailable', currentValueCents: null, unrealizedPnlCents: null,
       }],
@@ -152,11 +184,35 @@ describe('GET /api/bot-trader/analytics', () => {
     expect(body.analytics.performance).toEqual({ capital: { currentCents: 99 }, pnl: { unrealizedCents: null } });
   });
 
+  it('excludes a token-priced row when immutable human outcome identity is unresolved', async () => {
+    vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
+      id: 181, marketId: 'm181', kalshiTicker: 'KX-NY21-R', kalshiSide: 'yes',
+      pmConditionId: '0xdemocratic-question', pmEntryTokenId: 'democratic-no-token', pmSide: 'no',
+      outcomeIdentityStatus: 'unresolved', outcomeIdentityFailureReason: 'Execution-time selected outcome was not persisted',
+      remainingSharesKalshi: 1, remainingSharesPm: 1, status: 'open', entryCostStatus: 'available',
+      totalCostCents: 97, currentValueCents: null, unrealizedPnlCents: null,
+    }] } as never);
+    vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map([
+      ['kalshi|kx-ny21-r|yes|', { status: 'available', priceCents: 70, source: 'saved-market-full-scan', observedAt: '2026-08-19T12:00:00Z', ageMs: 0 }],
+      ['polymarket|0xdemocratic-question|no|democratic-no-token', { status: 'available', priceCents: 29, source: 'saved-market-full-scan', observedAt: '2026-08-19T12:00:00Z', ageMs: 0 }],
+    ]));
+
+    const body = await (await GET(new NextRequest('http://localhost/api/bot-trader/analytics'))).json();
+    expect(body.analytics.positions[0]).toMatchObject({
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      valuationStatus: 'unavailable',
+      valuationFailureReason: 'Execution-time selected outcome was not persisted',
+    });
+  });
+
   it('uses stale low-depth indicative snapshots and full stored precision for P&L and ROI', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({
       positions: [{
         id: 10, marketId: 'm10', kalshiTicker: 'KX-10', kalshiSide: 'yes',
         pmConditionId: '0x10', pmEntryTokenId: 'token-no', pmSide: 'no',
+        outcomeIdentityStatus: 'verified', kalshiOutcomeLabel: 'Outcome A', pmOutcomeLabel: 'Outcome B',
         remainingSharesKalshi: 1, remainingSharesPm: 1, remainingOpenCostCents: 97,
         totalCostCents: 97, totalCostMicrousd: 970_000,
         status: 'open', entryCostStatus: 'available', currentValueCents: null,

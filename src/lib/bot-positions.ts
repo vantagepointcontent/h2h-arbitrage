@@ -15,7 +15,8 @@ import {
   type PropositionRelationship,
   type PropositionRelationshipState,
 } from './proposition-identity';
-import { historicalPropositionAudit } from './bot-proposition-audit';
+import { historicalAuditLegMetadata, historicalPropositionAudit } from './bot-proposition-audit';
+import type { ReconciledSettlementLeg, SettlementPositionState } from './bot-settlement';
 import {
   findCanonicalPropositionRelationship,
   resolveCanonicalPropositionRelationship,
@@ -105,6 +106,14 @@ export interface BotPosition {
   kalshiTicker: string | null;
   pmConditionId: string | null;
   strategy: string | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  outcomeIdentityStatus?: 'verified' | 'unresolved';
+  outcomeIdentitySource?: string | null;
+  outcomeIdentityRecordedAt?: string | null;
+  outcomeIdentityFailureReason?: string | null;
   propositionRelationship?: PropositionRelationship | null;
   propositionRelationshipState?: PropositionRelationshipState;
   propositionRelationshipWarning?: string | null;
@@ -224,6 +233,14 @@ export interface BotPosition {
   resolutionOutcome?: BotPositionSide | null;
   resolutionPayoutCents?: number | null;
   resolutionValidationStatus?: 'pending' | 'verified' | 'invalid';
+  settlementState?: SettlementPositionState;
+  settlementLegs?: ReconciledSettlementLeg[];
+  settlementGrossProceedsCents?: number | null;
+  settlementNetProceedsCents?: number | null;
+  settlementFailureReason?: string | null;
+  settlementCashAvailableAt?: string | null;
+  settlementReconciledAt?: string | null;
+  realizedRoiBps?: number | null;
 }
 
 export type CreateBotPosition = Omit<BotPosition,
@@ -243,7 +260,9 @@ export type CreateBotPosition = Omit<BotPosition,
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
   'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' |
   'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt' |
-  'propositionRelationship' | 'propositionRelationshipState' | 'propositionRelationshipWarning'
+  'propositionRelationship' | 'propositionRelationshipState' | 'propositionRelationshipWarning' |
+  'kalshiMarketQuestion' | 'pmMarketQuestion' | 'kalshiOutcomeLabel' | 'pmOutcomeLabel' |
+  'outcomeIdentityStatus' | 'outcomeIdentitySource' | 'outcomeIdentityRecordedAt' | 'outcomeIdentityFailureReason'
 > & {
   expectedRoiBps?: number | null;
   expectedApyBps?: number | null;
@@ -253,6 +272,14 @@ export type CreateBotPosition = Omit<BotPosition,
   propositionRelationship?: PropositionRelationship | null;
   propositionRelationshipState?: PropositionRelationshipState;
   propositionRelationshipWarning?: string | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  outcomeIdentityStatus?: 'verified' | 'unresolved';
+  outcomeIdentitySource?: string | null;
+  outcomeIdentityRecordedAt?: string | null;
+  outcomeIdentityFailureReason?: string | null;
 };
 
 export interface ExecutableBidLevel {
@@ -290,7 +317,8 @@ function parseExecutableBidLevels(levels: unknown, label: string, tupleLevels = 
   return parsed.sort((a, b) => b.priceCents - a.priceCents);
 }
 
-export type BotExecutionStatus = 'open' | 'partially_closed' | 'closed' | 'settled';
+export type BotExecutionStatus = 'open' | 'partially_closed' | 'partially_settled'
+  | 'settlement_pending' | 'settlement_unresolved' | 'closed' | 'settled';
 
 export interface BotExecutionLeg {
   venue: 'kalshi' | 'polymarket';
@@ -342,7 +370,7 @@ export interface BotPositionMarket {
   valuedLiveStakeCents: number;
   realizedPnlCents: number;
   totalPnlCents: number;
-  status: 'open' | 'closed' | 'settled';
+  status: 'open' | 'closed' | 'settlement_pending' | 'settlement_unresolved' | 'settled';
   latestExecutionAt: string;
   latestOpenedAt: string;
   executions: BotExecution[];
@@ -1034,12 +1062,27 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     pmSide: String(row.pm_side),
   });
   const storedRelationship = parsePropositionRelationship(row.proposition_relationship_json);
+  const canonicalEntryRelationship = findCanonicalPropositionRelationship({
+    kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
+    pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
+    pmTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
+    kalshiSide: String(row.kalshi_side) as BotPositionSide,
+    pmSide: String(row.pm_side) as BotPositionSide,
+  });
+  const normalizedIdentity = (value: unknown) => typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const canonicalLabelsMatch = canonicalEntryRelationship != null
+    && normalizedIdentity(row.kalshi_market_question) === normalizedIdentity(canonicalEntryRelationship.legs.kalshi.marketQuestion)
+    && normalizedIdentity(row.pm_market_question) === normalizedIdentity(canonicalEntryRelationship.legs.polymarket.marketQuestion)
+    && normalizedIdentity(row.kalshi_outcome_label) === normalizedIdentity(canonicalEntryRelationship.legs.kalshi.payoutState)
+    && normalizedIdentity(row.pm_outcome_label) === normalizedIdentity(canonicalEntryRelationship.legs.polymarket.payoutState);
+  const outcomeIdentityVerified = row.outcome_identity_status === 'verified' && canonicalLabelsMatch;
   const storedRelationshipInvalid = typeof row.proposition_relationship_json === 'string'
     && row.proposition_relationship_json.length > 0
-    && storedRelationship == null;
+    && resolveCanonicalPropositionRelationship(storedRelationship) == null;
   const storedVerifiedWithoutRelationship = row.proposition_relationship_state === 'verified_complementary'
-    && storedRelationship == null;
-  const auditedInvalid = storedRelationship == null && historicalAudit?.classification === 'confirmed_invalid';
+    && !outcomeIdentityVerified;
+  const auditedInvalid = !outcomeIdentityVerified && historicalAudit?.classification === 'confirmed_invalid';
+  const auditedLegMetadata = historicalAuditLegMetadata(historicalAudit);
   const kalshiEntryFills = parseEntryFills(row.kalshi_entry_fills_json);
   const pmEntryFills = parseEntryFills(row.pm_entry_fills_json);
   const entryCostAvailable = row.entry_cost_status === 'available'
@@ -1063,15 +1106,35 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
     pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
     strategy: row.strategy != null ? String(row.strategy) : null,
-    propositionRelationship: storedRelationship,
-    propositionRelationshipState: (auditedInvalid
+    kalshiMarketQuestion: outcomeIdentityVerified
+      ? canonicalEntryRelationship!.legs.kalshi.marketQuestion : auditedLegMetadata?.kalshiMarketQuestion ?? null,
+    pmMarketQuestion: outcomeIdentityVerified
+      ? canonicalEntryRelationship!.legs.polymarket.marketQuestion : auditedLegMetadata?.pmMarketQuestion ?? null,
+    kalshiOutcomeLabel: outcomeIdentityVerified
+      ? canonicalEntryRelationship!.legs.kalshi.payoutState : auditedLegMetadata?.kalshiOutcomeLabel ?? null,
+    pmOutcomeLabel: outcomeIdentityVerified
+      ? canonicalEntryRelationship!.legs.polymarket.payoutState : auditedLegMetadata?.pmOutcomeLabel ?? null,
+    outcomeIdentityStatus: outcomeIdentityVerified ? 'verified' : 'unresolved',
+    outcomeIdentitySource: row.outcome_identity_source != null ? String(row.outcome_identity_source) : null,
+    outcomeIdentityRecordedAt: row.outcome_identity_recorded_at != null ? String(row.outcome_identity_recorded_at) : null,
+    outcomeIdentityFailureReason: outcomeIdentityVerified
+      ? null
+      : row.outcome_identity_failure_reason != null
+        ? String(row.outcome_identity_failure_reason)
+        : 'Persisted held outcome identity is not bound to a server-owned canonical exact-leg relationship',
+    propositionRelationship: outcomeIdentityVerified ? canonicalEntryRelationship : null,
+    propositionRelationshipState: (outcomeIdentityVerified
+      ? 'verified_complementary'
+      : auditedInvalid
       ? 'same_direction_invalid'
       : storedRelationshipInvalid || storedVerifiedWithoutRelationship
       ? 'invalid_metadata'
       : row.proposition_relationship_state != null
       ? String(row.proposition_relationship_state)
       : 'unknown') as PropositionRelationshipState,
-    propositionRelationshipWarning: auditedInvalid
+    propositionRelationshipWarning: outcomeIdentityVerified
+      ? null
+      : auditedInvalid
       ? historicalAudit.reason
       : storedRelationshipInvalid || storedVerifiedWithoutRelationship
       ? 'Persisted canonical proposition metadata is malformed or no longer validates'
@@ -1214,6 +1277,10 @@ function allocatedEntryPrincipalCents(position: Pick<BotPosition,
 }
 
 function executionStatus(position: BotPosition): BotExecutionStatus {
+  if (position.settlementState === 'settled') return 'settled';
+  if (position.settlementState === 'settlement_unresolved') return 'settlement_unresolved';
+  if (position.settlementState === 'settlement_pending') return 'settlement_pending';
+  if (position.settlementState === 'partially_settled') return 'partially_settled';
   if (position.status === 'settled') return 'settled';
   if (position.remainingSharesKalshi === 0 && position.remainingSharesPm === 0) return 'closed';
   if (position.remainingSharesKalshi < position.sharesKalshi || position.remainingSharesPm < position.sharesPm) {
@@ -1300,8 +1367,8 @@ function toExecution(position: BotPosition): BotExecution {
     executionPrincipalCents: position.totalCostCents - position.feesCents,
     executionFeesCents: position.feesCents,
     executionBuyCostCents: position.totalCostCents,
-    currentValueCents: status === 'closed' || status === 'settled' ? 0 : position.currentValueCents,
-    unrealizedPnlCents: status === 'closed' || status === 'settled' ? 0 : position.unrealizedPnlCents,
+    currentValueCents: status === 'closed' || status === 'settled' ? null : position.currentValueCents,
+    unrealizedPnlCents: status === 'closed' || status === 'settled' ? null : position.unrealizedPnlCents,
     legs,
   };
 }
@@ -1317,17 +1384,22 @@ function groupPositions(rows: BotPosition[]): BotPositionMarket[] {
     const executions = positions.map(toExecution);
     const latest = positions[0];
     const currentLiveStakeCents = executions.reduce((sum, item) => sum + item.remainingOpenCostCents, 0);
-    const valued = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed') && item.currentValueCents != null && item.unrealizedPnlCents != null);
-    const unavailableExecutionCount = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed') && item.currentValueCents == null).length;
+    const valued = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed' || item.status === 'partially_settled') && item.currentValueCents != null && item.unrealizedPnlCents != null);
+    const unavailableExecutionCount = executions.filter((item) => (item.status === 'open' || item.status === 'partially_closed' || item.status === 'partially_settled') && item.currentValueCents == null).length;
     const stale = valued.filter((item) => item.valuationStatus === 'stale');
     const oldestStaleValuationAt = stale.reduce<string | null>((oldest, item) =>
       item.lastValuationAt != null && (oldest == null || item.lastValuationAt < oldest) ? item.lastValuationAt : oldest, null);
     const valuedLiveStakeCents = valued.reduce((sum, item) => sum + item.remainingOpenCostCents, 0);
     const currentValueCents = valued.length ? valued.reduce((sum, item) => sum + (item.currentValueCents as number), 0) : null;
     const realizedPnlCents = executions.reduce((sum, item) => sum + (item.realizedPnlCents ?? 0), 0);
-    const anyOpen = executions.some((item) => item.status === 'open' || item.status === 'partially_closed');
+    const anyOpen = executions.some((item) => item.status === 'open' || item.status === 'partially_closed' || item.status === 'partially_settled');
     const allSettled = executions.every((item) => item.status === 'settled');
-    const status: BotPositionMarket['status'] = anyOpen ? 'open' : (allSettled ? 'settled' : 'closed');
+    const anyUnresolved = executions.some((item) => item.status === 'settlement_unresolved');
+    const anyPending = executions.some((item) => item.status === 'settlement_pending');
+    const status: BotPositionMarket['status'] = anyOpen ? 'open'
+      : anyUnresolved ? 'settlement_unresolved'
+        : anyPending ? 'settlement_pending'
+          : allSettled ? 'settled' : 'closed';
     const unrealizedPnlCents = valued.length
       ? valued.reduce((sum, item) => sum + (item.unrealizedPnlCents as number), 0)
       : null;
@@ -1359,9 +1431,11 @@ function groupPositions(rows: BotPosition[]): BotPositionMarket[] {
 
 export class BotPositionStore {
   private readonly client: Client;
+  private readonly dbUrl: string;
   private schemaReady: Promise<void> | null = null;
 
   constructor(dbUrl = `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}`) {
+    this.dbUrl = dbUrl;
     this.client = createClient({ url: dbUrl });
   }
 
@@ -1386,6 +1460,14 @@ export class BotPositionStore {
         proposition_relationship_json TEXT,
         proposition_relationship_state TEXT NOT NULL DEFAULT 'unknown',
         proposition_relationship_warning TEXT,
+        kalshi_market_question TEXT,
+        pm_market_question TEXT,
+        kalshi_outcome_label TEXT,
+        pm_outcome_label TEXT,
+        outcome_identity_status TEXT NOT NULL DEFAULT 'unresolved',
+        outcome_identity_source TEXT,
+        outcome_identity_recorded_at TEXT,
+        outcome_identity_failure_reason TEXT,
         kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
         pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
         buy_price_kalshi INTEGER NOT NULL,
@@ -1513,6 +1595,14 @@ export class BotPositionStore {
       proposition_relationship_json: 'TEXT',
       proposition_relationship_state: "TEXT NOT NULL DEFAULT 'unknown'",
       proposition_relationship_warning: 'TEXT',
+      kalshi_market_question: 'TEXT',
+      pm_market_question: 'TEXT',
+      kalshi_outcome_label: 'TEXT',
+      pm_outcome_label: 'TEXT',
+      outcome_identity_status: "TEXT NOT NULL DEFAULT 'unresolved'",
+      outcome_identity_source: 'TEXT',
+      outcome_identity_recorded_at: 'TEXT',
+      outcome_identity_failure_reason: 'TEXT',
       kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
       pm_side: "TEXT NOT NULL DEFAULT 'no'",
       buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
@@ -1635,6 +1725,12 @@ export class BotPositionStore {
       UPDATE bot_positions SET entry_cost_failure_reason =
         COALESCE(entry_cost_failure_reason, 'Legacy position lacks authoritative entry fill and fee data')
       WHERE entry_cost_status = 'unavailable'
+    `);
+    await this.client.execute(`
+      UPDATE bot_positions SET outcome_identity_failure_reason =
+        COALESCE(outcome_identity_failure_reason,
+          'Legacy position lacks immutable execution-time held outcome labels and canonical proposition proof')
+      WHERE outcome_identity_status != 'verified'
     `);
     // Existing positions predate the denormalized execution-mode identity.
     // Backfill from the authoritative execution record; orphaned legacy rows
@@ -1780,6 +1876,21 @@ export class BotPositionStore {
         throw new Error('Bot position relationship is not canonically bound to the exact selected contracts');
       }
     }
+    if (input.outcomeIdentityStatus === 'verified') {
+      if (!canonicalRelationship
+        || input.kalshiMarketQuestion !== canonicalRelationship.legs.kalshi.marketQuestion
+        || input.pmMarketQuestion !== canonicalRelationship.legs.polymarket.marketQuestion
+        || input.kalshiOutcomeLabel !== canonicalRelationship.legs.kalshi.payoutState
+        || input.pmOutcomeLabel !== canonicalRelationship.legs.polymarket.payoutState
+        || input.outcomeIdentitySource !== 'canonical_proposition_relationship_v1'
+        || input.outcomeIdentityRecordedAt !== canonicalRelationship.verifiedAt
+        || input.outcomeIdentityFailureReason != null) {
+        throw new Error('Verified held outcome identity is not canonically bound to the exact selected contracts');
+      }
+    } else if ((input.outcomeIdentityStatus ?? 'unresolved') !== 'unresolved'
+      || input.kalshiOutcomeLabel != null || input.pmOutcomeLabel != null) {
+      throw new Error('Unverified held outcome identity must remain unresolved without outcome labels');
+    }
     if (await this.hasOpenPair(input.kalshiTicker, input.pmConditionId, input.executionMode)) {
       throw new Error('An open bot position already exists for this market pair');
     }
@@ -1889,6 +2000,19 @@ export class BotPositionStore {
           ],
         });
       }
+      await transaction.execute({
+        sql: `UPDATE bot_positions SET
+          kalshi_market_question = ?, pm_market_question = ?, kalshi_outcome_label = ?, pm_outcome_label = ?,
+          outcome_identity_status = ?, outcome_identity_source = ?, outcome_identity_recorded_at = ?,
+          outcome_identity_failure_reason = ? WHERE id = ?`,
+        args: [
+          input.kalshiMarketQuestion ?? null, input.pmMarketQuestion ?? null,
+          input.kalshiOutcomeLabel ?? null, input.pmOutcomeLabel ?? null,
+          input.outcomeIdentityStatus ?? 'unresolved', input.outcomeIdentitySource ?? null,
+          input.outcomeIdentityRecordedAt ?? null, input.outcomeIdentityFailureReason ?? null,
+          insertedId,
+        ],
+      });
       await transaction.commit();
     } catch (error) {
       await transaction.rollback().catch(() => undefined);
@@ -2111,10 +2235,16 @@ export class BotPositionStore {
       LEFT JOIN executions e ON e.id = bp.execution_id
       ORDER BY bp.opened_at DESC, bp.execution_id DESC, bp.id DESC
     `);
-    const groups = groupPositions(result.rows.map((row) => rowToPosition(row as Record<string, unknown>)));
+    const baseRows = result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
+    const { BotSettlementStore, applySettlementProjection } = await import('./bot-settlement-store');
+    const settlementStore = new BotSettlementStore(this.dbUrl);
+    const settlements = await settlementStore.getByPositionIds(baseRows.map((row) => row.id));
+    settlementStore.close();
+    const groups = groupPositions(baseRows.map((row) => applySettlementProjection(row, settlements.get(row.id))));
     const status = options.status ?? 'all';
     let filtered = status === 'all' ? groups : groups.filter((group) =>
-      status === 'open' ? group.currentLiveStakeCents > 0 : group.status === 'settled');
+      status === 'open' ? group.status === 'open'
+        : group.status === 'settled' || group.status === 'settlement_pending' || group.status === 'settlement_unresolved');
     if (options.cursor) {
       let cursor: { latestExecutionAt: string; marketKey: string };
       try {
@@ -2343,6 +2473,14 @@ export interface BotPositionInput {
   pmConditionId: string | null;
   strategy: string;
   propositionRelationship?: PropositionRelationship | null;
+  kalshiMarketQuestion?: string | null;
+  pmMarketQuestion?: string | null;
+  kalshiOutcomeLabel?: string | null;
+  pmOutcomeLabel?: string | null;
+  outcomeIdentityStatus?: 'verified' | 'unresolved';
+  outcomeIdentitySource?: string | null;
+  outcomeIdentityRecordedAt?: string | null;
+  outcomeIdentityFailureReason?: string | null;
   kalshiSide: BotPositionSide;
   pmSide: BotPositionSide;
   kalshiPrice: number;
@@ -2686,6 +2824,14 @@ export async function recordBotPosition(
     propositionRelationship: canonicalRelationship,
     propositionRelationshipState: 'verified_complementary',
     propositionRelationshipWarning: null,
+    kalshiMarketQuestion: canonicalRelationship.legs.kalshi.marketQuestion,
+    pmMarketQuestion: canonicalRelationship.legs.polymarket.marketQuestion,
+    kalshiOutcomeLabel: canonicalRelationship.legs.kalshi.payoutState,
+    pmOutcomeLabel: canonicalRelationship.legs.polymarket.payoutState,
+    outcomeIdentityStatus: 'verified',
+    outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+    outcomeIdentityRecordedAt: canonicalRelationship.verifiedAt,
+    outcomeIdentityFailureReason: null,
     kalshiSide: input.kalshiSide,
     pmSide: input.pmSide,
     buyPriceKalshiCents,
@@ -2819,7 +2965,20 @@ function botPositionMark(position: BotPosition, nowMs: number): 'fresh' | 'stale
 }
 
 function isTerminalPosition(position: BotPosition): boolean {
-  return position.status === 'settled' || position.status === 'closed';
+  return position.settlementState === 'settled'
+    || position.status === 'settled' || position.status === 'closed';
+}
+
+function isOpenPosition(position: BotPosition): boolean {
+  return position.status === 'open'
+    && (position.settlementState == null
+      || position.settlementState === 'open'
+      || position.settlementState === 'partially_settled');
+}
+
+function isPendingSettlementPosition(position: BotPosition): boolean {
+  return position.settlementState === 'settlement_pending'
+    || position.settlementState === 'settlement_unresolved';
 }
 
 function hasVerifiedTerminalAccounting(position: BotPosition): boolean {
@@ -2866,9 +3025,11 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   const exactUnrealizedMicrocents = (position: BotPosition) => position.indicativePnlMicrocents
     ?? (position.currentValueCents! - analyticsBuyCostCents(position)) * 1_000_000;
   const nowMs = now.getTime();
-  const open = rows.filter((position) => position.status === 'open');
+  const open = rows.filter(isOpenPosition);
   const verifiedSettled = rows.filter(hasVerifiedTerminalAccounting);
-  const unverifiedSettled = rows.filter((position) => isTerminalPosition(position) && !hasVerifiedTerminalAccounting(position));
+  const unverifiedSettled = rows.filter((position) =>
+    (isTerminalPosition(position) || isPendingSettlementPosition(position))
+    && !hasVerifiedTerminalAccounting(position));
   const mark = (position: BotPosition) => botPositionMark(position, nowMs);
   const freshOpen = open.filter((position) => mark(position) === 'fresh');
   const markedOpen = open.filter((position) => mark(position) !== 'unavailable');
@@ -2909,7 +3070,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       ? null
       : point.deployedCents + analyticsBuyCostCents(position);
     point.trades += 1;
-    if (position.status === 'open') {
+    if (isOpenPosition(position)) {
       if (position.indicativePnlMicrocents == null) {
         point.realizedCents += position.realizedPnlCents ?? 0;
       }
@@ -3038,12 +3199,14 @@ export async function getBotPositionAnalytics(options: {
   const mode = options.mode ?? 'all';
   const range = options.range ?? '30d';
   const now = new Date();
-  const modePositions = await store().listAllForAnalytics({ mode });
+  const baseModePositions = await store().listAllForAnalytics({ mode });
+  const { enrichBotPositionsWithSettlementLedger } = await import('./bot-settlement-store');
+  const modePositions = await enrichBotPositionsWithSettlementLedger(baseModePositions);
   const allPositions = filterBotAnalyticsPositions(modePositions, { method: 'all', range }, now);
   const positions = filterBotAnalyticsPositions(modePositions, { method, range }, now);
   const paper = positions.filter((position) => position.dryRun).length;
   const production = positions.length - paper;
-  const open = positions.filter((position) => position.status === 'open');
+  const open = positions.filter(isOpenPosition);
   const settled = positions.filter(hasVerifiedTerminalAccounting);
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
   const score = (position: BotPosition) => position.status === 'open'
@@ -3126,6 +3289,8 @@ export async function pollOpenBotPositions(dependencies?: {
     noBids?: ExecutableBidLevel[];
     resolved: boolean;
     observedAt?: string;
+    yesTokenId?: string | null;
+    noTokenId?: string | null;
   } | null>;
   fetchFeeConfig?: typeof fetchAuthoritativeBotFeeConfig;
   observedAt?: string;
@@ -3186,6 +3351,8 @@ export async function pollOpenBotPositions(dependencies?: {
         noBids: heldSide === 'no' ? bids : undefined,
         resolved: false,
         observedAt: new Date().toISOString(),
+        yesTokenId: heldSide === 'yes' ? conditionId : null,
+        noTokenId: heldSide === 'no' ? conditionId : null,
       };
     }
     const market = await fetchClobMarket(conditionId);
@@ -3205,6 +3372,8 @@ export async function pollOpenBotPositions(dependencies?: {
     if (resolutionPrices.resolved) {
       return {
         ...resolutionPrices,
+        yesTokenId: yesToken.token_id,
+        noTokenId: noToken.token_id,
         yesBids: resolutionPrices.yesBidCents != null
           ? [{ priceCents: resolutionPrices.yesBidCents, size: Number.MAX_SAFE_INTEGER }]
           : undefined,
@@ -3233,6 +3402,8 @@ export async function pollOpenBotPositions(dependencies?: {
       ...prices,
       yesBids: parseExecutableBidLevels(yesBook.bids, 'Polymarket YES bid'),
       noBids: parseExecutableBidLevels(noBook.bids, 'Polymarket NO bid'),
+      yesTokenId: yesToken.token_id,
+      noTokenId: noToken.token_id,
       // This is a freshly fetched executable book. The venue timestamps above
       // are validated as provenance, but fetch completion governs freshness.
       observedAt: new Date().toISOString(),
@@ -3264,6 +3435,11 @@ export async function pollOpenBotPositions(dependencies?: {
       const pmBids = pmResult.value;
       if (!kalshi) throw new Error('Kalshi market lookup returned no market');
       if (!pmBids) throw new Error('Polymarket market lookup returned no market');
+      const heldPmTokenId = position.pmSide === 'yes' ? pmBids.yesTokenId : pmBids.noTokenId;
+      if (!position.pmEntryTokenId?.trim() || !heldPmTokenId?.trim()
+        || position.pmEntryTokenId.trim().toLowerCase() !== heldPmTokenId.trim().toLowerCase()) {
+        throw new Error('Polymarket executable valuation is not bound to the immutable entry token');
+      }
       const parseCents = (value: string | undefined): number | null => {
         if (value == null || !/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)) return null;
         const cents = Math.round(Number(value) * 100);
@@ -3310,8 +3486,7 @@ export async function pollOpenBotPositions(dependencies?: {
         const feeInput = {
           kalshiTicker: position.kalshiTicker,
           pmConditionId: position.pmConditionId,
-          pmTokenId: position.pmEntryTokenId ?? position.pmExitTokenId
-            ?? (/^\d+$/.test(position.pmConditionId) ? position.pmConditionId : undefined),
+          pmTokenId: position.pmEntryTokenId,
           pmSide: position.pmSide,
           category: position.category ?? undefined,
         };

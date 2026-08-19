@@ -48,6 +48,7 @@ describe('extractClobBidPrices', () => {
     expect(extractClobBidPrices({
       ...market,
       closed: true,
+      active: false,
       tokens: [
         { token_id: 'yes-token', outcome: 'Yes', winner: false },
         { token_id: 'no-token', outcome: 'No', winner: true },

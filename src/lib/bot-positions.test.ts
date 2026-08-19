@@ -29,6 +29,14 @@ function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
     kalshiTicker: 'KXTEST',
     pmConditionId: '0xabc',
     strategy: 'Buy YES Kalshi + NO PM',
+    kalshiMarketQuestion: null,
+    pmMarketQuestion: null,
+    kalshiOutcomeLabel: null,
+    pmOutcomeLabel: null,
+    outcomeIdentityStatus: 'unresolved',
+    outcomeIdentitySource: 'test_exact_identity_audit_v1',
+    outcomeIdentityRecordedAt: '2026-08-08T12:00:00.000Z',
+    outcomeIdentityFailureReason: 'Canonical relationship unavailable',
     kalshiSide: 'yes',
     pmSide: 'no',
     buyPriceKalshiCents: 45,
@@ -1013,6 +1021,14 @@ describe('BotPositionStore', () => {
       kalshiTicker: 'KXTEST',
       pmConditionId: '0xabc',
       strategy: 'Buy YES Kalshi + NO PM',
+      kalshiMarketQuestion: null,
+      pmMarketQuestion: null,
+      kalshiOutcomeLabel: null,
+      pmOutcomeLabel: null,
+      outcomeIdentityStatus: 'unresolved',
+      outcomeIdentitySource: 'test_exact_identity_audit_v1',
+      outcomeIdentityRecordedAt: '2026-08-08T12:00:00.000Z',
+      outcomeIdentityFailureReason: 'Canonical relationship unavailable',
       kalshiSide: 'yes',
       pmSide: 'no',
       buyPriceKalshiCents: 45,
@@ -1076,6 +1092,14 @@ describe('BotPositionStore', () => {
     expect(created.kalshiEntryFeeMultiplierPpm).toBe(1_000_000);
     expect(created.pmEntryFeeRateBps).toBe(400);
     expect(created.pmEntryTokenId).toBe('pm-no-token');
+    expect(created).toMatchObject({
+      kalshiMarketQuestion: null,
+      pmMarketQuestion: null,
+      kalshiOutcomeLabel: null,
+      pmOutcomeLabel: null,
+      outcomeIdentityStatus: 'unresolved',
+      outcomeIdentitySource: 'test_exact_identity_audit_v1',
+    });
     expect(created.pmEntryFeesEnabled).toBe(true);
     expect(created.pmEntryFeeSchedule).toEqual({ rate: 0.04, exponent: 1, takerOnly: true, rebateRate: 0.25 });
     expect(created.pmEntryOrderBaseFeeBps).toBe(1000);
@@ -1092,6 +1116,13 @@ describe('BotPositionStore', () => {
     });
     await expect(store.create({ ...created, id: undefined, feesCents: 29 } as never))
       .rejects.toThrow(/entry economics conflict/i);
+    await expect(store.create({
+      ...created, id: undefined, executionId: 8, executionMode: 'live',
+      kalshiTicker: 'KX-FORGED', pmConditionId: '0xforged',
+      kalshiOutcomeLabel: 'Republicans', pmOutcomeLabel: 'Republicans',
+      outcomeIdentityStatus: 'verified', outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+      outcomeIdentityFailureReason: null,
+    } as never)).rejects.toThrow(/not canonically bound/i);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'paper')).resolves.toBe(true);
     await expect(store.hasOpenPair('KXTEST', '0xabc', 'live')).resolves.toBe(false);
     await expect(store.create({ ...created, id: undefined } as never)).rejects.toThrow(/open bot position/i);
@@ -1180,6 +1211,8 @@ describe('BotPositionStore', () => {
       'pm_exit_fee_rebate_rate_ppm', 'pm_exit_order_base_fee_bps',
       'pm_exit_order_fee_source', 'pm_exit_order_fee_version',
       'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
+      'kalshi_market_question', 'pm_market_question', 'kalshi_outcome_label', 'pm_outcome_label',
+      'outcome_identity_status', 'outcome_identity_source', 'outcome_identity_recorded_at', 'outcome_identity_failure_reason',
     ]));
   });
 
@@ -1223,6 +1256,39 @@ describe('BotPositionStore', () => {
       observedAt: '2026-08-08T12:00:00.000Z',
       expiryDate: null,
     })).toThrow(/authoritative entry fill and fee data/i);
+    store.close();
+  });
+
+  it('does not trust a raw verified identity when exact identifiers are absent from the canonical registry', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-forged-identity-'));
+    dirs.push(dir);
+    const dbUrl = `file:${path.join(dir, 'test.db')}`;
+    const client = createClient({ url: dbUrl });
+    await client.execute('CREATE TABLE executions (id INTEGER PRIMARY KEY, dry_run INTEGER NOT NULL)');
+    await client.execute('INSERT INTO executions (id, dry_run) VALUES (7, 1)');
+    await client.execute(`CREATE TABLE bot_positions (
+      id INTEGER PRIMARY KEY, execution_id INTEGER, status TEXT, opened_at TEXT,
+      kalshi_ticker TEXT, pm_condition_id TEXT, pm_entry_token_id TEXT,
+      kalshi_side TEXT, pm_side TEXT, kalshi_market_question TEXT, pm_market_question TEXT,
+      kalshi_outcome_label TEXT, pm_outcome_label TEXT, outcome_identity_status TEXT,
+      proposition_relationship_state TEXT, proposition_relationship_json TEXT
+    )`);
+    await client.execute(`INSERT INTO bot_positions VALUES (
+      1, 7, 'open', '2026-08-19T00:00:00Z', 'KX-FORGED', '0xforged', 'unrelated-token',
+      'yes', 'no', 'Forged K question', 'Forged PM question', 'Republicans', 'Republicans',
+      'verified', 'verified_complementary', NULL
+    )`);
+    client.close();
+
+    const store = new BotPositionStore(dbUrl);
+    const [mapped] = await store.list({ status: 'all' });
+    expect(mapped).toMatchObject({
+      outcomeIdentityStatus: 'unresolved',
+      kalshiOutcomeLabel: null,
+      pmOutcomeLabel: null,
+      propositionRelationship: null,
+      propositionRelationshipState: 'invalid_metadata',
+    });
     store.close();
   });
 
@@ -1866,7 +1932,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         return { yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' };
       },
       fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
-      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:00.000Z' }),
       fetchFeeConfig: async () => ({
         kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
         polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'), pmTheta: 0.04,
@@ -1874,6 +1940,29 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
     });
     expect(peak).toBeLessThanOrEqual(8);
     expect(result).toEqual({ updated: 60, settled: 0, errors: [] });
+  });
+
+  it('rejects an opposite current token even when parent market and side still match', async () => {
+    const clearOpenValuation = vi.fn(async () => undefined);
+    const positionStore = {
+      listAllOpen: async () => [openPosition({ id: 180, pmEntryTokenId: 'republican-no-token', pmExitTokenId: 'republican-no-token' })],
+      updateValuationWithFeeConfig: vi.fn(async () => undefined),
+      updateValuation: vi.fn(async () => undefined),
+      clearOpenValuation,
+    } as unknown as BotPositionStore;
+    const result = await pollOpenBotPositions({
+      positionStore,
+      observedAt: '2026-08-19T12:00:00.000Z',
+      fetchKalshi: async () => ({ yes_bid_dollars: '0.70', no_bid_dollars: '0.29', status: 'open' }),
+      fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 70, size: 10 }], noBids: [{ priceCents: 29, size: 10 }], observedAt: '2026-08-19T12:00:00.000Z' }),
+      fetchPmBids: async () => ({
+        yesBidCents: 90, noBidCents: 9, yesBids: [{ priceCents: 90, size: 10 }],
+        noBids: [{ priceCents: 9, size: 10 }], resolved: false,
+        noTokenId: 'democratic-no-token', observedAt: '2026-08-19T12:00:00.000Z',
+      }),
+    });
+    expect(result.errors).toEqual([{ id: 180, error: expect.stringMatching(/immutable entry token/i) }]);
+    expect(clearOpenValuation).toHaveBeenCalledWith(180, '2026-08-19T12:00:00.000Z', expect.stringMatching(/immutable entry token/i));
   });
 
   it('reuses persisted exit fee authority instead of refetching it for every valuation', async () => {
@@ -1890,7 +1979,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
       observedAt: '2026-08-08T12:00:00.000Z',
       fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
       fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
-      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:00.000Z' }),
     });
     expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
     expect(feeFetch).not.toHaveBeenCalled();
@@ -1909,7 +1998,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
       positionStore, observedAt: '2026-08-08T12:00:10.000Z',
       fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
       fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:04.000Z' }),
-      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:03.000Z' }),
+      fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:03.000Z' }),
       fetchFeeConfig: async () => ({
         kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:10.000Z', version: 'v1' },
         polymarket: authoritativePmFee(400, '2026-08-08T12:00:10.000Z'), pmTheta: 0.04,
@@ -1919,7 +2008,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
     expect(persistedAt).toBe('2026-08-08T12:00:03.000Z');
   });
 
-  it('values an identifier-present legacy paper position from executable books and persisted buy cost', async () => {
+  it('fails a legacy paper valuation closed when its immutable entry token is missing', async () => {
     const previousCwd = process.cwd();
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-valuation-'));
     try {
@@ -1965,20 +2054,20 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         fetchPmBids: async () => ({
           yesBidCents: 42, noBidCents: 57,
           yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }],
-          resolved: false, observedAt: '2026-08-08T12:00:00.000Z',
+          resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:00.000Z',
         }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
           polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'),
           pmTheta: 0.04,
         }),
-      })).resolves.toEqual({ updated: 1, settled: 0, errors: [] });
+      })).resolves.toEqual({ updated: 0, settled: 0, errors: [{ id: created.id, error: expect.stringMatching(/immutable entry token/i) }] });
 
       const read = new BotPositionStore(dbUrl);
       const [valued] = await read.list({ status: 'open' });
-      expect(valued.currentValueCents).toBe(1022);
-      expect(valued.unrealizedPnlCents).toBe(44);
-      expect(valued.valuationFailureReason).toBeNull();
+      expect(valued.currentValueCents).toBeNull();
+      expect(valued.unrealizedPnlCents).toBeNull();
+      expect(valued.valuationFailureReason).toMatch(/immutable entry token/i);
       expect(valued.pmExitTokenId).toBe('pm-no-token');
       read.close();
     } finally {
@@ -1987,7 +2076,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
     }
   });
 
-  it('uses current token fee authority for legacy paper liquidation without rewriting persisted entry economics', async () => {
+  it('does not reconstruct a missing entry token from current exit-fee authority', async () => {
     const previousCwd = process.cwd();
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-position-legacy-token-fee-'));
     try {
@@ -2021,18 +2110,18 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
         positionStore: new BotPositionStore(dbUrl), observedAt: '2026-08-08T12:00:00.000Z',
         fetchKalshi: async () => ({ yes_bid_dollars: '0.48', no_bid_dollars: '0.51', status: 'open', close_time: '2026-08-10T00:00:00.000Z' }),
         fetchKalshiBids: async () => ({ yesBids: [{ priceCents: 48, size: 10 }], noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z' }),
-        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:00.000Z' }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
           polymarket: authoritativePmFee(0, '2026-08-08T12:00:00.000Z'), pmTheta: 0,
         }),
       });
-      expect(result).toEqual({ updated: 1, settled: 0, errors: [] });
+      expect(result).toEqual({ updated: 0, settled: 0, errors: [{ id: created.id, error: expect.stringMatching(/immutable entry token/i) }] });
       const read = new BotPositionStore(dbUrl);
       const [valued] = await read.list({ status: 'open' });
-      expect(valued.currentValueCents).toBe(1032);
+      expect(valued.currentValueCents).toBeNull();
       expect(valued.pmTheta).toBe(0.04);
-      expect(valued.pmExitFeeRateBps).toBe(0);
+      expect(valued.pmExitFeeRateBps).toBe(400);
       read.close();
     } finally {
       process.chdir(previousCwd);
@@ -2068,7 +2157,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
           yesBids: [{ priceCents: 48, size: ticker === 'KXSECOND' ? 10 : 0.5 }],
           noBids: [{ priceCents: 51, size: 10 }], observedAt: '2026-08-08T12:00:00.000Z',
         }),
-        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, observedAt: '2026-08-08T12:00:00.000Z' }),
+        fetchPmBids: async () => ({ yesBidCents: 42, noBidCents: 57, yesBids: [{ priceCents: 42, size: 10 }], noBids: [{ priceCents: 57, size: 10 }], resolved: false, noTokenId: 'pm-no-token', observedAt: '2026-08-08T12:00:00.000Z' }),
         fetchFeeConfig: async () => ({
           kalshi: { feeType: 'quadratic', feeMultiplierPpm: 1_000_000, source: 'kalshi-series', observedAt: '2026-08-08T12:00:00.000Z', version: 'v1' },
           polymarket: authoritativePmFee(400, '2026-08-08T12:00:00.000Z'), pmTheta: 0.04,
@@ -2129,6 +2218,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
           yesBids: [{ priceCents: 42, size: 10 }],
           noBids: [{ priceCents: 57, size: 10 }],
           resolved: false,
+          noTokenId: 'pm-no-token',
           observedAt: attemptedAt,
         }),
         fetchFeeConfig: async () => ({
@@ -2209,6 +2299,7 @@ describe('pollOpenBotPositions fail-closed valuation', () => {
           yesBidCents: 100,
           noBidCents: 0,
           resolved: true,
+          noTokenId: 'pm-no-token',
           observedAt: '2026-08-11T12:00:00.000Z',
         }),
         fetchFeeConfig: async () => {

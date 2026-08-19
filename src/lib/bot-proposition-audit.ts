@@ -15,7 +15,10 @@ export interface HistoricalPropositionAuditEntry {
   classification: HistoricalPropositionClassification;
   severity: 'high' | 'warning' | 'none';
   reason: string;
-  evidence?: { polymarket?: { tokenId?: string } };
+  evidence?: {
+    kalshi?: { question?: string; payoutState?: string };
+    polymarket?: { question?: string; payoutState?: string; tokenId?: string };
+  };
 }
 
 const byExecutionId = new Map<number, HistoricalPropositionAuditEntry>(
@@ -37,4 +40,25 @@ export function historicalPropositionAudit(
       || entry.kalshiSide !== identity.kalshiSide
       || entry.pmSide !== identity.pmSide) return null;
   return entry;
+}
+
+/** Display-only exact labels from a fingerprinted immutable audit finding. */
+export function historicalAuditLegMetadata(entry: HistoricalPropositionAuditEntry | null): {
+  kalshiMarketQuestion: string;
+  pmMarketQuestion: string;
+  kalshiOutcomeLabel: string;
+  pmOutcomeLabel: string;
+} | null {
+  if (entry?.classification !== 'confirmed_invalid') return null;
+  const kalshiQuestion = entry.evidence?.kalshi?.question?.trim();
+  const pmQuestion = entry.evidence?.polymarket?.question?.trim();
+  const kalshiOutcome = entry.evidence?.kalshi?.payoutState?.trim();
+  const pmOutcome = entry.evidence?.polymarket?.payoutState?.trim();
+  if (!kalshiQuestion || !pmQuestion || !kalshiOutcome || !pmOutcome) return null;
+  return {
+    kalshiMarketQuestion: kalshiQuestion,
+    pmMarketQuestion: pmQuestion,
+    kalshiOutcomeLabel: kalshiOutcome,
+    pmOutcomeLabel: pmOutcome,
+  };
 }

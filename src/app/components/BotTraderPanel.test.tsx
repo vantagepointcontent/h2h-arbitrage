@@ -42,6 +42,11 @@ const positions = [{
   kalshiUrl: 'https://kalshi.com/markets/kxtrump-26',
   polymarketUrl: 'https://polymarket.com/event/trump-2026',
   strategy: 'Buy YES K + NO PM',
+  kalshiOutcomeLabel: 'Republicans',
+  pmOutcomeLabel: 'Republicans',
+  outcomeIdentityStatus: 'verified',
+  outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+  pmEntryTokenId: 'held-republican-token',
   kalshiSide: 'yes',
   pmSide: 'no',
   buyPriceKalshiCents: 45,
@@ -288,6 +293,73 @@ describe('BotTraderPanel', () => {
     expect(screen.queryByTestId('combined-net-proceeds')).toBeNull();
   });
 
+  it('shows fail-closed legacy settlement outside Open without a fabricated zero loss', async () => {
+    const unresolved = {
+      ...positions[0],
+      settlementState: 'settlement_unresolved',
+      settlementFailureReason: 'Settlement unresolved — exact legacy leg evidence missing',
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      realizedPnlCents: null,
+      valuationFailureReason: 'Settlement unresolved — exact legacy leg evidence missing',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [unresolved] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const row = (await screen.findByText('Trump 2026')).closest('tr');
+    expect(row?.textContent).toContain('Settlement unresolved — exact legacy leg evidence missing');
+    expect(row?.textContent).toContain('Settlement unresolved');
+    expect(row?.textContent).not.toContain('-100.0%');
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    expect(screen.queryByText('Trump 2026')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'settled' }));
+    expect(await screen.findByText('Trump 2026')).toBeTruthy();
+  });
+
+  it('labels verified simulated terminal proceeds as Settled paper', async () => {
+    const settledPaper = {
+      ...positions[0], status: 'settled', settlementState: 'settled',
+      settlementGrossProceedsCents: 100, settlementNetProceedsCents: 100,
+      resolutionPayoutCents: 100, resolutionValidationStatus: 'verified',
+      realizedPnlCents: 3, realizedRoiBps: 309, currentValueCents: null,
+      settlementCashAvailableAt: '2026-08-19T12:00:02.000Z',
+      settlementLegs: [{
+        venue: 'kalshi', lifecycleState: 'reconciled', marketId: 'KXTRUMP-26', outcomeId: 'KXTRUMP-26:YES',
+        side: 'yes', filledQuantity: 1, resolutionWinningSide: 'yes', resolutionDetectedAt: '2026-08-19T12:00:00.000Z',
+        resolutionSource: 'kalshi_market_settlement', payoutEntitlementCents: 100, settlementFeeCents: 0,
+        netSettlementProceedsCents: 100, creditState: 'simulated_credited', cashAvailableAt: '2026-08-19T12:00:02.000Z', failureReason: null,
+      }, {
+        venue: 'polymarket', lifecycleState: 'reconciled', marketId: '0xabc', outcomeId: 'held-republican-token',
+        side: 'no', filledQuantity: 1, resolutionWinningSide: 'yes', resolutionDetectedAt: '2026-08-19T12:00:01.000Z',
+        resolutionSource: 'polymarket_clob_market', payoutEntitlementCents: 0, settlementFeeCents: 0,
+        netSettlementProceedsCents: 0, creditState: 'not_applicable', cashAvailableAt: null, failureReason: null,
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [settledPaper] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const row = (await screen.findByText('Trump 2026')).closest('tr');
+    expect(row?.textContent).toContain('Settled (paper)');
+    expect(row?.textContent).toContain('$1.00');
+    expect(row?.textContent).toContain('+$0.03');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByText('Settlement ledger').parentElement?.textContent).toContain('Simulated paper settlement');
+    expect(screen.getByTestId('kalshi-settlement-leg').textContent).toContain('simulated credited');
+    expect(screen.getByTestId('polymarket-settlement-leg').textContent).toContain('not applicable');
+    expect(screen.getByText('Net settlement proceeds').parentElement?.textContent).toContain('$1.00');
+  });
+
   it('derives settled ROI from realized P&L and total cost', () => {
     expect(positionRoiBps({ status: 'settled', totalCostCents: 200, realizedPnlCents: 25, unrealizedRoiBps: 9999 })).toBe(1250);
     expect(positionRoiBps({ status: 'open', totalCostCents: 200, realizedPnlCents: null, unrealizedRoiBps: 515 })).toBe(515);
@@ -302,6 +374,9 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('link', { name: 'Open Trump 2026 market' }).getAttribute('href')).toBe('/?view=scan&id=market-1');
     expect(screen.getByRole('link', { name: 'Open exact Kalshi YES market for Trump 2026' }).getAttribute('href')).toBe('https://kalshi.com/markets/kxtrump-26');
     expect(screen.getByRole('link', { name: 'Open exact Polymarket NO market for Trump 2026' }).getAttribute('href')).toBe('https://polymarket.com/event/trump-2026');
+    expect(screen.getByText('Kalshi Republicans — YES')).toBeTruthy();
+    expect(screen.getByText('Polymarket Republicans — NO')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Export exact legs CSV' }).getAttribute('href')).toBe('/api/bot-trader/positions/export?method=all&mode=paper&range=30d');
     expect(screen.getByText('Verified trades').parentElement?.textContent).toBe('Verified trades50');
     expect(screen.getByText('Open positions').parentElement?.textContent).toBe('Open positions12');
     expect(screen.getByText('Win rate').parentElement?.textContent).toBe('Win rate68.4%');
@@ -311,6 +386,38 @@ describe('BotTraderPanel', () => {
     const activeRange = screen.getByRole('button', { name: '30 Days' }) as HTMLButtonElement;
     expect(activeRange.disabled).toBe(true);
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
+  });
+
+  it('shows exact audited outcomes before side while keeping invalid legacy valuation unavailable', async () => {
+    const invalid = {
+      ...positions[0],
+      outcomeIdentityStatus: 'unresolved',
+      kalshiOutcomeLabel: 'Republican',
+      pmOutcomeLabel: 'Republican',
+      propositionRelationshipState: 'same_direction_invalid',
+      propositionRelationshipWarning: 'Both exact requested contracts select Republican and use the YES side.',
+      kalshiSide: 'yes',
+      pmSide: 'yes',
+      currentValueCents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      valuationStatus: 'unavailable',
+      valuationFailureReason: 'Immutable execution-time Polymarket entry token is missing from the position row',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: [invalid] } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    expect(await screen.findByText('Kalshi Republican — YES')).toBeTruthy();
+    expect(screen.getByText('Polymarket Republican — YES')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('Kalshi Republican — YES entry');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('Polymarket Republican — YES entry');
+    expect(screen.getAllByText('Immutable execution-time Polymarket entry token is missing from the position row').length).toBeGreaterThan(0);
   });
 
   it('maps buy cost, indicative current value, P&L, and percentage ROI into their labelled columns', async () => {
@@ -397,8 +504,10 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000000¢ exact fill');
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
-    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi YES Current PriceSaved$0.47');
-    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket NO Current PriceStale$0.55');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('Kalshi Republicans — YES entry');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('Polymarket Republicans — NO entry');
+    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi Republicans — YES Current PriceSaved$0.47');
+    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket Republicans — NO Current PriceStale$0.55');
     expect(screen.getAllByText(/Indicative last-scanned mark; not executable liquidation proceeds/)).toHaveLength(2);
     expect(screen.getByTestId('kalshi-fee-authority').textContent).toContain('quadratic:1000000:v1');
     expect(screen.getByTestId('polymarket-fee-authority').textContent).toContain('token-fee-rate:400');

@@ -25,6 +25,10 @@
     "migrate:poll-leases": "node scripts/disk-capacity-check.mjs --operation migration && node scripts/migrate-poll-leases.mjs",
     "build:migrate-bot-position-pm-identities": "esbuild scripts/fix-bot-position-pm-identifiers.ts --bundle --platform=node --format=esm --outfile=dist/fix-bot-position-pm-identifiers.mjs --external:@libsql/client",
     "migrate:bot-position-pm-identities": "node scripts/disk-capacity-check.mjs --operation migration --burst-file data/edgefinder.db && npm run build:migrate-bot-position-pm-identities --silent && node dist/fix-bot-position-pm-identifiers.mjs",
+    "build:reconcile-bot-outcome-identities": "esbuild scripts/reconcile-bot-outcome-identities.ts --bundle --platform=node --format=esm --outfile=dist/reconcile-bot-outcome-identities.mjs --external:@libsql/client --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "reconcile:bot-outcome-identities": "npm run build:reconcile-bot-outcome-identities --silent && node dist/reconcile-bot-outcome-identities.mjs",
+    "build:reconcile-bot-settlements": "esbuild scripts/reconcile-bot-settlements.ts --bundle --platform=node --format=esm --outfile=dist/reconcile-bot-settlements.mjs --external:@libsql/client --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "reconcile:bot-settlements:apply": "npm run build:reconcile-bot-settlements --silent && node dist/reconcile-bot-settlements.mjs --apply",
     "lint": "node scripts/lint-baseline.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
