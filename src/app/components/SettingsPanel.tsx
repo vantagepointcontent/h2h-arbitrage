@@ -66,12 +66,8 @@ const SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: "display", label: "Display", icon: <Monitor className="w-4 h-4" /> },
 ];
 
-const TOKEN = process.env.NEXT_PUBLIC_H2H_API_TOKEN;
-
 function apiHeaders(): Record<string, string> {
-  const h: Record<string, string> = { "Content-Type": "application/json" };
-  if (TOKEN) h["x-h2h-token"] = TOKEN;
-  return h;
+  return { "Content-Type": "application/json" };
 }
 
 interface BotStatus {

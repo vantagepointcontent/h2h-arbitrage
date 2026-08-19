@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
 import {
   buildScanLinkPayload,
   createQuickPricesRequestOwner,
+  createSavedMarketsListRequestOwner,
   createSavedMarketHydrationOwner,
   mergeQuickPricesResult,
   restoreSavedMarketPopNavigation,
   selectSavedMarketPriceCache,
+  normalizeSavedMarketsList,
 } from './lib/page-shared';
 
 type RefreshState = { loading: boolean; bgRefreshing: boolean };
@@ -87,6 +90,54 @@ function createSavedMarketViewHarness() {
 }
 
 describe('saved-market quick-price request ownership', () => {
+  it('wires sidebar refresh to the server bridge without the bulk-scan path', () => {
+    const page = readFileSync(`${process.cwd()}/src/app/page.tsx`, 'utf8');
+    const sidebar = readFileSync(`${process.cwd()}/src/app/components/MarketSidebar.tsx`, 'utf8');
+    const action = readFileSync(`${process.cwd()}/src/app/actions/saved-markets-list.ts`, 'utf8');
+
+    expect(page).toContain('onRefreshMarkets={loadSavedMarkets}');
+    expect(page).toContain('refreshSavedMarketsList');
+    expect(page).not.toContain('scanAllMarkets');
+    expect(page).not.toContain('/api/saved-markets/refresh');
+    expect(sidebar).toContain('title="Refresh markets from the latest persisted scanner snapshot"');
+    expect(action).toContain('/api/saved-markets/list-refresh');
+    expect(action).not.toMatch(/kalshi\.com|polymarket\.com|\/api\/scan/);
+    expect(page).toContain('refreshSavedMarketPrices');
+    expect(page).toContain('handleScanWithUrls');
+  });
+
+  it('deduplicates rapid canonical list refreshes', async () => {
+    const owner = createSavedMarketsListRequestOwner();
+    let resolve!: (value: string) => void;
+    const loader = vi.fn(() => new Promise<string>((done) => { resolve = done; }));
+    const first = owner.run(loader);
+    const second = owner.run(loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(second.deduplicated).toBe(true);
+    expect(second.promise).toBe(first.promise);
+    resolve('rev-1');
+    await expect(first.promise).resolves.toBe('rev-1');
+    expect(owner.finish(first)).toBe(true);
+  });
+
+  it('fences an older list response when a newer request supersedes it', () => {
+    const owner = createSavedMarketsListRequestOwner();
+    const first = owner.run(async () => 'rev-1');
+    const second = owner.run(async () => 'rev-2', { supersede: true });
+    expect(owner.owns(first)).toBe(false);
+    expect(owner.owns(second)).toBe(true);
+    expect(owner.finish(first)).toBe(false);
+    expect(owner.finish(second)).toBe(true);
+  });
+
+  it('deduplicates canonical rows by id and rejects malformed boundaries', () => {
+    const first = { id: 'market-1', eventTitle: 'Old', kalshiUrl: 'k', polymarketUrl: 'p', createdAt: '2026-01-01' };
+    const latest = { ...first, eventTitle: 'Latest' };
+    expect(normalizeSavedMarketsList([first, latest])).toEqual([latest]);
+    expect(normalizeSavedMarketsList({ error: 'unauthorized' })).toBeNull();
+  });
+
   it('uses the full persisted scan for market prices when the newer watcher result is summary-only', () => {
     const lastScanResult = {
       bestRoiPct: 1.5, bestProfit: 3, strategy: 'persisted', outcomeCount: 1,

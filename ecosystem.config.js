@@ -39,7 +39,6 @@ module.exports = {
         DEBUG_H2H: '0',
         PREDICTIONHUNT_API_KEY: 'pmx_U46EX9BAvyqxGoq9kinrYIqRt3KTWoWTrOU9B-I8VGQ',
         H2H_API_TOKEN: process.env.H2H_API_TOKEN,
-        NEXT_PUBLIC_H2H_API_TOKEN: process.env.NEXT_PUBLIC_H2H_API_TOKEN,
         TELEGRAM_MIN_ROI_PCT: '1.5',
         TELEGRAM_MIN_PROFIT_USD: '5',
         TELEGRAM_MIN_STAKE_USD: '50',

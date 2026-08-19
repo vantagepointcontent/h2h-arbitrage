@@ -89,7 +89,7 @@ const HistoricalSpreadChart = dynamic(() => import("@/app/components/HistoricalS
 import { saveSpread } from "@/lib/spreadHistory";
 
 
-import { MarketSidebar } from "@/app/components/MarketSidebar";
+import { MarketSidebar, type SavedMarketsListRefreshState } from "@/app/components/MarketSidebar";
 import { PlatformLinkInputs, type PlatformLinkInput } from "@/app/components/PlatformLinkInputs";
 // UI-005: code-split heavy view panels
 const OverviewPanel = dynamic(() => import("@/app/components/OverviewPanel").then(m => m.OverviewPanel), { ssr: false });
@@ -102,9 +102,9 @@ import {
   getStoredSidebarOpen, persistSidebarOpen, getTotalProfitFromOutcomes, isMatched,
   applyDurableFullScanToSavedMarket, formatCurrency, formatPercent, formatExpiry, formatRelativeTime, timeUntilExpiry, isMarketExpired,
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
-  createQuickPricesRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
+  createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
-  selectSavedMarketPriceCache, getMarketApySummary, mergeSavedMarketHydration,
+  selectSavedMarketPriceCache, normalizeSavedMarketsList, getMarketApySummary, mergeSavedMarketHydration,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -112,6 +112,7 @@ import type {
 } from "@/app/lib/page-shared";
 import type { SyncProgress } from "@/lib/catalog-progress";
 import { refreshSavedMarketPrices } from "@/app/actions/quick-prices";
+import { refreshSavedMarketsList } from "@/app/actions/saved-markets-list";
 
 
 /* ── Swipe gesture hook (Home-only) ── */
@@ -240,6 +241,9 @@ export default function Home() {
   const previousPricesRef = useRef<Map<string, { kYes: number; pYes: number }>>(new Map());
   const [priceChanges, setPriceChanges] = useState<Map<string, "up" | "down" | null>>(new Map());
   const [savedMarkets, setSavedMarkets] = useState<SavedMarket[]>([]);
+  const [savedMarketsListRefresh, setSavedMarketsListRefresh] = useState<SavedMarketsListRefreshState>({
+    status: 'idle', message: null, observedAt: null, source: null, revision: null,
+  });
     const [sidebarOpen, setSidebarOpen] = useState(() => getStoredSidebarOpen());
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -268,6 +272,7 @@ export default function Home() {
   const pmUrlRef = useRef(pmUrl);
   const activeMarketIdRef = useRef(activeMarketId);
   const quickPricesRequestOwnerRef = useRef(createQuickPricesRequestOwner());
+  const savedMarketsListRequestOwnerRef = useRef(createSavedMarketsListRequestOwner());
   const savedMarketHydrationOwnerRef = useRef(createSavedMarketHydrationOwner());
   // BUG-036: serialize MarketFinder individual saves to avoid concurrent read-modify-write races
   const mfSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -810,13 +815,18 @@ export default function Home() {
     }
   };
 
-  // Saved markets
+  // Saved markets: lightweight canonical persisted-list refresh. Automatic
+  // venue scans remain owned by the recurring server-side scanner.
   const loadSavedMarkets = async (): Promise<SavedMarket[]> => {
+    const request = savedMarketsListRequestOwnerRef.current.run(refreshSavedMarketsList);
+    if (!request.deduplicated) {
+      setSavedMarketsListRefresh((previous) => ({ ...previous, status: 'loading', message: null }));
+    }
     try {
-      const res = await fetch("/api/saved-markets?fields=basic");
-      if (res.ok) {
-        const data = await res.json();
-        const incoming: SavedMarket[] = data.markets || [];
+      const response = await request.promise;
+      if (!savedMarketsListRequestOwnerRef.current.owns(request)) return savedMarketsRef.current;
+      const incoming = response.ok ? normalizeSavedMarketsList(response.markets) : null;
+      if (response.ok && incoming) {
         const currentById = new Map(savedMarketsRef.current.map((market) => [market.id, market]));
         const merged = incoming.map((market) => {
           const current = currentById.get(market.id);
@@ -824,10 +834,32 @@ export default function Home() {
         });
         savedMarketsRef.current = merged;
         setSavedMarkets(merged);
+        setSavedMarketsListRefresh({
+          status: merged.length === 0 ? 'empty' : 'success',
+          message: null,
+          observedAt: response.observedAt,
+          source: response.source,
+          revision: response.revision,
+        });
         return merged;
       }
-    } catch { /* ignore */ }
-    return [];
+      setSavedMarketsListRefresh((previous) => ({
+        ...previous,
+        status: savedMarketsRef.current.length > 0 ? 'degraded' : 'error',
+        message: response.message ?? 'Saved markets are temporarily unavailable. The last-known list is still shown.',
+      }));
+    } catch {
+      if (savedMarketsListRequestOwnerRef.current.owns(request)) {
+        setSavedMarketsListRefresh((previous) => ({
+          ...previous,
+          status: savedMarketsRef.current.length > 0 ? 'degraded' : 'error',
+          message: 'Saved markets are temporarily unavailable. The last-known list is still shown.',
+        }));
+      }
+    } finally {
+      savedMarketsListRequestOwnerRef.current.finish(request);
+    }
+    return savedMarketsRef.current;
   };
 
   const loadManualMatches = async () => {
@@ -866,65 +898,6 @@ export default function Home() {
       await fetch(`/api/decoupled-pairs?id=${decoupledPairId}`, { method: "DELETE" });
       await loadDecoupledPairs();
     } catch { /* ignore */ }
-  };
-
-  // Scan ALL saved markets with LIVE prices — async background refresh with progress polling
-  const scanAllMarkets = async (marketsToScan?: SavedMarket[]) => {
-    if (scanningAll) return;
-    setScanningAll(true);
-    setScanAllError("");
-
-    try {
-      const ids = marketsToScan && marketsToScan.length > 0
-        ? marketsToScan.map((m) => m.id).join(',')
-        : undefined;
-      const startRes = await fetch('/api/saved-markets/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-        body: JSON.stringify({ ids: ids ? ids.split(',') : undefined }),
-      });
-      if (!startRes.ok) {
-        const err = await startRes.text();
-        throw new Error(err || 'Failed to start refresh job');
-      }
-
-      let status: any = {};
-      let attempts = 0;
-      const maxAttempts = 360; // ~6 min at 1s polling (backend has 5 min timeout)
-
-      while (attempts < maxAttempts) {
-        await new Promise(r => setTimeout(r, 1000));
-        const statusRes = await fetch(`/api/saved-markets/refresh?_=${Date.now()}`, {
-          headers: { 'Cache-Control': 'no-store' },
-        });
-        if (statusRes.ok) {
-          const data = await statusRes.json();
-          status = data.status || {};
-          setScanProgress({ current: status.processed ?? 0, total: status.total ?? 0 });
-          if (!status.running) break;
-        } else {
-          // If status endpoint fails, keep scanning locally; break after 30s to avoid spinning
-          if (attempts > 30) break;
-        }
-        attempts++;
-      }
-
-      await loadSavedMarkets();
-
-      // Check for timeout error from backend
-      if (status.errors?.some((e: any) => e.id === '__timeout__')) {
-        const timeoutErr = status.errors.find((e: any) => e.id === '__timeout__');
-        setScanAllError(timeoutErr.error);
-      } else if (status.failed > 0) {
-        setScanAllError(`${status.failed} market${status.failed > 1 ? 's' : ''} failed to refresh`);
-      }
-    } catch (e: any) {
-      console.error('[scanAllMarkets]', e);
-      setScanAllError(e.message || 'Refresh failed');
-    } finally {
-      setScanningAll(false);
-      setScanProgress({ current: 0, total: 0 });
-    }
   };
 
   // Delete saved market
@@ -1262,11 +1235,8 @@ export default function Home() {
   const [overviewExpiryFilter, setOverviewExpiryFilter] = useState<"all" | "lte7" | "lte14" | "lte30">(DEFAULT_MARKET_EXPIRY_FILTER);
   const [showExpired, setShowExpired] = useState(false);
   const [showArbOnly, setShowArbOnly] = useState(DEFAULT_SHOW_ARB_ONLY);
-  const [scanningAll, setScanningAll] = useState(false);
   const [copiedLinks, setCopiedLinks] = useState(false); // UI-013
   const [marketWorkspaceTab, setMarketWorkspaceTab] = useState<MarketWorkspaceTab>("prices");
-  const [scanAllError, setScanAllError] = useState("");
-  const [scanProgress, setScanProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
 
   // Favorites state (persisted to localStorage)
@@ -1769,10 +1739,8 @@ export default function Home() {
           onToggleShowExpired={() => setShowExpired(v => !v)}
           showArbOnly={showArbOnly}
           onToggleShowArbOnly={() => setShowArbOnly(v => !v)}
-          onScanAll={scanAllMarkets}
-          scanningAll={scanningAll}
-          scanProgress={scanProgress}
-          scanAllError={scanAllError}
+          onRefreshMarkets={loadSavedMarkets}
+          listRefreshState={savedMarketsListRefresh}
           onGoOverview={goToOverview}
           onGoOpportunities={goToOpportunities}
           onGoScan={goToScan}

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FullScanStatus, MarketSidebar, NavButton } from './MarketSidebar';
-import type { SavedMarket } from '@/app/lib/page-shared';
+import { createSavedMarketsListRequestOwner, type SavedMarket } from '@/app/lib/page-shared';
 
 describe('NavButton mobile accessibility', () => {
   it.each([
@@ -74,7 +75,7 @@ describe.each([
       onSelectMarket={noop} onDeleteMarket={noop} sort="name" sortDir="asc" onToggleSort={noop}
       timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
       showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
-      onScanAll={noop} scanningAll={false} scanProgress={{ current: 0, total: 0 }} scanAllError=""
+      onRefreshMarkets={noop} listRefreshState={{ status: 'idle', message: null, observedAt: null, source: null, revision: null }}
       onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
       onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
       favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
@@ -83,5 +84,137 @@ describe.each([
 
     expect(screen.getByText('(12.3%)')).toBeTruthy();
     expect(screen.queryByText(/56\.8%|90\.1%|Kalshi APY|Polymarket APY/)).toBeNull();
+  });
+});
+
+describe('BUG-168 lightweight Saved Markets refresh', () => {
+  it('renders a bounded degraded state while retaining rows', () => {
+    const noop = vi.fn();
+    const refresh = vi.fn();
+    const saved: SavedMarket = {
+      id: 'market-1', eventTitle: 'Retained market', category: 'Politics', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-01T00:00:00.000Z', lastScanResult: null,
+    };
+    render(<MarketSidebar
+      markets={[saved]} activeId="market-1" viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="apy" sortDir="desc" onToggleSort={noop}
+      timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={refresh}
+      listRefreshState={{ status: 'degraded', message: 'Saved markets are temporarily unavailable. The last-known list is still shown.', observedAt: '2026-08-19T14:55:00.000Z', source: 'persisted-saved-markets', revision: 'rev-1' }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh markets' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Retained market')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('last-known list');
+    expect(screen.queryByText(/\{"error"/)).toBeNull();
+  });
+
+  it.each([
+    ['apy', 'APY ↓'], ['roi', 'ROI ↓'], ['name', 'A-Z ↓'], ['scanned', 'Scanned ↓'],
+  ] as const)('preserves filters, %s sort, selection, and scroll across rerender', (sort, sortLabel) => {
+    const noop = vi.fn();
+    const initial: SavedMarket = {
+      id: 'market-target', eventTitle: 'Target market', category: 'Politics', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-01T00:00:00.000Z', expiryDate: '2026-08-25T00:00:00.000Z',
+      lastScanResult: { bestRoiPct: 2, bestProfit: 4, strategy: 'arb', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-19T14:00:00.000Z', allArbs: [] },
+    };
+    const props = {
+      activeId: 'market-target', viewMode: 'overview', sidebarOpen: true, onToggleSidebar: noop,
+      onSelectMarket: noop, onDeleteMarket: noop, sort, sortDir: 'desc' as const, onToggleSort: noop,
+      timeUntilExpiry: () => '6d', expiryFilter: 'lte30' as const, onSetExpiryFilter: noop,
+      showExpired: false, onToggleShowExpired: noop, showArbOnly: true, onToggleShowArbOnly: noop,
+      onRefreshMarkets: noop, onGoOverview: noop, onGoOpportunities: noop, onGoScan: noop,
+      onGoMarketFinder: noop, onGoLogs: noop, onGoDashboard: noop, onGoTrades: noop, onGoBotTrader: noop,
+      favoriteIds: new Set<string>(), onToggleFavorite: noop, sidebarFavoritesOnly: false,
+      onToggleSidebarFavorites: noop, mobileMenuOpen: false, onCloseMobileMenu: noop,
+    };
+    const { rerender } = render(<MarketSidebar {...props} markets={[initial]}
+      listRefreshState={{ status: 'loading', message: null, observedAt: null, source: null, revision: 'rev-1' }} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Filter by name...'), { target: { value: 'target' } });
+    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'Politics' } });
+    const list = screen.getByTestId('saved-markets-scroll');
+    list.scrollTop = 137;
+
+    rerender(<MarketSidebar {...props} markets={[{ ...initial, eventTitle: 'Target market refreshed' }]}
+      listRefreshState={{ status: 'success', message: null, observedAt: '2026-08-19T15:00:00.000Z', source: 'persisted-saved-markets', revision: 'rev-2' }} />);
+
+    expect(screen.getByPlaceholderText('Filter by name...')).toHaveProperty('value', 'target');
+    expect(screen.getAllByRole('combobox')[0]).toHaveProperty('value', 'lte30');
+    expect(screen.getAllByRole('combobox')[1]).toHaveProperty('value', 'Politics');
+    expect(screen.getByRole('button', { name: sortLabel })).toBeTruthy();
+    expect(screen.getByText('Target market refreshed').closest('.group')?.className).toContain('ring-1');
+    expect(screen.getByTestId('saved-markets-scroll').scrollTop).toBe(137);
+    expect(screen.getByTestId('saved-markets-revision').textContent).toContain('rev-2');
+  });
+
+  it('keeps the newer rendered revision when an older completion arrives later', async () => {
+    let resolveOld!: (market: SavedMarket) => void;
+    let resolveNew!: (market: SavedMarket) => void;
+    const oldResponse = new Promise<SavedMarket>((resolve) => { resolveOld = resolve; });
+    const newResponse = new Promise<SavedMarket>((resolve) => { resolveNew = resolve; });
+    const base: SavedMarket = { id: 'market-1', eventTitle: 'Initial market', kalshiUrl: 'k', polymarketUrl: 'p', createdAt: '2026-08-01', lastScanResult: null };
+
+    function Harness() {
+      const owner = useRef(createSavedMarketsListRequestOwner());
+      const [market, setMarket] = useState(base);
+      const [revision, setRevision] = useState('rev-0');
+      const start = (promise: Promise<SavedMarket>, nextRevision: string, supersede: boolean) => {
+        const request = owner.current.run(() => promise, { supersede });
+        void request.promise.then((next) => {
+          if (!owner.current.owns(request)) return;
+          setMarket(next);
+          setRevision(nextRevision);
+          owner.current.finish(request);
+        });
+      };
+      const noop = vi.fn();
+      return <>
+        <button onClick={() => start(oldResponse, 'rev-old', false)}>Start old refresh</button>
+        <button onClick={() => start(newResponse, 'rev-new', true)}>Start new refresh</button>
+        <MarketSidebar markets={[market]} activeId="market-1" viewMode="overview" sidebarOpen onToggleSidebar={noop}
+          onSelectMarket={noop} onDeleteMarket={noop} sort="name" sortDir="asc" onToggleSort={noop}
+          timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+          showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+          onRefreshMarkets={noop}
+          listRefreshState={{ status: 'success', message: null, observedAt: '2026-08-19T15:00:00.000Z', source: 'persisted-saved-markets', revision }}
+          onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+          onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+          favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+          onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />
+      </>;
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start old refresh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start new refresh' }));
+    resolveNew({ ...base, eventTitle: 'Newest market' });
+    expect(await screen.findByText('Newest market')).toBeTruthy();
+    expect(screen.getByTestId('saved-markets-revision').textContent).toContain('rev-new');
+    resolveOld({ ...base, eventTitle: 'Stale market' });
+    await Promise.resolve();
+    expect(screen.queryByText('Stale market')).toBeNull();
+    expect(screen.getByText('Newest market')).toBeTruthy();
+  });
+
+  it('shows a bounded empty state without a raw response payload', () => {
+    const noop = vi.fn();
+    render(<MarketSidebar markets={[]} activeId={null} viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="apy" sortDir="desc" onToggleSort={noop}
+      timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={noop} listRefreshState={{ status: 'empty', message: null, observedAt: null, source: null, revision: 'rev-empty' }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
+    expect(screen.getByText('The persisted Saved Markets list is empty.')).toBeTruthy();
+    expect(screen.queryByText(/\{"/)).toBeNull();
   });
 });

@@ -3,11 +3,7 @@ import { getConfigFromEnv, sendTestMessage, sendBatchAlerts, isPaused, ArbAlertI
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseTelegramAlertsRequest } from '@/lib/telegram-alerts-request';
-
-function authorized(request: NextRequest): boolean {
-  const token = process.env.H2H_API_TOKEN;
-  return !token || request.headers.get('x-h2h-token') === token;
-}
+import { isAuthorizedBrowserMutation } from '@/lib/browser-session';
 
 /**
  * GET /api/telegram-alerts
@@ -32,7 +28,7 @@ export async function GET() {
  *   { action: 'test' } — send a test message using configured environment credentials
  */
 export async function POST(request: NextRequest) {
-  if (!authorized(request)) {
+  if (!await isAuthorizedBrowserMutation(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -81,6 +81,58 @@ export function createQuickPricesRequestOwner() {
   };
 }
 
+export interface SavedMarketsListRequest<T> {
+  sequence: number;
+  promise: Promise<T>;
+  deduplicated: boolean;
+}
+
+/** Deduplicates rapid list refresh clicks and fences superseded responses. */
+export function createSavedMarketsListRequestOwner() {
+  let current: { sequence: number; promise: Promise<unknown> } | null = null;
+  let sequence = 0;
+
+  return {
+    run<T>(loader: () => Promise<T>, options?: { supersede?: boolean }): SavedMarketsListRequest<T> {
+      if (current && !options?.supersede) {
+        return { sequence: current.sequence, promise: current.promise as Promise<T>, deduplicated: true };
+      }
+      const next = { sequence: ++sequence, promise: loader() };
+      current = next;
+      return { ...next, deduplicated: false };
+    },
+    owns<T>(request: SavedMarketsListRequest<T>): boolean {
+      return current?.sequence === request.sequence && current.promise === request.promise;
+    },
+    finish<T>(request: SavedMarketsListRequest<T>): boolean {
+      if (current?.sequence !== request.sequence || current.promise !== request.promise) return false;
+      current = null;
+      return true;
+    },
+  };
+}
+
+/** Validate the server-action boundary and collapse duplicate IDs to the latest row. */
+export function normalizeSavedMarketsList(value: unknown): SavedMarket[] | null {
+  if (!Array.isArray(value)) return null;
+  const byId = new Map<string, SavedMarket>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return null;
+    const market = item as Partial<SavedMarket>;
+    if (
+      typeof market.id !== 'string' || !market.id
+      || typeof market.eventTitle !== 'string'
+      || typeof market.kalshiUrl !== 'string'
+      || typeof market.polymarketUrl !== 'string'
+    ) return null;
+    byId.set(market.id, {
+      ...market,
+      createdAt: typeof market.createdAt === 'string' ? market.createdAt : '',
+    } as SavedMarket);
+  }
+  return [...byId.values()];
+}
+
 export interface SavedMarketHydrationToken {
   controller: AbortController;
   marketId: string;

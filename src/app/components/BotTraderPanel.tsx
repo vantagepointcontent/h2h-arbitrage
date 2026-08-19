@@ -34,6 +34,22 @@ interface StoredPriceSnapshot {
   identity?: { platform: 'kalshi' | 'polymarket'; marketId: string | null; side: 'yes' | 'no'; tokenId: string | null };
 }
 
+type EntryArbProfitSnapshot = {
+  version: 1;
+  executionMode: 'paper' | 'live';
+  capturedAt: string;
+  provenance: 'simulated_placement_fills' | 'authoritative_venue_fills' | 'placement_snapshot' | 'historical_backfill';
+} & ({
+  status: 'available';
+  profitMicrousd: number;
+  currency: 'USDC';
+  monetaryUnit: 'microusd';
+} | {
+  status: 'unavailable';
+  reasonCode: string;
+  reason: string;
+});
+
 interface BotPosition {
   id: number;
   executionId: number;
@@ -80,6 +96,7 @@ interface BotPosition {
   entryRecordSource?: string | null;
   entryRecordedAt?: string | null;
   entryCostRoundingDeltaMicrocents?: number | null;
+  entryArbProfitSnapshot?: EntryArbProfitSnapshot;
   kalshiEntryFillCount?: number | null;
   pmEntryFillCount?: number | null;
   kalshiEntryFills?: Array<{ priceMicrocents: number; sizeMicrounits: number; authority?: 'persisted_position_aggregate' }> | null;
@@ -258,6 +275,17 @@ const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const THREE_DECIMAL = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const EXACT_CENTS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+const ENTRY_ARB_PROFIT_DESCRIPTION = 'Net profit expected from the verified placed arb if held to settlement, captured at entry';
+const ENTRY_ARB_PROFIT_UNAVAILABLE_REASON_CODES = new Set([
+  'relationship_not_verified_complementary',
+  'exact_outcome_identity_unverified',
+  'unmatched_filled_quantities',
+  'non_positive_filled_quantity',
+  'authoritative_entry_fee_missing',
+  'immutable_buy_cost_missing',
+  'entry_economics_do_not_reconcile',
+  'exact_leg_identity_missing',
+]);
 
 function formatCents(cents: number, signed = false): string {
   const value = cents / 100;
@@ -282,6 +310,69 @@ function formatMicrocents(microcents: number): string {
 
 function formatExactMicrocents(microcents: number): string {
   return EXACT_USD.format(microcents / 100_000_000);
+}
+
+function formatMicrousd(microusd: number): string {
+  return USD.format(microusd / 1_000_000);
+}
+
+function entryArbProvenanceLabel(snapshot: EntryArbProfitSnapshot): string {
+  const labels: Record<EntryArbProfitSnapshot['provenance'], string> = {
+    simulated_placement_fills: 'Simulated placement fills',
+    authoritative_venue_fills: 'Authoritative venue fills',
+    placement_snapshot: 'Placement snapshot',
+    historical_backfill: 'Historical backfill',
+  };
+  return labels[snapshot.provenance];
+}
+
+function entryArbProfitPresentation(snapshot: EntryArbProfitSnapshot | undefined) {
+  const missingReason = 'Entry Arb Profit unavailable: placement snapshot missing';
+  const malformedReason = 'Entry Arb Profit unavailable: placement snapshot is malformed';
+  if (!snapshot) return { available: false as const, label: 'Unavailable', reason: missingReason };
+  const executionModeValid = snapshot.executionMode === 'paper' || snapshot.executionMode === 'live';
+  const capturedAtValid = typeof snapshot.capturedAt === 'string'
+    && snapshot.capturedAt.trim().length > 0
+    && Number.isFinite(Date.parse(snapshot.capturedAt));
+  if (snapshot.version !== 1 || !executionModeValid || !capturedAtValid
+      || (snapshot.status !== 'available' && snapshot.status !== 'unavailable')) {
+    return { available: false as const, label: 'Unavailable', reason: malformedReason };
+  }
+  if (snapshot.status === 'unavailable') {
+    const provenanceValid = snapshot.provenance === 'placement_snapshot' || snapshot.provenance === 'historical_backfill';
+    const reasonCodeValid = typeof snapshot.reasonCode === 'string'
+      && ENTRY_ARB_PROFIT_UNAVAILABLE_REASON_CODES.has(snapshot.reasonCode);
+    const reason = typeof snapshot.reason === 'string' ? snapshot.reason.trim() : '';
+    if (!provenanceValid || !reasonCodeValid || !reason) {
+      return { available: false as const, label: 'Unavailable', reason: malformedReason };
+    }
+    const modeDetail = snapshot.executionMode === 'paper' ? 'Simulated paper position' : 'Authoritative live position';
+    return {
+      available: false as const,
+      label: 'Unavailable',
+      reason,
+      detail: `${entryArbProvenanceLabel(snapshot)} · ${modeDetail} · captured ${snapshot.capturedAt}`,
+    };
+  }
+  const provenanceValid = snapshot.provenance === 'simulated_placement_fills'
+    || snapshot.provenance === 'authoritative_venue_fills';
+  const modeMatchesProvenance = snapshot.executionMode === 'paper'
+    ? snapshot.provenance === 'simulated_placement_fills'
+    : snapshot.provenance === 'authoritative_venue_fills';
+  if (!provenanceValid || !modeMatchesProvenance || snapshot.currency !== 'USDC'
+      || snapshot.monetaryUnit !== 'microusd' || !Number.isSafeInteger(snapshot.profitMicrousd)) {
+    return { available: false as const, label: 'Unavailable', reason: malformedReason };
+  }
+  const label = formatMicrousd(snapshot.profitMicrousd);
+  const modeLabel = snapshot.executionMode === 'paper' ? 'Simulated paper placement snapshot' : 'Authoritative live placement snapshot';
+  const detail = `${modeLabel}; ${entryArbProvenanceLabel(snapshot)}; captured ${snapshot.capturedAt}`;
+  return {
+    available: true as const,
+    label,
+    value: snapshot.profitMicrousd,
+    title: `${ENTRY_ARB_PROFIT_DESCRIPTION}. ${detail}`,
+    detail,
+  };
 }
 
 function formatExactEntryPrice(grossMicrocents: number, quantity: number): string {
@@ -321,10 +412,7 @@ function snapshotStateLabel(snapshot: StoredPriceSnapshot): string {
 }
 
 function apiHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = typeof window === 'undefined' ? null : window.localStorage.getItem('h2h-api-token');
-  if (token) headers['x-h2h-token'] = token;
-  return headers;
+  return { 'Content-Type': 'application/json' };
 }
 
 function MetricCard({ label, value, valueClass = '' }: { label: string; value: string; valueClass?: string }) {
@@ -665,8 +753,13 @@ export default function BotTraderPanel() {
         </div>
 
         <div className="overflow-x-auto" data-testid="bot-positions-scroll">
-          <table className="w-full min-w-[900px] text-xs">
-            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Which legs the bot bought" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Immutable persisted trade entry cost" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Indicative value from exact-leg last-scanned prices; not executable liquidation proceeds" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Indicative last-scanned Current Value minus persisted Buy Cost" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Indicative last-scanned P&L divided by persisted Buy Cost" className="px-2 py-2 text-right font-medium">ROI</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
+          <span id="entry-arb-profit-header-description" className="sr-only">{ENTRY_ARB_PROFIT_DESCRIPTION}</span>
+          {sortedPositions.map((position) => {
+            const presentation = entryArbProfitPresentation(position.entryArbProfitSnapshot);
+            return <span key={`entry-arb-profit-description-${position.id}`} id={`entry-arb-profit-description-${position.id}`} className="sr-only">{presentation.available ? presentation.title : presentation.reason}</span>;
+          })}
+          <table className="w-full min-w-[960px] text-xs">
+            <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable human-readable outcomes selected for the exact placed platform legs" className="hidden px-2 py-2 text-left font-medium lg:table-cell">Outcome</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Exact contract sides bought on each platform" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Immutable persisted trade entry cost" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Indicative value from exact-leg last-scanned prices; not executable liquidation proceeds" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Indicative last-scanned Current Value minus persisted Buy Cost" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Indicative last-scanned P&L divided by persisted Buy Cost" className="px-2 py-2 text-right font-medium">ROI</th><th tabIndex={0} title={ENTRY_ARB_PROFIT_DESCRIPTION} aria-describedby="entry-arb-profit-header-description" className="hidden rounded px-2 py-2 text-right font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] lg:table-cell">Entry Arb Profit</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedPositions.map((position) => {
                 const isExpanded = expanded.has(position.id);
@@ -675,6 +768,15 @@ export default function BotTraderPanel() {
                 const relationshipHighSeverity = position.status === 'open'
                   && relationshipState !== 'verified_complementary'
                   && relationshipState !== 'unknown';
+                const hasCanonicalOutcomes = position.outcomeIdentityStatus === 'verified'
+                  && Boolean(position.kalshiOutcomeLabel?.trim())
+                  && Boolean(position.pmOutcomeLabel?.trim());
+                const outcomeUnavailableReason = position.outcomeIdentityFailureReason?.trim()
+                  || 'Immutable execution-time outcome identity is unavailable';
+                const placedOutcomeSummary = hasCanonicalOutcomes
+                  ? `K: ${position.kalshiOutcomeLabel!.trim()} · PM: ${position.pmOutcomeLabel!.trim()}`
+                  : 'Outcome unavailable';
+                const entryArbProfit = entryArbProfitPresentation(position.entryArbProfitSnapshot);
                 const entryCostAvailable = position.entryCostStatus !== 'unavailable'
                   && Number.isSafeInteger(position.totalCostCents);
                 const unallocatedEntryFeeCents = position.unallocatedEntryFeeCents ?? 0;
@@ -725,22 +827,26 @@ export default function BotTraderPanel() {
                 return [
                   <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
                     <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div>{!relationshipVerified && <div className={`mt-1 text-[9px] font-bold uppercase ${relationshipHighSeverity ? 'text-[var(--status-negative)]' : 'text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'High risk · invalid relationship' : 'Legacy/unknown relationship'}</div>}</td>
+                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div><div data-testid="responsive-position-outcome" className={`mt-1 break-words text-[9px] font-normal lg:hidden ${hasCanonicalOutcomes ? 'text-[var(--text-secondary)]' : 'text-[var(--status-warning)]'}`} title={hasCanonicalOutcomes ? placedOutcomeSummary : outcomeUnavailableReason}>{placedOutcomeSummary}</div><div data-testid="responsive-entry-arb-profit" tabIndex={0} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`} className={`mt-1 rounded text-[9px] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] lg:hidden ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : entryArbProfit.reason}>Entry arb {entryArbProfit.label}</div>{!relationshipVerified && <div className={`mt-1 text-[9px] font-bold uppercase ${relationshipHighSeverity ? 'text-[var(--status-negative)]' : 'text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'High risk · invalid relationship' : 'Legacy/unknown relationship'}</div>}</td>
+                    <td className={`hidden max-w-44 break-words px-2 py-2 lg:table-cell ${hasCanonicalOutcomes ? 'text-[var(--text-secondary)]' : 'text-[var(--status-warning)]'}`} title={hasCanonicalOutcomes ? placedOutcomeSummary : outcomeUnavailableReason} aria-label={hasCanonicalOutcomes ? `Placed outcomes: Kalshi ${position.kalshiOutcomeLabel!.trim()}; Polymarket ${position.pmOutcomeLabel!.trim()}` : `Outcome unavailable: ${outcomeUnavailableReason}`}>
+                      {hasCanonicalOutcomes
+                        ? <><div>K: {position.kalshiOutcomeLabel!.trim()}</div><div>PM: {position.pmOutcomeLabel!.trim()}</div></>
+                        : 'Outcome unavailable'}
+                    </td>
                     <td className="px-2 py-2 text-center"><span className="rounded bg-[var(--border-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--text-secondary)]">{position.selectionMethod?.toUpperCase() ?? 'Legacy/Unknown'}</span></td>
                     <td className="max-w-52 px-2 py-2 text-[var(--text-secondary)]">
-                      {position.kalshiOutcomeLabel && position.pmOutcomeLabel
-                        ? <><div>Kalshi {position.kalshiOutcomeLabel} — {position.kalshiSide.toUpperCase()}</div><div>Polymarket {position.pmOutcomeLabel} — {position.pmSide.toUpperCase()}</div></>
-                        : <span className="text-[var(--status-warning)]">Held outcomes unresolved</span>}
+                      <div>Kalshi {position.kalshiSide.toUpperCase()}</div><div>PM {position.pmSide.toUpperCase()}</div>
                     </td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
                     <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
                     <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market ROI'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
+                    <td tabIndex={0} className={`hidden whitespace-nowrap rounded px-2 py-2 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)] lg:table-cell ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : entryArbProfit.reason} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`}>{entryArbProfit.label}</td>
                     <td className="px-2 py-2 text-center"><StatusBadge position={position} /></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
                   isExpanded && <tr key={`detail-${position.id}`}>
-                    <td colSpan={10} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
+                    <td colSpan={12} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
                       {!relationshipVerified && <div role="alert" className={`mb-3 rounded border px-3 py-2 text-xs font-semibold ${relationshipHighSeverity ? 'border-[var(--status-negative)]/60 bg-[var(--status-negative)]/10 text-[var(--status-negative)]' : 'border-[var(--status-warning)]/50 bg-[var(--status-warning)]/10 text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'HIGH SEVERITY — ' : ''}{position.propositionRelationshipWarning || 'Legacy/unknown: canonical proposition relationship was not captured at entry.'}</div>}
                       {relationshipVerified && position.propositionRelationship && <div className="mb-3 rounded border border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10 px-3 py-2 text-xs text-[var(--text-secondary)]"><div className="font-semibold text-[var(--status-positive)]">Verified complementary payout relationship</div><div>{position.propositionRelationship.legs.kalshi.humanLabel}</div><div>{position.propositionRelationship.legs.polymarket.humanLabel}</div></div>}
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
@@ -753,6 +859,14 @@ export default function BotTraderPanel() {
                           : <span className="text-[var(--status-warning)]">Unavailable — authoritative fill evidence missing</span>}</div></div>
                         <div><span className="text-[var(--text-secondary)]">Expiry</span><div>{position.expiryDate ? new Date(position.expiryDate).toLocaleDateString() : '—'}</div></div>
                       </div>
+                      <div data-testid="entry-arb-profit-detail" className="mt-3 rounded border border-[var(--border-strong)] bg-[var(--surface-panel)] px-3 py-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[var(--text-primary)]">Entry Arb Profit</strong><span className={`tabular-nums ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`}>{entryArbProfit.label}</span></div>
+                        <div className="mt-1 text-[var(--text-secondary)]">{ENTRY_ARB_PROFIT_DESCRIPTION}.</div>
+                        {entryArbProfit.detail
+                          ? <div className="mt-1 text-[10px] text-[var(--text-muted)]">{entryArbProfit.detail}</div>
+                          : <div className="mt-1 text-[10px] text-[var(--status-warning)]">Placement snapshot provenance unavailable</div>}
+                        {!entryArbProfit.available && <div className="mt-1 font-semibold text-[var(--status-warning)]">{entryArbProfit.reason}</div>}
+                      </div>
                       {!entryCostAvailable ? (
                         <div className="mt-3 rounded border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 px-3 py-2 text-xs font-semibold text-[var(--status-warning)]">Buy Cost unavailable: {position.entryCostFailureReason || 'Recorded Buy Cost is missing or invalid'}</div>
                       ) : position.kalshiEntryGrossMicrocents == null || position.pmEntryGrossMicrocents == null ? (
@@ -760,13 +874,13 @@ export default function BotTraderPanel() {
                       ) : (
                         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
                           <div data-testid="kalshi-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {position.kalshiOutcomeLabel ? `${position.kalshiOutcomeLabel} — ` : ''}{position.kalshiSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Kalshi {hasCanonicalOutcomes ? `${position.kalshiOutcomeLabel!.trim()} — ` : ''}{position.kalshiSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesKalshi)} unit{position.sharesKalshi === 1 ? '' : 's'} · {formatExactEntryPrice(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} {entryPricePrecisionLabel(position.kalshiEntryGrossMicrocents, position.sharesKalshi)} · {formatMicrocents(position.kalshiEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.kalshiEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.kalshiEntryGrossMicrocents + (position.kalshiEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.kalshiEntryFillCount ?? 1) > 1 ? ` · ${position.kalshiEntryFillCount} fills` : ''}</div>
                             {position.kalshiEntryFills?.length ? <div data-testid="kalshi-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.kalshiEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
                           </div>
                           <div data-testid="polymarket-entry-cost" className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {position.pmOutcomeLabel ? `${position.pmOutcomeLabel} — ` : ''}{position.pmSide.toUpperCase()} entry</div>
+                            <div className="font-semibold text-[var(--text-primary)]">Polymarket {hasCanonicalOutcomes ? `${position.pmOutcomeLabel!.trim()} — ` : ''}{position.pmSide.toUpperCase()} entry</div>
                             <div className="mt-1 tabular-nums text-[var(--text-secondary)]">{INTEGER.format(position.sharesPm)} unit{position.sharesPm === 1 ? '' : 's'} · {formatExactEntryPrice(position.pmEntryGrossMicrocents, position.sharesPm)} {entryPricePrecisionLabel(position.pmEntryGrossMicrocents, position.sharesPm)} · {formatMicrocents(position.pmEntryGrossMicrocents)} gross</div>
                             <div className="tabular-nums text-[var(--text-secondary)]">{feeSplitAvailable ? <>{formatExactMicrocents((position.pmEntryFeeCents ?? 0) * 1_000_000)} execution fee · <strong className="text-[var(--text-primary)]">{formatExactMicrocents(position.pmEntryGrossMicrocents + (position.pmEntryFeeCents ?? 0) * 1_000_000)} net leg cost</strong></> : <>Platform fee allocation unavailable for this legacy entry</>}{(position.pmEntryFillCount ?? 1) > 1 ? ` · ${position.pmEntryFillCount} fills` : ''}</div>
                             {position.pmEntryFills?.length ? <div data-testid="polymarket-entry-fills" className="mt-2 border-t border-[var(--border-subtle)] pt-2 font-mono text-[10px] text-[var(--text-muted)]">{position.pmEntryFills.map((fill, index) => <div key={`${fill.priceMicrocents}-${fill.sizeMicrounits}-${index}`}>{fill.authority === 'persisted_position_aggregate' ? 'Persisted aggregate' : `Fill ${index + 1}`}: {(fill.sizeMicrounits / 1_000_000).toFixed(6)} units @ {(fill.priceMicrocents / 1_000_000).toFixed(6)}¢</div>)}</div> : <div className="mt-2 text-[10px] text-[var(--status-warning)]">Detailed fill ladder unavailable</div>}
@@ -797,7 +911,7 @@ export default function BotTraderPanel() {
                           const platformLabel = platform === 'kalshi' ? 'Kalshi' : 'Polymarket';
                           const side = platform === 'kalshi' ? position.kalshiSide : position.pmSide;
                           return <div key={platform} data-testid={`${platform}-stored-current-price`} className="rounded border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-2">
-                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {platform === 'kalshi' ? (position.kalshiOutcomeLabel ? `${position.kalshiOutcomeLabel} — ` : '') : (position.pmOutcomeLabel ? `${position.pmOutcomeLabel} — ` : '')}{side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
+                            <div className="flex items-center justify-between gap-2"><span className="font-semibold text-[var(--text-primary)]">{platformLabel} {hasCanonicalOutcomes ? `${platform === 'kalshi' ? position.kalshiOutcomeLabel!.trim() : position.pmOutcomeLabel!.trim()} — ` : ''}{side.toUpperCase()} Current Price</span><span className={snapshot.status === 'available' ? 'text-[var(--status-positive)]' : 'text-[var(--status-warning)]'}>{snapshotStateLabel(snapshot)}</span></div>
                             <div className="mt-1 tabular-nums text-[var(--text-primary)]">{snapshot.priceCents == null ? 'Unavailable' : formatCents(snapshot.priceCents)}</div>
                             <div className="text-[10px] text-[var(--text-secondary)]">{snapshot.source ? snapshot.source.replaceAll('-', ' ') : 'No persisted source'}{snapshot.observedAt ? ` · observed ${timeAgo(snapshot.observedAt)} · ${new Date(snapshot.observedAt).toLocaleString()}` : ''}</div>
                             <div className="text-[10px] font-medium text-[var(--text-secondary)]">Indicative last-scanned mark; not executable liquidation proceeds{snapshot.markFailureReason ? ` · ${snapshot.markFailureReason}` : ''}{snapshot.failureReason ? ` · Separate close evidence: ${snapshot.failureReason}` : ''}</div>
