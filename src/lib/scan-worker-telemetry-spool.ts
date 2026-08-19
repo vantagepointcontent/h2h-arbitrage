@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { RateLimiterMetricRecord } from './persistence';
-import { withSqliteBusyRetry } from './sqlite-write-retry';
 import logger from './logger';
 
 export interface WorkerTelemetryWriteHealth {
@@ -169,7 +168,10 @@ export class WorkerTelemetrySpool {
           }
           return envelope;
         }));
-        await withSqliteBusyRetry(() => this.persist(envelopes.flatMap((envelope) => envelope.records)));
+        // Auxiliary capacity telemetry has its own durable spool health. Do not
+        // charge a retained telemetry retry to canonical scan-publication
+        // exhaustion counters or hold the app writer loop for ~13 seconds.
+        await this.persist(envelopes.flatMap((envelope) => envelope.records));
         for (const fileName of batch) {
           await rm(path.join(this.spoolDir, fileName));
         }

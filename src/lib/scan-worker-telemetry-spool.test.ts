@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RateLimiterMetricRecord } from './persistence';
 import { WorkerTelemetrySpool } from './scan-worker-telemetry-spool';
+import { getSqliteContentionMetrics } from './sqlite-write-retry';
 
 const roots: string[] = [];
 
@@ -27,6 +28,21 @@ async function paths() {
 }
 
 describe('WorkerTelemetrySpool', () => {
+  it('reports auxiliary telemetry contention without incrementing canonical exhaustion counters', async () => {
+    const p = await paths();
+    getSqliteContentionMetrics(true);
+    const persist = vi.fn(async () => {
+      throw Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' });
+    });
+    const spool = new WorkerTelemetrySpool({ ...p, persist, autoDrain: false, autoRetry: false });
+    await spool.accept('job-busy', [record('2026-08-16T18:29:00.000Z')]);
+
+    await spool.drain();
+
+    expect(getSqliteContentionMetrics()).toMatchObject({ busyRetries: 0, exhaustedWrites: 0 });
+    expect(await spool.readHealth()).toMatchObject({ pendingSnapshots: 1, writeFailures: 1, error: 'database is locked' });
+  });
+
   it('retains exhausted writes and drains them after a process restart', async () => {
     const p = await paths();
     const blockedPersist = vi.fn(async () => { throw new Error('sustained writer contention'); });
