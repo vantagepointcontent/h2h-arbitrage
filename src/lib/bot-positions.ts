@@ -21,6 +21,11 @@ import {
   findCanonicalPropositionRelationship,
   resolveCanonicalPropositionRelationship,
 } from './proposition-registry';
+import type {
+  ExposureIdentityVerdict,
+  LegacyExposureVerdict,
+  RelationshipValidity,
+} from './bot-legacy-exposure-reconciliation';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -98,6 +103,152 @@ export interface BotEntryFillEvidence {
   authority?: 'persisted_position_aggregate';
 }
 
+export type EntryArbProfitUnavailableReason =
+  | 'relationship_not_verified_complementary'
+  | 'exact_outcome_identity_unverified'
+  | 'unmatched_filled_quantities'
+  | 'non_positive_filled_quantity'
+  | 'authoritative_entry_fee_missing'
+  | 'immutable_buy_cost_missing'
+  | 'entry_economics_do_not_reconcile'
+  | 'exact_leg_identity_missing';
+
+interface EntryArbProfitSnapshotBase {
+  version: 1;
+  executionMode: BotPositionExecutionMode;
+  capturedAt: string;
+}
+
+export type EntryArbProfitSnapshot = (EntryArbProfitSnapshotBase & {
+  status: 'available';
+  profitMicrousd: number;
+  currency: 'USDC';
+  monetaryUnit: 'microusd';
+  matchedQuantityMicrounits: number;
+  guaranteedPayoutMicrousd: number;
+  grossFillsMicrocents: { kalshi: number; polymarket: number };
+  entryFeesMicrousd: { kalshi: number; polymarket: number };
+  settlementFeeAssumptionMicrousd: number;
+  formula: 'guaranteed_payout_microusd-total_cost_microusd-settlement_fee_assumption_microusd';
+  formulaVersion: 1;
+  provenance: 'simulated_placement_fills' | 'authoritative_venue_fills';
+  legs: {
+    kalshi: { marketId: string; tokenId: null; side: BotPositionSide; outcome: string };
+    polymarket: { marketId: string; tokenId: string; side: BotPositionSide; outcome: string };
+  };
+  relationshipState: 'verified_complementary';
+  entryRoi: { numeratorMicrousd: number; denominatorMicrousd: number };
+}) | (EntryArbProfitSnapshotBase & {
+  status: 'unavailable';
+  reasonCode: EntryArbProfitUnavailableReason;
+  reason: string;
+  provenance: 'placement_snapshot' | 'historical_backfill';
+});
+
+export function buildEntryArbProfitSnapshot(input: {
+  executionMode: BotPositionExecutionMode;
+  relationshipState: PropositionRelationshipState;
+  outcomeIdentityStatus: 'verified' | 'unresolved';
+  kalshiMarketId: string | null;
+  pmMarketId: string | null;
+  pmTokenId: string | null;
+  kalshiSide: BotPositionSide;
+  pmSide: BotPositionSide;
+  kalshiOutcome: string | null;
+  pmOutcome: string | null;
+  sharesKalshi: number;
+  sharesPm: number;
+  kalshiGrossMicrocents: number | null;
+  pmGrossMicrocents: number | null;
+  kalshiEntryFeeMicrousd: number | null;
+  pmEntryFeeMicrousd: number | null;
+  totalCostMicrousd: number | null;
+  settlementFeeAssumptionMicrousd?: number | null;
+  capturedAt: string;
+  unavailableProvenance?: 'placement_snapshot' | 'historical_backfill';
+}): EntryArbProfitSnapshot {
+  const unavailable = (reasonCode: EntryArbProfitUnavailableReason, reason: string): EntryArbProfitSnapshot => ({
+    version: 1,
+    status: 'unavailable',
+    reasonCode,
+    reason,
+    executionMode: input.executionMode,
+    provenance: input.unavailableProvenance ?? 'placement_snapshot',
+    capturedAt: input.capturedAt,
+  });
+  if (input.relationshipState !== 'verified_complementary') {
+    return unavailable('relationship_not_verified_complementary', `Entry Arb Profit unavailable: relationship state is ${input.relationshipState}`);
+  }
+  if (input.outcomeIdentityStatus !== 'verified') {
+    return unavailable('exact_outcome_identity_unverified', 'Entry Arb Profit unavailable: exact held outcome identity is not verified');
+  }
+  if (!Number.isSafeInteger(input.sharesKalshi) || !Number.isSafeInteger(input.sharesPm)
+      || input.sharesKalshi <= 0 || input.sharesPm <= 0) {
+    return unavailable('non_positive_filled_quantity', 'Entry Arb Profit unavailable: filled quantity is missing, zero, or malformed');
+  }
+  if (input.sharesKalshi !== input.sharesPm) {
+    return unavailable('unmatched_filled_quantities', 'Entry Arb Profit unavailable: filled quantities are partial or unmatched');
+  }
+  if (!input.kalshiMarketId?.trim() || !input.pmMarketId?.trim() || !input.pmTokenId?.trim()
+      || !input.kalshiOutcome?.trim() || !input.pmOutcome?.trim()) {
+    return unavailable('exact_leg_identity_missing', 'Entry Arb Profit unavailable: exact immutable leg identity is incomplete');
+  }
+  if (!Number.isSafeInteger(input.kalshiEntryFeeMicrousd) || input.kalshiEntryFeeMicrousd! < 0
+      || !Number.isSafeInteger(input.pmEntryFeeMicrousd) || input.pmEntryFeeMicrousd! < 0) {
+    return unavailable('authoritative_entry_fee_missing', 'Entry Arb Profit unavailable: authoritative fee is missing for one or both entry legs');
+  }
+  if (!Number.isSafeInteger(input.totalCostMicrousd) || input.totalCostMicrousd! <= 0) {
+    return unavailable('immutable_buy_cost_missing', 'Entry Arb Profit unavailable: immutable Buy Cost is missing or malformed');
+  }
+  if (!Number.isSafeInteger(input.kalshiGrossMicrocents) || input.kalshiGrossMicrocents! < 0
+      || !Number.isSafeInteger(input.pmGrossMicrocents) || input.pmGrossMicrocents! < 0) {
+    return unavailable('entry_economics_do_not_reconcile', 'Entry Arb Profit unavailable: gross entry fills are missing or malformed');
+  }
+  const settlementFee = input.settlementFeeAssumptionMicrousd ?? 0;
+  if (!Number.isSafeInteger(settlementFee) || settlementFee < 0) {
+    return unavailable('entry_economics_do_not_reconcile', 'Entry Arb Profit unavailable: placement settlement-fee assumption is malformed');
+  }
+  const grossMicrousd = roundRatio(
+    BigInt(input.kalshiGrossMicrocents!) + BigInt(input.pmGrossMicrocents!),
+    100n,
+  );
+  const reconciledCost = BigInt(grossMicrousd)
+    + BigInt(input.kalshiEntryFeeMicrousd!) + BigInt(input.pmEntryFeeMicrousd!);
+  if (reconciledCost !== BigInt(input.totalCostMicrousd!)) {
+    return unavailable('entry_economics_do_not_reconcile', 'Entry Arb Profit unavailable: fills and entry fees do not reconcile to immutable Buy Cost');
+  }
+  const matchedQuantityMicrounits = BigInt(input.sharesKalshi) * 1_000_000n;
+  const guaranteedPayoutMicrousd = BigInt(input.sharesKalshi) * 1_000_000n;
+  const profitMicrousd = guaranteedPayoutMicrousd - reconciledCost - BigInt(settlementFee);
+  const exactValues = [matchedQuantityMicrounits, guaranteedPayoutMicrousd, profitMicrousd];
+  if (exactValues.some((value) => value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER))) {
+    return unavailable('entry_economics_do_not_reconcile', 'Entry Arb Profit unavailable: placement economics exceed the safe accounting range');
+  }
+  return {
+    version: 1,
+    status: 'available',
+    profitMicrousd: Number(profitMicrousd),
+    currency: 'USDC',
+    monetaryUnit: 'microusd',
+    matchedQuantityMicrounits: Number(matchedQuantityMicrounits),
+    guaranteedPayoutMicrousd: Number(guaranteedPayoutMicrousd),
+    grossFillsMicrocents: { kalshi: input.kalshiGrossMicrocents!, polymarket: input.pmGrossMicrocents! },
+    entryFeesMicrousd: { kalshi: input.kalshiEntryFeeMicrousd!, polymarket: input.pmEntryFeeMicrousd! },
+    settlementFeeAssumptionMicrousd: settlementFee,
+    formula: 'guaranteed_payout_microusd-total_cost_microusd-settlement_fee_assumption_microusd',
+    formulaVersion: 1,
+    executionMode: input.executionMode,
+    provenance: input.executionMode === 'paper' ? 'simulated_placement_fills' : 'authoritative_venue_fills',
+    legs: {
+      kalshi: { marketId: input.kalshiMarketId, tokenId: null, side: input.kalshiSide, outcome: input.kalshiOutcome },
+      polymarket: { marketId: input.pmMarketId, tokenId: input.pmTokenId, side: input.pmSide, outcome: input.pmOutcome },
+    },
+    relationshipState: 'verified_complementary',
+    entryRoi: { numeratorMicrousd: Number(profitMicrousd), denominatorMicrousd: input.totalCostMicrousd! },
+    capturedAt: input.capturedAt,
+  };
+}
+
 export interface BotPosition {
   id: number;
   executionId: number;
@@ -114,6 +265,13 @@ export interface BotPosition {
   outcomeIdentitySource?: string | null;
   outcomeIdentityRecordedAt?: string | null;
   outcomeIdentityFailureReason?: string | null;
+  relationshipValidity?: RelationshipValidity;
+  exposureIdentityStatus?: ExposureIdentityVerdict;
+  legacyExposureVerdict?: LegacyExposureVerdict | null;
+  legacyExposureRevision?: string | null;
+  legacyExposureRunId?: string | null;
+  exposureValuationLabel?: 'Verified arbitrage' | 'Invalid/unverified exposure' | 'Unavailable';
+  excludedFromVerifiedTotals?: boolean;
   propositionRelationship?: PropositionRelationship | null;
   propositionRelationshipState?: PropositionRelationshipState;
   propositionRelationshipWarning?: string | null;
@@ -173,6 +331,8 @@ export interface BotPosition {
   entryRecordVersion: number | null;
   entryRecordSource: string | null;
   entryRecordedAt: string | null;
+  /** Immutable hold-to-settlement economics captured atomically with placement. */
+  entryArbProfitSnapshot?: EntryArbProfitSnapshot;
   kalshiExitFeeType: KalshiFeeType | null;
   kalshiExitFeeMultiplierPpm: number | null;
   kalshiExitFeeSource: string | null;
@@ -260,6 +420,7 @@ export type CreateBotPosition = Omit<BotPosition,
   'expectedRoiBps' | 'expectedApyBps' | 'unitId' | 'entryCostStatus' | 'entryCostFailureReason' |
   'kalshiEntryCalculatedFeeCents' | 'kalshiEntryChargedFeeCents' |
   'unallocatedEntryFeeCents' | 'entryRecordVersion' | 'entryRecordSource' | 'entryRecordedAt' |
+  'entryArbProfitSnapshot' |
   'propositionRelationship' | 'propositionRelationshipState' | 'propositionRelationshipWarning' |
   'kalshiMarketQuestion' | 'pmMarketQuestion' | 'kalshiOutcomeLabel' | 'pmOutcomeLabel' |
   'outcomeIdentityStatus' | 'outcomeIdentitySource' | 'outcomeIdentityRecordedAt' | 'outcomeIdentityFailureReason'
@@ -1086,6 +1247,33 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
   const auditedPmEntryToken = historicalAuditPmEntryToken(historicalAudit);
   const exactHeldIdentityVerified = outcomeIdentityVerified
     || (auditedInvalid && auditedLegMetadata != null && auditedPmEntryToken != null);
+  const hasAppliedLegacyExposureVerdict = row.legacy_exposure_revision != null
+    && String(row.legacy_exposure_revision).trim().length > 0;
+  const relationshipValidity: RelationshipValidity = hasAppliedLegacyExposureVerdict && (row.relationship_validity === 'verified_complementary'
+    || row.relationship_validity === 'confirmed_invalid'
+    || row.relationship_validity === 'unresolved_relationship'
+    || row.relationship_validity === 'non_exhaustive_conflicting')
+    ? row.relationship_validity
+    : outcomeIdentityVerified ? 'verified_complementary'
+      : auditedInvalid ? 'confirmed_invalid'
+        : storedRelationshipInvalid || storedVerifiedWithoutRelationship
+          ? 'non_exhaustive_conflicting' : 'unresolved_relationship';
+  const exposureIdentityStatus: ExposureIdentityVerdict = hasAppliedLegacyExposureVerdict && (row.exposure_identity_status === 'exact_held_legs_proven'
+    || row.exposure_identity_status === 'partially_proven'
+    || row.exposure_identity_status === 'no_fill_rolled_back'
+    || row.exposure_identity_status === 'unrecoverable')
+    ? row.exposure_identity_status
+    : exactHeldIdentityVerified ? 'exact_held_legs_proven' : 'unrecoverable';
+  let legacyExposureVerdict: LegacyExposureVerdict | null = null;
+  try {
+    const parsed = row.legacy_exposure_verdict_json == null
+      ? null : JSON.parse(String(row.legacy_exposure_verdict_json)) as LegacyExposureVerdict;
+    if (parsed?.version === 1
+      && parsed.relationshipValidity === relationshipValidity
+      && parsed.exposureIdentity === exposureIdentityStatus) legacyExposureVerdict = parsed;
+  } catch {
+    legacyExposureVerdict = null;
+  }
   const kalshiEntryFills = parseEntryFills(row.kalshi_entry_fills_json);
   const pmEntryFills = parseEntryFills(row.pm_entry_fills_json);
   const entryCostAvailable = row.entry_cost_status === 'available'
@@ -1101,6 +1289,27 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
       + Number(row.entry_cost_rounding_delta_microcents)
     && entryFillsReconcile(kalshiEntryFills, Number(row.shares_kalshi), Number(row.kalshi_entry_gross_microcents), 'Kalshi')
     && entryFillsReconcile(pmEntryFills, Number(row.shares_pm), Number(row.pm_entry_gross_microcents), 'Polymarket');
+  let entryArbProfitSnapshot: EntryArbProfitSnapshot;
+  try {
+    const parsed: unknown = row.entry_arb_profit_snapshot_json == null
+      ? null : JSON.parse(String(row.entry_arb_profit_snapshot_json));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+        || (parsed as { version?: unknown }).version !== 1
+        || !['available', 'unavailable'].includes(String((parsed as { status?: unknown }).status))) {
+      throw new Error('snapshot missing or malformed');
+    }
+    entryArbProfitSnapshot = parsed as EntryArbProfitSnapshot;
+  } catch {
+    entryArbProfitSnapshot = {
+      version: 1,
+      status: 'unavailable',
+      reasonCode: 'exact_outcome_identity_unverified',
+      reason: 'Entry Arb Profit unavailable: historical position has no recoverable placement snapshot',
+      executionMode,
+      provenance: 'historical_backfill',
+      capturedAt: row.entry_recorded_at != null ? String(row.entry_recorded_at) : String(row.opened_at ?? ''),
+    };
+  }
   return {
     id: Number(row.id),
     executionId: Number(row.execution_id),
@@ -1125,6 +1334,17 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
       : row.outcome_identity_failure_reason != null
         ? String(row.outcome_identity_failure_reason)
         : 'Persisted held outcome identity is not bound to a server-owned canonical exact-leg relationship',
+    relationshipValidity,
+    exposureIdentityStatus,
+    legacyExposureVerdict,
+    legacyExposureRevision: row.legacy_exposure_revision == null ? null : String(row.legacy_exposure_revision),
+    legacyExposureRunId: row.legacy_exposure_run_id == null ? null : String(row.legacy_exposure_run_id),
+    exposureValuationLabel: exposureIdentityStatus !== 'exact_held_legs_proven'
+      ? 'Unavailable'
+      : relationshipValidity === 'verified_complementary'
+        ? 'Verified arbitrage' : 'Invalid/unverified exposure',
+    excludedFromVerifiedTotals: relationshipValidity !== 'verified_complementary'
+      || exposureIdentityStatus !== 'exact_held_legs_proven',
     propositionRelationship: outcomeIdentityVerified ? canonicalEntryRelationship : null,
     propositionRelationshipState: (outcomeIdentityVerified
       ? 'verified_complementary'
@@ -1202,6 +1422,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     entryRecordVersion: row.entry_record_version != null ? Number(row.entry_record_version) : null,
     entryRecordSource: row.entry_record_source != null ? String(row.entry_record_source) : null,
     entryRecordedAt: row.entry_recorded_at != null ? String(row.entry_recorded_at) : null,
+    entryArbProfitSnapshot,
     kalshiExitFeeType: isKalshiFeeType(row.kalshi_exit_fee_type) ? row.kalshi_exit_fee_type : null,
     kalshiExitFeeMultiplierPpm: row.kalshi_exit_fee_multiplier_ppm != null ? Number(row.kalshi_exit_fee_multiplier_ppm) : null,
     kalshiExitFeeSource: row.kalshi_exit_fee_source != null ? String(row.kalshi_exit_fee_source) : null,
@@ -1471,6 +1692,11 @@ export class BotPositionStore {
         outcome_identity_source TEXT,
         outcome_identity_recorded_at TEXT,
         outcome_identity_failure_reason TEXT,
+        relationship_validity TEXT NOT NULL DEFAULT 'unresolved_relationship',
+        exposure_identity_status TEXT NOT NULL DEFAULT 'unrecoverable',
+        legacy_exposure_verdict_json TEXT,
+        legacy_exposure_revision TEXT,
+        legacy_exposure_run_id TEXT,
         kalshi_side TEXT NOT NULL CHECK (kalshi_side IN ('yes', 'no')),
         pm_side TEXT NOT NULL CHECK (pm_side IN ('yes', 'no')),
         buy_price_kalshi INTEGER NOT NULL,
@@ -1527,6 +1753,7 @@ export class BotPositionStore {
         entry_record_version INTEGER,
         entry_record_source TEXT,
         entry_recorded_at TEXT,
+        entry_arb_profit_snapshot_json TEXT,
         kalshi_exit_fee_type TEXT,
         kalshi_exit_fee_multiplier_ppm INTEGER,
         kalshi_exit_fee_source TEXT,
@@ -1606,6 +1833,11 @@ export class BotPositionStore {
       outcome_identity_source: 'TEXT',
       outcome_identity_recorded_at: 'TEXT',
       outcome_identity_failure_reason: 'TEXT',
+      relationship_validity: "TEXT NOT NULL DEFAULT 'unresolved_relationship'",
+      exposure_identity_status: "TEXT NOT NULL DEFAULT 'unrecoverable'",
+      legacy_exposure_verdict_json: 'TEXT',
+      legacy_exposure_revision: 'TEXT',
+      legacy_exposure_run_id: 'TEXT',
       kalshi_side: "TEXT NOT NULL DEFAULT 'yes'",
       pm_side: "TEXT NOT NULL DEFAULT 'no'",
       buy_price_kalshi: 'INTEGER NOT NULL DEFAULT 0',
@@ -1662,6 +1894,7 @@ export class BotPositionStore {
       entry_record_version: 'INTEGER',
       entry_record_source: 'TEXT',
       entry_recorded_at: 'TEXT',
+      entry_arb_profit_snapshot_json: 'TEXT',
       kalshi_exit_fee_type: 'TEXT',
       kalshi_exit_fee_multiplier_ppm: 'INTEGER',
       kalshi_exit_fee_source: 'TEXT',
@@ -1918,6 +2151,28 @@ export class BotPositionStore {
     );
     const expectedRoiBps = input.expectedRoiBps
       ?? roiBps(input.expectedProfitCents, input.totalCostCents);
+    const entryArbProfitSnapshot = buildEntryArbProfitSnapshot({
+      executionMode: input.executionMode,
+      relationshipState: canonicalRelationship ? 'verified_complementary' : input.propositionRelationshipState ?? 'unknown',
+      outcomeIdentityStatus: input.outcomeIdentityStatus ?? 'unresolved',
+      kalshiMarketId: input.kalshiTicker,
+      pmMarketId: input.pmConditionId,
+      pmTokenId: input.pmEntryTokenId,
+      kalshiSide: input.kalshiSide,
+      pmSide: input.pmSide,
+      kalshiOutcome: input.kalshiOutcomeLabel ?? null,
+      pmOutcome: input.pmOutcomeLabel ?? null,
+      sharesKalshi: input.sharesKalshi,
+      sharesPm: input.sharesPm,
+      kalshiGrossMicrocents: kalshiEntryGrossMicrocents,
+      pmGrossMicrocents: pmEntryGrossMicrocents,
+      kalshiEntryFeeMicrousd: Number.isSafeInteger(input.kalshiEntryFeeCents)
+        ? input.kalshiEntryFeeCents * 10_000 : null,
+      pmEntryFeeMicrousd: input.pmEntryFeeMicrousd ?? null,
+      totalCostMicrousd: input.totalCostMicrousd ?? null,
+      settlementFeeAssumptionMicrousd: 0,
+      capturedAt: input.openedAt,
+    });
 
     let result;
     const transaction = await this.client.transaction('write');
@@ -1949,11 +2204,12 @@ export class BotPositionStore {
           status, opened_at, expiry_date, current_price_kalshi,
           current_price_pm, current_value, unrealized_pnl, unrealized_roi_pct,
           last_valuation_at, selection_method,
-          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at
+          entry_fee_unallocated, entry_record_version, entry_record_source, entry_recorded_at,
+          entry_arb_profit_snapshot_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.executionId, input.executionMode, input.marketId, input.marketTitle, input.kalshiTicker,
           input.pmConditionId, input.strategy, input.kalshiSide, input.pmSide,
@@ -1988,7 +2244,7 @@ export class BotPositionStore {
           input.openedAt,
           input.expiryDate, null, null, null, null, null, null,
           input.selectionMethod ?? null,
-          0, 1, 'bot_position_create', input.openedAt,
+          0, 1, 'bot_position_create', input.openedAt, JSON.stringify(entryArbProfitSnapshot),
         ],
       });
       const insertedId = Number(result.lastInsertRowid ?? 0);
@@ -2007,12 +2263,15 @@ export class BotPositionStore {
         sql: `UPDATE bot_positions SET
           kalshi_market_question = ?, pm_market_question = ?, kalshi_outcome_label = ?, pm_outcome_label = ?,
           outcome_identity_status = ?, outcome_identity_source = ?, outcome_identity_recorded_at = ?,
-          outcome_identity_failure_reason = ? WHERE id = ?`,
+          outcome_identity_failure_reason = ?, relationship_validity = ?, exposure_identity_status = ?
+          WHERE id = ?`,
         args: [
           input.kalshiMarketQuestion ?? null, input.pmMarketQuestion ?? null,
           input.kalshiOutcomeLabel ?? null, input.pmOutcomeLabel ?? null,
           input.outcomeIdentityStatus ?? 'unresolved', input.outcomeIdentitySource ?? null,
           input.outcomeIdentityRecordedAt ?? null, input.outcomeIdentityFailureReason ?? null,
+          canonicalRelationship ? 'verified_complementary' : 'unresolved_relationship',
+          canonicalRelationship ? 'exact_held_legs_proven' : 'unrecoverable',
           insertedId,
         ],
       });
@@ -2049,6 +2308,75 @@ export class BotPositionStore {
       args: [executionMode, kalshiTicker, pmConditionId],
     });
     return result.rows.length > 0;
+  }
+
+  async backfillEntryArbProfitSnapshots(batchSize = 250): Promise<{
+    inspected: number;
+    recovered: number;
+    unrecoverable: number;
+    conflicted: number;
+  }> {
+    await this.ensureSchema();
+    const boundedBatchSize = Math.min(1_000, Math.max(1, Math.trunc(batchSize)));
+    const report = { inspected: 0, recovered: 0, unrecoverable: 0, conflicted: 0 };
+    let afterId = 0;
+    while (true) {
+      const rows = await this.client.execute({
+        sql: `SELECT bp.*, e.dry_run FROM bot_positions bp
+          LEFT JOIN executions e ON e.id = bp.execution_id
+          WHERE bp.id > ? AND bp.entry_arb_profit_snapshot_json IS NULL
+          ORDER BY bp.id ASC LIMIT ?`,
+        args: [afterId, boundedBatchSize],
+      });
+      if (rows.rows.length === 0) break;
+      for (const raw of rows.rows) {
+        const row = raw as Record<string, unknown>;
+        afterId = Number(row.id);
+        report.inspected += 1;
+        const position = rowToPosition(row);
+        const snapshot = buildEntryArbProfitSnapshot({
+          executionMode: position.executionMode,
+          relationshipState: position.propositionRelationshipState ?? 'unknown',
+          outcomeIdentityStatus: position.outcomeIdentityStatus ?? 'unresolved',
+          kalshiMarketId: position.kalshiTicker,
+          pmMarketId: position.pmConditionId,
+          pmTokenId: position.pmEntryTokenId,
+          kalshiSide: position.kalshiSide,
+          pmSide: position.pmSide,
+          kalshiOutcome: position.kalshiOutcomeLabel ?? null,
+          pmOutcome: position.pmOutcomeLabel ?? null,
+          sharesKalshi: position.sharesKalshi,
+          sharesPm: position.sharesPm,
+          kalshiGrossMicrocents: position.entryCostStatus === 'available'
+            ? position.kalshiEntryGrossMicrocents ?? null : null,
+          pmGrossMicrocents: position.entryCostStatus === 'available'
+            ? position.pmEntryGrossMicrocents ?? null : null,
+          kalshiEntryFeeMicrousd: position.entryCostStatus === 'available'
+            && Number.isSafeInteger(position.kalshiEntryFeeCents)
+            ? position.kalshiEntryFeeCents * 10_000 : null,
+          pmEntryFeeMicrousd: position.entryCostStatus === 'available'
+            ? position.pmEntryFeeMicrousd ?? null : null,
+          totalCostMicrousd: position.entryCostStatus === 'available'
+            ? position.totalCostMicrousd ?? null : null,
+          settlementFeeAssumptionMicrousd: 0,
+          capturedAt: position.entryRecordedAt ?? position.openedAt,
+          unavailableProvenance: 'historical_backfill',
+        });
+        const updated = await this.client.execute({
+          sql: `UPDATE bot_positions SET entry_arb_profit_snapshot_json = ?
+            WHERE id = ? AND entry_arb_profit_snapshot_json IS NULL`,
+          args: [JSON.stringify(snapshot), position.id],
+        });
+        if (Number(updated.rowsAffected) !== 1) {
+          report.conflicted += 1;
+        } else if (snapshot.status === 'available') {
+          report.recovered += 1;
+        } else {
+          report.unrecoverable += 1;
+        }
+      }
+    }
+    return report;
   }
 
   private pairKey(kalshiTicker: string, pmConditionId: string): string {
@@ -2307,6 +2635,7 @@ export class BotPositionStore {
       INNER JOIN executions e ON e.id = bp.execution_id
       ${where}
       ORDER BY bp.opened_at DESC
+      LIMIT 1000
     `, args });
     return result.rows.map((row) => rowToPosition(row as Record<string, unknown>));
   }
@@ -2952,10 +3281,29 @@ export interface BotPerformanceSummary {
   entryCost: { available: number; unavailable: number };
   pnl: { realizedCents: number; unrealizedCents: number | null; totalCents: number | null; roiBps: number | null };
   valuation: { fresh: number; stale: number; unavailable: number; pendingSettlement: number; asOf: string | null };
+  classification: {
+    counts: {
+      verifiedComplementary: number; confirmedInvalid: number; exactExposureUnresolved: number;
+      partialIdentity: number; noFillRolledBack: number; unrecoverable: number;
+      stillUnavailable: number; excludedFromVerifiedTotals: number; conflicts: number;
+    };
+    verifiedArbitrage: BotExposureCohortSummary;
+    invalidExposure: BotExposureCohortSummary;
+    unresolvedExposure: BotExposureCohortSummary;
+    unavailable: BotExposureCohortSummary;
+  };
   entryCohorts: Array<{
     date: string; deployedCents: number | null; currentCents: number | null; heldToResolutionCents: number;
     realizedCents: number; unrealizedCents: number | null; trades: number;
   }>;
+}
+
+export interface BotExposureCohortSummary {
+  count: number;
+  deployedCents: number | null;
+  currentValueCents: number | null;
+  pnlCents: number | null;
+  roiBps: number | null;
 }
 
 const BOT_VALUATION_STALE_MS = 15 * 60_000;
@@ -3016,6 +3364,55 @@ function heldPayoutCents(position: BotPosition): number {
 
 export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): BotPerformanceSummary {
   const total = (values: number[]) => values.reduce((sum, value) => sum + value, 0);
+  const allRows = rows;
+  const exactExposure = (position: BotPosition) => position.exposureIdentityStatus == null
+    || position.exposureIdentityStatus === 'exact_held_legs_proven';
+  const verifiedRelationship = (position: BotPosition) => position.relationshipValidity == null
+    || position.relationshipValidity === 'verified_complementary';
+  const verifiedRows = allRows.filter((position) => exactExposure(position) && verifiedRelationship(position));
+  const invalidRows = allRows.filter((position) => exactExposure(position)
+    && (position.relationshipValidity === 'confirmed_invalid'
+      || position.relationshipValidity === 'non_exhaustive_conflicting'));
+  const unresolvedRows = allRows.filter((position) => exactExposure(position)
+    && position.relationshipValidity === 'unresolved_relationship');
+  const unavailableRows = allRows.filter((position) => !exactExposure(position));
+  const cohortSummary = (cohort: BotPosition[]): BotExposureCohortSummary => {
+    const costsAvailable = cohort.every(hasAvailableEntryCost);
+    const deployedCents = costsAvailable ? total(cohort.map(analyticsBuyCostCents)) : null;
+    const values = cohort.map((position) => isOpenPosition(position)
+      ? position.currentValueCents
+      : hasVerifiedTerminalAccounting(position) ? position.resolutionPayoutCents ?? null : null);
+    const pnls = cohort.map((position) => isOpenPosition(position)
+      ? position.unrealizedPnlCents
+      : hasVerifiedTerminalAccounting(position) ? position.realizedPnlCents ?? null : null);
+    const currentValueCents = values.some((value) => value == null)
+      ? null : total(values as number[]);
+    const pnlCents = pnls.some((value) => value == null) ? null : total(pnls as number[]);
+    const roiBps = pnlCents == null || deployedCents == null || deployedCents <= 0
+      ? null : Number((BigInt(pnlCents) * 10_000n + BigInt(pnlCents < 0 ? -deployedCents : deployedCents) / 2n)
+        / BigInt(deployedCents));
+    return { count: cohort.length, deployedCents, currentValueCents, pnlCents, roiBps };
+  };
+  const classification: BotPerformanceSummary['classification'] = {
+    counts: {
+      verifiedComplementary: verifiedRows.length,
+      confirmedInvalid: allRows.filter((position) => position.relationshipValidity === 'confirmed_invalid').length,
+      exactExposureUnresolved: unresolvedRows.length,
+      partialIdentity: allRows.filter((position) => position.exposureIdentityStatus === 'partially_proven').length,
+      noFillRolledBack: allRows.filter((position) => position.exposureIdentityStatus === 'no_fill_rolled_back').length,
+      unrecoverable: allRows.filter((position) => position.exposureIdentityStatus === 'unrecoverable').length,
+      stillUnavailable: unavailableRows.length,
+      excludedFromVerifiedTotals: allRows.length - verifiedRows.length,
+      conflicts: allRows.filter((position) => position.relationshipValidity === 'non_exhaustive_conflicting').length,
+    },
+    verifiedArbitrage: cohortSummary(verifiedRows),
+    invalidExposure: cohortSummary(invalidRows),
+    unresolvedExposure: cohortSummary(unresolvedRows),
+    unavailable: cohortSummary(unavailableRows),
+  };
+  // Primary cards and charts remain the verified-arbitrage cohort. Exact but
+  // invalid/unresolved exposure is truthful in its separate cohort only.
+  rows = verifiedRows;
   const roundMicrocents = (value: number) => {
     if (!Number.isSafeInteger(value)) throw new Error('Indicative aggregate exceeds safe integer range');
     const numerator = BigInt(value);
@@ -3103,7 +3500,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       : roundMicrocents(exactUnrealizedByDate.get(point.date) ?? 0),
   }));
   return {
-    positionIds: rows.map((position) => position.id),
+    positionIds: allRows.map((position) => position.id),
     capital: {
       deployedCents,
       currentCents,
@@ -3132,6 +3529,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       pendingSettlement: unverifiedSettled.length,
       asOf: Number.isFinite(oldestMarkedMs) ? new Date(oldestMarkedMs).toISOString() : null,
     },
+    classification,
     entryCohorts,
   };
 }

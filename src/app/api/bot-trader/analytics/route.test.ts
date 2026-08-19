@@ -184,13 +184,14 @@ describe('GET /api/bot-trader/analytics', () => {
     expect(body.analytics.performance).toEqual({ capital: { currentCents: 99 }, pnl: { unrealizedCents: null } });
   });
 
-  it('excludes a token-priced row when immutable human outcome identity is unresolved', async () => {
+  it('values exact-token unresolved exposure while excluding it from verified-arbitrage totals', async () => {
     vi.mocked(getBotPositionAnalytics).mockResolvedValue({ positions: [{
       id: 181, marketId: 'm181', kalshiTicker: 'KX-NY21-R', kalshiSide: 'yes',
       pmConditionId: '0xdemocratic-question', pmEntryTokenId: 'democratic-no-token', pmSide: 'no',
       outcomeIdentityStatus: 'unresolved', outcomeIdentityFailureReason: 'Execution-time selected outcome was not persisted',
+      relationshipValidity: 'unresolved_relationship', exposureIdentityStatus: 'exact_held_legs_proven',
       remainingSharesKalshi: 1, remainingSharesPm: 1, status: 'open', entryCostStatus: 'available',
-      totalCostCents: 97, currentValueCents: null, unrealizedPnlCents: null,
+      totalCostCents: 97, totalCostMicrousd: 970_000, currentValueCents: null, unrealizedPnlCents: null,
     }] } as never);
     vi.mocked(getPersistedCurrentPriceBatch).mockResolvedValue(new Map([
       ['kalshi|kx-ny21-r|yes|', { status: 'available', priceCents: 70, source: 'saved-market-full-scan', observedAt: '2026-08-19T12:00:00Z', ageMs: 0 }],
@@ -199,11 +200,13 @@ describe('GET /api/bot-trader/analytics', () => {
 
     const body = await (await GET(new NextRequest('http://localhost/api/bot-trader/analytics'))).json();
     expect(body.analytics.positions[0]).toMatchObject({
-      currentValueCents: null,
-      unrealizedPnlCents: null,
-      unrealizedRoiBps: null,
-      valuationStatus: 'unavailable',
-      valuationFailureReason: 'Execution-time selected outcome was not persisted',
+      currentValueCents: 99,
+      unrealizedPnlCents: 2,
+      unrealizedRoiBps: 206,
+      valuationStatus: 'current',
+      valuationFailureReason: null,
+      exposureValuationLabel: 'Invalid/unverified exposure',
+      excludedFromVerifiedTotals: true,
     });
   });
 

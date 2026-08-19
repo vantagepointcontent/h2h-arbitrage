@@ -63,8 +63,12 @@ function applyPersistedIndicativeValuation(
   polymarket: PersistedPriceSnapshot,
 ): BotPosition {
   if (position.status !== 'open') return position;
-  if (position.outcomeIdentityStatus !== 'verified'
-    || !position.kalshiOutcomeLabel?.trim() || !position.pmOutcomeLabel?.trim()) {
+  const exactExposureProven = position.exposureIdentityStatus === 'exact_held_legs_proven'
+    || (position.exposureIdentityStatus == null
+      && position.outcomeIdentityStatus === 'verified'
+      && Boolean(position.kalshiOutcomeLabel?.trim())
+      && Boolean(position.pmOutcomeLabel?.trim()));
+  if (!exactExposureProven) {
     return {
       ...position,
       currentPriceKalshiCents: null,
@@ -74,7 +78,9 @@ function applyPersistedIndicativeValuation(
       unrealizedRoiBps: null,
       valuationStatus: 'unavailable',
       valuationFailureReason: position.outcomeIdentityFailureReason?.trim()
-        || 'Immutable execution-time held outcome identity is unresolved',
+        || 'Exact immutable held-leg exposure identity is not proven',
+      exposureValuationLabel: 'Unavailable',
+      excludedFromVerifiedTotals: true,
     };
   }
   const available = (snapshot: PersistedPriceSnapshot) =>
@@ -160,6 +166,9 @@ function applyPersistedIndicativeValuation(
       .sort().at(-1) ?? lastValuationAt : null,
     unrealizedPnlCents,
     unrealizedRoiBps,
+    exposureValuationLabel: position.relationshipValidity === 'verified_complementary'
+      ? 'Verified arbitrage' : 'Invalid/unverified exposure',
+    excludedFromVerifiedTotals: position.relationshipValidity !== 'verified_complementary',
   };
 }
 

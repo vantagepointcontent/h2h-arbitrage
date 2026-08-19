@@ -48,7 +48,7 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.3.0',
+    version: '1.4.0',
     description: 'Scanner, saved-market, and BotTrader settlement contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
@@ -81,7 +81,10 @@ const openapi = {
       description: 'Bot position records with authoritative per-leg settlement state',
       content: { 'application/json': { schema: { $ref: '#/components/schemas/BotPositionPage' } } },
     } } } },
-
+    '/api/bot-trader/analytics': { get: { summary: 'Read bounded BotTrader analytics with immutable entry economics', responses: { '200': {
+      description: 'BotTrader analytics and positions; reads persisted data only',
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/BotAnalyticsResponse' } } },
+    } } } },
   },
   components: {
     schemas: {
@@ -157,7 +160,13 @@ const openapi = {
       BotPositionSettlementProjection: {
         type: 'object', additionalProperties: true,
         properties: {
-
+          entryArbProfitSnapshot: { $ref: '#/components/schemas/EntryArbProfitSnapshot' },
+          relationshipValidity: { $ref: '#/components/schemas/RelationshipValidity' },
+          exposureIdentityStatus: { $ref: '#/components/schemas/ExposureIdentityStatus' },
+          exposureValuationLabel: { type: 'string', enum: ['Verified arbitrage', 'Invalid/unverified exposure', 'Unavailable'] },
+          excludedFromVerifiedTotals: { type: 'boolean' },
+          legacyExposureRevision: { type: ['string', 'null'] },
+          legacyExposureVerdict: { $ref: '#/components/schemas/LegacyExposureVerdict' },
           settlementState: { type: 'string', enum: ['open', 'partially_settled', 'settlement_pending', 'settlement_unresolved', 'settled'] },
           settlementLegs: { type: 'array', items: { $ref: '#/components/schemas/BotSettlementLeg' } },
           settlementGrossProceedsCents: nullableInteger,
@@ -169,7 +178,79 @@ const openapi = {
           realizedRoiBps: nullableInteger,
         },
       },
-
+      RelationshipValidity: {
+        type: 'string', enum: ['verified_complementary', 'confirmed_invalid', 'unresolved_relationship', 'non_exhaustive_conflicting'],
+      },
+      ExposureIdentityStatus: {
+        type: 'string', enum: ['exact_held_legs_proven', 'partially_proven', 'no_fill_rolled_back', 'unrecoverable'],
+      },
+      LegacyExposureVerdict: {
+        type: ['object', 'null'], additionalProperties: true,
+        required: ['version', 'relationshipValidity', 'exposureIdentity', 'valuationClass', 'executionMode',
+          'simulated', 'exactLegs', 'reason', 'evidence', 'excludedFromVerifiedTotals', 'revision'],
+        properties: {
+          version: { type: 'integer', const: 1 },
+          relationshipValidity: { $ref: '#/components/schemas/RelationshipValidity' },
+          exposureIdentity: { $ref: '#/components/schemas/ExposureIdentityStatus' },
+          valuationClass: { type: 'string', enum: ['verified_arbitrage', 'invalid_unverified_exposure', 'unavailable'] },
+          executionMode: { type: 'string', enum: ['paper', 'live'] },
+          simulated: { type: 'boolean' },
+          exactLegs: { type: 'object', additionalProperties: true },
+          reason: { type: 'string' },
+          evidence: { type: 'array', items: { type: 'object', additionalProperties: false,
+            required: ['source', 'revision', 'capturedAt', 'confidence'], properties: {
+              source: { type: 'string' }, revision: { type: 'string' }, capturedAt: { type: 'string', format: 'date-time' },
+              confidence: { type: 'string', enum: ['canonical', 'exact_immutable_execution', 'fingerprinted_audit'] },
+            } } },
+          excludedFromVerifiedTotals: { type: 'boolean' },
+          revision: { type: 'string' },
+        },
+      },
+      EntryArbProfitRoi: {
+        type: 'object', additionalProperties: false,
+        required: ['numeratorMicrousd', 'denominatorMicrousd'],
+        properties: {
+          numeratorMicrousd: { type: 'integer' },
+          denominatorMicrousd: { type: 'integer', minimum: 1 },
+        },
+      },
+      EntryArbProfitSnapshot: {
+        type: 'object', additionalProperties: true,
+        required: ['version', 'status', 'executionMode', 'capturedAt'],
+        properties: {
+          version: { type: 'integer', const: 1 },
+          status: { type: 'string', enum: ['available', 'unavailable'] },
+          profitMicrousd: { type: 'integer' },
+          currency: { type: 'string', const: 'USDC' },
+          monetaryUnit: { type: 'string', const: 'microusd' },
+          matchedQuantityMicrounits: { type: 'integer', minimum: 1 },
+          guaranteedPayoutMicrousd: { type: 'integer', minimum: 1 },
+          grossFillsMicrocents: { type: 'object', additionalProperties: false, required: ['kalshi', 'polymarket'], properties: {
+            kalshi: { type: 'integer', minimum: 0 }, polymarket: { type: 'integer', minimum: 0 },
+          } },
+          entryFeesMicrousd: { type: 'object', additionalProperties: false, required: ['kalshi', 'polymarket'], properties: {
+            kalshi: { type: 'integer', minimum: 0 }, polymarket: { type: 'integer', minimum: 0 },
+          } },
+          settlementFeeAssumptionMicrousd: { type: 'integer', minimum: 0 },
+          formula: { type: 'string' },
+          formulaVersion: { type: 'integer', const: 1 },
+          executionMode: { type: 'string', enum: ['paper', 'live'] },
+          provenance: { type: 'string', enum: ['simulated_placement_fills', 'authoritative_venue_fills', 'placement_snapshot', 'historical_backfill'] },
+          relationshipState: { type: 'string', const: 'verified_complementary' },
+          entryRoi: { $ref: '#/components/schemas/EntryArbProfitRoi' },
+          legs: { type: 'object', additionalProperties: false, required: ['kalshi', 'polymarket'], properties: {
+            kalshi: { type: 'object', additionalProperties: false, required: ['marketId', 'tokenId', 'side', 'outcome'], properties: {
+              marketId: { type: 'string' }, tokenId: { type: 'null' }, side: { type: 'string', enum: ['yes', 'no'] }, outcome: { type: 'string' },
+            } },
+            polymarket: { type: 'object', additionalProperties: false, required: ['marketId', 'tokenId', 'side', 'outcome'], properties: {
+              marketId: { type: 'string' }, tokenId: { type: 'string' }, side: { type: 'string', enum: ['yes', 'no'] }, outcome: { type: 'string' },
+            } },
+          } },
+          reasonCode: { type: 'string' },
+          reason: { type: 'string' },
+          capturedAt: { type: 'string', format: 'date-time' },
+        },
+      },
       BotPositionPage: {
         type: 'object', additionalProperties: true,
         required: ['success', 'count', 'marketCount', 'markets', 'nextCursor', 'positions'],
@@ -182,7 +263,16 @@ const openapi = {
           positions: { type: 'array', items: { $ref: '#/components/schemas/BotPositionSettlementProjection' } },
         },
       },
-
+      BotAnalyticsResponse: {
+        type: 'object', additionalProperties: true,
+        required: ['success', 'analytics'],
+        properties: {
+          success: { type: 'boolean', const: true },
+          analytics: { type: 'object', additionalProperties: true, properties: {
+            positions: { type: 'array', maxItems: 1000, items: { $ref: '#/components/schemas/BotPositionSettlementProjection' } },
+          } },
+        },
+      },
       SettlementTimingSource: timingSource,
       EarlyDetermination: {
         type: 'object', required: ['eligible', 'condition', 'source'], additionalProperties: false,

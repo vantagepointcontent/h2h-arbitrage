@@ -21,6 +21,27 @@ type PerformanceMethod = 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy';
 type PerformanceRange = 'today' | '7d' | '30d' | '90d' | 'all';
 type SortKey = 'openedAt' | 'pnl' | 'roi';
 type SortDirection = 'asc' | 'desc';
+type RelationshipValidity = 'verified_complementary' | 'confirmed_invalid' | 'unresolved_relationship' | 'non_exhaustive_conflicting';
+type ExposureIdentityVerdict = 'exact_held_legs_proven' | 'partially_proven' | 'no_fill_rolled_back' | 'unrecoverable';
+
+interface LegacyExposureVerdict {
+  version: 1;
+  relationshipValidity: RelationshipValidity;
+  exposureIdentity: ExposureIdentityVerdict;
+  valuationClass: 'verified_arbitrage' | 'invalid_unverified_exposure' | 'unavailable';
+  executionMode: 'paper' | 'live';
+  simulated: boolean;
+  exactLegs: {
+    kalshi: { marketId: string | null; tokenId: null; side: 'yes' | 'no'; requestedQuantity: number | null; filledQuantity: number | null; orderId: string | null; marketQuestion: string | null; outcomeLabel: string | null };
+    polymarket: { marketId: string | null; tokenId: string | null; side: 'yes' | 'no'; requestedQuantity: number | null; filledQuantity: number | null; orderId: string | null; marketQuestion: string | null; outcomeLabel: string | null };
+  };
+  reason: string;
+  evidence: Array<{ source: string; revision: string; capturedAt: string; confidence: 'canonical' | 'exact_immutable_execution' | 'fingerprinted_audit' }>;
+  excludedFromVerifiedTotals: boolean;
+  tradeAuthorization: 'denied';
+  closeAuthorization: 'denied';
+  revision: string;
+}
 
 interface StoredPriceSnapshot {
   status: 'available' | 'stale' | 'unavailable' | 'missing_identifier' | 'side_mismatch' | 'never_saved';
@@ -69,6 +90,13 @@ interface BotPosition {
   outcomeIdentityRecordedAt?: string | null;
   outcomeIdentityFailureReason?: string | null;
   pmEntryTokenId?: string | null;
+  relationshipValidity?: RelationshipValidity;
+  exposureIdentityStatus?: ExposureIdentityVerdict;
+  legacyExposureVerdict?: LegacyExposureVerdict | null;
+  legacyExposureRevision?: string | null;
+  legacyExposureRunId?: string | null;
+  exposureValuationLabel?: 'Verified arbitrage' | 'Invalid/unverified exposure' | 'Unavailable';
+  excludedFromVerifiedTotals?: boolean;
   propositionRelationship?: {
     humanLabel: string;
     legs: { kalshi: { humanLabel: string }; polymarket: { humanLabel: string } };
@@ -447,6 +475,78 @@ function StatusBadge({ position }: { position: BotPosition }) {
   return <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[style]}`}>{label}</span>;
 }
 
+type ExposureClassification = {
+  label: 'Verified arb' | 'Invalid exposure' | 'Relationship unverified' | 'Legacy identity missing' | 'Settlement unresolved' | 'No exposure';
+  style: string;
+  detail: string;
+  reasons: string[];
+  evidence: LegacyExposureVerdict['evidence'];
+  missingIdentifiers: string[];
+  isExposureOnly: boolean;
+  excludedFromVerifiedTotals: boolean;
+};
+
+function exposureClassification(position: BotPosition, entryArbProfit: ReturnType<typeof entryArbProfitPresentation>): ExposureClassification {
+  const verdict = position.legacyExposureVerdict;
+  const relationship = position.relationshipValidity ?? verdict?.relationshipValidity;
+  const identity = position.exposureIdentityStatus ?? verdict?.exposureIdentity;
+  const openMark = position.status === 'open' ? openPositionMark(position) : null;
+  let label: ExposureClassification['label'];
+  if (position.settlementState === 'settlement_unresolved') label = 'Settlement unresolved';
+  else if (identity === 'no_fill_rolled_back') label = 'No exposure';
+  else if (identity === 'exact_held_legs_proven' && relationship === 'verified_complementary') label = 'Verified arb';
+  else if (identity === 'exact_held_legs_proven' && relationship === 'unresolved_relationship') label = 'Relationship unverified';
+  else if (identity === 'exact_held_legs_proven') label = 'Invalid exposure';
+  else if (position.propositionRelationshipState === 'verified_complementary') label = 'Verified arb';
+  else if (position.propositionRelationshipState && position.propositionRelationshipState !== 'unknown') label = 'Invalid exposure';
+  else label = 'Legacy identity missing';
+
+  const styles: Record<ExposureClassification['label'], string> = {
+    'Verified arb': 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10 text-[var(--status-positive)]',
+    'Invalid exposure': 'border-[var(--status-negative)]/50 bg-[var(--status-negative)]/10 text-[var(--status-negative)]',
+    'Relationship unverified': 'border-[var(--status-warning)]/50 bg-[var(--status-warning)]/10 text-[var(--status-warning)]',
+    'Legacy identity missing': 'border-[var(--status-warning)]/50 bg-[var(--status-warning)]/10 text-[var(--status-warning)]',
+    'Settlement unresolved': 'border-[var(--status-negative)]/50 bg-[var(--status-negative)]/10 text-[var(--status-negative)]',
+    'No exposure': 'border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[var(--text-secondary)]',
+  };
+  const reasons = Array.from(new Set([
+    verdict?.reason,
+    position.settlementFailureReason,
+    openMark && !openMark.available ? openMark.label : position.valuationFailureReason,
+    position.outcomeIdentityFailureReason,
+    position.entryCostFailureReason,
+    verdict ? null : position.propositionRelationshipWarning,
+    entryArbProfit.available ? null : entryArbProfit.reason,
+  ].map((reason) => reason?.trim()).filter((reason): reason is string => Boolean(reason))));
+  const missingIdentifiers: string[] = [];
+  if (verdict) {
+    if (!verdict.exactLegs.kalshi.marketId) missingIdentifiers.push('Kalshi market ID missing');
+    if (!verdict.exactLegs.polymarket.marketId) missingIdentifiers.push('Polymarket market ID missing');
+    if (!verdict.exactLegs.polymarket.tokenId) missingIdentifiers.push('Polymarket token missing');
+  } else {
+    if (!position.kalshiTicker) missingIdentifiers.push('Kalshi market ID missing');
+    if (!position.pmConditionId) missingIdentifiers.push('Polymarket market ID missing');
+    if (!position.pmEntryTokenId) missingIdentifiers.push('Polymarket token missing');
+  }
+  const excludedFromVerifiedTotals = position.excludedFromVerifiedTotals ?? verdict?.excludedFromVerifiedTotals ?? label !== 'Verified arb';
+  const evidence = verdict?.evidence ?? [];
+  const isExposureOnly = identity === 'exact_held_legs_proven' && relationship !== 'verified_complementary';
+  const detail = [
+    label,
+    ...reasons,
+    evidence.length ? `Evidence provenance: ${evidence.map((item) => `${item.source}, ${item.confidence}, captured ${item.capturedAt}, revision ${item.revision}`).join('; ')}` : 'Evidence provenance unavailable',
+    missingIdentifiers.length ? `Missing identifiers: ${missingIdentifiers.join('; ')}` : 'Exact held identifiers recorded',
+    excludedFromVerifiedTotals ? 'Excluded from verified-arbitrage totals' : 'Included in verified-arbitrage totals',
+    isExposureOnly ? 'Exposure mark-to-market only; not verified-arbitrage analytics or eligibility' : null,
+    'Exposure marks never authorize trade or close actions',
+  ].filter(Boolean).join('. ');
+  return { label, style: styles[label], detail, reasons, evidence, missingIdentifiers, isExposureOnly, excludedFromVerifiedTotals };
+}
+
+function ExposureBadge({ classification, testId, className = '' }: { classification: ExposureClassification; testId: string; className?: string }) {
+  return <span data-testid={testId} className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase ${classification.style} ${className}`}>{classification.label}</span>;
+}
+
 export default function BotTraderPanel() {
   const [view, setView] = useState<'analytics' | 'logs' | 'messages'>('analytics');
 
@@ -756,18 +856,17 @@ export default function BotTraderPanel() {
           <span id="entry-arb-profit-header-description" className="sr-only">{ENTRY_ARB_PROFIT_DESCRIPTION}</span>
           {sortedPositions.map((position) => {
             const presentation = entryArbProfitPresentation(position.entryArbProfitSnapshot);
-            return <span key={`entry-arb-profit-description-${position.id}`} id={`entry-arb-profit-description-${position.id}`} className="sr-only">{presentation.available ? presentation.title : presentation.reason}</span>;
+            const classification = exposureClassification(position, presentation);
+            return <span key={`position-description-${position.id}`}>
+              <span id={`entry-arb-profit-description-${position.id}`} className="sr-only">{presentation.available ? presentation.title : 'Unavailable; expand position details for the exact reason and provenance'}</span>
+              <span id={`exposure-classification-description-${position.id}`} className="sr-only">{classification.detail}</span>
+            </span>;
           })}
           <table className="w-full min-w-[960px] text-xs">
             <thead><tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)]"><th title="Expand position details" className="w-8 px-2 py-2" /><th title="Market event name" className="px-2 py-2 text-left font-medium">Market</th><th title="Immutable human-readable outcomes selected for the exact placed platform legs" className="hidden px-2 py-2 text-left font-medium lg:table-cell">Outcome</th><th title="Immutable selection method captured when BotTrader chose this trade" className="px-2 py-2 text-center font-medium">Method</th><th title="Exact contract sides bought on each platform" className="px-2 py-2 text-left font-medium">Strategy</th><th title="Immutable persisted trade entry cost" className="px-2 py-2 text-right font-medium">Buy Cost</th><th title="Indicative value from exact-leg last-scanned prices; not executable liquidation proceeds" className="px-2 py-2 text-right font-medium">Current Value</th><th title="Indicative last-scanned Current Value minus persisted Buy Cost" className="px-2 py-2 text-right font-medium">P&amp;L</th><th title="Indicative last-scanned P&L divided by persisted Buy Cost" className="px-2 py-2 text-right font-medium">ROI</th><th tabIndex={0} title={ENTRY_ARB_PROFIT_DESCRIPTION} aria-describedby="entry-arb-profit-header-description" className="hidden rounded px-2 py-2 text-right font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] lg:table-cell">Entry Arb Profit</th><th title="Position state: open, settled, or closed" className="px-2 py-2 text-center font-medium">Status</th><th title="When the bot placed this trade" className="px-2 py-2 text-right font-medium">Opened</th></tr></thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {sortedPositions.map((position) => {
                 const isExpanded = expanded.has(position.id);
-                const relationshipState = position.propositionRelationshipState ?? 'unknown';
-                const relationshipVerified = relationshipState === 'verified_complementary';
-                const relationshipHighSeverity = position.status === 'open'
-                  && relationshipState !== 'verified_complementary'
-                  && relationshipState !== 'unknown';
                 const hasCanonicalOutcomes = position.outcomeIdentityStatus === 'verified'
                   && Boolean(position.kalshiOutcomeLabel?.trim())
                   && Boolean(position.pmOutcomeLabel?.trim());
@@ -777,6 +876,7 @@ export default function BotTraderPanel() {
                   ? `K: ${position.kalshiOutcomeLabel!.trim()} · PM: ${position.pmOutcomeLabel!.trim()}`
                   : 'Outcome unavailable';
                 const entryArbProfit = entryArbProfitPresentation(position.entryArbProfitSnapshot);
+                const classification = exposureClassification(position, entryArbProfit);
                 const entryCostAvailable = position.entryCostStatus !== 'unavailable'
                   && Number.isSafeInteger(position.totalCostCents);
                 const unallocatedEntryFeeCents = position.unallocatedEntryFeeCents ?? 0;
@@ -826,8 +926,8 @@ export default function BotTraderPanel() {
                   : null;
                 return [
                   <tr key={`row-${position.id}`} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; })} className="cursor-pointer hover:bg-[var(--border-subtle)]/50" aria-expanded={isExpanded}>
-                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-[var(--border-strong)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
-                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div><div data-testid="responsive-position-outcome" className={`mt-1 break-words text-[9px] font-normal lg:hidden ${hasCanonicalOutcomes ? 'text-[var(--text-secondary)]' : 'text-[var(--status-warning)]'}`} title={hasCanonicalOutcomes ? placedOutcomeSummary : outcomeUnavailableReason}>{placedOutcomeSummary}</div><div data-testid="responsive-entry-arb-profit" tabIndex={0} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`} className={`mt-1 rounded text-[9px] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] lg:hidden ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : entryArbProfit.reason}>Entry arb {entryArbProfit.label}</div>{!relationshipVerified && <div className={`mt-1 text-[9px] font-bold uppercase ${relationshipHighSeverity ? 'text-[var(--status-negative)]' : 'text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'High risk · invalid relationship' : 'Legacy/unknown relationship'}</div>}</td>
+                    <td className="px-2 py-2 text-[var(--text-secondary)]"><button type="button" onClick={(event) => { event.stopPropagation(); setExpanded((current) => { const next = new Set(current); if (next.has(position.id)) next.delete(position.id); else next.add(position.id); return next; }); }} className="flex min-h-11 min-w-11 items-center justify-center rounded outline-none hover:bg-[var(--border-strong)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)]" aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${position.marketTitle}`} aria-describedby={`exposure-classification-description-${position.id}`}>{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
+                    <td className="max-w-56 px-2 py-2 font-medium text-[var(--text-primary)]" title={position.marketTitle}>{position.marketId ? <a href={`/?view=scan&id=${encodeURIComponent(position.marketId)}`} aria-label={`Open ${position.marketTitle} market`} onClick={(event) => event.stopPropagation()} className="block truncate underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--status-positive)]">{position.marketTitle}</a> : <span className="block truncate">{position.marketTitle}</span>}<div className="mt-1 flex gap-2 text-[9px] font-normal">{position.kalshiUrl && <a href={position.kalshiUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Kalshi ${position.kalshiSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-positive)] underline">Kalshi {position.kalshiSide.toUpperCase()}</a>}{position.polymarketUrl && <a href={position.polymarketUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open exact Polymarket ${position.pmSide.toUpperCase()} market for ${position.marketTitle}`} onClick={(event) => event.stopPropagation()} className="text-[var(--status-info)] underline">PM {position.pmSide.toUpperCase()}</a>}{!position.kalshiUrl && !position.polymarketUrl && <span className="text-[var(--text-muted)]">Link unavailable</span>}<span className="text-[var(--text-muted)]">#{position.executionId}</span></div><div data-testid="responsive-position-outcome" className={`mt-1 break-words text-[9px] font-normal lg:hidden ${hasCanonicalOutcomes ? 'text-[var(--text-secondary)]' : 'text-[var(--status-warning)]'}`} title={hasCanonicalOutcomes ? placedOutcomeSummary : outcomeUnavailableReason}>{placedOutcomeSummary}</div><div data-testid="responsive-entry-arb-profit" tabIndex={0} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`} className={`mt-1 rounded text-[9px] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] lg:hidden ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : undefined}>Entry arb {entryArbProfit.label}</div><ExposureBadge classification={classification} testId="responsive-exposure-classification" className="mt-1 lg:hidden" /></td>
                     <td className={`hidden max-w-44 break-words px-2 py-2 lg:table-cell ${hasCanonicalOutcomes ? 'text-[var(--text-secondary)]' : 'text-[var(--status-warning)]'}`} title={hasCanonicalOutcomes ? placedOutcomeSummary : outcomeUnavailableReason} aria-label={hasCanonicalOutcomes ? `Placed outcomes: Kalshi ${position.kalshiOutcomeLabel!.trim()}; Polymarket ${position.pmOutcomeLabel!.trim()}` : `Outcome unavailable: ${outcomeUnavailableReason}`}>
                       {hasCanonicalOutcomes
                         ? <><div>K: {position.kalshiOutcomeLabel!.trim()}</div><div>PM: {position.pmOutcomeLabel!.trim()}</div></>
@@ -838,17 +938,25 @@ export default function BotTraderPanel() {
                       <div>Kalshi {position.kalshiSide.toUpperCase()}</div><div>PM {position.pmSide.toUpperCase()}</div>
                     </td>
                     <td className={`px-2 py-2 text-right tabular-nums ${entryCostAvailable ? '' : 'text-[var(--status-warning)]'}`}>{entryCostAvailable ? formatCents(position.totalCostCents) : 'Unavailable'}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ?? (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
-                    <td className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (pnl == null ? 'Unavailable' : formatCents(pnl, true))}</td>
-                    <td className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : pnlClass(roiBps)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market ROI'}>{valueUnavailableLabel ?? entryCostUnavailableLabel ?? (roiBps == null ? 'Unavailable' : formatBps(roiBps, true))}</td>
-                    <td tabIndex={0} className={`hidden whitespace-nowrap rounded px-2 py-2 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)] lg:table-cell ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : entryArbProfit.reason} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`}>{entryArbProfit.label}</td>
-                    <td className="px-2 py-2 text-center"><StatusBadge position={position} /></td>
+                    <td data-valuation-kind={classification.isExposureOnly ? 'exposure-mark' : 'verified-arbitrage'} className={`px-2 py-2 text-right tabular-nums ${valueUnavailableLabel || staleValuationLabel ? 'text-[var(--status-warning)]' : classification.isExposureOnly ? 'text-[var(--status-info)]' : ''}`} title={staleValuationLabel ?? undefined}>{valueUnavailableLabel ? 'Unavailable' : (position.status === 'open' && openMark?.available ? `${formatCents(openMark.currentValueCents)}${staleValuationLabel ? ' · Stale' : ''}` : formatCents(position.resolutionPayoutCents!))}</td>
+                    <td data-valuation-kind={classification.isExposureOnly ? 'exposure-mark' : 'verified-arbitrage'} className={`px-2 py-2 text-right font-semibold tabular-nums ${pnl == null ? 'text-[var(--status-warning)]' : classification.isExposureOnly ? 'text-[var(--status-info)]' : pnlClass(pnl)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market P&L'}>{valueUnavailableLabel || entryCostUnavailableLabel || pnl == null ? 'Unavailable' : formatCents(pnl, true)}</td>
+                    <td data-valuation-kind={classification.isExposureOnly ? 'exposure-mark' : 'verified-arbitrage'} className={`px-2 py-2 text-right tabular-nums ${roiBps == null || valueUnavailableLabel ? 'text-[var(--status-warning)]' : classification.isExposureOnly ? 'text-[var(--status-info)]' : pnlClass(roiBps)}`} title={staleValuationLabel ?? 'Indicative last-scanned mark-to-market ROI'}>{valueUnavailableLabel || entryCostUnavailableLabel || roiBps == null ? 'Unavailable' : formatBps(roiBps, true)}</td>
+                    <td tabIndex={0} className={`hidden whitespace-nowrap rounded px-2 py-2 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)] lg:table-cell ${entryArbProfit.available ? pnlClass(entryArbProfit.value) : 'text-[var(--status-warning)]'}`} title={entryArbProfit.available ? entryArbProfit.title : undefined} aria-label={entryArbProfit.available ? `Entry Arb Profit ${entryArbProfit.label} USDC` : 'Entry Arb Profit unavailable'} aria-describedby={`entry-arb-profit-description-${position.id}`}>{entryArbProfit.label}</td>
+                    <td className="px-2 py-2 text-center"><div className="flex flex-col items-center gap-1"><StatusBadge position={position} /><ExposureBadge classification={classification} testId="desktop-exposure-classification" className="hidden lg:inline-flex" /></div></td>
                     <td className="px-2 py-2 text-right text-[var(--text-secondary)]" title={new Date(position.openedAt).toLocaleString()}>{timeAgo(position.openedAt)}</td>
                   </tr>,
                   isExpanded && <tr key={`detail-${position.id}`}>
                     <td colSpan={12} className="bg-[var(--surface-workspace)] px-3 py-3 sm:px-10">
-                      {!relationshipVerified && <div role="alert" className={`mb-3 rounded border px-3 py-2 text-xs font-semibold ${relationshipHighSeverity ? 'border-[var(--status-negative)]/60 bg-[var(--status-negative)]/10 text-[var(--status-negative)]' : 'border-[var(--status-warning)]/50 bg-[var(--status-warning)]/10 text-[var(--status-warning)]'}`}>{relationshipHighSeverity ? 'HIGH SEVERITY — ' : ''}{position.propositionRelationshipWarning || 'Legacy/unknown: canonical proposition relationship was not captured at entry.'}</div>}
-                      {relationshipVerified && position.propositionRelationship && <div className="mb-3 rounded border border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10 px-3 py-2 text-xs text-[var(--text-secondary)]"><div className="font-semibold text-[var(--status-positive)]">Verified complementary payout relationship</div><div>{position.propositionRelationship.legs.kalshi.humanLabel}</div><div>{position.propositionRelationship.legs.polymarket.humanLabel}</div></div>}
+                      <div data-testid="exposure-classification-detail" className={`mb-3 rounded border px-3 py-2 text-xs ${classification.style}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2"><strong>Position classification</strong><ExposureBadge classification={classification} testId="expanded-exposure-classification" /></div>
+                        {classification.reasons.map((reason) => <div key={reason} className="mt-1 font-semibold">{reason}</div>)}
+                        <div className="mt-2 grid gap-2 text-[10px] text-[var(--text-secondary)] sm:grid-cols-2">
+                          <div><strong className="text-[var(--text-primary)]">Evidence provenance</strong>{classification.evidence.length ? classification.evidence.map((item) => <div key={`${item.source}-${item.revision}`} className="break-all">{item.source} · {item.confidence.replaceAll('_', ' ')} · captured {item.capturedAt} · revision {item.revision}</div>) : <div>Unavailable</div>}</div>
+                          <div><strong className="text-[var(--text-primary)]">Identity and exclusion</strong><div>{classification.missingIdentifiers.length ? classification.missingIdentifiers.join(' · ') : 'Exact held identifiers recorded'}</div><div>{classification.excludedFromVerifiedTotals ? 'Excluded from verified-arbitrage totals' : 'Included in verified-arbitrage totals'}</div></div>
+                        </div>
+                        {classification.isExposureOnly && <div className="mt-2 font-semibold">Exposure mark-to-market only; not verified-arbitrage analytics or eligibility.</div>}
+                        <div className="mt-2 text-[10px] font-semibold">Exposure marks never authorize trade or close actions.</div>
+                      </div>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] sm:grid-cols-3 lg:grid-cols-4">
                         <div><span className="text-[var(--text-secondary)]">Kalshi ticker</span><div className="break-all font-mono text-[var(--text-primary)]">{position.kalshiTicker || '—'}</div></div>
                         <div><span className="text-[var(--text-secondary)]">PM conditionId</span><div className="break-all font-mono text-[var(--text-primary)]">{position.pmConditionId || '—'}</div></div>

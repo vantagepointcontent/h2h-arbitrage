@@ -48,6 +48,30 @@ const positions = [{
   outcomeIdentityStatus: 'verified',
   outcomeIdentitySource: 'canonical_proposition_relationship_v1',
   pmEntryTokenId: 'held-republican-token',
+  relationshipValidity: 'verified_complementary' as const,
+  exposureIdentityStatus: 'exact_held_legs_proven' as const,
+  exposureValuationLabel: 'Verified arbitrage' as const,
+  excludedFromVerifiedTotals: false,
+  legacyExposureRevision: 'verified-revision',
+  legacyExposureRunId: 'verified-run',
+  legacyExposureVerdict: {
+    version: 1 as const,
+    relationshipValidity: 'verified_complementary' as const,
+    exposureIdentity: 'exact_held_legs_proven' as const,
+    valuationClass: 'verified_arbitrage' as const,
+    executionMode: 'paper' as const,
+    simulated: true,
+    exactLegs: {
+      kalshi: { marketId: 'KXTRUMP-26', tokenId: null, side: 'yes' as const, requestedQuantity: 1, filledQuantity: 1, orderId: 'k-order', marketQuestion: 'Will Republicans win?', outcomeLabel: 'Republicans' },
+      polymarket: { marketId: '0xabc', tokenId: 'held-republican-token', side: 'no' as const, requestedQuantity: 1, filledQuantity: 1, orderId: 'pm-order', marketQuestion: 'Will Republicans win?', outcomeLabel: 'Republicans' },
+    },
+    reason: 'Canonical relationship and immutable fills prove the exact complementary legs',
+    evidence: [{ source: 'executions:9', revision: 'evidence-revision', capturedAt: '2026-08-08T16:00:00.000Z', confidence: 'canonical' as const }],
+    excludedFromVerifiedTotals: false,
+    tradeAuthorization: 'denied' as const,
+    closeAuthorization: 'denied' as const,
+    revision: 'verified-revision',
+  },
   kalshiSide: 'yes',
   pmSide: 'no',
   buyPriceKalshiCents: 45,
@@ -337,9 +361,11 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     const row = (await screen.findByText('Trump 2026')).closest('tr');
-    expect(row?.textContent).toContain('Settlement unresolved — exact legacy leg evidence missing');
     expect(row?.textContent).toContain('Settlement unresolved');
+    expect(row?.textContent).not.toContain('Settlement unresolved — exact legacy leg evidence missing');
     expect(row?.textContent).not.toContain('-100.0%');
+    const disclosure = screen.getByRole('button', { name: 'Expand Trump 2026' });
+    expect(disclosure).toHaveAccessibleDescription(/Settlement unresolved — exact legacy leg evidence missing/);
     fireEvent.click(screen.getByRole('button', { name: 'open' }));
     expect(screen.queryByText('Trump 2026')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'settled' }));
@@ -513,7 +539,8 @@ describe('BotTraderPanel', () => {
     cells[9].focus();
     expect(cells[9]).toHaveFocus();
     expect(cells[9].className).toContain('focus-visible:ring');
-    expect(cells[10].textContent).toBe('open');
+    expect(cells[10].textContent).toContain('open');
+    expect(cells[10].textContent).toContain('Verified arb');
     const responsiveEntryProfit = screen.getByTestId('responsive-entry-arb-profit');
     expect(responsiveEntryProfit.textContent).toBe('Entry arb $0.79');
     expect(responsiveEntryProfit).toHaveAccessibleName('Entry Arb Profit $0.79 USDC');
@@ -549,12 +576,12 @@ describe('BotTraderPanel', () => {
     const entryCell = Array.from(market.closest('tr')!.querySelectorAll('td'))[9];
     expect(entryCell.textContent).toBe('Unavailable');
     expect(entryCell.textContent).not.toContain('$0.00');
-    expect(entryCell.getAttribute('title')).toBe(unavailableReason);
+    expect(entryCell.getAttribute('title')).toBeNull();
     expect(entryCell).toHaveAccessibleName('Entry Arb Profit unavailable');
-    expect(entryCell).toHaveAccessibleDescription(unavailableReason);
+    expect(entryCell).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
     const responsiveEntryProfit = screen.getByTestId('responsive-entry-arb-profit');
     expect(responsiveEntryProfit).toHaveAccessibleName('Entry Arb Profit unavailable');
-    expect(responsiveEntryProfit).toHaveAccessibleDescription(unavailableReason);
+    expect(responsiveEntryProfit).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
     responsiveEntryProfit.focus();
     expect(responsiveEntryProfit).toHaveFocus();
 
@@ -603,8 +630,8 @@ describe('BotTraderPanel', () => {
       const row = screen.getByText(marketTitle).closest('tr')!;
       const entryCell = Array.from(row.querySelectorAll('td'))[9];
       expect(entryCell.textContent).toBe('Unavailable');
-      expect(entryCell).toHaveAccessibleDescription(malformedReason);
-      expect(row.querySelector('[data-testid="responsive-entry-arb-profit"]')).toHaveAccessibleDescription(malformedReason);
+      expect(entryCell).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
+      expect(row.querySelector('[data-testid="responsive-entry-arb-profit"]')).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand Invalid provenance' }));
@@ -637,8 +664,9 @@ describe('BotTraderPanel', () => {
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
     const entryCell = Array.from(row.querySelectorAll('td'))[9];
     expect(entryCell.textContent).toBe('Unavailable');
-    expect(entryCell).toHaveAccessibleDescription('Entry Arb Profit unavailable: placement snapshot is malformed');
+    expect(entryCell).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
     expect(entryCell).not.toHaveAccessibleDescription('Fabricated unavailable reason');
+    expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Entry Arb Profit unavailable: placement snapshot is malformed/);
   });
 
   it('rounds negative and zero Entry Arb Profit only for display while preserving direction styling', async () => {
@@ -711,6 +739,99 @@ describe('BotTraderPanel', () => {
     expect(screen.getAllByText('Immutable execution-time Polymarket entry token is missing from the position row').length).toBeGreaterThan(0);
   });
 
+  it('renders one compact BUG-172 classification per breakpoint and keeps full provenance in the row disclosure', async () => {
+    vi.setSystemTime(new Date('2026-08-19T19:35:00.000Z'));
+    const exactLegs = positions[0].legacyExposureVerdict.exactLegs;
+    const evidence = [{ source: 'executions:101', revision: 'audit-revision', capturedAt: '2026-08-19T19:30:00.000Z', confidence: 'exact_immutable_execution' as const }];
+    const classified = [{
+      ...positions[0], id: 2, executionId: 101, marketTitle: 'Invalid exposure row',
+      relationshipValidity: 'confirmed_invalid' as const,
+      exposureIdentityStatus: 'exact_held_legs_proven' as const,
+      exposureValuationLabel: 'Invalid/unverified exposure' as const,
+      excludedFromVerifiedTotals: true,
+      currentValueCents: 88, indicativePnlMicrocents: -9_000_000, unrealizedRoiBps: -928, lastValuationAt: '2026-08-19T19:30:00.000Z',
+      entryArbProfitSnapshot: { version: 1 as const, status: 'unavailable' as const, reasonCode: 'relationship_not_verified_complementary', reason: 'Entry Arb Profit unavailable: relationship is confirmed invalid', executionMode: 'paper' as const, provenance: 'historical_backfill' as const, capturedAt: '2026-08-19T19:30:00.000Z' },
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, relationshipValidity: 'confirmed_invalid' as const, valuationClass: 'invalid_unverified_exposure' as const, exactLegs, reason: 'Both exact held contracts pay on Republican YES', evidence, excludedFromVerifiedTotals: true },
+    }, {
+      ...positions[0], id: 3, executionId: 102, marketTitle: 'Unverified exposure row',
+      relationshipValidity: 'unresolved_relationship' as const,
+      exposureIdentityStatus: 'exact_held_legs_proven' as const,
+      exposureValuationLabel: 'Invalid/unverified exposure' as const,
+      excludedFromVerifiedTotals: true,
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, relationshipValidity: 'unresolved_relationship' as const, valuationClass: 'invalid_unverified_exposure' as const, exactLegs, reason: 'Exact held legs are proven but their payout relationship is unresolved', evidence, excludedFromVerifiedTotals: true },
+    }, {
+      ...positions[0], id: 4, executionId: 103, marketTitle: 'Missing identity row',
+      relationshipValidity: 'unresolved_relationship' as const,
+      exposureIdentityStatus: 'partially_proven' as const,
+      exposureValuationLabel: 'Unavailable' as const,
+      excludedFromVerifiedTotals: true,
+      currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null,
+      valuationFailureReason: 'Polymarket entry token is missing from immutable evidence',
+      entryArbProfitSnapshot: { version: 1 as const, status: 'unavailable' as const, reasonCode: 'exact_leg_identity_missing', reason: 'Entry Arb Profit unavailable: exact leg identity is missing', executionMode: 'live' as const, provenance: 'historical_backfill' as const, capturedAt: '2026-08-19T19:30:00.000Z' },
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, exposureIdentity: 'partially_proven' as const, relationshipValidity: 'unresolved_relationship' as const, valuationClass: 'unavailable' as const, exactLegs: { ...exactLegs, polymarket: { ...exactLegs.polymarket, tokenId: null } }, reason: 'Polymarket entry token is missing from immutable evidence', evidence, excludedFromVerifiedTotals: true },
+    }, {
+      ...positions[0], id: 5, executionId: 104, marketTitle: 'No exposure row',
+      relationshipValidity: 'unresolved_relationship' as const,
+      exposureIdentityStatus: 'no_fill_rolled_back' as const,
+      exposureValuationLabel: 'Unavailable' as const,
+      excludedFromVerifiedTotals: true,
+      currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null,
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, exposureIdentity: 'no_fill_rolled_back' as const, relationshipValidity: 'unresolved_relationship' as const, valuationClass: 'unavailable' as const, exactLegs, reason: 'Both immutable venue results terminally record zero fills', evidence, excludedFromVerifiedTotals: true },
+    }, {
+      ...positions[0], id: 6, executionId: 105, marketTitle: 'Settlement unresolved row',
+      status: 'closed', settlementState: 'settlement_unresolved' as const,
+      settlementFailureReason: 'Settlement unresolved — exact legacy leg evidence missing',
+      relationshipValidity: 'unresolved_relationship' as const,
+      exposureIdentityStatus: 'unrecoverable' as const,
+      exposureValuationLabel: 'Unavailable' as const,
+      excludedFromVerifiedTotals: true,
+      currentValueCents: null, unrealizedPnlCents: null, unrealizedRoiBps: null, lastValuationAt: null,
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, exposureIdentity: 'unrecoverable' as const, relationshipValidity: 'unresolved_relationship' as const, valuationClass: 'unavailable' as const, exactLegs, reason: 'No immutable execution evidence can be bound to the persisted position', evidence, excludedFromVerifiedTotals: true },
+    }];
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: classified, performance: { ...analytics.performance, positionIds: classified.map(({ id }) => id) } } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const invalidRow = (await screen.findByText('Invalid exposure row')).closest('tr')!;
+    expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Invalid exposure');
+    expect(invalidRow.querySelector('[data-testid="responsive-exposure-classification"]')?.textContent).toBe('Invalid exposure');
+    expect(invalidRow.querySelector('[data-testid="responsive-exposure-classification"]')?.closest('td')).toBe(invalidRow.querySelectorAll('td')[1]);
+    expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.closest('td')).toBe(invalidRow.querySelectorAll('td')[10]);
+    expect(Array.from(invalidRow.querySelectorAll('td'))[6].textContent).toBe('$0.88');
+    expect(Array.from(invalidRow.querySelectorAll('td'))[7].textContent).toBe('-$0.09');
+    expect(Array.from(invalidRow.querySelectorAll('td'))[8].textContent).toBe('-9.3%');
+    expect(invalidRow.textContent).not.toContain('Both exact held contracts pay on Republican YES');
+    expect(screen.getByText('Unverified exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Relationship unverified');
+    expect(screen.getByText('Missing identity row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Legacy identity missing');
+    expect(screen.getByText('No exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('No exposure');
+    expect(screen.getByText('Settlement unresolved row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Settlement unresolved');
+
+    const missingRow = screen.getByText('Missing identity row').closest('tr')!;
+    const missingCells = Array.from(missingRow.querySelectorAll('td'));
+    expect(missingCells[6].textContent).toBe('Unavailable');
+    expect(missingCells[7].textContent).toBe('Unavailable');
+    expect(missingCells[8].textContent).toBe('Unavailable');
+    expect(missingCells[9].textContent).toBe('Unavailable');
+    expect(missingRow.textContent).not.toContain('Polymarket entry token is missing from immutable evidence');
+    const disclosure = screen.getByRole('button', { name: 'Expand Missing identity row' });
+    expect(disclosure).toHaveAccessibleDescription(/Polymarket entry token is missing from immutable evidence/);
+    disclosure.focus();
+    expect(disclosure).toHaveFocus();
+    expect(disclosure.className).toContain('focus-visible:ring');
+    fireEvent.click(disclosure);
+    const detail = screen.getByTestId('exposure-classification-detail');
+    expect(detail.textContent).toContain('Legacy identity missing');
+    expect(detail.textContent).toContain('executions:101');
+    expect(detail.textContent).toContain('Polymarket token missing');
+    expect(detail.textContent).toContain('Excluded from verified-arbitrage totals');
+    expect(detail.textContent).toContain('Exposure marks never authorize trade or close actions');
+    expect(vi.mocked(fetch).mock.calls.every(([input]) => String(input).includes('/analytics') || String(input).includes('/status'))).toBe(true);
+  });
+
   it('maps buy cost, indicative current value, P&L, and percentage ROI into their labelled columns', async () => {
     vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     stubInitialFetch();
@@ -759,9 +880,11 @@ describe('BotTraderPanel', () => {
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
     expect(cells[5]).toBe('$0.00');
-    expect(cells[6]).toBe('Valuation unavailable: no executable mark has been recorded');
-    expect(cells[7]).toBe('Valuation unavailable: no executable mark has been recorded');
-    expect(cells[8]).toBe('Valuation unavailable: no executable mark has been recorded');
+    expect(cells[6]).toBe('Unavailable');
+    expect(cells[7]).toBe('Unavailable');
+    expect(cells[8]).toBe('Unavailable');
+    expect(marketLink.closest('tr')!.textContent).not.toContain('Valuation unavailable: no executable mark has been recorded');
+    expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Valuation unavailable: no executable mark has been recorded/);
   });
 
   it('shows the exact per-leg valuation blocker instead of generic Unavailable', async () => {
@@ -777,8 +900,11 @@ describe('BotTraderPanel', () => {
       throw new Error(`Unexpected fetch: ${url}`);
     }));
     render(<BotTraderPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getAllByText('Kalshi: insufficient executable depth (0.5 available, 1 required)')).toHaveLength(3);
+    const disclosure = await screen.findByRole('button', { name: 'Expand Trump 2026' });
+    expect(disclosure).toHaveAccessibleDescription(/Kalshi: insufficient executable depth \(0.5 available, 1 required\)/);
+    expect(disclosure.closest('tr')!.textContent).not.toContain('Kalshi: insufficient executable depth');
+    fireEvent.click(disclosure);
+    expect(screen.getAllByText('Kalshi: insufficient executable depth (0.5 available, 1 required)')).toHaveLength(1);
     expect(screen.getByText('Liquidation breakdown: Kalshi: insufficient executable depth (0.5 available, 1 required)')).toBeTruthy();
   });
 
@@ -908,12 +1034,14 @@ describe('BotTraderPanel', () => {
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
     expect(Array.from(row.querySelectorAll('td'))[5].textContent).toBe('Unavailable');
     expect(Array.from(row.querySelectorAll('td'))[6].textContent).toBe('$1.02');
-    expect(Array.from(row.querySelectorAll('td'))[7].textContent).toContain('Buy Cost unavailable:');
-    expect(Array.from(row.querySelectorAll('td'))[8].textContent).toContain('Buy Cost unavailable:');
+    expect(Array.from(row.querySelectorAll('td'))[7].textContent).toBe('Unavailable');
+    expect(Array.from(row.querySelectorAll('td'))[8].textContent).toBe('Unavailable');
     expect(Array.from(row.querySelectorAll('td'))[7].textContent).not.toContain('+$0.05');
     expect(Array.from(row.querySelectorAll('td'))[8].textContent).not.toContain('+5.2%');
+    expect(row.textContent).not.toContain('Buy Cost unavailable:');
+    expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Legacy paper position lacks authoritative entry fill and fee data/);
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getAllByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toHaveLength(3);
+    expect(screen.getAllByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toHaveLength(1);
     expect(screen.getByText('Buy Price').parentElement?.textContent).toBe('Buy PriceUnavailable — authoritative fill evidence missing');
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('DeployedUnavailable');
   });

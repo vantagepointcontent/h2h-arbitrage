@@ -51,6 +51,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       pmEntryTokenId: position.pmEntryTokenId,
       identity: buildBotLegIdentity({
         ...position,
+        kalshiMarketQuestion: position.outcomeIdentityStatus === 'verified' ? position.kalshiMarketQuestion : null,
+        pmMarketQuestion: position.outcomeIdentityStatus === 'verified' ? position.pmMarketQuestion : null,
+        kalshiOutcomeLabel: position.outcomeIdentityStatus === 'verified' ? position.kalshiOutcomeLabel : null,
+        pmOutcomeLabel: position.outcomeIdentityStatus === 'verified' ? position.pmOutcomeLabel : null,
         relationshipState: position.outcomeIdentityStatus === 'verified'
           && position.propositionRelationshipState === 'verified_complementary'
           ? 'verified_complementary'
@@ -61,6 +65,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }, null),
       buyPriceMicrocents: buyPriceMicrocents(position),
       buyCostMicrocents: buyCostMicrocents(position),
+      relationshipValidity: position.relationshipValidity,
+      exposureIdentityStatus: position.exposureIdentityStatus,
+      exposureValuationLabel: position.exposureValuationLabel,
+      excludedFromVerifiedTotals: position.excludedFromVerifiedTotals,
+      legacyExposureReason: position.legacyExposureVerdict?.reason,
+      legacyExposureRevision: position.legacyExposureRevision,
+      legacyExposureEvidence: position.legacyExposureVerdict?.evidence,
+      entryArbProfitSnapshot: position.entryArbProfitSnapshot,
       indicativeValueMicrocents: position.indicativeValueMicrocents,
       indicativePnlMicrocents: position.indicativePnlMicrocents,
       unrealizedRoiBps: position.unrealizedRoiBps,

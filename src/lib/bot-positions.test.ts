@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   BotPositionStore,
+  buildEntryArbProfitSnapshot,
   calculateBotPositionEntryCost,
   calculatePositionValuation,
   createBotPosition,
@@ -17,8 +18,76 @@ import {
   type BotPosition,
 } from './bot-positions';
 import { calcKalshiFee, calcPolymarketFee } from './matcher';
+import propositionRegistry from '../../data/proposition-relationships.json';
+import type { PropositionRelationship } from './proposition-identity';
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('buildEntryArbProfitSnapshot', () => {
+  const input = {
+    executionMode: 'paper' as const,
+    relationshipState: 'verified_complementary' as const,
+    outcomeIdentityStatus: 'verified' as const,
+    kalshiMarketId: 'KX-NY21-R',
+    pmMarketId: '0xny21',
+    pmTokenId: 'pm-dem-no',
+    kalshiSide: 'yes' as const,
+    pmSide: 'no' as const,
+    kalshiOutcome: 'Republican',
+    pmOutcome: 'Republican',
+    sharesKalshi: 2,
+    sharesPm: 2,
+    kalshiGrossMicrocents: 12_345_679,
+    pmGrossMicrocents: 180_000_000,
+    kalshiEntryFeeMicrousd: 10_000,
+    pmEntryFeeMicrousd: 20_000,
+    totalCostMicrousd: 1_953_457,
+    settlementFeeAssumptionMicrousd: 0,
+    capturedAt: '2026-08-19T16:30:00.000Z',
+  };
+
+  it('captures fixed-point placement profit and ROI from matched complementary fills', () => {
+    expect(buildEntryArbProfitSnapshot(input)).toEqual({
+      version: 1,
+      status: 'available',
+      profitMicrousd: 46_543,
+      currency: 'USDC',
+      monetaryUnit: 'microusd',
+      matchedQuantityMicrounits: 2_000_000,
+      guaranteedPayoutMicrousd: 2_000_000,
+      grossFillsMicrocents: { kalshi: 12_345_679, polymarket: 180_000_000 },
+      entryFeesMicrousd: { kalshi: 10_000, polymarket: 20_000 },
+      settlementFeeAssumptionMicrousd: 0,
+      formula: 'guaranteed_payout_microusd-total_cost_microusd-settlement_fee_assumption_microusd',
+      formulaVersion: 1,
+      executionMode: 'paper',
+      provenance: 'simulated_placement_fills',
+      legs: {
+        kalshi: { marketId: 'KX-NY21-R', tokenId: null, side: 'yes', outcome: 'Republican' },
+        polymarket: { marketId: '0xny21', tokenId: 'pm-dem-no', side: 'no', outcome: 'Republican' },
+      },
+      relationshipState: 'verified_complementary',
+      entryRoi: { numeratorMicrousd: 46_543, denominatorMicrousd: 1_953_457 },
+      capturedAt: '2026-08-19T16:30:00.000Z',
+    });
+  });
+
+  it.each([
+    [{ relationshipState: 'same_direction_invalid' }, 'relationship_not_verified_complementary'],
+    [{ outcomeIdentityStatus: 'unresolved' }, 'exact_outcome_identity_unverified'],
+    [{ sharesPm: 1 }, 'unmatched_filled_quantities'],
+    [{ pmEntryFeeMicrousd: null }, 'authoritative_entry_fee_missing'],
+    [{ totalCostMicrousd: null }, 'immutable_buy_cost_missing'],
+  ])('fails closed for unavailable placement economics %#', (overrides, reasonCode) => {
+    expect(buildEntryArbProfitSnapshot({ ...input, ...overrides } as never)).toMatchObject({
+      version: 1,
+      status: 'unavailable',
+      reasonCode,
+      executionMode: 'paper',
+      capturedAt: input.capturedAt,
+    });
+  });
+});
 
 function openPosition(overrides: Partial<BotPosition> = {}): BotPosition {
   const position: BotPosition = {
@@ -197,6 +266,43 @@ describe('summarizeBotPositions', () => {
 });
 
 describe('summarizeBotPerformance', () => {
+  it('keeps exact invalid and unresolved exposure out of verified-arbitrage totals while reporting separate cohorts', () => {
+    const result = summarizeBotPerformance([
+      openPosition({
+        id: 1, relationshipValidity: 'verified_complementary', exposureIdentityStatus: 'exact_held_legs_proven',
+        totalCostCents: 97, currentValueCents: 100, unrealizedPnlCents: 3,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+      }),
+      openPosition({
+        id: 2, relationshipValidity: 'confirmed_invalid', exposureIdentityStatus: 'exact_held_legs_proven',
+        totalCostCents: 50, currentValueCents: 60, unrealizedPnlCents: 10,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+      }),
+      openPosition({
+        id: 3, relationshipValidity: 'unresolved_relationship', exposureIdentityStatus: 'exact_held_legs_proven',
+        totalCostCents: 70, currentValueCents: 75, unrealizedPnlCents: 5,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+      }),
+      openPosition({
+        id: 4, relationshipValidity: 'unresolved_relationship', exposureIdentityStatus: 'partially_proven',
+        totalCostCents: 80, currentValueCents: null, unrealizedPnlCents: null, lastValuationAt: null,
+      }),
+    ], new Date('2026-08-17T12:00:00.000Z'));
+
+    expect(result.capital.currentCents).toBe(100);
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 3, totalCents: 3, roiBps: 309 });
+    expect(result.classification).toMatchObject({
+      counts: {
+        verifiedComplementary: 1, confirmedInvalid: 1, exactExposureUnresolved: 1,
+        partialIdentity: 1, noFillRolledBack: 0, unrecoverable: 0,
+        stillUnavailable: 1, excludedFromVerifiedTotals: 3, conflicts: 0,
+      },
+      invalidExposure: { count: 1, currentValueCents: 60, pnlCents: 10 },
+      unresolvedExposure: { count: 1, currentValueCents: 75, pnlCents: 5 },
+      unavailable: { count: 1 },
+    });
+  });
+
   it('includes stale indicative marks in portfolio totals while retaining stale coverage', () => {
     const result = summarizeBotPerformance([
       openPosition({
@@ -1113,7 +1219,52 @@ describe('BotPositionStore', () => {
       entryRecordVersion: 1,
       entryRecordSource: 'bot_position_create',
       entryRecordedAt: '2026-08-08T12:00:00.000Z',
+      entryArbProfitSnapshot: {
+        status: 'unavailable',
+        reasonCode: 'relationship_not_verified_complementary',
+        executionMode: 'paper',
+      },
     });
+    const canonicalRelationship = propositionRegistry.relationships[0] as PropositionRelationship;
+    expect(canonicalRelationship).toBeDefined();
+    const verified = await store.create({
+      ...created,
+      id: undefined,
+      executionId: 7,
+      marketId: 'verified-entry-arb-profit',
+      kalshiTicker: canonicalRelationship.legs.kalshi.platformMarketId,
+      pmConditionId: canonicalRelationship.legs.polymarket.platformMarketId,
+      propositionRelationship: canonicalRelationship,
+      propositionRelationshipState: 'verified_complementary',
+      propositionRelationshipWarning: null,
+      kalshiMarketQuestion: canonicalRelationship.legs.kalshi.marketQuestion,
+      pmMarketQuestion: canonicalRelationship.legs.polymarket.marketQuestion,
+      kalshiOutcomeLabel: canonicalRelationship.legs.kalshi.payoutState,
+      pmOutcomeLabel: canonicalRelationship.legs.polymarket.payoutState,
+      outcomeIdentityStatus: 'verified',
+      outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+      outcomeIdentityRecordedAt: canonicalRelationship.verifiedAt,
+      outcomeIdentityFailureReason: null,
+      kalshiSide: canonicalRelationship.legs.kalshi.contractSide,
+      pmSide: canonicalRelationship.legs.polymarket.contractSide,
+      pmEntryTokenId: canonicalRelationship.legs.polymarket.tokenId,
+      pmExitTokenId: canonicalRelationship.legs.polymarket.tokenId,
+      entryArbProfitSnapshot: undefined,
+    } as never);
+    expect(verified.entryArbProfitSnapshot).toMatchObject({
+      status: 'available', profitMicrousd: 220_000,
+      matchedQuantityMicrounits: 10_000_000, guaranteedPayoutMicrousd: 10_000_000,
+      executionMode: 'paper', provenance: 'simulated_placement_fills',
+      entryRoi: { numeratorMicrousd: 220_000, denominatorMicrousd: 9_780_000 },
+    });
+    await store.updateValuation(verified.id, {
+      status: 'open', currentPriceKalshiCents: 1, currentPricePmCents: 1, currentValueCents: 20,
+      kalshiGrossProceedsMicrocents: 10_000_000, pmGrossProceedsMicrocents: 10_000_000,
+      kalshiNetProceedsCents: 10, pmNetProceedsCents: 10, kalshiExitFeeCents: 0, pmExitFeeCents: 0,
+      unrealizedPnlCents: -958, unrealizedRoiBps: -9_796, lastValuationAt: '2026-08-08T12:01:00.000Z',
+      settledAt: null, realizedPnlCents: null, settlementSide: null,
+    });
+    expect((await store.getById(verified.id))?.entryArbProfitSnapshot).toEqual(verified.entryArbProfitSnapshot);
     await expect(store.create({ ...created, id: undefined, feesCents: 29 } as never))
       .rejects.toThrow(/entry economics conflict/i);
     await expect(store.create({
@@ -1213,6 +1364,7 @@ describe('BotPositionStore', () => {
       'entry_fee_unallocated', 'entry_record_version', 'entry_record_source', 'entry_recorded_at',
       'kalshi_market_question', 'pm_market_question', 'kalshi_outcome_label', 'pm_outcome_label',
       'outcome_identity_status', 'outcome_identity_source', 'outcome_identity_recorded_at', 'outcome_identity_failure_reason',
+      'entry_arb_profit_snapshot_json',
     ]));
   });
 
@@ -1239,6 +1391,15 @@ describe('BotPositionStore', () => {
     expect(legacy.pmNetProceedsCents).toBeNull();
     expect(legacy.entryCostStatus).toBe('unavailable');
     expect(legacy.entryCostFailureReason).toMatch(/legacy position lacks authoritative entry fill and fee data/i);
+    await expect(store.backfillEntryArbProfitSnapshots()).resolves.toEqual({
+      inspected: 1, recovered: 0, unrecoverable: 1, conflicted: 0,
+    });
+    expect((await store.getById(1))?.entryArbProfitSnapshot).toMatchObject({
+      status: 'unavailable', provenance: 'historical_backfill',
+    });
+    await expect(store.backfillEntryArbProfitSnapshots()).resolves.toEqual({
+      inspected: 0, recovered: 0, unrecoverable: 0, conflicted: 0,
+    });
     expect(() => calculatePositionValuation({
       ...legacy,
       sharesKalshi: 1,
@@ -1486,8 +1647,12 @@ describe('BotPositionStore', () => {
     expect(settled.currentValueCents).toBe(100);
     expect(settled.realizedPnlCents).toBe(15);
     expect(summarizeBotPerformance([reduced], new Date('2026-08-08T12:02:00.000Z'))).toMatchObject({
-      capital: { deployedCents: 89, currentCents: 100, heldToResolutionCents: 100 },
-      pnl: { realizedCents: 4, unrealizedCents: 11, totalCents: 15, roiBps: 1685 },
+      capital: { deployedCents: 0, currentCents: 0, heldToResolutionCents: 0 },
+      pnl: { realizedCents: 0, unrealizedCents: 0, totalCents: 0, roiBps: null },
+      classification: {
+        counts: { unrecoverable: 1, excludedFromVerifiedTotals: 1 },
+        unavailable: { count: 1, deployedCents: 89, currentValueCents: 100, pnlCents: 11 },
+      },
     });
     const result = await store.listMarkets();
     expect(result.markets[0].currentLiveStakeCents).toBe(89);
@@ -1502,8 +1667,9 @@ describe('BotPositionStore', () => {
     expect(terminal.realizedPnlBeforeSettlementCents).toBe(4);
     expect(terminal.realizedPnlCents).toBe(15);
     expect(summarizeBotPerformance([terminal], new Date('2026-08-11T00:01:00.000Z'))).toMatchObject({
-      pnl: { realizedCents: 15, unrealizedCents: 0, totalCents: 15 },
+      pnl: { realizedCents: 0, unrealizedCents: 0, totalCents: 0 },
       valuation: { pendingSettlement: 0 },
+      classification: { unavailable: { count: 1, pnlCents: 15 } },
     });
     store.close();
   });

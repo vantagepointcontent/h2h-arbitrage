@@ -228,8 +228,26 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
   pmConditionId?: string | null;
   pmEntryTokenId?: string | null;
   identity: BotPositionIdentity;
+  relationshipValidity?: string | null;
+  exposureIdentityStatus?: string | null;
+  exposureValuationLabel?: string | null;
+  excludedFromVerifiedTotals?: boolean;
+  legacyExposureReason?: string | null;
+  legacyExposureRevision?: string | null;
+  legacyExposureEvidence?: Array<{ source: string; revision: string; capturedAt: string; confidence: string }>;
   buyPriceMicrocents?: number | null;
   buyCostMicrocents?: number | null;
+  entryArbProfitSnapshot?: {
+    status: 'available' | 'unavailable';
+    profitMicrousd?: number;
+    currency?: string;
+    matchedQuantityMicrounits?: number;
+    guaranteedPayoutMicrousd?: number;
+    entryRoi?: { numeratorMicrousd: number; denominatorMicrousd: number };
+    formulaVersion?: number;
+    provenance?: string;
+    reason?: string;
+  };
   indicativeValueMicrocents?: number | null;
   indicativePnlMicrocents?: number | null;
   unrealizedRoiBps?: number | null;
@@ -260,7 +278,14 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
     'Row Type', 'Position ID', 'Execution ID', 'Kalshi Question', 'Kalshi Outcome', 'Kalshi Side', 'Kalshi Ticker',
     'Polymarket Question', 'Polymarket Outcome', 'Polymarket Side', 'PM Condition ID', 'PM Token ID',
     'Relationship State', 'Relationship Explanation',
-    'Buy Price Microcents', 'Buy Cost Microcents', 'Kalshi Current Price Microcents',
+    'Relationship Validity', 'Exposure Identity', 'Exposure Valuation Class', 'Excluded From Verified Totals',
+    'Legacy Exposure Reason', 'Legacy Exposure Revision', 'Legacy Exposure Evidence Provenance',
+    'Buy Price Microcents', 'Buy Cost Microcents',
+    'Entry Arb Profit Microusd', 'Entry Arb Profit Status', 'Entry Arb Profit Unavailable Reason',
+    'Entry Arb Profit Currency', 'Entry Matched Quantity Microunits', 'Entry Guaranteed Payout Microusd',
+    'Entry ROI Numerator Microusd', 'Entry ROI Denominator Microusd',
+    'Entry Arb Formula Version', 'Entry Arb Provenance',
+    'Kalshi Current Price Microcents',
     'PM Current Price Microcents', 'Current Value Microcents', 'P/L Microcents', 'ROI BPS',
     'Valuation Included', 'Valuation Status', 'Valuation Failure Reason', 'Valuation As Of',
     'Kalshi Snapshot Platform', 'Kalshi Snapshot Market ID', 'Kalshi Snapshot Side', 'Kalshi Snapshot Token ID',
@@ -271,6 +296,8 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
     'Realized P/L Cents', 'Realized ROI BPS', 'Settlement Failure Reason', 'Cash Available At',
   ];
   const included = (position: (typeof positions)[number]) =>
+    position.excludedFromVerifiedTotals !== true
+    &&
     (position.valuationStatus === 'current' || position.valuationStatus === 'stale')
     && Number.isSafeInteger(position.buyPriceMicrocents)
     && Number.isSafeInteger(position.buyCostMicrocents) && position.buyCostMicrocents! > 0
@@ -289,6 +316,8 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
   ];
   const rows = positions.map((position) => {
     const valuationIncluded = included(position);
+    const entryArb = position.entryArbProfitSnapshot;
+    const entryArbAvailable = entryArb?.status === 'available';
     return [
     'POSITION', position.id, position.executionId,
     position.identity.kalshi.marketQuestion, position.identity.kalshi.outcomeLabel,
@@ -296,7 +325,19 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
     position.identity.polymarket.marketQuestion, position.identity.polymarket.outcomeLabel,
     position.identity.polymarket.side.toUpperCase(), position.pmConditionId, position.pmEntryTokenId,
     position.identity.relationship.state, position.identity.relationship.explanation,
+    position.relationshipValidity, position.exposureIdentityStatus, position.exposureValuationLabel,
+    position.excludedFromVerifiedTotals === true ? 'yes' : 'no', position.legacyExposureReason, position.legacyExposureRevision,
+    position.legacyExposureEvidence?.map((evidence) =>
+      `${evidence.source}|${evidence.revision}|${evidence.capturedAt}|${evidence.confidence}`).join(';') ?? null,
     position.buyPriceMicrocents, position.buyCostMicrocents,
+    entryArbAvailable ? entryArb.profitMicrousd : null,
+    entryArb?.status ?? 'unavailable', entryArbAvailable ? null : entryArb?.reason ?? 'Entry Arb Profit unavailable: placement snapshot missing',
+    entryArbAvailable ? entryArb.currency : null,
+    entryArbAvailable ? entryArb.matchedQuantityMicrounits : null,
+    entryArbAvailable ? entryArb.guaranteedPayoutMicrousd : null,
+    entryArbAvailable ? entryArb.entryRoi?.numeratorMicrousd : null,
+    entryArbAvailable ? entryArb.entryRoi?.denominatorMicrousd : null,
+    entryArbAvailable ? entryArb.formulaVersion : null, entryArb?.provenance,
     valuationIncluded ? snapshotPrice(position.currentPriceSnapshots?.kalshi) : null,
     valuationIncluded ? snapshotPrice(position.currentPriceSnapshots?.polymarket) : null,
     valuationIncluded ? position.indicativeValueMicrocents : null,
@@ -324,7 +365,8 @@ export function exportBotPositionIdentitiesCsv(positions: Array<{
   const totalRow = [
     'TOTAL', null, null, null, null, null, null, null, null, null, null, null,
     null, `${valued.length} valued position(s); unavailable positions excluded`,
-    totalBuyPrice, totalBuyCost, null, null, totalValue, totalPnl, totalRoiBps,
+    ...Array(7).fill(null),
+    totalBuyPrice, totalBuyCost, ...Array(10).fill(null), null, null, totalValue, totalPnl, totalRoiBps,
     null, null, null, null,
     ...Array(14).fill(null),
     null,
