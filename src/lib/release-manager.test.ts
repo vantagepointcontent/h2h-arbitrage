@@ -73,6 +73,8 @@ describe('isolated production releases', () => {
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ws-watcher.mjs'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/position-valuer.mjs'");
+    expect(ecosystem).toContain("node_args: '--env-file-if-exists=.env.local'");
+    expect(ecosystem).not.toContain("node_args: '--env-file=.env.local'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/db-maintenance.mjs'");
     const releaseManager = await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8');
     expect(releaseManager)
