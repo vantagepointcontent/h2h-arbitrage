@@ -57,6 +57,11 @@ describe('existing executions calculation-envelope migration', () => {
 
     const columns = await client.execute('PRAGMA table_info(executions)');
     expect(columns.rows.filter((row) => row.name === 'calculation_envelope')).toHaveLength(1);
+    expect(columns.rows.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'paper_position_deleted_at',
+      'paper_position_deletion_reason',
+      'paper_position_deletion_source_revision',
+    ]));
     expect((await client.execute('PRAGMA integrity_check')).rows[0].integrity_check).toBe('ok');
     expect((await client.execute('PRAGMA foreign_key_check')).rows).toHaveLength(0);
     client.close();

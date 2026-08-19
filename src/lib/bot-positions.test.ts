@@ -1347,6 +1347,10 @@ describe('BotPositionStore', () => {
 
     const columnsClient = createClient({ url: dbUrl });
     const columns = await columnsClient.execute('PRAGMA table_info(bot_positions)');
+    await columnsClient.execute({
+      sql: `UPDATE executions SET paper_position_deleted_at=?, paper_position_deletion_reason=? WHERE id=7`,
+      args: ['2026-08-19T23:45:00.000Z', 'product_owner_deleted_unavailable_paper_positions'],
+    });
     columnsClient.close();
     expect(columns.rows.map((row) => String(row.name))).toEqual(expect.arrayContaining([
       'execution_id', 'buy_price_kalshi', 'buy_price_pm', 'current_value',
@@ -1366,6 +1370,12 @@ describe('BotPositionStore', () => {
       'outcome_identity_status', 'outcome_identity_source', 'outcome_identity_recorded_at', 'outcome_identity_failure_reason',
       'entry_arb_profit_snapshot_json',
     ]));
+    await expect(store.create({
+      ...created,
+      id: undefined,
+      kalshiTicker: 'KX-TOMBSTONED-REPLAY',
+      pmConditionId: '0xtombstoned-replay',
+    } as never)).rejects.toThrow(/paper position was deleted by owner/i);
   });
 
   it('migrates legacy rows with null fee authority so they fail valuation closed', async () => {

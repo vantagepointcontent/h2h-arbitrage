@@ -26,6 +26,7 @@ import type {
   LegacyExposureVerdict,
   RelationshipValidity,
 } from './bot-legacy-exposure-reconciliation';
+import { ensurePaperPositionDeletionSchema } from './bot-paper-position-deletion';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -1671,6 +1672,10 @@ export class BotPositionStore {
   private async createSchema(): Promise<void> {
     await this.client.execute('PRAGMA busy_timeout = 30000');
     await this.client.execute('PRAGMA foreign_keys = ON');
+    const executionsTable = await this.client.execute(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='executions' LIMIT 1",
+    );
+    if (executionsTable.rows.length > 0) await ensurePaperPositionDeletionSchema(this.client);
     await this.client.execute(`
       CREATE TABLE IF NOT EXISTS bot_positions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2079,6 +2084,14 @@ export class BotPositionStore {
 
   async create(input: CreateBotPosition): Promise<BotPosition> {
     await this.ensureSchema();
+    const deletedExecution = await this.client.execute({
+      sql: `SELECT paper_position_deleted_at FROM executions
+        WHERE id=? AND paper_position_deleted_at IS NOT NULL LIMIT 1`,
+      args: [input.executionId],
+    });
+    if (deletedExecution.rows.length > 0) {
+      throw new Error('This paper position was deleted by owner and cannot be regenerated from its historical execution');
+    }
     assertShares('sharesKalshi', input.sharesKalshi);
     assertShares('sharesPm', input.sharesPm);
     assertEntryFeeAuthority(input);

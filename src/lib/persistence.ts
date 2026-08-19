@@ -2216,6 +2216,9 @@ export async function migrateExecutionsSchema(
     `ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`,
     `ALTER TABLE executions ADD COLUMN proposition_relationship TEXT`,
     `ALTER TABLE executions ADD COLUMN calculation_envelope TEXT`,
+    `ALTER TABLE executions ADD COLUMN paper_position_deleted_at TEXT`,
+    `ALTER TABLE executions ADD COLUMN paper_position_deletion_reason TEXT`,
+    `ALTER TABLE executions ADD COLUMN paper_position_deletion_source_revision TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -2246,7 +2249,10 @@ async function ensureExecutionsTable(): Promise<void> {
       bot_entry_evidence TEXT,
       proposition_relationship TEXT,
       selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
-      calculation_envelope TEXT
+      calculation_envelope TEXT,
+      paper_position_deleted_at TEXT,
+      paper_position_deletion_reason TEXT,
+      paper_position_deletion_source_revision TEXT
     )`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_ts ON executions(timestamp DESC)`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
@@ -2405,7 +2411,8 @@ export async function getTodayBotExposure(executionMode?: 'paper' | 'live'): Pro
         WHEN polymarket_order IS NOT NULL THEN COALESCE(json_extract(polymarket_order, '$.size'), 0)
         ELSE 0
       END
-    ), 0) AS total FROM executions WHERE source = 'bot' ${executionMode ? 'AND dry_run = ?' : ''} AND timestamp >= ? AND timestamp < ?`,
+    ), 0) AS total FROM executions WHERE source = 'bot' AND paper_position_deleted_at IS NULL
+      ${executionMode ? 'AND dry_run = ?' : ''} AND timestamp >= ? AND timestamp < ?`,
     args: executionMode
       ? [executionMode === 'paper' ? 1 : 0, `${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`]
       : [`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
@@ -2418,7 +2425,8 @@ export async function hasOpenBotPosition(arbId: string, executionMode: 'paper' |
   await ensureExecutionsTable();
   const c = getClient();
   const res = await c.execute({
-    sql: `SELECT COUNT(*) AS cnt FROM executions WHERE arb_id = ? AND source = 'bot' AND success = 1 AND dry_run = ?`,
+    sql: `SELECT COUNT(*) AS cnt FROM executions WHERE arb_id = ? AND source = 'bot'
+      AND success = 1 AND dry_run = ? AND paper_position_deleted_at IS NULL`,
     args: [arbId, executionMode === 'paper' ? 1 : 0],
   });
   return Number((res.rows as any[])[0]?.cnt ?? 0) > 0;

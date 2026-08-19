@@ -19,6 +19,8 @@
     "recover:bot-entry-evidence": "npm run build:recovery && node dist/recover-bot-entry-evidence.mjs",
     "build:reconcile-bot-legacy-exposure": "esbuild scripts/reconcile-bot-legacy-exposure.ts --bundle --platform=node --format=esm --outfile=dist/reconcile-bot-legacy-exposure.mjs --external:@libsql/client",
     "reconcile:bot-legacy-exposure": "npm run build:reconcile-bot-legacy-exposure --silent && node dist/reconcile-bot-legacy-exposure.mjs",
+    "build:delete-unavailable-paper-positions": "esbuild scripts/delete-unavailable-paper-positions.ts --bundle --platform=node --format=esm --outfile=dist/delete-unavailable-paper-positions.mjs --external:@libsql/client",
+    "delete:unavailable-paper-positions": "npm run build:delete-unavailable-paper-positions --silent && node dist/delete-unavailable-paper-positions.mjs",
     "build:backfill-entry-arb-profit": "esbuild scripts/backfill-entry-arb-profit.ts --bundle --platform=node --format=esm --outfile=dist/backfill-entry-arb-profit.mjs --external:@libsql/client --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "backfill:entry-arb-profit": "npm run build:backfill-entry-arb-profit --silent && node dist/backfill-entry-arb-profit.mjs",
     "start": "next start",

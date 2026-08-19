@@ -889,7 +889,8 @@ async function countTodayBotTrades(executionMode: BotPositionExecutionMode): Pro
   try {
     const today = new Date().toISOString().slice(0, 10);
     const res = await c.execute({
-      sql: `SELECT COUNT(*) AS cnt FROM executions WHERE source = 'bot' AND dry_run = ? AND timestamp >= ? AND timestamp < ?`,
+      sql: `SELECT COUNT(*) AS cnt FROM executions WHERE source = 'bot' AND dry_run = ?
+        AND paper_position_deleted_at IS NULL AND timestamp >= ? AND timestamp < ?`,
       args: [executionMode === 'paper' ? 1 : 0, `${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`],
     });
     return Number((res.rows as Array<{ cnt?: unknown }>)[0]?.cnt ?? 0);
