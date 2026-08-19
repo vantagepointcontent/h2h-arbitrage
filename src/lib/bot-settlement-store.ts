@@ -73,6 +73,43 @@ function rowToLeg(row: Record<string, unknown>): ReconciledSettlementLeg {
   };
 }
 
+function settlementContent(result: SettlementLifecycleResult): string {
+  return JSON.stringify({
+    positionState: result.positionState,
+    legs: [...result.legs].sort((left, right) => left.venue.localeCompare(right.venue)).map((leg) => ({
+      venue: leg.venue,
+      marketId: leg.marketId,
+      outcomeId: leg.outcomeId,
+      side: leg.side,
+      requestedQuantity: leg.requestedQuantity,
+      filledQuantity: leg.filledQuantity,
+      remainingQuantity: legRemainingQuantity(leg),
+      orderId: leg.orderId,
+      fillIds: leg.fillIds,
+      exposureState: leg.exposureState,
+      mode: leg.mode,
+      lifecycleState: leg.lifecycleState,
+      resolutionWinningSide: leg.resolutionWinningSide,
+      resolutionDetectedAt: leg.resolutionDetectedAt,
+      resolutionSource: leg.resolutionSource,
+      resolutionSourceVersion: leg.resolutionSourceVersion,
+      payoutEntitlementCents: leg.payoutEntitlementCents,
+      settlementFeeCents: leg.settlementFeeCents,
+      netSettlementProceedsCents: leg.netSettlementProceedsCents,
+      creditState: leg.creditState,
+      cashAvailableAt: leg.cashAvailableAt,
+      failureReason: leg.failureReason,
+      reconciledAt: leg.reconciledAt,
+    })),
+    grossSettlementProceedsCents: result.grossSettlementProceedsCents,
+    netSettlementProceedsCents: result.netSettlementProceedsCents,
+    realizedPnlCents: result.realizedPnlCents,
+    realizedRoiBps: result.realizedRoiBps,
+    cashAvailableAt: result.cashAvailableAt,
+    failureReason: result.failureReason,
+  });
+}
+
 export class BotSettlementStore {
   private readonly client: Client;
   private schemaReady: Promise<void> | null = null;
@@ -150,7 +187,7 @@ export class BotSettlementStore {
     const transaction = await this.client.transaction('write');
     try {
       const existing = await transaction.execute({
-        sql: 'SELECT position_state, reconciled_at FROM bot_position_settlements WHERE position_id = ?',
+        sql: 'SELECT * FROM bot_position_settlements WHERE position_id = ?',
         args: [positionId],
       });
       const existingAt = existing.rows[0]?.reconciled_at;
@@ -163,7 +200,27 @@ export class BotSettlementStore {
           ? result.positionState !== 'settled' && result.positionState !== 'settlement_unresolved'
           : (existingState === 'partially_settled' || existingState === 'settlement_pending')
             && result.positionState === 'open';
-      if ((existingAt != null && String(existingAt) >= result.reconciledAt) || terminalDowngrade) {
+      let semanticNoop = false;
+      if (existing.rows[0]) {
+        const existingLegRows = await transaction.execute({
+          sql: 'SELECT * FROM bot_position_settlement_legs WHERE position_id = ? ORDER BY venue',
+          args: [positionId],
+        });
+        const row = existing.rows[0];
+        const existingResult: SettlementLifecycleResult = {
+          positionState: String(row.position_state) as SettlementPositionState,
+          legs: existingLegRows.rows.map((leg) => rowToLeg(leg as Record<string, unknown>)),
+          grossSettlementProceedsCents: asNullableNumber(row.gross_settlement_proceeds_cents),
+          netSettlementProceedsCents: asNullableNumber(row.net_settlement_proceeds_cents),
+          realizedPnlCents: asNullableNumber(row.realized_pnl_cents),
+          realizedRoiBps: asNullableNumber(row.realized_roi_bps),
+          cashAvailableAt: asNullableString(row.cash_available_at),
+          failureReason: asNullableString(row.failure_reason),
+          reconciledAt: String(row.reconciled_at),
+        };
+        semanticNoop = settlementContent(existingResult) === settlementContent(result);
+      }
+      if ((existingAt != null && String(existingAt) >= result.reconciledAt) || terminalDowngrade || semanticNoop) {
         await transaction.rollback();
         return false;
       }

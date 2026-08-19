@@ -75,6 +75,25 @@ describe('BotSettlementStore', () => {
     store.close();
   });
 
+  it('does not rewrite an unchanged unresolved backfill only to advance its poll timestamp', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-unresolved-noop-'));
+    dirs.push(dir);
+    const store = new BotSettlementStore(`file:${path.join(dir, 'test.db')}`);
+    const unresolvedAt = (observedAt: string) => reconcileSettlementLifecycle({
+      positionId: 1, executionMode: 'paper', buyCostCents: 96, realizedPnlBeforeSettlementCents: 0,
+      legs: [legs[0], { ...legs[1], outcomeId: null, fillIds: [] }],
+      resolutions: [], observedAt,
+    });
+
+    await expect(store.persist(1, unresolvedAt('2026-08-19T12:00:02.000Z'))).resolves.toBe(true);
+    const second = unresolvedAt('2026-08-19T12:05:02.000Z');
+    const existing = (await store.getByPositionIds([1])).get(1)!;
+    expect({ ...existing, reconciledAt: second.reconciledAt }).toEqual(second);
+    await expect(store.persist(1, second)).resolves.toBe(false);
+    expect((await store.getByPositionIds([1])).get(1)?.reconciledAt).toBe('2026-08-19T12:00:02.000Z');
+    store.close();
+  });
+
   it('serializes concurrent ledger writers on one SQLite client', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'bot-settlement-concurrent-'));
     dirs.push(dir);
