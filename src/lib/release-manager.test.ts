@@ -74,8 +74,11 @@ describe('isolated production releases', () => {
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ws-watcher.mjs'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/position-valuer.mjs'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/db-maintenance.mjs'");
-    expect(await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8'))
+    const releaseManager = await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8');
+    expect(releaseManager)
       .toMatch(/h2h-arbitrage[\s\S]+h2h-poller[\s\S]+h2h-scan-supervisor[\s\S]+h2h-watcher[\s\S]+h2h-valuer[\s\S]+h2h-db-maintenance/);
+    expect(releaseManager)
+      .toMatch(/'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-db-maintenance'[\s\S]+'start', 'ecosystem\.config\.js'/);
   });
 
   it('materializes detached dependencies and preserves generated runtime package aliases', async () => {

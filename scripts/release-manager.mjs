@@ -28,11 +28,6 @@ const REQUIRED_FILES = [
   'BUILD_ID',
   'DEPLOY_COMMIT',
   'full-scan-worker.cjs',
-  'ragnar-consumer.mjs',
-  'ws-watcher.mjs',
-  'position-valuer.mjs',
-  'db-maintenance.mjs',
-  'recover-bot-entry-evidence.mjs',
   'build-manifest.json',
   'routes-manifest.json',
   'prerender-manifest.json',
@@ -401,6 +396,15 @@ async function restartAndVerify(repoRoot, expected, options = {}) {
   await execFileAsync('pm2', [
     'start', 'ecosystem.config.js', '--only', 'h2h-poller,h2h-scan-supervisor', '--update-env',
   ], { cwd: repoRoot });
+  // PM2 `start --only` restarts an existing process without updating its
+  // executable path. Recreate release-packaged daemons so a promotion or
+  // rollback actually follows the active symlink instead of stale root dist/.
+  await execFileAsync('pm2', [
+    'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-db-maintenance',
+  ], { cwd: repoRoot }).catch((error) => {
+    const detail = `${error?.stdout ?? ''}\n${error?.stderr ?? ''}`;
+    if (!/Process or Namespace .* not found/i.test(detail)) throw error;
+  });
   await execFileAsync('pm2', [
     'start', 'ecosystem.config.js', '--only', 'h2h-watcher,h2h-valuer,h2h-ragnar,h2h-db-maintenance', '--update-env',
   ], { cwd: repoRoot });
@@ -581,8 +585,16 @@ export async function buildCandidate({ repoRoot, commit = 'HEAD', runId, skipTes
       DEPLOY_COMMIT: resolvedCommit,
     };
     await spawnCommand('npm', ['run', 'build:raw'], { cwd: source, env });
-    if (!await exists(path.join(source, '.next', 'ragnar-consumer.mjs'))) {
-      throw new Error('Isolated release build did not package ragnar-consumer.mjs');
+    for (const runtime of [
+      'ragnar-consumer.mjs',
+      'ws-watcher.mjs',
+      'position-valuer.mjs',
+      'db-maintenance.mjs',
+      'recover-bot-entry-evidence.mjs',
+    ]) {
+      if (!await exists(path.join(source, '.next', runtime))) {
+        throw new Error(`Isolated release build did not package ${runtime}`);
+      }
     }
     const runtimePackageAliases = await detectRuntimePackageAliases(path.join(source, '.next'));
     await writeFile(path.join(source, '.next', 'DEPLOY_COMMIT'), `${resolvedCommit}\n`);
