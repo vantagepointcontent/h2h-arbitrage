@@ -48,6 +48,47 @@
           "tokenId": "38424385756462253442221613485727105608987714090195314133724025202573806948368"
         }
       }
+    },
+    {
+      "schemaVersion": 1,
+      "state": "verified_complementary",
+      "verificationSource": "authoritative_platform_metadata",
+      "verifiedAt": "2026-08-19T17:00:00.000Z",
+      "parentEventId": "us-house-mo03-2026-party-winner",
+      "resolutionRuleId": "us-house-mo03-2026-party-winner-v1",
+      "exhaustivePayoutStates": [
+        "Democratic Party wins MO-03",
+        "Republican Party wins MO-03"
+      ],
+      "humanLabel": "MO-03 House Election Winner — Democratic vs Republican",
+      "legs": {
+        "kalshi": {
+          "platform": "kalshi",
+          "platformMarketId": "KXHOUSERACE-MO03-26-D",
+          "parentEventId": "us-house-mo03-2026-party-winner",
+          "selectedOutcome": "Democratic Party wins MO-03",
+          "contractSide": "yes",
+          "payoutState": "Democratic Party wins MO-03",
+          "eventPayoutStates": ["Democratic Party wins MO-03", "Republican Party wins MO-03"],
+          "resolutionRuleId": "us-house-mo03-2026-party-winner-v1",
+          "humanLabel": "Kalshi YES — Democratic Party wins MO-03",
+          "marketQuestion": "Will Democratic win the House race for MO-03?",
+          "tokenId": null
+        },
+        "polymarket": {
+          "platform": "polymarket",
+          "platformMarketId": "0xf32f28247b2a9653f52ee8078e6aa265c0fdc00b0697ef390902d86fdbef35e4",
+          "parentEventId": "us-house-mo03-2026-party-winner",
+          "selectedOutcome": "Republican Party wins MO-03",
+          "contractSide": "yes",
+          "payoutState": "Republican Party wins MO-03",
+          "eventPayoutStates": ["Democratic Party wins MO-03", "Republican Party wins MO-03"],
+          "resolutionRuleId": "us-house-mo03-2026-party-winner-v1",
+          "humanLabel": "Polymarket YES — Republican Party wins MO-03",
+          "marketQuestion": "Will the Republican Party win the MO-03 House seat?",
+          "tokenId": "78731837307763791013205666606889953610367275623708569393097319597715511164419"
+        }
+      }
     }
   ]
 }

@@ -31,7 +31,7 @@ const selfAsserted: PropositionRelationship = {
 
 describe('canonical proposition registry', () => {
   it('does not trust well-formed candidate metadata that is absent from the server registry', () => {
-    expect(canonicalPropositionRelationshipCount()).toBe(1);
+    expect(canonicalPropositionRelationshipCount()).toBe(2);
     expect(resolveCanonicalPropositionRelationship(selfAsserted)).toBeNull();
     expect(findCanonicalPropositionRelationship({
       kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token', kalshiSide: 'yes', pmSide: 'no',
@@ -68,5 +68,20 @@ describe('canonical proposition registry', () => {
       pmTokenId: '61536378782761462213691399252544797782501798493464719286188000407153618893171',
       kalshiSide: 'yes', pmSide: 'no',
     })).toBeNull();
+  });
+
+  it('resolves the intended MO-03 Democratic YES plus Republican YES pair exactly', () => {
+    expect(findCanonicalPropositionRelationship({
+      kalshiTicker: 'KXHOUSERACE-MO03-26-D',
+      pmConditionId: '0xf32f28247b2a9653f52ee8078e6aa265c0fdc00b0697ef390902d86fdbef35e4',
+      pmTokenId: '78731837307763791013205666606889953610367275623708569393097319597715511164419',
+      kalshiSide: 'yes', pmSide: 'yes',
+    })).toMatchObject({
+      state: 'verified_complementary',
+      legs: {
+        kalshi: { payoutState: 'Democratic Party wins MO-03' },
+        polymarket: { payoutState: 'Republican Party wins MO-03' },
+      },
+    });
   });
 });
