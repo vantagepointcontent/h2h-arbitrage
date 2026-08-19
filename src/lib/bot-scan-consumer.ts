@@ -440,7 +440,13 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       if (eligible) initiallyEligible.push(item);
     }
     if (initiallyEligible.length === 0) {
-      const blocked = scan.candidates.find((item) => item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable');
+      // Scanner execution blockers describe its legacy one-share request. Paper
+      // mode deliberately re-evaluates the authoritative venue minimum, so its
+      // terminal decision must report the BotTrader criteria that actually
+      // rejected the candidate rather than the stale scanner blocker.
+      const blocked = executionMode === 'paper'
+        ? undefined
+        : scan.candidates.find((item) => item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable');
       if (blocked) {
         return finish(rejection(
           'criteria_rejected',

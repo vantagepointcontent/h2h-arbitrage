@@ -318,6 +318,30 @@ describe('durable BotTrader scan consumer', () => {
     }));
   });
 
+  it('reports the real paper criteria instead of a legacy one-share scanner blocker', async () => {
+    const venueMinimumCandidate = candidate({
+      executionStatus: 'non_executable',
+      executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share',
+      pmNoMinOrderSize: 5,
+      roiPct: 1,
+      kalshiYesDepth: 2.25,
+      pmNoDepth: 2.50,
+    });
+    const h = harness({
+      scans: [scan({ candidates: [venueMinimumCandidate] })],
+      current: [venueMinimumCandidate],
+      botSettings: settings({ minRoiPct: 2 }),
+      executionMode: 'paper',
+    });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
+      state: 'criteria_rejected',
+      reasonCode: 'scan_criteria_rejected',
+      reason: 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data',
+    });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
   it('keeps venue-minimum scanner rejections blocked outside paper mode', async () => {
     const blocked = candidate({
       executionStatus: 'non_executable',
