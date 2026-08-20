@@ -102,11 +102,35 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
       { id: first.id, status: 'available', roiPct: 4.4, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:00.000Z', scanId: latest.id },
       { id: duplicate.id, status: 'available', roiPct: 4.4, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:00.000Z', scanId: latest.id },
       { id: similar.id, status: 'available', roiPct: 8.8, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:06:00.000Z', scanId: similar.id },
-      { id: onlyFailed.id, status: 'unavailable' },
-      { id: noArb.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:07:00.000Z', scanId: noArb.id },
-      { id: invalid.id, status: 'unavailable' },
-      { id: missingLinks.id, status: 'unavailable' },
-      { id: 999_999, status: 'never_scanned' },
+      {
+        id: onlyFailed.id,
+        status: 'unavailable',
+        reasonCode: 'no_completed_scan_for_exact_pair',
+        reason: 'No successfully completed scan exists for the exact linked market pair.',
+      },
+      {
+        id: noArb.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:07:00.000Z', scanId: noArb.id,
+        reasonCode: 'latest_completed_scan_has_no_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
+      },
+      {
+        id: invalid.id,
+        status: 'unavailable',
+        reasonCode: 'latest_completed_scan_invalid_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair failed canonical arbitrage validation.',
+      },
+      {
+        id: missingLinks.id,
+        status: 'unavailable',
+        reasonCode: 'missing_exact_link_identity',
+        reason: 'The historical row does not contain both exact linked event URLs.',
+      },
+      {
+        id: 999_999,
+        status: 'never_scanned',
+        reasonCode: 'log_row_not_found',
+        reason: 'The requested historical scan row does not exist.',
+      },
     ]);
   });
 });
