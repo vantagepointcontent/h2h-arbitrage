@@ -1,0 +1,52 @@
+{
+  "verifiedAt": "2026-08-20T14:57:00.231Z",
+  "deployment": {
+    "commit": "e7da52421dd28a0f7c5cd671fa6eed2b8c7964fe",
+    "buildId": "Lj2HDsqI8gyfFt6X3_7i2"
+  },
+  "logs": {
+    "total": 96386,
+    "firstPageRows": 500,
+    "secondPageRows": 500,
+    "secondPageOverlap": 0,
+    "firstPageFirstId": 819999,
+    "secondPageFirstId": 819499,
+    "summary": {
+      "totalArbs": 55278,
+      "avgRoi": 0.886769597804055,
+      "bestRoi": 23.86314,
+      "totalProfit": 206152.59789055955,
+      "arbTypeCounts": {
+        "direct": 52262,
+        "cross": 3016,
+        "internal": 0
+      }
+    },
+    "summaryReconciles": true,
+    "directFilterTotal": 30973,
+    "directRowsValid": true,
+    "csvRows": 500,
+    "csvContract": true
+  },
+  "markets": {
+    "apiCount": 476,
+    "listRefreshCount": 476,
+    "listRefreshRevision": "873348a94ab76c5d58b4ba97531be206b8ef0910",
+    "refreshParityMismatches": [],
+    "apyRows": 0,
+    "invalidBeforeRace": 0,
+    "invalidAfterRace": 0,
+    "dbInvalidBeforeRace": 0,
+    "dbInvalidAfterRace": 0,
+    "apySortMonotonic": true
+  },
+  "integrity": {
+    "sqlite": "ok",
+    "foreignKeyViolations": 0,
+    "triggers": [
+      "saved_market_apy_invariant_guard",
+      "saved_market_metric_revision_guard"
+    ]
+  },
+  "failures": []
+}
