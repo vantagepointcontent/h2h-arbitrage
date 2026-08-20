@@ -70,7 +70,16 @@ async function dependencyCounts(client: Client, plan: PaperPositionDeletionPlan)
 async function retainedPositionDigest(client: Client, cohort: PaperPositionDeletionCohortRow[]): Promise<string> {
   const ids = cohort.map((row) => row.positionId);
   const result = await client.execute({
-    sql: `SELECT * FROM bot_positions ${ids.length ? `WHERE id NOT IN (${ids.map(() => '?').join(',')})` : ''} ORDER BY id`,
+    sql: `SELECT id, execution_id, execution_mode, market_id, market_title, kalshi_ticker,
+      pm_condition_id, strategy, kalshi_side, pm_side, buy_price_kalshi, buy_price_pm,
+      shares_kalshi, shares_pm, total_cost, total_cost_microusd, expected_payout,
+      expected_profit, fees, status, opened_at, settled_at, closed_at, realized_pnl,
+      realized_pnl_before_settlement, entry_cost_status, entry_evidence_revision,
+      entry_evidence_sha256, entry_record_version, entry_record_source, entry_recorded_at,
+      relationship_validity, exposure_identity_status, legacy_exposure_revision,
+      entry_arb_profit_snapshot_json, resolution_source, resolution_payout,
+      resolution_validation_status
+      FROM bot_positions ${ids.length ? `WHERE id NOT IN (${ids.map(() => '?').join(',')})` : ''} ORDER BY id`,
     args: ids as InValue[],
   });
   return hashRows(result.rows as unknown as Row[]);
