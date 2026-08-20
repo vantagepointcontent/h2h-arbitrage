@@ -1,0 +1,1741 @@
+{
+  "revision": 2,
+  "generatedAt": "2026-08-20T08:52:36.561Z",
+  "windowHours": 24,
+  "thresholdPct": 2,
+  "policy": "Read-only reconciliation. Historical/stale opportunities were not submitted or replayed.",
+  "summary": {
+    "completed_scans": 15215,
+    "logs_rows_at_or_above_threshold": 520,
+    "threshold_rows_without_scan_decision": 0,
+    "all_completed_rows_without_scan_decision": 0,
+    "placed_scans": 0
+  },
+  "candidateSummary": {
+    "audited_candidates": 4822,
+    "candidates_at_or_above_threshold": 1014,
+    "accepted_at_or_above_threshold": 0,
+    "not_accepted_at_or_above_threshold": 1014
+  },
+  "thresholdQualifiedSkipReasons": [
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry",
+      "candidates": 420,
+      "min_roi_pct": 2.039599999999996,
+      "max_roi_pct": 25.26460000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 56.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.69 required; PM $1.29 / $0.11 required",
+      "candidates": 122,
+      "min_roi_pct": 3.1102000000000123,
+      "max_roi_pct": 3.1102000000000123
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 251.92 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.15 required; PM $28.47 / $0.57 required",
+      "candidates": 85,
+      "min_roi_pct": 4.29900000000001,
+      "max_roi_pct": 4.29900000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 20.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.70 required; PM $0.65 / $0.16 required",
+      "candidates": 31,
+      "min_roi_pct": 2.276000000000014,
+      "max_roi_pct": 2.276000000000014
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 88.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.40 required; PM $1.76 / $0.10 required",
+      "candidates": 30,
+      "min_roi_pct": 9.101999999999993,
+      "max_roi_pct": 9.141199999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 12.52 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $2.80 required; PM $4.13 / $1.65 required",
+      "candidates": 28,
+      "min_roi_pct": 8.094399999999993,
+      "max_roi_pct": 8.094399999999993
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 415.68 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.69 required; PM $12.47 / $0.15 required",
+      "candidates": 24,
+      "min_roi_pct": 2.3836000000000124,
+      "max_roi_pct": 2.3836000000000124
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 273.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.15 required; PM $30.85 / $0.57 required",
+      "candidates": 19,
+      "min_roi_pct": 4.29900000000001,
+      "max_roi_pct": 4.29900000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 273.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.20 required; PM $30.85 / $0.57 required",
+      "candidates": 17,
+      "min_roi_pct": 3.298999999999995,
+      "max_roi_pct": 3.298999999999995
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 205.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $23.78 / $0.58 required",
+      "candidates": 16,
+      "min_roi_pct": 4.789800000000006,
+      "max_roi_pct": 4.789800000000006
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 251.97 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.75 required; PM $3.53 / $0.07 required",
+      "candidates": 15,
+      "min_roi_pct": 3.1447999999999996,
+      "max_roi_pct": 3.1447999999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 332.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $212.93 / $3.20 required",
+      "candidates": 12,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 189.99 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.47 required; PM $165.29 / $4.35 required",
+      "candidates": 10,
+      "min_roi_pct": 2.247600000000014,
+      "max_roi_pct": 2.247600000000014
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 40.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.12 required; PM $38.00 / $4.75 required",
+      "candidates": 9,
+      "min_roi_pct": 2.2099999999999977,
+      "max_roi_pct": 2.2099999999999977
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 10.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $8.60 / $4.30 required",
+      "candidates": 8,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 20.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $5.80 / $1.40 required",
+      "candidates": 8,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 27.38 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.85 required; PM $21.63 / $3.95 required",
+      "candidates": 8,
+      "min_roi_pct": 2.3364000000000034,
+      "max_roi_pct": 2.3364000000000034
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 424.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $364.90 / $4.30 required",
+      "candidates": 8,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 56.88 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $36.40 / $3.20 required",
+      "candidates": 6,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 100.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.60 required; PM $5.00 / $0.25 required",
+      "candidates": 4,
+      "min_roi_pct": 2.162399999999989,
+      "max_roi_pct": 2.162399999999989
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 18.93 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.49 required; PM $16.09 / $4.25 required",
+      "candidates": 4,
+      "min_roi_pct": 3.7899999999999974,
+      "max_roi_pct": 3.7899999999999974
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 262.46 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.15 required; PM $29.66 / $0.57 required",
+      "candidates": 4,
+      "min_roi_pct": 4.29900000000001,
+      "max_roi_pct": 4.29900000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 29.90 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.40 required; PM $26.01 / $4.35 required",
+      "candidates": 4,
+      "min_roi_pct": 3.9475999999999996,
+      "max_roi_pct": 3.9475999999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 534.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $459.50 / $4.30 required",
+      "candidates": 4,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 648.37 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.65 required; PM $538.15 / $4.15 required",
+      "candidates": 4,
+      "min_roi_pct": 2.6356000000000037,
+      "max_roi_pct": 2.6356000000000037
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 94.01 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $81.79 / $4.35 required",
+      "candidates": 4,
+      "min_roi_pct": 2.64760000000001,
+      "max_roi_pct": 2.64760000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 0.01 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $0.01 / $4.35 required",
+      "candidates": 3,
+      "min_roi_pct": 2.64760000000001,
+      "max_roi_pct": 2.64760000000001
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 112.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $97.67 / $4.35 required",
+      "candidates": 3,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 20.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.10 required; PM $5.80 / $1.40 required",
+      "candidates": 3,
+      "min_roi_pct": 7.393599999999996,
+      "max_roi_pct": 7.393599999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 25.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.20 required; PM $17.75 / $3.55 required",
+      "candidates": 3,
+      "min_roi_pct": 2.9821999999999997,
+      "max_roi_pct": 2.9821999999999997
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 514.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $442.30 / $4.30 required",
+      "candidates": 3,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 91.41 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $58.50 / $3.20 required",
+      "candidates": 3,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 0.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $0.20 / $1.40 required",
+      "candidates": 2,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 100.53 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.45 required; PM $65.34 / $3.25 required",
+      "candidates": 2,
+      "min_roi_pct": 3.4899999999999967,
+      "max_roi_pct": 3.4899999999999967
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 137.33 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $118.10 / $4.30 required",
+      "candidates": 2,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 191.41 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $122.50 / $3.20 required",
+      "candidates": 2,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 20.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $5.60 / $1.40 required",
+      "candidates": 2,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 247.43 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $158.36 / $3.20 required",
+      "candidates": 2,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 251.92 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.20 required; PM $28.47 / $0.57 required",
+      "candidates": 2,
+      "min_roi_pct": 3.298999999999995,
+      "max_roi_pct": 3.298999999999995
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 367.24 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $235.03 / $3.20 required",
+      "candidates": 2,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 374.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $321.90 / $4.30 required",
+      "candidates": 2,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 402.56 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.60 required; PM $338.15 / $4.20 required",
+      "candidates": 2,
+      "min_roi_pct": 2.6624000000000034,
+      "max_roi_pct": 2.6624000000000034
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 435.45 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.90 required; PM $339.65 / $3.90 required",
+      "candidates": 2,
+      "min_roi_pct": 2.1135999999999857,
+      "max_roi_pct": 2.1135999999999857
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 478.40 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $411.42 / $4.30 required",
+      "candidates": 2,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 574.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $493.90 / $4.30 required",
+      "candidates": 2,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 578.40 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $497.42 / $4.30 required",
+      "candidates": 2,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 0.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.10 required; PM $0.20 / $1.40 required",
+      "candidates": 1,
+      "min_roi_pct": 7.393599999999996,
+      "max_roi_pct": 7.393599999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 100.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.45 required; PM $26.00 / $1.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.6304000000000043,
+      "max_roi_pct": 2.6304000000000043
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 1081.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $908.50 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 111.41 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $71.30 / $3.20 required",
+      "candidates": 1,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 12.56 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.54 required; PM $0.38 / $0.15 required",
+      "candidates": 1,
+      "min_roi_pct": 5.583599999999996,
+      "max_roi_pct": 5.583599999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 130.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.90 required; PM $101.40 / $3.90 required",
+      "candidates": 1,
+      "min_roi_pct": 2.1135999999999857,
+      "max_roi_pct": 2.1135999999999857
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 132.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $115.07 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 152.35 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $97.50 / $3.20 required",
+      "candidates": 1,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 156.88 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $1.55 required; PM $100.40 / $3.20 required",
+      "candidates": 1,
+      "min_roi_pct": 2.4784,
+      "max_roi_pct": 2.4784
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 18.93 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $16.09 / $4.25 required",
+      "candidates": 1,
+      "min_roi_pct": 3.6900000000000004,
+      "max_roi_pct": 3.6900000000000004
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 20.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.30 required; PM $5.80 / $1.40 required",
+      "candidates": 1,
+      "min_roi_pct": 3.593599999999992,
+      "max_roi_pct": 3.593599999999992
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 212.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $184.67 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 2310.48 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $300.36 / $0.65 required",
+      "candidates": 1,
+      "min_roi_pct": 3.4606000000000066,
+      "max_roi_pct": 3.4606000000000066
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 232.62 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.40 required; PM $58.16 / $1.25 required",
+      "candidates": 1,
+      "min_roi_pct": 4.649999999999993,
+      "max_roi_pct": 4.649999999999993
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 2456.78 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $319.38 / $0.65 required",
+      "candidates": 1,
+      "min_roi_pct": 3.4606000000000066,
+      "max_roi_pct": 3.4606000000000066
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 25.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.40 required; PM $21.75 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 3.9475999999999996,
+      "max_roi_pct": 3.9475999999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 25.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $7.20 / $1.40 required",
+      "candidates": 1,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 26.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $7.28 / $1.40 required",
+      "candidates": 1,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 2618.48 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $340.40 / $0.65 required",
+      "candidates": 1,
+      "min_roi_pct": 3.4606000000000066,
+      "max_roi_pct": 3.4606000000000066
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 272.03 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.47 required; PM $236.67 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.247600000000014,
+      "max_roi_pct": 2.247600000000014
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 2726.28 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $354.42 / $0.65 required",
+      "candidates": 1,
+      "min_roi_pct": 3.4606000000000066,
+      "max_roi_pct": 3.4606000000000066
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 30.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $25.80 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 30.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.54 required; PM $0.57 / $0.10 required",
+      "candidates": 1,
+      "min_roi_pct": 6.725399999999998,
+      "max_roi_pct": 6.725399999999998
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 335.97 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.75 required; PM $4.70 / $0.07 required",
+      "candidates": 1,
+      "min_roi_pct": 3.1447999999999996,
+      "max_roi_pct": 3.1447999999999996
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 38.93 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.49 required; PM $33.09 / $4.25 required",
+      "candidates": 1,
+      "min_roi_pct": 3.7899999999999974,
+      "max_roi_pct": 3.7899999999999974
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 381.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $331.70 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 394.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $339.10 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 40.71 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $3.20 required; PM $11.40 / $1.40 required",
+      "candidates": 1,
+      "min_roi_pct": 5.393599999999994,
+      "max_roi_pct": 5.393599999999994
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 422.56 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.60 required; PM $354.95 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 2.6624000000000034,
+      "max_roi_pct": 2.6624000000000034
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 444.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $382.10 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 447.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $375.94 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 447.67 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $385.00 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 453.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $389.84 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 47.10 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.72 required; PM $1.46 / $0.15 required",
+      "candidates": 1,
+      "min_roi_pct": 2.009800000000005,
+      "max_roi_pct": 2.009800000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 474.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $407.90 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 498.40 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $428.62 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 508.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $442.19 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 524.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $450.90 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 554.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.50 required; PM $476.70 / $4.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.7184000000000035,
+      "max_roi_pct": 2.7184000000000035
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 563.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $490.04 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 570.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $496.13 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 578.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $503.09 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 6.28 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.54 required; PM $0.24 / $0.19 required",
+      "candidates": 1,
+      "min_roi_pct": 4.7537999999999965,
+      "max_roi_pct": 4.7537999999999965
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 60.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.54 required; PM $3.60 / $0.30 required",
+      "candidates": 1,
+      "min_roi_pct": 2.4743999999999975,
+      "max_roi_pct": 2.4743999999999975
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 628.37 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.65 required; PM $521.55 / $4.15 required",
+      "candidates": 1,
+      "min_roi_pct": 2.6356000000000037,
+      "max_roi_pct": 2.6356000000000037
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 75.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.73 required; PM $2.18 / $0.15 required",
+      "candidates": 1,
+      "min_roi_pct": 2.015600000000009,
+      "max_roi_pct": 2.015600000000009
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 800.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.10 required; PM $90.40 / $0.57 required",
+      "candidates": 1,
+      "min_roi_pct": 5.0990000000000055,
+      "max_roi_pct": 5.0990000000000055
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 817.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $686.74 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 92.26 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.48 required; PM $80.27 / $4.35 required",
+      "candidates": 1,
+      "min_roi_pct": 2.0476000000000005,
+      "max_roi_pct": 2.0476000000000005
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 932.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $783.34 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 948.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $796.78 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 952.55 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $0.46 required; PM $800.14 / $4.20 required",
+      "candidates": 1,
+      "min_roi_pct": 5.562399999999999,
+      "max_roi_pct": 5.562399999999999
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 96.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.60 required; PM $4.80 / $0.25 required",
+      "candidates": 1,
+      "min_roi_pct": 2.162399999999989,
+      "max_roi_pct": 2.162399999999989
+    },
+    {
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.83 / PM 96.30 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.19 / $1.15 required; PM $67.41 / $3.50 required",
+      "candidates": 1,
+      "min_roi_pct": 4.969999999999993,
+      "max_roi_pct": 4.969999999999993
+    }
+  ],
+  "unprocessedThresholdRows": [],
+  "scanStatusCandidateAuditGaps": [
+    {
+      "scan_state": "disabled",
+      "persisted_scans": 22,
+      "persisted_candidates": 34,
+      "scans_with_missing_candidate_audits": 22,
+      "missing_candidate_audits": 34
+    },
+    {
+      "scan_state": "stale",
+      "persisted_scans": 511,
+      "persisted_candidates": 1057,
+      "scans_with_missing_candidate_audits": 511,
+      "missing_candidate_audits": 1057
+    }
+  ],
+  "scanStatusCandidateAuditGapSamples": [
+    {
+      "scan_id": 807198,
+      "market_id": "9bb8038e-2c64-43dc-8e56-b3f00bc3b134",
+      "scanned_at": "2026-08-20T01:16:29.139Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Ashley Trail",
+      "roi_pct": 0.03580000000001138
+    },
+    {
+      "scan_id": 807198,
+      "market_id": "9bb8038e-2c64-43dc-8e56-b3f00bc3b134",
+      "scanned_at": "2026-08-20T01:16:29.139Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Rome Seymour",
+      "roi_pct": 0.2262000000000071
+    },
+    {
+      "scan_id": 807191,
+      "market_id": "e4b8d745-aa73-4362-88d6-0eb6191a2e28",
+      "scanned_at": "2026-08-20T01:16:19.313Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic Party",
+      "roi_pct": 0.5475999999999994
+    },
+    {
+      "scan_id": 807190,
+      "market_id": "957c90cc-c4a2-4b51-93f2-444ec784886b",
+      "scanned_at": "2026-08-20T01:16:19.144Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Dallas",
+      "roi_pct": 1.10553
+    },
+    {
+      "scan_id": 807190,
+      "market_id": "957c90cc-c4a2-4b51-93f2-444ec784886b",
+      "scanned_at": "2026-08-20T01:16:19.144Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Chicago",
+      "roi_pct": 0.23079999999999307
+    },
+    {
+      "scan_id": 807190,
+      "market_id": "957c90cc-c4a2-4b51-93f2-444ec784886b",
+      "scanned_at": "2026-08-20T01:16:19.144Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 2,
+      "outcome": "Philadelphia",
+      "roi_pct": 0.4868000000000034
+    },
+    {
+      "scan_id": 807181,
+      "market_id": "1782999196727-house-oh14",
+      "scanned_at": "2026-08-20T01:16:06.806Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.0723999999999965
+    },
+    {
+      "scan_id": 807163,
+      "market_id": "1782999196727-house-tx09",
+      "scanned_at": "2026-08-20T01:15:52.276Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.23559999999998418
+    },
+    {
+      "scan_id": 807147,
+      "market_id": "1782999196727-house-tx24",
+      "scanned_at": "2026-08-20T01:15:39.567Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 2.7184000000000035
+    },
+    {
+      "scan_id": 807140,
+      "market_id": "1782999196726-house-hi01",
+      "scanned_at": "2026-08-20T01:15:33.296Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.28360000000000496
+    },
+    {
+      "scan_id": 807140,
+      "market_id": "1782999196726-house-hi01",
+      "scanned_at": "2026-08-20T01:15:33.296Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Republican",
+      "roi_pct": 1.2464000000000013
+    },
+    {
+      "scan_id": 807134,
+      "market_id": "1782999196726-house-ga13",
+      "scanned_at": "2026-08-20T01:15:28.019Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.6023999999999944
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Adam Schiff",
+      "roi_pct": 1.2723999999999978
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Hillary Clinton",
+      "roi_pct": 1.9648000000000136
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 2,
+      "outcome": "Barack Obama",
+      "roi_pct": 1.2064000000000015
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 3,
+      "outcome": "Tom Homan",
+      "roi_pct": 3.0625999999999896
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 4,
+      "outcome": "Anthony Fauci",
+      "roi_pct": 4.29900000000001
+    },
+    {
+      "scan_id": 807126,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-20T01:14:17.738Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 5,
+      "outcome": "Gavin Newsom",
+      "roi_pct": 3.1102000000000123
+    },
+    {
+      "scan_id": 807122,
+      "market_id": "1782999196726-house-ga14",
+      "scanned_at": "2026-08-20T01:14:05.284Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.4099999999999965
+    },
+    {
+      "scan_id": 807121,
+      "market_id": "7299b912-668a-40f2-af34-28ca3b4f4334",
+      "scanned_at": "2026-08-20T01:14:02.398Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Dallas",
+      "roi_pct": 0.7471999999999981
+    },
+    {
+      "scan_id": 807116,
+      "market_id": "1782999196727-house-wi07",
+      "scanned_at": "2026-08-20T01:13:58.296Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.17240000000001213
+    },
+    {
+      "scan_id": 807111,
+      "market_id": "1782999196727-house-tn05",
+      "scanned_at": "2026-08-20T01:13:53.213Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.16560000000000574
+    },
+    {
+      "scan_id": 807111,
+      "market_id": "1782999196727-house-tn05",
+      "scanned_at": "2026-08-20T01:13:53.213Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Republican",
+      "roi_pct": 0.7476000000000105
+    },
+    {
+      "scan_id": 807109,
+      "market_id": "1781521870595-oqgkld7",
+      "scanned_at": "2026-08-20T01:13:52.178Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "José Ramírez",
+      "roi_pct": 1.3879999999999928
+    },
+    {
+      "scan_id": 807107,
+      "market_id": "1782999196727-house-nc13",
+      "scanned_at": "2026-08-20T01:13:50.590Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.6899999999999928
+    },
+    {
+      "scan_id": 807105,
+      "market_id": "1782999196726-house-ga12",
+      "scanned_at": "2026-08-20T01:13:48.052Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 1.6623999999999897
+    },
+    {
+      "scan_id": 807105,
+      "market_id": "1782999196726-house-ga12",
+      "scanned_at": "2026-08-20T01:13:48.052Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Republican",
+      "roi_pct": 1.435600000000007
+    },
+    {
+      "scan_id": 807104,
+      "market_id": "1782999196727-house-oh15",
+      "scanned_at": "2026-08-20T01:13:45.582Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.13639999999999292
+    },
+    {
+      "scan_id": 807096,
+      "market_id": "62044ec2-d586-4374-b48a-695e428bae65",
+      "scanned_at": "2026-08-20T01:13:35.851Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Fluminense",
+      "roi_pct": 0.4498000000000028
+    },
+    {
+      "scan_id": 807080,
+      "market_id": "1782999196726-house-fl22",
+      "scanned_at": "2026-08-20T01:12:19.303Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 1.4675999999999945
+    },
+    {
+      "scan_id": 807076,
+      "market_id": "1782999196726-house-ca42",
+      "scanned_at": "2026-08-20T01:12:16.505Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.17440000000001843
+    },
+    {
+      "scan_id": 807076,
+      "market_id": "1782999196726-house-ca42",
+      "scanned_at": "2026-08-20T01:12:16.505Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 0.17440000000001843
+    },
+    {
+      "scan_id": 807074,
+      "market_id": "1782999196726-house-mn06",
+      "scanned_at": "2026-08-20T01:12:13.915Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 1.9775999999999894
+    },
+    {
+      "scan_id": 807072,
+      "market_id": "1782999196726-house-fl24",
+      "scanned_at": "2026-08-20T01:12:11.376Z",
+      "scan_state": "disabled",
+      "scan_reason_code": "bot_disabled",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.8447999999999999
+    },
+    {
+      "scan_id": 798387,
+      "market_id": "1782999196726-house-co06",
+      "scanned_at": "2026-08-16T11:16:22.492Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.17250000000000287
+    },
+    {
+      "scan_id": 798383,
+      "market_id": "1782999196726-house-fl26",
+      "scanned_at": "2026-08-16T11:16:18.070Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 1.6225
+    },
+    {
+      "scan_id": 798380,
+      "market_id": "1782999196727-house-tx13",
+      "scanned_at": "2026-08-16T11:16:08.747Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 1.448
+    },
+    {
+      "scan_id": 798377,
+      "market_id": "1782999196726-house-fl04",
+      "scanned_at": "2026-08-16T11:16:06.256Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.15999999999999992
+    },
+    {
+      "scan_id": 798374,
+      "market_id": "b2a32642-a451-405f-a400-42253eb5f5e8",
+      "scanned_at": "2026-08-16T11:15:00.295Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Drew Campbell",
+      "roi_pct": 0.22799999999999998
+    },
+    {
+      "scan_id": 798373,
+      "market_id": "1779918332608-3at7dls",
+      "scanned_at": "2026-08-16T11:14:57.759Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Bill Walker",
+      "roi_pct": 0.6150399999999999
+    },
+    {
+      "scan_id": 798366,
+      "market_id": "1782999196727-house-wi06",
+      "scanned_at": "2026-08-16T11:14:46.862Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 1.700059999999997
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Adam Schiff",
+      "roi_pct": 1.091120000000008
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Hillary Clinton",
+      "roi_pct": 2.2111199999999966
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 2,
+      "outcome": "Barack Obama",
+      "roi_pct": 2.2461200000000083
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 3,
+      "outcome": "Tom Homan",
+      "roi_pct": 5.361449999999997
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 4,
+      "outcome": "Anthony Fauci",
+      "roi_pct": 3.5605000000000007
+    },
+    {
+      "scan_id": 798359,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-16T11:14:34.986Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 5,
+      "outcome": "Gavin Newsom",
+      "roi_pct": 2.4545
+    },
+    {
+      "scan_id": 798336,
+      "market_id": "1782999196727-house-tn08",
+      "scanned_at": "2026-08-16T11:14:06.999Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.5712399999999997
+    },
+    {
+      "scan_id": 798326,
+      "market_id": "60793b42-cced-400f-9802-8001e90e8064",
+      "scanned_at": "2026-08-16T11:13:58.146Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Will Troy Rohrbaugh succeed Ja",
+      "roi_pct": 10.1545
+    },
+    {
+      "scan_id": 798324,
+      "market_id": "1782999196727-house-tx09",
+      "scanned_at": "2026-08-16T11:13:55.826Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 1.1744999999999999
+    },
+    {
+      "scan_id": 798322,
+      "market_id": "1782999196727-house-or03",
+      "scanned_at": "2026-08-16T11:13:48.840Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.7610000000000057
+    },
+    {
+      "scan_id": 798316,
+      "market_id": "1782999196727-house-nc14",
+      "scanned_at": "2026-08-16T11:13:43.569Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.478
+    },
+    {
+      "scan_id": 796165,
+      "market_id": "1782999196727-house-tx24",
+      "scanned_at": "2026-08-16T08:49:14.880Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 0.615
+    },
+    {
+      "scan_id": 778776,
+      "market_id": "1782999196726-house-fl04",
+      "scanned_at": "2026-08-15T13:58:30.562Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.15999999999999992
+    },
+    {
+      "scan_id": 773832,
+      "market_id": "685e008f-34ad-4664-9cd6-48bbea7c32f7",
+      "scanned_at": "2026-08-15T08:39:40.768Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Ebba Busch",
+      "roi_pct": 0.51008
+    },
+    {
+      "scan_id": 764888,
+      "market_id": "6e1332df-4bf1-4d18-89d2-2ec6bbfb891c",
+      "scanned_at": "2026-08-14T23:01:19.559Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Dallas",
+      "roi_pct": 0.01034999999999997
+    },
+    {
+      "scan_id": 757356,
+      "market_id": "1782999196727-house-wi07",
+      "scanned_at": "2026-08-14T14:53:09.062Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 2.3295000000000003
+    },
+    {
+      "scan_id": 757356,
+      "market_id": "1782999196727-house-wi07",
+      "scanned_at": "2026-08-14T14:53:09.062Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Republican",
+      "roi_pct": 2.4185000000000003
+    },
+    {
+      "scan_id": 757225,
+      "market_id": "1782999196727-house-tx24",
+      "scanned_at": "2026-08-14T14:48:10.385Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 2
+    },
+    {
+      "scan_id": 757224,
+      "market_id": "1782999196726-house-ga01",
+      "scanned_at": "2026-08-14T14:48:10.352Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 3.000000000000003
+    },
+    {
+      "scan_id": 757223,
+      "market_id": "1782999196727-house-nc06",
+      "scanned_at": "2026-08-14T14:48:10.308Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 3.0000000000000004
+    },
+    {
+      "scan_id": 757221,
+      "market_id": "1782999196726-house-fl09",
+      "scanned_at": "2026-08-14T14:48:10.229Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 5.000000000000008
+    },
+    {
+      "scan_id": 757221,
+      "market_id": "1782999196726-house-fl09",
+      "scanned_at": "2026-08-14T14:48:10.229Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 1.0000000000000049
+    },
+    {
+      "scan_id": 757219,
+      "market_id": "1782999196726-house-fl22",
+      "scanned_at": "2026-08-14T14:48:09.845Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Democratic",
+      "roi_pct": 4
+    },
+    {
+      "scan_id": 757174,
+      "market_id": "002501e5-8c1d-4492-9ed1-6411e87bf93a",
+      "scanned_at": "2026-08-14T14:46:58.989Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Manchester City",
+      "roi_pct": 2.208
+    },
+    {
+      "scan_id": 757166,
+      "market_id": "002501e5-8c1d-4492-9ed1-6411e87bf93a",
+      "scanned_at": "2026-08-14T14:46:51.237Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Manchester City",
+      "roi_pct": 2.208
+    },
+    {
+      "scan_id": 757076,
+      "market_id": "002501e5-8c1d-4492-9ed1-6411e87bf93a",
+      "scanned_at": "2026-08-14T14:44:56.397Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Manchester City",
+      "roi_pct": 2.208
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "John Brennan",
+      "roi_pct": -2.5000080000000002
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "James Clapper",
+      "roi_pct": -5.570000000000004
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 2,
+      "outcome": "Adam Schiff",
+      "roi_pct": 4.2298
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 3,
+      "outcome": "Hillary Clinton",
+      "roi_pct": 2.9245
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 4,
+      "outcome": "Benjamin Netanyahu",
+      "roi_pct": -5.866601941747578
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 5,
+      "outcome": "Barack Obama",
+      "roi_pct": 2.15612
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 6,
+      "outcome": "Tom Homan",
+      "roi_pct": 2.3072900763358755
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 7,
+      "outcome": "Brandon Johnson",
+      "roi_pct": -5.263947589450697
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 8,
+      "outcome": "Anthony Fauci",
+      "roi_pct": 2.00312
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 9,
+      "outcome": "Mahmoud Khalil",
+      "roi_pct": -8.919999999999998
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 10,
+      "outcome": "José Luis Rodríguez Zapatero",
+      "roi_pct": -3.137023914968997
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 11,
+      "outcome": "Letitia James",
+      "roi_pct": -3.4729780396357794
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 12,
+      "outcome": "Bill Clinton",
+      "roi_pct": -4.50621848739496
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 13,
+      "outcome": "Susan Rice",
+      "roi_pct": -4.086547603751754
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 14,
+      "outcome": "Gavin Newsom",
+      "roi_pct": 2.4545
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 15,
+      "outcome": "John Kerry",
+      "roi_pct": -1.9648223350253835
+    },
+    {
+      "scan_id": 756766,
+      "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "scanned_at": "2026-08-14T14:37:18.943Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 16,
+      "outcome": "Lisa Cook",
+      "roi_pct": -2.0785015772870667
+    },
+    {
+      "scan_id": 756451,
+      "market_id": "1782999196726-house-mn06",
+      "scanned_at": "2026-08-14T14:29:05.040Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 0.658
+    },
+    {
+      "scan_id": 756451,
+      "market_id": "1782999196726-house-mn06",
+      "scanned_at": "2026-08-14T14:29:05.040Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 3
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Texas",
+      "roi_pct": 3.594514277906813
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Oregon",
+      "roi_pct": 11.831010000000001
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 2,
+      "outcome": "Notre Dame",
+      "roi_pct": 12.17646495966667
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 3,
+      "outcome": "Indiana",
+      "roi_pct": 8.51771
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 4,
+      "outcome": "Oklahoma",
+      "roi_pct": 0.8472000000000122
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 5,
+      "outcome": "LSU",
+      "roi_pct": 3.257700000000003
+    },
+    {
+      "scan_id": 755134,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scanned_at": "2026-08-14T13:19:36.794Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 6,
+      "outcome": "Florida",
+      "roi_pct": 9.162
+    },
+    {
+      "scan_id": 735793,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:42:53.060Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 2.000000000000007
+    },
+    {
+      "scan_id": 735793,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:42:53.060Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 0.57
+    },
+    {
+      "scan_id": 735479,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:35:54.313Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 2.000000000000007
+    },
+    {
+      "scan_id": 735479,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:35:54.313Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 0.57
+    },
+    {
+      "scan_id": 735440,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:35:27.317Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 2.000000000000007
+    },
+    {
+      "scan_id": 735440,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:35:27.317Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 1,
+      "outcome": "Democratic",
+      "roi_pct": 0.57
+    },
+    {
+      "scan_id": 735379,
+      "market_id": "1782999196726-house-co08",
+      "scanned_at": "2026-08-13T21:32:56.683Z",
+      "scan_state": "stale",
+      "scan_reason_code": "scan_stale",
+      "candidate_index": 0,
+      "outcome": "Republican",
+      "roi_pct": 2.000000000000007
+    }
+  ]
+}

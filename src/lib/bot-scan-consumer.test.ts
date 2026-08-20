@@ -151,6 +151,7 @@ function harness(options: {
   botSettings?: BotSettings;
   execute?: BotExecutionResult | Error;
   executionMode?: 'paper' | 'live';
+  crashAfterPlacementTransition?: boolean;
 } = {}) {
   const scans = options.scans ?? [scan()];
   const decisions = new Map<number, BotScanDecision>();
@@ -160,6 +161,7 @@ function harness(options: {
   const opportunityDecisions: Array<{ candidateIndex: number; state: string; reasonCode: string; details?: unknown }> = [];
   const opportunityKey = (item: BotScanCandidate) => `${item.kalshiTicker}\0${item.pmConditionId}`;
   let cursor = 0;
+  let crashAfterPlacementTransition = options.crashAfterPlacementTransition === true;
   const now = new Date('2026-08-11T12:00:10.000Z');
 
   const deps: BotScanConsumerDeps = {
@@ -169,13 +171,13 @@ function harness(options: {
     loadScan: vi.fn(async (id) => scans.find((item) => item.id === id) ?? null),
     listBacklog: vi.fn(async () => scans.filter((item) => {
       const state = decisions.get(item.id)?.state;
-      return !state || state === 'received' || state === 'disabled'
+      return !state || state === 'received' || state === 'disabled' || state === 'placement_attempted'
         || (state === 'failed' && decisions.get(item.id)?.reasonCode === 'revalidation_failed');
     })),
     acquire: vi.fn(async (item, source) => {
       if (leases.has(item.id)) return null;
       const existing = decisions.get(item.id);
-      if (existing && !['received', 'disabled'].includes(existing.state)
+      if (existing && !['received', 'disabled', 'placement_attempted'].includes(existing.state)
           && !(existing.state === 'failed' && existing.reasonCode === 'revalidation_failed')) return null;
       leases.add(item.id);
       const row: BotScanDecision = existing ?? {
@@ -192,7 +194,7 @@ function harness(options: {
         details: null,
         leaseOwner: `lease-${item.id}-${source}`,
       };
-      row.state = 'received';
+      if (row.state !== 'placement_attempted') row.state = 'received';
       decisions.set(item.id, row);
       events.push({ scanId: item.id, state: 'received', code: 'scan_received' });
       return row;
@@ -201,6 +203,10 @@ function harness(options: {
       const row = decisions.get(id)!;
       Object.assign(row, update, { updatedAt: now.toISOString() });
       events.push({ scanId: id, state: update.state, code: update.reasonCode });
+      if (update.state === 'placement_attempted' && crashAfterPlacementTransition) {
+        crashAfterPlacementTransition = false;
+        throw new Error('simulated process termination after durable placement transition');
+      }
       return row;
     }),
     finish: vi.fn(async (id, _owner, update) => {
@@ -217,7 +223,9 @@ function harness(options: {
       for (const item of scans.sort((a, b) => a.id - b.id)) {
         if (item.id <= cursor) continue;
         const decision = decisions.get(item.id);
-        if (!decision || decision.state === 'received' || (decision.state === 'failed' && decision.reasonCode === 'revalidation_failed')) break;
+        if (!decision || decision.state === 'received' || decision.state === 'placement_attempted'
+            || (decision.state === 'partial_or_unhedged' && decision.reasonCode === 'interrupted_placement_reconciliation_required')
+            || (decision.state === 'failed' && decision.reasonCode === 'revalidation_failed')) break;
         cursor = item.id;
       }
     }),
@@ -453,12 +461,61 @@ describe('durable BotTrader scan consumer', () => {
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result).toMatchObject({ state: 'disabled', reasonCode: 'bot_disabled' });
     expect(h.deps.revalidate).not.toHaveBeenCalled();
+    expect(h.opportunityDecisions).toEqual([expect.objectContaining({
+      candidateIndex: 0,
+      state: 'rejected',
+      reasonCode: 'bot_disabled',
+      details: expect.objectContaining({
+        final: true,
+        stage: 'scan_status',
+        thresholds: expect.objectContaining({ minRoiPct: 2 }),
+      }),
+    })]);
   });
 
   it('persists stale when the completed scan exceeds the freshness window', async () => {
     const h = harness({ scans: [scan({ scannedAt: '2026-08-11T11:50:00.000Z' })] });
     const result = await h.consumer.consume(41, 'catch_up');
     expect(result).toMatchObject({ state: 'stale', reasonCode: 'scan_stale' });
+    expect(h.opportunityDecisions).toEqual([expect.objectContaining({
+      candidateIndex: 0,
+      state: 'rejected',
+      reasonCode: 'scan_stale',
+      details: expect.objectContaining({
+        final: true,
+        stage: 'scan_status',
+        ageMs: 610_000,
+        maxScanAgeMs: 300_000,
+        thresholds: expect.objectContaining({ minRoiPct: 2 }),
+      }),
+    })]);
+  });
+
+  it('fails closed after restart from placement_attempted without replaying venue orders or advancing the cursor', async () => {
+    const h = harness({ crashAfterPlacementTransition: true });
+
+    await expect(h.consumer.consume(41, 'scan_api')).rejects.toThrow('simulated process termination');
+    expect(h.decisions.get(41)?.state).toBe('placement_attempted');
+    expect(h.deps.execute).not.toHaveBeenCalled();
+
+    h.leases.clear();
+    const restarted = await h.consumer.processBacklog();
+
+    expect(restarted).toEqual([expect.objectContaining({
+      scanId: 41,
+      state: 'partial_or_unhedged',
+      reasonCode: 'interrupted_placement_reconciliation_required',
+    })]);
+    expect(h.deps.execute).not.toHaveBeenCalled();
+    expect(h.deps.retainOpportunityForExposure).toHaveBeenCalledWith(expect.any(Object), 'paper');
+    expect(h.opportunityDecisions.at(-1)).toEqual(expect.objectContaining({
+      candidateIndex: 0,
+      state: 'failed',
+      reasonCode: 'interrupted_placement_reconciliation_required',
+      details: expect.objectContaining({ final: true, possibleExposure: true }),
+    }));
+    expect(h.cursor()).toBe(0);
+    await expect(h.consumer.processBacklog()).resolves.toEqual([]);
   });
 
   it('rejects malformed positive scans with no parseable candidates', async () => {

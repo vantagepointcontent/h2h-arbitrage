@@ -355,7 +355,7 @@ describe('BotTraderPanel', () => {
     expect(screen.queryByTestId('combined-net-proceeds')).toBeNull();
   });
 
-  it('shows fail-closed legacy settlement outside Open without a fabricated zero loss', async () => {
+  it('keeps a canonically open unresolved settlement in Open without a fabricated zero loss', async () => {
     const unresolved = {
       ...positions[0],
       settlementState: 'settlement_unresolved',
@@ -381,9 +381,9 @@ describe('BotTraderPanel', () => {
     const disclosure = screen.getByRole('button', { name: 'Expand Trump 2026' });
     expect(disclosure).toHaveAccessibleDescription(/Settlement unresolved — exact legacy leg evidence missing/);
     fireEvent.click(screen.getByRole('button', { name: 'open' }));
-    expect(screen.queryByText('Trump 2026')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'settled' }));
     expect(await screen.findByText('Trump 2026')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'settled' }));
+    expect(screen.queryByText('Trump 2026')).toBeNull();
   });
 
   it('labels verified simulated terminal proceeds as Settled paper', async () => {
@@ -423,9 +423,20 @@ describe('BotTraderPanel', () => {
     expect(settledCells[9].textContent).toContain('Settled (paper)');
     expect(settledCells[9].querySelector('span')?.className).toContain('status-positive');
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
-    expect(screen.getByText('Settlement ledger').parentElement?.textContent).toContain('Simulated paper settlement');
-    expect(screen.getByTestId('kalshi-settlement-leg').textContent).toContain('simulated credited');
-    expect(screen.getByTestId('polymarket-settlement-leg').textContent).toContain('not applicable');
+    const settlementSummary = screen.getByTestId('position-settlement-summary');
+    expect(settlementSummary.textContent).toContain('SettlementSettled (paper)Paper');
+    expect(screen.getByTestId('kalshi-settlement-leg').textContent).toContain('Payout$1.00Fee$0.00Net proceeds$1.00');
+    expect(screen.getByTestId('polymarket-settlement-leg').textContent).toContain('Payout$0.00Fee$0.00Net proceeds$0.00');
+    expect(settlementSummary.textContent).not.toContain('KXTRUMP-26:YES');
+    expect(settlementSummary.textContent).not.toContain('held-republican-token');
+    expect(settlementSummary.textContent).not.toContain('polymarket_clob_market');
+    const technical = screen.getByTestId('position-technical-details') as HTMLDetailsElement;
+    expect(technical.open).toBe(false);
+    expect(screen.getByTestId('kalshi-settlement-technical').textContent).toContain('KXTRUMP-26:YES');
+    expect(screen.getByTestId('kalshi-settlement-technical').textContent).toContain('simulated credited');
+    expect(screen.getByTestId('polymarket-settlement-technical').textContent).toContain('held-republican-token');
+    expect(screen.getByTestId('polymarket-settlement-technical').textContent).toContain('polymarket_clob_market');
+    expect(screen.getByTestId('polymarket-settlement-technical').textContent).toContain('not applicable');
     expect(screen.getByText('Net settlement proceeds').parentElement?.textContent).toContain('$1.00');
   });
 
@@ -870,7 +881,13 @@ describe('BotTraderPanel', () => {
     expect(disclosure).toHaveFocus();
     expect(disclosure.className).toContain('focus-visible:ring');
     fireEvent.click(disclosure);
-    const detail = screen.getByTestId('exposure-classification-detail');
+    const detail = screen.getByTestId('position-detail-layout');
+    const classificationSummary = screen.getByTestId('exposure-classification-detail');
+    expect(classificationSummary.textContent).toContain('Outcome identity missing');
+    expect(classificationSummary.textContent).toContain('Current value unavailable');
+    expect(classificationSummary.textContent).not.toContain('Polymarket entry token is missing from immutable evidence');
+    const technical = screen.getByTestId('position-technical-details');
+    expect(technical.textContent).toContain('Polymarket entry token is missing from immutable evidence');
     expect(detail.textContent).toContain('Legacy identity missing');
     expect(detail.textContent).toContain('executions:101');
     expect(detail.textContent).toContain('Polymarket token missing');
@@ -1025,11 +1042,55 @@ describe('BotTraderPanel', () => {
     expect(screen.getByTestId('combined-entry-cost').textContent).toBe('Reconciled Buy Cost$0.97000000');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('Kalshi Republicans — YES entry');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('Polymarket Republicans — NO entry');
-    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi Republicans — YES Current PriceSaved$0.47');
-    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket Republicans — NO Current PriceStale$0.55');
-    expect(screen.getAllByText(/Indicative last-scanned mark; not executable liquidation proceeds/)).toHaveLength(2);
+    expect(screen.getByTestId('kalshi-stored-current-price').textContent).toContain('Kalshi Republicans — YES Current PricePersisted last scanSaved$0.47');
+    expect(screen.getByTestId('polymarket-stored-current-price').textContent).toContain('Polymarket Republicans — NO Current PricePersisted last scanStale$0.55');
+    expect(screen.getByText(/Current prices are persisted indicative last-scanned marks; not executable liquidation proceeds/)).toBeTruthy();
     expect(screen.getByTestId('kalshi-fee-authority').textContent).toContain('quadratic:1000000:v1');
     expect(screen.getByTestId('polymarket-fee-authority').textContent).toContain('token-fee-rate:400');
+  });
+
+  describe.each([
+    ['desktop', 1440],
+    ['responsive', 390],
+  ])('UI-114 expanded trade hierarchy on %s', (_viewport, width) => {
+    it('keeps decision data compact while diagnostic identifiers stay collapsed', async () => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+      stubInitialFetch();
+      render(<BotTraderPanel />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
+
+      const detail = screen.getByTestId('position-detail-layout');
+      expect(detail.className).toContain('min-w-0');
+      expect(detail.className).toContain('overflow-hidden');
+      expect(detail.className).toContain('w-[calc(100vw-2rem)]');
+      expect(detail.className).toContain('lg:w-auto');
+
+      const summary = screen.getByTestId('position-decision-summary');
+      expect(summary.textContent).toContain('Buy Cost$0.97');
+      expect(summary.textContent).toContain('Current Value$1.02');
+      expect(summary.textContent).toContain('P&L+$0.05');
+      expect(summary.textContent).toContain('ROI+5.2%');
+      expect(summary.textContent).toContain('Entry Arb Profit$0.03');
+      expect(summary.textContent).not.toContain('0xabc');
+      expect(Array.from(summary.querySelectorAll('[class]')).some((node) => node.className.includes('status-info'))).toBe(false);
+
+      const legs = screen.getByRole('group', { name: 'Placed trade legs' });
+      expect(legs.textContent).toContain('Kalshi Republicans — YES entry');
+      expect(legs.textContent).toContain('1 unit');
+      expect(legs.textContent).toContain('Entry price45.000000¢');
+      expect(legs.textContent).toContain('Entry fee$0.00000000');
+      expect(legs.textContent).toContain('YES Current PricePersisted last scanSaved$0.47');
+      expect(legs.textContent).not.toContain('held-republican-token');
+
+      const technical = screen.getByTestId('position-technical-details') as HTMLDetailsElement;
+      expect(technical.open).toBe(false);
+      expect(technical.querySelector('summary')?.textContent).toContain('Technical details');
+      expect(technical.textContent).toContain('executions:9');
+      expect(technical.textContent).toContain('held-republican-token');
+      expect(technical.textContent).toContain('quadratic:1000000:v1');
+      expect(technical.textContent).toContain('token-fee-rate:400');
+    });
   });
 
   it('renders authoritative entry economics losslessly and visibly reconciles them to Buy Cost', async () => {
@@ -1059,9 +1120,9 @@ describe('BotTraderPanel', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand Trump 2026' }));
 
-    expect(screen.getByText('Buy Price').parentElement?.textContent).toContain('YES 4.115226¢ K');
-    expect(screen.getByText('Buy Price').parentElement?.textContent).toContain('NO 85.012344¢ PM');
-    expect(screen.getByText('Buy Price').parentElement?.textContent).not.toContain('$0.45');
+    expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('Entry price4.115226¢');
+    expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('Entry price85.012344¢');
+    expect(screen.getByRole('group', { name: 'Placed trade legs' }).textContent).not.toContain('$0.45');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('3 units · 4.115226¢ rounded VWAP · $0.12345679 gross');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).not.toContain('exact fill');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('$0.01000000 execution fee · $0.13345679 net leg cost');
@@ -1144,7 +1205,7 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Legacy paper position lacks authoritative entry fill and fee data/);
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
     expect(screen.getAllByText('Buy Cost unavailable: Legacy paper position lacks authoritative entry fill and fee data')).toHaveLength(1);
-    expect(screen.getByText('Buy Price').parentElement?.textContent).toBe('Buy PriceUnavailable — authoritative fill evidence missing');
+    expect(screen.getByRole('group', { name: 'Placed trade legs' }).textContent).toContain('Entry price and cost unavailable');
     expect(screen.getByText('Deployed').parentElement?.textContent).toBe('DeployedUnavailable');
   });
 

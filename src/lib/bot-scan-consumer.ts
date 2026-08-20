@@ -275,6 +275,29 @@ function candidateAuditDetails(scan: PersistedBotScan, candidateIndex: number, c
   };
 }
 
+function rejectedCandidatePlaceholder(candidate: RejectedBotScanCandidate): BotScanCandidate {
+  return {
+    candidateIndex: candidate.candidateIndex,
+    outcome: candidate.outcome,
+    strategy: candidate.strategy,
+    roiPct: 0,
+    expectedProfit: 0,
+    kalshiStake: 0,
+    pmStake: 0,
+    kalshiTicker: '',
+    pmConditionId: '',
+    kalshiYesAsk: null,
+    kalshiNoAsk: null,
+    pmYesAsk: null,
+    pmNoAsk: null,
+    kalshiYesDepth: 0,
+    kalshiNoDepth: 0,
+    pmYesDepth: 0,
+    pmNoDepth: 0,
+    fees: null,
+  };
+}
+
 export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsumer {
   const maxScanAgeMs = deps.maxScanAgeMs ?? 5 * 60_000;
 
@@ -296,9 +319,92 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       return result;
     };
 
+    const recordTerminalScanSkip = async (
+      settings: BotSettings,
+      reasonCode: string,
+      reason: string,
+      extra: Record<string, unknown> = {},
+      state = 'rejected',
+      candidateFilter?: Set<number>,
+    ) => {
+      for (const [parsedIndex, candidate] of scan.candidates.entries()) {
+        const candidateIndex = candidate.candidateIndex ?? parsedIndex;
+        if (candidateFilter && !candidateFilter.has(candidateIndex)) continue;
+        await deps.recordCandidateDecision?.(
+          scan,
+          candidateIndex,
+          candidate,
+          state,
+          reasonCode,
+          reason,
+          candidateAuditDetails(scan, candidateIndex, candidate, settings, 'scan_status', { final: true, ...extra }),
+        );
+      }
+      for (const rejected of scan.rejectedCandidates ?? []) {
+        if (candidateFilter && !candidateFilter.has(rejected.candidateIndex)) continue;
+        const placeholder = rejectedCandidatePlaceholder(rejected);
+        await deps.recordCandidateDecision?.(
+          scan,
+          rejected.candidateIndex,
+          placeholder,
+          state,
+          reasonCode,
+          `${reason}; candidate input was also invalid: ${rejected.reason}`,
+          candidateAuditDetails(scan, rejected.candidateIndex, placeholder, settings, 'scan_status', {
+            final: true,
+            inputReasonCode: rejected.reasonCode,
+            ...extra,
+          }),
+        );
+      }
+    };
+
     const settings = await deps.getSettings();
+    if (claimed.state === 'placement_attempted') {
+      const executionMode = await deps.resolveExecutionMode(settings);
+      const reason = 'The prior worker stopped after placement began; venue outcome and exposure require explicit reconciliation before this scan can be checkpointed';
+      const priorDetails = claimed.details && typeof claimed.details === 'object'
+        ? claimed.details as Record<string, unknown>
+        : null;
+      const persistedAttemptedCandidateIndexes = Array.isArray(priorDetails?.attemptedCandidates)
+        ? priorDetails.attemptedCandidates.flatMap((item) => {
+          if (!item || typeof item !== 'object') return [];
+          const value = (item as Record<string, unknown>).candidateIndex;
+          return typeof value === 'number' && Number.isSafeInteger(value) ? [value] : [];
+        })
+        : [];
+      // Older placement rows predate attempted-candidate lineage. Treat absent or
+      // malformed lineage as all candidates possibly attempted rather than zero.
+      const attemptedCandidateIndexes = persistedAttemptedCandidateIndexes.length > 0
+        ? new Set(persistedAttemptedCandidateIndexes)
+        : undefined;
+      await recordTerminalScanSkip(settings, 'interrupted_placement_reconciliation_required', reason, {
+        executionMode,
+        possibleExposure: true,
+        priorDecision: claimed.details,
+      }, 'failed', attemptedCandidateIndexes);
+      for (const [parsedIndex, candidate] of scan.candidates.entries()) {
+        const candidateIndex = candidate.candidateIndex ?? parsedIndex;
+        if (attemptedCandidateIndexes && !attemptedCandidateIndexes.has(candidateIndex)) continue;
+        await deps.retainOpportunityForExposure?.(candidate, executionMode).catch((error) => {
+          logger.error('[bot-scan-consumer] failed to retain reservation for interrupted placement', { error: String(error) });
+        });
+      }
+      // Do not use `finish`: possible venue exposure must keep the cursor behind
+      // this scan until an operator reconciles the outcome explicitly.
+      return deps.finish(scanId, claimed.leaseOwner ?? '', {
+        state: 'partial_or_unhedged',
+        reasonCode: 'interrupted_placement_reconciliation_required',
+        reason,
+        placementCount: claimed.placementCount,
+        attempts: claimed.attempts,
+        details: { possibleExposure: true, executionMode, priorDecision: claimed.details },
+      });
+    }
     if (!settings.enabled) {
-      return finish(rejection('disabled', 'bot_disabled', 'BotTrader was disabled when this persisted scan was consumed'));
+      const reason = 'BotTrader was disabled when this persisted scan was consumed';
+      await recordTerminalScanSkip(settings, 'bot_disabled', reason);
+      return finish(rejection('disabled', 'bot_disabled', reason));
     }
     const executionMode = await deps.resolveExecutionMode(settings);
     if (settings.mode === 'production' && executionMode !== 'live') {
@@ -373,7 +479,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     const scannedAtMs = Date.parse(scan.scannedAt);
     const ageMs = deps.now().getTime() - scannedAtMs;
     if (!Number.isFinite(scannedAtMs) || ageMs < 0 || ageMs > maxScanAgeMs) {
-      return finish(rejection('stale', 'scan_stale', `Persisted scan is stale or has an invalid timestamp (age ${Number.isFinite(ageMs) ? ageMs : 'unknown'}ms)`, { ageMs, maxScanAgeMs }));
+      const reason = `Persisted scan is stale or has an invalid timestamp (age ${Number.isFinite(ageMs) ? ageMs : 'unknown'}ms)`;
+      await recordTerminalScanSkip(settings, 'scan_stale', reason, { ageMs, maxScanAgeMs });
+      return finish(rejection('stale', 'scan_stale', reason, { ageMs, maxScanAgeMs }));
     }
 
     if (scan.positiveArbCount <= 0) {
@@ -572,7 +680,15 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       reasonCode: 'placement_attempted',
       reason: `Attempting ${reserved.length} revalidated candidate placement(s)`,
       attempts: claimed.attempts + reserved.length,
-      details: { rejections },
+      details: {
+        rejections,
+        attemptedCandidates: reserved.map((candidate) => ({
+          candidateIndex: sourceCandidateIndex(scan, candidate),
+          kalshiTicker: candidate.kalshiTicker,
+          pmConditionId: candidate.pmConditionId,
+          outcome: candidate.outcome,
+        })),
+      },
     });
 
     const results: Array<{ outcome: string; result?: BotExecutionResult; error?: string }> = [];
@@ -927,6 +1043,7 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
         LEFT JOIN bot_scan_cursor c ON c.consumer = 'bot_trader'
         WHERE s.scan_status = 'completed' AND (
           (s.id > COALESCE(c.last_scan_id, 0) AND d.scan_id IS NULL) OR d.state = 'received'
+          OR d.state = 'placement_attempted'
           OR (d.state = 'failed' AND d.reason_code = 'revalidation_failed')
         )
         ORDER BY s.id ASC LIMIT ?`,
@@ -951,18 +1068,32 @@ async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<B
       args: [scan.id, `scan:${scan.id}`, source, now.toISOString(), now.toISOString()],
     });
     const claimed = await db.execute({
-      sql: `UPDATE bot_scan_decisions SET lease_owner=?, lease_expires_at=?, source=?, state='received',
-        reason_code='scan_received', reason='Persisted completed scan received', updated_at=?
+      sql: `UPDATE bot_scan_decisions SET lease_owner=?, lease_expires_at=?, source=?,
+        state=CASE WHEN state='placement_attempted' THEN state ELSE 'received' END,
+        reason_code=CASE WHEN state='placement_attempted' THEN reason_code ELSE 'scan_received' END,
+        reason=CASE WHEN state='placement_attempted' THEN reason ELSE 'Persisted completed scan received' END,
+        updated_at=?
         WHERE scan_id=?
-          AND (state = 'received' OR (state='failed' AND reason_code='revalidation_failed'))
+          AND (state IN ('received','placement_attempted') OR (state='failed' AND reason_code='revalidation_failed'))
           AND (lease_owner IS NULL OR lease_expires_at < ?)
         RETURNING *`,
       args: [owner, expires, source, now.toISOString(), scan.id, now.toISOString()],
     });
     const row = claimed.rows[0] as unknown as Record<string, unknown> | undefined;
     if (!row) return null;
-    await appendEvent(db, scan.id, source, 'received', 'scan_received', 'Persisted completed scan received', null);
-    return rowToDecision(row);
+    const decision = rowToDecision(row);
+    await appendEvent(
+      db,
+      scan.id,
+      source,
+      decision.state,
+      decision.state === 'placement_attempted' ? 'interrupted_placement_detected' : 'scan_received',
+      decision.state === 'placement_attempted'
+        ? 'Expired placement attempt was claimed for fail-closed reconciliation'
+        : 'Persisted completed scan received',
+      null,
+    );
+    return decision;
   } finally { db.close(); }
 }
 
@@ -1039,7 +1170,8 @@ async function advanceCursor() {
         SELECT 1 FROM scan_results gap
         LEFT JOIN bot_scan_decisions d ON d.scan_id=gap.id
         WHERE gap.scan_status='completed' AND gap.id>c.last_scan_id AND gap.id<=s.id AND (
-          d.scan_id IS NULL OR d.state='received'
+          d.scan_id IS NULL OR d.state IN ('received','placement_attempted')
+          OR (d.state='partial_or_unhedged' AND d.reason_code='interrupted_placement_reconciliation_required')
           OR (d.state='failed' AND d.reason_code='revalidation_failed')
         )
       )`);
@@ -1146,7 +1278,8 @@ export async function getBotScanHealth(): Promise<{
         LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
         WHERE s.scan_status='completed' AND (
-          (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state = 'received'
+          (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state IN ('received','placement_attempted')
+          OR (d.state='partial_or_unhedged' AND d.reason_code='interrupted_placement_reconciliation_required')
           OR (d.state='failed' AND d.reason_code='revalidation_failed'))`),
       db.execute(`SELECT COUNT(*) AS evaluated,
         SUM(CASE WHEN state IN ('eligible','accepted') THEN 1 ELSE 0 END) AS eligible
