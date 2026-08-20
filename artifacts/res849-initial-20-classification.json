@@ -1,0 +1,679 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-20T10:10:04.864Z",
+  "reviewer": "h2h-researcher",
+  "reviewTask": "RES-849",
+  "sourceWindow": {
+    "deployedAt": "2026-08-20T09:35:11.646Z",
+    "through": "2026-08-20T09:54:53.533Z",
+    "thresholdPct": 2
+  },
+  "policy": "Fail closed. Exact IDs and selected tokens are necessary but not sufficient; differing or ambiguous resolution rules are rejected. Historical candidates are evidence only and are never replayed.",
+  "summary": {
+    "candidateRows": 20,
+    "uniqueRelationships": 14,
+    "approvedRows": 0,
+    "rejectedRows": 20,
+    "registryEntriesAdded": 0,
+    "rejectionBreakdown": [
+      {
+        "code": "resolution_rule_conflict",
+        "rows": 10
+      },
+      {
+        "code": "resolution_event_conflict",
+        "rows": 3
+      },
+      {
+        "code": "resolution_scope_ambiguous",
+        "rows": 1
+      },
+      {
+        "code": "non_equivalent_wrong_sport",
+        "rows": 6
+      }
+    ]
+  },
+  "rows": [
+    {
+      "scanId": 815095,
+      "candidateIndex": 3,
+      "scannedAt": "2026-08-20T09:37:08.249Z",
+      "roiPct": 3.0625999999999896,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Tom Homan",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-THOM",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+        "pmSide": "no",
+        "pmSelectedTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Tom Homan be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Tom Homan is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Tom Homan be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815095,
+      "candidateIndex": 4,
+      "scannedAt": "2026-08-20T09:37:08.249Z",
+      "roiPct": 4.29900000000001,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Anthony Fauci",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-AFAU",
+        "kalshiSide": "no",
+        "pmConditionId": "0x1a975c8210f5aa11c76d645a4dd746764799310898445689b17fb500a8925c80",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "62664988686544541004962241557013553766520681768858444478309305931894695537107",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Anthony Fauci be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Anthony Fauci is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Anthony Fauci be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815095,
+      "candidateIndex": 5,
+      "scannedAt": "2026-08-20T09:37:08.249Z",
+      "roiPct": 2.3836000000000124,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Gavin Newsom",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-GNEW",
+        "kalshiSide": "no",
+        "pmConditionId": "0x30f0732734e61902d81cf2d3e37e531de8883b6a2c4cabd8ba3e4035977de1ed",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "81926437499375408929787207529000604100026014614447276020598559062677731079426",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Gavin Newsom be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Gavin Newsom is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Gavin Newsom be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815101,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:38:14.354Z",
+      "roiPct": 2.235599999999995,
+      "marketId": "1782999196727-house-va02",
+      "marketTitle": "VA-02 House Election Winner",
+      "outcome": "Democratic",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "HOUSEVA2-26-D",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xc4362a042c364699d66cf44f69e2dac40a889ac9c83a92195084628c39257b32",
+        "pmSide": "no",
+        "pmSelectedTokenId": "6431017214844719071529892865687247898079997766867991700132073831843261535430",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Democratic win the House race for VA-2?",
+        "kalshiRulesPrimary": "If the House member sworn in for VA-02 for the term beginning in 2027 is a member of the Democratic Party, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "This market is eligible for accelerated determination after a consensus of media organizations project the winner. See full rules for details.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will the Democratic Party win the VA-02 House seat?",
+        "polymarketDescription": "This market will resolve according to the party of the candidate who wins the VA-02 congressional district seat in the U.S. House of Representatives in the 2026 midterm elections. The midterm elections will take place on November 3, 2026.\n\n​​A candidate's party will be determined by their ballot-listed or otherwise identifiable affiliation with that party at the time all of the 2026 House elections are conclusively called by this market's resolution sources. A candidate without a ballot-listed affiliation to either the Democrat or Republican parties will be considered a member of one of these parties based on the party with which they most recently expressed their intent to caucus at the time all of the House elections are conclusively called by this market's resolution sources.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the United States government, specifically the Federal Election Commission (https://www.fec.gov/).",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_event_conflict",
+      "exactReason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815189,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:42:13.631Z",
+      "roiPct": 2.276000000000014,
+      "marketId": "1779921626235-sb1i94e",
+      "marketTitle": "Which countries will recognize Palestine before 2027?",
+      "outcome": "Greece",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXRECOGPALESTINE-27-GRE",
+        "kalshiSide": "no",
+        "pmConditionId": "0xecf32b871ad1ab9ca961ce1a12d5758c59b07bdcb99f649a1dbe3f07e7cb4bde",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "9568640529628232620171982414821256284849638329588081306176647962997142501307",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Who will recognize Palestine?",
+        "kalshiRulesPrimary": "If Greece recognizes Palestine before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Official diplomatic recognition may include, but is not limited to:\n\n- A formal announcement by the recognizing country that it recognizes the recognized country as a sovereign state\n- Establishment of diplomatic relations at the ambassadorial level\n- Opening of an embassy or diplomatic mission (not just consulates)\n- Signing of a joint communiqué establishing diplomatic relations\n- An official state visit by the head of state/government acknowledging sovereignty\n- A formal letter of recognition from the head of state/government or foreign minister\n\nThe following do **NOT** constitute recognition:\n\n- Trade relations or commercial agreements alone\n- Consular relations without diplomatic relations\n- Participation in the same international conference\n- Humanitarian assistance or aid\n- Cultural or educational exchanges\n- Recognition by subnational entities (states, provinces, cities)\n- Statements of \"support\" without formal recognition\n- De facto cooperation without formal recognition\n- Recognition conditional on future events that have not occurred\n- Parliamentary resolutions without executive action\n\n**For clarity:** recognition must be of the recognized country as a sovereign state, not merely acknowledgment of a government in charge. Withdrawal of recognition from a competing entity is not required. Votes in UN bodies do not constitute recognition unless accompanied by bilateral recognition.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Greece recognize Palestine before 2027?",
+        "polymarketDescription": "This market will resolve based on the countries that officially recognize Palestine as a state by December 31, 2026, 11:59pm ET.\n\nAn announcement of intentions will not suffice to resolve this market to \"Yes.\" Only a government's formal recognition of the State of Palestine will count toward a “Yes” resolution for this market.\n\nThe primary resolution source for this market will be official government information. However, a consensus of credible reporting will also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_scope_ambiguous",
+      "exactReason": "Rejected: Kalshi enumerates diplomatic acts that may qualify, including an official state visit acknowledging sovereignty, while Polymarket requires formal government recognition. The broader Kalshi examples are not proven equivalent to Polymarket formal recognition.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815202,
+      "candidateIndex": 3,
+      "scannedAt": "2026-08-20T09:43:32.787Z",
+      "roiPct": 3.0625999999999896,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Tom Homan",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-THOM",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+        "pmSide": "no",
+        "pmSelectedTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Tom Homan be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Tom Homan is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Tom Homan be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815202,
+      "candidateIndex": 4,
+      "scannedAt": "2026-08-20T09:43:32.787Z",
+      "roiPct": 4.29900000000001,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Anthony Fauci",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-AFAU",
+        "kalshiSide": "no",
+        "pmConditionId": "0x1a975c8210f5aa11c76d645a4dd746764799310898445689b17fb500a8925c80",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "62664988686544541004962241557013553766520681768858444478309305931894695537107",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Anthony Fauci be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Anthony Fauci is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Anthony Fauci be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815202,
+      "candidateIndex": 5,
+      "scannedAt": "2026-08-20T09:43:32.787Z",
+      "roiPct": 2.3836000000000124,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Gavin Newsom",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-GNEW",
+        "kalshiSide": "no",
+        "pmConditionId": "0x30f0732734e61902d81cf2d3e37e531de8883b6a2c4cabd8ba3e4035977de1ed",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "81926437499375408929787207529000604100026014614447276020598559062677731079426",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Gavin Newsom be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Gavin Newsom is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Gavin Newsom be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815224,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:45:10.246Z",
+      "roiPct": 2.4784,
+      "marketId": "1782999196726-house-az02",
+      "marketTitle": "AZ-02 House Election Winner",
+      "outcome": "Republican",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "HOUSEAZ2-26-R",
+        "kalshiSide": "no",
+        "pmConditionId": "0xbd353d44ec152e7bb9061883baed937386a50b3e3b6358c5d47ef9a572381f8b",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "9769128509997586115354824623743902848286350478991278642403742423177008633185",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Republican win the House race for AZ-2?",
+        "kalshiRulesPrimary": "If the House member sworn in for AZ-02 for the term beginning in 2027 is a member of the Republican Party, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "This market is eligible for accelerated determination after a consensus of media organizations project the winner. See full rules for details.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will the Republican Party win the AZ-02 House seat?",
+        "polymarketDescription": "This market will resolve according to the party of the candidate who wins the AZ-02 congressional district seat in the U.S. House of Representatives in the 2026 midterm elections. The midterm elections will take place on November 3, 2026.\n\n​​A candidate's party will be determined by their ballot-listed or otherwise identifiable affiliation with that party at the time all of the 2026 House elections are conclusively called by this market's resolution sources. A candidate without a ballot-listed affiliation to either the Democrat or Republican parties will be considered a member of one of these parties based on the party with which they most recently expressed their intent to caucus at the time all of the House elections are conclusively called by this market's resolution sources.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the United States government, specifically the Federal Election Commission (https://www.fec.gov/).",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_event_conflict",
+      "exactReason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815232,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:45:23.903Z",
+      "roiPct": 3.3599999999999963,
+      "marketId": "1782999196727-house-nc11",
+      "marketTitle": "NC-11 House Election Winner",
+      "outcome": "Republican",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXHOUSENC11-26-GOP",
+        "kalshiSide": "no",
+        "pmConditionId": "0xe64ec54460a1f1b250c9785968e6ebecfb0fd542a34300a161f64460c7a811df",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "56469543356517732605495507902287858078158624247054211481987383292845559158213",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Republican win the House race for NC-11?",
+        "kalshiRulesPrimary": "If the House member sworn in for NC-11 for the term beginning in 2027 is a member of the Republican Party, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "This market is eligible for accelerated determination after a consensus of media organizations project the winner. See full rules for details.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will the Republican Party win the NC-11 House seat?",
+        "polymarketDescription": "This market will resolve according to the party of the candidate who wins the NC-11 congressional district seat in the U.S. House of Representatives in the 2026 midterm elections. The midterm elections will take place on November 3, 2026.\n\n​​A candidate's party will be determined by their ballot-listed or otherwise identifiable affiliation with that party at the time all of the 2026 House elections are conclusively called by this market's resolution sources. A candidate without a ballot-listed affiliation to either the Democrat or Republican parties will be considered a member of one of these parties based on the party with which they most recently expressed their intent to caucus at the time all of the House elections are conclusively called by this market's resolution sources.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the United States government, specifically the Federal Election Commission (https://www.fec.gov/).",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_event_conflict",
+      "exactReason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815301,
+      "candidateIndex": 3,
+      "scannedAt": "2026-08-20T09:50:11.577Z",
+      "roiPct": 3.0625999999999896,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Tom Homan",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-THOM",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+        "pmSide": "no",
+        "pmSelectedTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Tom Homan be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Tom Homan is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Tom Homan be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815301,
+      "candidateIndex": 4,
+      "scannedAt": "2026-08-20T09:50:11.577Z",
+      "roiPct": 4.29900000000001,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Anthony Fauci",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-AFAU",
+        "kalshiSide": "no",
+        "pmConditionId": "0x1a975c8210f5aa11c76d645a4dd746764799310898445689b17fb500a8925c80",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "62664988686544541004962241557013553766520681768858444478309305931894695537107",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Anthony Fauci be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Anthony Fauci is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Anthony Fauci be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815301,
+      "candidateIndex": 5,
+      "scannedAt": "2026-08-20T09:50:11.577Z",
+      "roiPct": 2.3836000000000124,
+      "marketId": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+      "marketTitle": "Who will be arrested before 2027?",
+      "outcome": "Gavin Newsom",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXARREST-27JAN-GNEW",
+        "kalshiSide": "no",
+        "pmConditionId": "0x30f0732734e61902d81cf2d3e37e531de8883b6a2c4cabd8ba3e4035977de1ed",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "81926437499375408929787207529000604100026014614447276020598559062677731079426",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Gavin Newsom be arrested before Jan 2027?",
+        "kalshiRulesPrimary": "If Gavin Newsom is arrested before Jan 1, 2027, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Clarification (9/25/25): The contract states that if an individual \"surrenders at a police station or courthouse with their attorney\" the payout criterion is satisfied. To be clear, voluntarily surrendering to law enforcement pursuant to an indictment without an arrest warrant is sufficient to resolve a market to Yes.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Gavin Newsom be arrested before 2027?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed individual is arrested by December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nA qualifying arrest/detention includes:\n* Being taken into physical custody by law enforcement authorities (including federal, state, local, military, or international law enforcement)\n* Voluntarily surrendering to law enforcement authorities in response to an arrest warrant\n* Being formally booked or processed following detention\n* Being handcuffed by a state authority and taken to a police station\n* Surrendering at a police station or courthouse with their attorney\n* Being placed under house arrest or electronic monitoring\n\nThe following scenarios will NOT qualify as an arrest/detention\n* An arrest warrant being issued but not executed\n* Being briefly detained but not arrested (e.g. such as in the South Korean judicial system when an individual is awaiting a judge’s decision on whether to grant a detention warrant)\n* Being questioned or interviewed without arrest\n* Being named in an indictment without arrest\n\nThe primary resolution source for this market will be official information from the arresting government and law enforcement, however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 5.883200000000001,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "Texas",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-TEX",
+        "kalshiSide": "yes",
+        "pmConditionId": "0x040a5bbd143a046f8ff47f3112358b2a6377d3f1a91a3c5794c1bb15eadd0c5d",
+        "pmSide": "no",
+        "pmSelectedTokenId": "30728609885715374288858063112149413594109064855980318558797537001408917409057",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Texas win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If Texas is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Texas Longhorns win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 1,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 11.869600000000002,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "Oregon",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-ORE",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xa68349bd08f7036dff1aceb7833aa152e272cb48f2f4acf9f542a59d54d60649",
+        "pmSide": "no",
+        "pmSelectedTokenId": "17160285648768756154768735326069072201781771452584908909583244163794929213578",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Oregon win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If Oregon is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Oregon Ducks win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 4,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 12.26060000000001,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "Notre Dame",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-ND",
+        "kalshiSide": "yes",
+        "pmConditionId": "0x7d24d02b00d6769bd42af5b13ba704bcfe66bc940ead0ed9cf3c0f1017926b5f",
+        "pmSide": "no",
+        "pmSelectedTokenId": "56451478521419308087374626701005330017111892104870960799272996590285771980476",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Notre Dame win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If Notre Dame is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Notre Dame Fighting Irish win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 5,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 9.10639999999999,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "Indiana",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-IND",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xa4f3118c0238fa43bc40626f26f54ad849095620231d716a8cf09fc4d6baa4b8",
+        "pmSide": "no",
+        "pmSelectedTokenId": "82263693829785782986275620295212096452521878303846116132951400843622051066880",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Indiana win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If Indiana is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Indiana Hoosiers win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 8,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 3.43339999999999,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "LSU",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-LSU",
+        "kalshiSide": "yes",
+        "pmConditionId": "0x3afea9c03bc978ae991e54f6d0545d05f7c2189e6242871f3fac60d728b6850f",
+        "pmSide": "no",
+        "pmSelectedTokenId": "5089039005932083712320389663463940027243415242431150649612207639094893311735",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will LSU win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If LSU is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will LSU Tigers win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815305,
+      "candidateIndex": 10,
+      "scannedAt": "2026-08-20T09:50:14.836Z",
+      "roiPct": 9.141199999999994,
+      "marketId": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "marketTitle": "NCAA Football: 2027 National Champion",
+      "outcome": "Florida",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXMARMAD-27-FLA",
+        "kalshiSide": "no",
+        "pmConditionId": "0x3a41a0d9474d9902476a7f9487061b585e3bc37ae8c1838dedcd75f44ad8964d",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "100572769143137500942702681653834671315940314637605125862138069246640357375848",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Florida win the College Basketball National Championship?",
+        "kalshiRulesPrimary": "If Florida is the 2026-27 Division 1 Men's College Basketball National Champion, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "Kalshi is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the NCAA. All trademarks, logos, and brand names are the property of their respective owners.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Florida Gators win the 2027 CFP National Championship?",
+        "polymarketDescription": "This market will resolve to \"Yes\" if the listed club is determined as the national champion of the 2026-27 College Football Playoff. Otherwise, it will resolve to \"No\".\n\nIf at any point it becomes impossible for a listed participant to be named as the national champion of 2026-27 NCAA Football Division 1 season per the rules of NCAA (e.g., participant is eliminated), the corresponding market will resolve to \"No\".\n\nIf multiple teams are declared winners, this market will resolve in favor of the team whose listed name comes first alphabetically.\n\nIf this event is cancelled, postponed after February 8, 2027, 11:59 PM ET, or a champion has not been declared within this timeframe, this market will resolve to \"Other\".\n\nThe resolution source will be official information from the NCAA; however a consensus of credible reporting may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "non_equivalent_wrong_sport",
+      "exactReason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "registryAction": "none_fail_closed"
+    },
+    {
+      "scanId": 815364,
+      "candidateIndex": 0,
+      "scannedAt": "2026-08-20T09:53:53.142Z",
+      "roiPct": 2.162399999999989,
+      "marketId": "1780947485064-f22ikcd",
+      "marketTitle": "TIME Person of the Year 2026",
+      "outcome": "Sam Altman",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "exactIdentity": {
+        "kalshiTicker": "KXTIME-26-SA",
+        "kalshiSide": "no",
+        "pmConditionId": "0xab7081796629558979a40115a0870f0fb746779ee0d0bbbed534bb0c1907653b",
+        "pmSide": "yes",
+        "pmSelectedTokenId": "91195573269222885139319238736030855111206053072927457343337731770808533820424",
+        "tokenMappingVerifiedAgainstGamma": true
+      },
+      "authority": {
+        "kalshiTitle": "Will Sam Altman be Time Person of the Year in 2026?",
+        "kalshiRulesPrimary": "If Sam Altman is Time Person of the Year for 2026, then the market resolves to Yes.",
+        "kalshiRulesSecondary": "This will count towards the payout criterion: \nIf multiple persons win, all persons that are listed are encompassed within the Payout Criterion. If, for example, the Person of the Year is “Joe Biden and Kamala Harris”, both “Joe Biden” and “Kamala Harris” strikes are encompassed within the Payout Criterion. \nThe person must be explicitly named as the Person of the Year or pictured on the/a relevant cover if they are associated with the group/concept winning (the picture is only relevant for a natural human being winning). Some examples to illustrate this: “Jamal Khasogghi” would resolve to Yes in 2018, when “The Guardians” won, as he is also named and shown on a cover and falls within “The Guardians”. Similarly, “Bill Gates” would resolve to Yes in 2005. \nIf Time uses language that does not specifically refer to a person or organization (examples being 2018’s “The Guardians of Truth” or 2017’s “The Silence Breakers”), Kalshi will resolve markets to the most simple meaning reasonable. In those cases, “Journalists” and “the Me Too movement” would resolve to Yes.\n\nThis does NOT count towards the payout criterion: \nIf there is no Person of the Year (and instead many variations thereof, e.g. Entertainer of the Year, Hero of the Year), that is not encompassed in the Payout Criterion. \nIf “ChatGPT” was the Person of the Year, strikes of “AI” or “LLMs” would resolve to No, since even if they are conceptually linked, they are not synonymous (and thus are not explicitly named), and are not persons, so it would not matter if they were identified in the image. Or if “Sam Altman” was the Person of the Year, and the cover showed a person using ChatGPT on their computer, “ChatGPT” would not resolve to Yes because it is not a person.\n\nThis market and these products have not been endorsed by TIME. Any references to TIME, or any associated marks are descriptive only and do not indicate an endorsement of this product or any affiliation between TIME and Kalshi.",
+        "kalshiStatus": "active",
+        "polymarketQuestion": "Will Sam Altman be TIME Person of the Year 2026?",
+        "polymarketDescription": "This market will resolve to “Yes” if the listed person, group, entity, or thing is TIME Person of the Year for 2026. Otherwise, this market will resolve to “No”.\n\nA listed option will be considered TIME Person of the Year if they/it are explicitly named as Person of the Year. \n\nAdditionally, the following rules apply:\n\nIf multiple people are explicitly named person of the year, both people will be considered TIME Person of the Year.\n\nIf the TIME Person of the Year is a concept, group or thing, a person may still be considered Person of the Year if they are also explicitly named person of the year, or if they are directly associated with the concept, group or thing named as person of the Year and are pictured on any official TIME cover announcing the Person of the Year. For example, in 2025 when TIME Person of the Year was “Architects of AI” the option for Sam Altman would have resolved to “Yes” as he was associated with the concept and is pictured on the Cover. However, if Sam Altman were Person of the Year, and ChatGPT was shown on the cover, this would not qualify for ChatGPT because ChatGPT is not a person.\n\nIf the TIME Person of the Year is a specific concept, group, entity, or thing (e.g. artificial intelligence), listed concepts or entities will be considered Person of the Year only if they are synonymous with the announced TIME Person of the Year. For example, if ChatGPT were Person of the Year, options for AI or LLMs would resolve to “No” because, while they are conceptually linked, they are not synonymous.\n\nIf TIME uses language that does not refer to a specific, commonly-recognized, concept, group, entity, or thing (e.g. 2011’s “The Protester” or 2017’s “The Silence Breakers”), the TIME Person of the Year feature article will be used to determine the meaning of the language defining TIME Person of the Year. In such cases, listed concepts, groups, or things will be considered TIME Person of the Year if they can be reasonably understood as equivalent to the meaning of the language used to define TIME Person of the Year. For example, the option for “The Me Too Movement” would have resolved to “Yes” in 2017. \n\nIf for any reason the TIME's Person of the Year is not announced by June 30, 2027, 11:59 PM ET, this market will resolve to \"No\".\n\nThe resolution source for this market will be the TIME magazine cover or covers announcing the 2026 TIME Person of the Year; however, the TIME Person of the Year Feature article may also be used.",
+        "polymarketActive": true,
+        "polymarketAcceptingOrders": true
+      },
+      "classification": "rejected",
+      "rejectionCode": "resolution_rule_conflict",
+      "exactReason": "Rejected: Polymarket resolves No if TIME has not announced by June 30, 2027 and uses the feature article for ambiguous labels; Kalshi has a later expiration and applies the simplest reasonable meaning. A late announcement or ambiguous group label can produce different outcomes.",
+      "registryAction": "none_fail_closed"
+    }
+  ]
+}
