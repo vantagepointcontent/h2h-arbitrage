@@ -13,6 +13,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis
 import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
 import { updateSettingsFromBrowser } from '@/app/actions/bot-trader-mutations';
+import { projectOpenPositionPnlCents } from '@/lib/bot-position-financials';
 
 type PositionStatus = 'open' | 'settled' | 'closed';
 type SettlementState = 'open' | 'partially_settled' | 'settlement_pending' | 'settlement_unresolved' | 'settled';
@@ -212,19 +213,25 @@ function openPositionMark(position: BotPosition, now = Date.now()): OpenMark {
   const openCostCents = Number.isSafeInteger(position.remainingOpenCostCents)
     ? position.remainingOpenCostCents!
     : position.totalCostCents;
-  const hasIndicativeExactPnl = Number.isSafeInteger(position.indicativePnlMicrocents);
-  const pnlCents = hasIndicativeExactPnl
-    ? Math.round(position.indicativePnlMicrocents! / 1_000_000)
-    : (position.realizedPnlCents ?? 0) + position.currentValueCents - openCostCents;
+  const markCostCents = Number.isSafeInteger(position.indicativeBuyCostMicrocents)
+    ? position.totalCostCents
+    : openCostCents;
+  const pnlCents = projectOpenPositionPnlCents({
+    currentValueCents: position.currentValueCents,
+    buyCostCents: markCostCents,
+    indicativePnlMicrocents: position.indicativePnlMicrocents,
+    realizedPnlCents: position.realizedPnlCents,
+  });
+  if (pnlCents == null) {
+    return { available: false, label: position.valuationFailureReason?.trim() || 'Valuation unavailable: malformed persisted P&L inputs' };
+  }
   return {
     available: true,
     fresh: warning == null,
     warning,
     currentValueCents: position.currentValueCents,
     pnlCents,
-    roiBps: hasIndicativeExactPnl && Number.isSafeInteger(position.unrealizedRoiBps)
-      ? position.unrealizedRoiBps
-      : openCostCents > 0 ? Math.round((pnlCents * 10_000) / openCostCents) : null,
+    roiBps: markCostCents > 0 ? Math.round((pnlCents * 10_000) / markCostCents) : null,
   };
 }
 
@@ -626,7 +633,10 @@ export default function BotTraderPanel() {
     };
     const sortableRoi = (position: BotPosition) => {
       if (position.status !== 'open' && !hasVerifiedTerminalAccounting(position)) return null;
-      if (position.status === 'open' && !openPositionMark(position).available) return null;
+      if (position.status === 'open') {
+        const mark = openPositionMark(position);
+        return mark.available ? mark.roiBps : null;
+      }
       return positionRoiBps(position);
     };
     const values: Record<SortKey, [number | null, number | null]> = {

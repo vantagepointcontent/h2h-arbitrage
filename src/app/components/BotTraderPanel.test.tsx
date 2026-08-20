@@ -256,6 +256,81 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('img', { name: 'BotTrader current performance by entry date chart' })).toBeTruthy();
   });
 
+  it('reconciles the Unrealized meter to canonical open row P&L across warning states', async () => {
+    const valued = [
+      {
+        ...positions[0],
+        id: 1,
+        marketTitle: 'Verified open',
+        currentValueCents: 99,
+        indicativePnlMicrocents: 2_490_000,
+      },
+      {
+        ...positions[0],
+        id: 2,
+        marketTitle: 'Unverified stale open',
+        relationshipValidity: 'unresolved_relationship' as const,
+        legacyExposureVerdict: {
+          ...positions[0].legacyExposureVerdict,
+          relationshipValidity: 'unresolved_relationship' as const,
+          excludedFromVerifiedTotals: true,
+        },
+        excludedFromVerifiedTotals: true,
+        currentValueCents: 99,
+        indicativePnlMicrocents: 2_490_000,
+        lastValuationAt: '2026-08-11T12:00:00.000Z',
+      },
+    ];
+    const unavailable = {
+      ...positions[0],
+      id: 3,
+      marketTitle: 'Unavailable open',
+      currentValueCents: null,
+      indicativePnlMicrocents: null,
+      lastValuationAt: null,
+      valuationFailureReason: 'Persisted valuation inputs are unavailable',
+    };
+    const settled = {
+      ...positions[0],
+      id: 4,
+      marketTitle: 'Settled row',
+      status: 'settled',
+      currentValueCents: 199,
+      indicativePnlMicrocents: 102_000_000,
+      realizedPnlCents: 102,
+      resolutionPayoutCents: 199,
+      resolutionValidationStatus: 'verified',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: {
+        ...analytics,
+        positions: [...valued, unavailable, settled],
+        openPositions: { count: 3, unrealizedPnlCents: 4 },
+        performance: {
+          ...analytics.performance,
+          positionIds: [1, 2, 3, 4],
+          capital: { deployedCents: 388, currentCents: 198, heldToResolutionCents: 300, excludedOpenCostCents: 97 },
+          pnl: { realizedCents: 102, unrealizedCents: 4, totalCents: 106, roiBps: 2732 },
+          valuation: { fresh: 1, stale: 1, unavailable: 1, pendingSettlement: 0, asOf: '2026-08-11T12:00:00.000Z' },
+        },
+      } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    await screen.findByText('Verified open');
+    expect(screen.getByText('Unrealized').parentElement?.textContent).toBe('Unrealized+$0.04');
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    const valuedRows = ['Verified open', 'Unverified stale open'].map((title) => screen.getByText(title).closest('tr'));
+    expect(valuedRows.map((row) => row?.querySelectorAll('td')[6]?.textContent)).toEqual(['+$0.02', '+$0.02']);
+    expect(screen.getByText('Unavailable open').closest('tr')?.querySelectorAll('td')[6]?.textContent).toBe('Unavailable');
+    expect(screen.queryByText('Settled row')).toBeNull();
+    expect(screen.getAllByText('Relationship unverified').length).toBeGreaterThan(0);
+    expect(screen.getByText(/1 unavailable/)).toBeTruthy();
+  });
+
   it('reconciles a partially reduced row with the portfolio current ROI', async () => {
     vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     const reduced = {
@@ -384,6 +459,93 @@ describe('BotTraderPanel', () => {
     expect(await screen.findByText('Trump 2026')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'settled' }));
     expect(screen.queryByText('Trump 2026')).toBeNull();
+  });
+
+  it('reconciles Unrealized to rendered open-row P&L across relationship and valuation states', async () => {
+    vi.setSystemTime(new Date('2026-08-11T14:00:00.000Z'));
+    const verified = {
+      ...positions[0],
+      id: 1,
+      marketTitle: 'Verified open row',
+      currentValueCents: 99,
+      indicativeValueMicrocents: 99_490_000,
+      indicativePnlMicrocents: 2_490_000,
+      unrealizedPnlCents: 2,
+    };
+    const unverified = {
+      ...verified,
+      id: 2,
+      marketTitle: 'Relationship unverified open row',
+      relationshipValidity: 'unresolved_relationship' as const,
+      excludedFromVerifiedTotals: true,
+      lastValuationAt: '2026-08-11T12:00:00.000Z',
+      legacyExposureVerdict: {
+        ...positions[0].legacyExposureVerdict,
+        relationshipValidity: 'unresolved_relationship' as const,
+        excludedFromVerifiedTotals: true,
+      },
+    };
+    const unavailable = {
+      ...unverified,
+      id: 3,
+      marketTitle: 'Unavailable open row',
+      exposureIdentityStatus: 'partially_proven' as const,
+      currentValueCents: null,
+      indicativeValueMicrocents: null,
+      indicativePnlMicrocents: null,
+      unrealizedPnlCents: null,
+      unrealizedRoiBps: null,
+      lastValuationAt: null,
+      valuationFailureReason: 'Persisted valuation inputs are unavailable',
+    };
+    const settled = {
+      ...verified,
+      id: 4,
+      marketTitle: 'Settled row',
+      status: 'settled' as const,
+      settlementState: 'settled' as const,
+      resolutionPayoutCents: 100,
+      resolutionValidationStatus: 'verified' as const,
+      realizedPnlCents: 3,
+    };
+    const scopedPositions = [verified, unverified, unavailable, settled];
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: {
+        ...analytics,
+        positions: scopedPositions,
+        performance: {
+          ...analytics.performance,
+          positionIds: scopedPositions.map(({ id }) => id),
+          capital: { deployedCents: 388, currentCents: 298, heldToResolutionCents: 300, excludedOpenCostCents: 97 },
+          pnl: { realizedCents: 3, unrealizedCents: 4, totalCents: 7, roiBps: 180 },
+          valuation: { fresh: 1, stale: 1, unavailable: 1, pendingSettlement: 0, asOf: '2026-08-11T12:00:00.000Z' },
+        },
+      } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    await screen.findByText('Verified open row');
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    const displayedCents = (text: string) => {
+      const match = text.match(/^([+-])?\$(\d+)\.(\d{2})$/);
+      if (!match) throw new Error(`Unexpected money display: ${text}`);
+      return (match[1] === '-' ? -1 : 1) * (Number(match[2]) * 100 + Number(match[3]));
+    };
+    const rowPnlCents = ['Verified open row', 'Relationship unverified open row'].map((title) => {
+      const row = screen.getByText(title).closest('tr')!;
+      return displayedCents(Array.from(row.querySelectorAll('td'))[6].textContent!);
+    });
+    const unrealizedText = screen.getByText('Unrealized').parentElement!.textContent!.replace('Unrealized', '');
+
+    expect(rowPnlCents).toEqual([2, 2]);
+    expect(displayedCents(unrealizedText)).toBe(rowPnlCents.reduce((sum, cents) => sum + cents, 0));
+    expect(screen.getByText('Relationship unverified open row').closest('tr')?.textContent).toContain('Relationship unverified');
+    expect(screen.getByText('Unavailable open row').closest('tr')?.querySelectorAll('td')[6].textContent).toBe('Unavailable');
+    expect(screen.getByText(/1 unavailable/)).toBeTruthy();
+    expect(screen.queryByText('Settled row')).toBeNull();
   });
 
   it('labels verified simulated terminal proceeds as Settled paper', async () => {
