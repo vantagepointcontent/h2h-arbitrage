@@ -337,7 +337,7 @@ describe('durable BotTrader scan consumer', () => {
     await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
       state: 'criteria_rejected',
       reasonCode: 'scan_criteria_rejected',
-      reason: 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data',
+      reason: '1 candidate(s) evaluated; 0 eligible — ROI 1.00% < min 2.00%',
     });
     expect(h.deps.execute).not.toHaveBeenCalled();
   });
@@ -665,5 +665,57 @@ describe('durable BotTrader scan consumer', () => {
     expect(results).toHaveLength(1);
     expect(results[0].state).toBe('placed');
     expect(h.decisions.size).toBe(1);
+  });
+
+  // BOT-008 regressions
+  it('shows canonical-registry-only rejection as a single focused message', async () => {
+    const c = candidate({
+      kalshiTicker: 'KX-UNKNOWN',
+      pmConditionId: 'unknown-condition',
+      propositionRelationship: null,
+      roiPct: 5,
+    });
+    const h = harness({ scans: [scan({ candidates: [c] })], current: [c] });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({
+      state: 'criteria_rejected',
+      reasonCode: 'scan_criteria_rejected',
+      reason: expect.stringContaining('canonical proposition registry'),
+    });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
+  it('reconciles multiple positive candidates each with a distinct audit trail', async () => {
+    const first = candidate({ outcome: 'A', kalshiTicker: 'KX-A', pmConditionId: 'pm-a', roiPct: 3 });
+    const second = candidate({ outcome: 'B', kalshiTicker: 'KX-B', pmConditionId: 'pm-b', roiPct: 1 });
+    const h = harness({
+      scans: [scan({ candidates: [first, second] })],
+      current: [first, second],
+      botSettings: settings({ minRoiPct: 4 }),
+    });
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result.state).toBe('criteria_rejected');
+    expect(result.reason).toContain('2 candidate(s)');
+    expect(h.opportunityDecisions.length).toBe(2);
+    const eligibleOne = h.opportunityDecisions.find((d) => d.candidateIndex === 0);
+    const ineligibleOne = h.opportunityDecisions.find((d) => d.candidateIndex === 1);
+    expect(eligibleOne?.state).toBe('rejected');
+    expect(ineligibleOne?.state).toBe('rejected');
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
+  it('advances cursor after restart with a contiguous decision already present', async () => {
+    const scans = [41, 42, 43].map((id) => scan({
+      id,
+      candidates: [candidate({ kalshiTicker: `KX-${id}`, pmConditionId: `pm-${id}`, outcome: `outcome-${id}` })],
+    }));
+    // Pre-decide scan 41 so the backlog starts at 42
+    const h = harness({ scans });
+    await h.consumer.consume(41, 'scan_api');
+    expect(h.decisions.get(41)?.state).not.toBe('received');
+    // Simulate restart: listBacklog should return only 42 and 43
+    const backlog = await h.consumer.processBacklog();
+    expect(backlog.map((b) => b.scanId)).toEqual([42, 43]);
+    expect(h.cursor()).toBe(43);
   });
 });

@@ -69,6 +69,8 @@ const SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
 
 interface BotStatus {
   enabled: boolean;
+  botStatus?: 'ON' | 'OFF' | 'Blocked';
+  paperBlockedReasons?: string[];
   mode: 'paper' | 'production';
   todayCount: number;
   todayStakeUsd: number;
@@ -449,8 +451,8 @@ export default function SettingsPanel() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
                   <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">Bot</div>
-                  <div className={`text-sm font-medium ${botStatus.enabled ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}>
-                    {botStatus.enabled ? "ENABLED" : "OFF"}
+                  <div className={`text-sm font-medium ${botStatus.enabled ? (botStatus.botStatus === 'Blocked' ? 'text-[var(--status-warning)]' : "text-[#5DBE81]") : "text-[#8A9BA8]"}`}>
+                    {(botStatus.botStatus ?? (botStatus.enabled ? 'ON' : 'OFF'))}
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0E1621] border border-[#182533] px-3 py-2">
@@ -483,6 +485,11 @@ export default function SettingsPanel() {
                 </div>
               )}
               {botStatus.error && <div className="text-xs text-red-400">{botStatus.error}</div>}
+              {botStatus.paperBlockedReasons && botStatus.paperBlockedReasons.length > 0 && (
+                <div className="mt-1 text-xs text-[var(--status-warning)]">
+                  {botStatus.paperBlockedReasons.join(' · ')}
+                </div>
+              )}
             </>
           ) : (
             <span className="text-[#8A9BA8]">BotTrader status endpoint unavailable.</span>

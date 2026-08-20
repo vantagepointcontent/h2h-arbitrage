@@ -250,6 +250,8 @@ function hasVerifiedTerminalAccounting(position: BotPosition): boolean {
 
 interface BotStatus {
   enabled: boolean;
+  botStatus: 'ON' | 'OFF' | 'Blocked';
+  paperBlockedReasons?: string[];
   mode: 'paper' | 'production';
   selectionMethod: 'roi' | 'apy' | 'hybrid';
   todayCount: number;
@@ -786,11 +788,11 @@ export default function BotTraderPanel() {
       </div>
 
       {status && (
-        <div className={`rounded-lg border px-3 py-3 ${status.enabled ? 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10' : 'border-[var(--border-subtle)] bg-[var(--surface-panel)]'}`}>
+        <div className={`rounded-lg border px-3 py-3 ${status.enabled ? (status.botStatus === 'Blocked' ? 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10' : 'border-[var(--status-positive)]/40 bg-[var(--status-positive)]/10') : 'border-[var(--border-subtle)] bg-[var(--surface-panel)]'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Bot className={`h-4 w-4 ${status.enabled ? 'text-[var(--status-positive)]' : 'text-[var(--text-secondary)]'}`} />
-              <span className="font-semibold">BotTrader: {status.enabled ? 'ON' : 'OFF'}</span>
+              <Bot className={`h-4 w-4 ${status.enabled ? (status.botStatus === 'Blocked' ? 'text-[var(--status-warning)]' : 'text-[var(--status-positive)]') : 'text-[var(--text-secondary)]'}`} />
+              <span className="font-semibold">BotTrader: {status.botStatus ?? (status.enabled ? 'ON' : 'OFF')}</span>
               <span className="text-[var(--text-secondary)]">· {status.mode === 'production' ? 'Production' : 'Paper'} mode · {status.selectionMethod.toUpperCase()} selection · {INTEGER.format(status.todayCount)} trades today · {formatUsd(status.todayStakeUsd)} staked</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -798,6 +800,11 @@ export default function BotTraderPanel() {
               <button onClick={toggleMode} disabled={saving} className={`min-h-11 rounded-lg border px-3 text-xs font-semibold disabled:opacity-50 ${status.mode === 'production' ? 'border-[var(--status-warning)]/50 text-[var(--status-warning)]' : 'border-[var(--border-strong)] text-[var(--text-primary)]'}`}>{status.mode === 'production' ? 'Switch to Paper' : 'Switch to Production'}</button>
             </div>
           </div>
+          {status.paperBlockedReasons && status.paperBlockedReasons.length > 0 && (
+            <div className="mt-1 text-[10px] text-[var(--status-warning)]">
+              {status.paperBlockedReasons.join(' · ')}
+            </div>
+          )}
         </div>
       )}
 

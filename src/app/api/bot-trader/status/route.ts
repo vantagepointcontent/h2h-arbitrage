@@ -100,8 +100,22 @@ export async function GET() {
       ...readiness.blockedReasons,
     ];
 
+    // BOT-008: If an intentional state blocks paper placement, expose Blocked.
+    const paperBlockedReasons: string[] = [];
+    if (enabled && effectiveExecutionMode !== 'live' && mode === 'production') {
+      paperBlockedReasons.push(`Production requested but effective mode is ${effectiveExecutionMode}`);
+    }
+    if (enabled && todayCount2 >= maxTradesPerDay) {
+      paperBlockedReasons.push(`Daily trade limit reached (${todayCount2}/${maxTradesPerDay})`);
+    }
+    const botStatus: 'ON' | 'OFF' | 'Blocked' = enabled
+      ? (paperBlockedReasons.length > 0 ? 'Blocked' : 'ON')
+      : 'OFF';
+
     const status = {
       enabled,
+      botStatus,
+      paperBlockedReasons,
       mode,
       selectionMethod,
       minRoiPct,

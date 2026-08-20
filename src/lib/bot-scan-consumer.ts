@@ -413,6 +413,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     }
 
     const initiallyEligible: BotScanCandidate[] = [];
+    const candidateRejections: Array<{ candidateIndex: number; outcome: string; code: string; reason: string }> = [];
     for (const [parsedIndex, item] of scan.candidates.entries()) {
       const candidateIndex = item.candidateIndex ?? parsedIndex;
       // Paper BotTrader may recover scanner rows that were rejected only because
@@ -437,7 +438,11 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         reason,
         candidateAuditDetails(item, settings, 'scan', { evaluation: evaluation.criteria, final: !eligible }),
       );
-      if (eligible) initiallyEligible.push(item);
+      if (eligible) {
+        initiallyEligible.push(item);
+      } else {
+        candidateRejections.push({ candidateIndex, outcome: item.outcome, code: reasonCode, reason });
+      }
     }
     if (initiallyEligible.length === 0) {
       // Scanner execution blockers describe its legacy one-share request. Paper
@@ -455,7 +460,26 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           { outcome: blocked.outcome, executionStatus: blocked.executionStatus, executionBlocker: blocked.executionBlocker },
         ));
       }
-      return finish(rejection('criteria_rejected', 'scan_criteria_rejected', 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data'));
+      // Build truthful aggregate telemetry when positive opportunities exist
+      // but every candidate fails an unchanged gate.
+      let aggregateReason: string;
+      if (candidateRejections.length === 0) {
+        aggregateReason = 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data';
+      } else {
+        const distinctReasons = [...new Set(candidateRejections.map((r) => r.reason))];
+        const registryOnly = distinctReasons.length === 1
+          && distinctReasons[0]?.includes('canonical proposition registry');
+        if (registryOnly) {
+          aggregateReason = `${candidateRejections.length} candidate(s) rejected: exact selected contract pair(s) are absent from the canonical proposition registry`;
+        } else {
+          aggregateReason = `${candidateRejections.length} candidate(s) evaluated; 0 eligible — ${distinctReasons.join('; ')}`;
+        }
+      }
+      return finish(rejection('criteria_rejected', 'scan_criteria_rejected', aggregateReason, {
+        opportunitiesEvaluated: scan.candidates.length,
+        eligibleCount: 0,
+        candidateRejections: candidateRejections.slice(0, 20),
+      }));
     }
 
     let currentCandidates: BotScanCandidate[];
