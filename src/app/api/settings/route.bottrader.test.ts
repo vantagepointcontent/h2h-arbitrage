@@ -5,10 +5,11 @@ const mocks = vi.hoisted(() => ({
   getSetting: vi.fn(async () => 'paper'),
   setSettings: vi.fn(async () => ({ ok: true, errors: [] })),
   resetSetting: vi.fn(),
+  validateLiveConfirmation: vi.fn(() => false),
 }));
 
 vi.mock('@/lib/settings', () => mocks);
-vi.mock('@/lib/execution-mode', () => ({ validateLiveConfirmation: vi.fn(() => false) }));
+vi.mock('@/lib/execution-mode', () => ({ validateLiveConfirmation: mocks.validateLiveConfirmation }));
 vi.mock('@/lib/error-handler', () => ({ clientSafeError: vi.fn(() => 'safe error') }));
 
 import { POST } from './route';
@@ -24,6 +25,7 @@ function productionRequest(confirmation?: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getSetting.mockResolvedValue('paper');
+  mocks.validateLiveConfirmation.mockReturnValue(false);
 });
 
 describe('BotTrader production settings gate', () => {
@@ -50,5 +52,22 @@ describe('BotTrader production settings gate', () => {
     const response = await POST(productionRequest('PRODUCTION') as never);
     expect(response.status).toBe(200);
     expect(mocks.setSettings).toHaveBeenCalledWith({ 'bot.mode': 'production' });
+  });
+
+  it('accepts independent live and production confirmations in one atomic settings update', async () => {
+    mocks.validateLiveConfirmation.mockReturnValue(true);
+    const response = await POST(new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        values: { 'execute.mode': 'live', 'bot.mode': 'production' },
+        liveConfirmation: 'LIVE',
+        botConfirmation: 'PRODUCTION',
+      }),
+    }) as never);
+
+    expect(response.status).toBe(200);
+    expect(mocks.validateLiveConfirmation).toHaveBeenCalledWith('LIVE');
+    expect(mocks.setSettings).toHaveBeenCalledWith({ 'execute.mode': 'live', 'bot.mode': 'production' });
   });
 });

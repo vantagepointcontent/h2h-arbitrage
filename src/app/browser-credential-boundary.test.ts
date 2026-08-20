@@ -13,12 +13,17 @@ describe('browser credential boundary', () => {
     ].map(read).join('\n');
     const ecosystem = read('ecosystem.config.js');
     const sessionSource = read('src/lib/browser-session.ts');
+    const mutationAction = read('src/app/actions/bot-trader-mutations.ts');
 
     expect(clientSources).not.toContain('ApiTokenProvider');
     expect(clientSources).not.toContain('NEXT_PUBLIC_H2H_API_TOKEN');
     expect(clientSources).not.toContain('h2h-api-token');
     expect(clientSources).not.toContain("headers['x-h2h-token']");
+    expect(clientSources).not.toMatch(/fetch\(["']\/api\/settings["'],\s*\{\s*method:\s*["']POST["']/u);
+    expect(clientSources).not.toMatch(/fetch\(["']\/api\/bot-trader\/messages["'],\s*\{\s*method:\s*["']POST["']/u);
     expect(ecosystem).not.toContain('NEXT_PUBLIC_H2H_API_TOKEN');
+    expect(mutationAction).toContain("'use server'");
+    expect(mutationAction).toContain('process.env.H2H_API_TOKEN');
     expect(sessionSource).not.toContain("from 'node:crypto'");
     expect(sessionSource).not.toContain('Buffer.');
   });

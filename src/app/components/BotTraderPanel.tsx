@@ -12,6 +12,7 @@ import {
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import BotActionLogs from './BotActionLogs';
 import BotTraderMessages from './BotTraderMessages';
+import { updateSettingsFromBrowser } from '@/app/actions/bot-trader-mutations';
 
 type PositionStatus = 'open' | 'settled' | 'closed';
 type SettlementState = 'open' | 'partially_settled' | 'settlement_pending' | 'settlement_unresolved' | 'settled';
@@ -439,10 +440,6 @@ function snapshotStateLabel(snapshot: StoredPriceSnapshot): string {
   return labels[snapshot.status];
 }
 
-function apiHeaders(): Record<string, string> {
-  return { 'Content-Type': 'application/json' };
-}
-
 function MetricCard({ label, value, valueClass = '' }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-3 py-3 min-w-0">
@@ -567,7 +564,8 @@ export default function BotTraderPanel() {
   const [productionConfirmOpen, setProductionConfirmOpen] = useState(false);
   const [productionConfirmation, setProductionConfirmation] = useState('');
   const requestIdRef = useRef(0);
-  const latestLoadRef = useRef<(initial?: boolean) => Promise<void>>(async () => {});
+  const mutationIdRef = useRef(0);
+  const mutationInFlightRef = useRef(false);
 
   const load = useCallback(async (initial = false) => {
     const requestId = ++requestIdRef.current;
@@ -597,10 +595,6 @@ export default function BotTraderPanel() {
       }
     }
   }, [methodFilter, modeFilter, range]);
-
-  useEffect(() => {
-    latestLoadRef.current = load;
-  }, [load]);
 
   useEffect(() => {
     const initialId = window.setTimeout(() => void load(true), 0);
@@ -657,29 +651,41 @@ export default function BotTraderPanel() {
   };
 
   const saveSetting = async (key: 'bot.enabled' | 'bot.mode' | 'bot.selectionMethod', value: boolean | 'paper' | 'production' | 'roi' | 'apy' | 'hybrid', confirmation?: 'PRODUCTION') => {
-    if (!status) return;
-    const previous = status;
+    if (!status || mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
+    const mutationId = ++mutationIdRef.current;
+    let mutationPersisted = false;
     setSaving(true);
     setError(null);
-    setStatus({ ...status, ...(key === 'bot.enabled'
-      ? { enabled: value as boolean }
-      : key === 'bot.mode'
-        ? { mode: value as 'paper' | 'production' }
-        : { selectionMethod: value as 'roi' | 'apy' | 'hybrid' }) });
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: apiHeaders(),
-        body: JSON.stringify({ values: { [key]: value }, ...(confirmation ? { confirmation } : {}) }),
+      const result = await updateSettingsFromBrowser({
+        values: { [key]: value },
+        ...(confirmation ? { confirmation } : {}),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.details?.join('; ') || 'Setting update failed');
-      await latestLoadRef.current(false);
-    } catch (cause) {
-      setStatus(previous);
-      setError(cause instanceof Error ? cause.message : 'Setting update failed');
+      if (mutationId !== mutationIdRef.current) return;
+      if (!result.ok) {
+        setError(result.message || 'BotTrader settings are temporarily unavailable. The previous settings remain active.');
+        return;
+      }
+      mutationPersisted = true;
+      const requestId = ++requestIdRef.current;
+      setRefreshing(true);
+      const statusResponse = await fetch('/api/bot-trader/status', { cache: 'no-store' });
+      const canonicalStatus = await statusResponse.json();
+      if (!statusResponse.ok) throw new Error('canonical-status-unavailable');
+      if (requestId === requestIdRef.current) setStatus(canonicalStatus);
+    } catch {
+      if (mutationId === mutationIdRef.current) {
+        setError(mutationPersisted
+          ? 'The setting was saved, but canonical BotTrader status could not be refreshed. Refresh the panel to confirm the active state.'
+          : 'BotTrader settings are temporarily unavailable. The previous settings remain active.');
+      }
     } finally {
-      setSaving(false);
+      if (mutationId === mutationIdRef.current) {
+        mutationInFlightRef.current = false;
+        setRefreshing(false);
+        setSaving(false);
+      }
     }
   };
 

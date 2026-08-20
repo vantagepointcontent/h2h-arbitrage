@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const values = body.values as Record<string, unknown>;
-    if (values['execute.mode'] === 'live' && !validateLiveConfirmation(body.confirmation)) {
+    if (values['execute.mode'] === 'live' && !validateLiveConfirmation(body.liveConfirmation ?? body.confirmation)) {
       return NextResponse.json(
         { error: 'Entering live mode requires the exact confirmation text LIVE.' },
         { status: 400 },
@@ -53,13 +53,15 @@ export async function POST(request: NextRequest) {
     // Production is gated server-side as well as by the confirmation UI. This
     // does not alter the independent AUTO_LIVE_ORDERS_AUTHORIZED fail-closed guard.
     if (values['bot.mode'] === 'production') {
-      if (body.confirmation !== 'PRODUCTION') {
+      if ((body.botConfirmation ?? body.confirmation) !== 'PRODUCTION') {
         return NextResponse.json(
           { error: 'Entering BotTrader production mode requires the exact confirmation text PRODUCTION.' },
           { status: 400 },
         );
       }
-      const executeMode = await getSetting<string>('execute.mode').catch(() => 'paper');
+      const executeMode = values['execute.mode'] === 'live'
+        ? 'live'
+        : await getSetting<string>('execute.mode').catch(() => 'paper');
       if (executeMode !== 'live') {
         return NextResponse.json(
           { error: 'BotTrader production mode is only allowed when execute.mode is set to live.' },

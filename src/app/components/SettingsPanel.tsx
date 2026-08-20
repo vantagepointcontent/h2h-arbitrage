@@ -19,6 +19,7 @@ import { ExecutionCredsCard } from "@/app/components/ExecutionCredsCard";
 import { Switch } from "@/components/ui/switch";
 import { usePlatforms } from "@/lib/platforms/usePlatforms";
 import { PlatformIcon } from "@/lib/platforms/PlatformIcon";
+import { updateSettingsFromBrowser } from "@/app/actions/bot-trader-mutations";
 import {
   Settings as SettingsIcon,
   Bell,
@@ -66,10 +67,6 @@ const SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: "display", label: "Display", icon: <Monitor className="w-4 h-4" /> },
 ];
 
-function apiHeaders(): Record<string, string> {
-  return { "Content-Type": "application/json" };
-}
-
 interface BotStatus {
   enabled: boolean;
   mode: 'paper' | 'production';
@@ -103,6 +100,7 @@ export default function SettingsPanel() {
   const [liveConfirmed, setLiveConfirmed] = useState(false);
   const [botConfirmation, setBotConfirmation] = useState("");
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
+  const mutationInFlightRef = useRef(false);
 
   // WS-106: watcher health polling (15s) + msgs/sec derivation
   const [watcherHealth, setWatcherHealth] = useState<WatcherHealthPayload | null>(null);
@@ -233,18 +231,21 @@ export default function SettingsPanel() {
   const dirtyCount = Object.keys(dirty).length;
 
   const save = async () => {
-    if (!dirtyCount) return;
+    if (!dirtyCount || mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: apiHeaders(),
-        body: JSON.stringify({ values: dirty, confirmation: liveConfirmed ? "LIVE" : undefined }),
+      const result = await updateSettingsFromBrowser({
+        values: dirty,
+        ...(liveConfirmed ? { liveConfirmation: "LIVE" as const } : {}),
+        ...(dirty["bot.mode"] === "production" && botConfirmation === "PRODUCTION"
+          ? { botConfirmation: "PRODUCTION" as const }
+          : {}),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details?.join("; ") ?? data.error ?? "Save failed");
-      setSettings(data.settings ?? []);
+      if (!result.ok) throw new Error(result.message ?? "Settings are temporarily unavailable. Previous values remain active.");
+      const data = result.data as { settings?: ResolvedSetting[] } | null;
+      setSettings(data?.settings ?? []);
       const changed = Object.keys(dirty).join(", ");
       setDirty({});
       setLiveConfirmed(false);
@@ -255,27 +256,27 @@ export default function SettingsPanel() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      mutationInFlightRef.current = false;
       setSaving(false);
     }
   };
 
   const resetKey = async (key: string) => {
+    if (mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: apiHeaders(),
-        body: JSON.stringify({ reset: key }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Reset failed");
-      setSettings(data.settings ?? []);
+      const result = await updateSettingsFromBrowser({ reset: key });
+      if (!result.ok) throw new Error(result.message ?? "Settings are temporarily unavailable. Previous values remain active.");
+      const data = result.data as { settings?: ResolvedSetting[] } | null;
+      setSettings(data?.settings ?? []);
       setDirty((d) => { const n = { ...d }; delete n[key]; return n; });
-      setSavedMsg(`${key} reset to ${data.settings?.find((s: ResolvedSetting) => s.key === key)?.source ?? "fallback"} value.`);
+      setSavedMsg(`${key} reset to ${data?.settings?.find((s: ResolvedSetting) => s.key === key)?.source ?? "fallback"} value.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      mutationInFlightRef.current = false;
       setSaving(false);
     }
   };

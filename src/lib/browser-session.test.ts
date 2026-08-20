@@ -47,4 +47,14 @@ describe('server-issued browser session', () => {
     await expect(isAuthorizedBrowserMutation(serviceRequest)).resolves.toBe(true);
     await expect(isAuthorizedBrowserMutation(crossOriginRequest)).resolves.toBe(false);
   });
+
+  it('keeps browser sessions bound to the dedicated secret rather than service-token rotation', async () => {
+    vi.stubEnv('H2H_BROWSER_SESSION_SECRET', 'dedicated-browser-session-secret');
+    vi.stubEnv('H2H_API_TOKEN', 'service-token-before-rotation');
+    const session = await createBrowserSession();
+
+    vi.stubEnv('H2H_API_TOKEN', 'service-token-after-rotation');
+
+    await expect(verifyBrowserSession(session.value)).resolves.toBe(true);
+  });
 });

@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BotTraderPanel, { positionRoiBps } from './BotTraderPanel';
+
+const mutationMocks = vi.hoisted(() => ({
+  updateSettingsFromBrowser: vi.fn<(input: unknown) => Promise<{ ok: boolean; status: number; data: Record<string, unknown> | null; message: string | null; correlationId: string | null }>>(async () => ({
+    ok: true, status: 200, data: { success: true }, message: null, correlationId: null,
+  })),
+}));
+vi.mock('@/app/actions/bot-trader-mutations', () => mutationMocks);
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -176,6 +183,13 @@ function stubInitialFetch() {
     throw new Error(`Unexpected fetch: ${url}`);
   }));
 }
+
+beforeEach(() => {
+  mutationMocks.updateSettingsFromBrowser.mockReset();
+  mutationMocks.updateSettingsFromBrowser.mockResolvedValue({
+    ok: true, status: 200, data: { success: true }, message: null, correlationId: null,
+  });
+});
 
 afterEach(() => {
   cleanup();
@@ -1240,12 +1254,58 @@ describe('BotTraderPanel', () => {
     fireEvent.click(submit);
 
     await waitFor(() => {
-      const settingsCall = vi.mocked(fetch).mock.calls.find((call: [unknown, RequestInit?]) => String(call[0]) === '/api/settings');
-      expect(settingsCall).toBeTruthy();
-      expect(JSON.parse(String(settingsCall?.[1]?.body))).toEqual({
+      expect(mutationMocks.updateSettingsFromBrowser).toHaveBeenCalledWith({
         values: { 'bot.mode': 'production' },
         confirmation: 'PRODUCTION',
       });
     });
+  });
+
+  it('deduplicates rapid enable clicks and leaves the canonical state unchanged while the mutation is pending', async () => {
+    let resolveMutation!: (value: { ok: boolean; status: number; data: null; message: string | null; correlationId: null }) => void;
+    mutationMocks.updateSettingsFromBrowser.mockImplementationOnce(() => new Promise((resolve) => { resolveMutation = resolve; }));
+    stubInitialFetch();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<BotTraderPanel />);
+
+    const enable = await screen.findByRole('button', { name: 'Enable Bot' });
+    fireEvent.click(enable);
+    fireEvent.click(enable);
+
+    expect(mutationMocks.updateSettingsFromBrowser).toHaveBeenCalledTimes(1);
+    expect((enable as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
+
+    resolveMutation({ ok: false, status: 503, data: null, message: 'BotTrader settings are temporarily unavailable. The previous settings remain active.', correlationId: null });
+    expect(await screen.findByRole('alert')).toHaveTextContent('previous settings remain active');
+    expect(screen.getByText(/BotTrader: OFF/)).toBeTruthy();
+  });
+
+  it('refreshes from canonical status after success and ignores an older out-of-order status response', async () => {
+    let statusCalls = 0;
+    let resolveStaleStatus!: (value: { ok: boolean; json: () => Promise<Record<string, unknown>> }) => void;
+    const staleStatus = new Promise<{ ok: boolean; json: () => Promise<Record<string, unknown>> }>((resolve) => { resolveStaleStatus = resolve; });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions } });
+      if (url.includes('/status')) {
+        statusCalls += 1;
+        if (statusCalls === 2) return staleStatus;
+        return response({ enabled: statusCalls >= 3, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    await screen.findByRole('button', { name: 'Enable Bot' });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh BotTrader analytics' }));
+    await waitFor(() => expect(statusCalls).toBe(2));
+    fireEvent.click(await screen.findByRole('button', { name: 'Enable Bot' }));
+
+    expect(await screen.findByText(/BotTrader: ON/)).toBeTruthy();
+    expect(mutationMocks.updateSettingsFromBrowser).toHaveBeenCalledWith({ values: { 'bot.enabled': true } });
+    resolveStaleStatus(response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 2, todayStakeUsd: 10.5 }) as never);
+    await waitFor(() => expect(screen.getByText(/BotTrader: ON/)).toBeTruthy());
   });
 });

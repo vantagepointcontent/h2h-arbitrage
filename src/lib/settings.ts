@@ -275,12 +275,10 @@ export async function setSettings(values: Record<string, unknown>): Promise<{ ok
   await ensureTable();
   const now = new Date().toISOString();
   const c = getClient();
-  for (const [key, value] of Object.entries(values)) {
-    await c.execute({
+  await c.batch(Object.entries(values).map(([key, value]) => ({
       sql: 'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
       args: [key, String(value), now],
-    });
-  }
+  })), 'write');
   invalidateSettingsCache();
   return { ok: true, errors: [] };
 }
