@@ -93,6 +93,7 @@ function titleCase(value: string): string {
 }
 
 function decisionStatus(decision: ScanDecision): LogStatus {
+  if (decision.state === 'reset_cleared') return 'failed';
   if (decision.state === 'placed') return 'passed';
   if (decision.state === 'received' || decision.state === 'placement_attempted') return 'pending';
   return 'failed';

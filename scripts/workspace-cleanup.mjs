@@ -8,10 +8,44 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseSync } from 'node:sqlite';
 import { execSync } from 'child_process';
+import { DEFAULT_EVIDENCE_ROOT, isInsideManagedEvidence } from '../src/lib/protected-evidence.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+// Immutable roots: deleting any of these is always forbidden, regardless of
+// candidate classification. These match the production repo, live DB and its
+// WAL/SHM, release roots, backups, secrets/config, and in-flight Kanban state.
+const IMMUTABLE_ROOTS = [
+  '/home/scott/h2h-arbitrage',
+  '/home/scott/h2h-arbitrage/.git',
+  '/home/scott/h2h-arbitrage/data',
+  '/home/scott/h2h-arbitrage/.env',
+  '/home/scott/h2h-arbitrage/.env.local',
+  '/home/scott/h2h-arbitrage/.env.production',
+  '/home/scott/h2h-arbitrage/.h2h-releases',
+  '/home/scott/h2h-arbitrage/backups',
+  '/home/scott/h2h-arbitrage/.worktrees',
+  '/home/scott/.hermes',
+  process.env.H2H_EVIDENCE_ROOT || DEFAULT_EVIDENCE_ROOT,
+].map((p) => path.resolve(p));
+
+// Roots under which removal is permitted. Any path not inside one of these
+// is rejected by removePath(), preventing accidental deletion of arbitrary
+// directories. These must be kept in sync with IMMUTABLE_ROOTS.
+const ALLOWED_REMOVAL_ROOTS = [
+  path.join(REPO_ROOT, 'data', 'quarantine'),
+  path.join(REPO_ROOT, '.worktrees'),
+  path.join(REPO_ROOT, '.h2h-releases', 'builds'),
+  path.join(REPO_ROOT, '.h2h-releases', 'candidates'),
+  path.join(REPO_ROOT, '.h2h-releases', 'releases'),
+  path.join(REPO_ROOT, 'backups'),
+  path.join(REPO_ROOT, 'artifacts'),
+  path.join(REPO_ROOT, 'data', 'saved-market-leases'),
+  path.join(REPO_ROOT, 'node_modules', '.cache'),
+  '/tmp',
+];
 
 const DEFAULT_CONFIG = {
   repoRoot: REPO_ROOT,
@@ -25,6 +59,11 @@ const DEFAULT_CONFIG = {
     '/home/scott/h2h-arbitrage/data',
     '/home/scott/h2h-arbitrage/dist',
     '/home/scott/h2h-arbitrage/node_modules',
+    '/home/scott/h2h-arbitrage/.h2h-releases',
+    '/home/scott/h2h-arbitrage/backups',
+    '/home/scott/h2h-arbitrage/.worktrees',
+    '/home/scott/.hermes',
+    process.env.H2H_EVIDENCE_ROOT || DEFAULT_EVIDENCE_ROOT,
   ],
   cachePatterns: [
     { dir: '.next', description: 'Next.js build cache' },
@@ -41,6 +80,10 @@ const DEFAULT_CONFIG = {
   ],
   fullWorktreeRemovalStatuses: ['done', 'cancelled', 'archived'],
   partialPruneStatuses: ['blocked', 'changes_requested'],
+  // Worktree full-removal gates: branch must be merged and pushed to origin,
+  // git status must be clean, and no child task must use this worktree.
+  requireMergedAndPushed: true,
+  requireCleanGitStatus: true,
   usagePctSoft: 75,
   usagePctHard: 80,
   freeGbSoft: 20,
@@ -128,9 +171,20 @@ function openDb(dbPath) {
 }
 
 function loadKanbanState(db) {
-  const tasks = db.prepare('SELECT * FROM tasks').all();
-  const runs = db.prepare('SELECT * FROM task_runs').all();
-  const links = db.prepare('SELECT * FROM task_links').all();
+  let tasks = [];
+  let runs = [];
+  let links = [];
+  try {
+    tasks = db.prepare('SELECT * FROM tasks').all();
+  } catch {
+    // tolerate a non-kanban or empty DB in test/disaster contexts
+  }
+  try {
+    runs = db.prepare('SELECT * FROM task_runs').all();
+  } catch {}
+  try {
+    links = db.prepare('SELECT * FROM task_links').all();
+  } catch {}
   const childrenByParent = new Map();
   const parentsByChild = new Map();
   for (const l of links) {
@@ -303,16 +357,22 @@ function evaluateFullRemovalGates(candidate, task, config, kanban) {
 
   const statusLines = gitStatusShort(candidate.path);
   const dirty = statusLines.length > 0 && statusLines[0] !== 'git-status-error';
-  if (dirty) failures.push('uncommitted-work');
-  else reasons.push('clean-git-status');
+  if (config.requireCleanGitStatus !== false) {
+    if (dirty) failures.push('uncommitted-work');
+    else reasons.push('clean-git-status');
+  }
 
   const branch = task.branch_name || candidate.branch;
   if (branch) {
     const merged = isBranchMerged(config.repoRoot, branch);
     const pushed = isBranchPushed(config.repoRoot, branch);
-    if (merged) reasons.push('branch-merged');
-    if (pushed) reasons.push('branch-pushed');
-    if (!merged && !pushed) failures.push('unmerged-unpushed-branch');
+    if (config.requireMergedAndPushed !== false) {
+      if (merged) reasons.push('branch-merged');
+      if (pushed) reasons.push('branch-pushed');
+      if (!merged && !pushed) failures.push('unmerged-unpushed-branch');
+    } else {
+      reasons.push(`merged=${merged}`, `pushed=${pushed}`);
+    }
   } else {
     failures.push('no-branch');
   }
@@ -473,6 +533,30 @@ function quarantinePath(config, originalPath) {
 function removePath(p, dryRun) {
   if (dryRun) return true;
   try {
+    const resolved = path.resolve(p);
+    // Managed recovery/audit evidence is outside generic scratch. Refuse the
+    // namespace itself, descendants, and symlinks resolving into it before
+    // considering any lifecycle or disk-pressure policy.
+    if (isInsideManagedEvidence(p)) {
+      return false;
+    }
+    // Hard guard: these roots must never be removed, even if a caller passes
+    // an absolute or relative path that resolves to them.
+    for (const guarded of IMMUTABLE_ROOTS) {
+      if (resolved === guarded || resolved.startsWith(guarded + path.sep)) {
+        return false;
+      }
+    }
+    // Additional safety: refuse paths that are not under a known workspace,
+    // worktree, release, backup, artifact, tmp, or cache root. This prevents
+    // accidental deletion of arbitrary file system locations.
+    const underAllowedRoot = ALLOWED_REMOVAL_ROOTS.some((root) => {
+      const normalized = path.resolve(root);
+      return resolved === normalized || resolved.startsWith(normalized + path.sep);
+    });
+    if (!underAllowedRoot) {
+      return false;
+    }
     fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
     return true;
   } catch (e) {
@@ -508,17 +592,16 @@ function executeDecision(candidate, decision, config, logEntries) {
         entry.errors.push('quarantine-failed');
       }
     } else {
-      if (!fs.existsSync(candidate.path)) {
-        entry.reasons.push('already-absent');
-        logEntries.push(entry);
-        return entry;
-      }
-      const ok = removePath(candidate.path, config.dryRun);
-      if (ok) {
-        entry.removed.push(candidate.path);
-        entry.bytesReclaimed = decision.bytes || 0;
+      if (fs.existsSync(candidate.path)) {
+        const ok = removePath(candidate.path, config.dryRun);
+        if (ok) {
+          entry.removed.push(candidate.path);
+          entry.bytesReclaimed = decision.bytes || 0;
+        } else {
+          entry.errors.push('remove-failed');
+        }
       } else {
-        entry.errors.push('remove-failed');
+        entry.reasons.push('already-absent');
       }
     }
   } else if (decision.decision === 'prune-caches') {
@@ -533,6 +616,23 @@ function executeDecision(candidate, decision, config, logEntries) {
         entry.bytesReclaimed += cache.size || 0;
       } else {
         entry.errors.push(`remove-failed:${cache.path}`);
+      }
+    }
+    // If prune-caches is applied to a tmp-dir candidate (no cachePaths),
+    // remove the candidate itself only when it is under an allowed root and
+    // not immutable. This was the previous sweep behaviour, now gated.
+    if ((candidate.type === 'tmp-dir' || candidate.type === 'tmp-file')
+      && (decision.cachePaths || []).length === 0) {
+      if (!fs.existsSync(candidate.path)) {
+        entry.reasons.push('already-absent');
+      } else {
+        const ok = removePath(candidate.path, config.dryRun);
+        if (ok) {
+          entry.removed.push(candidate.path);
+          entry.bytesReclaimed += decision.bytes || 0;
+        } else {
+          entry.errors.push(`remove-failed:${candidate.path}`);
+        }
       }
     }
   }
@@ -623,6 +723,13 @@ function computeMetrics(config, candidates, decisions, logEntries, disk) {
 function main() {
   const config = loadConfig(process.argv);
 
+  // Pre-flight invariant: repo root must exist and not have been moved/removed.
+  if (!fs.existsSync(config.repoRoot) || !fs.existsSync(path.join(config.repoRoot, '.git'))) {
+    const message = `Refusing cleanup: repo root or .git is missing at ${config.repoRoot}`;
+    console.error(JSON.stringify({ ts: new Date().toISOString(), error: message }));
+    process.exit(1);
+  }
+
   if (!fs.existsSync(path.dirname(config.logPath))) {
     fs.mkdirSync(path.dirname(config.logPath), { recursive: true });
   }
@@ -648,6 +755,9 @@ function main() {
       }
     }
   } else {
+    // Default sweep mode: prune caches only. Never remove entire worktrees
+    // outside of explicit lifecycle mode, even if classifyCandidate says
+    // remove-worktree. This is the post-OPS-849 default.
     for (let i = 0; i < candidates.length; i++) {
       const d = decisions[i];
       if (d.decision === 'prune-caches') {

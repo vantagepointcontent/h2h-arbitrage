@@ -501,7 +501,7 @@ export default function LogsPanel() {
     setSearchQuery("");
     setDebouncedSearch("");
     setMinRoi(0);
-    setPositiveArbOnly(true);
+    setPositiveArbOnly(false);
     setFromDate(new Date(now.getTime() - 86_400_000).toISOString());
     setToDate(now.toISOString());
     setEventType("all");

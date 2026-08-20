@@ -419,6 +419,16 @@ describe('LogsPanel', () => {
     })).toBe(true));
   });
 
+  it('renders a non-empty canonical API population instead of the empty Logs state', async () => {
+    vi.stubGlobal('fetch', logsFetch([comparisonLog()]));
+
+    render(createElement(LogsPanel));
+
+    expect(await screen.findByText('Comparison market')).toBeTruthy();
+    expect(screen.queryByText('No log entries. Run a scan to generate data.')).toBeNull();
+    expect(screen.getByRole('row', { name: /Comparison market/ })).toBeTruthy();
+  });
+
   it('keeps Preset inline with the filters and applies a single TTE bound to data and export requests', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -449,11 +459,17 @@ describe('LogsPanel', () => {
     expect(screen.getByRole('button', { name: 'TTE under 90 days' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('link', { name: 'Export Scan CSV' }).getAttribute('href')).toContain('maxTteDays=90');
 
+    fireEvent.click(screen.getByLabelText('Positive arb only'));
+    expect(screen.getByLabelText('Positive arb only')).toHaveProperty('checked', true);
+
     fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
     expect(screen.getByRole('button', { name: 'All TTE' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByLabelText('Positive arb only')).toHaveProperty('checked', false);
     await waitFor(() => {
       const dataCalls = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/logs?'));
-      expect(new URL(String(dataCalls.at(-1)?.[0]), 'http://localhost').searchParams.has('maxTteDays')).toBe(false);
+      const resetParams = new URL(String(dataCalls.at(-1)?.[0]), 'http://localhost').searchParams;
+      expect(resetParams.has('maxTteDays')).toBe(false);
+      expect(resetParams.has('positiveArbOnly')).toBe(false);
     });
   });
 

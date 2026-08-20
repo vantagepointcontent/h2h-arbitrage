@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import registry from '../../data/proposition-relationships.json';
 import {
   appendPropositionRejection,
   buildPropositionRegistryIndex,
@@ -337,6 +341,47 @@ describe('canonical proposition registry', () => {
       evidenceRevision: 'sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203',
       resolutionRuleRevision: 'sha256:40d6f9809707d25b6aad5d28cb4d7b719e8c7f44d0c705c16ab3d2643d7c48f5',
     })).toMatchObject({ code: 'resolution_rule_conflict', sourceScanIds: [815095, 815202, 815301] });
+  });
+
+  it('loads all 14 checked-in exact rejection tuples with complete identities and verified evidence', () => {
+    expect(registry.schemaVersion).toBe(2);
+    expect(registry.relationships).toHaveLength(2);
+    expect(registry.rejections).toHaveLength(14);
+
+    const exactTuples = new Set<string>();
+    for (const rejection of registry.rejections) {
+      const tuple = rejection.executionTuple;
+      for (const identity of [
+        tuple.kalshiTicker,
+        tuple.pmConditionId,
+        tuple.pmTokenId,
+        tuple.kalshiSide,
+        tuple.pmSide,
+      ]) {
+        expect(identity.trim()).not.toBe('');
+      }
+      exactTuples.add([
+        tuple.kalshiTicker,
+        tuple.pmConditionId,
+        tuple.pmTokenId,
+        tuple.kalshiSide,
+        tuple.pmSide,
+      ].join('\u0000'));
+
+      expect(findCanonicalPropositionRelationship(tuple)).toBeNull();
+      expect(findCanonicalPropositionRejection({
+        ...tuple,
+        evidenceRevision: rejection.evidenceRevision,
+        resolutionRuleRevision: rejection.resolutionRuleRevision,
+      })).toEqual(rejection);
+
+      for (const evidence of rejection.evidence) {
+        const evidencePath = path.resolve(process.cwd(), evidence.uri);
+        const digest = createHash('sha256').update(readFileSync(evidencePath)).digest('hex');
+        expect(digest).toBe(evidence.sha256);
+      }
+    }
+    expect(exactTuples.size).toBe(14);
   });
 });
 

@@ -1,0 +1,23 @@
+{
+  "at": "2026-08-20T11:14:51.628Z",
+  "total": 93027,
+  "returned": 500,
+  "nextCursor": "2026-08-20T10:43:06.775Z|816135",
+  "firstId": 816634,
+  "lastId": 816135,
+  "secondPageReturned": 500,
+  "secondPageNextCursor": "2026-08-20T10:11:33.294Z|815636",
+  "duplicateIdsAcrossPages": 0,
+  "summary": {
+    "totalArbs": 55278,
+    "avgRoi": 0.4416775197762,
+    "bestRoi": 25.26460000000001,
+    "totalProfit": 194026.38973868976,
+    "arbTypeCounts": {
+      "direct": 43059,
+      "cross": 1621,
+      "internal": 0
+    }
+  },
+  "dataQualityState": "healthy"
+}

@@ -1,0 +1,12 @@
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -23,6 +23,8 @@
+     "delete:unavailable-paper-positions": "npm run build:delete-unavailable-paper-positions --silent && node dist/delete-unavailable-paper-positions.mjs",
+     "build:backfill-entry-arb-profit": "esbuild scripts/backfill-entry-arb-profit.ts --bundle --platform=node --format=esm --outfile=dist/backfill-entry-arb-profit.mjs --external:@libsql/client --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+     "backfill:entry-arb-profit": "npm run build:backfill-entry-arb-profit --silent && node dist/backfill-entry-arb-profit.mjs",
++    "build:recover-log-financials": "esbuild scripts/recover-log-financials.ts --bundle --platform=node --format=esm --outfile=dist/recover-log-financials.mjs --external:@libsql/client",
++    "recover:log-financials": "npm run build:recover-log-financials --silent && node dist/recover-log-financials.mjs",
+     "start": "next start",
+     "backup:db": "node scripts/safe-sqlite-backup.mjs",
+     "backup:db:dry-run": "node scripts/safe-sqlite-backup.mjs --dry-run",

@@ -30,6 +30,8 @@
     "backup:db:dry-run": "node scripts/safe-sqlite-backup.mjs --dry-run",
     "storage:retention:dry-run": "node scripts/storage-retention.mjs",
     "storage:retention": "node scripts/storage-retention.mjs --live",
+    "evidence:manage": "node scripts/protected-evidence.mjs",
+    "test:protected-evidence": "node --test scripts/protected-evidence.test.mjs",
     "migrate:poll-leases": "node scripts/disk-capacity-check.mjs --operation migration && node scripts/migrate-poll-leases.mjs",
     "build:migrate-bot-position-pm-identities": "esbuild scripts/fix-bot-position-pm-identifiers.ts --bundle --platform=node --format=esm --outfile=dist/fix-bot-position-pm-identifiers.mjs --external:@libsql/client",
     "migrate:bot-position-pm-identities": "node scripts/disk-capacity-check.mjs --operation migration --burst-file data/edgefinder.db && npm run build:migrate-bot-position-pm-identities --silent && node dist/fix-bot-position-pm-identifiers.mjs",

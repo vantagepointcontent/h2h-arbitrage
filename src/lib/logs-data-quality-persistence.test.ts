@@ -62,4 +62,32 @@ describe('Logs data-quality persistence guardrail', () => {
     expect(alerts.rows).toEqual([expect.objectContaining({ scan_id: degraded.id, reason: expect.stringContaining('profit:structural_zero_tolerance') })]);
     db.close();
   });
+
+  it('backfills recent telemetry without changing the canonical scan row count', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-quality-backfill-'));
+    const dbPath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    let persistence = await import('./persistence');
+    for (let index = 0; index < 12; index += 1) {
+      await persistence.saveScanResult(`backfill-${index}`, scan({
+        scannedAt: new Date(Date.parse('2026-08-20T10:00:00.000Z') + index * 60_000).toISOString(),
+      }));
+    }
+
+    const db = createClient({ url: `file:${dbPath}` });
+    const before = Number((await db.execute('SELECT COUNT(*) AS count FROM scan_results')).rows[0].count);
+    await db.execute('DELETE FROM logs_data_quality_batches');
+    expect((await db.execute('SELECT COUNT(*) AS count FROM logs_data_quality_batches')).rows[0].count).toBe(0);
+
+    vi.resetModules();
+    persistence = await import('./persistence');
+    await persistence.queryScanHistory({ limit: 1 });
+
+    const after = Number((await db.execute('SELECT COUNT(*) AS count FROM scan_results')).rows[0].count);
+    const telemetryRows = Number((await db.execute('SELECT COUNT(*) AS count FROM logs_data_quality_batches')).rows[0].count);
+    expect(after).toBe(before);
+    expect(after).toBe(12);
+    expect(telemetryRows).toBe(12);
+    db.close();
+  });
 });

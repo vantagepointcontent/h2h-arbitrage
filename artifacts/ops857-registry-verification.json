@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "approvalCount": 2,
+  "rejectionCount": 14,
+  "uniqueExactTupleCount": 14,
+  "allIdentityFieldsComplete": true,
+  "allEvidenceDigestsVerified": true,
+  "failClosedChecks": {
+    "canonicalRelationshipLookupRejectedAll14": true,
+    "exactRevisionRejectionLookupLoadedAll14": true,
+    "botTraderPlacementAdapterNotCalledForKxarrestThom": true
+  },
+  "ops855ProbeDiscrepancy": {
+    "resolved": true,
+    "cause": "The canonical registry execution-tuple schema names the selected Polymarket leg identity pmTokenId. The OPS-855 ad-hoc probe incorrectly read pmNoTokenId, which is not a registry field, so JavaScript returned undefined and the derived exact-match boolean was false.",
+    "kxarrestThom": {
+      "kalshiTicker": "KXARREST-27JAN-THOM",
+      "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+      "pmTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156",
+      "kalshiSide": "yes",
+      "pmSide": "no",
+      "exactRejectionLoaded": true,
+      "canonicalBindingAllowed": false
+    }
+  },
+  "evidenceDigests": {
+    "artifacts/res849-authoritative-market-evidence.json": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+    "artifacts/res849-initial-20-classification.json": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4"
+  }
+}

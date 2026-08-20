@@ -44,8 +44,20 @@ export async function enforceBackupRetention(options = {}) {
   const root = path.resolve(options.root ?? process.cwd());
   const backupRoot = path.join(root, 'backups');
   const policyPath = options.policyPath ?? path.join(root, 'data', 'backup-retention-policy.json');
-  const policy = JSON.parse(await readFile(policyPath, 'utf8'));
-  const entries = await readdir(backupRoot, { withFileTypes: true });
+  let policy;
+  try {
+    policy = JSON.parse(await readFile(policyPath, 'utf8'));
+  } catch (error) {
+    throw new Error(`Backup retention policy is missing or unreadable at ${policyPath}; refusing all deletes. ${error instanceof Error ? error.message : String(error)}`);
+  }
+  let entries = [];
+  try {
+    entries = await readdir(backupRoot, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+    // No backups directory is not permission to delete anything.
+    return { at: new Date().toISOString(), mode: options.live ? 'live' : 'dry-run', protected: policy.protectedNames, kept: [], events: [], reclaimedBytes: 0, note: 'backups directory does not exist' };
+  }
   const candidates = await Promise.all(entries
     .filter((entry) => /^(?:ops|bug|edgefinder|snapshot)/i.test(entry.name))
     .map(async (entry) => ({

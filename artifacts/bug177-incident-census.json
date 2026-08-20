@@ -1,0 +1,52 @@
+{
+  "at": "2026-08-20T11:04:45.534Z",
+  "canonicalApi": {
+    "total": 92885,
+    "returned": 500,
+    "nextCursor": "2026-08-20T10:31:13.319Z|815993",
+    "summary": {
+      "totalArbs": 55278,
+      "avgRoi": 0.44209533113226634,
+      "bestRoi": 25.26460000000001,
+      "totalProfit": 194026.38973868976,
+      "arbTypeCounts": {
+        "direct": 43040,
+        "cross": 1621,
+        "internal": 0
+      }
+    }
+  },
+  "positiveFilterApi": {
+    "total": 32594,
+    "returned": 500,
+    "nextCursor": "2026-08-14T14:42:04.906Z|756987",
+    "summary": {
+      "totalArbs": 55278,
+      "avgRoi": 0.886769597804055,
+      "bestRoi": 23.86314,
+      "totalProfit": 206152.59789055955,
+      "arbTypeCounts": {
+        "direct": 30973,
+        "cross": 1621,
+        "internal": 0
+      }
+    }
+  },
+  "defaultDateAll": {
+    "total": 17332,
+    "returned": 1,
+    "summary": {
+      "totalArbs": 0,
+      "avgRoi": 0.23366631490883927,
+      "bestRoi": 25.26460000000001,
+      "totalProfit": 0,
+      "arbTypeCounts": {
+        "direct": 2906,
+        "cross": 0,
+        "internal": 0
+      }
+    }
+  },
+  "firstId": 816492,
+  "lastFirstPageId": 815993
+}

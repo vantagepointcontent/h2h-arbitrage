@@ -1,0 +1,80 @@
+{
+  "summary": {
+    "total": 92213,
+    "eligible": 43678,
+    "roi_null": 0,
+    "profit_missing": 12835,
+    "apy_null": 10146,
+    "stake_missing": 11699,
+    "identity_missing": 30497,
+    "eligible_profit": 206152.59789055955
+  },
+  "statuses": [
+    {
+      "scan_status": "completed",
+      "count": 92213
+    }
+  ],
+  "recent": [
+    {
+      "id": 815818,
+      "market_id": "1780616584214-jghi7cb",
+      "scan_status": "completed",
+      "arb_valid": 1,
+      "positive_arb_count": 2,
+      "best_roi_pct": 0.41799999999999243,
+      "best_profit": 0,
+      "apy_pct": 4.0265922031693355,
+      "total_stake": 0,
+      "calculation_envelope": "{\"version\":1,\"scope\":\"opportunity\",\"status\":\"legacy_unverifiable\",\"blocker\":{\"code\":\"legacy_missing_calculation_authority\",\"message\":\"scan result 1780616584214-jghi7cb predates the versioned fee and executable-book calculation envelope\"},\"calculatedAt\":null,\"requestedQuantityMicros\":null,\"executableQuantityMicros\":null,\"legs\":[],\"totals\":{\"grossCostMicros\":null,\"grossPayoutMicros\":null,\"grossProfitMicros\":null,\"totalFeesMicros\":null,\"netPnlMicros\":null},\"rounding\":{\"moneyScale\":1000000,\"priceScale\":1000000,\"quantityScale\":1000000,\"mode\":\"venue_rules_then_sum\"}}"
+    },
+    {
+      "id": 815804,
+      "market_id": "bc83468a-a56e-48a6-a37e-8bbfbbe15348",
+      "scan_status": "completed",
+      "arb_valid": 1,
+      "positive_arb_count": 11,
+      "best_roi_pct": 12.26060000000001,
+      "best_profit": 0,
+      "apy_pct": 30.501597125859448,
+      "total_stake": 0,
+      "calculation_envelope": "{\"version\":1,\"scope\":\"opportunity\",\"status\":\"legacy_unverifiable\",\"blocker\":{\"code\":\"legacy_missing_calculation_authority\",\"message\":\"scan result bc83468a-a56e-48a6-a37e-8bbfbbe15348 predates the versioned fee and executable-book calculation envelope\"},\"calculatedAt\":null,\"requestedQuantityMicros\":null,\"executableQuantityMicros\":null,\"legs\":[],\"totals\":{\"grossCostMicros\":null,\"grossPayoutMicros\":null,\"grossProfitMicros\":null,\"totalFeesMicros\":null,\"netPnlMicros\":null},\"rounding\":{\"moneyScale\":1000000,\"priceScale\":1000000,\"quantityScale\":1000000,\"mode\":\"venue_rules_then_sum\"}}"
+    },
+    {
+      "id": 815803,
+      "market_id": "1782999196726-house-in05",
+      "scan_status": "completed",
+      "arb_valid": 1,
+      "positive_arb_count": 1,
+      "best_roi_pct": 0.40960000000001046,
+      "best_profit": 0,
+      "apy_pct": 2.0209872441667307,
+      "total_stake": 0,
+      "calculation_envelope": "{\"version\":1,\"scope\":\"opportunity\",\"status\":\"legacy_unverifiable\",\"blocker\":{\"code\":\"legacy_missing_calculation_authority\",\"message\":\"scan result 1782999196726-house-in05 predates the versioned fee and executable-book calculation envelope\"},\"calculatedAt\":null,\"requestedQuantityMicros\":null,\"executableQuantityMicros\":null,\"legs\":[],\"totals\":{\"grossCostMicros\":null,\"grossPayoutMicros\":null,\"grossProfitMicros\":null,\"totalFeesMicros\":null,\"netPnlMicros\":null},\"rounding\":{\"moneyScale\":1000000,\"priceScale\":1000000,\"quantityScale\":1000000,\"mode\":\"venue_rules_then_sum\"}}"
+    },
+    {
+      "id": 815800,
+      "market_id": "1782999196726-house-il12",
+      "scan_status": "completed",
+      "arb_valid": 1,
+      "positive_arb_count": 1,
+      "best_roi_pct": 0.49500000000000977,
+      "best_profit": 0,
+      "apy_pct": 2.44641910465823,
+      "total_stake": 0,
+      "calculation_envelope": "{\"version\":1,\"scope\":\"opportunity\",\"status\":\"legacy_unverifiable\",\"blocker\":{\"code\":\"legacy_missing_calculation_authority\",\"message\":\"scan result 1782999196726-house-il12 predates the versioned fee and executable-book calculation envelope\"},\"calculatedAt\":null,\"requestedQuantityMicros\":null,\"executableQuantityMicros\":null,\"legs\":[],\"totals\":{\"grossCostMicros\":null,\"grossPayoutMicros\":null,\"grossProfitMicros\":null,\"totalFeesMicros\":null,\"netPnlMicros\":null},\"rounding\":{\"moneyScale\":1000000,\"priceScale\":1000000,\"quantityScale\":1000000,\"mode\":\"venue_rules_then_sum\"}}"
+    },
+    {
+      "id": 815795,
+      "market_id": "1782999196726-house-co06",
+      "scan_status": "completed",
+      "arb_valid": 1,
+      "positive_arb_count": 2,
+      "best_roi_pct": 0.3099999999999986,
+      "best_profit": 0,
+      "apy_pct": 1.5265899519954835,
+      "total_stake": 0,
+      "calculation_envelope": "{\"version\":1,\"scope\":\"opportunity\",\"status\":\"legacy_unverifiable\",\"blocker\":{\"code\":\"legacy_missing_calculation_authority\",\"message\":\"scan result 1782999196726-house-co06 predates the versioned fee and executable-book calculation envelope\"},\"calculatedAt\":null,\"requestedQuantityMicros\":null,\"executableQuantityMicros\":null,\"legs\":[],\"totals\":{\"grossCostMicros\":null,\"grossPayoutMicros\":null,\"grossProfitMicros\":null,\"totalFeesMicros\":null,\"netPnlMicros\":null},\"rounding\":{\"moneyScale\":1000000,\"priceScale\":1000000,\"quantityScale\":1000000,\"mode\":\"venue_rules_then_sum\"}}"
+    }
+  ]
+}

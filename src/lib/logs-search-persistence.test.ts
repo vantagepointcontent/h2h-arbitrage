@@ -12,6 +12,39 @@ afterEach(() => {
 });
 
 describe('Logs FTS persistence', () => {
+  it('reconciles summary totals with every canonical row in the same filtered result set', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-summary-reconciliation-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    for (const [marketId, positiveArbCount, bestProfit] of [
+      ['summary-a', 1, 125],
+      ['summary-b', 3, 275],
+      ['summary-c', 2, 600],
+    ] as const) {
+      await persistence.saveScanResult(marketId, {
+        bestRoiPct: bestProfit / 100,
+        bestProfit,
+        strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct',
+        outcomeCount: positiveArbCount,
+        matchedCount: positiveArbCount,
+        kalshiCount: positiveArbCount,
+        pmCount: positiveArbCount,
+        positiveArbCount,
+        totalStake: 10_000,
+        scannedAt: '2026-08-20T10:00:00.000Z',
+      });
+    }
+
+    const history = await persistence.queryScanHistory({ positiveArbOnly: true, limit: 500 });
+    expect(history.rows).toHaveLength(history.total);
+    expect(history.summary.totalProfit).toBe(history.rows.reduce((sum, row) => sum + Number(row.best_profit), 0));
+    expect(history.summary.totalArbs).toBe(history.rows.reduce((sum, row) => sum + Number(row.positive_arb_count), 0));
+    expect(history.summary.totalProfit).toBe(1_000);
+    expect(history.summary.totalArbs).toBe(6);
+  });
+
   it('filters canonical scan-time TTE cumulatively before rows, metrics, counts, and exports', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-tte-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');

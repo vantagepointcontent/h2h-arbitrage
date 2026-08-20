@@ -1,0 +1,121 @@
+{
+  "verifiedAt": "2026-08-20T11:02:46.441Z",
+  "deployment": {
+    "commit": "8c25fbb677622f720b8bf15548900c39c5c0454c",
+    "buildId": "_BjfS4zvMW5oRYEqVYLqi"
+  },
+  "population": {
+    "rows": 32594,
+    "roi_available": 32594,
+    "profit_source_eligible": 30843,
+    "profit_available": 30843,
+    "apy_eligible": 30898,
+    "apy_available": 30898,
+    "state_available": 32594,
+    "total_profit": 206152.59789055955
+  },
+  "availabilityPct": {
+    "roi": 100,
+    "profitEligible": 100,
+    "apyEligible": 100,
+    "state": 100,
+    "currentRoiPersistedState": 100
+  },
+  "currentRoi": {
+    "denominator": 681,
+    "persisted_state_available": 681,
+    "numeric_roi": 2,
+    "confirmed_no_arb": 679
+  },
+  "summary": {
+    "total_profit": 206152.59789055955,
+    "total_arbs": 55278
+  },
+  "summaryProfitReconciles": true,
+  "logsDataQuality": {
+    "latest": {
+      "batchId": "scan:816492",
+      "state": "healthy",
+      "fields": {
+        "roi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "apy": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      },
+      "breaches": [],
+      "reconciliation": {
+        "requested": false,
+        "maxAttempts": 2
+      },
+      "recoveryVerified": false
+    },
+    "rolling": {
+      "batches": 100,
+      "degradedBatches": 0,
+      "fields": {
+        "roi": {
+          "denominator": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "apy": {
+          "denominator": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      }
+    }
+  },
+  "integrity": "ok"
+}

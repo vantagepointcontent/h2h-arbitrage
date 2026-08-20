@@ -1,0 +1,369 @@
+{
+  "verifiedAt": "2026-08-20T10:59:22.585Z",
+  "deployment": {
+    "commit": "8c25fbb677622f720b8bf15548900c39c5c0454c",
+    "buildId": "_BjfS4zvMW5oRYEqVYLqi"
+  },
+  "rowsChecked": 500,
+  "availability": {
+    "roi": {
+      "numerator": 500,
+      "denominator": 500,
+      "pct": 100
+    },
+    "profit": {
+      "numerator": 440,
+      "denominator": 500,
+      "pct": 88
+    },
+    "apy": {
+      "numerator": 0,
+      "denominator": 0,
+      "pct": 100
+    },
+    "state": {
+      "numerator": 500,
+      "denominator": 500,
+      "pct": 100
+    },
+    "currentRoi": {
+      "numerator": 0,
+      "denominator": 42,
+      "pct": 0
+    }
+  },
+  "summary": {
+    "totalArbs": 55278,
+    "avgRoi": 0.886769597804055,
+    "bestRoi": 23.86314,
+    "totalProfit": 206152.59789055955,
+    "arbTypeCounts": {
+      "direct": 30973,
+      "cross": 1621,
+      "internal": 0
+    }
+  },
+  "dataQuality": {
+    "latest": {
+      "batchId": "scan:816392",
+      "state": "healthy",
+      "fields": {
+        "roi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "apy": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      },
+      "breaches": [],
+      "reconciliation": {
+        "requested": false,
+        "maxAttempts": 2
+      },
+      "recoveryVerified": false
+    },
+    "rolling": {
+      "batches": 100,
+      "degradedBatches": 48,
+      "fields": {
+        "roi": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 48,
+          "unavailable": 48,
+          "unavailablePct": 100,
+          "reasons": {
+            "historical_profit_not_persisted": 18,
+            "persistence_field_missing": 30
+          }
+        },
+        "apy": {
+          "denominator": 45,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      }
+    }
+  },
+  "healthDataQuality": {
+    "latest": {
+      "batchId": "scan:816392",
+      "state": "healthy",
+      "fields": {
+        "roi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "apy": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 0,
+          "available": 0,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      },
+      "breaches": [],
+      "reconciliation": {
+        "requested": false,
+        "maxAttempts": 2
+      },
+      "recoveryVerified": false
+    },
+    "rolling": {
+      "batches": 100,
+      "degradedBatches": 48,
+      "fields": {
+        "roi": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "profit": {
+          "denominator": 48,
+          "unavailable": 48,
+          "unavailablePct": 100,
+          "reasons": {
+            "historical_profit_not_persisted": 18,
+            "persistence_field_missing": 30
+          }
+        },
+        "apy": {
+          "denominator": 45,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 48,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        }
+      }
+    }
+  },
+  "newest": [
+    {
+      "id": 760301,
+      "scannedAt": "2026-08-14T17:46:28.069Z",
+      "positiveArbCount": 2,
+      "roi": {
+        "status": "available",
+        "value": 2.3882000000000057,
+        "source": "scan_result_scalar",
+        "sourceRevision": "scan_results:760301"
+      },
+      "profit": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760301",
+        "reasonCode": "historical_profit_not_persisted",
+        "reason": "No authoritative scan-time profit value was persisted for this result."
+      },
+      "apy": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760301",
+        "reasonCode": "historical_apy_not_persisted",
+        "reason": "No authoritative scan-time APY value was persisted for this result."
+      },
+      "state": "completed",
+      "botTraderEvaluationStatus": "failed"
+    },
+    {
+      "id": 760294,
+      "scannedAt": "2026-08-14T17:46:18.746Z",
+      "positiveArbCount": 2,
+      "roi": {
+        "status": "available",
+        "value": 2.592399999999997,
+        "source": "scan_result_scalar",
+        "sourceRevision": "scan_results:760294"
+      },
+      "profit": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760294",
+        "reasonCode": "historical_profit_not_persisted",
+        "reason": "No authoritative scan-time profit value was persisted for this result."
+      },
+      "apy": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760294",
+        "reasonCode": "historical_apy_not_persisted",
+        "reason": "No authoritative scan-time APY value was persisted for this result."
+      },
+      "state": "completed",
+      "botTraderEvaluationStatus": "failed"
+    },
+    {
+      "id": 760287,
+      "scannedAt": "2026-08-14T17:46:09.919Z",
+      "positiveArbCount": 2,
+      "roi": {
+        "status": "available",
+        "value": 1.3944000000000056,
+        "source": "scan_result_scalar",
+        "sourceRevision": "scan_results:760287"
+      },
+      "profit": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760287",
+        "reasonCode": "historical_profit_not_persisted",
+        "reason": "No authoritative scan-time profit value was persisted for this result."
+      },
+      "apy": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760287",
+        "reasonCode": "historical_apy_not_persisted",
+        "reason": "No authoritative scan-time APY value was persisted for this result."
+      },
+      "state": "completed",
+      "botTraderEvaluationStatus": "failed"
+    },
+    {
+      "id": 760284,
+      "scannedAt": "2026-08-14T17:46:04.602Z",
+      "positiveArbCount": 2,
+      "roi": {
+        "status": "available",
+        "value": 7.926540000000011,
+        "source": "scan_result_scalar",
+        "sourceRevision": "scan_results:760284"
+      },
+      "profit": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760284",
+        "reasonCode": "historical_profit_not_persisted",
+        "reason": "No authoritative scan-time profit value was persisted for this result."
+      },
+      "apy": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760284",
+        "reasonCode": "historical_apy_not_persisted",
+        "reason": "No authoritative scan-time APY value was persisted for this result."
+      },
+      "state": "completed",
+      "botTraderEvaluationStatus": "failed"
+    },
+    {
+      "id": 760272,
+      "scannedAt": "2026-08-14T17:45:33.902Z",
+      "positiveArbCount": 1,
+      "roi": {
+        "status": "available",
+        "value": 0.9643999999999999,
+        "source": "scan_result_scalar",
+        "sourceRevision": "scan_results:760272"
+      },
+      "profit": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760272",
+        "reasonCode": "historical_profit_not_persisted",
+        "reason": "No authoritative scan-time profit value was persisted for this result."
+      },
+      "apy": {
+        "status": "unavailable",
+        "value": null,
+        "source": "unavailable",
+        "sourceRevision": "scan_results:760272",
+        "reasonCode": "historical_apy_not_persisted",
+        "reason": "No authoritative scan-time APY value was persisted for this result."
+      },
+      "state": "completed",
+      "botTraderEvaluationStatus": "failed"
+    }
+  ]
+}

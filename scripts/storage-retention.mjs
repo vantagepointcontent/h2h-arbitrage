@@ -10,7 +10,7 @@ export async function runStorageRetention(options = {}) {
   const root = path.resolve(options.root ?? process.cwd());
   const live = options.live === true;
   const commands = [
-    ['node', ['scripts/workspace-cleanup.mjs', live ? '--live' : '--dry-run', '--include-node-modules', '--log', 'artifacts/storage-retention.jsonl', '--metrics', 'data/workspace-cleanup-metrics.jsonl']],
+    ['node', ['scripts/workspace-cleanup.mjs', live ? '--live' : '--dry-run', '--mode', 'sweep', '--log', 'artifacts/storage-retention.jsonl', '--metrics', 'data/workspace-cleanup-metrics.jsonl']],
     ['node', ['scripts/backup-retention.mjs', ...(live ? ['--live'] : [])]],
     ['node', ['scripts/artifact-retention.mjs', ...(live ? ['--live'] : [])]],
     ...(live ? [['node', ['scripts/release-manager.mjs', 'cleanup', '--keep', '2']]] : []),

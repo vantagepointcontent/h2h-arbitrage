@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createClient } from '@libsql/client';
 import { getSetting } from '@/lib/settings';
 import { getExecutions, getTodayBotExposure } from '@/lib/persistence';
 import logger from '@/lib/logger';
-import { getBotScanDecisions, getBotScanHealth } from '@/lib/bot-scan-consumer';
+import { getBotScanDecisions, getBotScanHealth, type BotScanDecisionState } from '@/lib/bot-scan-consumer';
 import { getCredentialStatus } from '@/lib/execution-creds';
 import { getBotExecutionReadiness, type BotSettings } from '@/lib/bot-trader';
 
@@ -24,6 +25,23 @@ const DEFAULT_BOT_SETTINGS = {
 async function readConsumerHeartbeat(): Promise<Record<string, unknown> | null> {
   try {
     return JSON.parse(await readFile(path.join(process.cwd(), 'data', 'ragnar-consumer-health.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+interface ResetBaseline { resetAt: string; }
+
+async function getResetBaseline(): Promise<ResetBaseline | null> {
+  try {
+    const db = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
+    try {
+      const r = await db.execute('SELECT reset_at FROM bot_trader_reset_baseline ORDER BY id DESC LIMIT 1');
+      const row = (r.rows as unknown as Array<Record<string, unknown>>)[0];
+      return row ? { resetAt: String(row.reset_at) } : null;
+    } finally {
+      db.close();
+    }
   } catch {
     return null;
   }
@@ -112,6 +130,16 @@ export async function GET() {
       ? (paperBlockedReasons.length > 0 ? 'Blocked' : 'ON')
       : 'OFF';
 
+    // OPS-854: scan decision counts shown in BotTrader status should only
+    // reflect decisions made after the reset baseline. Pre-reset tombstoned
+    // decisions are excluded from visible counts.
+    const baseline = await getResetBaseline();
+    const postResetDecisions = recentDecisions.filter((d) => {
+      if (d.state === ('reset_cleared' as BotScanDecisionState)) return false;
+      if (!baseline) return true;
+      return d.updatedAt >= baseline.resetAt;
+    });
+
     const status = {
       enabled,
       botStatus,
@@ -133,10 +161,10 @@ export async function GET() {
         ? Number((lastTrade.result as { actualProfit?: unknown }).actualProfit ?? null)
         : null,
       scanDecisions: {
-        count: recentDecisions.length,
-        latest: recentDecisions[0] ?? null,
-        byState: Object.fromEntries([...new Set(recentDecisions.map((decision) => decision.state))]
-          .map((state) => [state, recentDecisions.filter((decision) => decision.state === state).length])),
+        count: postResetDecisions.length,
+        latest: postResetDecisions[0] ?? null,
+        byState: Object.fromEntries([...new Set(postResetDecisions.map((decision) => decision.state))]
+          .map((state) => [state, postResetDecisions.filter((decision) => decision.state === state).length])),
       },
       workflow: {
         health: degradedReasons.length === 0 ? 'healthy' : 'degraded',

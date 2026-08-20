@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotActionLogs, pruneBotActionLogs, type BotActionLogRow, type BotActionStatus } from '@/lib/bot-action-log';
 import { clientSafeError } from '@/lib/error-handler';
-import { getBotScanDecisions } from '@/lib/bot-scan-consumer';
+import { getBotScanDecisions, type BotScanDecisionState } from '@/lib/bot-scan-consumer';
 
 const VALID_STATUS = new Set<BotActionStatus>(['passed', 'failed', 'pending']);
 
@@ -72,8 +72,37 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       cursor,
       qualified: qualifiedParam == null ? undefined : qualifiedParam === 'true',
     }), getBotScanDecisions(200)]);
-    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), decisions, nextCursor: result.nextCursor });
+    // OPS-854: filter out pre-reset tombstoned decisions and any decisions
+    // whose latest update is before the reset baseline, so the visible
+    // BotTrader history starts cleanly after reset. Idempotency keys and
+    // cursor state remain intact in the DB.
+    const baseline = await getResetBaseline();
+    const visibleDecisions = decisions.filter((d) => {
+      if (d.state === ('reset_cleared' as BotScanDecisionState)) return false;
+      if (!baseline) return true;
+      return d.updatedAt >= baseline.resetAt;
+    });
+    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), decisions: visibleDecisions, nextCursor: result.nextCursor });
   } catch (error) {
     return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
+  }
+}
+
+interface ResetBaseline { resetAt: string; }
+
+async function getResetBaseline(): Promise<ResetBaseline | null> {
+  try {
+    const { createClient } = await import('@libsql/client');
+    const path = await import('path');
+    const db = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
+    try {
+      const r = await db.execute('SELECT reset_at FROM bot_trader_reset_baseline ORDER BY id DESC LIMIT 1');
+      const row = (r.rows as unknown as Array<Record<string, unknown>>)[0];
+      return row ? { resetAt: String(row.reset_at) } : null;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
   }
 }

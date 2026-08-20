@@ -1,0 +1,1 @@
+{"sqlitePath":"/home/scott/h2h-arbitrage/data/edgefinder.db","revision":2,"apply":true,"counts":{"inspected":43678,"recovered":43678,"fullyRecoverable":29655,"partiallyRecoverable":14023,"unrecoverable":0,"conflicted":0,"applied":43678,"alreadyCurrent":0}}

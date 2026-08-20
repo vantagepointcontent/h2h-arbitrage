@@ -70,6 +70,36 @@ describe('evaluateLogsDataQuality', () => {
     expect(recovered.recoveryVerified).toBe(true);
   });
 
+  it('enforces the 95% availability floor at the exact contract boundary', () => {
+    const rows = Array.from({ length: 20 }, (_, id) => row({
+      id,
+      roiPct: id === 0 ? null : 2.5,
+      reasons: id === 0 ? { roi: 'source_input_unavailable' } : {},
+    }));
+    const atFloor = evaluateLogsDataQuality({ batchId: 'availability-95', rows, previousBatch: null });
+
+    expect(atFloor.fields.roi).toMatchObject({ denominator: 20, available: 19, unavailable: 1, unavailablePct: 5 });
+    expect(atFloor.state).toBe('healthy');
+    expect(atFloor.breaches).toEqual([]);
+
+    const belowFloorRows = rows.map((candidate, id) => id === 1
+      ? { ...candidate, roiPct: null, reasons: { roi: 'source_input_unavailable' } }
+      : candidate);
+    const firstBelowFloor = evaluateLogsDataQuality({
+      batchId: 'availability-90-first', rows: belowFloorRows, previousBatch: atFloor,
+    });
+    expect(firstBelowFloor.fields.roi.unavailablePct).toBe(10);
+    expect(firstBelowFloor.state).toBe('warning');
+
+    const secondBelowFloor = evaluateLogsDataQuality({
+      batchId: 'availability-90-second', rows: belowFloorRows, previousBatch: firstBelowFloor,
+    });
+    expect(secondBelowFloor.state).toBe('degraded');
+    expect(secondBelowFloor.breaches).toContainEqual(expect.objectContaining({
+      field: 'roi', trigger: 'two_consecutive_batches_over_5pct', unavailablePct: 10,
+    }));
+  });
+
   it('excludes APY without recoverable event-time TTE and current ROI without exact identity from denominators', () => {
     const quality = evaluateLogsDataQuality({ batchId: 'b-6', rows: [row({
       apyPct: null,

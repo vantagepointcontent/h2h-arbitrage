@@ -15,9 +15,9 @@ import { walkExecutableBook } from './executable-book';
 import { orderbookState } from './orderbook-state';
 import type { PropositionRelationship } from './proposition-identity';
 
-vi.mock('./proposition-registry', () => ({
+vi.mock('./proposition-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./proposition-registry')>()),
   resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
-  findCanonicalPropositionRelationship: () => null,
 }));
 
 const TEST_PM_CONDITION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -844,6 +844,27 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(result.executed).toBe(false);
     expect(result.reason).toMatch(/fee authority/i);
     expect(persistence.persistExecution).not.toHaveBeenCalled();
+  });
+
+  it('does not call the placement adapter for an exact tuple in the checked-in rejection ledger', async () => {
+    const executeArb = vi.fn();
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb,
+    }));
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const input = makeInput({
+      kalshiTicker: 'KXARREST-27JAN-THOM',
+      pmConditionId: '0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6',
+      pmNoTokenId: '27705432816847291323925622847687396001932163087018486036209592664496834211156',
+      propositionRelationship: null,
+    });
+
+    const result = await maybeExecuteBotTrade(input);
+
+    expect(result).toMatchObject({ executed: false });
+    expect(result.reason).toMatch(/server-owned canonical proposition registry/i);
+    expect(executeArb).not.toHaveBeenCalled();
   });
 
   it('preserves a registry-resolved canonical relationship through the execution alert path', async () => {
