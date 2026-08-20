@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
 
 const mocks = vi.hoisted(() => ({
   upstream: vi.fn(),
@@ -245,7 +246,9 @@ describe('POST /api/scan saved-market lifecycle', () => {
           arbType: 'direct',
           kalshiStake: 60,
           pmStake: 40,
+          executionStatus: 'executable',
           fees: { kalshiFee: 0.5, pmFee: 0.5 },
+          calculationEnvelope: executableEnvelopeFixture,
         },
       },
       {
@@ -259,6 +262,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
           arbType: 'direct',
           kalshiStake: 55,
           pmStake: 45,
+          executionStatus: 'executable',
           fees: { kalshiFee: 0.5, pmFee: 0.5 },
         },
       },
@@ -271,6 +275,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
       'tx-07',
       expect.objectContaining({
         totalStake: 200,
+        calculationEnvelope: executableEnvelopeFixture,
         raw: expect.objectContaining({ scanCapital: 1000 }),
       }),
       'scan_api',
@@ -282,6 +287,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
         pmMarketQuestion?: string | null;
         kalshiOutcomeLabel?: string | null;
         pmOutcomeLabel?: string | null;
+        calculationEnvelope?: unknown;
       }> };
     }, string]>;
     const persisted = calls.at(-1)?.[1];
@@ -291,6 +297,35 @@ describe('POST /api/scan saved-market lifecycle', () => {
       pmMarketQuestion: 'Will Candidate A win on Polymarket?',
       kalshiOutcomeLabel: 'Kalshi Candidate A',
       pmOutcomeLabel: 'Polymarket Candidate A',
+      calculationEnvelope: executableEnvelopeFixture,
     });
+  });
+
+  it('does not persist an indicative non-executable quote as a completed positive arb', async () => {
+    mocks.upstream.mockResolvedValue([]);
+    mocks.calculateAllArbitrages.mockReturnValue([{
+      artist: 'Indicative only',
+      kalshi: { ticker: 'KXTX07-I', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 0, noAskDepth: 0 },
+      polymarket: { conditionId: 'pm-i', yesPrice: 0.42, noPrice: 0.58, askDepth: 0, noAskDepth: 0 },
+      arbitrage: {
+        roiPct: 12.5,
+        expectedProfit: 0,
+        strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct',
+        kalshiStake: 0,
+        pmStake: 0,
+        executionStatus: 'non_executable',
+        executionBlocker: 'Captured direct legs cannot fill one share',
+      },
+    }]);
+
+    const response = await executeFullScan(request());
+    expect(response.status).toBe(200);
+    expect(mocks.persistAndConsumeBotScan).toHaveBeenLastCalledWith(
+      'tx-07',
+      expect.objectContaining({ positiveArbCount: 0, bestProfit: 0, totalStake: 0 }),
+      'scan_api',
+    );
+    expect(mocks.appendScanHistory).toHaveBeenLastCalledWith(expect.objectContaining({ positiveArbCount: 0, totalProfit: 0 }));
   });
 });

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryScanHistory, getSavedMarkets } from '@/lib/persistence';
+import { queryScanHistory, getSavedMarkets, getLogsDataQualityHealth } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseLogLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
 import { parseCalculationEnvelope } from '@/lib/calculation-envelope';
+import { resolveHistoricalScanFinancials } from '@/lib/historical-scan-financials';
+import { getBotScanEvaluationSummaries } from '@/lib/bot-scan-consumer';
 
 /**
  * GET /api/logs
@@ -52,6 +54,7 @@ export async function GET(request: NextRequest) {
 
     const last = results[results.length - 1];
     const nextCursor = results.length === limit ? `${last.scanned_at}|${last.id}` : undefined;
+    const botEvaluations = await getBotScanEvaluationSummaries(results.map((row) => Number(row.id)));
 
     // UI-015: resolve human-readable market names. Prefer the name stored at
     // scan time (market_title), fall back to a live join with saved markets.
@@ -65,16 +68,22 @@ export async function GET(request: NextRequest) {
     const enriched = results.map((r) => {
       const listRow = { ...r };
       delete listRow.raw_result;
+      const botTraderEvaluation = botEvaluations.get(Number(r.id)) ?? null;
       return {
         ...listRow,
         calculation_envelope: parseCalculationEnvelope(r.calculation_envelope, `scan result ${r.id}`),
+        historical_financials: resolveHistoricalScanFinancials(r),
         market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,
         category: categoryMap.get(r.market_id) ?? null,
+        botTraderEvaluationCompleted: botTraderEvaluation?.botTraderEvaluationCompleted ?? false,
+        botTraderEvaluationStatus: botTraderEvaluation?.status ?? 'pending',
+        botTraderEvaluation,
       };
     });
 
+    const dataQuality = await getLogsDataQualityHealth();
     return NextResponse.json(
-      { logs: enriched, count: enriched.length, total, uniqueMarkets, maxRoiWithoutMin, summary, nextCursor },
+      { logs: enriched, count: enriched.length, total, uniqueMarkets, maxRoiWithoutMin, summary, dataQuality, nextCursor },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',

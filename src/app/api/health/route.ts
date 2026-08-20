@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSavedMarkets, recoverInterruptedScanPublications } from '@/lib/persistence';
+import { getSavedMarkets, recoverInterruptedScanPublications, getLogsDataQualityHealth } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { getScanWorkerMetrics } from '@/lib/scan-worker-coordinator';
 import { getSqliteContentionMetrics } from '@/lib/sqlite-write-retry';
@@ -42,10 +42,11 @@ export async function GET() {
   try {
     recovery ??= recoverInterruptedScanPublications();
     await recovery;
-    const [markets, pollerSnapshot, fullScanHealth] = await Promise.all([
+    const [markets, pollerSnapshot, fullScanHealth, logsDataQuality] = await Promise.all([
       getSavedMarkets(),
       readPollerHealth(),
       readFullScanHealth(),
+      getLogsDataQualityHealth(),
     ]);
     const pollerStatus = classifyPollerHealth(pollerSnapshot);
     return NextResponse.json({
@@ -59,6 +60,7 @@ export async function GET() {
       quickPrices: getQuickPricesMetrics(),
       sqliteContention: getSqliteContentionMetrics(),
       fullScanHealth,
+      logsDataQuality,
       savedMarketScheduler: {
         ...pollerStatus,
         status: pollerSnapshot?.status ?? null,

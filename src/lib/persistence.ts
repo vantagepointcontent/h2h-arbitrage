@@ -16,6 +16,8 @@ import {
   validateCalculationEnvelope,
   type CalculationEnvelope,
 } from './calculation-envelope';
+import { evaluateLogsDataQuality, LOGS_REQUIRED_FIELDS, type LogsDataQualitySnapshot } from './logs-data-quality';
+import { resolveHistoricalScanFinancials } from './historical-scan-financials';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -23,6 +25,7 @@ const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
 
 const SQLITE_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
 let _client: ReturnType<typeof createClient> | null = null;
+let _logsDataQualitySchemaReady = false;
 
 function getClient() {
   if (!_client) {
@@ -41,6 +44,74 @@ async function configureClient(c: ReturnType<typeof createClient>): Promise<void
   await c.execute('PRAGMA wal_autocheckpoint = 1000');
   await c.execute('PRAGMA cache_size = -16000');
   await c.execute('PRAGMA mmap_size = 268435456');
+}
+
+async function ensureLogsDataQualitySchema(c: ReturnType<typeof createClient>): Promise<void> {
+  if (_logsDataQualitySchemaReady) return;
+  await c.execute(`CREATE TABLE IF NOT EXISTS logs_data_quality_batches (
+    scan_id INTEGER PRIMARY KEY,
+    observed_at TEXT NOT NULL,
+    state TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    reconciliation_attempts INTEGER NOT NULL DEFAULT 0
+  )`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_logs_data_quality_observed ON logs_data_quality_batches(observed_at DESC, scan_id DESC)`);
+  await c.execute(`CREATE TABLE IF NOT EXISTS logs_data_quality_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL
+  )`);
+  _logsDataQualitySchemaReady = true;
+}
+
+async function backfillRecentLogsDataQuality(c: ReturnType<typeof createClient>): Promise<void> {
+  const recent = await c.execute(`SELECT id, strategy, positive_arb_count, best_roi_pct, best_profit,
+    apy_pct, total_stake, raw_result, calculation_envelope, days_to_expiry, scan_status,
+    arb_valid, kalshi_url, polymarket_url, scanned_at
+    FROM scan_results WHERE scan_status = 'completed' AND arb_valid = 1 AND positive_arb_count > 0
+      AND id NOT IN (SELECT scan_id FROM logs_data_quality_batches)
+    ORDER BY scanned_at DESC, id DESC LIMIT 100`);
+  let previousBatch: LogsDataQualitySnapshot | null = null;
+  const existing = await c.execute('SELECT snapshot_json FROM logs_data_quality_batches ORDER BY observed_at DESC, scan_id DESC LIMIT 1');
+  try {
+    previousBatch = typeof existing.rows[0]?.snapshot_json === 'string'
+      ? JSON.parse(existing.rows[0].snapshot_json) as LogsDataQualitySnapshot
+      : null;
+  } catch { /* malformed historical telemetry does not satisfy continuity */ }
+  for (const row of [...recent.rows].reverse()) {
+    const historical = resolveHistoricalScanFinancials(row as Record<string, unknown>);
+    const value = (field: 'roiPct' | 'profitUsd' | 'apyPct') => {
+      const resolved = historical.fields[field];
+      return resolved.status === 'available' ? resolved.value : null;
+    };
+    const exactIdentity = typeof row.kalshi_url === 'string' && row.kalshi_url.length > 0
+      && typeof row.polymarket_url === 'string' && row.polymarket_url.length > 0;
+    const apyEligible = typeof row.days_to_expiry === 'number' && Number.isFinite(row.days_to_expiry) && row.days_to_expiry > 0;
+    const reasons = Object.fromEntries((['roi', 'profit', 'apy'] as const).flatMap((name) => {
+      const fieldName = name === 'roi' ? 'roiPct' : name === 'profit' ? 'profitUsd' : 'apyPct';
+      const field = historical.fields[fieldName];
+      return field.status === 'unavailable' ? [[name, field.reasonCode]] : [];
+    }));
+    const snapshot = evaluateLogsDataQuality({
+      batchId: `scan:${Number(row.id)}`,
+      previousBatch,
+      rows: [{
+        id: Number(row.id), scanStatus: 'completed', positiveArbCount: Number(row.positive_arb_count),
+        arbValid: row.arb_valid === 1, roiPct: value('roiPct'), profitUsd: value('profitUsd'),
+        apyPct: value('apyPct'), apyEligible, state: 'completed', exactMarketIdentity: exactIdentity,
+        currentRoiPct: exactIdentity ? value('roiPct') : null,
+        reasons: { ...reasons, currentRoi: exactIdentity ? undefined : 'missing_exact_link_identity' },
+      }],
+    });
+    await c.execute({
+      sql: `INSERT OR IGNORE INTO logs_data_quality_batches
+        (scan_id, observed_at, state, snapshot_json, reconciliation_attempts) VALUES (?, ?, ?, ?, ?)`,
+      args: [Number(row.id), String(row.scanned_at), snapshot.state, JSON.stringify(snapshot), snapshot.reconciliation.requested ? 2 : 0],
+    });
+    previousBatch = snapshot;
+  }
 }
 
 async function initDb(): Promise<void> {
@@ -118,6 +189,8 @@ async function initDb(): Promise<void> {
   // PERF-P3: partial index for positiveArbOnly logs filter + dashboard top-arbs
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arbs ON scan_results(scanned_at DESC) WHERE positive_arb_count > 0`);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_scan_results_arb_type_ts ON scan_results(arb_type, scanned_at DESC)`);
+  await ensureLogsDataQualitySchema(c);
+  await backfillRecentLogsDataQuality(c);
 
   // Market Catalog (FEAT-101): all open markets from Kalshi + Polymarket
   await c.execute(`
@@ -483,10 +556,25 @@ export async function saveScanResult(
 ): Promise<{ id: number }> {
   await ensureDb();
   const c = getClient();
+  await ensureLogsDataQualitySchema(c);
   const scannedAt = result.scannedAt ?? new Date().toISOString();
   const audit = auditArbClassification(result.strategy, result.arbType);
   const financiallyValid = audit.valid && audit.canonicalType !== null;
-  const canonicalRoi = financiallyValid ? (result.bestRoiPct ?? 0) : 0;
+  const recoverable = resolveHistoricalScanFinancials({
+    positive_arb_count: result.positiveArbCount,
+    best_roi_pct: result.bestRoiPct,
+    best_profit: result.bestProfit,
+    total_stake: result.totalStake,
+    strategy: result.strategy,
+    raw_result: result.raw,
+  });
+  const recoveredValue = (field: 'roiPct' | 'profitUsd' | 'stakeUsd', fallback: number): number => {
+    const value = recoverable.fields[field];
+    return value.status === 'available' ? value.value : fallback;
+  };
+  const canonicalRoi = financiallyValid ? recoveredValue('roiPct', 0) : 0;
+  const canonicalProfit = financiallyValid ? recoveredValue('profitUsd', 0) : 0;
+  const canonicalStake = financiallyValid ? recoveredValue('stakeUsd', 0) : 0;
   const snapshot = financiallyValid
     ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
     : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
@@ -504,14 +592,14 @@ export async function saveScanResult(
     args: [
       marketId,
       canonicalRoi,
-      financiallyValid ? (result.bestProfit ?? 0) : 0,
+      canonicalProfit,
       result.strategy ?? '',
       result.outcomeCount ?? 0,
       result.matchedCount ?? 0,
       result.kalshiCount ?? 0,
       result.pmCount ?? 0,
       financiallyValid ? (result.positiveArbCount ?? 0) : 0,
-      financiallyValid ? (result.totalStake ?? 0) : 0,
+      canonicalStake,
       scannedAt,
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
@@ -527,7 +615,89 @@ export async function saveScanResult(
       JSON.stringify(calculationEnvelope),
     ],
   });
-  return { id: Number((row as any).insertId ?? row.lastInsertRowid ?? 0) };
+  const id = Number((row as any).insertId ?? row.lastInsertRowid ?? 0);
+  const previous = await c.execute(`SELECT snapshot_json FROM logs_data_quality_batches ORDER BY observed_at DESC, scan_id DESC LIMIT 1`);
+  let previousBatch: LogsDataQualitySnapshot | null = null;
+  try {
+    previousBatch = typeof previous.rows[0]?.snapshot_json === 'string'
+      ? JSON.parse(previous.rows[0].snapshot_json) as LogsDataQualitySnapshot
+      : null;
+  } catch { /* malformed telemetry is not trusted as threshold history */ }
+  const positiveArbCount = financiallyValid ? (result.positiveArbCount ?? 0) : 0;
+  const exactMarketIdentity = typeof result.kalshiUrl === 'string' && result.kalshiUrl.length > 0
+    && typeof result.polymarketUrl === 'string' && result.polymarketUrl.length > 0;
+  const reason = (available: boolean, code: string) => available ? undefined : code;
+  const apyEligible = snapshot.daysToExpiry != null && snapshot.daysToExpiry > 0;
+  const quality = evaluateLogsDataQuality({
+    batchId: `scan:${id}`,
+    previousBatch,
+    rows: [{
+      id,
+      scanStatus: 'completed',
+      positiveArbCount,
+      arbValid: financiallyValid,
+      roiPct: Number.isFinite(canonicalRoi) ? canonicalRoi : null,
+      profitUsd: canonicalProfit > 0 && Number.isFinite(canonicalProfit) ? canonicalProfit : null,
+      apyPct: snapshot.apyPct != null && Number.isFinite(snapshot.apyPct) ? snapshot.apyPct : null,
+      apyEligible,
+      state: 'completed',
+      exactMarketIdentity,
+      currentRoiPct: exactMarketIdentity && Number.isFinite(canonicalRoi) ? canonicalRoi : null,
+      reasons: {
+        roi: reason(Number.isFinite(canonicalRoi), 'persistence_field_missing'),
+        profit: reason(canonicalProfit > 0 && Number.isFinite(canonicalProfit), 'persistence_field_missing'),
+        apy: reason(!apyEligible || snapshot.apyPct != null, snapshot.unavailableReason ?? 'historical_apy_not_persisted'),
+        state: undefined,
+        currentRoi: reason(exactMarketIdentity, 'missing_exact_link_identity'),
+      },
+    }],
+  });
+  await c.execute({
+    sql: `INSERT OR REPLACE INTO logs_data_quality_batches
+      (scan_id, observed_at, state, snapshot_json, reconciliation_attempts) VALUES (?, ?, ?, ?, ?)`,
+    args: [id, scannedAt, quality.state, JSON.stringify(quality), quality.reconciliation.requested ? 2 : 0],
+  });
+  if (quality.state === 'degraded') {
+    const alertReason = quality.breaches.map((breach) => `${breach.field}:${breach.trigger}:${breach.unavailablePct.toFixed(2)}%`).join(', ');
+    await c.execute({
+      sql: 'INSERT INTO logs_data_quality_alerts (scan_id, created_at, reason, snapshot_json) VALUES (?, ?, ?, ?)',
+      args: [id, new Date().toISOString(), alertReason, JSON.stringify(quality)],
+    });
+    console.error(`[logs-data-quality] degraded scan=${id} ${alertReason}; bounded reconciliation exhausted`);
+  }
+  return { id };
+}
+
+export async function getLogsDataQualityHealth(windowSize: number = 100): Promise<{
+  latest: LogsDataQualitySnapshot | null;
+  rolling: { batches: number; degradedBatches: number; fields: Record<string, { denominator: number; unavailable: number; unavailablePct: number; reasons: Record<string, number> }> };
+}> {
+  await ensureDb();
+  const limit = Math.min(Math.max(Math.trunc(windowSize), 1), 500);
+  const rows = await getClient().execute({
+    sql: 'SELECT state, snapshot_json FROM logs_data_quality_batches ORDER BY observed_at DESC, scan_id DESC LIMIT ?',
+    args: [limit],
+  });
+  const snapshots = rows.rows.flatMap((row) => {
+    try { return [JSON.parse(String(row.snapshot_json)) as LogsDataQualitySnapshot]; } catch { return []; }
+  });
+  const fields = Object.fromEntries(LOGS_REQUIRED_FIELDS.map((field) => {
+    const denominator = snapshots.reduce((sum, snapshot) => sum + snapshot.fields[field].denominator, 0);
+    const unavailable = snapshots.reduce((sum, snapshot) => sum + snapshot.fields[field].unavailable, 0);
+    const reasons: Record<string, number> = {};
+    for (const snapshot of snapshots) for (const [reasonCode, count] of Object.entries(snapshot.fields[field].reasons)) {
+      reasons[reasonCode] = (reasons[reasonCode] ?? 0) + count;
+    }
+    return [field, { denominator, unavailable, unavailablePct: denominator === 0 ? 0 : unavailable * 100 / denominator, reasons }];
+  }));
+  return {
+    latest: snapshots[0] ?? null,
+    rolling: {
+      batches: snapshots.length,
+      degradedBatches: snapshots.filter((snapshot) => snapshot.state === 'degraded').length,
+      fields,
+    },
+  };
 }
 
 /** Prune zero-arbitrage scan results after at least seven days. Positive-arbitrage evidence is immutable. */
@@ -687,7 +857,7 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                 arb_type, arb_valid, arb_invalidation_reason, calculation_envelope
+                 arb_type, arb_valid, arb_invalidation_reason, scan_status, calculation_envelope
           FROM scan_results${pageWhere}
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
     args: [...pageArgs, limit],
@@ -941,7 +1111,7 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                   arb_type, arb_valid, arb_invalidation_reason, raw_result, calculation_envelope
+                   arb_type, arb_valid, arb_invalidation_reason, scan_status, raw_result, calculation_envelope
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],

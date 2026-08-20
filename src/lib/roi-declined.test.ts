@@ -17,7 +17,7 @@ describe('compareRoiDecline', () => {
     { historical: null, current: 0, unavailableInputs: ['scan-time ROI'] },
     { historical: 0, current: undefined, unavailableInputs: ['Current ROI'] },
     { historical: Number.NaN, current: Number.POSITIVE_INFINITY, unavailableInputs: ['scan-time ROI', 'Current ROI'] },
-  ])('returns FALSE without coercing unavailable inputs', ({ historical, current, unavailableInputs }) => {
-    expect(compareRoiDecline(historical, current)).toEqual({ declined: false, unavailableInputs });
+  ])('returns an unavailable comparison without coercing missing inputs to FALSE', ({ historical, current, unavailableInputs }) => {
+    expect(compareRoiDecline(historical, current)).toEqual({ declined: null, unavailableInputs });
   });
 });

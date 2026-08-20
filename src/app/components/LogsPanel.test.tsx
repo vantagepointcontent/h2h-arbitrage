@@ -12,6 +12,134 @@ afterEach(() => {
 });
 
 describe('LogsPanel', () => {
+  it.each([
+    ['completed', true, 'Completed', 'bg-[#5DBE81]'],
+    ['pending', false, 'Pending', 'bg-[#facc15]'],
+    ['partial', false, 'Partial', 'bg-[#ef4444]'],
+    ['failed', false, 'Failed', 'bg-[#ef4444]'],
+    ['not_run_disabled', false, 'Disabled', 'bg-[#ef4444]'],
+    ['not_applicable_no_positive_arb', false, 'N/A', 'bg-[#8A9BA8]'],
+  ] as const)('renders a truthful, accessible BotTrader %s indicator', async (status, completed, visibleLabel, dotClass) => {
+    const isNotApplicable = status === 'not_applicable_no_positive_arb';
+    const log = {
+      ...comparisonLog(),
+      botTraderEvaluationCompleted: completed,
+      botTraderEvaluationStatus: status,
+      botTraderEvaluation: botTraderEvaluation({
+        status,
+        completed,
+        ...(isNotApplicable ? {
+          candidateCount: 0,
+          evaluatedCount: 0,
+          eligibleCount: 0,
+          placementAttemptCount: 0,
+          placedCount: 0,
+        } : status === 'completed' ? { evaluatedCount: 3 } : {}),
+      }),
+    };
+    vi.stubGlobal('fetch', logsFetch([log]));
+
+    render(createElement(LogsPanel));
+
+    const indicator = await screen.findByRole('status', {
+      name: `BotTrader evaluation: ${status}; completed: ${completed ? 'yes' : 'no'}`,
+    });
+    expect(indicator.textContent).toContain(visibleLabel);
+    expect(indicator.querySelector('[aria-hidden="true"]')?.className).toContain(dotClass);
+    const descriptionId = indicator.getAttribute('aria-describedby');
+    const detail = descriptionId ? document.getElementById(descriptionId) : null;
+    const tooltip = indicator.parentElement?.querySelector('[data-bot-trader-evaluation-tooltip]');
+    expect(tooltip?.className).toContain('group-focus-within:visible');
+    expect(tooltip?.textContent).toContain(`Status: ${status}`);
+    expect(detail?.textContent).toContain(`Status: ${status}`);
+    expect(detail?.textContent).toContain('Evaluation timestamp: 2026-08-11T13:43:00.000Z');
+    expect(detail?.textContent).toContain(`Candidates evaluated: ${isNotApplicable ? '0 of 0' : status === 'completed' ? '3 of 3' : '2 of 3'}`);
+    expect(detail?.textContent).toContain(`Eligible: ${isNotApplicable ? '0' : '1'}`);
+    expect(detail?.textContent).toContain(`Placement attempts: ${isNotApplicable ? '0' : '1'}`);
+    expect(detail?.textContent).toContain('Placed: 0');
+    expect(detail?.textContent).toContain(`Reason: ${status === 'not_applicable_no_positive_arb'
+      ? 'No Positive Arb — BotTrader not applicable'
+      : `Exact ${status} reason`}`);
+  });
+
+  it('keeps evaluation completion separate from eligibility and placement', async () => {
+    const log = {
+      ...comparisonLog(),
+      botTraderEvaluationCompleted: true,
+      botTraderEvaluationStatus: 'completed',
+      botTraderEvaluation: botTraderEvaluation({
+        status: 'completed',
+        completed: true,
+        candidateCount: 2,
+        evaluatedCount: 2,
+        eligibleCount: 1,
+        placementAttemptCount: 1,
+        placedCount: 1,
+      }),
+    };
+    vi.stubGlobal('fetch', logsFetch([log]));
+
+    render(createElement(LogsPanel));
+
+    const indicator = await screen.findByRole('status', { name: 'BotTrader evaluation: completed; completed: yes' });
+    const detail = document.getElementById(indicator.getAttribute('aria-describedby')!);
+    expect(detail?.textContent).toContain('Candidates evaluated: 2 of 2');
+    expect(detail?.textContent).toContain('Eligible: 1');
+    expect(detail?.textContent).toContain('Placement attempts: 1');
+    expect(detail?.textContent).toContain('Placed: 1');
+  });
+
+  it('shows green completion when every candidate was evaluated but none were eligible', async () => {
+    const log = {
+      ...comparisonLog(),
+      botTraderEvaluationCompleted: true,
+      botTraderEvaluationStatus: 'completed',
+      botTraderEvaluation: botTraderEvaluation({
+        status: 'completed',
+        completed: true,
+        candidateCount: 2,
+        evaluatedCount: 2,
+        eligibleCount: 0,
+        placementAttemptCount: 0,
+        placedCount: 0,
+      }),
+    };
+    vi.stubGlobal('fetch', logsFetch([log]));
+
+    render(createElement(LogsPanel));
+
+    const indicator = await screen.findByRole('status', { name: 'BotTrader evaluation: completed; completed: yes' });
+    expect(indicator.querySelector('[aria-hidden="true"]')?.className).toContain('bg-[#5DBE81]');
+    const detail = document.getElementById(indicator.getAttribute('aria-describedby')!);
+    expect(detail?.textContent).toContain('Candidates evaluated: 2 of 2');
+    expect(detail?.textContent).toContain('Eligible: 0');
+    expect(detail?.textContent).toContain('Placement attempts: 0');
+    expect(detail?.textContent).toContain('Placed: 0');
+  });
+
+  it('updates a pending BotTrader indicator through existing auto-refresh polling', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let logsRequest = 0;
+    const fetchMock = logsFetch(() => {
+      logsRequest += 1;
+      const completed = logsRequest > 1;
+      return [{
+        ...comparisonLog(),
+        botTraderEvaluationCompleted: completed,
+        botTraderEvaluationStatus: completed ? 'completed' : 'pending',
+        botTraderEvaluation: botTraderEvaluation({ status: completed ? 'completed' : 'pending', completed }),
+      }];
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(createElement(LogsPanel));
+    expect(await screen.findByRole('status', { name: 'BotTrader evaluation: pending; completed: no' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Auto' }));
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await screen.findByRole('status', { name: 'BotTrader evaluation: completed; completed: yes' })).toBeTruthy();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/logs?'))).toHaveLength(2);
+  });
+
   it('shows invalidated legacy classifications and their audit reason instead of the old arb type', async () => {
     const invalidated = {
       ...comparisonLog(),
@@ -61,6 +189,87 @@ describe('LogsPanel', () => {
     expect(headers.slice(roiIndex, roiIndex + 4).map((label) => label?.replace(/[▲▼↕↑↓]/g, '').trim())).toEqual(['ROI %', 'Current ROI %', 'ROI Declined?', 'Profit']);
     expect(screen.getByText('-1.23%').className).toContain('text-[#8A9BA8]');
   });
+
+  it('renders legacy scalar economics and shows ROI Declined as unavailable when Current ROI is missing', async () => {
+    const legacy = { ...comparisonLog(), calculation_envelope: null };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [legacy], total: 1 }) });
+      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{
+        id: 91,
+        status: 'never_scanned',
+        reasonCode: 'no_completed_scan_for_exact_pair',
+        reason: 'No successfully completed scan exists for the exact linked market pair.',
+      }] }) });
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+
+    expect(await screen.findByText('+2.50%')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
+    expect(screen.getByText('$12.50')).toBeTruthy();
+    expect(screen.getByText('$100.00')).toBeTruthy();
+    await waitFor(() => expect(document.querySelector(
+      'td[title="No successfully completed scan exists for the exact linked market pair."]',
+    )).toBeTruthy());
+    expect(screen.getByLabelText('ROI Declined? Unavailable')).toBeTruthy();
+    expect(screen.queryByLabelText('ROI Declined? FALSE')).toBeNull();
+  });
+
+  it('shows exact field reasons and sorts raw-snapshot historical values by the displayed economics', async () => {
+    const lowDisplayed = {
+      ...comparisonLog(),
+      id: 301,
+      market_id: 'low-displayed',
+      market_name: 'Low displayed ROI',
+      best_roi_pct: null,
+      best_profit: null,
+      apy_pct: null,
+      historical_financials: historicalFinancials({ roiPct: 1.25, profitUsd: 2.5 }),
+    };
+    const highDisplayed = {
+      ...comparisonLog(),
+      id: 302,
+      market_id: 'high-displayed',
+      market_name: 'High displayed ROI',
+      best_roi_pct: null,
+      best_profit: null,
+      apy_pct: null,
+      historical_financials: historicalFinancials({ roiPct: 8.75, profitUsd: 17.5 }),
+    };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [lowDisplayed, highDisplayed], total: 2 }) });
+      if (url === '/api/logs/current-roi') {
+        const ids = JSON.parse(String(init?.body)).ids as number[];
+        return Promise.resolve({ ok: true, json: async () => ({ valuations: ids.map((id) => ({
+          id,
+          status: 'never_scanned',
+          reasonCode: 'no_completed_scan_for_exact_pair',
+          reason: 'No successfully completed scan exists for the exact linked market pair.',
+        })) }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+    await waitFor(() => expect(screen.getByText('High displayed ROI')).toBeTruthy());
+    expect(document.querySelector('td[title="No authoritative scan-time APY value was persisted for this result."]')).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('td[title="No successfully completed scan exists for the exact linked market pair."]')).toBeTruthy());
+
+    const roiHeader = Array.from(document.querySelectorAll('thead th'))
+      .find((header) => header.textContent?.trim().startsWith('ROI %'))!;
+    fireEvent.click(roiHeader);
+    const descendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[2]?.textContent?.trim());
+    expect(descendingNames.slice(0, 2)).toEqual(['High displayed ROI', 'Low displayed ROI']);
+    fireEvent.click(roiHeader);
+    const ascendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[2]?.textContent?.trim());
+    expect(ascendingNames.slice(0, 2)).toEqual(['Low displayed ROI', 'High displayed ROI']);
+  });
+
 
   it.each([
     ['no_arbitrage', 'No arbitrage'],
@@ -455,7 +664,7 @@ describe('LogsPanel', () => {
     expect(screen.getByText('+102.70%')).toBeTruthy();
     expect(screen.queryByText('+23.40%')).toBeNull();
     expect(screen.getByTestId('logs-table-scroll').className).toContain('overflow-x-auto');
-    expect(document.querySelector('table')?.className).toContain('min-w-[1240px]');
+    expect(document.querySelector('table')?.className).toContain('min-w-[1340px]');
     expect(document.querySelector('thead th')?.className).toContain('sticky');
     expect(document.querySelector('tbody td')?.className).toContain('sticky');
     expect(screen.getByRole('button', { name: 'Refresh' }).className).toContain('min-h-11');
@@ -707,12 +916,100 @@ function comparisonLog() {
     pm_count: 1,
     positive_arb_count: 1,
     total_stake: 100,
+    scan_status: 'completed',
     scanned_at: '2026-08-11T13:42:00.000Z',
     expiry_at: '2026-08-12T01:42:00.000Z',
     days_to_expiry: 0.5,
     apy_pct: 1825,
     apy_unavailable_reason: null,
     calculation_envelope: executableEnvelopeFixture,
+  };
+}
+
+function botTraderEvaluation({
+  status,
+  completed,
+  candidateCount = 3,
+  evaluatedCount = 2,
+  eligibleCount = 1,
+  placementAttemptCount = 1,
+  placedCount = 0,
+}: {
+  status: 'pending' | 'completed' | 'partial' | 'failed' | 'not_run_disabled' | 'not_applicable_no_positive_arb';
+  completed: boolean;
+  candidateCount?: number;
+  evaluatedCount?: number;
+  eligibleCount?: number;
+  placementAttemptCount?: number;
+  placedCount?: number;
+}) {
+  return {
+    scanId: 91,
+    status,
+    botTraderEvaluationCompleted: completed,
+    reason: status === 'not_applicable_no_positive_arb'
+      ? 'No Positive Arb — BotTrader not applicable'
+      : `Exact ${status} reason`,
+    startedAt: '2026-08-11T13:42:30.000Z',
+    completedAt: status === 'pending' ? null : '2026-08-11T13:43:00.000Z',
+    updatedAt: '2026-08-11T13:43:00.000Z',
+    settingsVersion: 'settings-v4',
+    candidateCount,
+    evaluatedCount,
+    eligibleCount,
+    placementAttemptCount,
+    placedCount,
+    skippedCount: Math.max(0, evaluatedCount - placedCount),
+    failureCount: status === 'failed' ? 1 : 0,
+    missingCandidateIndexes: evaluatedCount < candidateCount ? [candidateCount - 1] : [],
+    failingCandidateIndexes: status === 'failed' ? [0] : [],
+  };
+}
+
+function logsFetch(rowsOrFactory: unknown[] | (() => unknown[])) {
+  return vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith('/api/logs?')) {
+      const logs = typeof rowsOrFactory === 'function' ? rowsOrFactory() : rowsOrFactory;
+      return Promise.resolve({ ok: true, json: async () => ({ logs, total: logs.length }) });
+    }
+    if (url === '/api/logs/current-roi') {
+      return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'no_arbitrage' }] }) });
+    }
+    if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+    return Promise.resolve({ ok: true, json: async () => [] });
+  });
+}
+
+function historicalFinancials(values: { roiPct: number; profitUsd: number; apyPct?: number; stakeUsd?: number }) {
+  const available = (value: number) => ({
+    status: 'available' as const,
+    value,
+    source: 'scan_result_scalar' as const,
+    sourceRevision: 'scan_results:test',
+  });
+  const unavailable = (reasonCode: 'historical_apy_not_persisted' | 'historical_stake_not_persisted', reason: string) => ({
+    status: 'unavailable' as const,
+    value: null,
+    source: 'unavailable' as const,
+    sourceRevision: 'scan_results:test',
+    reasonCode,
+    reason,
+  });
+  return {
+    revision: 2 as const,
+    scanId: 1,
+    envelope: executableEnvelopeFixture,
+    fields: {
+      roiPct: available(values.roiPct),
+      profitUsd: available(values.profitUsd),
+      apyPct: values.apyPct == null
+        ? unavailable('historical_apy_not_persisted', 'No authoritative scan-time APY value was persisted for this result.')
+        : available(values.apyPct),
+      stakeUsd: values.stakeUsd == null
+        ? unavailable('historical_stake_not_persisted', 'No authoritative scan-time stake value was persisted for this result.')
+        : available(values.stakeUsd),
+    },
   };
 }
 

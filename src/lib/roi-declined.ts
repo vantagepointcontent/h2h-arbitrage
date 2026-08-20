@@ -1,5 +1,5 @@
 export type RoiDeclineComparison = {
-  declined: boolean;
+  declined: boolean | null;
   unavailableInputs: Array<'scan-time ROI' | 'Current ROI'>;
 };
 
@@ -16,7 +16,7 @@ export function compareRoiDecline(scanTimeRoi: unknown, currentRoi: unknown): Ro
   if (!currentAvailable) unavailableInputs.push('Current ROI');
 
   return {
-    declined: scanTimeAvailable && currentAvailable && scanTimeRoi > currentRoi,
+    declined: scanTimeAvailable && currentAvailable ? scanTimeRoi > currentRoi : null,
     unavailableInputs,
   };
 }

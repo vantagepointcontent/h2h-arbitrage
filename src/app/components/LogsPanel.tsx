@@ -24,20 +24,22 @@ import {
 import { compareRoiDecline } from "@/lib/roi-declined";
 import { parseCalculationEnvelope } from "@/lib/calculation-envelope";
 import { CalculationProvenance } from "./CalculationProvenance";
+import { resolveHistoricalScanFinancials, type HistoricalScanFinancials } from "@/lib/historical-scan-financials";
 
 interface LogEntry {
   id: number;
   market_id: string;
   best_roi_pct: number | null;
-  best_profit: number;
+  best_profit: number | null;
   strategy: string;
   outcome_count: number;
   matched_count: number;
   kalshi_count: number;
   pm_count: number;
   positive_arb_count: number;
-  total_stake: number;
+  total_stake: number | null;
   scanned_at: string;
+  scan_status?: string | null;
 
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
@@ -50,6 +52,30 @@ interface LogEntry {
   arb_valid: 0 | 1;
   arb_invalidation_reason: string | null;
   calculation_envelope?: unknown;
+  historical_financials?: HistoricalScanFinancials;
+  botTraderEvaluationCompleted?: boolean;
+  botTraderEvaluationStatus?: BotTraderEvaluationStatus;
+  botTraderEvaluation?: BotTraderEvaluation | null;
+}
+
+type BotTraderEvaluationStatus = 'pending' | 'completed' | 'partial' | 'failed' | 'not_run_disabled' | 'not_applicable_no_positive_arb';
+
+interface BotTraderEvaluation {
+  status: BotTraderEvaluationStatus;
+  botTraderEvaluationCompleted: boolean;
+  reason: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  candidateCount: number;
+  evaluatedCount: number;
+  eligibleCount: number;
+  placementAttemptCount: number;
+  placedCount: number;
+  skippedCount: number;
+  failureCount: number;
+  missingCandidateIndexes: number[];
+  failingCandidateIndexes: number[];
 }
 
 type ArbTypeFilter = "all" | ArbType;
@@ -86,7 +112,7 @@ const LOG_RENDER_WINDOW = 100;
 const CURRENT_ROI_BATCH_SIZE = 100;
 
 type CurrentRoiStatus = 'loading' | 'available' | 'no_arbitrage' | 'never_scanned' | 'unavailable' | 'upstream_failure';
-type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; scannedAt?: string; scanId?: number };
+type CurrentRoiValuation = { status: CurrentRoiStatus; roiPct?: number; strategy?: string; scannedAt?: string; scanId?: number; reasonCode?: string; reason?: string };
 
 function currentRoiStatusLabel(status: CurrentRoiStatus): string {
   switch (status) {
@@ -130,6 +156,7 @@ export default function LogsPanel() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{ totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } } | null>(null);
+  const [dataQuality, setDataQuality] = useState<{ latest?: { state?: string; breaches?: Array<{ field: string; trigger: string; unavailablePct: number }> } | null } | null>(null);
   const requestGeneration = useRef(0);
   const loadingMoreGeneration = useRef<number | null>(null);
   const lastRequestedCursor = useRef<string | null>(null);
@@ -214,6 +241,7 @@ export default function LogsPanel() {
         setUniqueMarkets(typeof data.uniqueMarkets === "number" ? data.uniqueMarkets : null);
         setTotal(typeof data.total === "number" ? data.total : (data.logs || []).length);
         setSummary(data.summary ?? null);
+        setDataQuality(data.dataQuality ?? null);
         const nextMaxRoi = typeof data.maxRoiWithoutMin === "number" && Number.isFinite(data.maxRoiWithoutMin)
           ? Math.max(0, data.maxRoiWithoutMin)
           : 0;
@@ -303,16 +331,28 @@ export default function LogsPanel() {
           bVal = new Date(b.scanned_at).getTime();
           break;
         case "best_roi_pct":
-          aVal = typeof a.best_roi_pct === 'number' && Number.isFinite(a.best_roi_pct) ? a.best_roi_pct : Number.NEGATIVE_INFINITY;
-          bVal = typeof b.best_roi_pct === 'number' && Number.isFinite(b.best_roi_pct) ? b.best_roi_pct : Number.NEGATIVE_INFINITY;
+          {
+            const aField = (a.historical_financials ?? resolveHistoricalScanFinancials(a)).fields.roiPct;
+            const bField = (b.historical_financials ?? resolveHistoricalScanFinancials(b)).fields.roiPct;
+            aVal = aField.status === 'available' ? aField.value : Number.NEGATIVE_INFINITY;
+            bVal = bField.status === 'available' ? bField.value : Number.NEGATIVE_INFINITY;
+          }
           break;
         case "best_profit":
-          aVal = a.best_profit;
-          bVal = b.best_profit;
+          {
+            const aField = (a.historical_financials ?? resolveHistoricalScanFinancials(a)).fields.profitUsd;
+            const bField = (b.historical_financials ?? resolveHistoricalScanFinancials(b)).fields.profitUsd;
+            aVal = aField.status === 'available' ? aField.value : Number.NEGATIVE_INFINITY;
+            bVal = bField.status === 'available' ? bField.value : Number.NEGATIVE_INFINITY;
+          }
           break;
         case "apy":
-          aVal = logApyPct(a) ?? 0;
-          bVal = logApyPct(b) ?? 0;
+          {
+            const aField = (a.historical_financials ?? resolveHistoricalScanFinancials(a)).fields.apyPct;
+            const bField = (b.historical_financials ?? resolveHistoricalScanFinancials(b)).fields.apyPct;
+            aVal = aField.status === 'available' ? aField.value : Number.NEGATIVE_INFINITY;
+            bVal = bField.status === 'available' ? bField.value : Number.NEGATIVE_INFINITY;
+          }
           break;
         case "positive_arb_count":
           aVal = a.positive_arb_count;
@@ -539,6 +579,15 @@ export default function LogsPanel() {
       )}
 
       {/* Stats Summary */}
+      {dataQuality?.latest?.state === 'degraded' && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">
+          <div className="font-semibold">Logs data quality degraded</div>
+          <div className="mt-1">
+            {(dataQuality.latest.breaches ?? []).map((breach) => `${breach.field}: ${breach.unavailablePct.toFixed(2)}% unavailable (${breach.trigger})`).join('; ')
+              || 'Required historical fields failed the availability contract; bounded reconciliation was triggered.'}
+          </div>
+        </div>
+      )}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <StatBox label="Total Scans" value={stats.count.toString()} />
@@ -806,7 +855,7 @@ export default function LogsPanel() {
               }
             }}
           >
-            <table className="w-full min-w-[1240px] text-sm">
+            <table className="w-full min-w-[1340px] text-sm">
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
                   <th className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
@@ -826,6 +875,12 @@ export default function LogsPanel() {
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Arb Type
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    State
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    BotTrader
                   </th>
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
@@ -880,13 +935,13 @@ export default function LogsPanel() {
               </thead>
               <tbody>
                 {visibleWindow.start > 0 && (
-                  <tr aria-hidden="true"><td colSpan={16} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={18} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
                 {visibleWindow.rows.map((log, i) => (
                   <LogRow key={log.id ?? i} log={log} currentRoi={currentRoiById.get(log.id) ?? { status: 'loading' }} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
                 {visibleWindow.end < sorted.length && (
-                  <tr aria-hidden="true"><td colSpan={16} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={18} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
               </tbody>
             </table>
@@ -935,6 +990,80 @@ function arbInvalidationReasonLabel(reason: string | null): string {
   return ARB_INVALIDATION_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
 }
 
+const BOT_TRADER_STATUS_PRESENTATION: Record<BotTraderEvaluationStatus, {
+  label: string;
+  dotClass: string;
+  textClass: string;
+}> = {
+  completed: { label: 'Completed', dotClass: 'bg-[#5DBE81]', textClass: 'text-[#5DBE81]' },
+  pending: { label: 'Pending', dotClass: 'bg-[#facc15]', textClass: 'text-[#facc15]' },
+  partial: { label: 'Partial', dotClass: 'bg-[#ef4444]', textClass: 'text-[#ef4444]' },
+  failed: { label: 'Failed', dotClass: 'bg-[#ef4444]', textClass: 'text-[#ef4444]' },
+  not_run_disabled: { label: 'Disabled', dotClass: 'bg-[#ef4444]', textClass: 'text-[#ef4444]' },
+  not_applicable_no_positive_arb: { label: 'N/A', dotClass: 'bg-[#8A9BA8]', textClass: 'text-[#8A9BA8]' },
+};
+
+function evaluationCount(value: number | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? String(value)
+    : 'unavailable';
+}
+
+function BotTraderEvaluationIndicator({ log }: { log: LogEntry }) {
+  const evaluation = log.botTraderEvaluation;
+  const status = evaluation?.status ?? log.botTraderEvaluationStatus ?? 'pending';
+  const completed = status === 'completed'
+    && (log.botTraderEvaluationCompleted ?? evaluation?.botTraderEvaluationCompleted ?? false);
+  const presentation = BOT_TRADER_STATUS_PRESENTATION[status];
+  const timestamp = evaluation?.completedAt ?? evaluation?.updatedAt ?? evaluation?.startedAt ?? 'Unavailable';
+  const reason = evaluation?.reason ?? 'BotTrader evaluation envelope is not yet available.';
+  const missing = evaluation?.missingCandidateIndexes?.length
+    ? evaluation.missingCandidateIndexes.join(', ')
+    : 'none';
+  const failing = evaluation?.failingCandidateIndexes?.length
+    ? evaluation.failingCandidateIndexes.join(', ')
+    : 'none';
+  const detail = [
+    `Status: ${status}`,
+    `Evaluation timestamp: ${timestamp}`,
+    `Candidates evaluated: ${evaluationCount(evaluation?.evaluatedCount)} of ${evaluationCount(evaluation?.candidateCount)}`,
+    `Eligible: ${evaluationCount(evaluation?.eligibleCount)}`,
+    `Placement attempts: ${evaluationCount(evaluation?.placementAttemptCount)}`,
+    `Placed: ${evaluationCount(evaluation?.placedCount)}`,
+    `Skipped: ${evaluationCount(evaluation?.skippedCount)}`,
+    `Failures: ${evaluationCount(evaluation?.failureCount)}`,
+    `Missing candidate indexes: ${missing}`,
+    `Failing candidate indexes: ${failing}`,
+    `Reason: ${reason}`,
+  ].join('. ');
+  const descriptionId = `bot-trader-evaluation-${log.id}`;
+
+  return (
+    <span className="group relative inline-flex">
+      <span
+        role="status"
+        tabIndex={0}
+        aria-label={`BotTrader evaluation: ${status}; completed: ${completed ? 'yes' : 'no'}`}
+        aria-describedby={descriptionId}
+        title={detail}
+        onClick={(event) => event.stopPropagation()}
+        className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81] ${presentation.textClass}`}
+      >
+        <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${presentation.dotClass}`} />
+        {presentation.label}
+      </span>
+      <span id={descriptionId} className="sr-only">{detail}</span>
+      <span
+        aria-hidden="true"
+        data-bot-trader-evaluation-tooltip
+        className="pointer-events-none invisible absolute left-0 top-full z-40 mt-1 w-80 whitespace-normal rounded border border-[#3A4A59] bg-[#0E1621] p-2 text-[10px] font-normal leading-relaxed text-[#D5DEE5] opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+      >
+        {detail}
+      </span>
+    </span>
+  );
+}
+
 type ClientCurrentQuote = {
   platform: QuotePlatform;
   marketId: string;
@@ -968,33 +1097,31 @@ function LogRow({
   savedMarkets: Map<string, { title: string; expiryDate?: string | null }>;
 }) {
   const scanEnvelope = parseCalculationEnvelope(log.calculation_envelope, `scan log ${log.id}`);
-  const scanNetMicros = scanEnvelope.status === 'executable' ? scanEnvelope.totals.netPnlMicros : null;
-  const scanCostMicros = scanEnvelope.status === 'executable' ? scanEnvelope.totals.grossCostMicros : null;
-  const scanRoiPct = scanNetMicros != null && scanCostMicros != null && scanCostMicros > 0
-    ? scanNetMicros / scanCostMicros * 100
-    : null;
-  const scanTimeRoi = scanRoiPct;
+  const historical = log.historical_financials ?? resolveHistoricalScanFinancials(log);
+  const scanTimeRoi = historical.fields.roiPct.status === 'available' ? historical.fields.roiPct.value : null;
+  const scanProfit = historical.fields.profitUsd.status === 'available' ? historical.fields.profitUsd.value : null;
+  const scanStake = historical.fields.stakeUsd.status === 'available' ? historical.fields.stakeUsd.value : null;
   const roiColor = scanTimeRoi == null ? "text-[#8A9BA8]" : scanTimeRoi > 0 ? "text-[#5DBE81]" : scanTimeRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
   const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
   const arbIsValid = log.arb_valid !== 0;
   const arbTypeMeta = arbIsValid
     ? (log.arb_type ? ARB_TYPES[log.arb_type] : getArbTypeMeta(log.strategy))
     : null;
-  const apy = scanEnvelope.status === 'executable' ? logApyPct(log) : null;
+  const apy = historical.fields.apyPct.status === 'available' ? historical.fields.apyPct.value : null;
   const currentRoiValue = currentRoi.status === 'available'
     && typeof currentRoi.roiPct === 'number'
     && Number.isFinite(currentRoi.roiPct)
     ? currentRoi.roiPct
     : null;
   const roiDecline = compareRoiDecline(scanTimeRoi, currentRoiValue);
-  const roiDeclineText = roiDecline.declined ? 'TRUE' : 'FALSE';
+  const roiDeclineText = roiDecline.declined == null ? 'Unavailable' : roiDecline.declined ? 'TRUE' : 'FALSE';
   const roiDeclineUnavailableReason = roiDecline.unavailableInputs.length === 0
     ? null
     : roiDecline.unavailableInputs.map((input) => input === 'Current ROI'
-      ? `Current ROI is unavailable: ${currentRoiStatusLabel(currentRoi.status)}`
+      ? `Current ROI is unavailable: ${currentRoi.reason ?? currentRoiStatusLabel(currentRoi.status)}`
       : 'scan-time ROI is unavailable').join('; ');
   const roiDeclineTitle = roiDeclineUnavailableReason
-    ? `ROI Declined? FALSE — ${roiDeclineUnavailableReason}.`
+    ? `ROI Declined? unavailable — ${roiDeclineUnavailableReason}.`
     : `ROI Declined? ${roiDeclineText} — compared using full-precision persisted ROI values.`;
   const roiDeclineDescriptionId = `roi-declined-reason-${log.id}`;
   // Kept at row scope so collapsing does not discard the brief lazy-fetch cache.
@@ -1103,10 +1230,18 @@ function LogRow({
             <span className="text-[#8A9BA8]">—</span>
           )}
         </td>
-        <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`} title={scanTimeRoi == null ? 'Scan-time ROI unavailable' : 'ROI captured at scan time'}>
+        <td className="px-3 py-2 text-xs whitespace-nowrap" title={log.scan_status ? `Canonical persisted scan state: ${log.scan_status}` : 'No canonical persisted scan state was recorded.'}>
+          {log.scan_status
+            ? <span className={log.scan_status === 'completed' ? 'text-[#5DBE81]' : log.scan_status === 'failed' ? 'text-[#ef4444]' : 'text-[#facc15]'}>{log.scan_status.charAt(0).toUpperCase() + log.scan_status.slice(1)}</span>
+            : <span className="text-[#8A9BA8]">Unavailable</span>}
+        </td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          <BotTraderEvaluationIndicator log={log} />
+        </td>
+        <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`} title={historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : 'ROI captured at scan time'}>
           {scanTimeRoi == null ? 'Unavailable' : fmtPct(scanTimeRoi)}
         </td>
-        <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.scannedAt ? `Latest persisted scan: ${currentRoi.scannedAt}${currentRoi.strategy ? ` — ${currentRoi.strategy}` : ''}` : currentRoiStatusLabel(currentRoi.status)}>
+        <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.scannedAt ? `Latest persisted scan: ${currentRoi.scannedAt}${currentRoi.strategy ? ` — ${currentRoi.strategy}` : ''}` : currentRoi.reason ?? currentRoiStatusLabel(currentRoi.status)}>
           {currentRoiValue != null
             ? `${currentRoiValue.toFixed(2)}%`
             : currentRoiStatusLabel(currentRoi.status)}
@@ -1125,16 +1260,16 @@ function LogRow({
           </span>
           <span id={roiDeclineDescriptionId} className="sr-only">{roiDeclineTitle}</span>
         </td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]">{scanNetMicros == null ? 'Unavailable' : fmtUsd(scanNetMicros / 1_000_000)}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]" title={historical.fields.profitUsd.status === 'unavailable' ? historical.fields.profitUsd.reason : 'Profit captured at scan time'}>{scanProfit == null ? 'Unavailable' : fmtUsd(scanProfit)}</td>
         <td
           className={`px-3 py-2 text-right text-xs font-mono ${apy != null ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
-          title={apy == null ? `APY unavailable: ${log.apy_unavailable_reason ?? 'unknown reason'}` : 'APY captured at scan time'}
+          title={historical.fields.apyPct.status === 'unavailable' ? historical.fields.apyPct.reason : 'APY captured at scan time'}
         >{apy != null ? fmtPct(apy) : "Unavailable"}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{scanCostMicros == null ? 'Unavailable' : fmtUsd(scanCostMicros / 1_000_000)}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]" title={historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : 'Stake captured at scan time'}>{scanStake == null ? 'Unavailable' : fmtUsd(scanStake)}</td>
         <td className="px-3 py-2 text-center">
           <button
             onClick={handleNavigate}
@@ -1147,7 +1282,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={16} className="px-4 py-3">
+          <td colSpan={18} className="px-4 py-3">
             {detailState === 'loading' || detailState === 'idle' ? (
               <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
             ) : detailState === 'error' ? (

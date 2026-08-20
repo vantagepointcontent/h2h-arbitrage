@@ -449,7 +449,11 @@ export async function executeFullScan(request: NextRequest) {
         const positiveArbs = withArbitrage.filter(o => o.arbitrage
           && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
           && o.arbitrage.arbType !== null
-          && o.arbitrage.roiPct > 0 && !o.arbitrage.suspicious);
+          && o.arbitrage.executionStatus === 'executable'
+          && o.arbitrage.roiPct > 0
+          && o.arbitrage.expectedProfit > 0
+          && (o.arbitrage.kalshiStake + o.arbitrage.pmStake) > 0
+          && !o.arbitrage.suspicious);
         const suspiciousCount = withArbitrage.filter(o => o.arbitrage?.suspicious).length;
         if (suspiciousCount > 0) {
           console.log(`[scan] ${market.eventTitle}: ${suspiciousCount} suspicious arb(s) excluded from stats (ROI > threshold with unknown depth)`);

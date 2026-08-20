@@ -7,6 +7,8 @@ import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/
 import { getCurrentLogRoiBatch } from '@/lib/current-log-roi.server';
 import { compareRoiDecline } from '@/lib/roi-declined';
 import { formatScaledMoney, parseCalculationEnvelope } from '@/lib/calculation-envelope';
+import { resolveHistoricalScanFinancials } from '@/lib/historical-scan-financials';
+import { getBotScanEvaluationSummaries } from '@/lib/bot-scan-consumer';
 
 const CURRENT_ROI_BATCH_SIZE = 100;
 
@@ -19,9 +21,14 @@ const headers = [
   'Arb Type',
   'Arb Valid',
   'Invalidation Reason',
+  'State',
+  'State Unavailable Reason',
   'ROI %',
+  'ROI Unavailable Reason',
   'Current ROI %',
+  'Current ROI Unavailable Reason',
   'ROI Declined?',
+  'ROI Declined Unavailable Reason',
   'APY %',
   'APY Unavailable Reason',
   'Days to Expiry',
@@ -37,12 +44,29 @@ const headers = [
   'Scenario B Timing Source',
   'Scenario B Unavailable Reason',
   'Profit ($)',
+  'Profit Unavailable Reason',
   'Matched Count',
   'Kalshi Count',
   'PM Count',
   'Positive Arb Count',
   'Total Stake ($)',
+  'Stake Unavailable Reason',
   'Outcome Count',
+  'BotTrader Evaluation Completed',
+  'BotTrader Evaluation Status',
+  'BotTrader Evaluation Reason',
+  'BotTrader Evaluation Started At',
+  'BotTrader Evaluation Completed At',
+  'BotTrader Settings Version',
+  'BotTrader Candidates Evaluated',
+  'BotTrader Candidates Total',
+  'BotTrader Eligible Count',
+  'BotTrader Placement Attempts',
+  'BotTrader Placed Count',
+  'BotTrader Skipped Count',
+  'BotTrader Failure Count',
+  'BotTrader Missing Candidate Indexes',
+  'BotTrader Failing Candidate Indexes',
   'Calculation Version',
   'Calculation Status',
   'Calculation Blocker Code',
@@ -134,6 +158,7 @@ export async function GET(request: NextRequest) {
             (_, index) => getCurrentLogRoiBatch(ids.slice(index * CURRENT_ROI_BATCH_SIZE, (index + 1) * CURRENT_ROI_BATCH_SIZE)),
           ));
           const currentRoiById = new Map(currentRoiPages.flat().map((valuation) => [valuation.id, valuation]));
+          const botEvaluations = await getBotScanEvaluationSummaries(ids);
           for (const r of batch) {
             let outcomeApy: OutcomeContingentApy | null = null;
             try {
@@ -148,7 +173,21 @@ export async function GET(request: NextRequest) {
               && Number.isFinite(currentRoi.roiPct)
               ? currentRoi.roiPct
               : null;
-            const roiDeclined = compareRoiDecline(r.best_roi_pct, currentRoiPct).declined;
+            const historical = resolveHistoricalScanFinancials(r);
+            const botEvaluation = botEvaluations.get(Number(r.id));
+            const historicalRoi = historical.fields.roiPct.status === 'available' ? historical.fields.roiPct.value : null;
+            const roiComparison = compareRoiDecline(historicalRoi, currentRoiPct);
+            const currentRoiReason = currentRoiPct == null
+              ? currentRoi?.reason ?? (currentRoi?.status === 'never_scanned'
+                ? 'No successfully completed scan exists for the exact linked market pair.'
+                : 'Current ROI is unavailable from persisted completed scans.')
+              : '';
+            const roiDeclinedReason = roiComparison.declined == null
+              ? roiComparison.unavailableInputs.map((input) => input === 'Current ROI'
+                ? `Current ROI is unavailable: ${currentRoiReason}`
+                : `Scan-time ROI is unavailable: ${historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : 'unknown reason'}`
+              ).join('; ')
+              : '';
             const envelopeCacheKey = typeof r.calculation_envelope === 'string'
               ? r.calculation_envelope
               : `legacy:${r.id}`;
@@ -193,11 +232,16 @@ export async function GET(request: NextRequest) {
               r.arb_valid === 1 ? (r.arb_type ?? classifyArbType(r.strategy) ?? '') : '',
               r.arb_valid === 1 ? 'true' : 'false',
               r.arb_invalidation_reason ?? '',
-              r.best_roi_pct,
+              typeof r.scan_status === 'string' && r.scan_status ? r.scan_status : null,
+              typeof r.scan_status === 'string' && r.scan_status ? '' : 'No canonical persisted scan state was recorded.',
+              historical.fields.roiPct.status === 'available' ? historical.fields.roiPct.value : null,
+              historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : '',
               currentRoiPct,
-              roiDeclined ? 'TRUE' : 'FALSE',
-              r.apy_pct,
-              r.apy_unavailable_reason,
+              currentRoiReason,
+              roiComparison.declined == null ? '' : roiComparison.declined ? 'TRUE' : 'FALSE',
+              roiDeclinedReason,
+              historical.fields.apyPct.status === 'available' ? historical.fields.apyPct.value : null,
+              historical.fields.apyPct.status === 'unavailable' ? historical.fields.apyPct.reason : '',
               r.days_to_expiry,
               r.expiry_at,
               outcomeApy?.scenarioA?.winner,
@@ -210,13 +254,30 @@ export async function GET(request: NextRequest) {
               outcomeApy?.scenarioB?.apyPct,
               outcomeApy?.scenarioB?.timingSource,
               outcomeApy?.scenarioB?.unavailableReason,
-              r.best_profit,
+              historical.fields.profitUsd.status === 'available' ? historical.fields.profitUsd.value : null,
+              historical.fields.profitUsd.status === 'unavailable' ? historical.fields.profitUsd.reason : '',
               r.matched_count,
               r.kalshi_count,
               r.pm_count,
               r.positive_arb_count,
-              r.total_stake,
+              historical.fields.stakeUsd.status === 'available' ? historical.fields.stakeUsd.value : null,
+              historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : '',
               r.outcome_count,
+              botEvaluation?.botTraderEvaluationCompleted ? 'TRUE' : 'FALSE',
+              botEvaluation?.status ?? 'pending',
+              botEvaluation?.reason ?? 'BotTrader evaluation envelope is not yet available.',
+              botEvaluation?.startedAt ?? '',
+              botEvaluation?.completedAt ?? '',
+              botEvaluation?.settingsVersion ?? '',
+              botEvaluation?.evaluatedCount ?? 0,
+              botEvaluation?.candidateCount ?? 0,
+              botEvaluation?.eligibleCount ?? 0,
+              botEvaluation?.placementAttemptCount ?? 0,
+              botEvaluation?.placedCount ?? 0,
+              botEvaluation?.skippedCount ?? 0,
+              botEvaluation?.failureCount ?? 0,
+              JSON.stringify(botEvaluation?.missingCandidateIndexes ?? []),
+              JSON.stringify(botEvaluation?.failingCandidateIndexes ?? []),
             ]
               .map(escapeCsv)
               .join(',') + ',' + envelopeSuffix;
