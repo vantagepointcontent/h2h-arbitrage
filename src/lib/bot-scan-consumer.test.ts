@@ -3,6 +3,7 @@ import {
   createBotScanConsumer,
   createPersistedBotScanPublisher,
   parseBotScanCandidate,
+  summarizeBotScanEvaluation,
   type BotScanCandidate,
   type BotScanConsumerDeps,
   type BotScanDecision,
@@ -254,6 +255,97 @@ function harness(options: {
 }
 
 describe('durable BotTrader scan consumer', () => {
+  it('marks a scan completed only when every contained candidate has a terminal audit decision', () => {
+    const completed = summarizeBotScanEvaluation({
+      scanId: 41,
+      candidateIndexes: [0, 1],
+      scanDecision: {
+        state: 'placed', reasonCode: 'paper_placed', reason: 'one placement completed',
+        receivedAt: '2026-08-11T12:00:00.000Z', updatedAt: '2026-08-11T12:00:10.000Z',
+        attempts: 1, placementCount: 1, details: { configVersion: 'bot-settings-v1:test' },
+      },
+      candidateDecisions: [
+        { candidateIndex: 0, state: 'accepted', reasonCode: 'execution_completed', finalResult: 'accepted', executionId: 9, details: { stage: 'execution' } },
+        { candidateIndex: 1, state: 'rejected', reasonCode: 'scan_criteria_rejected', finalResult: 'rejected', executionId: null, details: { stage: 'scan' } },
+      ],
+    });
+
+    expect(completed).toMatchObject({
+      status: 'completed', botTraderEvaluationCompleted: true,
+      settingsVersion: 'bot-settings-v1:test', candidateCount: 2, evaluatedCount: 2,
+      eligibleCount: 1, placementAttemptCount: 1, placedCount: 1,
+      skippedCount: 1, failureCount: 0, missingCandidateIndexes: [], failingCandidateIndexes: [],
+    });
+
+    const partial = summarizeBotScanEvaluation({
+      scanId: 42,
+      candidateIndexes: [0, 1],
+      scanDecision: {
+        state: 'partial_or_unhedged', reasonCode: 'partial_or_unhedged', reason: 'leg B failed',
+        receivedAt: '2026-08-11T12:00:00.000Z', updatedAt: '2026-08-11T12:00:10.000Z',
+        attempts: 1, placementCount: 0, details: { configVersion: 'bot-settings-v1:test' },
+      },
+      candidateDecisions: [
+        { candidateIndex: 0, state: 'failed', reasonCode: 'execution_outcome_unknown', finalResult: 'failed', executionId: null, details: { stage: 'execution' } },
+        { candidateIndex: 1, state: 'eligible', reasonCode: 'scan_eligible', finalResult: null, executionId: null, details: { stage: 'scan' } },
+      ],
+    });
+
+    expect(partial).toMatchObject({
+      status: 'partial', botTraderEvaluationCompleted: false,
+      candidateCount: 2, evaluatedCount: 1, failureCount: 1,
+      missingCandidateIndexes: [1], failingCandidateIndexes: [0],
+    });
+  });
+
+  it('distinguishes disabled, failed, and legacy no-positive scan envelopes', () => {
+    const common = {
+      scanId: 41, candidateIndexes: [], candidateDecisions: [],
+      scanDecision: {
+        reasonCode: 'no_opportunities', reason: 'No opportunities',
+        receivedAt: '2026-08-11T12:00:00.000Z', updatedAt: '2026-08-11T12:00:10.000Z',
+        attempts: 0, placementCount: 0, details: { configVersion: 'bot-settings-v1:test' },
+      },
+    };
+    expect(summarizeBotScanEvaluation({ ...common, scanDecision: { ...common.scanDecision, state: 'criteria_rejected' } }))
+      .toMatchObject({ status: 'not_applicable_no_positive_arb', botTraderEvaluationCompleted: false, candidateCount: 0 });
+    expect(summarizeBotScanEvaluation({ ...common, scanDecision: { ...common.scanDecision, state: 'disabled', reasonCode: 'bot_disabled' } }))
+      .toMatchObject({ status: 'not_run_disabled', botTraderEvaluationCompleted: false });
+    expect(summarizeBotScanEvaluation({ ...common, candidateIndexes: [0], scanDecision: { ...common.scanDecision, state: 'failed', reasonCode: 'revalidation_failed' } }))
+      .toMatchObject({ status: 'failed', botTraderEvaluationCompleted: false, missingCandidateIndexes: [0] });
+  });
+
+  it('classifies a canonical no-positive-arb decision as terminal not-applicable without candidate gaps', () => {
+    expect(summarizeBotScanEvaluation({
+      scanId: 41,
+      candidateIndexes: [0],
+      scanDecision: {
+        state: 'criteria_rejected',
+        reasonCode: 'no_positive_arb',
+        reason: 'No Positive Arb — BotTrader not applicable',
+        receivedAt: '2026-08-11T12:00:00.000Z',
+        updatedAt: '2026-08-11T12:00:10.000Z',
+        attempts: 0,
+        placementCount: 0,
+        details: null,
+      },
+      candidateDecisions: [],
+    })).toMatchObject({
+      status: 'not_applicable_no_positive_arb',
+      botTraderEvaluationCompleted: false,
+      reason: 'No Positive Arb — BotTrader not applicable',
+      candidateCount: 0,
+      evaluatedCount: 0,
+      eligibleCount: 0,
+      placementAttemptCount: 0,
+      placedCount: 0,
+      skippedCount: 0,
+      failureCount: 0,
+      missingCandidateIndexes: [],
+      failingCandidateIndexes: [],
+    });
+  });
+
   it('publishes a canonical Logs row before immediately consuming that exact scan', async () => {
     const calls: string[] = [];
     const publisher = createPersistedBotScanPublisher({
@@ -753,11 +845,64 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.cursor()).toBe(43);
   });
 
-  it('checkpoints completed scans with zero opportunities', async () => {
-    const h = harness({ scans: [scan({ positiveArbCount: 0, candidates: [] })] });
+  it('checkpoints a non-positive scan as not applicable before settings, candidate evaluation, or placement checks', async () => {
+    const h = harness({
+      scans: [scan({
+        scannedAt: '2020-01-01T00:00:00.000Z',
+        positiveArbCount: 0,
+        candidates: [candidate()],
+      })],
+      botSettings: settings({ enabled: false }),
+    });
     const result = await h.consumer.consume(41, 'catch_up');
-    expect(result).toMatchObject({ state: 'criteria_rejected', reasonCode: 'no_opportunities' });
+    expect(result).toMatchObject({
+      state: 'criteria_rejected',
+      reasonCode: 'no_positive_arb',
+      reason: 'No Positive Arb — BotTrader not applicable',
+      attempts: 0,
+      placementCount: 0,
+    });
+    expect(h.deps.getSettings).not.toHaveBeenCalled();
+    expect(h.deps.resolveExecutionMode).not.toHaveBeenCalled();
+    expect(h.deps.revalidate).not.toHaveBeenCalled();
+    expect(h.deps.reserveOpportunity).not.toHaveBeenCalled();
+    expect(h.deps.execute).not.toHaveBeenCalled();
+    expect(h.opportunityDecisions).toEqual([]);
     expect(h.cursor()).toBe(41);
+  });
+
+  it('applies the positive-arb gate during catch-up without suppressing eligible scans', async () => {
+    const zero = scan({ id: 41, positiveArbCount: 0, candidates: [] });
+    const positive = scan({
+      id: 42,
+      candidates: [candidate({ kalshiTicker: 'KX-42', pmConditionId: 'pm-42' })],
+    });
+    const h = harness({ scans: [zero, positive] });
+    vi.mocked(h.deps.revalidate).mockImplementation(async (persisted) => persisted.candidates);
+
+    const results = await h.consumer.processBacklog();
+
+    expect(results).toEqual([
+      expect.objectContaining({ scanId: 41, reasonCode: 'no_positive_arb' }),
+      expect.objectContaining({ scanId: 42, state: 'placed' }),
+    ]);
+    expect(h.deps.getSettings).toHaveBeenCalledTimes(1);
+    expect(h.deps.revalidate).toHaveBeenCalledTimes(1);
+    expect(h.deps.execute).toHaveBeenCalledTimes(1);
+    expect(h.opportunityDecisions.every((decision) => decision.candidateIndex === 0)).toBe(true);
+    expect(h.cursor()).toBe(42);
+  });
+
+  it('does not create candidate work when a non-positive scan is delivered twice', async () => {
+    const h = harness({ scans: [scan({ positiveArbCount: 0, candidates: [] })] });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({ reasonCode: 'no_positive_arb' });
+    await expect(h.consumer.consume(41, 'catch_up')).resolves.toMatchObject({ state: 'duplicate_replay' });
+
+    expect(h.deps.getSettings).not.toHaveBeenCalled();
+    expect(h.deps.revalidate).not.toHaveBeenCalled();
+    expect(h.deps.execute).not.toHaveBeenCalled();
+    expect(h.opportunityDecisions).toEqual([]);
   });
 
   it('does not advance the cursor across an unfinished completed-scan gap', async () => {

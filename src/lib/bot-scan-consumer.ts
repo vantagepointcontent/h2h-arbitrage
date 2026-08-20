@@ -109,6 +109,158 @@ export interface BotScanDecision {
   leaseOwner?: string | null;
 }
 
+export type BotTraderEvaluationStatus =
+  | 'pending'
+  | 'completed'
+  | 'partial'
+  | 'failed'
+  | 'not_run_disabled'
+  | 'not_applicable_no_positive_arb';
+
+export interface BotScanEvaluationEnvelope {
+  scanId: number;
+  status: BotTraderEvaluationStatus;
+  botTraderEvaluationCompleted: boolean;
+  reason: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  settingsVersion: string | null;
+  candidateCount: number;
+  evaluatedCount: number;
+  eligibleCount: number;
+  placementAttemptCount: number;
+  placedCount: number;
+  skippedCount: number;
+  failureCount: number;
+  missingCandidateIndexes: number[];
+  failingCandidateIndexes: number[];
+}
+
+interface EvaluationCandidateDecision {
+  candidateIndex: number;
+  state: string;
+  reasonCode: string;
+  finalResult: string | null;
+  executionId: number | null;
+  details: unknown;
+}
+
+interface EvaluationScanDecision {
+  state: string;
+  reasonCode: string;
+  reason: string;
+  receivedAt: string | null;
+  updatedAt: string | null;
+  attempts: number;
+  placementCount: number;
+  details: unknown;
+}
+
+function recordObject(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+export function summarizeBotScanEvaluation(input: {
+  scanId: number;
+  candidateIndexes: number[];
+  scanDecision: EvaluationScanDecision | null;
+  candidateDecisions: EvaluationCandidateDecision[];
+}): BotScanEvaluationEnvelope {
+  const notApplicable = input.scanDecision?.reasonCode === 'no_positive_arb'
+    || input.scanDecision?.reasonCode === 'no_opportunities';
+  if (notApplicable) {
+    return {
+      scanId: input.scanId,
+      status: 'not_applicable_no_positive_arb',
+      botTraderEvaluationCompleted: false,
+      reason: 'No Positive Arb — BotTrader not applicable',
+      startedAt: input.scanDecision?.receivedAt ?? null,
+      completedAt: input.scanDecision?.updatedAt ?? null,
+      updatedAt: input.scanDecision?.updatedAt ?? null,
+      settingsVersion: null,
+      candidateCount: 0,
+      evaluatedCount: 0,
+      eligibleCount: 0,
+      placementAttemptCount: 0,
+      placedCount: 0,
+      skippedCount: 0,
+      failureCount: 0,
+      missingCandidateIndexes: [],
+      failingCandidateIndexes: [],
+    };
+  }
+  const expected = [...new Set(input.candidateIndexes)].sort((a, b) => a - b);
+  const decisionsByIndex = new Map(input.candidateDecisions.map((item) => [item.candidateIndex, item]));
+  const terminal = expected.flatMap((candidateIndex) => {
+    const decision = decisionsByIndex.get(candidateIndex);
+    return decision?.finalResult ? [decision] : [];
+  });
+  const missingCandidateIndexes = expected.filter((candidateIndex) => !decisionsByIndex.get(candidateIndex)?.finalResult);
+  const executionDecisions = input.candidateDecisions.filter((item) => recordObject(item.details)?.stage === 'execution');
+  const eligibleCount = input.candidateDecisions.filter((item) =>
+    item.state === 'eligible' || item.state === 'accepted' || recordObject(item.details)?.stage === 'execution').length;
+  const disabled = input.scanDecision?.state === 'disabled';
+  const inProgress = input.scanDecision == null
+    || input.scanDecision.state === 'received'
+    || input.scanDecision.state === 'placement_attempted';
+  const partialExposure = input.scanDecision?.state === 'partial_or_unhedged';
+  const failedScan = input.scanDecision?.state === 'failed';
+  const allTerminal = terminal.length === expected.length;
+  const failingCandidateIndexes = terminal
+    .filter((item) => item.finalResult === 'failed'
+      || (recordObject(item.details)?.stage === 'execution' && item.finalResult !== 'accepted'
+        && input.scanDecision?.state !== 'daily_limit'))
+    .map((item) => item.candidateIndex)
+    .sort((a, b) => a - b);
+  let status: BotTraderEvaluationStatus;
+  if (disabled) status = 'not_run_disabled';
+  else if (inProgress) status = 'pending';
+  else if (partialExposure || (!allTerminal && terminal.length > 0)) status = 'partial';
+  else if (failedScan || !allTerminal) status = 'failed';
+  else status = 'completed';
+  const completed = status === 'completed';
+  const decisionDetails = recordObject(input.scanDecision?.details);
+  const candidateSettingsVersion = input.candidateDecisions
+    .map((item) => recordObject(item.details)?.configVersion)
+    .find((value): value is string => typeof value === 'string');
+  const settingsVersion = typeof decisionDetails?.configVersion === 'string'
+    ? decisionDetails.configVersion
+    : candidateSettingsVersion ?? null;
+  const placedCount = Math.max(
+    input.scanDecision?.placementCount ?? 0,
+    terminal.filter((item) => item.finalResult === 'accepted').length,
+  );
+  const placementAttemptCount = Math.max(input.scanDecision?.attempts ?? 0, executionDecisions.length);
+  const failureCount = failingCandidateIndexes.length;
+  const skippedCount = terminal.filter((item) =>
+    !failingCandidateIndexes.includes(item.candidateIndex) && item.finalResult !== 'accepted').length;
+  const reason = completed
+    ? 'Every candidate has a terminal auditable BotTrader decision'
+    : input.scanDecision?.reason ?? 'BotTrader evaluation has not started';
+  return {
+    scanId: input.scanId,
+    status,
+    botTraderEvaluationCompleted: completed,
+    reason,
+    startedAt: input.scanDecision?.receivedAt ?? null,
+    completedAt: inProgress ? null : input.scanDecision?.updatedAt ?? null,
+    updatedAt: input.scanDecision?.updatedAt ?? null,
+    settingsVersion,
+    candidateCount: expected.length,
+    evaluatedCount: terminal.length,
+    eligibleCount,
+    placementAttemptCount,
+    placedCount,
+    skippedCount,
+    failureCount,
+    missingCandidateIndexes,
+    failingCandidateIndexes,
+  };
+}
+
 type DecisionUpdate = Pick<BotScanDecision, 'state' | 'reasonCode' | 'reason'> & Partial<Pick<BotScanDecision, 'attempts' | 'placementCount' | 'details'>>;
 
 export interface BotScanConsumerDeps {
@@ -313,11 +465,37 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       return { ...TERMINAL_REPLAY, scanId, idempotencyKey: `scan:${scanId}`, source, receivedAt: scan.scannedAt, updatedAt: deps.now().toISOString() };
     }
 
+    let activeSettingsVersion: string | null = null;
+    const withSettingsVersion = (details: unknown): unknown => activeSettingsVersion == null
+      ? details
+      : { ...(recordObject(details) ?? {}), configVersion: activeSettingsVersion };
     const finish = async (update: DecisionUpdate) => {
-      const result = await deps.finish(scanId, claimed.leaseOwner ?? '', update);
+      const result = await deps.finish(scanId, claimed.leaseOwner ?? '', {
+        ...update,
+        details: withSettingsVersion(update.details),
+      });
       await deps.advanceCursor(scanId);
       return result;
     };
+
+    // Canonical persisted classification is the fan-out gate. Check it before
+    // settings, freshness, revalidation, candidate audit writes, reservations,
+    // or placement checks so non-positive scans create no BotTrader workload.
+    // A previously persisted placement transition remains fail-closed because
+    // possible venue exposure must never be reclassified as not applicable.
+    if (scan.positiveArbCount <= 0 && claimed.state !== 'placement_attempted') {
+      return finish({
+        state: 'criteria_rejected',
+        reasonCode: 'no_positive_arb',
+        reason: 'No Positive Arb — BotTrader not applicable',
+        attempts: 0,
+        placementCount: 0,
+        details: {
+          evaluationStatus: 'not_applicable_no_positive_arb',
+          canonicalPositiveArbCount: scan.positiveArbCount,
+        },
+      });
+    }
 
     const recordTerminalScanSkip = async (
       settings: BotSettings,
@@ -360,6 +538,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     };
 
     const settings = await deps.getSettings();
+    activeSettingsVersion = `bot-settings-v1:${JSON.stringify(settings)}`;
     if (claimed.state === 'placement_attempted') {
       const executionMode = await deps.resolveExecutionMode(settings);
       const reason = 'The prior worker stopped after placement began; venue outcome and exposure require explicit reconciliation before this scan can be checkpointed';
@@ -484,12 +663,6 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       return finish(rejection('stale', 'scan_stale', reason, { ageMs, maxScanAgeMs }));
     }
 
-    if (scan.positiveArbCount <= 0) {
-      return finish(rejection('criteria_rejected', 'no_opportunities', 'Completed scan contained no positive arbitrage opportunities', {
-        opportunitiesEvaluated: 0,
-        eligibleCount: 0,
-      }));
-    }
     for (const rejected of scan.rejectedCandidates ?? []) {
       const placeholder: BotScanCandidate = {
         candidateIndex: rejected.candidateIndex,
@@ -680,7 +853,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       reasonCode: 'placement_attempted',
       reason: `Attempting ${reserved.length} revalidated candidate placement(s)`,
       attempts: claimed.attempts + reserved.length,
-      details: {
+      details: withSettingsVersion({
         rejections,
         attemptedCandidates: reserved.map((candidate) => ({
           candidateIndex: sourceCandidateIndex(scan, candidate),
@@ -688,7 +861,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           pmConditionId: candidate.pmConditionId,
           outcome: candidate.outcome,
         })),
-      },
+      }),
     });
 
     const results: Array<{ outcome: string; result?: BotExecutionResult; error?: string }> = [];
@@ -859,6 +1032,25 @@ async function ensureSchema(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_bot_scan_events_scan ON bot_scan_decision_events(scan_id, id)`,
       `CREATE INDEX IF NOT EXISTS idx_bot_opportunity_decisions_scan ON bot_opportunity_decisions(scan_id, candidate_index)`,
       `CREATE TABLE IF NOT EXISTS bot_scan_cursor (consumer TEXT PRIMARY KEY, last_scan_id INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS bot_scan_evaluations (
+        scan_id INTEGER PRIMARY KEY REFERENCES scan_results(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        reason TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        updated_at TEXT,
+        settings_version TEXT,
+        candidate_count INTEGER NOT NULL DEFAULT 0,
+        evaluated_count INTEGER NOT NULL DEFAULT 0,
+        eligible_count INTEGER NOT NULL DEFAULT 0,
+        placement_attempt_count INTEGER NOT NULL DEFAULT 0,
+        placed_count INTEGER NOT NULL DEFAULT 0,
+        skipped_count INTEGER NOT NULL DEFAULT 0,
+        failure_count INTEGER NOT NULL DEFAULT 0,
+        missing_candidate_indexes TEXT NOT NULL DEFAULT '[]',
+        failing_candidate_indexes TEXT NOT NULL DEFAULT '[]'
+      )`,
     ], 'write');
     for (const migration of [
       'ALTER TABLE bot_opportunity_decisions ADD COLUMN threshold_config_version TEXT',
@@ -882,6 +1074,87 @@ async function ensureSchema(): Promise<void> {
 function parseJson(value: unknown): unknown {
   if (typeof value !== 'string' || !value) return null;
   try { return JSON.parse(value); } catch { return null; }
+}
+
+function candidateIndexesFromScanRow(row: Record<string, unknown> | undefined, decisionIndexes: number[]): number[] {
+  const raw = parseJson(row?.raw_result);
+  const allArbs = recordObject(raw)?.allArbs;
+  if (Array.isArray(allArbs)) return allArbs.map((_, candidateIndex) => candidateIndex);
+  const positiveArbCount = Number(row?.positive_arb_count ?? 0);
+  const inferredCount = Number.isSafeInteger(positiveArbCount) && positiveArbCount > 0 ? positiveArbCount : 0;
+  const indexes = new Set(decisionIndexes);
+  for (let candidateIndex = 0; candidateIndex < inferredCount; candidateIndex++) indexes.add(candidateIndex);
+  return [...indexes].sort((a, b) => a - b);
+}
+
+async function refreshPersistedScanEvaluation(db: ReturnType<typeof createClient>, scanId: number): Promise<BotScanEvaluationEnvelope> {
+  const [scanResult, decisionResult, candidateResult] = await Promise.all([
+    db.execute({ sql: 'SELECT raw_result,positive_arb_count,scanned_at FROM scan_results WHERE id=?', args: [scanId] }),
+    db.execute({ sql: 'SELECT * FROM bot_scan_decisions WHERE scan_id=?', args: [scanId] }),
+    db.execute({ sql: 'SELECT * FROM bot_opportunity_decisions WHERE scan_id=? ORDER BY candidate_index', args: [scanId] }),
+  ]);
+  const decisionRow = decisionResult.rows[0] as unknown as Record<string, unknown> | undefined;
+  const candidateDecisions: EvaluationCandidateDecision[] = (candidateResult.rows as unknown as Record<string, unknown>[]).map((row) => ({
+    candidateIndex: Number(row.candidate_index),
+    state: String(row.state),
+    reasonCode: String(row.reason_code),
+    finalResult: row.final_result == null ? null : String(row.final_result),
+    executionId: row.execution_id == null ? null : Number(row.execution_id),
+    details: parseJson(row.details),
+  }));
+  const scanRow = scanResult.rows[0] as unknown as Record<string, unknown> | undefined;
+  const canonicalPositiveArbCount = Number(scanRow?.positive_arb_count ?? 0);
+  const persistedScanDecision: EvaluationScanDecision | null = decisionRow ? {
+    state: String(decisionRow.state),
+    reasonCode: String(decisionRow.reason_code),
+    reason: String(decisionRow.reason),
+    receivedAt: decisionRow.received_at == null ? null : String(decisionRow.received_at),
+    updatedAt: decisionRow.updated_at == null ? null : String(decisionRow.updated_at),
+    attempts: Number(decisionRow.attempts ?? 0),
+    placementCount: Number(decisionRow.placement_count ?? 0),
+    details: parseJson(decisionRow.details),
+  } : Number.isFinite(canonicalPositiveArbCount) && canonicalPositiveArbCount <= 0 ? {
+    state: 'criteria_rejected',
+    reasonCode: 'no_positive_arb',
+    reason: 'No Positive Arb — BotTrader not applicable',
+    receivedAt: scanRow?.scanned_at == null ? null : String(scanRow.scanned_at),
+    updatedAt: scanRow?.scanned_at == null ? null : String(scanRow.scanned_at),
+    attempts: 0,
+    placementCount: 0,
+    details: null,
+  } : null;
+  const envelope = summarizeBotScanEvaluation({
+    scanId,
+    candidateIndexes: candidateIndexesFromScanRow(
+      scanRow,
+      candidateDecisions.map((item) => item.candidateIndex),
+    ),
+    scanDecision: persistedScanDecision,
+    candidateDecisions,
+  });
+  await db.execute({
+    sql: `INSERT INTO bot_scan_evaluations
+      (scan_id,status,completed,reason,started_at,completed_at,updated_at,settings_version,
+       candidate_count,evaluated_count,eligible_count,placement_attempt_count,placed_count,skipped_count,failure_count,
+       missing_candidate_indexes,failing_candidate_indexes)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(scan_id) DO UPDATE SET
+        status=excluded.status,completed=excluded.completed,reason=excluded.reason,
+        started_at=excluded.started_at,completed_at=excluded.completed_at,updated_at=excluded.updated_at,
+        settings_version=excluded.settings_version,candidate_count=excluded.candidate_count,
+        evaluated_count=excluded.evaluated_count,eligible_count=excluded.eligible_count,
+        placement_attempt_count=excluded.placement_attempt_count,placed_count=excluded.placed_count,
+        skipped_count=excluded.skipped_count,failure_count=excluded.failure_count,
+        missing_candidate_indexes=excluded.missing_candidate_indexes,failing_candidate_indexes=excluded.failing_candidate_indexes`,
+    args: [
+      envelope.scanId, envelope.status, envelope.botTraderEvaluationCompleted ? 1 : 0, envelope.reason,
+      envelope.startedAt, envelope.completedAt, envelope.updatedAt, envelope.settingsVersion,
+      envelope.candidateCount, envelope.evaluatedCount, envelope.eligibleCount, envelope.placementAttemptCount,
+      envelope.placedCount, envelope.skippedCount, envelope.failureCount,
+      JSON.stringify(envelope.missingCandidateIndexes), JSON.stringify(envelope.failingCandidateIndexes),
+    ],
+  });
+  return envelope;
 }
 
 function parseDepth(value: unknown): number {
@@ -1093,6 +1366,7 @@ async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<B
         : 'Persisted completed scan received',
       null,
     );
+    await refreshPersistedScanEvaluation(db, scan.id);
     return decision;
   } finally { db.close(); }
 }
@@ -1120,6 +1394,7 @@ async function updateDecision(scanId: number, leaseOwner: string, update: Decisi
     const updated = result.rows[0] as unknown as Record<string, unknown> | undefined;
     if (!updated) throw new Error(`Bot scan ${scanId} lease expired during decision update`);
     await appendEvent(db, scanId, prior.source as BotScanSource, update.state, update.reasonCode, update.reason, update.details);
+    await refreshPersistedScanEvaluation(db, scanId);
     return rowToDecision(updated);
   } finally { db.close(); }
 }
@@ -1153,6 +1428,7 @@ async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: n
         candidate.roiPct, candidate.apyPct ?? null, now, now, details == null ? null : JSON.stringify(details),
         `scan:${scan.id}:opportunity:${candidateIndex}`, configVersion, finalResult, executionId],
     });
+    await refreshPersistedScanEvaluation(db, scan.id);
   } finally { db.close(); }
 }
 
@@ -1248,6 +1524,61 @@ export async function getBotScanDecisions(limit = 100): Promise<BotScanDecision[
   } finally { db.close(); }
 }
 
+function parseIndexArray(value: unknown): number[] {
+  const parsed = parseJson(value);
+  return Array.isArray(parsed)
+    ? parsed.filter((item): item is number => typeof item === 'number' && Number.isSafeInteger(item))
+    : [];
+}
+
+function rowToEvaluation(row: Record<string, unknown>): BotScanEvaluationEnvelope {
+  return {
+    scanId: Number(row.scan_id),
+    status: row.status as BotTraderEvaluationStatus,
+    botTraderEvaluationCompleted: Number(row.completed) === 1,
+    reason: String(row.reason),
+    startedAt: row.started_at == null ? null : String(row.started_at),
+    completedAt: row.completed_at == null ? null : String(row.completed_at),
+    updatedAt: row.updated_at == null ? null : String(row.updated_at),
+    settingsVersion: row.settings_version == null ? null : String(row.settings_version),
+    candidateCount: Number(row.candidate_count ?? 0),
+    evaluatedCount: Number(row.evaluated_count ?? 0),
+    eligibleCount: Number(row.eligible_count ?? 0),
+    placementAttemptCount: Number(row.placement_attempt_count ?? 0),
+    placedCount: Number(row.placed_count ?? 0),
+    skippedCount: Number(row.skipped_count ?? 0),
+    failureCount: Number(row.failure_count ?? 0),
+    missingCandidateIndexes: parseIndexArray(row.missing_candidate_indexes),
+    failingCandidateIndexes: parseIndexArray(row.failing_candidate_indexes),
+  };
+}
+
+export async function getBotScanEvaluationSummaries(scanIds: number[]): Promise<Map<number, BotScanEvaluationEnvelope>> {
+  await ensureSchema();
+  const ids = [...new Set(scanIds)].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 500);
+  const evaluations = new Map<number, BotScanEvaluationEnvelope>();
+  if (ids.length === 0) return evaluations;
+  const db = dbClient();
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    const read = async () => db.execute({
+      sql: `SELECT * FROM bot_scan_evaluations WHERE scan_id IN (${placeholders})`,
+      args: ids,
+    });
+    let rows = await read();
+    const found = new Set(rows.rows.map((row) => Number(row.scan_id)));
+    for (const scanId of ids) {
+      if (!found.has(scanId)) await refreshPersistedScanEvaluation(db, scanId);
+    }
+    if (found.size !== ids.length) rows = await read();
+    for (const row of rows.rows as unknown as Record<string, unknown>[]) {
+      const evaluation = rowToEvaluation(row);
+      evaluations.set(evaluation.scanId, evaluation);
+    }
+    return evaluations;
+  } finally { db.close(); }
+}
+
 export async function getBotScanHealth(): Promise<{
   latestCompletedScanId: number | null;
   latestCompletedScanAt: string | null;
@@ -1277,7 +1608,7 @@ export async function getBotScanHealth(): Promise<{
       db.execute(`SELECT COUNT(*) AS count FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
-        WHERE s.scan_status='completed' AND (
+        WHERE s.scan_status='completed' AND s.positive_arb_count>0 AND (
           (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state IN ('received','placement_attempted')
           OR (d.state='partial_or_unhedged' AND d.reason_code='interrupted_placement_reconciliation_required')
           OR (d.state='failed' AND d.reason_code='revalidation_failed'))`),
