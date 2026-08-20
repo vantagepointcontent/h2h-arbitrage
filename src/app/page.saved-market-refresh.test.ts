@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import {
   buildScanLinkPayload,
+  buildSavedMarketsListFailureState,
   createQuickPricesRequestOwner,
   createSavedMarketsListRequestOwner,
   createSavedMarketHydrationOwner,
@@ -90,6 +91,37 @@ function createSavedMarketViewHarness() {
 }
 
 describe('saved-market quick-price request ownership', () => {
+  it('keeps retained rows with an actionable degraded refresh message', () => {
+    expect(buildSavedMarketsListFailureState(true, null)).toEqual({
+      status: 'degraded',
+      message: 'Saved markets could not be refreshed. The last-known list is still shown. Try Refresh again.',
+    });
+  });
+
+  it('reports an actionable unavailable error without claiming retained rows', () => {
+    const state = buildSavedMarketsListFailureState(false, null);
+
+    expect(state).toEqual({
+      status: 'error',
+      message: 'Saved markets are unavailable, so no markets can be shown. Reload the app, then try Refresh again.',
+    });
+    expect(state.message).not.toContain('last-known list');
+  });
+
+  it('explains session recovery while retained rows remain visible', () => {
+    expect(buildSavedMarketsListFailureState(true, 401)).toEqual({
+      status: 'degraded',
+      message: 'The saved-markets session expired. The last-known list is still shown. Reload the app and try Refresh again.',
+    });
+  });
+
+  it('explains session recovery when no rows can be shown', () => {
+    expect(buildSavedMarketsListFailureState(false, 403)).toEqual({
+      status: 'error',
+      message: 'Saved markets are unavailable because the session expired, so no markets can be shown. Reload the app, then try Refresh again.',
+    });
+  });
+
   it('wires sidebar refresh to the server bridge without the bulk-scan path', () => {
     const page = readFileSync(`${process.cwd()}/src/app/page.tsx`, 'utf8');
     const sidebar = readFileSync(`${process.cwd()}/src/app/components/MarketSidebar.tsx`, 'utf8');

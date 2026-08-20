@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendPropositionRejection,
+  buildPropositionRegistryIndex,
   canonicalPropositionRelationshipCount,
+  exportPropositionReviewQueue,
   findCanonicalPropositionRelationship,
+  findCanonicalPropositionRejection,
+  migratePropositionRegistryV1,
   resolveCanonicalPropositionRelationship,
 } from './proposition-registry';
-import type { PropositionRelationship } from './proposition-identity';
+import {
+  validatePropositionRelationship,
+  type PropositionRelationship,
+  type PropositionRelationshipV2,
+} from './proposition-identity';
 
 const selfAsserted: PropositionRelationship = {
   schemaVersion: 1,
@@ -27,6 +36,17 @@ const selfAsserted: PropositionRelationship = {
       humanLabel: 'Polymarket NO', marketQuestion: 'Will it win?', tokenId: 'no-token',
     },
   },
+};
+
+const reviewedRelationship: PropositionRelationshipV2 = {
+  ...selfAsserted,
+  schemaVersion: 2,
+  reviewedBy: ['reviewer-a', 'reviewer-b'],
+  reviewedAt: '2026-08-20T10:10:04.864Z',
+  reviewTask: 'RES-849',
+  evidenceRevision: 'authority-v1',
+  resolutionRuleRevision: 'rule-v1',
+  evidence: [{ uri: 'artifacts/authority.json', sha256: 'a'.repeat(64), observedAt: '2026-08-20T10:00:00.000Z' }],
 };
 
 describe('canonical proposition registry', () => {
@@ -84,4 +104,243 @@ describe('canonical proposition registry', () => {
       },
     });
   });
+
+  it('keeps an exact rejected tuple untrusted and non-executable for the reviewed revisions', () => {
+    const tuple = {
+      kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+      kalshiSide: 'yes' as const, pmSide: 'no' as const,
+    };
+    const index = buildPropositionRegistryIndex({
+      schemaVersion: 2,
+      description: 'test registry',
+      relationships: [],
+      rejections: [{
+        schemaVersion: 1,
+        executionTuple: tuple,
+        evidenceRevision: 'authority-v1',
+        resolutionRuleRevision: 'rule',
+        rejectedBy: ['reviewer-a', 'reviewer-b'],
+        rejectedAt: '2026-08-20T10:10:04.864Z',
+        reviewTask: 'RES-849',
+        code: 'resolution_rule_conflict',
+        reason: 'The authoritative rules can resolve differently.',
+        sourceScanIds: [1],
+        evidence: reviewedRelationship.evidence,
+      }],
+    });
+
+    expect(index.findExact(tuple)).toBeNull();
+    expect(index.findRejection({ ...tuple, evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule' }))
+      .toMatchObject({ code: 'resolution_rule_conflict' });
+  });
+
+  it('exports only exact tuples whose evidence or rule revision still needs review', () => {
+    const rejectedTuple = {
+      kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+      kalshiSide: 'yes' as const, pmSide: 'no' as const,
+    };
+    const file = {
+      schemaVersion: 2 as const,
+      description: 'test registry',
+      relationships: [],
+      rejections: [{
+        schemaVersion: 1 as const,
+        executionTuple: rejectedTuple,
+        evidenceRevision: 'authority-v1',
+        resolutionRuleRevision: 'rule-v1',
+        rejectedBy: ['reviewer-a', 'reviewer-b'],
+        rejectedAt: '2026-08-20T10:10:04.864Z',
+        reviewTask: 'RES-849',
+        code: 'resolution_rule_conflict',
+        reason: 'The authoritative rules can resolve differently.',
+        sourceScanIds: [1],
+        evidence: reviewedRelationship.evidence,
+      }],
+    };
+    const candidates = [
+      { ...rejectedTuple, evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1', sourceScanIds: [1] },
+      { ...rejectedTuple, evidenceRevision: 'authority-v2', resolutionRuleRevision: 'rule-v2', sourceScanIds: [2] },
+      { ...rejectedTuple, pmTokenId: 'different-token', evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1', sourceScanIds: [3] },
+    ];
+
+    expect(exportPropositionReviewQueue(file, candidates)).toEqual([candidates[1], candidates[2]]);
+  });
+
+  it('fails closed when a revision-aware execution lookup reports changed authority', () => {
+    const index = buildPropositionRegistryIndex({
+      schemaVersion: 2,
+      description: 'approved registry',
+      relationships: [reviewedRelationship],
+      rejections: [],
+    });
+    const tuple = {
+      kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+      kalshiSide: 'yes' as const, pmSide: 'no' as const,
+    };
+
+    expect(index.findExact({ ...tuple, evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1' }))
+      .toBe(reviewedRelationship);
+    expect(index.findExact({ ...tuple, evidenceRevision: 'authority-v2', resolutionRuleRevision: 'rule-v2' }))
+      .toBeNull();
+  });
+
+  it('migrates a source-controlled v1 registry only with explicit review provenance', () => {
+    const migrated = migratePropositionRegistryV1({
+      schemaVersion: 1,
+      description: 'legacy registry',
+      relationships: [selfAsserted],
+    }, {
+      reviewedBy: ['reviewer-a', 'reviewer-b'],
+      reviewedAt: '2026-08-20T10:10:04.864Z',
+      reviewTask: 'RES-849',
+      evidenceRevision: 'migration-authority-v1',
+      resolutionRuleRevision: 'rule-v1',
+      evidence: reviewedRelationship.evidence,
+    });
+
+    expect(migrated).toMatchObject({
+      schemaVersion: 2,
+      rejections: [],
+      relationships: [{
+        schemaVersion: 2,
+        reviewedBy: ['reviewer-a', 'reviewer-b'],
+        evidenceRevision: 'migration-authority-v1',
+      }],
+    });
+    expect(buildPropositionRegistryIndex(migrated).count).toBe(1);
+  });
+
+  it('fails closed on unknown registry, relationship, and rejection revisions', () => {
+    expect(() => buildPropositionRegistryIndex({ schemaVersion: 99 } as never)).toThrow(/unsupported/i);
+    expect(validateUnknownRelationshipRevision()).toMatchObject({ valid: false });
+
+    const file = {
+      schemaVersion: 2 as const,
+      description: 'test registry',
+      relationships: [],
+      rejections: [{
+        schemaVersion: 99,
+        executionTuple: {
+          kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+          kalshiSide: 'yes' as const, pmSide: 'no' as const,
+        },
+      }],
+    };
+    expect(() => buildPropositionRegistryIndex(file as never)).toThrow(/unsupported.*rejection/i);
+  });
+
+  it('rejects duplicate decisions and approval/rejection conflicts at the same reviewed revisions', () => {
+    const rejection = {
+      schemaVersion: 1 as const,
+      executionTuple: {
+        kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+        kalshiSide: 'yes' as const, pmSide: 'no' as const,
+      },
+      evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1',
+      rejectedBy: ['reviewer-a', 'reviewer-b'], rejectedAt: '2026-08-20T10:10:04.864Z',
+      reviewTask: 'RES-849', code: 'conflict', reason: 'Rules conflict.', sourceScanIds: [1],
+      evidence: reviewedRelationship.evidence,
+    };
+    expect(() => buildPropositionRegistryIndex({
+      schemaVersion: 2, description: 'duplicate', relationships: [], rejections: [rejection, rejection],
+    })).toThrow(/duplicate.*rejection/i);
+    expect(() => buildPropositionRegistryIndex({
+      schemaVersion: 2, description: 'conflict', relationships: [reviewedRelationship], rejections: [rejection],
+    })).toThrow(/conflicting approval and rejection/i);
+  });
+
+  it('allows a newly reviewed approval to coexist with an append-only historical rejection', () => {
+    const rejection = {
+      schemaVersion: 1 as const,
+      executionTuple: {
+        kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+        kalshiSide: 'yes' as const, pmSide: 'no' as const,
+      },
+      evidenceRevision: 'authority-v0', resolutionRuleRevision: 'rule-v0',
+      rejectedBy: ['reviewer-a', 'reviewer-b'], rejectedAt: '2026-08-19T10:10:04.864Z',
+      reviewTask: 'RES-848', code: 'conflict', reason: 'Old rules conflicted.', sourceScanIds: [1],
+      evidence: reviewedRelationship.evidence,
+    };
+
+    const index = buildPropositionRegistryIndex({
+      schemaVersion: 2,
+      description: 'revision-aware re-review',
+      relationships: [reviewedRelationship],
+      rejections: [rejection],
+    });
+
+    expect(index.findExact({
+      ...rejection.executionTuple,
+      evidenceRevision: 'authority-v1',
+      resolutionRuleRevision: 'rule-v1',
+    })).toBe(reviewedRelationship);
+    expect(index.findRejection({
+      ...rejection.executionTuple,
+      evidenceRevision: 'authority-v0',
+      resolutionRuleRevision: 'rule-v0',
+    })).toBe(rejection);
+  });
+
+  it.each([
+    ['whitespace aliases', ['alice', ' alice :other']],
+    ['empty identity component', [':service', 'h2h-backend']],
+  ])('rejects rejection provenance with %s', (_label, rejectedBy) => {
+    expect(() => buildPropositionRegistryIndex({
+      schemaVersion: 2,
+      description: 'invalid reviewer provenance',
+      relationships: [],
+      rejections: [{
+        schemaVersion: 1,
+        executionTuple: {
+          kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+          kalshiSide: 'yes', pmSide: 'no',
+        },
+        evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1',
+        rejectedBy, rejectedAt: '2026-08-20T10:10:04.864Z',
+        reviewTask: 'RES-849', code: 'conflict', reason: 'Rules conflict.', sourceScanIds: [1],
+        evidence: reviewedRelationship.evidence,
+      }],
+    })).toThrow(/distinct reviewers/i);
+  });
+
+  it('appends rejection decisions without rewriting prior ledger entries', () => {
+    const file = { schemaVersion: 2 as const, description: 'ledger', relationships: [], rejections: [] };
+    const rejection = {
+      schemaVersion: 1 as const,
+      executionTuple: {
+        kalshiTicker: 'KXTEST', pmConditionId: '0xcondition', pmTokenId: 'no-token',
+        kalshiSide: 'yes' as const, pmSide: 'no' as const,
+      },
+      evidenceRevision: 'authority-v1', resolutionRuleRevision: 'rule-v1',
+      rejectedBy: ['reviewer-a', 'reviewer-b'], rejectedAt: '2026-08-20T10:10:04.864Z',
+      reviewTask: 'RES-849', code: 'conflict', reason: 'Rules conflict.', sourceScanIds: [1],
+      evidence: reviewedRelationship.evidence,
+    };
+    const appended = appendPropositionRejection(file, rejection);
+
+    expect(file.rejections).toEqual([]);
+    expect(appended.rejections).toEqual([rejection]);
+    expect(() => appendPropositionRejection(appended, rejection)).toThrow(/duplicate.*rejection/i);
+  });
+
+  it('keeps the checked-in RES-849 rejected tuple absent from canonical execution lookup', () => {
+    const tuple = {
+      kalshiTicker: 'KXARREST-27JAN-THOM',
+      pmConditionId: '0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6',
+      pmTokenId: '27705432816847291323925622847687396001932163087018486036209592664496834211156',
+      kalshiSide: 'yes' as const,
+      pmSide: 'no' as const,
+    };
+    expect(findCanonicalPropositionRelationship(tuple)).toBeNull();
+    expect(findCanonicalPropositionRejection({
+      ...tuple,
+      evidenceRevision: 'sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203',
+      resolutionRuleRevision: 'sha256:40d6f9809707d25b6aad5d28cb4d7b719e8c7f44d0c705c16ab3d2643d7c48f5',
+    })).toMatchObject({ code: 'resolution_rule_conflict', sourceScanIds: [815095, 815202, 815301] });
+  });
 });
+
+function validateUnknownRelationshipRevision() {
+  const unknown = { ...selfAsserted, schemaVersion: 99 };
+  return validatePropositionRelationship(unknown as never);
+}

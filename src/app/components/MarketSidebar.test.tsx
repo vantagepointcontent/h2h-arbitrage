@@ -88,6 +88,32 @@ describe.each([
 });
 
 describe('BUG-168 lightweight Saved Markets refresh', () => {
+  it('renders no healthy persisted-list status or revision details', () => {
+    const noop = vi.fn();
+    const saved: SavedMarket = {
+      id: 'market-healthy', eventTitle: 'Healthy market', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-01T00:00:00.000Z', lastScanResult: null,
+    };
+
+    render(<MarketSidebar markets={[saved]} activeId={null} viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="name" sortDir="asc" onToggleSort={noop}
+      timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={noop}
+      listRefreshState={{ status: 'success', message: null, observedAt: '2026-08-20T10:00:00.000Z', source: 'persisted-saved-markets', revision: 'rev-private' }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
+
+    expect(screen.getByText('Healthy market')).toBeTruthy();
+    expect(screen.queryByText(/Latest persisted list loaded|rev-private/i)).toBeNull();
+    expect(screen.queryByTestId('saved-markets-revision')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    const filters = screen.getByPlaceholderText('Filter by name...').parentElement;
+    expect(filters?.previousElementSibling?.textContent).toContain('Saved Markets (1)');
+  });
+
   it('renders a bounded degraded state while retaining rows', () => {
     const noop = vi.fn();
     const refresh = vi.fn();
@@ -112,7 +138,25 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Retained market')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('last-known list');
+    expect(screen.getByRole('alert').className).toContain('status-warning');
     expect(screen.queryByText(/\{"error"/)).toBeNull();
+  });
+
+  it('renders an unavailable list as a red actionable error', () => {
+    const noop = vi.fn();
+    render(<MarketSidebar markets={[]} activeId={null} viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="name" sortDir="asc" onToggleSort={noop}
+      timeUntilExpiry={() => '100d'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={noop}
+      listRefreshState={{ status: 'error', message: 'Saved markets are unavailable. Reload the app and try Refresh again.', observedAt: null, source: null, revision: null }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
+
+    expect(screen.getByRole('alert').textContent).toContain('Reload the app and try Refresh again.');
+    expect(screen.getByRole('alert').className).toContain('status-negative');
   });
 
   it.each([
@@ -137,6 +181,9 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     const { rerender } = render(<MarketSidebar {...props} markets={[initial]}
       listRefreshState={{ status: 'loading', message: null, observedAt: null, source: null, revision: 'rev-1' }} />);
 
+    const refreshButton = screen.getByRole('button', { name: 'Refresh markets' });
+    expect(refreshButton).toHaveProperty('disabled', true);
+    expect(refreshButton.querySelector('.animate-spin')).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText('Filter by name...'), { target: { value: 'target' } });
     fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'Politics' } });
     const list = screen.getByTestId('saved-markets-scroll');
@@ -151,7 +198,9 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     expect(screen.getByRole('button', { name: sortLabel })).toBeTruthy();
     expect(screen.getByText('Target market refreshed').closest('.group')?.className).toContain('ring-1');
     expect(screen.getByTestId('saved-markets-scroll').scrollTop).toBe(137);
-    expect(screen.getByTestId('saved-markets-revision').textContent).toContain('rev-2');
+    expect(screen.queryByText(/Latest persisted list loaded|rev-2/i)).toBeNull();
+    expect(refreshButton).toHaveProperty('disabled', false);
+    expect(refreshButton.querySelector('.animate-spin')).toBeNull();
   });
 
   it('keeps the newer rendered revision when an older completion arrives later', async () => {
@@ -196,7 +245,7 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start new refresh' }));
     resolveNew({ ...base, eventTitle: 'Newest market' });
     expect(await screen.findByText('Newest market')).toBeTruthy();
-    expect(screen.getByTestId('saved-markets-revision').textContent).toContain('rev-new');
+    expect(screen.queryByText(/Latest persisted list loaded|rev-new/i)).toBeNull();
     resolveOld({ ...base, eventTitle: 'Stale market' });
     await Promise.resolve();
     expect(screen.queryByText('Stale market')).toBeNull();
@@ -214,7 +263,9 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
       onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
       favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
       onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
-    expect(screen.getByText('The persisted Saved Markets list is empty.')).toBeTruthy();
+    expect(screen.getByText('No saved markets yet.')).toBeTruthy();
+    expect(screen.queryByText('The persisted Saved Markets list is empty.')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByText(/\{"/)).toBeNull();
   });
 });

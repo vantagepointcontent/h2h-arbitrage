@@ -346,27 +346,12 @@ function MarketSidebarInner({
                 </div>
               </div>
 
-              {listRefreshState.status === 'loading' && (
-                <div role="status" className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Refreshing saved markets...
-                </div>
-              )}
               {(listRefreshState.status === 'degraded' || listRefreshState.status === 'error') && listRefreshState.message && (
-                <div role="alert" className="text-xs text-[var(--status-warning)]">
+                <div role="alert" className={`text-xs ${listRefreshState.status === 'error' ? 'text-[var(--status-negative)]' : 'text-[var(--status-warning)]'}`}>
                   {listRefreshState.message}
                   {listRefreshState.source === 'persisted-saved-markets' && listRefreshState.observedAt
                     ? ` Persisted snapshot loaded ${formatTimeAgo(listRefreshState.observedAt)}.` : ''}
                 </div>
-              )}
-              {listRefreshState.status === 'success' && (
-                <div role="status" className="text-[10px] text-[var(--status-positive)]">
-                  Latest persisted list loaded.
-                  {listRefreshState.revision && <span data-testid="saved-markets-revision"> Revision {listRefreshState.revision}.</span>}
-                </div>
-              )}
-              {listRefreshState.status === 'empty' && (
-                <div role="status" className="text-[10px] text-[var(--text-secondary)]">The persisted Saved Markets list is empty.</div>
               )}
 
               {/* Filters */}

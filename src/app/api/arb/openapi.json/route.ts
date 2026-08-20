@@ -77,8 +77,15 @@ const openapi = {
     '/api/logs': { get: { summary: 'Read immutable scan economics with field-level provenance', responses: { '200': {
       description: 'Scan log rows. Historical economics are scan-time evidence; Current ROI is fetched separately from persisted completed scans only.',
       content: { 'application/json': { schema: { type: 'object', required: ['logs', 'count', 'total'], properties: {
-        logs: { type: 'array', items: { type: 'object', additionalProperties: true, required: ['historical_financials'], properties: {
+        logs: { type: 'array', items: { type: 'object', additionalProperties: true, required: [
+          'historical_financials', 'botTraderEvaluationCompleted', 'botTraderEvaluationStatus', 'botTraderEvaluation',
+        ], properties: {
           historical_financials: { $ref: '#/components/schemas/HistoricalScanFinancials' },
+          botTraderEvaluationCompleted: { type: 'boolean' },
+          botTraderEvaluationStatus: { type: 'string', enum: [
+            'pending', 'completed', 'partial', 'failed', 'not_run_disabled', 'not_applicable_no_positive_arb',
+          ] },
+          botTraderEvaluation: { anyOf: [{ $ref: '#/components/schemas/BotScanEvaluation' }, { type: 'null' }] },
         } } },
         count: { type: 'integer' }, total: { type: 'integer' },
       } } } },
@@ -129,6 +136,35 @@ const openapi = {
           sourceRevision: { type: 'string' },
           reasonCode: { type: 'string' },
           reason: { type: 'string' },
+        },
+      },
+      BotScanEvaluation: {
+        type: 'object', additionalProperties: false,
+        required: [
+          'scanId', 'status', 'botTraderEvaluationCompleted', 'reason', 'startedAt', 'completedAt', 'updatedAt',
+          'settingsVersion', 'candidateCount', 'evaluatedCount', 'eligibleCount', 'placementAttemptCount',
+          'placedCount', 'skippedCount', 'failureCount', 'missingCandidateIndexes', 'failingCandidateIndexes',
+        ],
+        properties: {
+          scanId: { type: 'integer', minimum: 1 },
+          status: { type: 'string', enum: [
+            'pending', 'completed', 'partial', 'failed', 'not_run_disabled', 'not_applicable_no_positive_arb',
+          ] },
+          botTraderEvaluationCompleted: { type: 'boolean' },
+          reason: { type: 'string' },
+          startedAt: { type: ['string', 'null'], format: 'date-time' },
+          completedAt: { type: ['string', 'null'], format: 'date-time' },
+          updatedAt: { type: ['string', 'null'], format: 'date-time' },
+          settingsVersion: { type: ['string', 'null'] },
+          candidateCount: { type: 'integer', minimum: 0 },
+          evaluatedCount: { type: 'integer', minimum: 0 },
+          eligibleCount: { type: 'integer', minimum: 0 },
+          placementAttemptCount: { type: 'integer', minimum: 0 },
+          placedCount: { type: 'integer', minimum: 0 },
+          skippedCount: { type: 'integer', minimum: 0 },
+          failureCount: { type: 'integer', minimum: 0 },
+          missingCandidateIndexes: { type: 'array', items: { type: 'integer', minimum: 0 } },
+          failingCandidateIndexes: { type: 'array', items: { type: 'integer', minimum: 0 } },
         },
       },
       HistoricalScanFinancials: {

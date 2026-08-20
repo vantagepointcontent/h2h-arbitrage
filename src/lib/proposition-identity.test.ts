@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   validatePropositionRelationship,
   type PropositionIdentity,
-  type PropositionRelationship,
+  type PropositionRelationshipV1,
+  type PropositionRelationshipV2,
 } from './proposition-identity';
 
 const EVENT_STATES = ['democratic', 'republican'] as const;
@@ -27,8 +28,8 @@ function leg(overrides: Partial<PropositionIdentity> = {}): PropositionIdentity 
 function relationship(
   kalshi: PropositionIdentity,
   polymarket: PropositionIdentity,
-  overrides: Partial<PropositionRelationship> = {},
-): PropositionRelationship {
+  overrides: Partial<PropositionRelationshipV1> = {},
+): PropositionRelationshipV1 {
   return {
     schemaVersion: 1,
     state: 'verified_complementary',
@@ -108,4 +109,48 @@ it('rejects multi-outcome non-exhaustive pairs', () => {
 
 it('quarantines legacy missing relationship metadata', () => {
   expect(validatePropositionRelationship(null)).toMatchObject({ valid: false, state: 'unknown' });
+});
+
+it('accepts schema v2 only with reviewer provenance and authoritative evidence digests', () => {
+  const versioned: PropositionRelationshipV2 = {
+    ...relationship(leg(), pmYesRepublican()),
+    schemaVersion: 2,
+    reviewedBy: ['h2h-researcher', 'h2h-backend'],
+    reviewedAt: '2026-08-20T10:10:04.864Z',
+    reviewTask: 'RES-849',
+    evidenceRevision: 'res849-authority-v1',
+    resolutionRuleRevision: 'fl-26-house-2026-rules-content-v1',
+    evidence: [{
+      uri: 'artifacts/res849-authoritative-market-evidence.json',
+      sha256: 'a'.repeat(64),
+      observedAt: '2026-08-20T10:03:00.000Z',
+    }],
+  };
+
+  expect(validatePropositionRelationship(versioned)).toEqual({ valid: true });
+});
+
+it.each([
+  ['whitespace aliases', ['alice', ' alice :other']],
+  ['empty identity component', [':service', 'h2h-backend']],
+])('rejects schema v2 reviewer provenance with %s', (_label, reviewedBy) => {
+  const versioned: PropositionRelationshipV2 = {
+    ...relationship(leg(), pmYesRepublican()),
+    schemaVersion: 2,
+    reviewedBy,
+    reviewedAt: '2026-08-20T10:10:04.864Z',
+    reviewTask: 'RES-849',
+    evidenceRevision: 'res849-authority-v1',
+    resolutionRuleRevision: 'fl-26-house-2026-rules-content-v1',
+    evidence: [{
+      uri: 'artifacts/res849-authoritative-market-evidence.json',
+      sha256: 'a'.repeat(64),
+      observedAt: '2026-08-20T10:03:00.000Z',
+    }],
+  };
+
+  expect(validatePropositionRelationship(versioned)).toMatchObject({
+    valid: false,
+    reason: expect.stringMatching(/distinct reviewer identities/i),
+  });
 });

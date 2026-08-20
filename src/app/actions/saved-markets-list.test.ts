@@ -62,7 +62,7 @@ describe('refreshSavedMarketsList server action', () => {
 
   it.each([
     [401, { error: 'unauthorized' }, 'The saved-markets session is no longer authorized. Reload the app and try again.'],
-    [503, { error: 'database unavailable' }, 'Saved markets are temporarily unavailable. The last-known list is still shown.'],
+    [503, { error: 'database unavailable' }, 'Saved markets are unavailable. Try Refresh again.'],
   ])('maps %i failures to bounded client-safe errors', async (status, body, expectedMessage) => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status })));
     await expect(refreshSavedMarketsList()).resolves.toMatchObject({ ok: false, status, markets: null, message: expectedMessage });

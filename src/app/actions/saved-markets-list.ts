@@ -24,7 +24,7 @@ function failureMessage(status: number): string {
   if (status === 401 || status === 403) {
     return 'The saved-markets session is no longer authorized. Reload the app and try again.';
   }
-  return 'Saved markets are temporarily unavailable. The last-known list is still shown.';
+  return 'Saved markets are unavailable. Try Refresh again.';
 }
 
 function failure(status: number, correlationId: string | null = null): SavedMarketsListRefreshResponse {

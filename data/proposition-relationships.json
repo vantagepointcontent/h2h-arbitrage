@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
-  "description": "Human-reviewed, exact cross-venue proposition relationships allowed for BotTrader execution. Fuzzy/title matching must never populate this registry.",
+  "schemaVersion": 2,
+  "description": "Human-reviewed exact cross-venue relationships and append-only exact-tuple rejections. Fuzzy/title matching must never populate trust.",
   "relationships": [
     {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "state": "verified_complementary",
       "verificationSource": "authoritative_platform_metadata",
       "verifiedAt": "2026-08-19T14:44:00.000Z",
@@ -47,10 +47,25 @@
           "marketQuestion": "Will Franco Colapinto win the 2026 Action of the Year?",
           "tokenId": "38424385756462253442221613485727105608987714090195314133724025202573806948368"
         }
-      }
+      },
+      "reviewedBy": [
+        "Victor Jendelheim:source-control-approval",
+        "h2h-backend:t_778a2bf4:migration-integrity-review"
+      ],
+      "reviewedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "BUG-175/t_778a2bf4",
+      "evidenceRevision": "sha256:7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+      "resolutionRuleRevision": "sha256:7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+      "evidence": [
+        {
+          "uri": "artifacts/bug175-valid-opportunity-blocker.json",
+          "sha256": "7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+          "observedAt": "2026-08-20T09:54:53.533Z"
+        }
+      ]
     },
     {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "state": "verified_complementary",
       "verificationSource": "authoritative_platform_metadata",
       "verifiedAt": "2026-08-19T17:00:00.000Z",
@@ -69,7 +84,10 @@
           "selectedOutcome": "Democratic Party wins MO-03",
           "contractSide": "yes",
           "payoutState": "Democratic Party wins MO-03",
-          "eventPayoutStates": ["Democratic Party wins MO-03", "Republican Party wins MO-03"],
+          "eventPayoutStates": [
+            "Democratic Party wins MO-03",
+            "Republican Party wins MO-03"
+          ],
           "resolutionRuleId": "us-house-mo03-2026-party-winner-v1",
           "humanLabel": "Kalshi YES — Democratic Party wins MO-03",
           "marketQuestion": "Will Democratic win the House race for MO-03?",
@@ -82,13 +100,529 @@
           "selectedOutcome": "Republican Party wins MO-03",
           "contractSide": "yes",
           "payoutState": "Republican Party wins MO-03",
-          "eventPayoutStates": ["Democratic Party wins MO-03", "Republican Party wins MO-03"],
+          "eventPayoutStates": [
+            "Democratic Party wins MO-03",
+            "Republican Party wins MO-03"
+          ],
           "resolutionRuleId": "us-house-mo03-2026-party-winner-v1",
           "humanLabel": "Polymarket YES — Republican Party wins MO-03",
           "marketQuestion": "Will the Republican Party win the MO-03 House seat?",
           "tokenId": "78731837307763791013205666606889953610367275623708569393097319597715511164419"
         }
-      }
+      },
+      "reviewedBy": [
+        "Victor Jendelheim:source-control-approval",
+        "h2h-backend:t_778a2bf4:migration-integrity-review"
+      ],
+      "reviewedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "BUG-175/t_778a2bf4",
+      "evidenceRevision": "sha256:7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+      "resolutionRuleRevision": "sha256:7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+      "evidence": [
+        {
+          "uri": "artifacts/bug175-valid-opportunity-blocker.json",
+          "sha256": "7a700b660617718412a6e4106ad76e870e85f90359bad38523d99a6fe9ff19e9",
+          "observedAt": "2026-08-20T09:54:53.533Z"
+        }
+      ]
+    }
+  ],
+  "rejections": [
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXARREST-27JAN-THOM",
+        "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+        "pmTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:40d6f9809707d25b6aad5d28cb4d7b719e8c7f44d0c705c16ab3d2643d7c48f5",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_rule_conflict",
+      "reason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "sourceScanIds": [
+        815095,
+        815202,
+        815301
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXARREST-27JAN-AFAU",
+        "pmConditionId": "0x1a975c8210f5aa11c76d645a4dd746764799310898445689b17fb500a8925c80",
+        "pmTokenId": "62664988686544541004962241557013553766520681768858444478309305931894695537107",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:ca7bd8374e6660c4e87b75835e3d0900b4d10c79ac9f34721c186669bcda3ec4",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_rule_conflict",
+      "reason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "sourceScanIds": [
+        815095,
+        815202,
+        815301
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXARREST-27JAN-GNEW",
+        "pmConditionId": "0x30f0732734e61902d81cf2d3e37e531de8883b6a2c4cabd8ba3e4035977de1ed",
+        "pmTokenId": "81926437499375408929787207529000604100026014614447276020598559062677731079426",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:000e0603817de3ab8547754f42dc3fdc7825e7d1cec62d2ab951784f9a3e1981",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_rule_conflict",
+      "reason": "Rejected: Kalshi counts voluntary surrender pursuant to an indictment without an arrest warrant; Polymarket explicitly excludes indictment without arrest and only counts voluntary surrender in response to an arrest warrant. The propositions can resolve differently.",
+      "sourceScanIds": [
+        815095,
+        815202,
+        815301
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "HOUSEVA2-26-D",
+        "pmConditionId": "0xc4362a042c364699d66cf44f69e2dac40a889ac9c83a92195084628c39257b32",
+        "pmTokenId": "6431017214844719071529892865687247898079997766867991700132073831843261535430",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:ce4710ebd1eb07caafcbb9612d630f68c005ba583a9554752e2cc2818dc29d9a",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_event_conflict",
+      "reason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "sourceScanIds": [
+        815101
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXRECOGPALESTINE-27-GRE",
+        "pmConditionId": "0xecf32b871ad1ab9ca961ce1a12d5758c59b07bdcb99f649a1dbe3f07e7cb4bde",
+        "pmTokenId": "9568640529628232620171982414821256284849638329588081306176647962997142501307",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:8c7a7936cd84acbdba81788299bc4544ae9ed8cc61c4b4fceb77a977a84d9c5d",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_scope_ambiguous",
+      "reason": "Rejected: Kalshi enumerates diplomatic acts that may qualify, including an official state visit acknowledging sovereignty, while Polymarket requires formal government recognition. The broader Kalshi examples are not proven equivalent to Polymarket formal recognition.",
+      "sourceScanIds": [
+        815189
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "HOUSEAZ2-26-R",
+        "pmConditionId": "0xbd353d44ec152e7bb9061883baed937386a50b3e3b6358c5d47ef9a572381f8b",
+        "pmTokenId": "9769128509997586115354824623743902848286350478991278642403742423177008633185",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:56241112514d020255f6b165e897e5365846c457fe017ee1a12bd53cf1c585b0",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_event_conflict",
+      "reason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "sourceScanIds": [
+        815224
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXHOUSENC11-26-GOP",
+        "pmConditionId": "0xe64ec54460a1f1b250c9785968e6ebecfb0fd542a34300a161f64460c7a811df",
+        "pmTokenId": "56469543356517732605495507902287858078158624247054211481987383292845559158213",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:961ee5f3788a6593938c463388cf1915d6c8b560e982537fea69c04743456c37",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_event_conflict",
+      "reason": "Rejected: Kalshi resolves on the party of the member sworn in for the 2027 term; Polymarket resolves on the party of the candidate who wins the 2026 election. Death, withdrawal, disqualification, replacement, or party change between election and swearing can make the propositions diverge.",
+      "sourceScanIds": [
+        815232
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-TEX",
+        "pmConditionId": "0x040a5bbd143a046f8ff47f3112358b2a6377d3f1a91a3c5794c1bb15eadd0c5d",
+        "pmTokenId": "30728609885715374288858063112149413594109064855980318558797537001408917409057",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:01042378e514fec98e45b7ebe84ef8d0516a78f0636d56d82ed373d1163587c8",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-ORE",
+        "pmConditionId": "0xa68349bd08f7036dff1aceb7833aa152e272cb48f2f4acf9f542a59d54d60649",
+        "pmTokenId": "17160285648768756154768735326069072201781771452584908909583244163794929213578",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:18804987d3de5524725de4b9a568b2975883f9c55362bb7bd5b66dd8e34ad8db",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-ND",
+        "pmConditionId": "0x7d24d02b00d6769bd42af5b13ba704bcfe66bc940ead0ed9cf3c0f1017926b5f",
+        "pmTokenId": "56451478521419308087374626701005330017111892104870960799272996590285771980476",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:8b7357270e047b502ba9c17a61da4eda2fda91d049c4bac1ce594717de2add19",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-IND",
+        "pmConditionId": "0xa4f3118c0238fa43bc40626f26f54ad849095620231d716a8cf09fc4d6baa4b8",
+        "pmTokenId": "82263693829785782986275620295212096452521878303846116132951400843622051066880",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:9688424fc57f9d7e9d61559315c52e15d2e35a030d7c7aa832cec3cb4de6d0bb",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-LSU",
+        "pmConditionId": "0x3afea9c03bc978ae991e54f6d0545d05f7c2189e6242871f3fac60d728b6850f",
+        "pmTokenId": "5089039005932083712320389663463940027243415242431150649612207639094893311735",
+        "kalshiSide": "yes",
+        "pmSide": "no"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:b5f00ab55ea58f8e92fb5cf3087e08e0a944aefeecb06e7f81e72385786d839d",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXMARMAD-27-FLA",
+        "pmConditionId": "0x3a41a0d9474d9902476a7f9487061b585e3bc37ae8c1838dedcd75f44ad8964d",
+        "pmTokenId": "100572769143137500942702681653834671315940314637605125862138069246640357375848",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:901f6ac36257ce544b4c3b23f53a31d9d0394d00e9d16c1d27239d5dc42ab881",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "non_equivalent_wrong_sport",
+      "reason": "Rejected: the Kalshi contract is the 2026-27 Division I men's college basketball champion; the Polymarket contract is the 2026-27 College Football Playoff champion. Same school name does not make basketball and football propositions equivalent.",
+      "sourceScanIds": [
+        815305
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "executionTuple": {
+        "kalshiTicker": "KXTIME-26-SA",
+        "pmConditionId": "0xab7081796629558979a40115a0870f0fb746779ee0d0bbbed534bb0c1907653b",
+        "pmTokenId": "91195573269222885139319238736030855111206053072927457343337731770808533820424",
+        "kalshiSide": "no",
+        "pmSide": "yes"
+      },
+      "evidenceRevision": "sha256:8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+      "resolutionRuleRevision": "sha256:9898d9c4a4e071ac6729510d760d8ff7eb1667c40abf5a6504d1d050c6478a74",
+      "rejectedBy": [
+        "h2h-researcher:RES-849:semantic-review",
+        "h2h-backend:t_778a2bf4:registry-integrity-review"
+      ],
+      "rejectedAt": "2026-08-20T10:10:04.864Z",
+      "reviewTask": "RES-849/t_778a2bf4",
+      "code": "resolution_rule_conflict",
+      "reason": "Rejected: Polymarket resolves No if TIME has not announced by June 30, 2027 and uses the feature article for ambiguous labels; Kalshi has a later expiration and applies the simplest reasonable meaning. A late announcement or ambiguous group label can produce different outcomes.",
+      "sourceScanIds": [
+        815364
+      ],
+      "evidence": [
+        {
+          "uri": "artifacts/res849-authoritative-market-evidence.json",
+          "sha256": "8d1634bef8c406b44f81ef7c6e4fc8bc1c7b2f781e2893c4d1aaa237fc689203",
+          "observedAt": "2026-08-20T10:04:15.450Z"
+        },
+        {
+          "uri": "artifacts/res849-initial-20-classification.json",
+          "sha256": "4f9155e73426fd3937afe24ecbe40ceec2f2aa617d8ee45729d358534b7c74d4",
+          "observedAt": "2026-08-20T10:10:04.864Z"
+        }
+      ]
     }
   ]
 }

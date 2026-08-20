@@ -13,10 +13,13 @@ import {
 import { buildExecutionRequest, type BotExecutionResult, type BotSettings } from './bot-trader';
 import type { PropositionRelationship } from './proposition-identity';
 
-vi.mock('./proposition-registry', () => ({
-  resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
-  findCanonicalPropositionRelationship: () => null,
-}));
+vi.mock('./proposition-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./proposition-registry')>();
+  return {
+    ...actual,
+    resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
+  };
+});
 import { walkExecutableBook } from './executable-book';
 
 function settings(overrides: Partial<BotSettings> = {}): BotSettings {
@@ -943,6 +946,26 @@ describe('durable BotTrader scan consumer', () => {
     });
     const h = harness({ scans: [scan({ candidates: [c] })], current: [c] });
     const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({
+      state: 'criteria_rejected',
+      reasonCode: 'scan_criteria_rejected',
+      reason: expect.stringContaining('canonical proposition registry'),
+    });
+    expect(h.deps.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not execute a checked-in ledger-rejected exact tuple', async () => {
+    const c = candidate({
+      kalshiTicker: 'KXARREST-27JAN-THOM',
+      pmConditionId: '0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6',
+      pmNoTokenId: '27705432816847291323925622847687396001932163087018486036209592664496834211156',
+      propositionRelationship: null,
+      roiPct: 5,
+    });
+    const h = harness({ scans: [scan({ candidates: [c] })], current: [c] });
+
+    const result = await h.consumer.consume(41, 'scan_api');
+
     expect(result).toMatchObject({
       state: 'criteria_rejected',
       reasonCode: 'scan_criteria_rejected',

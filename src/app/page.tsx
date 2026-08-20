@@ -105,7 +105,7 @@ import {
   DEFAULT_MARKET_EXPIRY_FILTER, DEFAULT_SHOW_ARB_ONLY, buildScanLinkPayload,
   createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
-  selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration,
+  selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration, buildSavedMarketsListFailureState,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -846,15 +846,13 @@ export default function Home() {
       }
       setSavedMarketsListRefresh((previous) => ({
         ...previous,
-        status: savedMarketsRef.current.length > 0 ? 'degraded' : 'error',
-        message: response.message ?? 'Saved markets are temporarily unavailable. The last-known list is still shown.',
+        ...buildSavedMarketsListFailureState(savedMarketsRef.current.length > 0, response.status),
       }));
     } catch {
       if (savedMarketsListRequestOwnerRef.current.owns(request)) {
         setSavedMarketsListRefresh((previous) => ({
           ...previous,
-          status: savedMarketsRef.current.length > 0 ? 'degraded' : 'error',
-          message: 'Saved markets are temporarily unavailable. The last-known list is still shown.',
+          ...buildSavedMarketsListFailureState(savedMarketsRef.current.length > 0, null),
         }));
       }
     } finally {

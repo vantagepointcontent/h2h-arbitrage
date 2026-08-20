@@ -112,6 +112,28 @@ export function createSavedMarketsListRequestOwner() {
   };
 }
 
+/** Build actionable persisted-list failure state without exposing transport details. */
+export function buildSavedMarketsListFailureState(
+  hasRetainedMarkets: boolean,
+  responseStatus: number | null,
+): { status: 'degraded' | 'error'; message: string } {
+  const sessionExpired = responseStatus === 401 || responseStatus === 403;
+  if (hasRetainedMarkets) {
+    return {
+      status: 'degraded',
+      message: sessionExpired
+        ? 'The saved-markets session expired. The last-known list is still shown. Reload the app and try Refresh again.'
+        : 'Saved markets could not be refreshed. The last-known list is still shown. Try Refresh again.',
+    };
+  }
+  return {
+    status: 'error',
+    message: sessionExpired
+      ? 'Saved markets are unavailable because the session expired, so no markets can be shown. Reload the app, then try Refresh again.'
+      : 'Saved markets are unavailable, so no markets can be shown. Reload the app, then try Refresh again.',
+  };
+}
+
 /** Validate the server-action boundary and collapse duplicate IDs to the latest row. */
 export function normalizeSavedMarketsList(value: unknown): SavedMarket[] | null {
   if (!Array.isArray(value)) return null;

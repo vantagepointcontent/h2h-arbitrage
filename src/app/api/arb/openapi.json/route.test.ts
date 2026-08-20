@@ -28,6 +28,28 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
         }),
       },
     });
+    expect(spec.components.schemas.BotScanEvaluation).toMatchObject({
+      required: expect.arrayContaining([
+        'scanId', 'status', 'botTraderEvaluationCompleted', 'candidateCount', 'evaluatedCount',
+        'eligibleCount', 'placementAttemptCount', 'placedCount', 'skippedCount', 'failureCount',
+      ]),
+      properties: {
+        status: { type: 'string', enum: [
+          'pending', 'completed', 'partial', 'failed', 'not_run_disabled', 'not_applicable_no_positive_arb',
+        ] },
+        botTraderEvaluationCompleted: { type: 'boolean' },
+        missingCandidateIndexes: { type: 'array', items: { type: 'integer', minimum: 0 } },
+        failingCandidateIndexes: { type: 'array', items: { type: 'integer', minimum: 0 } },
+      },
+    });
+    const logsSchema = spec.paths['/api/logs'].get.responses['200'].content['application/json'].schema as {
+      properties: { logs: { items: { required: string[]; properties: Record<string, unknown> } } };
+    };
+    expect(logsSchema.properties.logs.items.required).toEqual(expect.arrayContaining([
+      'botTraderEvaluationCompleted', 'botTraderEvaluationStatus', 'botTraderEvaluation',
+    ]));
+    expect(logsSchema.properties.logs.items.properties.botTraderEvaluation)
+      .toEqual({ anyOf: [{ $ref: '#/components/schemas/BotScanEvaluation' }, { type: 'null' }] });
     expect(spec.components.schemas.BotPositionSettlementProjection.properties.entryArbProfitSnapshot)
       .toEqual({ $ref: '#/components/schemas/EntryArbProfitSnapshot' });
     expect(spec.components.schemas.EntryArbProfitSnapshot).toMatchObject({

@@ -25,8 +25,7 @@ export interface PropositionIdentity {
   tokenId: string | null;
 }
 
-export interface PropositionRelationship {
-  schemaVersion: 1;
+interface PropositionRelationshipBase {
   state: 'verified_complementary';
   verificationSource: 'authoritative_platform_metadata' | 'manually_verified_ids';
   verifiedAt: string;
@@ -36,6 +35,34 @@ export interface PropositionRelationship {
   legs: { kalshi: PropositionIdentity; polymarket: PropositionIdentity };
   humanLabel: string;
 }
+
+export interface PropositionEvidenceReference {
+  /** Source-controlled path or authoritative HTTPS URL. */
+  uri: string;
+  /** Lowercase SHA-256 digest of the exact evidence bytes. */
+  sha256: string;
+  /** Time the successful authoritative response was observed. */
+  observedAt: string;
+}
+
+export interface PropositionRelationshipV1 extends PropositionRelationshipBase {
+  schemaVersion: 1;
+}
+
+export interface PropositionRelationshipV2 extends PropositionRelationshipBase {
+  schemaVersion: 2;
+  /** Stable human or service identities; at least two independent reviewers. */
+  reviewedBy: string[];
+  reviewedAt: string;
+  reviewTask: string;
+  /** Immutable revision of the evidence set used for this decision. */
+  evidenceRevision: string;
+  /** Content revision of the authoritative resolution rules. */
+  resolutionRuleRevision: string;
+  evidence: PropositionEvidenceReference[];
+}
+
+export type PropositionRelationship = PropositionRelationshipV1 | PropositionRelationshipV2;
 
 export type PropositionValidation =
   | { valid: true }
@@ -47,6 +74,26 @@ function normalized(value: string): string {
 
 function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function reviewerIdentity(value: string): string {
+  return value.split(':', 1)[0].trim().toLowerCase();
+}
+
+export function hasDistinctReviewerIdentities(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length < 2 || value.some((reviewer) => !nonEmpty(reviewer))) {
+    return false;
+  }
+  const identities = value.map(reviewerIdentity);
+  return identities.every(nonEmpty) && new Set(identities).size === identities.length;
+}
+
+function validEvidenceReference(value: PropositionEvidenceReference): boolean {
+  return Boolean(value)
+    && nonEmpty(value.uri)
+    && typeof value.sha256 === 'string'
+    && /^[a-f0-9]{64}$/.test(value.sha256)
+    && Number.isFinite(Date.parse(value.observedAt));
 }
 
 function sameStates(left: string[], right: string[]): boolean {
@@ -102,8 +149,24 @@ function validateLeg(leg: PropositionIdentity, platform: PropositionPlatform): P
  */
 export function validatePropositionRelationship(value: PropositionRelationship | null | undefined): PropositionValidation {
   if (!value) return invalid('Canonical proposition relationship metadata is unavailable', 'unknown');
-  if (value.schemaVersion !== 1 || value.state !== 'verified_complementary') {
+  if ((value.schemaVersion !== 1 && value.schemaVersion !== 2) || value.state !== 'verified_complementary') {
     return invalid('Proposition relationship is not a supported verified revision');
+  }
+  if (value.schemaVersion === 2) {
+    if (!hasDistinctReviewerIdentities(value.reviewedBy)) {
+      return invalid('Relationship requires two distinct reviewer identities');
+    }
+    if (!Number.isFinite(Date.parse(value.reviewedAt))
+        || !nonEmpty(value.reviewTask)
+        || !nonEmpty(value.evidenceRevision)
+        || !nonEmpty(value.resolutionRuleRevision)) {
+      return invalid('Relationship reviewer or evidence revision provenance is malformed');
+    }
+    if (!Array.isArray(value.evidence)
+        || value.evidence.length === 0
+        || value.evidence.some((reference) => !validEvidenceReference(reference))) {
+      return invalid('Relationship authoritative evidence references are malformed');
+    }
   }
   if (!Number.isFinite(Date.parse(value.verifiedAt))) return invalid('Relationship verification timestamp is malformed');
   if (!nonEmpty(value.parentEventId) || !nonEmpty(value.resolutionRuleId) || !nonEmpty(value.humanLabel)) {
