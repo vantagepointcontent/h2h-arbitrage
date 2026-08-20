@@ -1,0 +1,66 @@
+{
+  "revision": 1,
+  "generatedAt": "2026-08-20T09:47:50.130Z",
+  "deployment": {
+    "commit": "4f32696dadbcea709773aed7142f6ba40822e96c",
+    "buildId": "PtdzAfrx6ExTPLo7U3xk0"
+  },
+  "policy": "Read-only production verification. No unreviewed relationship was promoted and no stale trade was replayed.",
+  "postDeploy": {
+    "completed_scans": 198,
+    "persisted_candidates": 63,
+    "candidates_at_or_above_threshold": 10,
+    "reviewed_candidates_at_or_above_threshold": 0
+  },
+  "reviewedRegistryLiveChecks": [
+    {
+      "humanLabel": "Franco Colapinto — 2026 FIA F1 Action of the Year",
+      "exactIdentity": {
+        "kalshiTicker": "KXF1ACTION-2026-COL",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961",
+        "pmTokenId": "38424385756462253442221613485727105608987714090195314133724025202573806948368",
+        "pmSide": "no"
+      },
+      "authority": {
+        "kalshiQuestion": "Will Franco Colapinto win the FIA F1 Action of the Year award in the 2026 FIA (Fédération Internationale de l'Automobile) season?",
+        "kalshiRules": "If Franco Colapinto wins the FIA F1 Action of the Year award in the 2026 FIA (Fédération Internationale de l'Automobile) season, then the market resolves to Yes.",
+        "pmQuestion": "Will Franco Colapinto win the 2026 Action of the Year?",
+        "pmDescription": "This market will resolve to the driver who wins the 2026 Action of the Year award for the 2026 Formula 1 season as awarded at the FIA Awards.\n\nIn the event of a tie, this market will resolve according to the official winner as determined by FIA rules. If multiple winners are announced then this market will resolve to the player whose listed last name comes first alphabetically.\n\nIf the 2026 Formula 1 season is cancelled, postponed after December 31, 2026, 11:59 PM ET, or there is otherwise no winner declared within that timeframe, this market will resolve to “Other”.\n\nThe resolution source for this market will be official information from the FIA; however, a consensus of credible reporting may also be used."
+      },
+      "executableAsks": {
+        "kalshiMicros": 50000,
+        "polymarketMicros": 989000
+      },
+      "grossCostMicros": 1039000,
+      "grossEdgeMicrosBeforeFees": -39000,
+      "qualifiesBeforeFees": false,
+      "blocker": "Exact reviewed legs cost at least the guaranteed payout before fees"
+    },
+    {
+      "humanLabel": "MO-03 House Election Winner — Democratic vs Republican",
+      "exactIdentity": {
+        "kalshiTicker": "KXHOUSERACE-MO03-26-D",
+        "kalshiSide": "yes",
+        "pmConditionId": "0xf32f28247b2a9653f52ee8078e6aa265c0fdc00b0697ef390902d86fdbef35e4",
+        "pmTokenId": "78731837307763791013205666606889953610367275623708569393097319597715511164419",
+        "pmSide": "yes"
+      },
+      "authority": {
+        "kalshiQuestion": "Will Democratic win the House race for MO-03?",
+        "kalshiRules": "If the House member sworn in for MO-03 for the term beginning in 2027 is a member of the Democratic Party, then the market resolves to Yes.",
+        "pmQuestion": "Will the Republican Party win the MO-03 House seat?",
+        "pmDescription": "This market will resolve according to the party of the candidate who wins the MO-03 congressional district seat in the U.S. House of Representatives in the 2026 midterm elections. The midterm elections will take place on November 3, 2026.\n\n​A candidate's party will be determined by their ballot-listed or otherwise identifiable affiliation with that party at the time all of the 2026 House elections are conclusively called by this market's resolution sources. A candidate without a ballot-listed affiliation to either the Democrat or Republican parties will be considered a member of one of these parties based on the party with which they most recently expressed their intent to caucus at the time all of the House elections are conclusively called by this market's resolution sources.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the United States government, specifically the Federal Election Commission (https://www.fec.gov/)."
+      },
+      "executableAsks": {
+        "kalshiMicros": 100000,
+        "polymarketMicros": 920000
+      },
+      "grossCostMicros": 1020000,
+      "grossEdgeMicrosBeforeFees": -20000,
+      "qualifiesBeforeFees": false,
+      "blocker": "Exact reviewed legs cost at least the guaranteed payout before fees"
+    }
+  ],
+  "conclusion": "No server-reviewed exact relationship currently has a positive executable gross edge; fees can only worsen these costs."
+}

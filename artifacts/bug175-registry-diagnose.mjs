@@ -19,5 +19,11 @@ try {
       COUNT(*) AS candidates
     FROM scan_results s JOIN json_each(json_extract(s.raw_result, '$.allArbs')) candidate
     WHERE s.scanned_at >= datetime('now','-24 hours')`);
-  console.log(JSON.stringify({ registered, sourceBreakdown }, null, 2));
+  const postDeploy = await run(`SELECT
+      COUNT(*) AS completed_scans,
+      SUM(CASE WHEN json_extract(candidate.value, '$.propositionRelationship') IS NOT NULL THEN 1 ELSE 0 END) AS with_relationship,
+      COUNT(candidate.key) AS candidates
+    FROM scan_results s LEFT JOIN json_each(json_extract(s.raw_result, '$.allArbs')) candidate
+    WHERE s.scan_status='completed' AND s.scanned_at >= '2026-08-20T09:35:11.646Z'`);
+  console.log(JSON.stringify({ registered, sourceBreakdown, postDeploy }, null, 2));
 } finally { db.close(); }

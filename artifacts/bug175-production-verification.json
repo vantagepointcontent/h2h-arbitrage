@@ -1,0 +1,602 @@
+{
+  "revision": 1,
+  "verifiedAt": "2026-08-20T09:48:04.062Z",
+  "deployedAt": "2026-08-20T09:35:11.646Z",
+  "thresholdPct": 2,
+  "safetyStatement": "Read-only verification; no stale historical opportunity was submitted.",
+  "scan": {
+    "id": 815095,
+    "market_id": "1cd2bd85-76a0-4f03-a4de-378e05702df8",
+    "market_title": "Who will be arrested before 2027?",
+    "scanned_at": "2026-08-20T09:37:08.249Z",
+    "best_roi_pct": 4.29900000000001,
+    "positive_arb_count": 6,
+    "state": "criteria_rejected",
+    "reason_code": "scan_criteria_rejected",
+    "reason": "6 candidate(s) evaluated; 0 eligible — ROI 1.17% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 30.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.75 required; PM $1.02 / $0.17 required; ROI 1.96% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 555.75 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.70 required; PM $19.45 / $0.18 required; ROI 1.21% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 101.66 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.79 required; PM $2.44 / $0.12 required; Exact selected contracts are absent from the server-owned canonical proposition registry; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 251.92 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.15 required; PM $28.47 / $0.57 required; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 415.68 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.69 required; PM $12.47 / $0.15 required",
+    "received_at": "2026-08-20T09:37:08.385Z",
+    "updated_at": "2026-08-20T09:37:08.544Z",
+    "placement_count": 0
+  },
+  "decisionLatencyMs": 136,
+  "opportunities": [
+    {
+      "opportunity_id": "scan:815095:opportunity:0",
+      "candidate_index": 0,
+      "outcome": "Adam Schiff",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "ROI 1.17% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 30.00 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.75 required; PM $1.02 / $0.17 required",
+      "roi_pct": 1.1685999999999979,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.401Z",
+      "updated_at": "2026-08-20T09:37:08.401Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:0",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 1.1685999999999979,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-ASCH",
+            "pmConditionId": "0xa996ddae9ea35ff0c110e5cc04f116714ec5d4013119088f347b27920017e590",
+            "pmYesTokenId": "89927690970866432638583725236459419388263927903641808909198263362524997727072",
+            "pmNoTokenId": "7688913201495619943888392479052625162415524338153302558398355055767703980178"
+          },
+          "asks": {
+            "kalshiYes": 0.07,
+            "kalshiNo": 0.949,
+            "pmYes": 0.034,
+            "pmNo": 0.976
+          },
+          "executableQuotes": {
+            "kalshiYes": {
+              "status": "executable",
+              "reason": null,
+              "requestedQuantityMicros": 1000000,
+              "filledQuantityMicros": 1000000,
+              "totalCostMicroCents": 7000000,
+              "vwapPriceMicroCents": 7000000,
+              "limitPriceMicroCents": 7000000,
+              "fills": [
+                {
+                  "priceCents": 7,
+                  "priceMicroCents": 7000000,
+                  "quantityMicros": 1000000
+                }
+              ],
+              "depthTimestamp": "2026-08-20T09:37:08.249Z",
+              "tickSizeMicroCents": 1000000,
+              "minimumOrderQuantityMicros": 1000000
+            },
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 73.01,
+            "kalshiNo": 0,
+            "pmYes": 1.02,
+            "pmNo": 12.02432
+          },
+          "fees": {
+            "kalshiFee": 0.02,
+            "pmFee": 0.00657,
+            "kalshiFeeDetails": "Kalshi NO buy 5 @ $0.95 = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.03 (θ=0.04) = $0.01"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 1.1685999999999979,
+          "apyPct": 0,
+          "depthKUsd": 0,
+          "depthPUsd": 1.02,
+          "sharesK": 0,
+          "sharesP": 30,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    },
+    {
+      "opportunity_id": "scan:815095:opportunity:1",
+      "candidate_index": 1,
+      "outcome": "Hillary Clinton",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "ROI 1.96% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 555.75 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.70 required; PM $19.45 / $0.18 required",
+      "roi_pct": 1.9648000000000136,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.407Z",
+      "updated_at": "2026-08-20T09:37:08.407Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:1",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 1.9648000000000136,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-HCLIN",
+            "pmConditionId": "0x862c6d9cb806315fe626d37e8b9f21585710a98ada2fb9338061574fb9a5f453",
+            "pmYesTokenId": "77886043686904669353038045910688496171684395999056641079178277517931779123468",
+            "pmNoTokenId": "5712872342665635023626330801674954382318913254789649338225564634297022934101"
+          },
+          "asks": {
+            "kalshiYes": 0.063,
+            "kalshiNo": 0.94,
+            "pmYes": 0.035,
+            "pmNo": 0.975
+          },
+          "executableQuotes": {
+            "kalshiYes": null,
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 53.42,
+            "kalshiNo": 0,
+            "pmYes": 19.45125,
+            "pmNo": 29.25
+          },
+          "fees": {
+            "kalshiFee": 0.02,
+            "pmFee": 0.00676,
+            "kalshiFeeDetails": "Kalshi NO buy 5 @ $0.94 = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.04 (θ=0.04) = $0.01"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 1.9648000000000136,
+          "apyPct": 0,
+          "depthKUsd": 0,
+          "depthPUsd": 19.45125,
+          "sharesK": 0,
+          "sharesP": 555.75,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    },
+    {
+      "opportunity_id": "scan:815095:opportunity:2",
+      "candidate_index": 2,
+      "outcome": "Barack Obama",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "ROI 1.21% < min 2.00%; Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 101.66 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.79 required; PM $2.44 / $0.12 required",
+      "roi_pct": 1.2064000000000015,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.530Z",
+      "updated_at": "2026-08-20T09:37:08.530Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:2",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 1.2064000000000015,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-BOM",
+            "pmConditionId": "0xf0f06f10ca905fa971609b18ea337047068e80e8fed592886edf1716a71fe389",
+            "pmYesTokenId": "33428360253534978212559209778778692481592503265991528085861037294251487931202",
+            "pmNoTokenId": "16784118751140916017839079210646263843773095280953585749697187282637249364107"
+          },
+          "asks": {
+            "kalshiYes": 0.052,
+            "kalshiNo": 0.959,
+            "pmYes": 0.024,
+            "pmNo": 0.988
+          },
+          "executableQuotes": {
+            "kalshiYes": null,
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 500.01,
+            "kalshiNo": 0,
+            "pmYes": 2.43984,
+            "pmNo": 39.519999999999996
+          },
+          "fees": {
+            "kalshiFee": 0.02,
+            "pmFee": 0.00468,
+            "kalshiFeeDetails": "Kalshi NO buy 5 @ $0.96 = $0.02",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.02 (θ=0.04) = $0.00"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 1.2064000000000015,
+          "apyPct": 0,
+          "depthKUsd": 0,
+          "depthPUsd": 2.43984,
+          "sharesK": 0,
+          "sharesP": 101.65999999999998,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    },
+    {
+      "opportunity_id": "scan:815095:opportunity:3",
+      "candidate_index": 3,
+      "outcome": "Tom Homan",
+      "strategy": "Buy YES Kalshi + NO PM",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry",
+      "roi_pct": 3.0625999999999896,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.534Z",
+      "updated_at": "2026-08-20T09:37:08.534Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:3",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 3.0625999999999896,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-THOM",
+            "pmConditionId": "0xbe555c50fc49ae7f1a970fbe13f226d179c192d87daa71c7ca082464b71fb8f6",
+            "pmYesTokenId": "68573038148377142897679188886918535473939642314197309810135827411166768194472",
+            "pmNoTokenId": "27705432816847291323925622847687396001932163087018486036209592664496834211156"
+          },
+          "asks": {
+            "kalshiYes": 0.055,
+            "kalshiNo": 0.96,
+            "pmYes": 0.109,
+            "pmNo": 0.907
+          },
+          "executableQuotes": {
+            "kalshiYes": null,
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 40,
+            "kalshiNo": 0,
+            "pmYes": 6.54,
+            "pmNo": 4.535
+          },
+          "fees": {
+            "kalshiFee": 0.02,
+            "pmFee": 0.01687,
+            "kalshiFeeDetails": "Kalshi YES buy 5 @ $0.06 = $0.02",
+            "pmFeeDetails": "Polymarket NO buy 5 @ $0.91 (θ=0.04) = $0.02"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 3.0625999999999896,
+          "apyPct": 0,
+          "depthKUsd": 40,
+          "depthPUsd": 4.535,
+          "sharesK": 727.2727272727273,
+          "sharesP": 5,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    },
+    {
+      "opportunity_id": "scan:815095:opportunity:4",
+      "candidate_index": 4,
+      "outcome": "Anthony Fauci",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 251.92 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.15 required; PM $28.47 / $0.57 required",
+      "roi_pct": 4.29900000000001,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.538Z",
+      "updated_at": "2026-08-20T09:37:08.538Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:4",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 4.29900000000001,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-AFAU",
+            "pmConditionId": "0x1a975c8210f5aa11c76d645a4dd746764799310898445689b17fb500a8925c80",
+            "pmYesTokenId": "62664988686544541004962241557013553766520681768858444478309305931894695537107",
+            "pmNoTokenId": "17975191090368850629199328837942579544544087040168159526074580068832106631805"
+          },
+          "asks": {
+            "kalshiYes": 0.18,
+            "kalshiNo": 0.83,
+            "pmYes": 0.113,
+            "pmNo": 0.894
+          },
+          "executableQuotes": {
+            "kalshiYes": {
+              "status": "executable",
+              "reason": null,
+              "requestedQuantityMicros": 1000000,
+              "filledQuantityMicros": 1000000,
+              "totalCostMicroCents": 18000000,
+              "vwapPriceMicroCents": 18000000,
+              "limitPriceMicroCents": 18000000,
+              "fills": [
+                {
+                  "priceCents": 18,
+                  "priceMicroCents": 18000000,
+                  "quantityMicros": 1000000
+                }
+              ],
+              "depthTimestamp": "2026-08-20T09:37:08.249Z",
+              "tickSizeMicroCents": 1000000,
+              "minimumOrderQuantityMicros": 1000000
+            },
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 90.01,
+            "kalshiNo": 0,
+            "pmYes": 28.46696,
+            "pmNo": 210.95718
+          },
+          "fees": {
+            "kalshiFee": 0.05,
+            "pmFee": 0.02005,
+            "kalshiFeeDetails": "Kalshi NO buy 5 @ $0.83 = $0.05",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.11 (θ=0.04) = $0.02"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 4.29900000000001,
+          "apyPct": 0,
+          "depthKUsd": 0,
+          "depthPUsd": 28.46696,
+          "sharesK": 0,
+          "sharesP": 251.92,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    },
+    {
+      "opportunity_id": "scan:815095:opportunity:5",
+      "candidate_index": 5,
+      "outcome": "Gavin Newsom",
+      "strategy": "Buy YES PM + NO Kalshi",
+      "state": "rejected",
+      "reason_code": "scan_criteria_rejected",
+      "reason": "Exact selected contracts are absent from the server-owned canonical proposition registry; Insufficient shares at best ask: Kalshi 0.00 / PM 415.68 (requested 5); Insufficient executable depth at quoted ask: Kalshi $0.00 / $4.69 required; PM $12.47 / $0.15 required",
+      "roi_pct": 2.3836000000000124,
+      "apy_pct": null,
+      "threshold_config_version": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+      "final_result": "rejected",
+      "execution_id": null,
+      "created_at": "2026-08-20T09:37:08.540Z",
+      "updated_at": "2026-08-20T09:37:08.540Z",
+      "details": {
+        "schemaVersion": 1,
+        "scanId": 815095,
+        "opportunityId": "scan:815095:opportunity:5",
+        "configVersion": "bot-settings-v1:{\"enabled\":true,\"mode\":\"paper\",\"selectionMethod\":\"roi\",\"minRoiPct\":2,\"minApyPct\":0,\"minDepthUsd\":0.5,\"minSharesPerLeg\":1,\"maxExpiryDays\":360,\"maxTradesPerDay\":100}",
+        "stage": "scan",
+        "thresholds": {
+          "enabled": true,
+          "mode": "paper",
+          "selectionMethod": "roi",
+          "minRoiPct": 2,
+          "minApyPct": 0,
+          "minDepthUsd": 0.5,
+          "minSharesPerLeg": 1,
+          "maxExpiryDays": 360,
+          "maxTradesPerDay": 100
+        },
+        "inputs": {
+          "roiPct": 2.3836000000000124,
+          "apyPct": null,
+          "expectedProfit": 0,
+          "expiryDate": null,
+          "kalshiStake": 0,
+          "pmStake": 0,
+          "exactIds": {
+            "kalshiTicker": "KXARREST-27JAN-GNEW",
+            "pmConditionId": "0x30f0732734e61902d81cf2d3e37e531de8883b6a2c4cabd8ba3e4035977de1ed",
+            "pmYesTokenId": "81926437499375408929787207529000604100026014614447276020598559062677731079426",
+            "pmNoTokenId": "46222214742622769331945251325777816613109573852530941987955100282625485777233"
+          },
+          "asks": {
+            "kalshiYes": 0.069,
+            "kalshiNo": 0.939,
+            "pmYes": 0.03,
+            "pmNo": 0.978
+          },
+          "executableQuotes": {
+            "kalshiYes": null,
+            "kalshiNo": null,
+            "pmYes": null,
+            "pmNo": null
+          },
+          "depthUsd": {
+            "kalshiYes": 45.33,
+            "kalshiNo": 0,
+            "pmYes": 12.4704,
+            "pmNo": 1770.69834
+          },
+          "fees": {
+            "kalshiFee": 0.03,
+            "pmFee": 0.00582,
+            "kalshiFeeDetails": "Kalshi NO buy 5 @ $0.94 = $0.03",
+            "pmFeeDetails": "Polymarket YES buy 5 @ $0.03 (θ=0.04) = $0.01"
+          },
+          "venueConstraints": {
+            "pmYesMinimumOrder": 5,
+            "pmNoMinimumOrder": 5,
+            "pmYesTickSize": 0.001,
+            "pmNoTickSize": 0.001
+          }
+        },
+        "evaluation": {
+          "roiPct": 2.3836000000000124,
+          "apyPct": 0,
+          "depthKUsd": 0,
+          "depthPUsd": 12.4704,
+          "sharesK": 0,
+          "sharesP": 415.68,
+          "expiryDays": null
+        },
+        "final": true
+      }
+    }
+  ],
+  "executions": [],
+  "eventCounts": [
+    {
+      "state": "criteria_rejected",
+      "reason_code": "scan_criteria_rejected",
+      "count": 1
+    },
+    {
+      "state": "received",
+      "reason_code": "scan_received",
+      "count": 1
+    }
+  ],
+  "duplicateDecisionRows": 0
+}
