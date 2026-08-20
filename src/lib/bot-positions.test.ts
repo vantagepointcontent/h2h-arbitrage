@@ -266,7 +266,87 @@ describe('summarizeBotPositions', () => {
 });
 
 describe('summarizeBotPerformance', () => {
-  it('keeps exact invalid and unresolved exposure out of verified-arbitrage totals while reporting separate cohorts', () => {
+  it('aggregates every lifecycle-open persisted P&L regardless of relationship classification', () => {
+    const result = summarizeBotPerformance([
+      openPosition({
+        id: 1,
+        relationshipValidity: 'verified_complementary',
+        exposureIdentityStatus: 'exact_held_legs_proven',
+        totalCostCents: 97,
+        currentValueCents: 100,
+        unrealizedPnlCents: 3,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+      }),
+      openPosition({
+        id: 2,
+        relationshipValidity: 'unresolved_relationship',
+        exposureIdentityStatus: 'exact_held_legs_proven',
+        totalCostCents: 50,
+        currentValueCents: 60,
+        unrealizedPnlCents: 10,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+      }),
+      openPosition({
+        id: 3,
+        relationshipValidity: 'unresolved_relationship',
+        exposureIdentityStatus: 'partially_proven',
+        totalCostCents: 70,
+        currentValueCents: 75,
+        unrealizedPnlCents: 5,
+        lastValuationAt: '2026-08-17T10:00:00.000Z',
+      }),
+      openPosition({
+        id: 4,
+        settlementState: 'settlement_unresolved',
+        relationshipValidity: 'unresolved_relationship',
+        exposureIdentityStatus: 'unrecoverable',
+        totalCostCents: 80,
+        currentValueCents: null,
+        unrealizedPnlCents: null,
+        lastValuationAt: null,
+        valuationFailureReason: 'Persisted valuation inputs are unavailable',
+      }),
+      openPosition({
+        id: 5,
+        status: 'settled',
+        totalCostCents: 90,
+        currentValueCents: 189,
+        unrealizedPnlCents: 99,
+        realizedPnlCents: 10,
+        resolutionPayoutCents: 100,
+        resolutionValidationStatus: 'verified',
+      }),
+    ], new Date('2026-08-17T12:00:00.000Z'));
+
+    expect(result.pnl.unrealizedCents).toBe(18);
+    expect(result.capital.heldToResolutionCents).toBe(4000);
+    expect(result.valuation).toMatchObject({ fresh: 2, stale: 1, unavailable: 1 });
+    expect(result.capital.excludedOpenCostCents).toBe(80);
+    expect(result.classification.counts.excludedFromVerifiedTotals).toBe(3);
+  });
+
+  it('uses canonical open status when a settlement projection is contradictory', () => {
+    const result = summarizeBotPerformance([
+      openPosition({
+        status: 'open',
+        settlementState: 'settled',
+        totalCostCents: 90,
+        remainingOpenCostCents: 90,
+        currentValueCents: 100,
+        unrealizedPnlCents: 10,
+        lastValuationAt: '2026-08-17T11:59:00.000Z',
+        resolutionPayoutCents: 100,
+        resolutionValidationStatus: 'verified',
+        realizedPnlCents: 10,
+      }),
+    ], new Date('2026-08-17T12:00:00.000Z'));
+
+    expect(result.capital.currentCents).toBe(100);
+    expect(result.pnl).toEqual({ realizedCents: 10, unrealizedCents: 20, totalCents: 20, roiBps: 2222 });
+    expect(result.valuation).toMatchObject({ fresh: 1, pendingSettlement: 0 });
+  });
+
+  it('keeps relationship cohorts separate without excluding lifecycle-open exposure totals', () => {
     const result = summarizeBotPerformance([
       openPosition({
         id: 1, relationshipValidity: 'verified_complementary', exposureIdentityStatus: 'exact_held_legs_proven',
@@ -289,8 +369,8 @@ describe('summarizeBotPerformance', () => {
       }),
     ], new Date('2026-08-17T12:00:00.000Z'));
 
-    expect(result.capital.currentCents).toBe(100);
-    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 3, totalCents: 3, roiBps: 309 });
+    expect(result.capital.currentCents).toBe(235);
+    expect(result.pnl).toEqual({ realizedCents: 0, unrealizedCents: 18, totalCents: 18, roiBps: 829 });
     expect(result.classification).toMatchObject({
       counts: {
         verifiedComplementary: 1, confirmedInvalid: 1, exactExposureUnresolved: 1,
@@ -321,6 +401,7 @@ describe('summarizeBotPerformance', () => {
   it('does not treat a legacy position with unavailable authoritative entry cost as zero deployed capital', () => {
     const result = summarizeBotPerformance([
       openPosition({
+        exposureIdentityStatus: 'partially_proven',
         currentValueCents: 1022,
         lastValuationAt: '2026-08-11T13:55:00.000Z',
         entryCostStatus: 'unavailable',
@@ -336,6 +417,13 @@ describe('summarizeBotPerformance', () => {
     expect(result.entryCohorts[0].deployedCents).toBeNull();
     expect(result.entryCohorts[0].currentCents).toBe(1022);
     expect(result.entryCohorts[0].unrealizedCents).toBeNull();
+    expect(result.classification.unavailable).toMatchObject({
+      count: 1,
+      deployedCents: null,
+      currentValueCents: 1022,
+      pnlCents: null,
+      roiBps: null,
+    });
   });
 
   it('uses one fee-inclusive population for cards and chart while retaining stale indicative marks', () => {
@@ -355,9 +443,28 @@ describe('summarizeBotPerformance', () => {
     ]);
   });
 
-  it('rounds indicative portfolio and cohort totals only after aggregating exact marks', () => {
-    const rows = [1, 2].map((id) => openPosition({
-      id,
+  it('makes every relationship cohort P&L equal the sum of canonical rounded row values', () => {
+    const rows = [
+      {
+        id: 1,
+        relationshipValidity: 'verified_complementary' as const,
+        exposureIdentityStatus: 'exact_held_legs_proven' as const,
+        unrealizedPnlCents: 22,
+      },
+      {
+        id: 2,
+        relationshipValidity: 'unresolved_relationship' as const,
+        exposureIdentityStatus: 'exact_held_legs_proven' as const,
+        unrealizedPnlCents: 33,
+      },
+      {
+        id: 3,
+        relationshipValidity: 'unresolved_relationship' as const,
+        exposureIdentityStatus: 'partially_proven' as const,
+        unrealizedPnlCents: 44,
+      },
+    ].map((classification) => openPosition({
+      ...classification,
       openedAt: '2026-08-10T13:00:00.000Z',
       totalCostCents: 97,
       currentValueCents: 99,
@@ -368,9 +475,12 @@ describe('summarizeBotPerformance', () => {
     }));
 
     const result = summarizeBotPerformance(rows, new Date('2026-08-11T14:00:00.000Z'));
-    expect(result.capital.currentCents).toBe(199);
-    expect(result.pnl).toMatchObject({ unrealizedCents: 5, totalCents: 5, roiBps: 257 });
-    expect(result.entryCohorts[0]).toMatchObject({ currentCents: 199, unrealizedCents: 5 });
+    expect(result.capital.currentCents).toBe(297);
+    expect(result.pnl).toMatchObject({ unrealizedCents: 6, totalCents: 6, roiBps: 206 });
+    expect(result.entryCohorts[0]).toMatchObject({ currentCents: 297, unrealizedCents: 6 });
+    expect(result.classification.verifiedArbitrage).toMatchObject({ currentValueCents: 99, pnlCents: 2, roiBps: 206 });
+    expect(result.classification.unresolvedExposure).toMatchObject({ currentValueCents: 99, pnlCents: 2, roiBps: 206 });
+    expect(result.classification.unavailable).toMatchObject({ currentValueCents: 99, pnlCents: 2, roiBps: 206 });
   });
 
   it('reconciles a reduced open position from immutable Buy Cost across row, cards, ROI, and cohort', () => {
@@ -1657,11 +1767,11 @@ describe('BotPositionStore', () => {
     expect(settled.currentValueCents).toBe(100);
     expect(settled.realizedPnlCents).toBe(15);
     expect(summarizeBotPerformance([reduced], new Date('2026-08-08T12:02:00.000Z'))).toMatchObject({
-      capital: { deployedCents: 0, currentCents: 0, heldToResolutionCents: 0 },
-      pnl: { realizedCents: 0, unrealizedCents: 0, totalCents: 0, roiBps: null },
+      capital: { deployedCents: 89, currentCents: 100, heldToResolutionCents: 100 },
+      pnl: { realizedCents: 4, unrealizedCents: 15, totalCents: 15, roiBps: 1685 },
       classification: {
         counts: { unrecoverable: 1, excludedFromVerifiedTotals: 1 },
-        unavailable: { count: 1, deployedCents: 89, currentValueCents: 100, pnlCents: 11 },
+        unavailable: { count: 1, deployedCents: 89, currentValueCents: 100, pnlCents: 15 },
       },
     });
     const result = await store.listMarkets();

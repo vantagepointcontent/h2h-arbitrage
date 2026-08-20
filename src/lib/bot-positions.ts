@@ -27,6 +27,7 @@ import type {
   RelationshipValidity,
 } from './bot-legacy-exposure-reconciliation';
 import { ensurePaperPositionDeletionSchema } from './bot-paper-position-deletion';
+import { projectOpenPositionPnlCents } from './bot-position-financials';
 
 export type BotPositionStatus = 'open' | 'settled' | 'closed';
 export type BotPositionSide = 'yes' | 'no';
@@ -3329,15 +3330,11 @@ function botPositionMark(position: BotPosition, nowMs: number): 'fresh' | 'stale
 }
 
 function isTerminalPosition(position: BotPosition): boolean {
-  return position.settlementState === 'settled'
-    || position.status === 'settled' || position.status === 'closed';
+  return position.status === 'settled' || position.status === 'closed';
 }
 
 function isOpenPosition(position: BotPosition): boolean {
-  return position.status === 'open'
-    && (position.settlementState == null
-      || position.settlementState === 'open'
-      || position.settlementState === 'partially_settled');
+  return position.status === 'open';
 }
 
 function isPendingSettlementPosition(position: BotPosition): boolean {
@@ -3382,6 +3379,12 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     || position.exposureIdentityStatus === 'exact_held_legs_proven';
   const verifiedRelationship = (position: BotPosition) => position.relationshipValidity == null
     || position.relationshipValidity === 'verified_complementary';
+  const rowUnrealizedCents = (position: BotPosition) => projectOpenPositionPnlCents({
+    currentValueCents: position.currentValueCents,
+    buyCostCents: analyticsBuyCostCents(position),
+    indicativePnlMicrocents: position.indicativePnlMicrocents,
+    realizedPnlCents: position.realizedPnlCents,
+  });
   const verifiedRows = allRows.filter((position) => exactExposure(position) && verifiedRelationship(position));
   const invalidRows = allRows.filter((position) => exactExposure(position)
     && (position.relationshipValidity === 'confirmed_invalid'
@@ -3396,7 +3399,7 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       ? position.currentValueCents
       : hasVerifiedTerminalAccounting(position) ? position.resolutionPayoutCents ?? null : null);
     const pnls = cohort.map((position) => isOpenPosition(position)
-      ? position.unrealizedPnlCents
+      ? hasAvailableEntryCost(position) ? rowUnrealizedCents(position) : null
       : hasVerifiedTerminalAccounting(position) ? position.realizedPnlCents ?? null : null);
     const currentValueCents = values.some((value) => value == null)
       ? null : total(values as number[]);
@@ -3423,27 +3426,29 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
     unresolvedExposure: cohortSummary(unresolvedRows),
     unavailable: cohortSummary(unavailableRows),
   };
-  // Primary cards and charts remain the verified-arbitrage cohort. Exact but
-  // invalid/unresolved exposure is truthful in its separate cohort only.
-  rows = verifiedRows;
-  const roundMicrocents = (value: number) => {
-    if (!Number.isSafeInteger(value)) throw new Error('Indicative aggregate exceeds safe integer range');
-    const numerator = BigInt(value);
-    const absolute = numerator < 0n ? -numerator : numerator;
-    const rounded = (absolute + 500_000n) / 1_000_000n;
-    return Number(numerator < 0n ? -rounded : rounded);
-  };
-  const exactValueMicrocents = (position: BotPosition) => position.indicativeValueMicrocents
-    ?? position.currentValueCents! * 1_000_000;
-  const exactUnrealizedMicrocents = (position: BotPosition) => position.indicativePnlMicrocents
-    ?? (position.currentValueCents! - analyticsBuyCostCents(position)) * 1_000_000;
+  // Relationship classification is orthogonal to lifecycle. Every canonical
+  // open position remains in exposure, valuation, P&L, ROI, and chart totals;
+  // non-open analytics retain the verified-arbitrage cohort semantics.
+  rows = allRows.filter((position) => isOpenPosition(position)
+    || (exactExposure(position) && verifiedRelationship(position)));
+  // Summary cards must reconcile to the integer-cent values rendered for each
+  // persisted row. Round each row first; rounding only after portfolio
+  // aggregation can make the meter disagree with the visible row sum.
+  const rowValueCents = (position: BotPosition) => position.currentValueCents!;
   const nowMs = now.getTime();
   const open = rows.filter(isOpenPosition);
   const verifiedSettled = rows.filter(hasVerifiedTerminalAccounting);
-  const unverifiedSettled = rows.filter((position) =>
-    (isTerminalPosition(position) || isPendingSettlementPosition(position))
+  const unverifiedSettled = rows.filter((position) => !isOpenPosition(position)
+    && (isTerminalPosition(position) || isPendingSettlementPosition(position))
     && !hasVerifiedTerminalAccounting(position));
-  const mark = (position: BotPosition) => botPositionMark(position, nowMs);
+  const mark = (position: BotPosition) => {
+    const persistedMark = botPositionMark(position, nowMs);
+    return persistedMark !== 'unavailable'
+      && hasAvailableEntryCost(position)
+      && rowUnrealizedCents(position) == null
+      ? 'unavailable' as const
+      : persistedMark;
+  };
   const freshOpen = open.filter((position) => mark(position) === 'fresh');
   const markedOpen = open.filter((position) => mark(position) !== 'unavailable');
   const stale = open.filter((position) => mark(position) === 'stale').length;
@@ -3453,28 +3458,30 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   // A BUG-160 indicative P&L already compares the remaining mark with immutable
   // original Buy Cost. Add partial-close realized P&L only for legacy executable
   // valuations, where P&L still uses remaining basis.
-  const realizedCents = total([
-    ...verifiedSettled.map((position) => position.realizedPnlCents!),
-    ...open.filter((position) => position.indicativePnlMicrocents == null)
-      .map((position) => position.realizedPnlCents ?? 0),
-  ]);
+  const terminalRealizedCents = total(verifiedSettled.map((position) => position.realizedPnlCents!));
+  const openPartialRealizedCents = total(open.filter((position) => position.indicativePnlMicrocents == null)
+    .map((position) => position.realizedPnlCents ?? 0));
+  const realizedCents = terminalRealizedCents + openPartialRealizedCents;
   const valuedOpen = markedOpen.filter(hasAvailableEntryCost);
-  const exactOpenValueMicrocents = total(markedOpen.map(exactValueMicrocents));
-  const exactOpenUnrealizedMicrocents = total(valuedOpen.map(exactUnrealizedMicrocents));
+  const openValueCents = total(markedOpen.map(rowValueCents));
+  const openUnrealizedCents = total(valuedOpen.map((position) => rowUnrealizedCents(position)!));
   const unrealizedCents = open.length > 0 && valuedOpen.length === 0
     ? null
-    : roundMicrocents(exactOpenUnrealizedMicrocents);
-  const totalCents = unrealizedCents == null || unverifiedSettled.length > 0 ? null : realizedCents + unrealizedCents;
+    : openUnrealizedCents;
+  // Legacy open-row P&L already includes any realized partial-close component,
+  // so Total adds terminal realized P&L only and must not double count it.
+  const totalCents = unrealizedCents == null || unverifiedSettled.length > 0
+    ? null : terminalRealizedCents + unrealizedCents;
   const deployedCents = allEntryCostsAvailable ? total(rows.map(analyticsBuyCostCents)) : null;
-  const currentCents = roundMicrocents(exactOpenValueMicrocents
-    + total(verifiedSettled.map((position) => position.resolutionPayoutCents!)) * 1_000_000);
+  const currentCents = openValueCents
+    + total(verifiedSettled.map((position) => position.resolutionPayoutCents!));
   const valuedCostCents = total(valuedOpen.map(analyticsBuyCostCents))
     + total(verifiedSettled.map((position) => position.totalCostCents));
   const excludedOpenCostCents = total(open.filter((position) => mark(position) === 'unavailable' || !hasAvailableEntryCost(position)).map(analyticsBuyCostCents));
   const oldestMarkedMs = markedOpen.reduce((oldest, position) => Math.min(oldest, Date.parse(position.lastValuationAt!)), Number.POSITIVE_INFINITY);
   const dates = new Map<string, BotPerformanceSummary['entryCohorts'][number] & { incomplete: boolean }>();
-  const exactCurrentByDate = new Map<string, number>();
-  const exactUnrealizedByDate = new Map<string, number>();
+  const currentByDate = new Map<string, number>();
+  const unrealizedByDate = new Map<string, number>();
   for (const position of rows) {
     const openedAt = new Date(position.openedAt);
     const date = [openedAt.getFullYear(), String(openedAt.getMonth() + 1).padStart(2, '0'), String(openedAt.getDate()).padStart(2, '0')].join('-');
@@ -3489,16 +3496,16 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       }
       point.heldToResolutionCents += heldPayoutCents(position);
       if (mark(position) !== 'unavailable') {
-        exactCurrentByDate.set(date, (exactCurrentByDate.get(date) ?? 0) + exactValueMicrocents(position));
+        currentByDate.set(date, (currentByDate.get(date) ?? 0) + rowValueCents(position));
         point.unrealizedCents = !hasAvailableEntryCost(position) || point.unrealizedCents == null
           ? null
           : point.unrealizedCents;
         if (point.unrealizedCents != null) {
-          exactUnrealizedByDate.set(date, (exactUnrealizedByDate.get(date) ?? 0) + exactUnrealizedMicrocents(position));
+          unrealizedByDate.set(date, (unrealizedByDate.get(date) ?? 0) + rowUnrealizedCents(position)!);
         }
       }
     } else if (hasVerifiedTerminalAccounting(position)) {
-      exactCurrentByDate.set(date, (exactCurrentByDate.get(date) ?? 0) + position.resolutionPayoutCents! * 1_000_000);
+      currentByDate.set(date, (currentByDate.get(date) ?? 0) + position.resolutionPayoutCents!);
       point.realizedCents += position.realizedPnlCents!;
     } else {
       point.incomplete = true;
@@ -3507,10 +3514,10 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
   }
   const entryCohorts = [...dates.values()].sort((a, b) => a.date.localeCompare(b.date)).map(({ incomplete, ...point }) => ({
     ...point,
-    currentCents: incomplete ? null : roundMicrocents(exactCurrentByDate.get(point.date) ?? 0),
+    currentCents: incomplete ? null : currentByDate.get(point.date) ?? 0,
     unrealizedCents: incomplete || point.unrealizedCents == null
       ? null
-      : roundMicrocents(exactUnrealizedByDate.get(point.date) ?? 0),
+      : unrealizedByDate.get(point.date) ?? 0,
   }));
   return {
     positionIds: allRows.map((position) => position.id),
@@ -3525,15 +3532,8 @@ export function summarizeBotPerformance(rows: BotPosition[], now = new Date()): 
       realizedCents,
       unrealizedCents,
       totalCents,
-      roiBps: totalCents == null || valuedCostCents <= 0 ? null : (() => {
-        const exactOpenCost = valuedOpen.reduce((sum, position) => sum
-          + (position.indicativeBuyCostMicrocents ?? analyticsBuyCostCents(position) * 1_000_000), 0);
-        const terminalCost = total(verifiedSettled.map((position) => position.totalCostCents)) * 1_000_000;
-        const denominator = exactOpenCost + terminalCost;
-        return denominator <= 0 ? null : Math.round(
-          (exactOpenUnrealizedMicrocents + realizedCents * 1_000_000) * 10_000 / denominator,
-        );
-      })(),
+      roiBps: totalCents == null || valuedCostCents <= 0
+        ? null : Math.round(totalCents * 10_000 / valuedCostCents),
     },
     valuation: {
       fresh: freshOpen.length,
@@ -3623,12 +3623,17 @@ export async function getBotPositionAnalytics(options: {
   const open = positions.filter(isOpenPosition);
   const settled = positions.filter(hasVerifiedTerminalAccounting);
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+  const openRowPnlCents = (position: BotPosition) => projectOpenPositionPnlCents({
+    currentValueCents: position.currentValueCents,
+    buyCostCents: analyticsBuyCostCents(position),
+    indicativePnlMicrocents: position.indicativePnlMicrocents,
+    realizedPnlCents: position.realizedPnlCents,
+  });
   const score = (position: BotPosition) => position.status === 'open'
-    ? (position.indicativePnlMicrocents == null ? position.realizedPnlCents ?? 0 : 0)
-      + (position.currentValueCents ?? analyticsBuyCostCents(position)) - analyticsBuyCostCents(position)
+    ? openRowPnlCents(position)!
     : hasVerifiedTerminalAccounting(position) ? position.realizedPnlCents! : 0;
   const ranked = positions.filter((position) => position.status === 'open'
-    ? botPositionMark(position, now.getTime()) === 'fresh'
+    ? botPositionMark(position, now.getTime()) === 'fresh' && openRowPnlCents(position) != null
     : hasVerifiedTerminalAccounting(position)).sort((a, b) => score(b) - score(a));
   const performance = summarizeBotPerformance(positions, now);
   const dailyPnl = cohortPnlFor(positions, now);
