@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSavedMarkets, queryScanHistoryStream, countScanHistory } from '@/lib/persistence';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { clientSafeError } from '@/lib/error-handler';
-import { classifyArbType } from '@/lib/arb-types';
+import { projectCanonicalArbClassification } from '@/lib/arb-types';
 import { parseExportLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib/logs-request';
 import { getCurrentLogRoiBatch } from '@/lib/current-log-roi.server';
 import { compareRoiDecline } from '@/lib/roi-declined';
 import { formatScaledMoney, parseCalculationEnvelope } from '@/lib/calculation-envelope';
 import { resolveHistoricalScanFinancials } from '@/lib/historical-scan-financials';
 import { getBotScanEvaluationSummaries } from '@/lib/bot-scan-consumer';
+import { scanStatusPresentation } from '@/lib/scan-status';
 
 const CURRENT_ROI_BATCH_SIZE = 100;
 
@@ -21,8 +22,8 @@ const headers = [
   'Arb Type',
   'Arb Valid',
   'Invalidation Reason',
-  'State',
-  'State Unavailable Reason',
+  'Scan Status',
+  'Scan Status Explanation',
   'ROI %',
   'ROI Unavailable Reason',
   'Current ROI %',
@@ -160,6 +161,7 @@ export async function GET(request: NextRequest) {
           const currentRoiById = new Map(currentRoiPages.flat().map((valuation) => [valuation.id, valuation]));
           const botEvaluations = await getBotScanEvaluationSummaries(ids);
           for (const r of batch) {
+            const arbProjection = projectCanonicalArbClassification(r);
             let outcomeApy: OutcomeContingentApy | null = null;
             try {
               const raw = typeof r.raw_result === 'string'
@@ -175,6 +177,11 @@ export async function GET(request: NextRequest) {
               : null;
             const historical = resolveHistoricalScanFinancials(r);
             const botEvaluation = botEvaluations.get(Number(r.id));
+            const scanStatus = typeof r.scan_status === 'string' && r.scan_status ? r.scan_status : null;
+            const scanStatusExplanation = scanStatusPresentation(
+              scanStatus,
+              typeof r.scan_status_reason === 'string' ? r.scan_status_reason : null,
+            ).explanation;
             const historicalRoi = historical.fields.roiPct.status === 'available' ? historical.fields.roiPct.value : null;
             const roiComparison = compareRoiDecline(historicalRoi, currentRoiPct);
             const currentRoiReason = currentRoiPct == null
@@ -229,11 +236,11 @@ export async function GET(request: NextRequest) {
               categoryMap.get(r.market_id) ?? '',
               r.market_id,
               r.strategy,
-              r.arb_valid === 1 ? (r.arb_type ?? classifyArbType(r.strategy) ?? '') : '',
-              r.arb_valid === 1 ? 'true' : 'false',
-              r.arb_invalidation_reason ?? '',
-              typeof r.scan_status === 'string' && r.scan_status ? r.scan_status : null,
-              typeof r.scan_status === 'string' && r.scan_status ? '' : 'No canonical persisted scan state was recorded.',
+              arbProjection.arbType ?? '',
+              arbProjection.arbValid === 1 ? 'true' : 'false',
+              arbProjection.arbInvalidationReason ?? '',
+              scanStatus,
+              scanStatusExplanation,
               historical.fields.roiPct.status === 'available' ? historical.fields.roiPct.value : null,
               historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : '',
               currentRoiPct,
@@ -259,7 +266,7 @@ export async function GET(request: NextRequest) {
               r.matched_count,
               r.kalshi_count,
               r.pm_count,
-              r.positive_arb_count,
+              arbProjection.positiveArbCount,
               historical.fields.stakeUsd.status === 'available' ? historical.fields.stakeUsd.value : null,
               historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : '',
               r.outcome_count,

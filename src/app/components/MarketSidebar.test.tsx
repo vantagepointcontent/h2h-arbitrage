@@ -55,7 +55,10 @@ describe.each([
     const saved: SavedMarket = {
       id: 'market-apy', eventTitle: 'Canonical APY market', kalshiUrl: 'k', polymarketUrl: 'p',
       createdAt: '2026-08-13T18:00:00Z', expiryDate: '2027-01-01T00:00:00.000Z',
-      canonicalApyPct: 12.34, canonicalApyObservedAt: '2026-08-16T00:00:00.000Z', canonicalApySource: 'full_scan',
+      canonicalApyPct: 12.34, canonicalApyObservedAt: '2026-08-16T00:00:00.000Z', canonicalApySource: 'full_scan', canonicalApyRevision: 1,
+      canonicalCurrentRoiPct: 2, canonicalCurrentProfit: 1, canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 365 * Math.log(1.02) / Math.log(1.1234),
+      canonicalCurrentExpiryAt: '2027-01-01T00:00:00.000Z', canonicalCurrentRevision: 1,
       lastScanResult: { bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-16T00:00:00.000Z', allArbs: [] },
     };
     saved.lastScanResult = {
@@ -166,6 +169,7 @@ describe('BUG-168 lightweight Saved Markets refresh', () => {
     const initial: SavedMarket = {
       id: 'market-target', eventTitle: 'Target market', category: 'Politics', kalshiUrl: 'k', polymarketUrl: 'p',
       createdAt: '2026-08-01T00:00:00.000Z', expiryDate: '2026-08-25T00:00:00.000Z',
+      canonicalCurrentRoiPct: 2, canonicalCurrentProfit: 4, canonicalCurrentStrategy: 'arb',
       lastScanResult: { bestRoiPct: 2, bestProfit: 4, strategy: 'arb', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-19T14:00:00.000Z', allArbs: [] },
     };
     const props = {
@@ -276,6 +280,7 @@ describe('BUG-169 complete Saved Markets APY pipeline', () => {
     const markets = Array.from({ length: 482 }, (_, index): SavedMarket => {
       const eligible = index % 2 === 0;
       const canonicalApyPct = index === 2 ? 30.01 : index === 400 ? 30.04 : index / 1000;
+      const roiPct = (Math.pow(1 + canonicalApyPct / 100, 100 / 365) - 1) * 100;
       return {
         id: `market-${index.toString().padStart(3, '0')}`,
         eventTitle: `${eligible ? 'Eligible' : 'Excluded'} Market ${index.toString().padStart(3, '0')}`,
@@ -286,6 +291,13 @@ describe('BUG-169 complete Saved Markets APY pipeline', () => {
         canonicalApyPct,
         canonicalApyObservedAt: '2026-08-19T14:00:00.000Z',
         canonicalApySource: 'full_scan',
+        canonicalApyRevision: 1,
+        canonicalCurrentRoiPct: roiPct,
+        canonicalCurrentProfit: 1,
+        canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+        canonicalCurrentDaysToExpiry: 100,
+        canonicalCurrentExpiryAt: '2026-11-27T14:00:00.000Z',
+        canonicalCurrentRevision: 1,
       };
     });
 

@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-08-20T14:08:10.001Z",
+  "integrityCheck": [
+    "ok"
+  ],
+  "backupPath": "/home/scott/h2h-arbitrage/backups/bug179-pre-reconcile-20260820T140712Z.db",
+  "marketCount": 476,
+  "reconciledRows": 22,
+  "beforeInvalidCount": 0,
+  "beforeRawInvalidCount": 15,
+  "afterInvalidCount": 0,
+  "telemetryAlertCount": 137,
+  "installedGuards": [
+    "saved_market_apy_invariant_guard",
+    "saved_market_metric_revision_guard"
+  ],
+  "unrepairedRows": []
+}

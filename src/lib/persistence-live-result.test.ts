@@ -123,7 +123,12 @@ describe('WS-107 liveResult persistence', () => {
     await persistence.updateSavedMarketScanResult(m.id, makeScan({
       publicationGeneration: scanGeneration,
       matchStatus: 'matched',
-      allArbs: [{ artist: 'MD-01', roiPct: 12, expectedProfit: 12, strategy: 'Buy YES Kalshi + NO PM', apyPct: 29.959508018509656 }],
+      allArbs: [{
+        artist: 'MD-01', roiPct: 12, expectedProfit: 12, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', totalStake: 100, executionStatus: 'executable', apyPct: 29.959508018509656,
+        daysToExpiry: 365 * Math.log(1.12) / Math.log(1 + 29.959508018509656 / 100),
+        expiryAt: '2027-01-01T00:00:00.000Z',
+      }],
     }));
     const liveGeneration = await persistence.reserveSavedMarketPublication(m.id, 'live');
     await persistence.updateSavedMarketLiveResult(m.id, makeScan({

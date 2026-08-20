@@ -10,9 +10,10 @@ import {
   Search,
   AlertTriangle,
   ExternalLink,
+  CircleHelp,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { getArbTypeMeta, ARB_TYPES, type ArbType } from "@/lib/arb-types";
+import { projectCanonicalArbClassification, ARB_TYPES, type ArbType } from "@/lib/arb-types";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import {
   buildHistoricalLegs,
@@ -25,6 +26,7 @@ import { compareRoiDecline } from "@/lib/roi-declined";
 import { parseCalculationEnvelope } from "@/lib/calculation-envelope";
 import { CalculationProvenance } from "./CalculationProvenance";
 import { resolveHistoricalScanFinancials, type HistoricalScanFinancials } from "@/lib/historical-scan-financials";
+import { SCAN_STATUS_HEADER_EXPLANATION, scanStatusPresentation, type ScanStatusTone } from "@/lib/scan-status";
 
 interface LogEntry {
   id: number;
@@ -40,6 +42,7 @@ interface LogEntry {
   total_stake: number | null;
   scanned_at: string;
   scan_status?: string | null;
+  scan_status_reason?: string | null;
 
   market_title?: string | null;  // stored at scan time (BUG-030)
   market_name?: string | null;   // server-resolved (UI-015)
@@ -880,11 +883,34 @@ export default function LogsPanel() {
                     Arb Type
                   </th>
                   <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
-                    State
+                    Validation
                   </th>
-                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
-                    BotTrader
+                  <th aria-label="BotTrader Status" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    BotTrader Status
                   </th>
+                  <th aria-label="Scan Status" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    <span className="group relative inline-flex items-center gap-1">
+                      <span>Scan Status</span>
+                      <button
+                        type="button"
+                        aria-label="About scan status"
+                        aria-describedby="scan-status-header-description"
+                        title={SCAN_STATUS_HEADER_EXPLANATION}
+                        className="rounded text-[#8A9BA8] hover:text-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81]"
+                      >
+                        <CircleHelp aria-hidden="true" className="h-3 w-3" />
+                      </button>
+                      <span id="scan-status-header-description" className="sr-only">{SCAN_STATUS_HEADER_EXPLANATION}</span>
+                      <span
+                        aria-hidden="true"
+                        data-scan-status-header-tooltip
+                        className="pointer-events-none invisible absolute left-0 top-full z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] whitespace-normal rounded border border-[#3A4A59] bg-[#0E1621] p-2 text-left text-[10px] font-normal normal-case leading-relaxed tracking-normal text-[#D5DEE5] opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+                      >
+                        {SCAN_STATUS_HEADER_EXPLANATION}
+                      </span>
+                    </span>
+                  </th>
+
                   <th
                     className="px-3 py-2.5 text-right text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide cursor-pointer hover:text-[#FFFFFF] whitespace-nowrap"
                     onClick={() => toggleSort("best_roi_pct")}
@@ -938,13 +964,13 @@ export default function LogsPanel() {
               </thead>
               <tbody>
                 {visibleWindow.start > 0 && (
-                  <tr aria-hidden="true"><td colSpan={18} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={19} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
                 {visibleWindow.rows.map((log, i) => (
                   <LogRow key={log.id ?? i} log={log} currentRoi={currentRoiById.get(log.id) ?? { status: 'loading' }} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
                 {visibleWindow.end < sorted.length && (
-                  <tr aria-hidden="true"><td colSpan={18} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={19} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
               </tbody>
             </table>
@@ -991,6 +1017,43 @@ const ARB_INVALIDATION_REASON_LABELS: Record<string, string> = {
 function arbInvalidationReasonLabel(reason: string | null): string {
   if (!reason) return 'Classification failed canonical arbitrage validation.';
   return ARB_INVALIDATION_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
+}
+
+const SCAN_STATUS_TEXT_CLASS: Record<ScanStatusTone, string> = {
+  success: 'text-[#5DBE81]',
+  progress: 'text-[#facc15]',
+  warning: 'text-amber-300',
+  error: 'text-[#ef4444]',
+  unavailable: 'text-[#8A9BA8]',
+};
+
+function ScanStatusIndicator({ log }: { log: LogEntry }) {
+  const presentation = scanStatusPresentation(log.scan_status, log.scan_status_reason);
+  const descriptionId = `scan-status-description-${log.id}`;
+
+  return (
+    <span className="group relative inline-flex">
+      <span
+        role="status"
+        tabIndex={0}
+        aria-label={`Scan status: ${presentation.label}`}
+        aria-describedby={descriptionId}
+        title={presentation.explanation}
+        onClick={(event) => event.stopPropagation()}
+        className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DBE81] ${SCAN_STATUS_TEXT_CLASS[presentation.tone]}`}
+      >
+        {presentation.label}
+      </span>
+      <span id={descriptionId} className="sr-only">{presentation.explanation}</span>
+      <span
+        aria-hidden="true"
+        data-scan-status-tooltip
+        className="pointer-events-none invisible absolute left-0 top-full z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] whitespace-normal rounded border border-[#3A4A59] bg-[#0E1621] p-2 text-[10px] font-normal leading-relaxed text-[#D5DEE5] opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+      >
+        {presentation.explanation}
+      </span>
+    </span>
+  );
 }
 
 const BOT_TRADER_STATUS_PRESENTATION: Record<BotTraderEvaluationStatus, {
@@ -1105,10 +1168,11 @@ function LogRow({
   const scanProfit = historical.fields.profitUsd.status === 'available' ? historical.fields.profitUsd.value : null;
   const scanStake = historical.fields.stakeUsd.status === 'available' ? historical.fields.stakeUsd.value : null;
   const roiColor = scanTimeRoi == null ? "text-[#8A9BA8]" : scanTimeRoi > 0 ? "text-[#5DBE81]" : scanTimeRoi < 0 ? "text-[#ef4444]" : "text-[#FFFFFF]";
-  const arbBadge = log.positive_arb_count > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
-  const arbIsValid = log.arb_valid !== 0;
-  const arbTypeMeta = arbIsValid
-    ? (log.arb_type ? ARB_TYPES[log.arb_type] : getArbTypeMeta(log.strategy))
+  const arbProjection = projectCanonicalArbClassification(log);
+  const arbBadge = arbProjection.positiveArbCount > 0 ? "bg-[#5DBE81]/10 text-[#5DBE81]" : "text-[#8A9BA8]";
+  const arbIsValid = arbProjection.arbValid === 1;
+  const arbTypeMeta = arbProjection.arbType
+    ? ARB_TYPES[arbProjection.arbType]
     : null;
   const apy = historical.fields.apyPct.status === 'available' ? historical.fields.apyPct.value : null;
   const currentRoiValue = currentRoi.status === 'available'
@@ -1214,17 +1278,7 @@ function LogRow({
         </td>
         <td className="px-3 py-2 text-xs truncate max-w-[200px]" title={log.strategy}><CompactStrategyDisplay strategy={log.strategy} /></td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          {!arbIsValid ? (
-            <div className="max-w-[260px] whitespace-normal" role="status">
-              <span className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
-                <AlertTriangle className="h-3 w-3" />
-                Invalid arb
-              </span>
-              <div className="mt-1 text-[10px] leading-tight text-red-300">
-                {arbInvalidationReasonLabel(log.arb_invalidation_reason)}
-              </div>
-            </div>
-          ) : arbTypeMeta ? (
+          {arbTypeMeta ? (
             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${arbTypeMeta.badgeClass}`}>
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${arbTypeMeta.dotClass}`} />
               {arbTypeMeta.label}
@@ -1233,13 +1287,26 @@ function LogRow({
             <span className="text-[#8A9BA8]">—</span>
           )}
         </td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap" title={log.scan_status ? `Canonical persisted scan state: ${log.scan_status}` : 'No canonical persisted scan state was recorded.'}>
-          {log.scan_status
-            ? <span className={log.scan_status === 'completed' ? 'text-[#5DBE81]' : log.scan_status === 'failed' ? 'text-[#ef4444]' : 'text-[#facc15]'}>{log.scan_status.charAt(0).toUpperCase() + log.scan_status.slice(1)}</span>
-            : <span className="text-[#8A9BA8]">Unavailable</span>}
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          {!arbIsValid ? (
+            <div className="max-w-[260px] whitespace-normal" role="status">
+              <span className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
+                <AlertTriangle className="h-3 w-3" />
+                Failed validation
+              </span>
+              <div className="mt-1 text-[10px] leading-tight text-red-300">
+                {arbInvalidationReasonLabel(arbProjection.arbInvalidationReason)}
+              </div>
+            </div>
+          ) : (
+            <span className="text-[10px] text-[#8A9BA8]">Passed</span>
+          )}
         </td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <BotTraderEvaluationIndicator log={log} />
+        </td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          <ScanStatusIndicator log={log} />
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`} title={historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : 'ROI captured at scan time'}>
           {scanTimeRoi == null ? 'Unavailable' : fmtPct(scanTimeRoi)}
@@ -1271,7 +1338,7 @@ function LogRow({
         <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
-        <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{log.positive_arb_count}</td>
+        <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{arbProjection.positiveArbCount}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]" title={historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : 'Stake captured at scan time'}>{scanStake == null ? 'Unavailable' : fmtUsd(scanStake)}</td>
         <td className="px-3 py-2 text-center">
           <button
@@ -1285,7 +1352,7 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={18} className="px-4 py-3">
+          <td colSpan={19} className="px-4 py-3">
             {detailState === 'loading' || detailState === 'idle' ? (
               <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
             ) : detailState === 'error' ? (
@@ -1315,20 +1382,28 @@ function LogRow({
                     const arbRoiPct = arbNetMicros != null && arbCostMicros != null && arbCostMicros > 0
                       ? arbNetMicros / arbCostMicros * 100
                       : null;
+                    const opportunityProjection = projectCanonicalArbClassification({
+                      strategy: arb.strategy,
+                      arb_type: arb.arbType,
+                      arb_invalidation_reason: arb.arbInvalidationReason,
+                      positive_arb_count: arbEnvelope.status === 'executable'
+                        && typeof arb.expectedProfit === 'number'
+                        && arb.expectedProfit > 0 ? 1 : 0,
+                    });
+                    const opportunityTypeMeta = opportunityProjection.arbType
+                      ? ARB_TYPES[opportunityProjection.arbType]
+                      : null;
                     return (
                     <div key={i} className="rounded-lg border border-[#182533] bg-[#17212B] p-3 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-[#FFFFFF]">{String(arb.artist || arb.strategy || "—")}</span>
                         <div className="flex items-center gap-2">
-                          {(() => {
-                            const meta = getArbTypeMeta(String(arb.strategy));
-                            return meta ? (
-                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.badgeClass}`}>
-                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
-                                {meta.label}
-                              </span>
-                            ) : null;
-                          })()}
+                          {opportunityTypeMeta ? (
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${opportunityTypeMeta.badgeClass}`}>
+                              <span className={`inline-block w-1.5 h-1.5 rounded-full ${opportunityTypeMeta.dotClass}`} />
+                              {opportunityTypeMeta.label}
+                            </span>
+                          ) : null}
                           <span className={`text-xs font-mono font-semibold ${arbRoiPct == null ? "text-[#8A9BA8]" : arbRoiPct > 0 ? "text-[#5DBE81]" : "text-[#ef4444]"}`}>
                             {arbRoiPct == null ? 'Unavailable' : fmtPct(arbRoiPct)}
                           </span>

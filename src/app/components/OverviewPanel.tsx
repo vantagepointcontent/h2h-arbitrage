@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Check, Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 
-import { OverviewSort, SavedMarket, compareSavedMarketApy, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
+import { OverviewSort, SavedMarket, compareSavedMarketApy, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalCurrentMarketMetrics, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
@@ -118,9 +118,9 @@ function OverviewPanelInner({
   // Helper: check if a market's numeric value is missing (shows as "—")
   const hasNoValue = (m: SavedMarket, field: OverviewSort): boolean => {
     switch (field) {
-      case "roi": return (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) === 0;
+      case "roi": return (getCanonicalCurrentMarketMetrics(m).roiPct ?? 0) === 0;
       case "apy": return getMarketApy(m) == null;
-      case "profit": return (m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0) === 0;
+      case "profit": return (getCanonicalCurrentMarketMetrics(m).profit ?? 0) === 0;
       case "matched": return getCanonicalMatchState(m).status === 'not_scanned';
       case "arbs": {
         const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
@@ -145,8 +145,8 @@ function OverviewPanelInner({
     }
     if (sort === "name") return mul * a.eventTitle.localeCompare(b.eventTitle);
     if (sort === "strategy") {
-      const sa = a.liveResult?.strategy ?? a.lastScanResult?.strategy ?? "";
-      const sb = b.liveResult?.strategy ?? b.lastScanResult?.strategy ?? "";
+      const sa = getCanonicalCurrentMarketMetrics(a).strategy;
+      const sb = getCanonicalCurrentMarketMetrics(b).strategy;
       return mul * sa.localeCompare(sb);
     }
     if (sort === "expiry") {
@@ -155,16 +155,16 @@ function OverviewPanelInner({
       return mul * (ea - eb);
     }
     if (sort === "roi") {
-      const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
-      const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
+      const ra = getCanonicalCurrentMarketMetrics(a).roiPct ?? 0;
+      const rb = getCanonicalCurrentMarketMetrics(b).roiPct ?? 0;
       return mul * (ra - rb);
     }
     if (sort === "apy") {
       return compareSavedMarketApy(a, b, sortDir);
     }
     if (sort === "profit") {
-      const pa = a.liveResult?.bestProfit ?? a.lastScanResult?.bestProfit ?? 0;
-      const pb = b.liveResult?.bestProfit ?? b.lastScanResult?.bestProfit ?? 0;
+      const pa = getCanonicalCurrentMarketMetrics(a).profit ?? 0;
+      const pb = getCanonicalCurrentMarketMetrics(b).profit ?? 0;
       return mul * (pa - pb);
     }
     if (sort === "matched") {
@@ -225,7 +225,7 @@ function OverviewPanelInner({
     return true;
   }).filter(m => {
     if (!showArbOnly) return true;
-    const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+    const roi = getCanonicalCurrentMarketMetrics(m).roiPct ?? 0;
     return roi > 0;
   }).sort(sortFn),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -235,11 +235,11 @@ function OverviewPanelInner({
   const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
     const totalMarkets = filteredByExpiry.length;
     const totalProfit = filteredByExpiry.reduce((sum, m) => {
-      const p = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
+      const p = getCanonicalCurrentMarketMetrics(m).profit ?? 0;
       return sum + (p > 0 ? p : 0);
     }, 0);
-    const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0), 0) / totalMarkets : 0;
-    const arbOpportunities = filteredByExpiry.filter(m => (m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0) > 0).length;
+    const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (getCanonicalCurrentMarketMetrics(m).roiPct ?? 0), 0) / totalMarkets : 0;
+    const arbOpportunities = filteredByExpiry.filter(m => (getCanonicalCurrentMarketMetrics(m).roiPct ?? 0) > 0).length;
     return { totalMarkets, totalProfit, avgRoi, arbOpportunities };
   }, [filteredByExpiry]);
 
@@ -446,14 +446,15 @@ function OverviewPanelInner({
       ) : layout === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredByExpiry.map((m) => {
-            const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+            const current = getCanonicalCurrentMarketMetrics(m);
+            const roi = current.roiPct ?? 0;
             const apySummary = getMarketApySummary(m);
             const apy = apySummary.sortApyPct ?? 0;
-            const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
-            const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
+            const profit = current.profit ?? 0;
+            const allArbs = m.lastScanResult?.allArbs;
             const matchedLabel = formatCanonicalMatchState(m);
             const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
-            const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
+            const scannedAt = m.lastScanResult?.scannedAt;
             return (
               <div
                 key={m.id}
@@ -529,15 +530,16 @@ function OverviewPanelInner({
             </thead>
             <tbody>
               {filteredByExpiry.map((m) => {
-                const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+                const current = getCanonicalCurrentMarketMetrics(m);
+                const roi = current.roiPct ?? 0;
                 const apySummary = getMarketApySummary(m);
                 const apy = apySummary.sortApyPct ?? 0;
-                const profit = m.liveResult?.bestProfit ?? m.lastScanResult?.bestProfit ?? 0;
-                const allArbs = m.liveResult?.allArbs ?? m.lastScanResult?.allArbs;
-                const strategy = m.liveResult?.strategy ?? m.lastScanResult?.strategy ?? "";
+                const profit = current.profit ?? 0;
+                const allArbs = m.lastScanResult?.allArbs;
+                const strategy = current.strategy;
                 const matchState = getCanonicalMatchState(m);
                 const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
-                const scannedAt = m.liveResult?.scannedAt ?? m.lastScanResult?.scannedAt;
+                const scannedAt = m.lastScanResult?.scannedAt;
                 const metricProvenance = getMetricProvenance(m, scannedAt, renderedAt);
                 const metricsAreCurrent = metricProvenance === "current";
                 const selected = m.id === selectedMarketId;

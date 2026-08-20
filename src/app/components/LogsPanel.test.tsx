@@ -13,6 +13,53 @@ afterEach(() => {
 
 describe('LogsPanel', () => {
   it.each([
+    ['pending', 'Pending', 'Pending means the scan has not started.'],
+    ['queued', 'Queued', 'Queued means the scan has not started.'],
+    ['running', 'Running', 'Running means the scan is executing.'],
+    ['completed', 'Completed', 'Completed means the scan finished and its result was persisted. The market may still be open; this does not mean it resolved/closed/settled.'],
+    ['partial', 'Partial', 'Partial means the scan finished with incomplete sources or results.'],
+    ['incomplete', 'Partial', 'Partial means the scan finished with incomplete sources or results.'],
+    ['failed', 'Failed', 'Failed means the scan did not complete successfully. Reason: Kalshi request timed out. Action: Retry the scan or open scan details to investigate.'],
+  ] as const)('explains the %s scan lifecycle without implying market resolution', async (status, label, explanation) => {
+    vi.stubGlobal('fetch', logsFetch([{
+      ...comparisonLog(),
+      scan_status: status,
+      ...(status === 'failed' ? { scan_status_reason: 'Kalshi request timed out.' } : {}),
+    }]));
+
+    render(createElement(LogsPanel));
+
+    const indicator = await screen.findByRole('status', { name: `Scan status: ${label}` });
+    expect(indicator).toHaveProperty('tabIndex', 0);
+    const description = document.getElementById(indicator.getAttribute('aria-describedby')!);
+    expect(description?.textContent).toBe(explanation);
+    expect(indicator.getAttribute('title')).toBe(explanation);
+    const tooltip = indicator.parentElement?.querySelector('[data-scan-status-tooltip]');
+    expect(tooltip?.textContent).toBe(explanation);
+    expect(tooltip?.className).toContain('group-focus-within:visible');
+    expect(tooltip?.className).toContain('max-w-[calc(100vw-2rem)]');
+  });
+
+  it('labels the column Scan Status and exposes its definition by hover, keyboard focus, and screen reader description', async () => {
+    vi.stubGlobal('fetch', logsFetch([comparisonLog()]));
+
+    render(createElement(LogsPanel));
+
+    await screen.findByRole('status', { name: 'Scan status: Completed' });
+    expect(screen.queryByText('State', { selector: 'th' })).toBeNull();
+    expect(screen.getByText('Scan Status', { selector: 'th *' })).toBeTruthy();
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.indexOf(screen.getByRole('columnheader', { name: 'BotTrader Status' })))
+      .toBeLessThan(headers.indexOf(screen.getByRole('columnheader', { name: 'Scan Status' })));
+    const help = screen.getByRole('button', { name: 'About scan status' });
+    expect(help).toHaveProperty('tabIndex', 0);
+    const description = document.getElementById(help.getAttribute('aria-describedby')!);
+    expect(description?.textContent).toContain('scan job lifecycle');
+    expect(description?.textContent).toContain('not the market lifecycle, resolution, or settlement');
+    expect(help.parentElement?.querySelector('[data-scan-status-header-tooltip]')?.className).toContain('group-focus-within:visible');
+  });
+
+  it.each([
     ['completed', true, 'Completed', 'bg-[#5DBE81]'],
     ['pending', false, 'Pending', 'bg-[#facc15]'],
     ['partial', false, 'Partial', 'bg-[#ef4444]'],
@@ -44,6 +91,7 @@ describe('LogsPanel', () => {
     const indicator = await screen.findByRole('status', {
       name: `BotTrader evaluation: ${status}; completed: ${completed ? 'yes' : 'no'}`,
     });
+    expect(screen.getByRole('status', { name: 'Scan status: Completed' })).toBeTruthy();
     expect(indicator.textContent).toContain(visibleLabel);
     expect(indicator.querySelector('[aria-hidden="true"]')?.className).toContain(dotClass);
     const descriptionId = indicator.getAttribute('aria-describedby');
@@ -140,7 +188,7 @@ describe('LogsPanel', () => {
     expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/logs?'))).toHaveLength(2);
   });
 
-  it('shows invalidated legacy classifications and their audit reason instead of the old arb type', async () => {
+  it('shows failed validation separately while the Arb Type remains not applicable', async () => {
     const invalidated = {
       ...comparisonLog(),
       id: 558,
@@ -163,9 +211,14 @@ describe('LogsPanel', () => {
 
     render(createElement(LogsPanel));
 
-    await waitFor(() => expect(screen.getByText('Invalid arb')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Failed validation')).toBeTruthy());
     expect(screen.getByText('Legacy Internal YES+YES duplicates the same directional exposure.')).toBeTruthy();
     expect(screen.queryByText('Internal Arb')).toBeNull();
+    expect(screen.queryByText('Invalid arb')).toBeNull();
+    const headers = Array.from(document.querySelectorAll('thead th')).map((header) => header.textContent?.trim());
+    const cells = Array.from(document.querySelectorAll('tbody tr:first-child td'));
+    expect(cells[headers.indexOf('Arb Type')]?.textContent).toBe('—');
+    expect(cells[headers.indexOf('Validation')]?.textContent).toContain('Failed validation');
   });
 
   it('shows scan ROI, lazy current executable ROI, and Profit in that order', async () => {

@@ -3,7 +3,8 @@ import path from 'path';
 import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
 import { calculateScanApy } from './scan-apy';
-import { auditArbClassification } from './arb-types';
+import { auditArbClassification, projectCanonicalArbClassification } from './arb-types';
+import { selectCanonicalSavedMarketMetrics, type CanonicalSavedMarketMetrics } from './canonical-saved-market-metrics';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
 import { boundedZeroArbRetentionDays, scanRetentionDeleteSql } from './scan-retention.mjs';
 import { calculateOutcomeContingentApy, type OutcomeContingentApy, type SettlementTiming } from './settlement-apy';
@@ -19,7 +20,7 @@ import {
 import { evaluateLogsDataQuality, LOGS_REQUIRED_FIELDS, type LogsDataQualitySnapshot } from './logs-data-quality';
 import { resolveHistoricalScanFinancials } from './historical-scan-financials';
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'saved-markets.json');
+const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || path.join(process.cwd(), 'data', 'saved-markets.json');
 
 // ── SQLite (libsql) ──────────────────────────────────────────────
 
@@ -307,11 +308,65 @@ async function initDb(): Promise<void> {
     `ALTER TABLE saved_markets ADD COLUMN canonical_apy_observed_at TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_apy_source TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_apy_revision INTEGER`,
+    // BUG-179: one atomic current-market metric projection. APY is valid only
+    // when these fields bind ROI/strategy/TTE to the same full-scan revision.
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_roi_pct REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_profit REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_strategy TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_days_to_expiry REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_expiry_at TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_revision INTEGER`,
     // FEAT-3: retain legacy URL columns during the N-platform migration.
     `ALTER TABLE saved_markets ADD COLUMN platform_links TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
+  await c.execute(`CREATE TABLE IF NOT EXISTS saved_market_metric_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    market_id TEXT NOT NULL,
+    detected_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    source_revision INTEGER,
+    reconciled INTEGER NOT NULL DEFAULT 0
+  )`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_saved_market_metric_alerts_market
+    ON saved_market_metric_alerts(market_id, detected_at DESC)`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS saved_market_metric_revision_guard
+    AFTER UPDATE OF canonical_apy_revision, canonical_current_revision ON saved_markets
+    WHEN NEW.canonical_apy_revision IS NOT NULL
+      AND (NEW.canonical_current_revision IS NULL OR NEW.canonical_current_revision <> NEW.canonical_apy_revision)
+    BEGIN
+      UPDATE saved_markets SET
+        canonical_current_roi_pct = NULL,
+        canonical_current_profit = NULL,
+        canonical_current_strategy = 'No arb',
+        canonical_current_days_to_expiry = NULL,
+        canonical_current_expiry_at = NULL,
+        canonical_current_revision = NEW.canonical_apy_revision
+      WHERE id = NEW.id;
+    END`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS saved_market_apy_invariant_guard
+    AFTER UPDATE OF canonical_apy_pct, canonical_apy_revision, canonical_current_roi_pct,
+      canonical_current_profit, canonical_current_strategy, canonical_current_days_to_expiry,
+      canonical_current_expiry_at, canonical_current_revision ON saved_markets
+    WHEN NEW.canonical_apy_pct IS NOT NULL AND (
+      NEW.canonical_current_roi_pct IS NULL OR NEW.canonical_current_roi_pct <= 0
+      OR NEW.canonical_current_profit IS NULL OR NEW.canonical_current_profit <= 0
+      OR NEW.canonical_current_strategy IS NULL OR NEW.canonical_current_strategy = 'No arb'
+      OR NEW.canonical_current_strategy LIKE 'Unavailable%'
+      OR NEW.canonical_current_days_to_expiry IS NULL OR NEW.canonical_current_days_to_expiry <= 0
+      OR NEW.canonical_current_expiry_at IS NULL
+      OR NEW.canonical_apy_revision IS NULL OR NEW.canonical_current_revision IS NULL
+      OR NEW.canonical_apy_revision <> NEW.canonical_current_revision
+    )
+    BEGIN
+      INSERT INTO saved_market_metric_alerts
+        (market_id, detected_at, reason, source_revision, reconciled)
+      VALUES (NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'current_metric_invariant_failed', NEW.canonical_apy_revision, 1);
+      UPDATE saved_markets SET canonical_apy_pct = NULL,
+        canonical_apy_unavailable_reason = 'current_metric_invariant_failed'
+      WHERE id = NEW.id;
+    END`);
 
   // UI-046: a B-tree cannot accelerate LIKE '%term%'. Trigram FTS does,
   // while preserving case-insensitive contains semantics across all existing
@@ -558,8 +613,12 @@ export async function saveScanResult(
   const c = getClient();
   await ensureLogsDataQualitySchema(c);
   const scannedAt = result.scannedAt ?? new Date().toISOString();
-  const audit = auditArbClassification(result.strategy, result.arbType);
-  const financiallyValid = audit.valid && audit.canonicalType !== null;
+  const projection = projectCanonicalArbClassification({
+    strategy: result.strategy,
+    arb_type: result.arbType,
+    positive_arb_count: result.positiveArbCount ?? 0,
+  });
+  const financiallyValid = projection.positiveArbCount > 0;
   const recoverable = resolveHistoricalScanFinancials({
     positive_arb_count: result.positiveArbCount,
     best_roi_pct: result.bestRoiPct,
@@ -577,7 +636,7 @@ export async function saveScanResult(
   const canonicalStake = financiallyValid ? recoveredValue('stakeUsd', 0) : 0;
   const snapshot = financiallyValid
     ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
-    : { daysToExpiry: null, apyPct: 0, unavailableReason: audit.valid ? 'no_arbitrage' : 'invalid_arb_classification' };
+    : { daysToExpiry: null, apyPct: 0, unavailableReason: projection.arbValid === 1 ? 'no_arbitrage' : 'invalid_arb_classification' };
   const calculationEnvelope = result.calculationEnvelope == null
     ? legacyUnverifiableEnvelope(`scan result ${marketId}`)
     : validateCalculationEnvelope(result.calculationEnvelope);
@@ -598,20 +657,20 @@ export async function saveScanResult(
       result.matchedCount ?? 0,
       result.kalshiCount ?? 0,
       result.pmCount ?? 0,
-      financiallyValid ? (result.positiveArbCount ?? 0) : 0,
+      projection.positiveArbCount,
       canonicalStake,
       scannedAt,
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
       result.kalshiUrl ?? null,
       result.polymarketUrl ?? null,
-      audit.canonicalType,
+      projection.arbType,
       result.expiryAt ?? null,
       snapshot.daysToExpiry,
       snapshot.apyPct,
       snapshot.unavailableReason,
-      financiallyValid ? 1 : 0,
-      audit.reason,
+      projection.arbValid,
+      projection.arbInvalidationReason,
       JSON.stringify(calculationEnvelope),
     ],
   });
@@ -623,7 +682,7 @@ export async function saveScanResult(
       ? JSON.parse(previous.rows[0].snapshot_json) as LogsDataQualitySnapshot
       : null;
   } catch { /* malformed telemetry is not trusted as threshold history */ }
-  const positiveArbCount = financiallyValid ? (result.positiveArbCount ?? 0) : 0;
+  const positiveArbCount = projection.positiveArbCount;
   const exactMarketIdentity = typeof result.kalshiUrl === 'string' && result.kalshiUrl.length > 0
     && typeof result.polymarketUrl === 'string' && result.polymarketUrl.length > 0;
   const reason = (available: boolean, code: string) => available ? undefined : code;
@@ -635,7 +694,7 @@ export async function saveScanResult(
       id,
       scanStatus: 'completed',
       positiveArbCount,
-      arbValid: financiallyValid,
+      arbValid: projection.arbValid === 1,
       roiPct: Number.isFinite(canonicalRoi) ? canonicalRoi : null,
       profitUsd: canonicalProfit > 0 && Number.isFinite(canonicalProfit) ? canonicalProfit : null,
       apyPct: snapshot.apyPct != null && Number.isFinite(snapshot.apyPct) ? snapshot.apyPct : null,
@@ -779,14 +838,55 @@ type ScanHistoryFilters = {
   maxTteDays?: 30 | 90 | 180;
 };
 type ScanHistorySummary = { totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } };
-type ScanHistoryRow = Record<string, unknown> & { id: number; market_id: string; scanned_at: string };
+type ScanHistoryRow = Record<string, unknown> & { id: number; market_id: string; strategy: string; scanned_at: string };
+
+// Keep these case-sensitive, shape-exact predicates aligned with classifyArbType().
+// GLOB's ?* pair implements the regex .+ requirement (at least one character).
+const scanHistoryStrategyArbTypeSql = `CASE
+  WHEN strategy GLOB 'Buy YES both sides: Kalshi ?* + PM ?*'
+    OR strategy GLOB 'Buy YES both sides: Kalshi ?* + Polymarket ?*' THEN 'cross'
+  WHEN strategy GLOB 'Same-platform YES+NO Kalshi: ?*'
+    OR strategy GLOB 'Same-platform YES+NO Polymarket: ?*' THEN 'internal'
+  WHEN strategy = 'Buy YES Kalshi + NO PM'
+    OR strategy = 'Buy YES PM + NO Kalshi'
+    OR strategy = 'direct' THEN 'direct'
+END`;
+const scanHistoryCanonicalArbTypeSql = `CASE
+  WHEN typeof(positive_arb_count) = 'integer'
+    AND positive_arb_count > 0
+    AND positive_arb_count <= 9007199254740991
+    AND NULLIF(arb_invalidation_reason, '') IS NULL
+    AND arb_valid IS NOT 0
+    AND (${scanHistoryStrategyArbTypeSql}) IS NOT NULL
+    AND (
+      arb_type IS NULL
+      OR arb_type NOT IN ('direct', 'cross', 'internal')
+      OR arb_type = (${scanHistoryStrategyArbTypeSql})
+    )
+    THEN (${scanHistoryStrategyArbTypeSql})
+END`;
+const scanHistoryCanonicalArbCountSql = `CASE
+  WHEN (${scanHistoryCanonicalArbTypeSql}) IN ('direct', 'cross', 'internal') THEN positive_arb_count
+  ELSE 0
+END`;
+
+function projectScanHistoryRow(row: ScanHistoryRow): ScanHistoryRow {
+  const projection = projectCanonicalArbClassification(row);
+  return {
+    ...row,
+    arb_type: projection.arbType,
+    arb_valid: projection.arbValid,
+    arb_invalidation_reason: projection.arbInvalidationReason,
+    positive_arb_count: projection.positiveArbCount,
+  };
+}
 
 function scanHistoryWhere(opts: ScanHistoryFilters) {
   let where = ' WHERE 1=1';
   const args: (string | number)[] = [];
   if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
   if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
-  if (opts.positiveArbOnly) where += ' AND arb_valid = 1 AND positive_arb_count > 0';
+  if (opts.positiveArbOnly) where += ` AND (${scanHistoryCanonicalArbCountSql}) > 0`;
   if (opts.maxTteDays !== undefined) {
     where += ' AND days_to_expiry >= 0 AND days_to_expiry < ?';
     args.push(opts.maxTteDays);
@@ -804,11 +904,11 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
       args.push(`%${literalLike}%`);
     }
   }
-  if (opts.eventType === 'arb') where += ' AND arb_valid = 1 AND positive_arb_count > 0';
-  if (opts.eventType === 'scan') where += ' AND positive_arb_count = 0';
+  if (opts.eventType === 'arb') where += ` AND (${scanHistoryCanonicalArbCountSql}) > 0`;
+  if (opts.eventType === 'scan') where += ` AND (${scanHistoryCanonicalArbCountSql}) = 0`;
   if (opts.eventType === 'system') where += ' AND (matched_count = 0 OR kalshi_count = 0 OR pm_count = 0)';
   if (opts.arbType && opts.arbType !== 'all') {
-    where += ` AND arb_valid = 1 AND COALESCE(arb_type, CASE WHEN strategy LIKE 'Buy YES both sides:%' THEN 'cross' WHEN strategy LIKE 'Same-platform YES+NO%' THEN 'internal' WHEN strategy LIKE 'Buy YES%' THEN 'direct' END) = ?`;
+    where += ` AND (${scanHistoryCanonicalArbTypeSql}) = ?`;
     args.push(opts.arbType);
   }
   return { where, args };
@@ -834,10 +934,15 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
 
   const [countRes, rangeRes] = await Promise.all([
     c.execute({
-      sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets, COALESCE(SUM(positive_arb_count), 0) AS total_arbs, COALESCE(AVG(best_roi_pct), 0) AS avg_roi, COALESCE(MAX(best_roi_pct), 0) AS best_roi, COALESCE(SUM(best_profit), 0) AS total_profit,
-        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'direct' THEN 1 ELSE 0 END) AS direct_count,
-        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'cross' THEN 1 ELSE 0 END) AS cross_count,
-        SUM(CASE WHEN arb_valid = 1 AND arb_type = 'internal' THEN 1 ELSE 0 END) AS internal_count FROM scan_results${base.where}`,
+      sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets,
+        COALESCE(SUM(${scanHistoryCanonicalArbCountSql}), 0) AS total_arbs,
+        COALESCE(AVG(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_roi_pct END), 0) AS avg_roi,
+        COALESCE(MAX(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_roi_pct END), 0) AS best_roi,
+        COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_profit ELSE 0 END), 0) AS total_profit,
+        COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'direct' THEN positive_arb_count ELSE 0 END), 0) AS direct_count,
+        COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'cross' THEN positive_arb_count ELSE 0 END), 0) AS cross_count,
+        COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'internal' THEN positive_arb_count ELSE 0 END), 0) AS internal_count
+        FROM scan_results${base.where}`,
       args: base.args,
     }),
     c.execute({
@@ -864,7 +969,7 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
   });
   const rawMaxRoiWithoutMin = Number(rangeRes.rows[0]?.max_roi ?? 0);
   const maxRoiWithoutMin = Number.isFinite(rawMaxRoiWithoutMin) ? Math.max(0, rawMaxRoiWithoutMin) : 0;
-  return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]) : [], total, uniqueMarkets, maxRoiWithoutMin, summary: {
+  return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]).map(projectScanHistoryRow) : [], total, uniqueMarkets, maxRoiWithoutMin, summary: {
     totalArbs: Number(countRow?.total_arbs ?? 0), avgRoi: Number(countRow?.avg_roi ?? 0), bestRoi: Number(countRow?.best_roi ?? 0), totalProfit: Number(countRow?.total_profit ?? 0),
     arbTypeCounts: { direct: Number(countRow?.direct_count ?? 0), cross: Number(countRow?.cross_count ?? 0), internal: Number(countRow?.internal_count ?? 0) },
   } };
@@ -1117,7 +1222,9 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
       args: [...cursorArgs, thisLimit],
     });
 
-    const batch = Array.isArray(res.rows) ? (res.rows as any[]) : [];
+    const batch = Array.isArray(res.rows)
+      ? (res.rows as unknown as ScanHistoryRow[]).map(projectScanHistoryRow)
+      : [];
     if (batch.length === 0) break;
 
     yield batch;
@@ -1527,6 +1634,8 @@ export interface LastScanResult {
     } | null;
     kalshiStake?: number;
     pmStake?: number;
+    executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+    executionBlocker?: string;
     apyPct?: number | null;
     daysToExpiry?: number | null;
     expiryAt?: string | null;
@@ -1572,6 +1681,12 @@ export interface SavedMarket {
   canonicalApyObservedAt?: string | null;
   canonicalApySource?: 'full_scan' | null;
   canonicalApyRevision?: number | null;
+  canonicalCurrentRoiPct?: number | null;
+  canonicalCurrentProfit?: number | null;
+  canonicalCurrentStrategy?: string | null;
+  canonicalCurrentDaysToExpiry?: number | null;
+  canonicalCurrentExpiryAt?: string | null;
+  canonicalCurrentRevision?: number | null;
   // AUTO-002: lifecycle
   archived?: boolean;
   archivedAt?: string | null;
@@ -1624,7 +1739,7 @@ function rowToMarket(r: any): SavedMarket {
   }
   const kalshiUrl = String(r.kalshi_url);
   const polymarketUrl = String(r.polymarket_url);
-  return {
+  const market: SavedMarket = {
     id: String(r.id),
     kalshiUrl,
     polymarketUrl,
@@ -1645,10 +1760,47 @@ function rowToMarket(r: any): SavedMarket {
     canonicalApySource: r.canonical_apy_source === 'full_scan' ? 'full_scan' : null,
     canonicalApyRevision: r.canonical_apy_revision != null && Number.isSafeInteger(Number(r.canonical_apy_revision))
       ? Number(r.canonical_apy_revision) : null,
+    canonicalCurrentRoiPct: r.canonical_current_roi_pct != null && Number.isFinite(Number(r.canonical_current_roi_pct))
+      ? Number(r.canonical_current_roi_pct) : null,
+    canonicalCurrentProfit: r.canonical_current_profit != null && Number.isFinite(Number(r.canonical_current_profit))
+      ? Number(r.canonical_current_profit) : null,
+    canonicalCurrentStrategy: r.canonical_current_strategy != null ? String(r.canonical_current_strategy) : null,
+    canonicalCurrentDaysToExpiry: r.canonical_current_days_to_expiry != null && Number.isFinite(Number(r.canonical_current_days_to_expiry))
+      ? Number(r.canonical_current_days_to_expiry) : null,
+    canonicalCurrentExpiryAt: r.canonical_current_expiry_at != null ? String(r.canonical_current_expiry_at) : null,
+    canonicalCurrentRevision: r.canonical_current_revision != null && Number.isSafeInteger(Number(r.canonical_current_revision))
+      ? Number(r.canonical_current_revision) : null,
     archived: Boolean(Number(r.archived ?? 0)),
     archivedAt: r.archived_at != null ? String(r.archived_at) : null,
     archiveReason: r.archive_reason != null ? String(r.archive_reason) : null,
     lastMatchedAt: r.last_matched_at != null ? String(r.last_matched_at) : null,
+  };
+  return sanitizeSavedMarketCurrentMetrics(market);
+}
+
+function sanitizeSavedMarketCurrentMetrics(market: SavedMarket): SavedMarket {
+  if (market.canonicalApyPct == null) return market;
+  const roi = market.canonicalCurrentRoiPct;
+  const profit = market.canonicalCurrentProfit;
+  const strategy = market.canonicalCurrentStrategy;
+  const days = market.canonicalCurrentDaysToExpiry;
+  const expiry = market.canonicalCurrentExpiryAt;
+  const revisionMatches = Number.isSafeInteger(market.canonicalApyRevision)
+    && market.canonicalApyRevision === market.canonicalCurrentRevision;
+  const expectedApy = typeof roi === 'number' && Number.isFinite(roi)
+    && typeof days === 'number' && Number.isFinite(days) && days > 0
+    ? (Math.pow(1 + roi / 100, 365 / days) - 1) * 100 : null;
+  const apyMatches = expectedApy != null && Number.isFinite(expectedApy)
+    && Math.abs(market.canonicalApyPct - expectedApy) <= Math.max(1e-9, Math.abs(expectedApy) * 1e-9);
+  const valid = typeof roi === 'number' && Number.isFinite(roi) && roi > 0
+    && typeof profit === 'number' && Number.isFinite(profit) && profit > 0
+    && typeof strategy === 'string' && strategy !== 'No arb' && !strategy.startsWith('Unavailable')
+    && typeof expiry === 'string' && Number.isFinite(Date.parse(expiry))
+    && market.canonicalApySource === 'full_scan' && revisionMatches && apyMatches;
+  return valid ? market : {
+    ...market,
+    canonicalApyPct: null,
+    canonicalApyUnavailableReason: 'current_metric_invariant_failed',
   };
 }
 
@@ -1959,45 +2111,11 @@ function isStaleMatchPublication(previous: LastScanResult | null, incoming: Last
   return matchPublicationAuthority(incoming) < matchPublicationAuthority(previous);
 }
 
-interface CanonicalSavedMarketApy {
-  value: number | null;
-  unavailableReason: string | null;
-  outcome: string | null;
-  observedAt: string | null;
-}
-
 /** Extract the compact scalar from the same full-scan candidate that owns the
- * persisted best ROI. Never recompute APY from current ROI/time-to-expiry. */
-export function canonicalSavedMarketApy(result: LastScanResult): CanonicalSavedMarketApy {
-  const observedAt = typeof result.scannedAt === 'string' && Number.isFinite(Date.parse(result.scannedAt))
-    ? result.scannedAt : null;
-  const candidates = (result.allArbs ?? []).filter((candidate) =>
-    candidate.strategy !== 'No arb'
-    && Number.isFinite(candidate.roiPct)
-    && Number.isFinite(candidate.expectedProfit),
-  );
-  const best = candidates.reduce<(typeof candidates)[number] | null>((current, candidate) => {
-    if (!current) return candidate;
-    if (candidate.roiPct !== current.roiPct) return candidate.roiPct > current.roiPct ? candidate : current;
-    return candidate.artist.localeCompare(current.artist) < 0 ? candidate : current;
-  }, null);
-  if (!best) {
-    return { value: null, unavailableReason: 'no_canonical_arbitrage', outcome: null, observedAt };
-  }
-  if (typeof best.apyPct !== 'number' || !Number.isFinite(best.apyPct)) {
-    return {
-      value: null,
-      unavailableReason: best.apyUnavailableReason ?? 'canonical_apy_unavailable',
-      outcome: best.artist,
-      observedAt: best.outcomeApy?.observedAt ?? observedAt,
-    };
-  }
-  return {
-    value: best.apyPct,
-    unavailableReason: null,
-    outcome: best.artist,
-    observedAt: best.outcomeApy?.observedAt ?? observedAt,
-  };
+ * persisted current ROI. Recompute only as an invariant check against the
+ * candidate's same-revision persisted TTE; never use wall-clock time. */
+export function canonicalSavedMarketApy(result: LastScanResult): CanonicalSavedMarketMetrics {
+  return selectCanonicalSavedMarketMetrics(result.allArbs ?? [], result.scannedAt);
 }
 
 export type SavedMarketPublicationChannel = 'scan' | 'live';
@@ -2064,7 +2182,13 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
               canonical_apy_outcome = CASE WHEN ? THEN ? ELSE canonical_apy_outcome END,
               canonical_apy_observed_at = CASE WHEN ? THEN ? ELSE canonical_apy_observed_at END,
               canonical_apy_source = CASE WHEN ? THEN 'full_scan' ELSE canonical_apy_source END,
-              canonical_apy_revision = CASE WHEN ? THEN ? ELSE canonical_apy_revision END
+              canonical_apy_revision = CASE WHEN ? THEN ? ELSE canonical_apy_revision END,
+              canonical_current_roi_pct = CASE WHEN ? THEN ? ELSE canonical_current_roi_pct END,
+              canonical_current_profit = CASE WHEN ? THEN ? ELSE canonical_current_profit END,
+              canonical_current_strategy = CASE WHEN ? THEN ? ELSE canonical_current_strategy END,
+              canonical_current_days_to_expiry = CASE WHEN ? THEN ? ELSE canonical_current_days_to_expiry END,
+              canonical_current_expiry_at = CASE WHEN ? THEN ? ELSE canonical_current_expiry_at END,
+              canonical_current_revision = CASE WHEN ? THEN ? ELSE canonical_current_revision END
             WHERE id = ?
               AND scan_publication_generation = ?
               AND last_scan_result IS ?
@@ -2076,6 +2200,12 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
         successfulFullScan ? 1 : 0, canonicalApy?.outcome ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.observedAt ?? null,
         successfulFullScan ? 1 : 0,
+        successfulFullScan ? 1 : 0, result.publicationGeneration ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.roiPct ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.profit ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.strategy ?? 'No arb',
+        successfulFullScan ? 1 : 0, canonicalApy?.daysToExpiry ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.expiryAt ?? null,
         successfulFullScan ? 1 : 0, result.publicationGeneration ?? null,
         id, generation, previousRaw,
         ...(dependencies.length > 0 ? [JSON.stringify(dependencies)] : []),
@@ -2174,55 +2304,104 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
     const updated = await getSavedMarketById(String(row.id));
     if (JSON.stringify(updated?.lastScanResult?.matchDependencies ?? null) !== before) reconciled++;
   }
-  // BUG-169: repair compact APY summaries from the newest durable scan ledger
-  // row. scan_results is written only by completed full scans; quick refreshes
-  // must not participate. Do not derive APY from current ROI/TTE.
-  const apyRows = await c.execute(`
-    WITH ranked AS (
-      SELECT r.*,
-             ROW_NUMBER() OVER (PARTITION BY r.market_id ORDER BY r.scanned_at DESC, r.id DESC) AS rank
-      FROM scan_results r
-      WHERE r.arb_valid = 1
-    )
-    SELECT market_id, scanned_at, strategy, apy_pct, apy_unavailable_reason,
-           positive_arb_count, raw_result
-    FROM ranked WHERE rank = 1
-  `);
-  for (const row of apyRows.rows as unknown as Array<Record<string, unknown>>) {
-    const observedAt = typeof row.scanned_at === 'string' && Number.isFinite(Date.parse(row.scanned_at))
-      ? row.scanned_at : null;
-    if (!observedAt) continue;
-    const parsedApy = row.apy_pct == null ? null : Number(row.apy_pct);
-    const hasArb = String(row.strategy ?? '') !== 'No arb'
-      && (Number(row.positive_arb_count ?? 0) > 0 || (parsedApy != null && Number.isFinite(parsedApy)));
-    const value = hasArb && parsedApy != null && Number.isFinite(parsedApy) ? parsedApy : null;
-    const unavailableReason = value == null
-      ? (typeof row.apy_unavailable_reason === 'string' && row.apy_unavailable_reason
-          ? row.apy_unavailable_reason : hasArb ? 'canonical_apy_unavailable' : 'no_canonical_arbitrage')
-      : null;
-    let outcome: string | null = null;
-    if (typeof row.raw_result === 'string') {
+  // BUG-179: bounded, same-row reconciliation. The saved full-scan payload is
+  // the current source of truth; immutable scan_results history is never copied
+  // back into current state. A CAS fences every repaired projection.
+  const metricRows = await c.execute(`SELECT id, last_scan_result, scan_publication_generation,
+      canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
+      canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision,
+      canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
+      canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision
+    FROM saved_markets
+    WHERE last_scan_result IS NOT NULL OR canonical_apy_pct IS NOT NULL
+    ORDER BY id LIMIT 500`);
+  for (const row of metricRows.rows as unknown as Array<Record<string, unknown>>) {
+    const raw = row.last_scan_result == null ? null : String(row.last_scan_result);
+    let result: LastScanResult | null = null;
+    if (raw != null) {
       try {
-        const raw = JSON.parse(row.raw_result) as { allArbs?: Array<{ artist?: unknown; roiPct?: unknown }> };
-        const best = (raw.allArbs ?? []).filter((candidate) =>
-          typeof candidate.artist === 'string' && Number.isFinite(Number(candidate.roiPct)),
-        ).sort((a, b) => Number(b.roiPct) - Number(a.roiPct)
-          || String(a.artist).localeCompare(String(b.artist)))[0];
-        outcome = typeof best?.artist === 'string' ? best.artist : null;
-      } catch { /* scalar ledger fields remain authoritative */ }
+        const parsed = JSON.parse(raw) as LastScanResult;
+        result = sanitizeSavedArbResult(parsed) ?? parsed;
+      } catch { /* APY without a readable current source is cleared below */ }
+    }
+    const canonical = result ? canonicalSavedMarketApy(result) : {
+      value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
+      roiPct: null, profit: null, strategy: 'No arb', daysToExpiry: null, expiryAt: null,
+    };
+    const revision = result && Number.isSafeInteger(result.publicationGeneration) ? result.publicationGeneration! : null;
+    const desired = [
+      canonical.value, canonical.unavailableReason, canonical.outcome, canonical.observedAt, 'full_scan', revision,
+      canonical.roiPct, canonical.profit, canonical.strategy, canonical.daysToExpiry, canonical.expiryAt, revision,
+    ];
+    const existing = [
+      row.canonical_apy_pct == null ? null : Number(row.canonical_apy_pct),
+      row.canonical_apy_unavailable_reason ?? null,
+      row.canonical_apy_outcome ?? null,
+      row.canonical_apy_observed_at ?? null,
+      row.canonical_apy_source ?? null,
+      row.canonical_apy_revision == null ? null : Number(row.canonical_apy_revision),
+      row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct),
+      row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
+      row.canonical_current_strategy ?? null,
+      row.canonical_current_days_to_expiry == null ? null : Number(row.canonical_current_days_to_expiry),
+      row.canonical_current_expiry_at ?? null,
+      row.canonical_current_revision == null ? null : Number(row.canonical_current_revision),
+    ];
+    if (JSON.stringify(existing) === JSON.stringify(desired)) continue;
+    const invariantViolation = row.canonical_apy_pct != null && canonical.value == null;
+    if (invariantViolation) {
+      const reason = canonical.unavailableReason ?? 'current_metric_invariant_failed';
+      await c.execute({
+        sql: `INSERT INTO saved_market_metric_alerts
+              (market_id, detected_at, reason, source_revision, reconciled)
+              SELECT ?, ?, ?, ?, 1 WHERE NOT EXISTS (
+                SELECT 1 FROM saved_market_metric_alerts
+                WHERE market_id = ? AND reason = ? AND source_revision IS ?
+              )`,
+        args: [String(row.id), new Date().toISOString(), reason, revision, String(row.id), reason, revision],
+      });
+      console.warn(`[saved-market-metric-invariant] ${String(row.id)}: ${reason}; stale APY cleared`);
     }
     const repaired = await c.execute({
-      sql: `UPDATE saved_markets
-            SET canonical_apy_pct = ?, canonical_apy_unavailable_reason = ?,
-                canonical_apy_outcome = ?, canonical_apy_observed_at = ?,
-                canonical_apy_source = 'full_scan', canonical_apy_revision = NULL
-            WHERE id = ?
-              AND (canonical_apy_observed_at IS NULL OR canonical_apy_observed_at < ?
-                   OR (canonical_apy_observed_at = ? AND canonical_apy_source IS NULL))`,
-      args: [value, unavailableReason, outcome, observedAt, String(row.market_id), observedAt, observedAt],
+      sql: `UPDATE saved_markets SET
+              canonical_apy_pct = ?, canonical_apy_unavailable_reason = ?, canonical_apy_outcome = ?,
+              canonical_apy_observed_at = ?, canonical_apy_source = ?, canonical_apy_revision = ?,
+              canonical_current_roi_pct = ?, canonical_current_profit = ?, canonical_current_strategy = ?,
+              canonical_current_days_to_expiry = ?, canonical_current_expiry_at = ?, canonical_current_revision = ?
+            WHERE id = ? AND scan_publication_generation = ? AND last_scan_result IS ?`,
+      args: [...desired, String(row.id), Number(row.scan_publication_generation), raw],
     });
     reconciled += repaired.rowsAffected;
   }
+  // Close the bounded CAS race window fail-closed. This statement only clears
+  // projections that still violate prerequisite/revision invariants; it never
+  // promotes or reconstructs a value and cannot touch immutable scan history.
+  const invalidPredicate = `canonical_apy_pct IS NOT NULL AND (
+    canonical_current_roi_pct IS NULL OR canonical_current_roi_pct <= 0
+    OR canonical_current_profit IS NULL OR canonical_current_profit <= 0
+    OR canonical_current_strategy IS NULL OR canonical_current_strategy = 'No arb'
+    OR canonical_current_strategy LIKE 'Unavailable%'
+    OR canonical_current_days_to_expiry IS NULL OR canonical_current_days_to_expiry <= 0
+    OR canonical_current_expiry_at IS NULL
+    OR canonical_apy_revision IS NULL OR canonical_current_revision IS NULL
+    OR canonical_apy_revision <> canonical_current_revision
+  )`;
+  await c.execute(`INSERT INTO saved_market_metric_alerts
+      (market_id, detected_at, reason, source_revision, reconciled)
+    SELECT id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+      'current_metric_invariant_failed', canonical_apy_revision, 1
+    FROM saved_markets WHERE ${invalidPredicate}`);
+  const failClosed = await c.execute(`UPDATE saved_markets SET
+      canonical_apy_pct = NULL,
+      canonical_apy_unavailable_reason = 'current_metric_invariant_failed',
+      canonical_current_roi_pct = NULL,
+      canonical_current_profit = NULL,
+      canonical_current_strategy = 'No arb',
+      canonical_current_days_to_expiry = NULL,
+      canonical_current_expiry_at = NULL,
+      canonical_current_revision = canonical_apy_revision
+    WHERE ${invalidPredicate}`);
+  reconciled += failClosed.rowsAffected;
   if (reconciled > 0) {
     invalidateMarketsCache();
     mirrorMarketsToJsonThrottled();

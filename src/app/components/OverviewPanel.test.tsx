@@ -28,6 +28,9 @@ const market = (id: string, eventTitle: string, category?: string): SavedMarket 
 
 const marketWithOpportunity = (id: string, eventTitle: string): SavedMarket => ({
   ...market(id, eventTitle, 'Politics'),
+  canonicalCurrentRoiPct: 5,
+  canonicalCurrentProfit: 10,
+  canonicalCurrentStrategy: 'Buy YES Kalshi + NO Polymarket',
   lastScanResult: {
     scannedAt: '2026-08-12T18:00:00.000Z',
     bestRoiPct: 5,
@@ -97,6 +100,10 @@ describe.each([
     saved.canonicalApyPct = 12.34;
     saved.canonicalApyObservedAt = '2026-08-16T00:00:00.000Z';
     saved.canonicalApySource = 'full_scan';
+    saved.canonicalApyRevision = 1;
+    saved.canonicalCurrentDaysToExpiry = 365 * Math.log(1.05) / Math.log(1.1234);
+    saved.canonicalCurrentExpiryAt = '2027-01-01T00:00:00.000Z';
+    saved.canonicalCurrentRevision = 1;
     saved.lastScanResult.allArbs = [{
       ...baseArb, apyPct: 12.34,
       outcomeApy: {
@@ -140,6 +147,9 @@ describe('BUG-133 canonical matched state', () => {
       ...tx07.lastScanResult!, bestRoiPct: 0, bestProfit: 0, strategy: 'No arb',
       matchedCount: 2, matchStatus: 'matched', allArbs: [],
     } as SavedMarket['lastScanResult'];
+    tx07.canonicalCurrentRoiPct = null;
+    tx07.canonicalCurrentProfit = null;
+    tx07.canonicalCurrentStrategy = 'No arb';
 
     render(<OverviewPanel {...props} layout="table" markets={[tx07]} />);
 
@@ -159,6 +169,7 @@ describe('BUG-133 canonical matched state', () => {
       bestRoiPct: 0, bestProfit: 0,
       strategy: matchStatus === 'not_scanned' ? 'Not scanned' : 'No arb',
       matchedCount: 0, matchStatus,
+      outcomeCount: 0, kalshiCount: 0, pmCount: 0,
       matchError: matchStatus === 'unavailable' ? 'Polymarket unavailable' : undefined,
       allArbs: [],
     } as SavedMarket['lastScanResult'];
@@ -222,7 +233,8 @@ describe('UI-104 Markets table hierarchy', () => {
     const refreshing = market('refreshing', 'Refreshing market');
     refreshing.lastScanResult = {
       scannedAt: '2026-08-13T12:29:00.000Z', bestRoiPct: 0, bestProfit: 0,
-      strategy: 'No arb', matchedCount: 0, matchStatus: 'refreshing', allArbs: [],
+      strategy: 'No arb', matchedCount: 0, outcomeCount: 0, kalshiCount: 0, pmCount: 0,
+      matchStatus: 'refreshing', allArbs: [],
     } as SavedMarket['lastScanResult'];
 
     render(<OverviewPanel {...props} layout="table" markets={[active, stale, refreshing]} />);

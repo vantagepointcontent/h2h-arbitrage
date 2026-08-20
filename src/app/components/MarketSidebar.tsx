@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, RefreshCw, Scan, Star, X, Zap } from "lucide-react";
-import { SavedMarket, compareSavedMarketApy, formatPercent, getMarketApySummary, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
+import { SavedMarket, compareSavedMarketApy, formatPercent, getCanonicalCurrentMarketMetrics, getMarketApySummary, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 
@@ -210,7 +210,7 @@ function MarketSidebarInner({
     if (sidebarSearch && !m.eventTitle.toLowerCase().includes(sidebarSearch.toLowerCase())) return false;
     if (sidebarFavoritesOnly && !favoriteIds.has(m.id)) return false;
     if (showArbOnly) {
-      const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+      const roi = getCanonicalCurrentMarketMetrics(m).roiPct ?? 0;
       if (roi <= 0) return false;
     }
     return true;
@@ -223,8 +223,8 @@ function MarketSidebarInner({
       return mul * (ea - eb);
     }
     if (sort === "roi") {
-      const ra = a.liveResult?.bestRoiPct ?? a.lastScanResult?.bestRoiPct ?? 0;
-      const rb = b.liveResult?.bestRoiPct ?? b.lastScanResult?.bestRoiPct ?? 0;
+      const ra = getCanonicalCurrentMarketMetrics(a).roiPct ?? 0;
+      const rb = getCanonicalCurrentMarketMetrics(b).roiPct ?? 0;
       return mul * (ra - rb);
     }
     if (sort === "apy") {
@@ -412,7 +412,7 @@ function MarketSidebarInner({
               {/* Market list */}
               <div data-testid="saved-markets-scroll" className="flex-1 overflow-y-auto space-y-1 min-h-0">
                 {filtered.map((m) => {
-                  const roi = m.liveResult?.bestRoiPct ?? m.lastScanResult?.bestRoiPct ?? 0;
+                  const roi = getCanonicalCurrentMarketMetrics(m).roiPct ?? 0;
                   const apySummary = getMarketApySummary(m);
                   const apy = apySummary.sortApyPct;
                   const isActive = activeId === m.id;

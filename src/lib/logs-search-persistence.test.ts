@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createClient } from '@libsql/client';
 
 let tempDir = '';
 
@@ -17,16 +18,16 @@ describe('Logs FTS persistence', () => {
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
     vi.resetModules();
     const persistence = await import('./persistence');
-    for (const [marketId, positiveArbCount, bestProfit] of [
-      ['summary-a', 1, 125],
-      ['summary-b', 3, 275],
-      ['summary-c', 2, 600],
+    for (const [marketId, positiveArbCount, bestProfit, strategy, arbType] of [
+      ['summary-a', 1, 125, 'Buy YES Kalshi + NO PM', 'direct'],
+      ['summary-b', 3, 275, 'Buy YES both sides: Kalshi A + PM B', 'cross'],
+      ['summary-c', 2, 600, 'Same-platform YES+NO Kalshi: Proposition', 'internal'],
     ] as const) {
       await persistence.saveScanResult(marketId, {
         bestRoiPct: bestProfit / 100,
         bestProfit,
-        strategy: 'Buy YES Kalshi + NO PM',
-        arbType: 'direct',
+        strategy,
+        arbType,
         outcomeCount: positiveArbCount,
         matchedCount: positiveArbCount,
         kalshiCount: positiveArbCount,
@@ -43,6 +44,84 @@ describe('Logs FTS persistence', () => {
     expect(history.summary.totalArbs).toBe(history.rows.reduce((sum, row) => sum + Number(row.positive_arb_count), 0));
     expect(history.summary.totalProfit).toBe(1_000);
     expect(history.summary.totalArbs).toBe(6);
+    expect(history.summary.arbTypeCounts).toEqual({ direct: 1, cross: 3, internal: 2 });
+    expect(history.summary.totalArbs).toBe(
+      history.summary.arbTypeCounts.direct
+      + history.summary.arbTypeCounts.cross
+      + history.summary.arbTypeCounts.internal,
+    );
+  });
+
+  it('excludes declared-type mismatches and unrecognized strategies from rows, summaries, filters, counts, and export streams', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-canonical-sql-'));
+    const databasePath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = databasePath;
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    for (const marketId of ['valid-direct', 'mismatched-type', 'unrecognized-strategy']) {
+      await persistence.saveScanResult(marketId, {
+        bestRoiPct: 2,
+        bestProfit: 5,
+        strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct',
+        outcomeCount: 2,
+        matchedCount: 2,
+        kalshiCount: 2,
+        pmCount: 2,
+        positiveArbCount: 2,
+        totalStake: 100,
+        scannedAt: '2026-08-20T10:00:00.000Z',
+      });
+    }
+
+    // Reproduce stale immutable production evidence that predates canonical projection.
+    const client = createClient({ url: `file:${databasePath}` });
+    await client.execute({
+      sql: `UPDATE scan_results SET strategy = ?, arb_type = 'direct', arb_valid = 1,
+              arb_invalidation_reason = NULL, positive_arb_count = 2
+            WHERE market_id = 'mismatched-type'`,
+      args: ['Buy YES both sides: Kalshi A + PM B'],
+    });
+    await client.execute({
+      sql: `UPDATE scan_results SET strategy = ?, arb_type = 'direct', arb_valid = 1,
+              arb_invalidation_reason = NULL, positive_arb_count = 2
+            WHERE market_id = 'unrecognized-strategy'`,
+      args: ['Buy YES both sides: Kalshi A + PM'],
+    });
+    client.close();
+
+    const history = await persistence.queryScanHistory({ limit: 500 });
+    expect(history.total).toBe(3);
+    expect(history.summary.totalArbs).toBe(2);
+    expect(history.summary.arbTypeCounts).toEqual({ direct: 2, cross: 0, internal: 0 });
+    expect(history.summary.totalArbs).toBe(
+      history.summary.arbTypeCounts.direct
+      + history.summary.arbTypeCounts.cross
+      + history.summary.arbTypeCounts.internal,
+    );
+    expect(history.rows.find((row) => row.market_id === 'mismatched-type')).toMatchObject({
+      arb_type: null,
+      arb_valid: 0,
+      arb_invalidation_reason: 'arb_type_strategy_mismatch',
+      positive_arb_count: 0,
+    });
+    expect(history.rows.find((row) => row.market_id === 'unrecognized-strategy')).toMatchObject({
+      arb_type: null,
+      arb_valid: 0,
+      arb_invalidation_reason: 'unrecognized_arbitrage_strategy',
+      positive_arb_count: 0,
+    });
+
+    const direct = await persistence.queryScanHistory({ arbType: 'direct', limit: 500 });
+    expect(direct.total).toBe(1);
+    expect(direct.rows.map((row) => row.market_id)).toEqual(['valid-direct']);
+    expect(direct.summary.totalArbs).toBe(2);
+    expect(await persistence.countScanHistory({ arbType: 'direct' })).toBe(1);
+    const streamed: string[] = [];
+    for await (const batch of persistence.queryScanHistoryStream({ arbType: 'direct', chunkSize: 1 })) {
+      streamed.push(...batch.map((row) => row.market_id));
+    }
+    expect(streamed).toEqual(['valid-direct']);
   });
 
   it('filters canonical scan-time TTE cumulatively before rows, metrics, counts, and exports', async () => {
@@ -123,7 +202,7 @@ describe('Logs FTS persistence', () => {
     });
   });
 
-  it('does not persist positive financial metrics for No arb', async () => {
+  it('projects no-arb and non-executable scans with no Arb Type while keeping validation separate', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-no-arb-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
     vi.resetModules();
@@ -134,8 +213,34 @@ describe('Logs FTS persistence', () => {
       totalStake: 99, scannedAt: '2026-08-12T12:00:00.000Z',
     });
 
-    const row = (await persistence.queryScanHistory({ limit: 10 })).rows.find((item) => item.id === saved.id);
-    expect(row).toMatchObject({ arb_valid: 0, positive_arb_count: 0, best_profit: 0, best_roi_pct: 0 });
+    const nonExecutable = await persistence.saveScanResult('non-executable', {
+      bestRoiPct: 2, bestProfit: 2, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 0,
+      totalStake: 0, scannedAt: '2026-08-12T12:01:00.000Z',
+    });
+
+    const history = await persistence.queryScanHistory({ limit: 10 });
+    const row = history.rows.find((item) => item.id === saved.id);
+    const nonExecutableRow = history.rows.find((item) => item.id === nonExecutable.id);
+    expect(row).toMatchObject({
+      arb_type: null,
+      arb_valid: 1,
+      arb_invalidation_reason: null,
+      positive_arb_count: 0,
+      best_profit: 0,
+      best_roi_pct: 0,
+    });
+    expect(nonExecutableRow).toMatchObject({
+      arb_type: null,
+      arb_valid: 1,
+      arb_invalidation_reason: null,
+      positive_arb_count: 0,
+    });
+    expect((await persistence.queryScanHistory({ arbType: 'direct' })).rows).toHaveLength(0);
+    const exported: Array<Record<string, unknown>> = [];
+    for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
+    expect(exported.find((item) => item.id === saved.id)).toMatchObject({ arb_type: null, arb_valid: 1 });
+    expect(exported.find((item) => item.id === nonExecutable.id)).toMatchObject({ arb_type: null, arb_valid: 1 });
   });
 
   it('loads immutable current-valuation identity and original scan capital from the captured payload', async () => {

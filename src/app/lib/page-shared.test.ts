@@ -138,6 +138,53 @@ describe("saved-market scheduler status", () => {
     expect(updated.liveResult).toMatchObject({ bestRoiPct: 2.5, scannedAt: "2026-08-13T19:59:00Z" });
   });
 
+  it.each([
+    ['unrecognized strategy', { strategy: 'Buy MAYBE somewhere' }, null],
+    ['non-executable candidate', { executionStatus: 'non_executable' }, null],
+    ['zero total stake', { kalshiStake: 0, pmStake: 0 }, null],
+    ['APY mismatch', { apyPct: 99 }, {
+      canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: 1.25,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 50, canonicalCurrentExpiryAt: '2026-10-02T00:00:00.000Z',
+      canonicalApyUnavailableReason: 'current_apy_mismatch',
+    }],
+  ])('fails closed after a persisted full scan with an %s', (_label, override, retainedCurrent) => {
+    const daysToExpiry = 50;
+    const roiPct = 2.5;
+    const candidate = outcome(roiPct, 1.25);
+    candidate.arbitrage = {
+      ...candidate.arbitrage,
+      arbType: 'direct',
+      executionStatus: 'executable',
+      apyPct: (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100,
+      daysToExpiry,
+      expiryAt: '2026-10-02T00:00:00.000Z',
+      ...override,
+    } as UnifiedOutcome['arbitrage'] & { arbType: 'direct' };
+    const market: SavedMarket = {
+      id: 'market-1', eventTitle: 'Market 1', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-13T18:00:00Z',
+    };
+
+    const updated = applyDurableFullScanToSavedMarket(market, {
+      fullScanPersisted: true, publicationGeneration: 4,
+      outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
+    }, '2026-08-13T19:59:00Z');
+
+    expect(updated).toMatchObject({
+      canonicalApyPct: null,
+      canonicalCurrentRoiPct: retainedCurrent?.canonicalCurrentRoiPct ?? null,
+      canonicalCurrentProfit: retainedCurrent?.canonicalCurrentProfit ?? null,
+      canonicalCurrentStrategy: retainedCurrent?.canonicalCurrentStrategy ?? 'No arb',
+      canonicalCurrentDaysToExpiry: retainedCurrent?.canonicalCurrentDaysToExpiry ?? null,
+      canonicalCurrentExpiryAt: retainedCurrent?.canonicalCurrentExpiryAt ?? null,
+      ...(retainedCurrent?.canonicalApyUnavailableReason
+        ? { canonicalApyUnavailableReason: retainedCurrent.canonicalApyUnavailableReason } : {}),
+      canonicalApyRevision: 4,
+      canonicalCurrentRevision: 4,
+    });
+  });
+
   it("never treats a watcher tick as the last successful full scan", () => {
     const market = {
       id: "market-1", eventTitle: "Market 1", kalshiUrl: "k", polymarketUrl: "p", createdAt: "2026-08-13T18:00:00Z",
@@ -300,17 +347,19 @@ describe('canonical market APY summary', () => {
     });
     const marketWithScenarios = {
       id: 'market', kalshiUrl: '', polymarketUrl: '', eventTitle: 'Market', createdAt: '',
-      canonicalApyPct: 5.26, canonicalApyObservedAt: '2026-08-14T00:00:00Z',
+      canonicalApyPct: (Math.pow(1.01, 365 / 71) - 1) * 100, canonicalApyObservedAt: '2026-08-14T00:00:00Z',
       canonicalApySource: 'full_scan', canonicalApyRevision: 9,
+      canonicalCurrentRoiPct: 1, canonicalCurrentProfit: 1, canonicalCurrentStrategy: 'Direct',
+      canonicalCurrentDaysToExpiry: 71, canonicalCurrentExpiryAt: '2026-10-24T00:00:00Z', canonicalCurrentRevision: 9,
       lastScanResult: { bestRoiPct: 1, bestProfit: 1, strategy: 'Direct', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, scannedAt: '2026-08-14T00:00:00Z', allArbs: [{
         artist: 'A', roiPct: 1, expectedProfit: 1, strategy: 'Direct', apyPct: 5.26, daysToExpiry: 71,
         outcomeApy: { observedAt: '2026-08-14T00:00:00Z', apyPct: null, unavailableReason: 'outcome_contingent' as const, scenarioA: scenario('kalshi', 2.5, '2027-01-01T00:00:00Z'), scenarioB: scenario('polymarket', 4.5, '2026-11-01T00:00:00Z'), kalshi: null, polymarket: null },
       }] },
     } as SavedMarket;
     expect(getMarketApySummary(marketWithScenarios)).toMatchObject({
-      scalarApyPct: 5.26,
+      scalarApyPct: (Math.pow(1.01, 365 / 71) - 1) * 100,
       scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
-      sortApyPct: 5.26,
+      sortApyPct: (Math.pow(1.01, 365 / 71) - 1) * 100,
       unavailableReason: null,
     });
 
@@ -323,10 +372,65 @@ describe('canonical market APY summary', () => {
     });
   });
 
-  it('sorts full precision deterministically with unavailable values last', () => {
-    const saved = (id: string, eventTitle: string, canonicalApyPct: number | null): SavedMarket => ({
-      id, eventTitle, canonicalApyPct, kalshiUrl: '', polymarketUrl: '', createdAt: '',
+  it.each([
+    ['NCAA Football: 2027 National Champion', null, 'No arb', null],
+    ['MLB: Stolen Bases Leader', 1.388, 'Buy YES PM + NO Kalshi', null],
+    ['Big Brother Season 28: 2nd Place', 1.275, 'Buy YES Kalshi + NO PM', 42.45],
+  ])('rejects APY-only current projection for %s', (eventTitle, roiPct, strategy, daysToExpiry) => {
+    const market = {
+      id: eventTitle, eventTitle, kalshiUrl: '', polymarketUrl: '', createdAt: '',
+      canonicalApyPct: 14,
+      canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
+      canonicalApySource: 'full_scan',
+      canonicalApyRevision: 12,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentStrategy: strategy,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: daysToExpiry == null ? null : '2026-10-01T00:00:00.000Z',
+      canonicalCurrentRevision: strategy === 'No arb' ? 12 : 11,
+    } as SavedMarket;
+
+    expect(getMarketApySummary(market)).toMatchObject({
+      scalarApyPct: null,
+      sortApyPct: null,
+      unavailableReason: 'current_metric_invariant_failed',
     });
+  });
+
+  it('sorts an APY-only row as unavailable even when its scalar is positive', () => {
+    const validApy = (Math.pow(1.02, 365 / 100) - 1) * 100;
+    const valid = {
+      id: 'valid', eventTitle: 'Valid', kalshiUrl: '', polymarketUrl: '', createdAt: '',
+      canonicalApyPct: validApy, canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 3,
+      canonicalCurrentRoiPct: 2, canonicalCurrentProfit: 1, canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 100, canonicalCurrentExpiryAt: '2026-11-28T13:00:00.000Z',
+      canonicalCurrentRevision: 3,
+    } as SavedMarket;
+    const invalid = {
+      ...valid, id: 'invalid', eventTitle: 'Invalid', canonicalApyPct: 99,
+      canonicalCurrentRoiPct: null, canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentDaysToExpiry: null, canonicalCurrentExpiryAt: null,
+    } as SavedMarket;
+
+    expect([invalid, valid].sort((a, b) => compareSavedMarketApy(a, b, 'desc')).map((row) => row.id))
+      .toEqual(['valid', 'invalid']);
+  });
+
+  it('sorts full precision deterministically with unavailable values last', () => {
+    const saved = (id: string, eventTitle: string, canonicalApyPct: number | null): SavedMarket => {
+      const roiPct = canonicalApyPct != null && canonicalApyPct > 0
+        ? (Math.pow(1 + canonicalApyPct / 100, 100 / 365) - 1) * 100 : null;
+      return {
+        id, eventTitle, canonicalApyPct, kalshiUrl: '', polymarketUrl: '', createdAt: '',
+        canonicalApySource: canonicalApyPct != null ? 'full_scan' : null, canonicalApyRevision: canonicalApyPct != null ? 1 : null,
+        canonicalCurrentRoiPct: roiPct, canonicalCurrentProfit: roiPct == null ? null : 1,
+        canonicalCurrentStrategy: roiPct == null ? 'No arb' : 'Buy YES Kalshi + NO PM',
+        canonicalCurrentDaysToExpiry: roiPct == null ? null : 100,
+        canonicalCurrentExpiryAt: roiPct == null ? null : '2026-11-28T00:00:00Z',
+        canonicalCurrentRevision: canonicalApyPct != null ? 1 : null,
+      };
+    };
     const rows = [
       saved('null', 'Unavailable', null),
       saved('rounded-low', 'NCAA', 29.723101937298058),
@@ -337,9 +441,9 @@ describe('canonical market APY summary', () => {
       saved('tie-a', 'A tie', 10),
     ];
     expect([...rows].sort((a, b) => compareSavedMarketApy(a, b, 'desc')).map((row) => row.id)).toEqual([
-      'rounded-high', 'rounded-low', 'tie-a', 'tie-b', 'zero', 'negative', 'null',
+      'rounded-high', 'rounded-low', 'tie-a', 'tie-b', 'negative', 'null', 'zero',
     ]);
-    expect([...rows].sort((a, b) => compareSavedMarketApy(a, b, 'asc')).at(-1)?.id).toBe('null');
+    expect([...rows].sort((a, b) => compareSavedMarketApy(a, b, 'asc')).at(-1)?.id).toBe('zero');
   });
 
   it('fences delayed hydration from rolling back a newer canonical revision', () => {

@@ -3,6 +3,7 @@
 import {
   formatPercent,
   formatRelativeTime,
+  getCanonicalCurrentMarketMetrics,
   getMarketApySummary,
   getQuickApyProvenance,
   type SavedMarket,
@@ -11,6 +12,7 @@ import {
 
 export function SelectedMarketApyProvenance({ market, result }: { market: SavedMarket; result: ScanResult }) {
   const persisted = getMarketApySummary(market);
+  const current = getCanonicalCurrentMarketMetrics(market);
   const quick = getQuickApyProvenance(result);
   const quickStatus = quick.status === 'partial'
     ? 'partial refresh'
@@ -25,7 +27,8 @@ export function SelectedMarketApyProvenance({ market, result }: { market: SavedM
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[11px] text-[var(--text-secondary)]" data-testid="selected-market-apy-provenance">
       <span title="This full-precision persisted value controls Saved Markets APY sorting.">
-        Persisted scan APY: <strong className="text-[var(--text-primary)]">{persisted.scalarApyPct == null ? 'Unavailable' : formatPercent(persisted.scalarApyPct)}</strong>
+        Persisted scan ROI/APY: <strong className="text-[var(--text-primary)]">{current.valid ? `${formatPercent(current.roiPct!)} (${formatPercent(persisted.scalarApyPct!)})` : 'Unavailable'}</strong>
+        {current.valid ? ` · ${current.strategy} · ${current.daysToExpiry!.toFixed(2)}d TTE` : ''}
         {persisted.observedAt ? ` · ${formatRelativeTime(persisted.observedAt)}` : ''}
         {persisted.revision != null ? ` · revision ${persisted.revision}` : ''}
       </span>

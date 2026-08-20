@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-08-20T14:38:36.024Z",
+  "quickCheck": [
+    {
+      "quick_check": "ok"
+    }
+  ],
+  "scanRows": 96014,
+  "canonical": {
+    "totalArbs": 55278,
+    "direct": 52262,
+    "cross": 3016,
+    "internal": 0
+  },
+  "reconciles": true,
+  "sqlProjectionParity": {
+    "mismatches": 0,
+    "samples": []
+  },
+  "immutableEvidence": {
+    "staleNoArbEvidenceRows": 50798,
+    "staleNonOpportunityTypeRows": 12560,
+    "rewritten": false,
+    "correctionMode": "canonical read projection"
+  },
+  "files": {
+    "data/saved-markets.json": {
+      "bytes": 3210755,
+      "topLevel": "array",
+      "records": 476
+    },
+    "data/manual-matches.json": {
+      "bytes": 40575,
+      "topLevel": "array",
+      "records": 114
+    },
+    "data/predictionhunt-markets.json": {
+      "bytes": 7617,
+      "topLevel": "array",
+      "records": 13
+    }
+  }
+}

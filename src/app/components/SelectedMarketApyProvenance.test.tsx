@@ -20,6 +20,12 @@ describe('selected-market APY provenance', () => {
       canonicalApyObservedAt: '2026-08-19T17:41:41.000Z',
       canonicalApySource: 'full_scan',
       canonicalApyRevision: 12,
+      canonicalCurrentRoiPct: 5,
+      canonicalCurrentProfit: 10,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 365 * Math.log(1.05) / Math.log(1 + 30.02065284618085 / 100),
+      canonicalCurrentExpiryAt: '2026-11-01T00:00:00.000Z',
+      canonicalCurrentRevision: 12,
     };
     const result: ScanResult = {
       eventTitle: market.eventTitle,
@@ -40,7 +46,8 @@ describe('selected-market APY provenance', () => {
     render(<SelectedMarketApyProvenance market={market} result={result} />);
 
     const provenance = screen.getByTestId('selected-market-apy-provenance');
-    expect(provenance.textContent).toContain('Persisted scan APY: 30.0% · 30min · revision 12');
+    expect(provenance.textContent).toContain('Persisted scan ROI/APY: 5.0% (30.0%)');
+    expect(provenance.textContent).toContain('revision 12');
     expect(provenance.textContent).toContain('Current quick APY: Unavailable · partial refresh · Kalshi timed out · 30min');
     expect(provenance.textContent).toContain('Saved Markets sorts by persisted scan APY.');
     expect(provenance.textContent).not.toContain('Current quick APY: 0.0%');

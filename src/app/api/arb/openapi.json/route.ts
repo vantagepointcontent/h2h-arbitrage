@@ -48,7 +48,7 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.5.1',
+    version: '1.5.2',
     description: 'Scanner, saved-market, and BotTrader settlement contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
@@ -76,10 +76,15 @@ const openapi = {
     },
     '/api/logs': { get: { summary: 'Read immutable scan economics with field-level provenance', responses: { '200': {
       description: 'Scan log rows. Historical economics are scan-time evidence; Current ROI is fetched separately from persisted completed scans only.',
-      content: { 'application/json': { schema: { type: 'object', required: ['logs', 'count', 'total'], properties: {
+      content: { 'application/json': { schema: { type: 'object', required: ['logs', 'count', 'total', 'summary'], properties: {
         logs: { type: 'array', items: { type: 'object', additionalProperties: true, required: [
+          'arb_type', 'arb_valid', 'arb_invalidation_reason', 'positive_arb_count',
           'historical_financials', 'botTraderEvaluationCompleted', 'botTraderEvaluationStatus', 'botTraderEvaluation',
         ], properties: {
+          arb_type: { type: ['string', 'null'], enum: ['direct', 'cross', 'internal', null], description: 'Canonical type only when this row contains one or more valid executable arbitrage opportunities; otherwise null.' },
+          arb_valid: { type: 'integer', enum: [0, 1], description: 'Canonical classification validation result. This is separate from Arb Type and does not imply an opportunity exists.' },
+          arb_invalidation_reason: { type: ['string', 'null'], description: 'Exact classification validation reason, separate from Arb Type.' },
+          positive_arb_count: { type: 'integer', minimum: 0, description: 'Count of valid executable opportunities represented by this row after canonical projection.' },
           historical_financials: { $ref: '#/components/schemas/HistoricalScanFinancials' },
           botTraderEvaluationCompleted: { type: 'boolean' },
           botTraderEvaluationStatus: { type: 'string', enum: [
@@ -88,6 +93,14 @@ const openapi = {
           botTraderEvaluation: { anyOf: [{ $ref: '#/components/schemas/BotScanEvaluation' }, { type: 'null' }] },
         } } },
         count: { type: 'integer' }, total: { type: 'integer' },
+        summary: { type: 'object', required: ['totalArbs', 'arbTypeCounts'], properties: {
+          totalArbs: { type: 'integer', minimum: 0, description: 'Always equals direct + cross + internal under the identical server-side filter scope.' },
+          arbTypeCounts: { type: 'object', required: ['direct', 'cross', 'internal'], properties: {
+            direct: { type: 'integer', minimum: 0 },
+            cross: { type: 'integer', minimum: 0 },
+            internal: { type: 'integer', minimum: 0 },
+          } },
+        } },
       } } } },
     } } } },
     '/api/executions': { get: { summary: 'Read executions with calculation envelopes and canonical Logs lineage', responses: { '200': {
@@ -454,6 +467,12 @@ const openapi = {
           canonicalApyObservedAt: { type: ['string', 'null'], format: 'date-time' },
           canonicalApySource: { type: ['string', 'null'], enum: ['full_scan', null] },
           canonicalApyRevision: { type: ['integer', 'null'] },
+          canonicalCurrentRoiPct: { type: ['number', 'null'], description: 'Canonical current ROI percentage from the same executable full-scan candidate and revision as canonicalApyPct.' },
+          canonicalCurrentProfit: { type: ['number', 'null'] },
+          canonicalCurrentStrategy: { type: ['string', 'null'] },
+          canonicalCurrentDaysToExpiry: { type: ['number', 'null'] },
+          canonicalCurrentExpiryAt: { type: ['string', 'null'], format: 'date-time' },
+          canonicalCurrentRevision: { type: ['integer', 'null'], description: 'Must equal canonicalApyRevision whenever canonicalApyPct is non-null.' },
           lastScanResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
           liveResult: { anyOf: [{ $ref: '#/components/schemas/ScanResult' }, { type: 'null' }] },
         },

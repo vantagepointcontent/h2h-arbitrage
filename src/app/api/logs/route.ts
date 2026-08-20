@@ -5,6 +5,7 @@ import { parseLogLimit, parseOptionalFiniteNumber, parseTteMaxDays } from '@/lib
 import { parseCalculationEnvelope } from '@/lib/calculation-envelope';
 import { resolveHistoricalScanFinancials } from '@/lib/historical-scan-financials';
 import { getBotScanEvaluationSummaries } from '@/lib/bot-scan-consumer';
+import { projectCanonicalArbClassification } from '@/lib/arb-types';
 
 /**
  * GET /api/logs
@@ -68,9 +69,14 @@ export async function GET(request: NextRequest) {
     const enriched = results.map((r) => {
       const listRow = { ...r };
       delete listRow.raw_result;
+      const arbProjection = projectCanonicalArbClassification(r);
       const botTraderEvaluation = botEvaluations.get(Number(r.id)) ?? null;
       return {
         ...listRow,
+        arb_type: arbProjection.arbType,
+        arb_valid: arbProjection.arbValid,
+        arb_invalidation_reason: arbProjection.arbInvalidationReason,
+        positive_arb_count: arbProjection.positiveArbCount,
         calculation_envelope: parseCalculationEnvelope(r.calculation_envelope, `scan result ${r.id}`),
         historical_financials: resolveHistoricalScanFinancials(r),
         market_name: r.market_title ?? nameMap.get(r.market_id) ?? null,

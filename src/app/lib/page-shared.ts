@@ -2,6 +2,8 @@
 // Extracted from page.tsx (PERF-002 split). No behavior changes.
 
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
+import { selectCanonicalSavedMarketMetrics } from '@/lib/canonical-saved-market-metrics';
+import type { ArbType } from '@/lib/arb-types';
 
 // ─── Generic localStorage helpers ───
 
@@ -275,6 +277,7 @@ export interface ArbitrageInfo {
   pmStake: number;
   expectedProfit: number;
   roiPct: number;
+  arbType?: ArbType | null;
   apyPct?: number | null;
   daysToExpiry?: number | null;
   expiryAt?: string | null;
@@ -284,6 +287,7 @@ export interface ArbitrageInfo {
   buyPrice: number;
   sellPlatform: "kalshi" | "polymarket" | null;
   sellPrice: number;
+  executionStatus?: 'executable' | 'non_executable' | 'unavailable';
   suspicious?: boolean;
 }
 
@@ -373,7 +377,7 @@ export interface LastScanResult {
     roiPct: number;
     expectedProfit: number;
     strategy: string;
-    arbType?: string;
+    arbType?: import('@/lib/arb-types').ArbType;
     totalStake?: number;
     kalshiTicker?: string;
     kalshiYesAsk?: number;
@@ -387,6 +391,8 @@ export interface LastScanResult {
     pmBestAsk?: number;
     kalshiStake?: number;
     pmStake?: number;
+    executionStatus?: 'executable' | 'non_executable' | 'unavailable';
+    executionBlocker?: string;
     apyPct?: number | null;
     daysToExpiry?: number | null;
     expiryAt?: string | null;
@@ -489,6 +495,12 @@ export interface SavedMarket {
   canonicalApyObservedAt?: string | null;
   canonicalApySource?: 'full_scan' | null;
   canonicalApyRevision?: number | null;
+  canonicalCurrentRoiPct?: number | null;
+  canonicalCurrentProfit?: number | null;
+  canonicalCurrentStrategy?: string | null;
+  canonicalCurrentDaysToExpiry?: number | null;
+  canonicalCurrentExpiryAt?: string | null;
+  canonicalCurrentRevision?: number | null;
 }
 
 export interface MarketApySummary {
@@ -501,6 +513,44 @@ export interface MarketApySummary {
   revision: number | null;
   quickApyPct: number | null;
   quickObservedAt: string | null;
+}
+
+export interface CanonicalCurrentMarketMetrics {
+  roiPct: number | null;
+  profit: number | null;
+  strategy: string;
+  apyPct: number | null;
+  daysToExpiry: number | null;
+  expiryAt: string | null;
+  revision: number | null;
+  valid: boolean;
+}
+
+export function getCanonicalCurrentMarketMetrics(market: SavedMarket): CanonicalCurrentMarketMetrics {
+  const roiPct = typeof market.canonicalCurrentRoiPct === 'number' && Number.isFinite(market.canonicalCurrentRoiPct)
+    ? market.canonicalCurrentRoiPct : null;
+  const profit = typeof market.canonicalCurrentProfit === 'number' && Number.isFinite(market.canonicalCurrentProfit)
+    ? market.canonicalCurrentProfit : null;
+  const strategy = typeof market.canonicalCurrentStrategy === 'string' && market.canonicalCurrentStrategy.trim()
+    ? market.canonicalCurrentStrategy : 'No arb';
+  const rawApy = typeof market.canonicalApyPct === 'number' && Number.isFinite(market.canonicalApyPct)
+    ? market.canonicalApyPct : null;
+  const daysToExpiry = typeof market.canonicalCurrentDaysToExpiry === 'number'
+    && Number.isFinite(market.canonicalCurrentDaysToExpiry) && market.canonicalCurrentDaysToExpiry > 0
+    ? market.canonicalCurrentDaysToExpiry : null;
+  const expiryAt = typeof market.canonicalCurrentExpiryAt === 'string'
+    && Number.isFinite(Date.parse(market.canonicalCurrentExpiryAt)) ? market.canonicalCurrentExpiryAt : null;
+  const revision = Number.isSafeInteger(market.canonicalCurrentRevision) ? market.canonicalCurrentRevision! : null;
+  const apyRevision = Number.isSafeInteger(market.canonicalApyRevision) ? market.canonicalApyRevision! : null;
+  const expectedApy = roiPct != null && daysToExpiry != null
+    ? (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100 : null;
+  const apyMatches = rawApy != null && expectedApy != null && Number.isFinite(expectedApy)
+    && Math.abs(rawApy - expectedApy) <= Math.max(1e-9, Math.abs(expectedApy) * 1e-9);
+  const valid = rawApy != null && roiPct != null && roiPct > 0 && profit != null && profit > 0
+    && strategy !== 'No arb' && !strategy.startsWith('Unavailable')
+    && daysToExpiry != null && expiryAt != null && revision != null && revision === apyRevision
+    && market.canonicalApySource === 'full_scan' && apyMatches;
+  return { roiPct, profit, strategy, apyPct: valid ? rawApy : null, daysToExpiry, expiryAt, revision, valid };
 }
 
 export interface QuickApyProvenance {
@@ -568,14 +618,15 @@ export function getMarketApySummary(market: SavedMarket): MarketApySummary {
     (current, arb) => !current || arb.roiPct > current.roiPct ? arb : current,
     null,
   );
-  const scalarApyPct = typeof market.canonicalApyPct === 'number' && Number.isFinite(market.canonicalApyPct)
-    ? market.canonicalApyPct : null;
+  const current = getCanonicalCurrentMarketMetrics(market);
+  const scalarApyPct = current.apyPct;
   return {
     scalarApyPct,
     scenarioApyPct: scenarios,
     sortApyPct: scalarApyPct,
     unavailableReason: scalarApyPct == null
-      ? (market.canonicalApyUnavailableReason ?? 'canonical_apy_unavailable') : null,
+      ? (market.canonicalApyPct != null ? 'current_metric_invariant_failed'
+        : market.canonicalApyUnavailableReason ?? 'canonical_apy_unavailable') : null,
     observedAt: market.canonicalApyObservedAt ?? null,
     source: market.canonicalApySource ?? null,
     revision: Number.isSafeInteger(market.canonicalApyRevision) ? market.canonicalApyRevision! : null,
@@ -592,10 +643,8 @@ export function compareSavedMarketApy(
   b: SavedMarket,
   direction: 'asc' | 'desc',
 ): number {
-  const av = typeof a.canonicalApyPct === 'number' && Number.isFinite(a.canonicalApyPct)
-    ? a.canonicalApyPct : null;
-  const bv = typeof b.canonicalApyPct === 'number' && Number.isFinite(b.canonicalApyPct)
-    ? b.canonicalApyPct : null;
+  const av = getCanonicalCurrentMarketMetrics(a).apyPct;
+  const bv = getCanonicalCurrentMarketMetrics(b).apyPct;
   if (av == null && bv != null) return 1;
   if (av != null && bv == null) return -1;
   if (av != null && bv != null && av !== bv) return direction === 'asc' ? av - bv : bv - av;
@@ -631,6 +680,12 @@ export function mergeSavedMarketHydration(current: SavedMarket, incoming: SavedM
     merged.canonicalApyObservedAt = current.canonicalApyObservedAt ?? null;
     merged.canonicalApySource = current.canonicalApySource ?? null;
     merged.canonicalApyRevision = current.canonicalApyRevision ?? null;
+    merged.canonicalCurrentRoiPct = current.canonicalCurrentRoiPct ?? null;
+    merged.canonicalCurrentProfit = current.canonicalCurrentProfit ?? null;
+    merged.canonicalCurrentStrategy = current.canonicalCurrentStrategy ?? null;
+    merged.canonicalCurrentDaysToExpiry = current.canonicalCurrentDaysToExpiry ?? null;
+    merged.canonicalCurrentExpiryAt = current.canonicalCurrentExpiryAt ?? null;
+    merged.canonicalCurrentRevision = current.canonicalCurrentRevision ?? null;
   }
   if (newer(
     rank(current.lastScanResult?.scannedAt, current.lastScanResult?.publicationGeneration),
@@ -683,25 +738,28 @@ export function applyDurableFullScanToSavedMarket(
     matchedCount: scan.matchedCount,
   };
   if (scan.fullScanPersisted !== true) return { ...market, liveResult };
-  const canonical = scan.outcomes.filter((outcome) =>
-    outcome.arbitrage.strategy !== 'No arb'
-    && Number.isFinite(outcome.arbitrage.roiPct)
-    && Number.isFinite(outcome.arbitrage.expectedProfit),
-  ).sort((a, b) => b.arbitrage.roiPct - a.arbitrage.roiPct || a.artist.localeCompare(b.artist))[0];
-  const canonicalApyPct = typeof canonical?.arbitrage.apyPct === 'number' && Number.isFinite(canonical.arbitrage.apyPct)
-    ? canonical.arbitrage.apyPct : null;
+  const canonical = selectCanonicalSavedMarketMetrics(scan.outcomes.map((outcome) => ({
+    artist: outcome.artist,
+    ...outcome.arbitrage,
+    totalStake: outcome.arbitrage.kalshiStake + outcome.arbitrage.pmStake,
+  })), scannedAt);
   const freshnessSlaMs = market.scheduler?.freshnessSlaMs ?? 60 * 60_000;
   const scannedAtMs = Date.parse(scannedAt);
   const nextDueAt = new Date(scannedAtMs + freshnessSlaMs).toISOString();
   return {
     ...market,
-    canonicalApyPct,
-    canonicalApyUnavailableReason: canonicalApyPct == null
-      ? (canonical?.arbitrage.apyUnavailableReason ?? (canonical ? 'canonical_apy_unavailable' : 'no_canonical_arbitrage')) : null,
-    canonicalApyOutcome: canonical?.artist ?? null,
-    canonicalApyObservedAt: canonical?.arbitrage.outcomeApy?.observedAt ?? scannedAt,
+    canonicalApyPct: canonical.value,
+    canonicalApyUnavailableReason: canonical.unavailableReason,
+    canonicalApyOutcome: canonical.outcome,
+    canonicalApyObservedAt: canonical.observedAt,
     canonicalApySource: 'full_scan',
     canonicalApyRevision: Number.isSafeInteger(scan.publicationGeneration) ? scan.publicationGeneration! : null,
+    canonicalCurrentRoiPct: canonical.roiPct,
+    canonicalCurrentProfit: canonical.profit,
+    canonicalCurrentStrategy: canonical.strategy,
+    canonicalCurrentDaysToExpiry: canonical.daysToExpiry,
+    canonicalCurrentExpiryAt: canonical.expiryAt,
+    canonicalCurrentRevision: Number.isSafeInteger(scan.publicationGeneration) ? scan.publicationGeneration! : null,
     scheduler: {
       ...market.scheduler,
       lastSuccessAt: scannedAt,

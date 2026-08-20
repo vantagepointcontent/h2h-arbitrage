@@ -12,7 +12,7 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
         properties: Record<string, unknown>;
       }> };
     };
-    expect(spec.info.version).toBe('1.5.1');
+    expect(spec.info.version).toBe('1.5.2');
     expect(spec.paths['/api/executions'].get.responses['200'].content['application/json'].schema)
       .toEqual({ $ref: '#/components/schemas/ExecutionListResponse' });
     expect(spec.components.schemas.ExecutionRecord.properties).toMatchObject({
@@ -46,8 +46,15 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
       properties: { logs: { items: { required: string[]; properties: Record<string, unknown> } } };
     };
     expect(logsSchema.properties.logs.items.required).toEqual(expect.arrayContaining([
+      'arb_type', 'arb_valid', 'arb_invalidation_reason', 'positive_arb_count',
       'botTraderEvaluationCompleted', 'botTraderEvaluationStatus', 'botTraderEvaluation',
     ]));
+    expect(logsSchema.properties.logs.items.properties).toMatchObject({
+      arb_type: { type: ['string', 'null'], enum: ['direct', 'cross', 'internal', null] },
+      arb_valid: { type: 'integer', enum: [0, 1] },
+      arb_invalidation_reason: { type: ['string', 'null'] },
+      positive_arb_count: { type: 'integer', minimum: 0 },
+    });
     expect(logsSchema.properties.logs.items.properties.botTraderEvaluation)
       .toEqual({ anyOf: [{ $ref: '#/components/schemas/BotScanEvaluation' }, { type: 'null' }] });
     expect(spec.components.schemas.BotPositionSettlementProjection.properties.entryArbProfitSnapshot)

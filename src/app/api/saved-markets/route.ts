@@ -5,6 +5,7 @@ import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
+import { getCanonicalCurrentMarketMetrics, type SavedMarket as SavedMarketView } from '@/app/lib/page-shared';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -34,8 +35,13 @@ export async function GET(request: NextRequest) {
         && (!schedulerSuccessAt || Date.parse(scanAt) > Date.parse(schedulerSuccessAt))
         ? scanAt
         : schedulerSuccessAt;
+      const projected = market as SavedMarketView;
+      const current = getCanonicalCurrentMarketMetrics(projected);
       return {
         ...market,
+        canonicalApyPct: current.apyPct,
+        canonicalApyUnavailableReason: market.canonicalApyPct != null && !current.valid
+          ? 'current_metric_invariant_failed' : market.canonicalApyUnavailableReason ?? null,
         scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
       };
     });
@@ -80,6 +86,12 @@ export async function GET(request: NextRequest) {
           canonicalApyObservedAt: m.canonicalApyObservedAt ?? null,
           canonicalApySource: m.canonicalApySource ?? null,
           canonicalApyRevision: m.canonicalApyRevision ?? null,
+          canonicalCurrentRoiPct: m.canonicalCurrentRoiPct ?? null,
+          canonicalCurrentProfit: m.canonicalCurrentProfit ?? null,
+          canonicalCurrentStrategy: m.canonicalCurrentStrategy ?? 'No arb',
+          canonicalCurrentDaysToExpiry: m.canonicalCurrentDaysToExpiry ?? null,
+          canonicalCurrentExpiryAt: m.canonicalCurrentExpiryAt ?? null,
+          canonicalCurrentRevision: m.canonicalCurrentRevision ?? null,
           lastScanResult: ls ? {
             bestRoiPct: ls.bestRoiPct ?? 0,
             bestProfit: ls.bestProfit ?? 0,

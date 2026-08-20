@@ -6,6 +6,7 @@ import {
   reconcileSavedMarketMatchSummaries,
   type SavedMarket,
 } from './persistence';
+import { getCanonicalCurrentMarketMetrics, type SavedMarket as SavedMarketView } from '@/app/lib/page-shared';
 
 export async function readSavedMarketSchedulerState(): Promise<Record<string, unknown>> {
   try {
@@ -67,6 +68,7 @@ export function buildBasicSavedMarketList(savedMarkets: SavedMarket[], scheduler
     const schedulerSuccessAt = typeof scheduler?.lastSuccessAt === 'string' ? scheduler.lastSuccessAt : null;
     const lastSuccessAt = scanSucceeded && scanAt
       && (!schedulerSuccessAt || Date.parse(scanAt) > Date.parse(schedulerSuccessAt)) ? scanAt : schedulerSuccessAt;
+    const current = getCanonicalCurrentMarketMetrics(market as SavedMarketView);
     return {
       id: market.id,
       eventTitle: market.eventTitle,
@@ -75,12 +77,19 @@ export function buildBasicSavedMarketList(savedMarkets: SavedMarket[], scheduler
       expiryDate: market.expiryDate,
       category: market.category,
       scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
-      canonicalApyPct: market.canonicalApyPct ?? null,
-      canonicalApyUnavailableReason: market.canonicalApyUnavailableReason ?? null,
+      canonicalApyPct: current.apyPct,
+      canonicalApyUnavailableReason: market.canonicalApyPct != null && !current.valid
+        ? 'current_metric_invariant_failed' : market.canonicalApyUnavailableReason ?? null,
       canonicalApyOutcome: market.canonicalApyOutcome ?? null,
       canonicalApyObservedAt: market.canonicalApyObservedAt ?? null,
       canonicalApySource: market.canonicalApySource ?? null,
       canonicalApyRevision: market.canonicalApyRevision ?? null,
+      canonicalCurrentRoiPct: market.canonicalCurrentRoiPct ?? null,
+      canonicalCurrentProfit: market.canonicalCurrentProfit ?? null,
+      canonicalCurrentStrategy: market.canonicalCurrentStrategy ?? 'No arb',
+      canonicalCurrentDaysToExpiry: market.canonicalCurrentDaysToExpiry ?? null,
+      canonicalCurrentExpiryAt: market.canonicalCurrentExpiryAt ?? null,
+      canonicalCurrentRevision: market.canonicalCurrentRevision ?? null,
       lastScanResult: summarizeScan(market.lastScanResult, true),
       liveResult: summarizeScan(market.liveResult, false),
     };

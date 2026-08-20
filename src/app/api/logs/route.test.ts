@@ -173,6 +173,10 @@ describe('Logs scan-time APY serialization', () => {
     const columns = header.split(',');
     const values = row.split(',');
 
+    expect(columns).toContain('Scan Status');
+    expect(columns).not.toContain('State');
+    expect(values[columns.indexOf('Scan Status')]).toBe('completed');
+    expect(values[columns.indexOf('Scan Status Explanation')]).toContain('market may still be open');
     expect(columns).toContain('APY %');
     expect(values[columns.indexOf('APY %')]).toBe('1825');
     expect(values[columns.indexOf('APY Unavailable Reason')]).toBe('');
@@ -191,6 +195,40 @@ describe('Logs scan-time APY serialization', () => {
     expect(values[columns.indexOf('BotTrader Candidates Total')]).toBe('1');
     expect(values[columns.indexOf('BotTrader Placed Count')]).toBe('0');
     expect(csv).toContain('pm-no-token-1');
+  });
+
+  it('never exports validation failure or no-arb state as an Arb Type', async () => {
+    mocks.queryScanHistoryStream.mockImplementationOnce(async function* () {
+      yield [
+        {
+          ...persistedRow,
+          id: 70,
+          strategy: 'No arb',
+          positive_arb_count: 0,
+          arb_type: 'direct',
+          arb_valid: 0,
+          arb_invalidation_reason: null,
+        },
+        {
+          ...persistedRow,
+          id: 71,
+          strategy: 'Same-platform YES+YES Kalshi: A + B',
+          positive_arb_count: 0,
+          arb_type: null,
+          arb_valid: 0,
+          arb_invalidation_reason: 'legacy_internal_yes_yes_directional_duplication',
+        },
+      ];
+    });
+
+    const response = await exportLogs(new NextRequest('http://localhost/api/logs/export'));
+    const [header, noArb, invalid] = (await response.text()).trim().split('\n').map((line) => line.split(','));
+    expect(noArb[header.indexOf('Arb Type')]).toBe('');
+    expect(noArb[header.indexOf('Arb Valid')]).toBe('true');
+    expect(noArb[header.indexOf('Invalidation Reason')]).toBe('');
+    expect(invalid[header.indexOf('Arb Type')]).toBe('');
+    expect(invalid[header.indexOf('Arb Valid')]).toBe('false');
+    expect(invalid[header.indexOf('Invalidation Reason')]).toBe('legacy_internal_yes_yes_directional_duplication');
   });
 
   it('returns and exports the intentional no-positive-arb not-applicable status', async () => {

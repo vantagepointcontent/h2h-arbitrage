@@ -11,6 +11,21 @@ export interface ArbClassificationAudit {
   reason: ArbInvalidationReason | null;
 }
 
+export interface PersistedArbClassificationInput {
+  strategy: unknown;
+  arb_type?: unknown;
+  arb_valid?: unknown;
+  arb_invalidation_reason?: unknown;
+  positive_arb_count?: unknown;
+}
+
+export interface CanonicalArbProjection {
+  arbType: ArbType | null;
+  arbValid: 0 | 1;
+  arbInvalidationReason: string | null;
+  positiveArbCount: number;
+}
+
 export interface ArbTypeMeta {
   id: ArbType;
   label: string;
@@ -54,4 +69,34 @@ export function auditArbClassification(strategy: string, declaredType?: ArbType 
 export function getArbTypeMeta(strategy: string): ArbTypeMeta | null {
   const type = classifyArbType(strategy);
   return type ? ARB_TYPES[type] : null;
+}
+
+/**
+ * Canonical read projection for persisted Logs evidence. This corrects stale
+ * classification columns without rewriting the immutable scan-time payload.
+ */
+export function projectCanonicalArbClassification(input: PersistedArbClassificationInput): CanonicalArbProjection {
+  const strategy = typeof input.strategy === 'string' ? input.strategy : '';
+  const declaredType = input.arb_type === 'direct' || input.arb_type === 'cross' || input.arb_type === 'internal'
+    ? input.arb_type
+    : null;
+  const audit = auditArbClassification(strategy, declaredType);
+  const persistedReason = typeof input.arb_invalidation_reason === 'string' && input.arb_invalidation_reason.length > 0
+    ? input.arb_invalidation_reason
+    : null;
+  const invalidationReason = persistedReason ?? audit.reason;
+  const persistedCanonicalFailure = input.arb_valid === 0 && audit.canonicalType !== null;
+  const arbValid = invalidationReason === null && audit.valid && !persistedCanonicalFailure ? 1 : 0;
+  const rawCount = typeof input.positive_arb_count === 'number'
+    ? input.positive_arb_count
+    : Number(input.positive_arb_count);
+  const candidateCount = Number.isSafeInteger(rawCount) && rawCount > 0 ? rawCount : 0;
+  const arbType = arbValid === 1 && candidateCount > 0 ? audit.canonicalType : null;
+
+  return {
+    arbType,
+    arbValid,
+    arbInvalidationReason: arbValid === 1 ? null : invalidationReason,
+    positiveArbCount: arbType === null ? 0 : candidateCount,
+  };
 }
