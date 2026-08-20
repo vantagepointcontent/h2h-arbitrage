@@ -61,3 +61,26 @@ Observed: 2026-08-20 UTC
 - `artifacts/bug180-census.mjs`
 - `artifacts/bug180-saved-market-recovery-census.ts`
 - `artifacts/bug180-integrity.mjs`
+
+## OPS-860 production release and reconciliation
+
+- Scoped implementation commit `23a11fd4acbe7b597059a56d8421ffe9e5f855a4` was pushed to `origin/main` and canonically built/promoted as BUILD_ID `Ll2-DBTXG4krj4lufhEez` (run `ops860-20260820T225602Z`). Release-manager verification and `/api/health` independently reported the same active identity after restart.
+- The release-manager build reran the complete 270-file / 2,204-test suite, lint baseline, and isolated Next.js production build. Promotion restarted the artifact-dependent PM2 processes; `h2h-arbitrage` was subsequently restarted again with `--update-env`, and `pm2 save` succeeded.
+- Before reconciliation, `safe-sqlite-backup.mjs` created `/home/scott/h2h-arbitrage/backups/edgefinder-ops860-pre-reconcile-20260820T225602Z.db` (2,377,625,600 bytes, SHA-256 `751dcfcac1ddf857812b57a0e6941084b267f1681a347f34710b918137c37813`, integrity `ok`).
+- Evidence-only recovery dry-run inspected 46,359 rows: 45,949 recoverable (29,655 fully, 16,294 partially), 410 unrecoverable with reason `historical_financials_not_persisted`, and 0 CAS conflicts. Apply completed for the fenced cohort; the post-apply dry-run inspected 0 rows and reported 46,461 already current.
+- Post-release canonical Logs verification reconciled 104,007 API/DB rows at the fixed cutoff. Two distinct 500-row cursor pages had zero overlap; bottom reach found the oldest DB row. Avg ROI was 0.9222433191870112, Best ROI 25.26460000000001, Total Arbs 55,278, and executable-only Total Profit 206,152.59789055955. Min-ROI and Arb Type filters were populated and CSV/API profit/counts reconciled for the verified 500-row export.
+- The first 500 Logs rows contained 53 positive authoritative historical ROI values and no presented numeric zero. Remaining states were nonnumeric: 424 confirmed no-candidate/not-applicable and 23 without authoritative persisted scan-time ROI. Persisted revision-3 projection recorded 46,027 available ROI rows, 446 `historical ROI not persisted`, and 78 confirmed no-candidate/not-applicable rows; 524 physical compatibility zeros were explicitly unavailable rather than presented as numeric zero.
+- Current ROI batch verification returned 14 available, 84 confirmed no-arbitrage, and 2 unavailable with an exact persisted-evidence reason. Saved Markets returned all 476 active rows with 73 positive current ROI values, 0 numeric-zero current ROI values, and 403 unavailable rows, all reasoned `no_canonical_arbitrage`. Non-executable examples retained indicative ROI/strategy while profit/APY remained null with `current_candidate_non_executable`.
+- Data-quality monitoring was active over the bounded 100-row cohort. The verified degraded batch recorded the exact unavailable denominators/reasons, emitted one alert, requested reconciliation, and recorded two reconciliation attempts (the configured maximum). SQLite integrity remained `ok`, foreign-key violations remained 0, and both saved-market JSON files parsed with 476 identical rows after restart.
+- Populated desktop/mobile evidence verified `/Logs`, `/Markets`, Saved Markets sidebar, selected details, ROI sorting, filter interaction, and two distinct browser bottom reaches. Virtual scroll height grew from 9,934 to 28,451 to 46,932, proving one additional bounded page per distinct reach. Logs refresh preserved the populated result set. All API and browser assertions passed with no failures.
+
+## OPS-860 final artifacts
+
+- `artifacts/ops860-production-verify.mjs`
+- `artifacts/ops860-production-verification.json`
+- `artifacts/ops860-browser-verify.mjs`
+- `artifacts/ops860-browser-verification.json`
+- `artifacts/ops860-production-logs-1920.png`
+- `artifacts/ops860-production-logs-390.png`
+- `artifacts/ops860-production-markets-1920.png`
+- `artifacts/ops860-production-markets-390.png`

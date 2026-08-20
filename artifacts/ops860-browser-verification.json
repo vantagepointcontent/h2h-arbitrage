@@ -1,0 +1,182 @@
+{
+  "verifiedAt": "2026-08-20T23:19:37.502Z",
+  "logs": {
+    "initial": {
+      "url": "http://127.0.0.1:3000/?view=logs",
+      "renderedRows": 101,
+      "virtualScrollHeight": 9896,
+      "scrollTop": 0,
+      "positivePercentCells": 27,
+      "unavailableCells": 100,
+      "firstRowText": "politicsAug 20, 11:19:04 PMNJ-09 House Election WinnerNo arb—PassedN/AStatus: not_applicable_no_positive_arb. Evaluation timestamp: 2026-08-20T23:19:04.717Z. Candidates evaluated: 0 of 0. Eligible: 0. Placement attempts: 0. Placed: 0. Skipped: 0. Failures: 0. Missing candidate indexes: none. Failing candidate indexes: none. Reason: No Positive Arb — BotTrader not applicableStatus: not_applicable_no_positive_arb. Evaluation timestamp: 2026-08-20T23:19:04.717Z. Candidates evaluated: 0 of 0. Eligible: 0. Placement attempts: 0. Placed: 0. Skipped: 0. Failures: 0. Missing candidate indexes: none. Failing candidate indexes: none. Reason: No Positive Arb — BotTrader not applicableCompletedCompleted means the scan finished and its result was persisted. The market may still be open; this does not m",
+      "summaryText": [
+        "Total Arbs",
+        "Avg ROI",
+        "Best ROI",
+        "Total Profit"
+      ]
+    },
+    "refreshClicked": true,
+    "afterRefresh": {
+      "url": "http://127.0.0.1:3000/?view=logs",
+      "renderedRows": 101,
+      "virtualScrollHeight": 9896,
+      "scrollTop": 0,
+      "positivePercentCells": 27,
+      "unavailableCells": 100,
+      "firstRowText": "politicsAug 20, 11:19:04 PMNJ-09 House Election WinnerNo arb—PassedN/AStatus: not_applicable_no_positive_arb. Evaluation timestamp: 2026-08-20T23:19:04.717Z. Candidates evaluated: 0 of 0. Eligible: 0. Placement attempts: 0. Placed: 0. Skipped: 0. Failures: 0. Missing candidate indexes: none. Failing candidate indexes: none. Reason: No Positive Arb — BotTrader not applicableStatus: not_applicable_no_positive_arb. Evaluation timestamp: 2026-08-20T23:19:04.717Z. Candidates evaluated: 0 of 0. Eligible: 0. Placement attempts: 0. Placed: 0. Skipped: 0. Failures: 0. Missing candidate indexes: none. Failing candidate indexes: none. Reason: No Positive Arb — BotTrader not applicableCompletedCompleted means the scan finished and its result was persisted. The market may still be open; this does not m",
+      "summaryText": [
+        "Total Arbs",
+        "Avg ROI",
+        "Best ROI",
+        "Total Profit"
+      ]
+    },
+    "selectedLog": {
+      "clicked": true,
+      "detailVisible": true,
+      "detailExcerpt": [
+        "politics\tAug 20, 11:13:37 PM\tLA-03 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "politics\tAug 20, 11:13:35 PM\tGA-09 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "politics\tAug 20, 11:13:34 PM\tGA-11 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "politics\tAug 20, 11:13:34 PM\tNE-03 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "\t+0.59%\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — Current ROI is unavailable: Unavailable / failed.",
+        "politics\tAug 20, 11:13:32 PM\tSC-07 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "politics\tAug 20, 11:13:32 PM\tGA-03 House Election Winner\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t2\t2 / 8\t0\tUnavailable\t",
+        "sports\tAug 20, 11:13:29 PM\tPro Football: NFC East Champion\tNo arb\t—\tPassed\t",
+        "\tUnavailable\tUnavailable / failed\tUnavailable",
+        "ROI Declined? unavailable — scan-time ROI is unavailable; Current ROI is unavailable: Unavailable / failed.",
+        "\tUnavailable\tUnavailable\t—\t4\t4 / 5\t0\tUnavailable\t"
+      ]
+    },
+    "firstReach": {
+      "found": true,
+      "clientHeight": 741,
+      "scrollHeight": 9896,
+      "scrollTop": 9155
+    },
+    "afterFirstBottom": {
+      "url": "http://127.0.0.1:3000/?view=logs",
+      "renderedRows": 102,
+      "virtualScrollHeight": 28451,
+      "scrollTop": 9155,
+      "positivePercentCells": 31,
+      "unavailableCells": 100,
+      "firstRowText": null,
+      "summaryText": [
+        "Total Arbs",
+        "Avg ROI",
+        "Best ROI",
+        "Total Profit"
+      ]
+    },
+    "secondReach": {
+      "found": true,
+      "clientHeight": 741,
+      "scrollHeight": 28451,
+      "scrollTop": 27710
+    },
+    "afterSecondBottom": {
+      "url": "http://127.0.0.1:3000/?view=logs",
+      "renderedRows": 102,
+      "virtualScrollHeight": 46932,
+      "scrollTop": 27710,
+      "positivePercentCells": 18,
+      "unavailableCells": 100,
+      "firstRowText": null,
+      "summaryText": [
+        "Total Arbs",
+        "Avg ROI",
+        "Best ROI",
+        "Total Profit"
+      ]
+    }
+  },
+  "markets": {
+    "initial": {
+      "savedHeading": "SAVED MARKETS (476)",
+      "renderedRows": 476,
+      "positivePercentCells": 70,
+      "apyUnavailableVisible": true,
+      "firstRowText": "Maine Senate Election WinnerSelectedCached scanpoliticsNov 3, 20262 matched—+0.5%Unavailable—YES·NOStale · 15min"
+    },
+    "selectedMarket": {
+      "clicked": true,
+      "detailVisible": true,
+      "detailExcerpt": [
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "(APY unavailable)",
+        "BEST NET ROI",
+        "BEST NET PROFIT",
+        "Persisted scan ROI/APY: Unavailable · 15min · revision 246",
+        "Current quick APY: 2.7% · 0s",
+        "Saved Markets sorts by persisted scan APY.",
+        "\tROI",
+        "\tAPY",
+        "\tPROFIT"
+      ]
+    },
+    "roiSortClicked": true,
+    "sortedMarketFirstRow": "▶Troy Jackson (D)$0.66$0.35$0.70$0.310.5%2.7%APY BreakdownROI+0.5%Days to expiry74Annualization×5Annualized (APY)+2.7%((1 + 0.5% ÷ 100)^(365 ÷ 74.03 days) − 1) × 100 = +2.7%—Depth unknownCollecting data…—DIRECT"
+  },
+  "assertions": {
+    "logsPopulated": true,
+    "logsRefreshPreservesPopulation": true,
+    "logsTruthfulUnavailable": true,
+    "selectedLogDetail": true,
+    "bottomReachLoadsOneBatchEach": true,
+    "marketsPopulated": true,
+    "selectedMarketDetail": true,
+    "roiSortingInteractive": true
+  },
+  "failures": []
+}

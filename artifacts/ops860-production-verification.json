@@ -1,0 +1,250 @@
+{
+  "verifiedAt": "2026-08-20T23:08:06.655Z",
+  "deployment": {
+    "commit": "23a11fd4acbe7b597059a56d8421ffe9e5f855a4",
+    "buildId": "Ll2-DBTXG4krj4lufhEez"
+  },
+  "pagination": {
+    "apiTotal": 104007,
+    "dbRows": 104007,
+    "dbApiReconciles": true,
+    "firstBatchRows": 500,
+    "secondBatchRows": 500,
+    "secondPageOverlap": 0,
+    "bottomReachRows": 1,
+    "reachesOldestDbRow": true
+  },
+  "summariesAndFilters": {
+    "summary": {
+      "totalArbs": 55278,
+      "avgRoi": 0.9222433191870112,
+      "bestRoi": 25.26460000000001,
+      "totalProfit": 206152.59789055955,
+      "arbTypeCounts": {
+        "direct": 52262,
+        "cross": 3016,
+        "internal": 0
+      }
+    },
+    "nonBlanketPopulation": true,
+    "minRoiTotal": 12055,
+    "minRoiViolations": 0,
+    "directTotal": 30973,
+    "positiveTotal": 32594
+  },
+  "logsAvailability": {
+    "first500Available": 53,
+    "first500Positive": 53,
+    "first500AuthoritativeZero": 0,
+    "first500UnavailableReasons": {
+      "No authoritative scan-time ROI value was persisted for this result.": 23,
+      "The completed scan found no candidate opportunity; this financial metric is not applicable.": 424
+    },
+    "persistedDistribution": [
+      {
+        "status": "legacy_unmaterialized",
+        "reason": "",
+        "rows": 57456
+      },
+      {
+        "status": "available",
+        "reason": "",
+        "rows": 46027
+      },
+      {
+        "status": "unavailable",
+        "reason": "No authoritative scan-time ROI value was persisted for this result.",
+        "rows": 446
+      },
+      {
+        "status": "unavailable",
+        "reason": "The completed scan found no candidate opportunity; this financial metric is not applicable.",
+        "rows": 78
+      }
+    ],
+    "authoritativeNumericZeroRows": 0,
+    "unavailableCompatibilityZeroRows": 524
+  },
+  "currentRoi": {
+    "requested": 100,
+    "returned": 100,
+    "statuses": {
+      "available": 14,
+      "no_arbitrage": 84,
+      "unavailable": 2
+    },
+    "unavailableReasons": {
+      "No authoritative scan-time ROI value was persisted for this result.": 2,
+      "The newest successfully completed scan for the exact linked market pair recorded no arbitrage.": 84
+    }
+  },
+  "savedMarkets": {
+    "total": 476,
+    "positiveCurrentRoi": 73,
+    "authoritativeZeroCurrentRoi": 0,
+    "unavailableCurrentRoi": 403,
+    "unavailableReasons": {
+      "no_canonical_arbitrage": 403
+    },
+    "positiveSample": {
+      "id": "1779565300940-jqb54rc",
+      "roiPct": 0.5443999999999938,
+      "strategy": "Buy YES PM + NO Kalshi",
+      "profit": null,
+      "apy": null,
+      "apyReason": "current_candidate_non_executable"
+    }
+  },
+  "csv": {
+    "rows": 500,
+    "roiColumn": true,
+    "roiReasonColumn": true,
+    "apiRows": 500,
+    "profitReconcilesFirst500": true,
+    "arbsReconcileFirst500": true
+  },
+  "dataQuality": {
+    "latest": {
+      "batchId": "scan:827676",
+      "state": "degraded",
+      "fields": {
+        "roi": {
+          "denominator": 100,
+          "available": 69,
+          "unavailable": 31,
+          "unavailablePct": 31,
+          "exactlyZero": 0,
+          "nonZero": 69,
+          "reasons": {
+            "historical_roi_not_persisted": 31
+          }
+        },
+        "profit": {
+          "denominator": 100,
+          "available": 14,
+          "unavailable": 86,
+          "unavailablePct": 86,
+          "exactlyZero": 14,
+          "nonZero": 0,
+          "reasons": {
+            "historical_profit_not_persisted": 86
+          }
+        },
+        "apy": {
+          "denominator": 13,
+          "available": 13,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "exactlyZero": 0,
+          "nonZero": 13,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 100,
+          "available": 100,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "exactlyZero": 0,
+          "nonZero": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 100,
+          "available": 69,
+          "unavailable": 31,
+          "unavailablePct": 31,
+          "exactlyZero": 0,
+          "nonZero": 69,
+          "reasons": {
+            "unexpected_missing_without_reason": 31
+          }
+        }
+      },
+      "breaches": [
+        {
+          "field": "roi",
+          "trigger": "structural_zero_tolerance",
+          "unavailablePct": 31
+        },
+        {
+          "field": "profit",
+          "trigger": "structural_zero_tolerance",
+          "unavailablePct": 86
+        },
+        {
+          "field": "currentRoi",
+          "trigger": "two_consecutive_batches_over_5pct",
+          "unavailablePct": 31
+        }
+      ],
+      "reconciliation": {
+        "requested": true,
+        "maxAttempts": 2
+      },
+      "recoveryVerified": false
+    },
+    "rolling": {
+      "batches": 100,
+      "degradedBatches": 92,
+      "fields": {
+        "roi": {
+          "denominator": 9200,
+          "unavailable": 3121,
+          "unavailablePct": 33.92391304347826,
+          "reasons": {
+            "historical_roi_not_persisted": 3121
+          }
+        },
+        "profit": {
+          "denominator": 9200,
+          "unavailable": 8568,
+          "unavailablePct": 93.1304347826087,
+          "reasons": {
+            "historical_profit_not_persisted": 8568
+          }
+        },
+        "apy": {
+          "denominator": 567,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "state": {
+          "denominator": 9200,
+          "unavailable": 0,
+          "unavailablePct": 0,
+          "reasons": {}
+        },
+        "currentRoi": {
+          "denominator": 9200,
+          "unavailable": 3121,
+          "unavailablePct": 33.92391304347826,
+          "reasons": {
+            "unexpected_missing_without_reason": 3121
+          }
+        }
+      }
+    },
+    "latestExecution": {
+      "scan_id": 827676,
+      "state": "degraded",
+      "reconciliation_attempts": 2,
+      "alerts": 1
+    }
+  },
+  "integrity": {
+    "sqlite": "ok",
+    "foreignKeyViolations": 0
+  },
+  "assertions": {
+    "deploymentIdentity": true,
+    "pagination": true,
+    "nonBlanketRoi": true,
+    "filters": true,
+    "csvParity": true,
+    "zeroAuthority": true,
+    "dataQualityActive": true,
+    "integrity": true
+  },
+  "failures": []
+}
