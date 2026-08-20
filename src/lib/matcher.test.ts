@@ -1079,6 +1079,43 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
 });
 
 describe('calculateAllArbitrages — cross-outcome guard', () => {
+  it('binds an exact server-registry relationship to the strategy-selected persisted Logs legs', () => {
+    const base = makeOutcome();
+    const registered = makeOutcome({
+      artist: 'Franco Colapinto',
+      kalshi: {
+        ...base.kalshi,
+        ticker: 'KXF1ACTION-2026-COL',
+        yesAsk: 0.05,
+        noAsk: 0.99,
+      },
+      polymarket: {
+        ...base.polymarket,
+        conditionId: '0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961',
+        yesTokenId: '42414903704366618249547146570427817032140368369434795263286643567961575256460',
+        noTokenId: '38424385756462253442221613485727105608987714090195314133724025202573806948368',
+        bestAsk: 0.20,
+        yesPrice: 0.20,
+        noPrice: 0.80,
+      },
+    });
+
+    const [result] = calculateAllArbitrages([registered], 'world');
+
+    expect(result.arbitrage.strategy).toBe('Buy YES Kalshi + NO PM');
+    expect(result.propositionRelationship).toMatchObject({
+      state: 'verified_complementary',
+      legs: {
+        kalshi: { platformMarketId: 'KXF1ACTION-2026-COL', contractSide: 'yes' },
+        polymarket: {
+          platformMarketId: '0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961',
+          tokenId: '38424385756462253442221613485727105608987714090195314133724025202573806948368',
+          contractSide: 'no',
+        },
+      },
+    });
+  });
+
   it('does NOT create cross-outcome arbs when market has more than two outcomes', () => {
     // Two matched outcomes (like Saudi + North Korea) plus many Kalshi-only outcomes.
     const matchedA = makeOutcome({ artist: 'Saudi Arabia' });

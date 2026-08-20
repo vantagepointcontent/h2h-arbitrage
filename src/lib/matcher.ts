@@ -15,6 +15,10 @@ import { calculateKalshiFeeUsd, type KalshiFeeAuthority } from './kalshi-fee-quo
 import { getPolymarketCategoryFeeRateBps, resolvePolymarketFeeRateBps } from './polymarket-fees';
 import type { PropositionRelationship } from './proposition-identity';
 import type { CalculationEnvelope } from './calculation-envelope';
+import {
+  findCanonicalPropositionRelationship,
+  resolveCanonicalPropositionRelationship,
+} from './proposition-registry';
 
 export interface UnifiedOutcome {
   artist: string;
@@ -1155,9 +1159,37 @@ export function calculateAllArbitrages(
     if (isStrictBinary && a && b) {
       complement = o.artist === a.artist ? b : o.artist === b.artist ? a : null;
     }
+    const arbitrage = calculateBestArbitrageForOutcome(o, complement, category, maxCapital, isStrictBinary);
+    const selectedPm = arbitrage.pmConditionId
+      ? outcomes.find((candidate) => candidate.polymarket?.conditionId === arbitrage.pmConditionId)?.polymarket
+      : o.polymarket;
+    const strategy = arbitrage.strategy.toLowerCase();
+    const selectedSides = strategy.includes('both sides')
+      ? { kalshi: 'yes' as const, polymarket: 'yes' as const }
+      : strategy.includes('yes kalshi')
+        ? { kalshi: 'yes' as const, polymarket: 'no' as const }
+        : strategy.includes('yes pm')
+          ? { kalshi: 'no' as const, polymarket: 'yes' as const }
+          : null;
+    const selectedPmToken = selectedSides?.polymarket === 'yes'
+      ? selectedPm?.yesTokenId
+      : selectedSides?.polymarket === 'no'
+        ? selectedPm?.noTokenId
+        : null;
+    const propositionRelationship = resolveCanonicalPropositionRelationship(o.propositionRelationship)
+      ?? (selectedSides && o.kalshi && selectedPm
+        ? findCanonicalPropositionRelationship({
+          kalshiTicker: o.kalshi.ticker,
+          pmConditionId: selectedPm.conditionId,
+          pmTokenId: selectedPmToken,
+          kalshiSide: selectedSides.kalshi,
+          pmSide: selectedSides.polymarket,
+        })
+        : null);
     return {
       ...o,
-      arbitrage: calculateBestArbitrageForOutcome(o, complement, category, maxCapital, isStrictBinary),
+      arbitrage,
+      propositionRelationship,
     };
   });
 }
