@@ -26,6 +26,29 @@ describe('POST /api/logs/current-roi', () => {
     await expect(response.json()).resolves.toEqual({ valuations: [{ id: 7, status: 'available', roiPct: 1.2 }] });
   });
 
+  it('preserves unavailable provenance separately from a genuine persisted zero', async () => {
+    mocks.getCurrentLogRoiBatch.mockResolvedValue([
+      {
+        id: 7,
+        status: 'unavailable',
+        reasonCode: 'historical_roi_not_persisted',
+        reason: 'No authoritative scan-time ROI value was persisted for this result.',
+      },
+      { id: 8, status: 'available', roiPct: 0 },
+    ]);
+
+    const response = await POST(request({ ids: [7, 8] }));
+    await expect(response.json()).resolves.toEqual({ valuations: [
+      {
+        id: 7,
+        status: 'unavailable',
+        reasonCode: 'historical_roi_not_persisted',
+        reason: 'No authoritative scan-time ROI value was persisted for this result.',
+      },
+      { id: 8, status: 'available', roiPct: 0 },
+    ] });
+  });
+
   it.each([[], [0], [1.5], Array.from({ length: 101 }, (_, index) => index + 1)])('rejects an invalid batch', async (ids) => {
     expect((await POST(request({ ids }))).status).toBe(400);
     expect(mocks.getCurrentLogRoiBatch).not.toHaveBeenCalled();

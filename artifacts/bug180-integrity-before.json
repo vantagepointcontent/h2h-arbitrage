@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-08-20T21:21:02.434Z",
+  "dbPath": "data/edgefinder.db",
+  "integrity": "ok",
+  "foreignKeyViolations": 0,
+  "dbCounts": {
+    "saved_markets": 634,
+    "scan_results": 102408
+  },
+  "files": {
+    "data/saved-markets.json": {
+      "validJson": true,
+      "rows": 476,
+      "sha256": "e93a0bf2241f76155b5c8e04c254b89ef70f00c23f6aff0c78990e4553a23f37"
+    },
+    "data/saved-markets.json.bak": {
+      "validJson": true,
+      "rows": 476,
+      "sha256": "e93a0bf2241f76155b5c8e04c254b89ef70f00c23f6aff0c78990e4553a23f37"
+    }
+  }
+}

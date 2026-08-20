@@ -95,6 +95,9 @@ const openapi = {
         count: { type: 'integer' }, total: { type: 'integer' },
         summary: { type: 'object', required: ['totalArbs', 'arbTypeCounts'], properties: {
           totalArbs: { type: 'integer', minimum: 0, description: 'Always equals direct + cross + internal under the identical server-side filter scope.' },
+          avgRoi: { type: ['number', 'null'], description: 'Average immutable scan-time ROI across rows with selected-candidate evidence; no-arb and unavailable rows are excluded.' },
+          bestRoi: { type: ['number', 'null'], description: 'Best immutable scan-time ROI across rows with selected-candidate evidence.' },
+          totalProfit: { type: ['number', 'null'], description: 'Sum of persisted scan-time indicative profit across rows with selected-candidate evidence.' },
           arbTypeCounts: { type: 'object', required: ['direct', 'cross', 'internal'], properties: {
             direct: { type: 'integer', minimum: 0 },
             cross: { type: 'integer', minimum: 0 },
@@ -184,7 +187,7 @@ const openapi = {
         type: 'object', additionalProperties: false,
         required: ['revision', 'scanId', 'envelope', 'fields'],
         properties: {
-          revision: { type: 'integer', const: 1 },
+          revision: { type: 'integer', const: 3 },
           scanId: nullableInteger,
           envelope: { $ref: '#/components/schemas/CalculationEnvelope' },
           fields: { type: 'object', additionalProperties: false,

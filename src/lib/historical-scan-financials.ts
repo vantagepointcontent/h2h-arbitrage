@@ -1,6 +1,6 @@
 import { parseCalculationEnvelope, type CalculationEnvelope } from './calculation-envelope';
 
-export const HISTORICAL_SCAN_FINANCIALS_REVISION = 2 as const;
+export const HISTORICAL_SCAN_FINANCIALS_REVISION = 3 as const;
 
 export type HistoricalFinancialSource = 'scan_result_scalar' | 'raw_result_snapshot';
 export type HistoricalFinancialFieldName = 'roiPct' | 'profitUsd' | 'apyPct' | 'stakeUsd';
@@ -8,7 +8,8 @@ export type HistoricalFinancialReasonCode =
   | 'historical_roi_not_persisted'
   | 'historical_profit_not_persisted'
   | 'historical_apy_not_persisted'
-  | 'historical_stake_not_persisted';
+  | 'historical_stake_not_persisted'
+  | 'confirmed_no_arbitrage';
 
 export type HistoricalFinancialField =
   | {
@@ -43,6 +44,8 @@ type PersistedFinancialRow = {
   total_stake?: unknown;
   raw_result?: unknown;
   calculation_envelope?: unknown;
+  historical_financials_revision?: unknown;
+  historical_financials_provenance?: unknown;
 };
 
 type RawFinancialSnapshot = {
@@ -114,6 +117,43 @@ function selectRawSnapshot(row: PersistedFinancialRow): RawFinancialSnapshot | n
   return exact.length === 1 ? exact[0] : null;
 }
 
+type PersistedFieldProvenance = { status?: unknown; reasonCode?: unknown };
+
+function parseFieldProvenance(row: PersistedFinancialRow): Partial<Record<HistoricalFinancialFieldName, PersistedFieldProvenance>> | null {
+  if (row.historical_financials_revision !== HISTORICAL_SCAN_FINANCIALS_REVISION) return null;
+  let parsed = row.historical_financials_provenance;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { return null; }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const fields = (parsed as { fields?: unknown }).fields;
+  return fields && typeof fields === 'object' && !Array.isArray(fields)
+    ? fields as Partial<Record<HistoricalFinancialFieldName, PersistedFieldProvenance>>
+    : null;
+}
+
+export function serializeHistoricalFinancialProvenance(
+  row: PersistedFinancialRow,
+  authoritativeScalarFields: HistoricalFinancialFieldName[] = [],
+): string {
+  const authoritativeFields = Object.fromEntries(authoritativeScalarFields.map((name) => [name, { status: 'available' }]));
+  const resolved = resolveHistoricalScanFinancials({
+    ...row,
+    historical_financials_revision: authoritativeScalarFields.length > 0 ? HISTORICAL_SCAN_FINANCIALS_REVISION : null,
+    historical_financials_provenance: authoritativeScalarFields.length > 0
+      ? { revision: HISTORICAL_SCAN_FINANCIALS_REVISION, fields: authoritativeFields }
+      : null,
+  });
+  return JSON.stringify({
+    revision: HISTORICAL_SCAN_FINANCIALS_REVISION,
+    fields: Object.fromEntries(Object.entries(resolved.fields).map(([name, field]) => [name,
+      field.status === 'available'
+        ? { status: 'available', source: field.source, sourceRevision: field.sourceRevision }
+        : { status: 'unavailable', reasonCode: field.reasonCode, reason: field.reason },
+    ])),
+  });
+}
+
 /**
  * Resolve immutable historical economics field-by-field. Calculation envelopes
  * are provenance, not a gate: a sparse/newer envelope must never erase older
@@ -128,11 +168,32 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
   const raw = selectRawSnapshot(row);
   const scalarRevision = `scan_results:${scanId ?? 'unknown'}`;
   const rawRevision = `${scalarRevision}:raw_result`;
+  const confirmedNoArbitrage = row.strategy === 'No arb' && !positiveArb;
+  const selectedCandidate = typeof row.strategy === 'string' && row.strategy.length > 0 && row.strategy !== 'No arb';
+  const provenance = parseFieldProvenance(row);
 
   const fields = Object.fromEntries((Object.keys(FIELD_METADATA) as HistoricalFinancialFieldName[]).map((name) => {
     const metadata = FIELD_METADATA[name];
+    if (confirmedNoArbitrage) {
+      return [name, {
+        status: 'unavailable', value: null, source: 'unavailable', sourceRevision: scalarRevision,
+        reasonCode: 'confirmed_no_arbitrage',
+        reason: 'The completed scan found no candidate opportunity; this financial metric is not applicable.',
+      } satisfies HistoricalFinancialField];
+    }
+    const persistedField = provenance?.[name];
+    if (persistedField?.status === 'unavailable') {
+      return [name, {
+        status: 'unavailable', value: null, source: 'unavailable', sourceRevision: scalarRevision,
+        reasonCode: metadata.reasonCode, reason: metadata.reason,
+      } satisfies HistoricalFinancialField];
+    }
     const scalar = finitePersistedNumber(row[metadata.scalar]);
-    const scalarUsable = scalar != null && (!positiveArb || scalar > 0);
+    // Legacy positive-opportunity writers used zero as a missing-value
+    // sentinel. A zero is authoritative only when the row is not claiming a
+    // positive executable opportunity; negative event-time ROI remains valid.
+    const scalarUsable = scalar != null && (scalar !== 0 || persistedField?.status === 'available'
+      || (!positiveArb && !selectedCandidate));
     if (scalarUsable) {
       return [name, {
         status: 'available', value: scalar, source: 'scan_result_scalar', sourceRevision: scalarRevision,
@@ -140,7 +201,7 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
     }
 
     const rawValue = finitePersistedNumber(raw?.[metadata.raw]);
-    const rawUsable = rawValue != null && (!positiveArb || rawValue > 0);
+    const rawUsable = rawValue != null && (rawValue !== 0 || persistedField?.status === 'available');
     if (rawUsable) {
       return [name, {
         status: 'available', value: rawValue, source: 'raw_result_snapshot', sourceRevision: rawRevision,

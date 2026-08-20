@@ -22,7 +22,7 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
     expect(spec.components.schemas.HistoricalScanFinancials).toMatchObject({
       required: ['revision', 'scanId', 'envelope', 'fields'],
       properties: {
-        revision: { type: 'integer', const: 1 },
+        revision: { type: 'integer', const: 3 },
         fields: expect.objectContaining({
           required: ['roiPct', 'profitUsd', 'apyPct', 'stakeUsd'],
         }),

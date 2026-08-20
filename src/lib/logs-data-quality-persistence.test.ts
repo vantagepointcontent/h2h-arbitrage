@@ -42,11 +42,11 @@ describe('Logs data-quality persistence guardrail', () => {
 
     const healthy = await persistence.saveScanResult('healthy', scan());
     const degraded = await persistence.saveScanResult('degraded', scan({
-      bestProfit: 0,
-      totalStake: 0,
+      bestProfit: undefined,
+      totalStake: undefined,
       raw: { allArbs: [{ roiPct: 2.5, strategy: 'Buy YES Kalshi + NO PM' }] },
       scannedAt: '2026-08-20T10:01:00.000Z',
-    }));
+    }) as Parameters<typeof persistence.saveScanResult>[1]);
 
     const db = createClient({ url: `file:${dbPath}` });
     const batches = await db.execute('SELECT scan_id, state, reconciliation_attempts, snapshot_json FROM logs_data_quality_batches ORDER BY scan_id');

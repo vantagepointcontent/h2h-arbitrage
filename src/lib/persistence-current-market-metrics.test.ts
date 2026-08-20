@@ -14,6 +14,65 @@ afterEach(() => {
 });
 
 describe('BUG-179 canonical current-market metric projection', () => {
+  it('recovers field-level legacy ROI while leaving contradictory zero profit and APY unavailable', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-legacy-roi-only-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/legacy-roi', polymarketUrl: 'https://polymarket.com/event/legacy-roi',
+      eventTitle: 'Legacy ROI-only candidate', expiryDate: '2026-11-28T00:00:00.000Z',
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: 2, bestProfit: 0, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: '2026-08-20T13:00:00.000Z', publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct: 2, expectedProfit: 0, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', totalStake: 99, daysToExpiry: 100, expiryAt: '2026-11-28T00:00:00.000Z' }],
+    });
+
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+      canonicalCurrentRoiPct: 2,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'current_profit_unavailable',
+    });
+  });
+
+  it('recovers a pre-executionStatus persisted candidate instead of relabeling it No arb', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-legacy-metrics-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/legacy', polymarketUrl: 'https://polymarket.com/event/legacy',
+      eventTitle: 'Legacy persisted candidate', expiryDate: '2026-11-28T00:00:00.000Z',
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    const roiPct = 2;
+    const daysToExpiry = 100;
+    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: '2026-08-20T13:00:00.000Z', publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', totalStake: 99, apyPct, daysToExpiry, expiryAt: '2026-11-28T00:00:00.000Z' }],
+    });
+
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: 1,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalApyPct: apyPct,
+    });
+  });
+
   it('publishes one executable revision atomically and clears every metric on arb to no-arb', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-metrics-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');

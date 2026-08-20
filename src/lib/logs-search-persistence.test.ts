@@ -174,13 +174,22 @@ describe('Logs FTS persistence', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-internal-audit-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
     vi.resetModules();
-    const persistence = await import('./persistence');
+    let persistence = await import('./persistence');
     const raw = { allArbs: [{ strategy: 'Same-platform YES+YES Kalshi: A + B', expectedProfit: 10 }] };
     const invalid = await persistence.saveScanResult('legacy-internal', {
       bestRoiPct: 10, bestProfit: 10, strategy: 'Same-platform YES+YES Kalshi: A + B',
       arbType: 'internal', outcomeCount: 2, matchedCount: 2, kalshiCount: 2, pmCount: 2,
       positiveArbCount: 1, totalStake: 90, scannedAt: '2026-08-12T12:00:00.000Z', raw,
     });
+    const client = createClient({ url: `file:${process.env.H2H_SQLITE_PATH}` });
+    await client.execute({
+      sql: `UPDATE scan_results SET arb_valid = 1, arb_invalidation_reason = NULL,
+        arb_type = 'internal', positive_arb_count = 1 WHERE id = ?`,
+      args: [invalid.id],
+    });
+    client.close();
+    vi.resetModules();
+    persistence = await import('./persistence');
     await persistence.saveScanResult('valid-internal', {
       bestRoiPct: 5, bestProfit: 5, strategy: 'Same-platform YES+NO Kalshi: Proposition',
       arbType: 'internal', outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1,
@@ -198,11 +207,13 @@ describe('Logs FTS persistence', () => {
       arb_valid: 0,
       arb_invalidation_reason: 'legacy_internal_yes_yes_directional_duplication',
       positive_arb_count: 0,
-      best_profit: 0,
+      best_roi_pct: 10,
+      best_profit: 10,
+      total_stake: 90,
     });
   });
 
-  it('projects no-arb and non-executable scans with no Arb Type while keeping validation separate', async () => {
+  it('projects no-arb and non-executable scans with no Arb Type while preserving indicative event-time economics', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-no-arb-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
     vi.resetModules();
@@ -235,12 +246,90 @@ describe('Logs FTS persistence', () => {
       arb_valid: 1,
       arb_invalidation_reason: null,
       positive_arb_count: 0,
+      best_profit: 2,
+      best_roi_pct: 2,
+      total_stake: 0,
     });
+    expect(history.summary).toMatchObject({ totalArbs: 0, avgRoi: 2, bestRoi: 2, totalProfit: null });
     expect((await persistence.queryScanHistory({ arbType: 'direct' })).rows).toHaveLength(0);
     const exported: Array<Record<string, unknown>> = [];
     for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
     expect(exported.find((item) => item.id === saved.id)).toMatchObject({ arb_type: null, arb_valid: 1 });
     expect(exported.find((item) => item.id === nonExecutable.id)).toMatchObject({ arb_type: null, arb_valid: 1 });
+  });
+
+  it('persists missing selected-candidate economics as unavailable while preserving a genuine zero', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-missing-financial-provenance-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const { resolveHistoricalScanFinancials } = await import('./historical-scan-financials');
+    const base = {
+      strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct' as const, outcomeCount: 1,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 0,
+      scannedAt: '2026-08-12T12:02:00.000Z',
+    };
+    await persistence.saveScanResult('missing-selected', {
+      ...base, bestRoiPct: undefined, bestProfit: undefined, totalStake: undefined,
+    } as unknown as Parameters<typeof persistence.saveScanResult>[1]);
+    await persistence.saveScanResult('genuine-zero-selected', {
+      ...base, bestRoiPct: 0, bestProfit: 0, totalStake: 100,
+      scannedAt: '2026-08-12T12:03:00.000Z',
+    });
+
+    const history = await persistence.queryScanHistory({ limit: 10 });
+    const missing = history.rows.find((row) => row.market_id === 'missing-selected');
+    const genuine = history.rows.find((row) => row.market_id === 'genuine-zero-selected');
+    expect(resolveHistoricalScanFinancials(missing ?? {} as never).fields.roiPct).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+    });
+    expect(resolveHistoricalScanFinancials(genuine ?? {} as never).fields.roiPct).toMatchObject({
+      status: 'available', value: 0,
+    });
+    expect(history.summary).toMatchObject({ avgRoi: 0, bestRoi: 0, totalProfit: null });
+    const exported: Array<Record<string, unknown>> = [];
+    for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
+    const exportedMissing = exported.find((row) => row.market_id === 'missing-selected');
+    expect(resolveHistoricalScanFinancials(exportedMissing ?? {} as never).fields.roiPct).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+    });
+  });
+
+  it('reconciles legacy raw ROI evidence across API rows, summaries, filters, and exports', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-legacy-raw-parity-'));
+    const databasePath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = databasePath;
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const { resolveHistoricalScanFinancials } = await import('./historical-scan-financials');
+    const saved = await persistence.saveScanResult('legacy-raw-selected', {
+      bestRoiPct: 7, bestProfit: 3, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 0,
+      totalStake: 100, scannedAt: '2026-08-12T12:04:00.000Z',
+      raw: { allArbs: [{
+        strategy: 'Buy YES Kalshi + NO PM', roiPct: 7, expectedProfit: 3, totalStake: 100,
+      }] },
+    });
+    const client = createClient({ url: `file:${databasePath}` });
+    await client.execute({
+      sql: `UPDATE scan_results SET best_roi_pct = 0, best_profit = 0, total_stake = 0,
+        historical_financials_revision = NULL, historical_financials_provenance = NULL WHERE id = ?`,
+      args: [saved.id],
+    });
+    client.close();
+
+    const history = await persistence.queryScanHistory({ limit: 10 });
+    expect(resolveHistoricalScanFinancials(history.rows[0]).fields.roiPct).toMatchObject({
+      status: 'available', value: 7, source: 'raw_result_snapshot',
+    });
+    expect(history.summary).toMatchObject({ avgRoi: 7, bestRoi: 7, totalProfit: null });
+    await expect(persistence.queryScanHistory({ minRoi: 6, limit: 10 })).resolves.toMatchObject({ total: 1 });
+
+    const exported: Array<Record<string, unknown>> = [];
+    for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
+    expect(resolveHistoricalScanFinancials(exported[0]).fields.roiPct).toMatchObject({
+      status: 'available', value: 7, source: 'raw_result_snapshot',
+    });
   });
 
   it('loads immutable current-valuation identity and original scan capital from the captured payload', async () => {

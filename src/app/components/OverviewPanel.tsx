@@ -234,12 +234,12 @@ function OverviewPanelInner({
   // Aggregate stats (respect current filter)
   const { totalMarkets, totalProfit, avgRoi, arbOpportunities } = useMemo(() => {
     const totalMarkets = filteredByExpiry.length;
-    const totalProfit = filteredByExpiry.reduce((sum, m) => {
-      const p = getCanonicalCurrentMarketMetrics(m).profit ?? 0;
-      return sum + (p > 0 ? p : 0);
-    }, 0);
-    const avgRoi = totalMarkets > 0 ? filteredByExpiry.reduce((sum, m) => sum + (getCanonicalCurrentMarketMetrics(m).roiPct ?? 0), 0) / totalMarkets : 0;
-    const arbOpportunities = filteredByExpiry.filter(m => (getCanonicalCurrentMarketMetrics(m).roiPct ?? 0) > 0).length;
+    const metrics = filteredByExpiry.map(getCanonicalCurrentMarketMetrics);
+    const profits = metrics.map((metric) => metric.profit).filter((value): value is number => value != null);
+    const rois = metrics.map((metric) => metric.roiPct).filter((value): value is number => value != null);
+    const totalProfit = profits.length > 0 ? profits.reduce((sum, value) => sum + value, 0) : null;
+    const avgRoi = rois.length > 0 ? rois.reduce((sum, value) => sum + value, 0) / rois.length : null;
+    const arbOpportunities = rois.filter((roi) => roi > 0).length;
     return { totalMarkets, totalProfit, avgRoi, arbOpportunities };
   }, [filteredByExpiry]);
 
@@ -319,14 +319,14 @@ function OverviewPanelInner({
       {/* ── Aggregate Stats Bar ── */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
-          <TrendingUp className={`w-3 h-3 ${avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
+          <TrendingUp className={`w-3 h-3 ${avgRoi != null && avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi != null && avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
           <span className="text-[10px] text-[var(--text-secondary)]">Avg Yield</span>
-          <span className={`text-xs font-bold ${avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{avgRoi > 0 ? "+" : ""}{formatPercent(avgRoi)}</span>
+          <span className={`text-xs font-bold ${avgRoi != null && avgRoi > 0 ? "text-[var(--status-positive)]" : avgRoi != null && avgRoi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{avgRoi == null ? "—" : `${avgRoi > 0 ? "+" : ""}${formatPercent(avgRoi)}`}</span>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
-          <DollarSign className={`w-3 h-3 ${totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
+          <DollarSign className={`w-3 h-3 ${totalProfit != null && totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit != null && totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`} />
           <span className="text-[10px] text-[var(--text-secondary)]">Total Profit</span>
-          <span className={`text-xs font-bold ${totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{formatCurrency(totalProfit)}</span>
+          <span className={`text-xs font-bold ${totalProfit != null && totalProfit > 0 ? "text-[var(--status-positive)]" : totalProfit != null && totalProfit < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>{totalProfit == null ? "—" : formatCurrency(totalProfit)}</span>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
           <Zap className="w-3 h-3 text-[var(--status-warning)]" />

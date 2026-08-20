@@ -332,7 +332,7 @@ describe('Logs scan-time APY serialization', () => {
     const body = await response.json();
 
     expect(body.logs[0].historical_financials).toMatchObject({
-      revision: 2,
+      revision: 3,
       fields: {
         roiPct: { status: 'available', value: 2.5 },
         profitUsd: { status: 'unavailable', reasonCode: 'historical_profit_not_persisted' },

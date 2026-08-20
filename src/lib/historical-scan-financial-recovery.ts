@@ -1,5 +1,9 @@
 import type { Client } from '@libsql/client';
-import { HISTORICAL_SCAN_FINANCIALS_REVISION, resolveHistoricalScanFinancials } from './historical-scan-financials';
+import {
+  HISTORICAL_SCAN_FINANCIALS_REVISION,
+  resolveHistoricalScanFinancials,
+  serializeHistoricalFinancialProvenance,
+} from './historical-scan-financials';
 
 export interface HistoricalFinancialRecoveryReport {
   revision: typeof HISTORICAL_SCAN_FINANCIALS_REVISION;
@@ -14,6 +18,7 @@ export interface HistoricalFinancialRecoveryReport {
     applied: number;
     alreadyCurrent: number;
   };
+  unrecoverableReasons: Record<string, number>;
 }
 
 type RecoveryRow = Record<string, unknown> & { id: number };
@@ -36,45 +41,32 @@ async function ensureRecoveryColumns(client: Client): Promise<void> {
   }
 }
 
-function stableProvenance(row: RecoveryRow) {
-  const resolved = resolveHistoricalScanFinancials(row);
-  return {
-    revision: resolved.revision,
-    scanId: resolved.scanId,
-    envelope: {
-      version: resolved.envelope.version,
-      status: resolved.envelope.status,
-      blockerCode: resolved.envelope.blocker?.code ?? null,
-    },
-    fields: Object.fromEntries(Object.entries(resolved.fields).map(([name, field]) => [name, field.status === 'available'
-      ? { status: field.status, source: field.source, sourceRevision: field.sourceRevision }
-      : {
-          status: field.status,
-          source: field.source,
-          sourceRevision: field.sourceRevision,
-          reasonCode: field.reasonCode,
-          reason: field.reason,
-        }])),
-  };
-}
-
 /**
  * Recover only directly persisted scalar/raw snapshot evidence. Existing valid
  * scalars are never overwritten, and a higher revision always fences this run.
  */
 export async function recoverHistoricalScanFinancials(
   client: Client,
-  options: { apply: boolean },
+  options: { apply: boolean; ids?: number[] },
 ): Promise<HistoricalFinancialRecoveryReport> {
   if (options.apply) await ensureRecoveryColumns(client);
   const hasRevision = await hasColumn(client, 'historical_financials_revision');
   const hasProvenance = await hasColumn(client, 'historical_financials_provenance');
   const hasStrategy = await hasColumn(client, 'strategy');
-  const result = await client.execute(`SELECT id, ${hasStrategy ? 'strategy' : 'NULL AS strategy'}, positive_arb_count, best_roi_pct, best_profit,
-    apy_pct, total_stake, raw_result, calculation_envelope,
-    ${hasRevision ? 'historical_financials_revision' : 'NULL'} AS historical_financials_revision,
-    ${hasProvenance ? 'historical_financials_provenance' : 'NULL'} AS historical_financials_provenance
-    FROM scan_results WHERE positive_arb_count > 0 ORDER BY id`);
+  const ids = options.ids == null
+    ? null
+    : [...new Set(options.ids)].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 100);
+  const idFilter = ids == null ? '' : ids.length === 0 ? ' AND 0' : ` AND id IN (${ids.map(() => '?').join(', ')})`;
+  const result = await client.execute({
+    sql: `SELECT id, ${hasStrategy ? 'strategy' : 'NULL AS strategy'}, positive_arb_count, best_roi_pct, best_profit,
+      apy_pct, total_stake, raw_result, calculation_envelope,
+      ${hasRevision ? 'historical_financials_revision' : 'NULL'} AS historical_financials_revision,
+      ${hasProvenance ? 'historical_financials_provenance' : 'NULL'} AS historical_financials_provenance
+      FROM scan_results
+      WHERE ${hasStrategy ? "strategy IS NOT NULL AND strategy <> '' AND strategy <> 'No arb'" : 'positive_arb_count > 0'}${idFilter}
+      ORDER BY id`,
+    args: ids ?? [],
+  });
 
   const counts: HistoricalFinancialRecoveryReport['counts'] = {
     inspected: 0,
@@ -86,6 +78,7 @@ export async function recoverHistoricalScanFinancials(
     applied: 0,
     alreadyCurrent: 0,
   };
+  const unrecoverableReasons: Record<string, number> = {};
   const statements: Array<{ sql: string; args: Array<string | number | null> }> = [];
 
   for (const rawRow of result.rows) {
@@ -105,8 +98,11 @@ export async function recoverHistoricalScanFinancials(
     counts.inspected += 1;
     const resolved = resolveHistoricalScanFinancials(row);
     const available = Object.values(resolved.fields).filter((field) => field.status === 'available').length;
-    if (available === 0) counts.unrecoverable += 1;
-    else {
+    if (available === 0) {
+      counts.unrecoverable += 1;
+      unrecoverableReasons.historical_financials_not_persisted =
+        (unrecoverableReasons.historical_financials_not_persisted ?? 0) + 1;
+    } else {
       counts.recovered += 1;
       if (available === 4) counts.fullyRecoverable += 1;
       else counts.partiallyRecoverable += 1;
@@ -132,6 +128,8 @@ export async function recoverHistoricalScanFinancials(
           AND total_stake IS ?
           AND raw_result IS ?
           AND calculation_envelope IS ?
+          ${hasStrategy ? 'AND strategy IS ?' : ''}
+          ${hasProvenance ? 'AND historical_financials_provenance IS ?' : ''}
           AND COALESCE(historical_financials_revision, 0) < ?`,
       args: [
         rawValue('roiPct'), rawValue('roiPct'),
@@ -139,7 +137,7 @@ export async function recoverHistoricalScanFinancials(
         rawValue('apyPct'), rawValue('apyPct'),
         rawValue('stakeUsd'), rawValue('stakeUsd'),
         HISTORICAL_SCAN_FINANCIALS_REVISION,
-        JSON.stringify(stableProvenance(row)),
+        serializeHistoricalFinancialProvenance(row),
         Number(row.id),
         Number(row.positive_arb_count),
         typeof row.best_roi_pct === 'number' ? row.best_roi_pct : null,
@@ -148,6 +146,9 @@ export async function recoverHistoricalScanFinancials(
         typeof row.total_stake === 'number' ? row.total_stake : null,
         typeof row.raw_result === 'string' ? row.raw_result : null,
         typeof row.calculation_envelope === 'string' ? row.calculation_envelope : null,
+        ...(hasStrategy ? [typeof row.strategy === 'string' ? row.strategy : null] : []),
+        ...(hasProvenance ? [typeof row.historical_financials_provenance === 'string'
+          ? row.historical_financials_provenance : null] : []),
         HISTORICAL_SCAN_FINANCIALS_REVISION,
       ],
     });
@@ -159,5 +160,5 @@ export async function recoverHistoricalScanFinancials(
     counts.conflicted += statements.length - counts.applied;
   }
 
-  return { revision: HISTORICAL_SCAN_FINANCIALS_REVISION, apply: options.apply, counts };
+  return { revision: HISTORICAL_SCAN_FINANCIALS_REVISION, apply: options.apply, counts, unrecoverableReasons };
 }

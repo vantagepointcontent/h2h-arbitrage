@@ -1066,7 +1066,7 @@ function historicalFinancials(values: { roiPct: number; profitUsd: number; apyPc
     reason,
   });
   return {
-    revision: 2 as const,
+    revision: 3 as const,
     scanId: 1,
     envelope: executableEnvelopeFixture,
     fields: {

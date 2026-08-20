@@ -18,7 +18,12 @@ import {
   type CalculationEnvelope,
 } from './calculation-envelope';
 import { evaluateLogsDataQuality, LOGS_REQUIRED_FIELDS, type LogsDataQualitySnapshot } from './logs-data-quality';
-import { resolveHistoricalScanFinancials } from './historical-scan-financials';
+import {
+  HISTORICAL_SCAN_FINANCIALS_REVISION,
+  resolveHistoricalScanFinancials,
+  serializeHistoricalFinancialProvenance,
+} from './historical-scan-financials';
+import { recoverHistoricalScanFinancials } from './historical-scan-financial-recovery';
 
 const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -67,11 +72,54 @@ async function ensureLogsDataQualitySchema(c: ReturnType<typeof createClient>): 
   _logsDataQualitySchemaReady = true;
 }
 
+function persistedRowToLogsQuality(row: Record<string, unknown>) {
+  const historical = resolveHistoricalScanFinancials(row);
+  const value = (field: 'roiPct' | 'profitUsd' | 'apyPct') => {
+    const resolved = historical.fields[field];
+    return resolved.status === 'available' ? resolved.value : null;
+  };
+  const exactIdentity = typeof row.kalshi_url === 'string' && row.kalshi_url.length > 0
+    && typeof row.polymarket_url === 'string' && row.polymarket_url.length > 0;
+  const hasSelectedCandidate = typeof row.strategy === 'string' && row.strategy.length > 0
+    && row.strategy !== 'No arb';
+  const apyEligible = typeof row.days_to_expiry === 'number'
+    && Number.isFinite(row.days_to_expiry) && row.days_to_expiry > 0;
+  const reasons = Object.fromEntries((['roi', 'profit', 'apy'] as const).flatMap((name) => {
+    const fieldName = name === 'roi' ? 'roiPct' : name === 'profit' ? 'profitUsd' : 'apyPct';
+    const field = historical.fields[fieldName];
+    return field.status === 'unavailable' ? [[name, field.reasonCode]] : [];
+  }));
+  return {
+    id: Number(row.id), scanStatus: typeof row.scan_status === 'string' ? row.scan_status : null,
+    positiveArbCount: Number(row.positive_arb_count), hasSelectedCandidate,
+    arbValid: row.arb_valid === 1, roiPct: value('roiPct'), profitUsd: value('profitUsd'),
+    apyPct: value('apyPct'), apyEligible, state: typeof row.scan_status === 'string' ? row.scan_status : null,
+    exactMarketIdentity: exactIdentity, currentRoiPct: exactIdentity ? value('roiPct') : null,
+    reasons: { ...reasons, currentRoi: exactIdentity ? undefined : 'missing_exact_link_identity' },
+  };
+}
+
+async function loadRecentLogsQualityRows(c: ReturnType<typeof createClient>, limit: number = 100) {
+  const recent = await c.execute({
+    sql: `SELECT id, strategy, positive_arb_count, best_roi_pct, best_profit,
+      apy_pct, total_stake, raw_result, calculation_envelope, historical_financials_revision,
+      historical_financials_provenance, days_to_expiry, scan_status, arb_valid,
+      kalshi_url, polymarket_url, scanned_at
+      FROM scan_results
+      WHERE scan_status = 'completed' AND strategy IS NOT NULL AND strategy <> '' AND strategy <> 'No arb'
+      ORDER BY scanned_at DESC, id DESC LIMIT ?`,
+    args: [limit],
+  });
+  return recent.rows.map((row) => persistedRowToLogsQuality(row as Record<string, unknown>));
+}
+
 async function backfillRecentLogsDataQuality(c: ReturnType<typeof createClient>): Promise<void> {
   const recent = await c.execute(`SELECT id, strategy, positive_arb_count, best_roi_pct, best_profit,
-    apy_pct, total_stake, raw_result, calculation_envelope, days_to_expiry, scan_status,
+    apy_pct, total_stake, raw_result, calculation_envelope, historical_financials_revision,
+    historical_financials_provenance, days_to_expiry, scan_status,
     arb_valid, kalshi_url, polymarket_url, scanned_at
-    FROM scan_results WHERE scan_status = 'completed' AND arb_valid = 1 AND positive_arb_count > 0
+    FROM scan_results WHERE scan_status = 'completed'
+      AND strategy IS NOT NULL AND strategy <> '' AND strategy <> 'No arb'
       AND id NOT IN (SELECT scan_id FROM logs_data_quality_batches)
     ORDER BY scanned_at DESC, id DESC LIMIT 100`);
   let previousBatch: LogsDataQualitySnapshot | null = null;
@@ -100,6 +148,7 @@ async function backfillRecentLogsDataQuality(c: ReturnType<typeof createClient>)
       previousBatch,
       rows: [{
         id: Number(row.id), scanStatus: 'completed', positiveArbCount: Number(row.positive_arb_count),
+        hasSelectedCandidate: true,
         arbValid: row.arb_valid === 1, roiPct: value('roiPct'), profitUsd: value('profitUsd'),
         apyPct: value('apyPct'), apyEligible, state: 'completed', exactMarketIdentity: exactIdentity,
         currentRoiPct: exactIdentity ? value('roiPct') : null,
@@ -109,7 +158,7 @@ async function backfillRecentLogsDataQuality(c: ReturnType<typeof createClient>)
     await c.execute({
       sql: `INSERT OR IGNORE INTO logs_data_quality_batches
         (scan_id, observed_at, state, snapshot_json, reconciliation_attempts) VALUES (?, ?, ?, ?, ?)`,
-      args: [Number(row.id), String(row.scanned_at), snapshot.state, JSON.stringify(snapshot), snapshot.reconciliation.requested ? 2 : 0],
+      args: [Number(row.id), String(row.scanned_at), snapshot.state, JSON.stringify(snapshot), 0],
     });
     previousBatch = snapshot;
   }
@@ -176,12 +225,7 @@ async function initDb(): Promise<void> {
     SET arb_valid = 0,
         arb_invalidation_reason = 'legacy_internal_yes_yes_directional_duplication',
         arb_type = NULL,
-        positive_arb_count = 0,
-        best_profit = 0,
-        best_roi_pct = 0,
-        total_stake = 0,
-        apy_pct = 0,
-        apy_unavailable_reason = 'invalid_arb_classification'
+        positive_arb_count = 0
     WHERE strategy LIKE 'Same-platform YES+YES%'
       AND (arb_valid <> 0 OR arb_invalidation_reason IS NULL)`);
   // Index for fast per-market lookups
@@ -618,7 +662,8 @@ export async function saveScanResult(
     arb_type: result.arbType,
     positive_arb_count: result.positiveArbCount ?? 0,
   });
-  const financiallyValid = projection.positiveArbCount > 0;
+  const hasSelectedCandidate = typeof result.strategy === 'string' && result.strategy.length > 0
+    && result.strategy !== 'No arb';
   const recoverable = resolveHistoricalScanFinancials({
     positive_arb_count: result.positiveArbCount,
     best_roi_pct: result.bestRoiPct,
@@ -627,16 +672,18 @@ export async function saveScanResult(
     strategy: result.strategy,
     raw_result: result.raw,
   });
-  const recoveredValue = (field: 'roiPct' | 'profitUsd' | 'stakeUsd', fallback: number): number => {
+  const recoveredValue = (field: 'roiPct' | 'profitUsd' | 'stakeUsd', direct: unknown): number | null => {
+    if (typeof direct === 'number' && Number.isFinite(direct)) return direct;
     const value = recoverable.fields[field];
-    return value.status === 'available' ? value.value : fallback;
+    return value.status === 'available' ? value.value : null;
   };
-  const canonicalRoi = financiallyValid ? recoveredValue('roiPct', 0) : 0;
-  const canonicalProfit = financiallyValid ? recoveredValue('profitUsd', 0) : 0;
-  const canonicalStake = financiallyValid ? recoveredValue('stakeUsd', 0) : 0;
-  const snapshot = financiallyValid
+  const canonicalRoi = hasSelectedCandidate ? recoveredValue('roiPct', result.bestRoiPct) : null;
+  const canonicalProfit = hasSelectedCandidate ? recoveredValue('profitUsd', result.bestProfit) : null;
+  const canonicalStake = hasSelectedCandidate ? recoveredValue('stakeUsd', result.totalStake) : null;
+  const snapshot = hasSelectedCandidate && canonicalRoi != null
     ? calculateScanApy(canonicalRoi, scannedAt, result.expiryAt)
-    : { daysToExpiry: null, apyPct: 0, unavailableReason: projection.arbValid === 1 ? 'no_arbitrage' : 'invalid_arb_classification' };
+    : { daysToExpiry: null, apyPct: null, unavailableReason: hasSelectedCandidate
+        ? 'historical_roi_not_persisted' : 'no_arbitrage' };
   const calculationEnvelope = result.calculationEnvelope == null
     ? legacyUnverifiableEnvelope(`scan result ${marketId}`)
     : validateCalculationEnvelope(result.calculationEnvelope);
@@ -646,19 +693,20 @@ export async function saveScanResult(
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
        kalshi_url, polymarket_url, arb_type, expiry_at, days_to_expiry,
-       apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason, calculation_envelope)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason, calculation_envelope,
+       historical_financials_revision, historical_financials_provenance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       marketId,
-      canonicalRoi,
-      canonicalProfit,
+      canonicalRoi ?? 0,
+      canonicalProfit ?? 0,
       result.strategy ?? '',
       result.outcomeCount ?? 0,
       result.matchedCount ?? 0,
       result.kalshiCount ?? 0,
       result.pmCount ?? 0,
       projection.positiveArbCount,
-      canonicalStake,
+      canonicalStake ?? 0,
       scannedAt,
       typeof result.raw === 'string' ? result.raw : (result.raw ? JSON.stringify(result.raw) : null),
       result.marketTitle ?? null,
@@ -667,11 +715,26 @@ export async function saveScanResult(
       projection.arbType,
       result.expiryAt ?? null,
       snapshot.daysToExpiry,
-      snapshot.apyPct,
+      snapshot.apyPct ?? 0,
       snapshot.unavailableReason,
       projection.arbValid,
       projection.arbInvalidationReason,
       JSON.stringify(calculationEnvelope),
+      HISTORICAL_SCAN_FINANCIALS_REVISION,
+      serializeHistoricalFinancialProvenance({
+        positive_arb_count: result.positiveArbCount,
+        best_roi_pct: result.bestRoiPct,
+        best_profit: result.bestProfit,
+        apy_pct: snapshot.apyPct,
+        total_stake: result.totalStake,
+        strategy: result.strategy,
+        raw_result: result.raw,
+      }, [
+        ...(typeof result.bestRoiPct === 'number' && Number.isFinite(result.bestRoiPct) ? ['roiPct' as const] : []),
+        ...(typeof result.bestProfit === 'number' && Number.isFinite(result.bestProfit) ? ['profitUsd' as const] : []),
+        ...(snapshot.apyPct != null && Number.isFinite(snapshot.apyPct) ? ['apyPct' as const] : []),
+        ...(typeof result.totalStake === 'number' && Number.isFinite(result.totalStake) ? ['stakeUsd' as const] : []),
+      ]),
     ],
   });
   const id = Number((row as any).insertId ?? row.lastInsertRowid ?? 0);
@@ -682,39 +745,19 @@ export async function saveScanResult(
       ? JSON.parse(previous.rows[0].snapshot_json) as LogsDataQualitySnapshot
       : null;
   } catch { /* malformed telemetry is not trusted as threshold history */ }
-  const positiveArbCount = projection.positiveArbCount;
-  const exactMarketIdentity = typeof result.kalshiUrl === 'string' && result.kalshiUrl.length > 0
-    && typeof result.polymarketUrl === 'string' && result.polymarketUrl.length > 0;
-  const reason = (available: boolean, code: string) => available ? undefined : code;
-  const apyEligible = snapshot.daysToExpiry != null && snapshot.daysToExpiry > 0;
-  const quality = evaluateLogsDataQuality({
-    batchId: `scan:${id}`,
-    previousBatch,
-    rows: [{
-      id,
-      scanStatus: 'completed',
-      positiveArbCount,
-      arbValid: projection.arbValid === 1,
-      roiPct: Number.isFinite(canonicalRoi) ? canonicalRoi : null,
-      profitUsd: canonicalProfit > 0 && Number.isFinite(canonicalProfit) ? canonicalProfit : null,
-      apyPct: snapshot.apyPct != null && Number.isFinite(snapshot.apyPct) ? snapshot.apyPct : null,
-      apyEligible,
-      state: 'completed',
-      exactMarketIdentity,
-      currentRoiPct: exactMarketIdentity && Number.isFinite(canonicalRoi) ? canonicalRoi : null,
-      reasons: {
-        roi: reason(Number.isFinite(canonicalRoi), 'persistence_field_missing'),
-        profit: reason(canonicalProfit > 0 && Number.isFinite(canonicalProfit), 'persistence_field_missing'),
-        apy: reason(!apyEligible || snapshot.apyPct != null, snapshot.unavailableReason ?? 'historical_apy_not_persisted'),
-        state: undefined,
-        currentRoi: reason(exactMarketIdentity, 'missing_exact_link_identity'),
-      },
-    }],
-  });
+  let qualityRows = await loadRecentLogsQualityRows(c);
+  let quality = evaluateLogsDataQuality({ batchId: `scan:${id}`, previousBatch, rows: qualityRows });
+  let reconciliationAttempts = 0;
+  while (quality.state === 'degraded' && reconciliationAttempts < quality.reconciliation.maxAttempts) {
+    await recoverHistoricalScanFinancials(c, { apply: true, ids: qualityRows.map((candidate) => candidate.id) });
+    reconciliationAttempts += 1;
+    qualityRows = await loadRecentLogsQualityRows(c);
+    quality = evaluateLogsDataQuality({ batchId: `scan:${id}`, previousBatch, rows: qualityRows });
+  }
   await c.execute({
     sql: `INSERT OR REPLACE INTO logs_data_quality_batches
       (scan_id, observed_at, state, snapshot_json, reconciliation_attempts) VALUES (?, ?, ?, ?, ?)`,
-    args: [id, scannedAt, quality.state, JSON.stringify(quality), quality.reconciliation.requested ? 2 : 0],
+    args: [id, scannedAt, quality.state, JSON.stringify(quality), reconciliationAttempts],
   });
   if (quality.state === 'degraded') {
     const alertReason = quality.breaches.map((breach) => `${breach.field}:${breach.trigger}:${breach.unavailablePct.toFixed(2)}%`).join(', ');
@@ -722,7 +765,9 @@ export async function saveScanResult(
       sql: 'INSERT INTO logs_data_quality_alerts (scan_id, created_at, reason, snapshot_json) VALUES (?, ?, ?, ?)',
       args: [id, new Date().toISOString(), alertReason, JSON.stringify(quality)],
     });
-    console.error(`[logs-data-quality] degraded scan=${id} ${alertReason}; bounded reconciliation exhausted`);
+    console.error(`[logs-data-quality] degraded scan=${id} ${alertReason}; bounded reconciliation exhausted after ${reconciliationAttempts} attempts`);
+  } else if (reconciliationAttempts > 0) {
+    console.info(`[logs-data-quality] recovered scan=${id} after ${reconciliationAttempts} reconciliation attempt(s)`);
   }
   return { id };
 }
@@ -829,7 +874,8 @@ export async function getScanHistory(marketId?: string, limit: number = 20): Pro
 /**
  * PERF-P1: SQL-side filtered scan history for /api/logs.
  * Filters run in SQLite (indexed on scanned_at DESC) instead of loading
- * 10k rows into JS. Excludes the heavy raw_result blob.
+ * 10k rows into JS. The bounded page includes raw_result only so the API can
+ * resolve legacy immutable event-time evidence with the same contract as CSV.
  * Returns { rows, total } where total counts all matches (pre-LIMIT).
  */
 type ScanHistoryFilters = {
@@ -837,7 +883,7 @@ type ScanHistoryFilters = {
   search?: string; eventType?: 'all' | 'scan' | 'arb' | 'system'; arbType?: 'all' | 'direct' | 'cross' | 'internal';
   maxTteDays?: 30 | 90 | 180;
 };
-type ScanHistorySummary = { totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } };
+type ScanHistorySummary = { totalArbs: number; avgRoi: number | null; bestRoi: number | null; totalProfit: number | null; arbTypeCounts: { direct: number; cross: number; internal: number } };
 type ScanHistoryRow = Record<string, unknown> & { id: number; market_id: string; strategy: string; scanned_at: string };
 
 // Keep these case-sensitive, shape-exact predicates aligned with classifyArbType().
@@ -869,6 +915,35 @@ const scanHistoryCanonicalArbCountSql = `CASE
   WHEN (${scanHistoryCanonicalArbTypeSql}) IN ('direct', 'cross', 'internal') THEN positive_arb_count
   ELSE 0
 END`;
+const scanHistoryHistoricalCandidateSql = `strategy IS NOT NULL AND strategy <> '' AND strategy <> 'No arb'`;
+const scanHistorySingleRawFieldSql = (field: 'roiPct' | 'expectedProfit') => `CASE
+  WHEN json_valid(raw_result) THEN CASE
+    WHEN json_type(raw_result, '$.allArbs') = 'array'
+      AND json_array_length(json_extract(raw_result, '$.allArbs')) = 1
+      AND typeof(json_extract(raw_result, '$.allArbs[0].${field}')) IN ('integer', 'real')
+      AND json_extract(raw_result, '$.allArbs[0].${field}') <> 0
+    THEN json_extract(raw_result, '$.allArbs[0].${field}')
+  END
+END`;
+const scanHistoryHistoricalFieldValueSql = (
+  scalar: 'best_roi_pct' | 'best_profit',
+  provenanceField: 'roiPct' | 'profitUsd',
+  rawField: 'roiPct' | 'expectedProfit',
+) => `CASE WHEN (${scanHistoryHistoricalCandidateSql}) THEN CASE
+  WHEN historical_financials_revision = ${HISTORICAL_SCAN_FINANCIALS_REVISION}
+    AND json_valid(historical_financials_provenance)
+    AND json_extract(historical_financials_provenance, '$.fields.${provenanceField}.status') = 'unavailable'
+    THEN NULL
+  WHEN historical_financials_revision = ${HISTORICAL_SCAN_FINANCIALS_REVISION}
+    AND json_valid(historical_financials_provenance)
+    AND json_extract(historical_financials_provenance, '$.fields.${provenanceField}.status') = 'available'
+    THEN ${scalar}
+  WHEN ${scalar} <> 0 THEN ${scalar}
+  ELSE (${scanHistorySingleRawFieldSql(rawField)})
+END END`;
+const scanHistoryHistoricalRoiValueSql = scanHistoryHistoricalFieldValueSql('best_roi_pct', 'roiPct', 'roiPct');
+const scanHistoryHistoricalProfitValueSql = scanHistoryHistoricalFieldValueSql('best_profit', 'profitUsd', 'expectedProfit');
+const scanHistoryHistoricalProfitAvailableSql = `(${scanHistoryHistoricalProfitValueSql}) IS NOT NULL`;
 
 function projectScanHistoryRow(row: ScanHistoryRow): ScanHistoryRow {
   const projection = projectCanonicalArbClassification(row);
@@ -885,7 +960,10 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
   let where = ' WHERE 1=1';
   const args: (string | number)[] = [];
   if (opts.marketId) { where += ' AND market_id = ?'; args.push(opts.marketId); }
-  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) { where += ' AND best_roi_pct >= ?'; args.push(opts.minRoi); }
+  if (opts.minRoi !== undefined && !isNaN(opts.minRoi)) {
+    where += ` AND (${scanHistoryHistoricalRoiValueSql}) >= ?`;
+    args.push(opts.minRoi);
+  }
   if (opts.positiveArbOnly) where += ` AND (${scanHistoryCanonicalArbCountSql}) > 0`;
   if (opts.maxTteDays !== undefined) {
     where += ' AND days_to_expiry >= 0 AND days_to_expiry < ?';
@@ -936,9 +1014,10 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
     c.execute({
       sql: `SELECT COUNT(*) AS cnt, COUNT(DISTINCT market_id) AS unique_markets,
         COALESCE(SUM(${scanHistoryCanonicalArbCountSql}), 0) AS total_arbs,
-        COALESCE(AVG(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_roi_pct END), 0) AS avg_roi,
-        COALESCE(MAX(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_roi_pct END), 0) AS best_roi,
-        COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0 THEN best_profit ELSE 0 END), 0) AS total_profit,
+        AVG(${scanHistoryHistoricalRoiValueSql}) AS avg_roi,
+        MAX(${scanHistoryHistoricalRoiValueSql}) AS best_roi,
+        SUM(CASE WHEN (${scanHistoryCanonicalArbCountSql}) > 0
+          AND (${scanHistoryHistoricalProfitAvailableSql}) THEN (${scanHistoryHistoricalProfitValueSql}) END) AS total_profit,
         COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'direct' THEN positive_arb_count ELSE 0 END), 0) AS direct_count,
         COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'cross' THEN positive_arb_count ELSE 0 END), 0) AS cross_count,
         COALESCE(SUM(CASE WHEN (${scanHistoryCanonicalArbTypeSql}) = 'internal' THEN positive_arb_count ELSE 0 END), 0) AS internal_count
@@ -946,7 +1025,8 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
       args: base.args,
     }),
     c.execute({
-      sql: `SELECT COALESCE(MAX(best_roi_pct), 0) AS max_roi FROM scan_results${rangeBase.where}`,
+      sql: `SELECT COALESCE(MAX(${scanHistoryHistoricalRoiValueSql}), 0) AS max_roi
+        FROM scan_results${rangeBase.where}`,
       args: rangeBase.args,
     }),
   ]);
@@ -962,7 +1042,8 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                 arb_type, arb_valid, arb_invalidation_reason, scan_status, calculation_envelope
+                 arb_type, arb_valid, arb_invalidation_reason, scan_status, raw_result, calculation_envelope,
+                 historical_financials_revision, historical_financials_provenance
           FROM scan_results${pageWhere}
           ORDER BY scanned_at DESC, id DESC LIMIT ?`,
     args: [...pageArgs, limit],
@@ -970,7 +1051,10 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
   const rawMaxRoiWithoutMin = Number(rangeRes.rows[0]?.max_roi ?? 0);
   const maxRoiWithoutMin = Number.isFinite(rawMaxRoiWithoutMin) ? Math.max(0, rawMaxRoiWithoutMin) : 0;
   return { rows: Array.isArray(rows.rows) ? (rows.rows as unknown as ScanHistoryRow[]).map(projectScanHistoryRow) : [], total, uniqueMarkets, maxRoiWithoutMin, summary: {
-    totalArbs: Number(countRow?.total_arbs ?? 0), avgRoi: Number(countRow?.avg_roi ?? 0), bestRoi: Number(countRow?.best_roi ?? 0), totalProfit: Number(countRow?.total_profit ?? 0),
+    totalArbs: Number(countRow?.total_arbs ?? 0),
+    avgRoi: countRow?.avg_roi == null ? null : Number(countRow.avg_roi),
+    bestRoi: countRow?.best_roi == null ? null : Number(countRow.best_roi),
+    totalProfit: countRow?.total_profit == null ? null : Number(countRow.total_profit),
     arbTypeCounts: { direct: Number(countRow?.direct_count ?? 0), cross: Number(countRow?.cross_count ?? 0), internal: Number(countRow?.internal_count ?? 0) },
   } };
 }
@@ -1077,6 +1161,8 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
             SELECT p.kalshi_url, p.polymarket_url,
                    s.id AS scan_id, s.best_roi_pct, s.strategy, s.positive_arb_count,
                    s.arb_valid, s.apy_unavailable_reason, s.scanned_at,
+                   s.raw_result, s.calculation_envelope,
+                   s.historical_financials_revision, s.historical_financials_provenance,
                    ROW_NUMBER() OVER (
                      PARTITION BY p.kalshi_url, p.polymarket_url
                      ORDER BY s.scanned_at DESC, s.id DESC
@@ -1090,7 +1176,9 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
           SELECT r.id, r.kalshi_url, r.polymarket_url, r.scan_status AS requested_scan_status,
                  latest.scan_id, latest.best_roi_pct, latest.strategy,
                  latest.positive_arb_count, latest.arb_valid,
-                 latest.apy_unavailable_reason, latest.scanned_at
+                 latest.apy_unavailable_reason, latest.scanned_at,
+                 latest.raw_result, latest.calculation_envelope,
+                 latest.historical_financials_revision, latest.historical_financials_provenance
           FROM requested r
           LEFT JOIN ranked latest
             ON latest.kalshi_url = r.kalshi_url
@@ -1137,7 +1225,7 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
         reason: 'The newest successfully completed scan is missing a valid arbitrage count.',
       };
     }
-    if (positiveArbCount === 0) {
+    if (positiveArbCount === 0 && row.strategy === 'No arb') {
       return row.arb_valid === 1 || row.apy_unavailable_reason === 'no_arbitrage'
         ? {
             ...common,
@@ -1160,21 +1248,28 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
         reason: 'The newest successfully completed scan for the exact linked market pair failed canonical arbitrage validation.',
       };
     }
-    const roiPct = typeof row.best_roi_pct === 'number' && Number.isFinite(row.best_roi_pct)
-      ? row.best_roi_pct
-      : null;
-    if (roiPct === null) {
+    const historicalRoi = resolveHistoricalScanFinancials({
+      id: scanId,
+      strategy: row.strategy,
+      positive_arb_count: positiveArbCount,
+      best_roi_pct: row.best_roi_pct,
+      raw_result: row.raw_result,
+      calculation_envelope: row.calculation_envelope,
+      historical_financials_revision: row.historical_financials_revision,
+      historical_financials_provenance: row.historical_financials_provenance,
+    }).fields.roiPct;
+    if (historicalRoi.status === 'unavailable') {
       return {
         id,
         status: 'unavailable' as const,
-        reasonCode: 'latest_completed_scan_missing_roi',
-        reason: 'The newest successfully completed scan did not persist an authoritative ROI value.',
+        reasonCode: historicalRoi.reasonCode,
+        reason: historicalRoi.reason,
       };
     }
     return {
       ...common,
       status: 'available' as const,
-      roiPct,
+      roiPct: historicalRoi.value,
       ...(typeof row.strategy === 'string' && row.strategy ? { strategy: row.strategy } : {}),
     };
   });
@@ -1216,7 +1311,8 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
-                   arb_type, arb_valid, arb_invalidation_reason, scan_status, raw_result, calculation_envelope
+                   arb_type, arb_valid, arb_invalidation_reason, scan_status, raw_result, calculation_envelope,
+                   historical_financials_revision, historical_financials_provenance
             FROM scan_results${cursorWhere}
             ORDER BY scanned_at DESC, id DESC LIMIT ?`,
       args: [...cursorArgs, thisLimit],
@@ -2314,7 +2410,7 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision
     FROM saved_markets
     WHERE last_scan_result IS NOT NULL OR canonical_apy_pct IS NOT NULL
-    ORDER BY id LIMIT 500`);
+    ORDER BY id LIMIT 1000`);
   for (const row of metricRows.rows as unknown as Array<Record<string, unknown>>) {
     const raw = row.last_scan_result == null ? null : String(row.last_scan_result);
     let result: LastScanResult | null = null;

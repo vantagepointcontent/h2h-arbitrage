@@ -161,7 +161,7 @@ export default function LogsPanel() {
   const [loadMoreError, setLoadMoreError] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState<{ totalArbs: number; avgRoi: number; bestRoi: number; totalProfit: number; arbTypeCounts: { direct: number; cross: number; internal: number } } | null>(null);
+  const [summary, setSummary] = useState<{ totalArbs: number; avgRoi: number | null; bestRoi: number | null; totalProfit: number | null; arbTypeCounts: { direct: number; cross: number; internal: number } } | null>(null);
   const [dataQuality, setDataQuality] = useState<{ latest?: { state?: string; breaches?: Array<{ field: string; trigger: string; unavailablePct: number }> } | null } | null>(null);
   const requestGeneration = useRef(0);
   const loadingMoreGeneration = useRef<number | null>(null);
@@ -589,7 +589,7 @@ export default function LogsPanel() {
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">
           <div className="font-semibold">Logs data quality degraded</div>
           <div className="mt-1">
-            {(dataQuality.latest.breaches ?? []).map((breach) => `${breach.field}: ${breach.unavailablePct.toFixed(2)}% unavailable (${breach.trigger})`).join('; ')
+            {(dataQuality.latest.breaches ?? []).map((breach) => `${breach.field}: ${breach.unavailablePct.toFixed(2)}% affected (${breach.trigger})`).join('; ')
               || 'Required historical fields failed the availability contract; bounded reconciliation was triggered.'}
           </div>
         </div>
@@ -599,9 +599,9 @@ export default function LogsPanel() {
           <StatBox label="Total Scans" value={stats.count.toString()} />
           <StatBox label="Unique Markets" value={uniqueMarkets != null ? uniqueMarkets.toLocaleString() : "—"} color="#5DBE81" />
           <StatBox label="Total Arbs" value={stats.totalArbs.toString()} color="#5DBE81" />
-          <StatBox label="Avg ROI" value={fmtPct(stats.avgRoi)} color={stats.avgRoi > 0 ? "#5DBE81" : "#ef4444"} />
-          <StatBox label="Best ROI" value={fmtPct(stats.bestRoi)} color="#5DBE81" />
-          <StatBox label="Total Profit" value={fmtUsd(stats.totalProfit)} color="#facc15" />
+          <StatBox label="Avg ROI" value={stats.avgRoi == null ? "—" : fmtPct(stats.avgRoi)} color={stats.avgRoi != null && stats.avgRoi > 0 ? "#5DBE81" : "#ef4444"} />
+          <StatBox label="Best ROI" value={stats.bestRoi == null ? "—" : fmtPct(stats.bestRoi)} color="#5DBE81" />
+          <StatBox label="Total Profit" value={stats.totalProfit == null ? "—" : fmtUsd(stats.totalProfit)} color="#facc15" />
         </div>
       )}
 

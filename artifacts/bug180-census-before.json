@@ -1,0 +1,175 @@
+{
+  "observedAt": "2026-08-20T20:51:14.332Z",
+  "dbPath": "data/edgefinder.db",
+  "queries": {
+    "scanPopulation": [
+      {
+        "total": 101934,
+        "positive_arb_rows": 32594,
+        "positive_roi_rows": 44307,
+        "zero_roi_rows": 56745,
+        "null_roi_rows": 0,
+        "rows_with_raw_roi": 46169
+      }
+    ],
+    "recentScans": [
+      {
+        "total": 26367,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 3431,
+        "zero_roi_rows": 22936,
+        "null_roi_rows": 0
+      }
+    ],
+    "savedMarkets": [
+      {
+        "total": 634,
+        "positive_current_roi": 0,
+        "zero_current_roi": 0,
+        "null_current_roi": 634,
+        "available_apy": 0,
+        "payloads_with_roi": 105,
+        "payloads_with_executable": 0
+      }
+    ],
+    "scanStrategies": [
+      {
+        "strategy": "No arb",
+        "arb_type": null,
+        "arb_valid": 0,
+        "arb_invalidation_reason": null,
+        "rows": 51019,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Buy YES PM + NO Kalshi",
+        "arb_type": "direct",
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 25637,
+        "positive_arb_rows": 17535,
+        "positive_roi_rows": 25637
+      },
+      {
+        "strategy": "Buy YES Kalshi + NO PM",
+        "arb_type": "direct",
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 17931,
+        "positive_arb_rows": 13438,
+        "positive_roi_rows": 17049
+      },
+      {
+        "strategy": "No arb",
+        "arb_type": null,
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 4721,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Buy YES both sides: Kalshi Republican + PM Democratic",
+        "arb_type": "cross",
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 1217,
+        "positive_arb_rows": 1217,
+        "positive_roi_rows": 1217
+      },
+      {
+        "strategy": "Buy YES PM + NO Kalshi",
+        "arb_type": null,
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 589,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Buy YES Kalshi + NO PM",
+        "arb_type": null,
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 360,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Buy YES both sides: Kalshi Democratic + PM Republican",
+        "arb_type": "cross",
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 318,
+        "positive_arb_rows": 318,
+        "positive_roi_rows": 318
+      },
+      {
+        "strategy": "Buy YES both sides: Kalshi Troy Jackson (D) + PM Susan Collins (R)",
+        "arb_type": "cross",
+        "arb_valid": 1,
+        "arb_invalidation_reason": null,
+        "rows": 86,
+        "positive_arb_rows": 86,
+        "positive_roi_rows": 86
+      },
+      {
+        "strategy": "Same-platform YES+YES Polymarket: Democratic + Republican",
+        "arb_type": null,
+        "arb_valid": 0,
+        "arb_invalidation_reason": "legacy_internal_yes_yes_directional_duplication",
+        "rows": 28,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Same-platform YES+YES Kalshi: Republican + Democratic",
+        "arb_type": null,
+        "arb_valid": 0,
+        "arb_invalidation_reason": "legacy_internal_yes_yes_directional_duplication",
+        "rows": 18,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      },
+      {
+        "strategy": "Same-platform YES+YES Polymarket: Republican + Democratic",
+        "arb_type": null,
+        "arb_valid": 0,
+        "arb_invalidation_reason": "legacy_internal_yes_yes_directional_duplication",
+        "rows": 10,
+        "positive_arb_rows": 0,
+        "positive_roi_rows": 0
+      }
+    ],
+    "savedUnavailableReasons": [
+      {
+        "reason": "no_canonical_arbitrage",
+        "rows": 581
+      },
+      {
+        "reason": null,
+        "rows": 45
+      },
+      {
+        "reason": "current_metric_invariant_failed",
+        "rows": 5
+      },
+      {
+        "reason": "unaligned_resolution_rules",
+        "rows": 2
+      },
+      {
+        "reason": "outcome_contingent",
+        "rows": 1
+      }
+    ],
+    "recoverableHistorical": [
+      {
+        "rows": 101934,
+        "zero_scalar_with_raw_roi": 1005,
+        "zero_count_with_raw_roi": 13600
+      }
+    ]
+  }
+}

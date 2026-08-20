@@ -1,0 +1,25 @@
+{
+  "observedAt": "2026-08-20T21:23:30.029Z",
+  "dbPath": "data/edgefinder.db",
+  "totalMarkets": 476,
+  "payloads": 476,
+  "malformed": 0,
+  "alreadyRoi": 0,
+  "recoverableRoi": 81,
+  "recoverableApy": 0,
+  "candidateStages": {
+    "total": 138,
+    "classified": 138,
+    "positiveRoi": 138,
+    "positiveProfit": 0,
+    "positiveStake": 0,
+    "explicitExecutable": 0,
+    "legacyExecutionStatus": 0,
+    "explicitNonExecutable": 138,
+    "explicitUnavailable": 0
+  },
+  "reasons": {
+    "no_canonical_arbitrage": 395,
+    "current_candidate_non_executable": 81
+  }
+}

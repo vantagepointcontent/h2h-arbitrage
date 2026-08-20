@@ -42,7 +42,11 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
 
     const first = await persistence.saveScanResult('market-a-old', scan({ scannedAt: '2026-08-13T20:00:00.000Z', bestRoiPct: 1.1 }));
     const duplicate = await persistence.saveScanResult('market-a-duplicate', scan({ scannedAt: '2026-08-13T20:01:00.000Z', bestRoiPct: 2.2 }));
-    const latest = await persistence.saveScanResult('market-a-latest', scan({ scannedAt: '2026-08-13T20:03:00.000Z', bestRoiPct: 4.4 }));
+    await persistence.saveScanResult('market-a-latest', scan({ scannedAt: '2026-08-13T20:03:00.000Z', bestRoiPct: 4.4 }));
+    const latestIndicative = await persistence.saveScanResult('market-a-latest-indicative', scan({
+      scannedAt: '2026-08-13T20:03:30.000Z', bestRoiPct: 3.7, bestProfit: 1.5,
+      positiveArbCount: 0,
+    }));
     const failed = await persistence.saveScanResult('market-a-failed', scan({ scannedAt: '2026-08-13T20:04:00.000Z', bestRoiPct: 99 }));
     const incomplete = await persistence.saveScanResult('market-a-incomplete', scan({ scannedAt: '2026-08-13T20:05:00.000Z', bestRoiPct: 88 }));
     await persistence.saveScanResult('market-a-stale-insert', scan({ scannedAt: '2026-08-13T20:02:00.000Z', bestRoiPct: 3.3 }));
@@ -81,6 +85,23 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
       kalshiUrl: undefined,
       polymarketUrl: undefined,
     }));
+    const missingRoi = await persistence.saveScanResult('market-missing-roi', scan({
+      scannedAt: '2026-08-13T20:08:30.000Z',
+      bestRoiPct: undefined,
+      bestProfit: undefined,
+      totalStake: undefined,
+      positiveArbCount: 0,
+      kalshiUrl: 'https://kalshi.com/markets/missing-roi/event/MISSING',
+      polymarketUrl: 'https://polymarket.com/event/missing-roi',
+    }) as Parameters<typeof persistence.saveScanResult>[1]);
+    const genuineZero = await persistence.saveScanResult('market-genuine-zero', scan({
+      scannedAt: '2026-08-13T20:09:00.000Z',
+      bestRoiPct: 0,
+      bestProfit: 0,
+      positiveArbCount: 0,
+      kalshiUrl: 'https://kalshi.com/markets/genuine-zero/event/ZERO',
+      polymarketUrl: 'https://polymarket.com/event/genuine-zero',
+    }));
 
     const db = createClient({ url: `file:${dbPath}` });
     await db.execute({ sql: 'UPDATE scan_results SET scan_status = ? WHERE id = ?', args: ['failed', failed.id] });
@@ -96,11 +117,13 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
       noArb.id,
       invalid.id,
       missingLinks.id,
+      missingRoi.id,
+      genuineZero.id,
       999_999,
       first.id,
     ])).resolves.toEqual([
-      { id: first.id, status: 'available', roiPct: 4.4, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:00.000Z', scanId: latest.id },
-      { id: duplicate.id, status: 'available', roiPct: 4.4, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:00.000Z', scanId: latest.id },
+      { id: first.id, status: 'available', roiPct: 3.7, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id },
+      { id: duplicate.id, status: 'available', roiPct: 3.7, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id },
       { id: similar.id, status: 'available', roiPct: 8.8, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:06:00.000Z', scanId: similar.id },
       {
         id: onlyFailed.id,
@@ -124,6 +147,20 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
         status: 'unavailable',
         reasonCode: 'missing_exact_link_identity',
         reason: 'The historical row does not contain both exact linked event URLs.',
+      },
+      {
+        id: missingRoi.id,
+        status: 'unavailable',
+        reasonCode: 'historical_roi_not_persisted',
+        reason: 'No authoritative scan-time ROI value was persisted for this result.',
+      },
+      {
+        id: genuineZero.id,
+        status: 'available',
+        roiPct: 0,
+        strategy: 'Buy YES Kalshi + NO PM',
+        scannedAt: '2026-08-13T20:09:00.000Z',
+        scanId: genuineZero.id,
       },
       {
         id: 999_999,

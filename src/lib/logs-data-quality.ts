@@ -6,6 +6,7 @@ export interface LogsQualityRow {
   id: number;
   scanStatus: string | null;
   positiveArbCount: number;
+  hasSelectedCandidate: boolean;
   arbValid: boolean;
   roiPct: number | null;
   profitUsd: number | null;
@@ -22,6 +23,8 @@ export interface LogsFieldAvailability {
   available: number;
   unavailable: number;
   unavailablePct: number;
+  exactlyZero: number;
+  nonZero: number;
   reasons: Record<string, number>;
 }
 
@@ -31,7 +34,8 @@ export interface LogsDataQualitySnapshot {
   fields: Record<LogsRequiredField, LogsFieldAvailability>;
   breaches: Array<{
     field: LogsRequiredField;
-    trigger: 'structural_zero_tolerance' | 'single_batch_over_50pct' | 'two_consecutive_batches_over_5pct';
+    trigger: 'structural_zero_tolerance' | 'single_batch_over_50pct' | 'two_consecutive_batches_over_5pct'
+      | 'all_zero_population' | 'zero_regression_over_5pct';
     unavailablePct: number;
   }>;
   reconciliation: { requested: boolean; maxAttempts: 2 };
@@ -49,7 +53,9 @@ function finite(value: number | null): value is number {
 }
 
 function eligible(row: LogsQualityRow, field: LogsRequiredField): boolean {
-  if (row.scanStatus !== 'completed' || !row.arbValid || row.positiveArbCount <= 0) return false;
+  if (row.scanStatus !== 'completed') return false;
+  if (field === 'state') return true;
+  if (!row.hasSelectedCandidate) return false;
   if (field === 'apy') return row.apyEligible;
   if (field === 'currentRoi') return row.exactMarketIdentity;
   return true;
@@ -73,11 +79,22 @@ function fieldAvailability(rows: LogsQualityRow[], field: LogsRequiredField): Lo
     const reason = row.reasons[field] ?? 'unexpected_missing_without_reason';
     reasons[reason] = (reasons[reason] ?? 0) + 1;
   }
+  const numericValue = (row: LogsQualityRow): number | null => {
+    if (field === 'roi') return row.roiPct;
+    if (field === 'profit') return row.profitUsd;
+    if (field === 'apy') return row.apyPct;
+    if (field === 'currentRoi') return row.currentRoiPct;
+    return null;
+  };
+  const availableNumeric = field === 'state' ? [] : cohort.map(numericValue).filter(finite);
+  const exactlyZero = availableNumeric.filter((value) => value === 0).length;
   return {
     denominator: cohort.length,
     available: cohort.length - unavailableRows.length,
     unavailable: unavailableRows.length,
     unavailablePct: cohort.length === 0 ? 0 : unavailableRows.length * 100 / cohort.length,
+    exactlyZero,
+    nonZero: availableNumeric.length - exactlyZero,
     reasons,
   };
 }
@@ -92,9 +109,20 @@ export function evaluateLogsDataQuality(input: LogsQualityBatchInput): LogsDataQ
   let warning = false;
   for (const field of LOGS_REQUIRED_FIELDS) {
     const metric = fields[field];
+    const previous = input.previousBatch?.fields[field];
+    if (field !== 'state' && metric.denominator > 0 && metric.exactlyZero === metric.denominator) {
+      breaches.push({ field, trigger: 'all_zero_population', unavailablePct: 100 });
+      continue;
+    }
+    const zeroPct = metric.denominator === 0 ? 0 : metric.exactlyZero * 100 / metric.denominator;
+    if (field !== 'state' && zeroPct > 5 && (previous?.nonZero ?? 0) > 0) {
+      breaches.push({ field, trigger: 'zero_regression_over_5pct', unavailablePct: zeroPct });
+      continue;
+    }
     if (metric.unavailable === 0) continue;
     const structural = Object.keys(metric.reasons).some((reason) =>
-      reason.includes('structural') || reason.includes('schema') || reason.includes('persistence_field_missing'));
+      reason.includes('structural') || reason.includes('schema')
+      || reason.includes('persistence_field_missing') || reason.includes('_not_persisted'));
     if (structural) {
       breaches.push({ field, trigger: 'structural_zero_tolerance', unavailablePct: metric.unavailablePct });
     } else if (metric.unavailablePct > 50) {

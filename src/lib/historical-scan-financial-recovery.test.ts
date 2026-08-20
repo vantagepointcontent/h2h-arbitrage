@@ -62,7 +62,7 @@ describe('recoverHistoricalScanFinancials', () => {
       best_profit: 2.5,
       apy_pct: 30,
       total_stake: 200,
-      historical_financials_revision: 2,
+      historical_financials_revision: 3,
     });
 
     const second = await recoverHistoricalScanFinancials(client, { apply: true });
@@ -114,6 +114,34 @@ describe('recoverHistoricalScanFinancials', () => {
       historical_financials_provenance: null,
     });
     concurrent.close();
+    client.close();
+  });
+
+  it('recovers and enumerates the selected-candidate cohort even when executable count is zero', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'historical-financial-selected-candidate-'));
+    const client = createClient({ url: `file:${path.join(tempDir, 'recovery.db')}` });
+    await client.execute(`CREATE TABLE scan_results (
+      id INTEGER PRIMARY KEY, strategy TEXT NOT NULL, positive_arb_count INTEGER NOT NULL,
+      best_roi_pct REAL, best_profit REAL, apy_pct REAL, total_stake REAL,
+      raw_result TEXT, calculation_envelope TEXT
+    )`);
+    await client.batch([
+      { sql: 'INSERT INTO scan_results VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', args: [
+        1, 'Buy YES Kalshi + NO PM', 0, 0, 0, 0, 0,
+        JSON.stringify({ allArbs: [{ strategy: 'Buy YES Kalshi + NO PM', roiPct: 2, expectedProfit: 2, apyPct: 20, totalStake: 100 }] }), null,
+      ] },
+      { sql: 'INSERT INTO scan_results VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', args: [
+        2, 'Buy YES Kalshi + NO PM', 0, 0, 0, 0, 0, null, null,
+      ] },
+      { sql: 'INSERT INTO scan_results VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', args: [
+        3, 'No arb', 0, 0, 0, 0, 0, null, null,
+      ] },
+    ], 'write');
+
+    const report = await recoverHistoricalScanFinancials(client, { apply: true });
+    expect(report.counts).toMatchObject({ inspected: 2, recovered: 1, unrecoverable: 1, applied: 2 });
+    expect(report.unrecoverableReasons).toEqual({ historical_financials_not_persisted: 1 });
+    expect((await client.execute('SELECT best_roi_pct FROM scan_results WHERE id = 1')).rows[0].best_roi_pct).toBe(2);
     client.close();
   });
 });

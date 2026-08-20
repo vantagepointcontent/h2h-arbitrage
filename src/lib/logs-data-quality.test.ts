@@ -6,6 +6,7 @@ function row(overrides: Partial<LogsQualityBatchInput['rows'][number]> = {}): Lo
     id: 1,
     scanStatus: 'completed',
     positiveArbCount: 1,
+    hasSelectedCandidate: true,
     arbValid: true,
     roiPct: 2.5,
     profitUsd: 5,
@@ -26,7 +27,7 @@ describe('evaluateLogsDataQuality', () => {
       row({ id: 2, profitUsd: null, reasons: { profit: 'historical_profit_not_persisted' } }),
     ], previousBatch: null });
 
-    expect(quality.fields.profit).toEqual({
+    expect(quality.fields.profit).toMatchObject({
       denominator: 2,
       available: 1,
       unavailable: 1,
@@ -112,5 +113,58 @@ describe('evaluateLogsDataQuality', () => {
     expect(quality.fields.apy.denominator).toBe(0);
     expect(quality.fields.currentRoi.denominator).toBe(0);
     expect(quality.state).toBe('healthy');
+  });
+
+  it('fails immediately when every eligible historical ROI is exactly zero after a non-zero population', () => {
+    const previous = evaluateLogsDataQuality({ batchId: 'non-zero-baseline', rows: [row({ roiPct: 2.5 })], previousBatch: null });
+    const allZero = evaluateLogsDataQuality({
+      batchId: 'all-zero-regression',
+      rows: Array.from({ length: 20 }, (_, id) => row({ id, roiPct: 0 })),
+      previousBatch: previous,
+    });
+
+    expect(allZero.state).toBe('degraded');
+    expect(allZero.fields.roi).toMatchObject({ denominator: 20, available: 20, exactlyZero: 20, nonZero: 0 });
+    expect(allZero.breaches).toContainEqual(expect.objectContaining({ field: 'roi', trigger: 'all_zero_population' }));
+    expect(allZero.reconciliation).toEqual({ requested: true, maxAttempts: 2 });
+  });
+
+  it('fails an all-zero selected-candidate population on cold start including non-executable candidates', () => {
+    const quality = evaluateLogsDataQuality({
+      batchId: 'cold-all-zero',
+      rows: Array.from({ length: 20 }, (_, id) => row({
+        id, positiveArbCount: 0, hasSelectedCandidate: true,
+        roiPct: 0, profitUsd: 0, apyPct: 0, currentRoiPct: 0,
+      })),
+      previousBatch: null,
+    });
+
+    expect(quality.fields.roi).toMatchObject({ denominator: 20, exactlyZero: 20, nonZero: 0 });
+    expect(quality.state).toBe('degraded');
+    expect(quality.breaches).toContainEqual(expect.objectContaining({
+      field: 'roi', trigger: 'all_zero_population',
+    }));
+  });
+
+  it('degrades when more than five percent of a recent cohort becomes zero without requiring population shrinkage', () => {
+    const baseline = evaluateLogsDataQuality({
+      batchId: 'non-zero-94',
+      rows: Array.from({ length: 94 }, (_, id) => row({ id, roiPct: 2.5 })),
+      previousBatch: null,
+    });
+    const regressed = evaluateLogsDataQuality({
+      batchId: 'six-new-zeros',
+      rows: [
+        ...Array.from({ length: 94 }, (_, id) => row({ id, roiPct: 2.5 })),
+        ...Array.from({ length: 6 }, (_, offset) => row({ id: 94 + offset, roiPct: 0 })),
+      ],
+      previousBatch: baseline,
+    });
+
+    expect(regressed.fields.roi).toMatchObject({ denominator: 100, exactlyZero: 6, nonZero: 94 });
+    expect(regressed.state).toBe('degraded');
+    expect(regressed.breaches).toContainEqual(expect.objectContaining({
+      field: 'roi', trigger: 'zero_regression_over_5pct', unavailablePct: 6,
+    }));
   });
 });

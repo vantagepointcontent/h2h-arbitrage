@@ -15,7 +15,7 @@ describe('resolveHistoricalScanFinancials', () => {
     });
 
     expect(resolved).toMatchObject({
-      revision: 2,
+      revision: 3,
       fields: {
         roiPct: { status: 'available', value: 2.345678, source: 'scan_result_scalar' },
         profitUsd: { status: 'available', value: 12.34, source: 'scan_result_scalar' },
@@ -105,5 +105,93 @@ describe('resolveHistoricalScanFinancials', () => {
     expect(resolved.fields.profitUsd).toMatchObject({ status: 'available', value: 9, source: 'raw_result_snapshot' });
     expect(resolved.fields.apyPct).toMatchObject({ status: 'available', value: 60, source: 'raw_result_snapshot' });
     expect(resolved.fields.stakeUsd).toMatchObject({ status: 'available', value: 200, source: 'raw_result_snapshot' });
+  });
+
+  it('represents a confirmed no-arb row as unavailable instead of fabricated numeric zero', () => {
+    const resolved = resolveHistoricalScanFinancials({
+      id: 22,
+      positive_arb_count: 0,
+      strategy: 'No arb',
+      best_roi_pct: 0,
+      best_profit: 0,
+      apy_pct: 0,
+      total_stake: 0,
+    });
+
+    expect(resolved.fields.roiPct).toMatchObject({
+      status: 'unavailable',
+      value: null,
+      reasonCode: 'confirmed_no_arbitrage',
+    });
+    expect(Object.values(resolved.fields).every((field) => field.status === 'unavailable')).toBe(true);
+  });
+
+  it('preserves an actual persisted zero calculation for a selected candidate', () => {
+    const resolved = resolveHistoricalScanFinancials({
+      id: 23,
+      positive_arb_count: 0,
+      strategy: 'Buy YES Kalshi + NO PM',
+      best_roi_pct: 0,
+      best_profit: 0,
+      apy_pct: 0,
+      total_stake: 100,
+      historical_financials_revision: 3,
+      historical_financials_provenance: JSON.stringify({
+        revision: 3,
+        fields: {
+          roiPct: { status: 'available' }, profitUsd: { status: 'available' },
+          apyPct: { status: 'available' }, stakeUsd: { status: 'available' },
+        },
+      }),
+    });
+
+    expect(resolved.fields.roiPct).toMatchObject({ status: 'available', value: 0 });
+    expect(resolved.fields.profitUsd).toMatchObject({ status: 'available', value: 0 });
+  });
+
+  it('uses durable field provenance to distinguish compatibility zeros from genuine zero calculations', () => {
+    const compatibilityZero = resolveHistoricalScanFinancials({
+      id: 24,
+      positive_arb_count: 0,
+      strategy: 'Buy YES Kalshi + NO PM',
+      best_roi_pct: 0,
+      best_profit: 0,
+      apy_pct: 0,
+      total_stake: 0,
+      historical_financials_revision: 3,
+      historical_financials_provenance: JSON.stringify({
+        revision: 3,
+        fields: {
+          roiPct: { status: 'unavailable', reasonCode: 'historical_roi_not_persisted' },
+          profitUsd: { status: 'unavailable', reasonCode: 'historical_profit_not_persisted' },
+          apyPct: { status: 'unavailable', reasonCode: 'historical_apy_not_persisted' },
+          stakeUsd: { status: 'unavailable', reasonCode: 'historical_stake_not_persisted' },
+        },
+      }),
+    });
+    expect(compatibilityZero.fields.roiPct).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+    });
+    expect(compatibilityZero.fields.profitUsd.status).toBe('unavailable');
+
+    const genuineZero = resolveHistoricalScanFinancials({
+      id: 25,
+      positive_arb_count: 0,
+      strategy: 'Buy YES Kalshi + NO PM',
+      best_roi_pct: 0,
+      best_profit: 0,
+      apy_pct: 0,
+      total_stake: 100,
+      historical_financials_revision: 3,
+      historical_financials_provenance: JSON.stringify({
+        revision: 3,
+        fields: {
+          roiPct: { status: 'available' }, profitUsd: { status: 'available' },
+          apyPct: { status: 'available' }, stakeUsd: { status: 'available' },
+        },
+      }),
+    });
+    expect(genuineZero.fields.roiPct).toMatchObject({ status: 'available', value: 0 });
+    expect(genuineZero.fields.profitUsd).toMatchObject({ status: 'available', value: 0 });
   });
 });

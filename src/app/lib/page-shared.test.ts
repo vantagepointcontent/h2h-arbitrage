@@ -140,7 +140,12 @@ describe("saved-market scheduler status", () => {
 
   it.each([
     ['unrecognized strategy', { strategy: 'Buy MAYBE somewhere' }, null],
-    ['non-executable candidate', { executionStatus: 'non_executable' }, null],
+    ['non-executable candidate', { executionStatus: 'non_executable' }, {
+      canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 50, canonicalCurrentExpiryAt: '2026-10-02T00:00:00.000Z',
+      canonicalApyUnavailableReason: 'current_candidate_non_executable',
+    }],
     ['zero total stake', { kalshiStake: 0, pmStake: 0 }, null],
     ['APY mismatch', { apyPct: 99 }, {
       canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: 1.25,

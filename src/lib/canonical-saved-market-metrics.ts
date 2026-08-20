@@ -42,11 +42,19 @@ export function selectCanonicalSavedMarketMetrics(
     const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
       ? candidate.arbType : null;
     const classification = auditArbClassification(candidate.strategy, declared);
+    // executionStatus post-dates thousands of complete durable scan payloads.
+    // Missing means legacy persisted evidence. Explicit non-executable rows may
+    // retain indicative ROI, but never executable profit/APY; unavailable rows
+    // remain closed entirely.
+    const executionEligible = candidate.executionStatus == null
+      || candidate.executionStatus === 'executable'
+      || candidate.executionStatus === 'non_executable';
+    const stakeEligible = candidate.executionStatus === 'non_executable'
+      || (Number.isFinite(candidate.totalStake) && Number(candidate.totalStake) > 0);
     return classification.valid && classification.canonicalType !== null
-      && candidate.executionStatus === 'executable'
+      && executionEligible
       && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0
-      && Number.isFinite(candidate.expectedProfit) && candidate.expectedProfit > 0
-      && Number.isFinite(candidate.totalStake) && Number(candidate.totalStake) > 0;
+      && stakeEligible;
   });
   const best = eligible.reduce<CanonicalSavedMarketCandidate | null>((current, candidate) => {
     if (!current) return candidate;
@@ -64,6 +72,34 @@ export function selectCanonicalSavedMarketMetrics(
     ? best.daysToExpiry : null;
   const expiryAt = typeof best.expiryAt === 'string' && Number.isFinite(Date.parse(best.expiryAt))
     ? best.expiryAt : null;
+  if (best.executionStatus === 'non_executable') {
+    return {
+      value: null,
+      unavailableReason: 'current_candidate_non_executable',
+      outcome: best.artist,
+      observedAt: best.outcomeApy?.observedAt ?? observedAt,
+      roiPct: best.roiPct,
+      profit: null,
+      strategy: best.strategy,
+      daysToExpiry,
+      expiryAt,
+    };
+  }
+  const profit = typeof best.expectedProfit === 'number' && Number.isFinite(best.expectedProfit)
+    && best.expectedProfit > 0 ? best.expectedProfit : null;
+  if (profit == null) {
+    return {
+      value: null,
+      unavailableReason: 'current_profit_unavailable',
+      outcome: best.artist,
+      observedAt: best.outcomeApy?.observedAt ?? observedAt,
+      roiPct: best.roiPct,
+      profit: null,
+      strategy: best.strategy,
+      daysToExpiry,
+      expiryAt,
+    };
+  }
   const expectedApy = daysToExpiry == null ? null
     : (Math.pow(1 + best.roiPct / 100, 365 / daysToExpiry) - 1) * 100;
   const apyMatches = typeof best.apyPct === 'number' && Number.isFinite(best.apyPct)
@@ -77,7 +113,7 @@ export function selectCanonicalSavedMarketMetrics(
       outcome: best.artist,
       observedAt: best.outcomeApy?.observedAt ?? observedAt,
       roiPct: best.roiPct,
-      profit: best.expectedProfit,
+      profit,
       strategy: best.strategy,
       daysToExpiry,
       expiryAt,
@@ -89,7 +125,7 @@ export function selectCanonicalSavedMarketMetrics(
     outcome: best.artist,
     observedAt: best.outcomeApy?.observedAt ?? observedAt,
     roiPct: best.roiPct,
-    profit: best.expectedProfit,
+    profit,
     strategy: best.strategy,
     daysToExpiry,
     expiryAt,
