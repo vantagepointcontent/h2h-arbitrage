@@ -135,7 +135,10 @@ export default function LogsPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [minRoi, setMinRoi] = useState(0);
   const [maxRoi, setMaxRoi] = useState(0);
-  const [positiveArbOnly, setPositiveArbOnly] = useState(true);
+  // Default to the full canonical scan population. Positive-arb-only is an
+  // explicit operator filter; making it the default can hide every completed
+  // scan during a legitimate zero-executable-arb window.
+  const [positiveArbOnly, setPositiveArbOnly] = useState(false);
   const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 86_400_000).toISOString());
   const [toDate, setToDate] = useState(() => new Date().toISOString());
   const [eventType, setEventType] = useState<EventType>("all");

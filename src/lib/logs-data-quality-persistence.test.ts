@@ -51,6 +51,7 @@ describe('Logs data-quality persistence guardrail', () => {
     const db = createClient({ url: `file:${dbPath}` });
     const batches = await db.execute('SELECT scan_id, state, reconciliation_attempts, snapshot_json FROM logs_data_quality_batches ORDER BY scan_id');
     expect(batches.rows).toHaveLength(2);
+    expect((await db.execute('SELECT COUNT(*) AS count FROM scan_results')).rows[0].count).toBe(2);
     expect(batches.rows[0]).toMatchObject({ scan_id: healthy.id, state: 'healthy', reconciliation_attempts: 0 });
     expect(batches.rows[1]).toMatchObject({ scan_id: degraded.id, state: 'degraded', reconciliation_attempts: 2 });
     expect(JSON.parse(String(batches.rows[1].snapshot_json))).toMatchObject({

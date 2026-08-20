@@ -55,6 +55,7 @@ describe('recoverHistoricalScanFinancials', () => {
 
     const applied = await recoverHistoricalScanFinancials(client, { apply: true });
     expect(applied.counts.applied).toBe(3);
+    expect((await client.execute('SELECT COUNT(*) AS count FROM scan_results')).rows[0].count).toBe(3);
     const recovered = await client.execute('SELECT * FROM scan_results WHERE id = 2');
     expect(recovered.rows[0]).toMatchObject({
       best_roi_pct: 1.25,

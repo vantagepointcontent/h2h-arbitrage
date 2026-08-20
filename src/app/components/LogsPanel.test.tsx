@@ -382,7 +382,7 @@ describe('LogsPanel', () => {
     expect(screen.getByText('0.00%', { selector: 'output' })).toBeTruthy();
   });
 
-  it('defaults to rolling 24 hours, positive arbs, 250 rows, and server-side search', async () => {
+  it('defaults to the non-empty rolling 24-hour canonical population, 250 rows, and server-side search', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-12T20:15:30.000Z'));
     const fetchMock = vi.fn((input: RequestInfo | URL, ..._rest: [RequestInit?]) => {
@@ -402,11 +402,11 @@ describe('LogsPanel', () => {
     const firstUrl = String(fetchMock.mock.calls.find(([input]) => String(input).startsWith('/api/logs?'))?.[0]);
     const firstParams = new URL(firstUrl, 'http://localhost').searchParams;
     expect(firstParams.get('limit')).toBe('250');
-    expect(firstParams.get('positiveArbOnly')).toBe('true');
+    expect(firstParams.has('positiveArbOnly')).toBe(false);
     expect(firstParams.get('fromDate')).toBe('2026-08-11T20:15:30.000Z');
     expect(firstParams.get('toDate')).toBe('2026-08-12T20:15:30.000Z');
     expect(firstParams.has('maxTteDays')).toBe(false);
-    expect(screen.getByLabelText('Positive arb only')).toHaveProperty('checked', true);
+    expect(screen.getByLabelText('Positive arb only')).toHaveProperty('checked', false);
     expect(screen.getByRole('button', { name: /Latest 24 hours/ }).getAttribute('title')).toMatch(/rolling 24 hours/i);
     expect(screen.getByText('501')).toBeTruthy();
     expect(screen.getByText('777')).toBeTruthy();
