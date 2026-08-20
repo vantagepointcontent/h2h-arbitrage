@@ -275,6 +275,8 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       roiPct: o.arbitrage!.roiPct,
       expectedProfit: o.arbitrage!.expectedProfit,
       strategy: o.arbitrage!.strategy,
+      arbType: o.arbitrage!.arbType ?? undefined,
+      propositionRelationship: o.propositionRelationship ?? null,
       totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
       kalshiTicker: o.kalshi?.ticker,
       kalshiYesAsk: o.kalshi?.yesAsk,

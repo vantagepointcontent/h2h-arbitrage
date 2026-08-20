@@ -40,7 +40,21 @@ describe('/api/bot-trader/run token guard', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 400 for missing pairId without side effects when token is valid', async () => {
+  it('disables explicit and ranked alternate candidate sources', async () => {
+    const explicit = await POST(makeRequest({ pairId: 'pair-1' }, 'secret-token'));
+    const ranked = await POST(makeRequest({ ranked: true }, 'secret-token'));
+
+    expect(explicit.status).toBe(409);
+    expect(ranked.status).toBe(409);
+    expect(await explicit.json()).toMatchObject({
+      reasonCode: 'canonical_logs_only',
+      error: expect.stringContaining('canonical persisted Logs'),
+    });
+    expect(await ranked.json()).toMatchObject({ reasonCode: 'canonical_logs_only' });
+    expect(processBacklogMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unrecognized request without side effects when token is valid', async () => {
     const res = await POST(makeRequest({}, 'secret-token'));
     expect(res.status).toBe(400);
     const json = await res.json();

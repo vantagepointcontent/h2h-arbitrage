@@ -157,6 +157,9 @@ export interface BotTradeInput {
   selectionMethod?: BotSelectionMethod | null;
   /** Mode of the durable reservation acquired before this execution attempt. */
   reservationMode?: BotPositionExecutionMode;
+  /** Canonical Logs lineage for scan-driven decisions. Null for manual runs. */
+  sourceScanId?: number | null;
+  sourceOpportunityId?: string | null;
 }
 
 export interface BotExecutionResult {
@@ -1137,6 +1140,8 @@ export async function maybeExecuteBotTrade(
     source: 'bot',
     selectionMethod: input.selectionMethod ?? null,
     propositionRelationship: canonicalRelationship,
+    sourceScanId: input.sourceScanId ?? null,
+    sourceOpportunityId: input.sourceOpportunityId ?? null,
   };
 
   const performanceEvidence = getBotPerformanceEvidence(result, effectiveDryRun);

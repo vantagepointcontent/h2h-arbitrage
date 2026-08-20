@@ -6,12 +6,28 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
     const response = GET();
     const spec = await response.json() as {
       info: { version: string };
+      paths: Record<string, { get: { responses: Record<string, { content: Record<string, { schema: unknown }> }> } }>;
       components: { schemas: Record<string, {
         required?: string[];
         properties: Record<string, unknown>;
       }> };
     };
-    expect(spec.info.version).toBe('1.4.0');
+    expect(spec.info.version).toBe('1.5.1');
+    expect(spec.paths['/api/executions'].get.responses['200'].content['application/json'].schema)
+      .toEqual({ $ref: '#/components/schemas/ExecutionListResponse' });
+    expect(spec.components.schemas.ExecutionRecord.properties).toMatchObject({
+      sourceScanId: { type: ['integer', 'null'], minimum: 1 },
+      sourceOpportunityId: { type: ['string', 'null'] },
+    });
+    expect(spec.components.schemas.HistoricalScanFinancials).toMatchObject({
+      required: ['revision', 'scanId', 'envelope', 'fields'],
+      properties: {
+        revision: { type: 'integer', const: 1 },
+        fields: expect.objectContaining({
+          required: ['roiPct', 'profitUsd', 'apyPct', 'stakeUsd'],
+        }),
+      },
+    });
     expect(spec.components.schemas.BotPositionSettlementProjection.properties.entryArbProfitSnapshot)
       .toEqual({ $ref: '#/components/schemas/EntryArbProfitSnapshot' });
     expect(spec.components.schemas.EntryArbProfitSnapshot).toMatchObject({

@@ -160,6 +160,7 @@ function validFees(fees: BotScanFees | null): fees is BotScanFees {
 }
 
 function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settings: BotSettings, reservationMode?: BotPositionExecutionMode): BotTradeInput {
+  const candidateIndex = sourceCandidateIndex(scan, item);
   return {
     pairId: scan.marketId,
     marketTitle: scan.marketTitle,
@@ -204,6 +205,8 @@ function candidateToInput(scan: PersistedBotScan, item: BotScanCandidate, settin
     category: item.category,
     selectionMethod: settings.selectionMethod,
     reservationMode,
+    sourceScanId: scan.id,
+    sourceOpportunityId: candidateIndex >= 0 ? `scan:${scan.id}:opportunity:${candidateIndex}` : null,
   };
 }
 
@@ -231,9 +234,11 @@ function rejection(
   return { state, reasonCode, reason, placementCount: 0, details };
 }
 
-function candidateAuditDetails(candidate: BotScanCandidate, settings: BotSettings, stage: string, extra: Record<string, unknown> = {}) {
+function candidateAuditDetails(scan: PersistedBotScan, candidateIndex: number, candidate: BotScanCandidate, settings: BotSettings, stage: string, extra: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
+    scanId: scan.id,
+    opportunityId: `scan:${scan.id}:opportunity:${candidateIndex}`,
     configVersion: `bot-settings-v1:${JSON.stringify(settings)}`,
     stage,
     thresholds: settings,
@@ -311,7 +316,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           'rejected',
           'production_execution_blocked',
           reason,
-          candidateAuditDetails(candidate, settings, 'production_readiness', {
+          candidateAuditDetails(scan, candidate.candidateIndex ?? parsedIndex, candidate, settings, 'production_readiness', {
             final: true,
             executionMode,
             alertDurable: report?.alertDurable ?? false,
@@ -347,7 +352,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           'rejected',
           'production_execution_blocked',
           `${reason}; candidate input was also invalid: ${rejected.reason}`,
-          candidateAuditDetails(placeholder, settings, 'production_readiness', {
+          candidateAuditDetails(scan, rejected.candidateIndex, placeholder, settings, 'production_readiness', {
             final: true,
             inputReasonCode: rejected.reasonCode,
             executionMode,
@@ -405,7 +410,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         'rejected',
         rejected.reasonCode,
         rejected.reason,
-        candidateAuditDetails(placeholder, settings, 'input_validation', { final: true }),
+        candidateAuditDetails(scan, rejected.candidateIndex, placeholder, settings, 'input_validation', { final: true }),
       );
     }
     if (scan.candidates.length === 0) {
@@ -436,7 +441,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         eligible ? 'eligible' : 'rejected',
         reasonCode,
         reason,
-        candidateAuditDetails(item, settings, 'scan', { evaluation: evaluation.criteria, final: !eligible }),
+        candidateAuditDetails(scan, candidateIndex, item, settings, 'scan', { evaluation: evaluation.criteria, final: !eligible }),
       );
       if (eligible) {
         initiallyEligible.push(item);
@@ -537,7 +542,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         'rejected',
         rejected.code,
         rejected.reason,
-        candidateAuditDetails(rejected.candidate, settings, 'revalidation', { final: true }),
+        candidateAuditDetails(scan, rejected.candidateIndex, rejected.candidate, settings, 'revalidation', { final: true }),
       );
     }
 
@@ -553,7 +558,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         const reason = 'Exact economic legs are already reserved or have an open BotTrader position';
         rejections.push({ outcome: item.outcome, code: 'opportunity_already_claimed', reason, candidateIndex, candidate: item });
         await deps.recordCandidateDecision?.(scan, candidateIndex, item, 'rejected', 'opportunity_already_claimed', reason,
-          candidateAuditDetails(item, settings, 'reservation', { final: true, executionMode }));
+          candidateAuditDetails(scan, candidateIndex, item, settings, 'reservation', { final: true, executionMode }));
         continue;
       }
       reserved.push(item);
@@ -590,7 +595,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           result.executed ? 'accepted' : 'rejected',
           result.executed ? 'execution_completed' : 'execution_rejected',
           result.reason,
-          candidateAuditDetails(item, settings, 'execution', {
+          candidateAuditDetails(scan, sourceCandidateIndex(scan, item), item, settings, 'execution', {
             final: true,
             executionId: result.executionId ?? null,
             executionMode,
@@ -621,7 +626,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
           'failed',
           'execution_outcome_unknown',
           reason,
-          candidateAuditDetails(item, settings, 'execution', { final: true, executionMode, possibleExposure: true }),
+          candidateAuditDetails(scan, sourceCandidateIndex(scan, item), item, settings, 'execution', { final: true, executionMode, possibleExposure: true }),
         ).catch((auditError) => logger.error('[bot-scan-consumer] failed to persist final opportunity audit', { error: String(auditError) }));
         // executeArb can throw after one venue accepted an order. Preserve this
         // reservation as possible exposure and stop all further placements.
@@ -728,6 +733,7 @@ async function ensureSchema(): Promise<void> {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         details TEXT,
+        opportunity_id TEXT,
         threshold_config_version TEXT,
         final_result TEXT,
         execution_id INTEGER,
@@ -742,6 +748,7 @@ async function ensureSchema(): Promise<void> {
       'ALTER TABLE bot_opportunity_decisions ADD COLUMN threshold_config_version TEXT',
       'ALTER TABLE bot_opportunity_decisions ADD COLUMN final_result TEXT',
       'ALTER TABLE bot_opportunity_decisions ADD COLUMN execution_id INTEGER',
+      'ALTER TABLE bot_opportunity_decisions ADD COLUMN opportunity_id TEXT',
     ]) {
       try { await db.execute(migration); } catch { /* already migrated */ }
     }
@@ -904,7 +911,7 @@ async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
   await ensureSchema();
   const db = dbClient();
   try {
-    const result = await db.execute({ sql: 'SELECT * FROM scan_results WHERE id = ?', args: [scanId] });
+    const result = await db.execute({ sql: "SELECT * FROM scan_results WHERE id = ? AND scan_status = 'completed'", args: [scanId] });
     const row = result.rows[0] as unknown as Record<string, unknown> | undefined;
     return row ? rowToScan(row) : null;
   } finally { db.close(); }
@@ -918,7 +925,7 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
       sql: `SELECT s.* FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id = s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer = 'bot_trader'
-        WHERE (
+        WHERE s.scan_status = 'completed' AND (
           (s.id > COALESCE(c.last_scan_id, 0) AND d.scan_id IS NULL) OR d.state = 'received'
           OR (d.state = 'failed' AND d.reason_code = 'revalidation_failed')
         )
@@ -1004,14 +1011,16 @@ async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: n
   try {
     await db.execute({
       sql: `INSERT INTO bot_opportunity_decisions
-        (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,roi_pct,apy_pct,created_at,updated_at,details,threshold_config_version,final_result,execution_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,roi_pct,apy_pct,created_at,updated_at,details,opportunity_id,threshold_config_version,final_result,execution_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(scan_id,candidate_index) DO UPDATE SET
           state=excluded.state,reason_code=excluded.reason_code,reason=excluded.reason,
           roi_pct=excluded.roi_pct,apy_pct=excluded.apy_pct,updated_at=excluded.updated_at,details=excluded.details,
-          threshold_config_version=excluded.threshold_config_version,final_result=excluded.final_result,execution_id=excluded.execution_id`,
+          opportunity_id=excluded.opportunity_id,threshold_config_version=excluded.threshold_config_version,
+          final_result=excluded.final_result,execution_id=excluded.execution_id`,
       args: [scan.id, candidateIndex, scan.marketId, candidate.outcome, candidate.strategy, state, reasonCode, reason,
-        candidate.roiPct, candidate.apyPct ?? null, now, now, details == null ? null : JSON.stringify(details), configVersion, finalResult, executionId],
+        candidate.roiPct, candidate.apyPct ?? null, now, now, details == null ? null : JSON.stringify(details),
+        `scan:${scan.id}:opportunity:${candidateIndex}`, configVersion, finalResult, executionId],
     });
   } finally { db.close(); }
 }
@@ -1026,10 +1035,10 @@ async function advanceCursor() {
       ) SELECT MAX(s.id) AS last_scan_id
       FROM scan_results s
       CROSS JOIN current c
-      WHERE s.id>c.last_scan_id AND NOT EXISTS (
+      WHERE s.scan_status='completed' AND s.id>c.last_scan_id AND NOT EXISTS (
         SELECT 1 FROM scan_results gap
         LEFT JOIN bot_scan_decisions d ON d.scan_id=gap.id
-        WHERE gap.id>c.last_scan_id AND gap.id<=s.id AND (
+        WHERE gap.scan_status='completed' AND gap.id>c.last_scan_id AND gap.id<=s.id AND (
           d.scan_id IS NULL OR d.state='received'
           OR (d.state='failed' AND d.reason_code='revalidation_failed')
         )
@@ -1127,8 +1136,8 @@ export async function getBotScanHealth(): Promise<{
   const db = dbClient();
   try {
     const [latest, latestPositive, cursor, decision, terminalDecision, inProgress, pending, opportunityCounts] = await Promise.all([
-      db.execute('SELECT id,scanned_at FROM scan_results ORDER BY id DESC LIMIT 1'),
-      db.execute('SELECT id,scanned_at FROM scan_results WHERE positive_arb_count>0 ORDER BY id DESC LIMIT 1'),
+      db.execute("SELECT id,scanned_at FROM scan_results WHERE scan_status='completed' ORDER BY id DESC LIMIT 1"),
+      db.execute("SELECT id,scanned_at FROM scan_results WHERE scan_status='completed' AND positive_arb_count>0 ORDER BY id DESC LIMIT 1"),
       db.execute("SELECT last_scan_id,updated_at FROM bot_scan_cursor WHERE consumer='bot_trader'"),
       db.execute('SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT 1'),
       db.execute("SELECT scan_id,state,reason,updated_at FROM bot_scan_decisions WHERE state <> 'received' ORDER BY scan_id DESC LIMIT 1"),
@@ -1136,7 +1145,7 @@ export async function getBotScanHealth(): Promise<{
       db.execute(`SELECT COUNT(*) AS count FROM scan_results s
         LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id
         LEFT JOIN bot_scan_cursor c ON c.consumer='bot_trader'
-        WHERE (
+        WHERE s.scan_status='completed' AND (
           (s.id > COALESCE(c.last_scan_id,0) AND d.scan_id IS NULL) OR d.state = 'received'
           OR (d.state='failed' AND d.reason_code='revalidation_failed'))`),
       db.execute(`SELECT COUNT(*) AS evaluated,
@@ -1181,10 +1190,23 @@ export async function persistAndConsumeBotScan(
   source: BotScanSource,
 ): Promise<{ id: number; decision: BotScanDecision | null; backlogProcessed: number }> {
   const { saveScanResult } = await import('./persistence');
-  const saved = await saveScanResult(marketId, result);
-  // The dedicated h2h-ragnar process owns consumption and catch-up. Scanner
-  // workers only publish durable input, preventing execution work and repeated
-  // backlog walks from contending with scan persistence.
-  void source;
-  return { ...saved, decision: null, backlogProcessed: 0 };
+  return createPersistedBotScanPublisher({ saveScanResult, consumePersistedBotScan })(marketId, result, source);
+}
+
+export function createPersistedBotScanPublisher(deps: {
+  saveScanResult: typeof import('./persistence').saveScanResult;
+  consumePersistedBotScan: typeof consumePersistedBotScan;
+}) {
+  return async (
+    marketId: string,
+    result: Parameters<typeof import('./persistence').saveScanResult>[1],
+    source: BotScanSource,
+  ): Promise<{ id: number; decision: BotScanDecision; backlogProcessed: number }> => {
+    // The inserted scan_results row is the canonical Logs completion event.
+    // Consume only after its durable ID exists; Ragnar remains a restart-safe
+    // catch-up reader for failures and process interruption.
+    const saved = await deps.saveScanResult(marketId, result);
+    const decision = await deps.consumePersistedBotScan(saved.id, source);
+    return { ...saved, decision, backlogProcessed: 0 };
+  };
 }

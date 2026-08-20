@@ -43,6 +43,8 @@ describe('execution bot entry evidence persistence', () => {
       timestamp: '2026-08-14T10:00:00.000Z', arbId: evidence.economicActionId,
       marketTitle: 'Market', dryRun: true, success: true, estimatedProfit: 3,
       source: 'bot', selectionMethod: 'roi',
+      sourceScanId: 91,
+      sourceOpportunityId: 'scan:91:opportunity:0',
       kalshiOrder: JSON.stringify({ ticker: 'K-TICKER' }),
       polymarketOrder: JSON.stringify({ conditionId: 'pm-token' }),
       result: JSON.stringify({
@@ -54,6 +56,10 @@ describe('execution bot entry evidence persistence', () => {
 
     const [record] = await getExecutions(1, 'bot');
     expect(record.botEntryEvidence).toEqual(evidence);
+    expect(record).toMatchObject({
+      sourceScanId: 91,
+      sourceOpportunityId: 'scan:91:opportunity:0',
+    });
 
     await expect(persistExecution({
       timestamp: '2026-08-14T10:01:00.000Z', arbId: 'bot:missing:evidence',

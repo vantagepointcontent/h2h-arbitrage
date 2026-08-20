@@ -472,6 +472,7 @@ export async function executeFullScan(request: NextRequest) {
           bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
           bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
           strategy: bestNetArb ? bestNetArb.arbitrage!.strategy : 'No arb',
+          calculationEnvelope: bestNetArb?.arbitrage?.calculationEnvelope,
           arbType: bestNetArb ? (bestNetArb.arbitrage as any).arbType ?? null : null,
           outcomeCount: withArbitrage.length,
           matchedCount,
@@ -505,6 +506,7 @@ export async function executeFullScan(request: NextRequest) {
             expectedProfit: o.arbitrage!.expectedProfit,
             strategy: o.arbitrage!.strategy,
             arbType: o.arbitrage!.arbType ?? undefined,
+            propositionRelationship: o.propositionRelationship ?? null,
             totalStake: (o.arbitrage!.kalshiStake ?? 0) + (o.arbitrage!.pmStake ?? 0),
             kalshiTicker: o.kalshi?.ticker,
             kalshiYesAsk: o.kalshi?.yesAsk,
@@ -561,6 +563,7 @@ export async function executeFullScan(request: NextRequest) {
             sellPlatform: o.arbitrage!.sellPlatform,
             sellPrice: o.arbitrage!.sellPrice,
             fees: o.arbitrage!.fees,
+            calculationEnvelope: o.arbitrage!.calculationEnvelope,
           };
           }),
         };
@@ -611,6 +614,7 @@ export async function executeFullScan(request: NextRequest) {
           scannedAt: scanResult.scannedAt,
           expiryAt: pmEvent.endDate ?? null,
           outcomeApy: bestNetArb?.arbitrage?.outcomeApy,
+          calculationEnvelope: scanResult.calculationEnvelope,
           // ARB-01a: persist the best arb's type classification
           arbType: bestNetArb?.arbitrage?.arbType ?? undefined,
           // PERF-P2: raw blob only stored when there are arbs to drill into —

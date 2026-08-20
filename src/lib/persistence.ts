@@ -72,7 +72,9 @@ async function initDb(): Promise<void> {
       arb_valid       INTEGER NOT NULL DEFAULT 1,
       arb_invalidation_reason TEXT,
       scan_status     TEXT    NOT NULL DEFAULT 'completed',
-      calculation_envelope TEXT
+      calculation_envelope TEXT,
+      historical_financials_revision INTEGER,
+      historical_financials_provenance TEXT
     )
   `);
   // Migration: add columns if missing (existing DBs)
@@ -89,6 +91,8 @@ async function initDb(): Promise<void> {
     `ALTER TABLE scan_results ADD COLUMN arb_invalidation_reason TEXT`,
     `ALTER TABLE scan_results ADD COLUMN scan_status TEXT NOT NULL DEFAULT 'completed'`,
     `ALTER TABLE scan_results ADD COLUMN calculation_envelope TEXT`,
+    `ALTER TABLE scan_results ADD COLUMN historical_financials_revision INTEGER`,
+    `ALTER TABLE scan_results ADD COLUMN historical_financials_provenance TEXT`,
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
@@ -770,6 +774,8 @@ export interface PersistedCurrentLogRoi {
   strategy?: string;
   scannedAt?: string;
   scanId?: number;
+  reasonCode?: string;
+  reason?: string;
 }
 
 /**
@@ -821,29 +827,74 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
 
   return uniqueIds.map((id) => {
     const row = rowsById.get(id);
-    if (!row) return { id, status: 'never_scanned' as const };
+    if (!row) return {
+      id,
+      status: 'never_scanned' as const,
+      reasonCode: 'log_row_not_found',
+      reason: 'The requested historical scan row does not exist.',
+    };
     if (typeof row.kalshi_url !== 'string' || row.kalshi_url.length === 0
       || typeof row.polymarket_url !== 'string' || row.polymarket_url.length === 0) {
-      return { id, status: 'unavailable' as const };
+      return {
+        id,
+        status: 'unavailable' as const,
+        reasonCode: 'missing_exact_link_identity',
+        reason: 'The historical row does not contain both exact linked event URLs.',
+      };
     }
     const scanId = Number(row.scan_id);
     if (!Number.isSafeInteger(scanId) || scanId <= 0) {
-      return { id, status: row.requested_scan_status === 'completed' ? 'never_scanned' as const : 'unavailable' as const };
+      return {
+        id,
+        status: 'unavailable' as const,
+        reasonCode: 'no_completed_scan_for_exact_pair',
+        reason: 'No successfully completed scan exists for the exact linked market pair.',
+      };
     }
     const scannedAt = typeof row.scanned_at === 'string' ? row.scanned_at : undefined;
     const common = { id, scanId, ...(scannedAt ? { scannedAt } : {}) };
     const positiveArbCount = Number(row.positive_arb_count);
     if (!Number.isSafeInteger(positiveArbCount) || positiveArbCount < 0) {
-      return { id, status: 'unavailable' as const };
+      return {
+        id,
+        status: 'unavailable' as const,
+        reasonCode: 'latest_completed_scan_missing_arb_count',
+        reason: 'The newest successfully completed scan is missing a valid arbitrage count.',
+      };
     }
     if (positiveArbCount === 0) {
       return row.arb_valid === 1 || row.apy_unavailable_reason === 'no_arbitrage'
-        ? { ...common, status: 'no_arbitrage' as const }
-        : { id, status: 'unavailable' as const };
+        ? {
+            ...common,
+            status: 'no_arbitrage' as const,
+            reasonCode: 'latest_completed_scan_has_no_arbitrage',
+            reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
+          }
+        : {
+            id,
+            status: 'unavailable' as const,
+            reasonCode: 'latest_completed_scan_invalid_arbitrage',
+            reason: 'The newest successfully completed scan for the exact linked market pair failed canonical arbitrage validation.',
+          };
     }
-    const roiPct = Number(row.best_roi_pct);
-    if (row.arb_valid !== 1 || !Number.isFinite(roiPct)) {
-      return { id, status: 'unavailable' as const };
+    if (row.arb_valid !== 1) {
+      return {
+        id,
+        status: 'unavailable' as const,
+        reasonCode: 'latest_completed_scan_invalid_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair failed canonical arbitrage validation.',
+      };
+    }
+    const roiPct = typeof row.best_roi_pct === 'number' && Number.isFinite(row.best_roi_pct)
+      ? row.best_roi_pct
+      : null;
+    if (roiPct === null) {
+      return {
+        id,
+        status: 'unavailable' as const,
+        reasonCode: 'latest_completed_scan_missing_roi',
+        reason: 'The newest successfully completed scan did not persist an authoritative ROI value.',
+      };
     }
     return {
       ...common,
@@ -2215,6 +2266,8 @@ export async function migrateExecutionsSchema(
     `ALTER TABLE executions ADD COLUMN selection_method TEXT`,
     `ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`,
     `ALTER TABLE executions ADD COLUMN proposition_relationship TEXT`,
+    `ALTER TABLE executions ADD COLUMN source_scan_id INTEGER`,
+    `ALTER TABLE executions ADD COLUMN source_opportunity_id TEXT`,
     `ALTER TABLE executions ADD COLUMN calculation_envelope TEXT`,
     `ALTER TABLE executions ADD COLUMN paper_position_deleted_at TEXT`,
     `ALTER TABLE executions ADD COLUMN paper_position_deletion_reason TEXT`,
@@ -2248,6 +2301,8 @@ async function ensureExecutionsTable(): Promise<void> {
       steps            TEXT,
       bot_entry_evidence TEXT,
       proposition_relationship TEXT,
+      source_scan_id INTEGER,
+      source_opportunity_id TEXT,
       selection_method TEXT CHECK (selection_method IN ('roi', 'apy', 'hybrid') OR selection_method IS NULL),
       calculation_envelope TEXT,
       paper_position_deleted_at TEXT,
@@ -2258,6 +2313,7 @@ async function ensureExecutionsTable(): Promise<void> {
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_arb_id ON executions(arb_id)`);
   await migrateExecutionsSchema(c);
   await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_selection_method ON executions(selection_method, timestamp DESC)`);
+  await c.execute(`CREATE INDEX IF NOT EXISTS idx_executions_scan_lineage ON executions(source_scan_id, source_opportunity_id)`);
   _executionsReady = true;
 }
 
@@ -2278,6 +2334,8 @@ export interface ExecutionRecord {
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
   botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
   propositionRelationship?: import('./proposition-identity').PropositionRelationship | null;
+  sourceScanId?: number | null;
+  sourceOpportunityId?: string | null;
   calculationEnvelope?: CalculationEnvelope;
 }
 
@@ -2303,8 +2361,8 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
     ? validateCalculationEnvelope(resultEnvelope)
     : legacyUnverifiableEnvelope(`execution ${e.arbId}`, 'execution'));
   const res = await c.execute({
-    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, proposition_relationship, calculation_envelope)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO executions (timestamp, arb_id, market_title, dry_run, success, strategy, kalshi_order, polymarket_order, result, estimated_profit, steps, source, selection_method, bot_entry_evidence, proposition_relationship, source_scan_id, source_opportunity_id, calculation_envelope)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id`,
     args: [
       e.timestamp, e.arbId, e.marketTitle, e.dryRun ? 1 : 0, e.success ? 1 : 0,
@@ -2318,6 +2376,8 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.source === 'bot' ? (e.selectionMethod ?? null) : null,
       e.botEntryEvidence != null ? JSON.stringify(e.botEntryEvidence) : null,
       e.propositionRelationship != null ? JSON.stringify(e.propositionRelationship) : null,
+      e.sourceScanId ?? null,
+      e.sourceOpportunityId ?? null,
       JSON.stringify(validateCalculationEnvelope(calculationEnvelope)),
     ],
   });
@@ -2380,6 +2440,8 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
     botEntryEvidence: r.bot_entry_evidence ? JSON.parse(String(r.bot_entry_evidence)) : null,
     propositionRelationship: r.proposition_relationship ? JSON.parse(String(r.proposition_relationship)) : null,
+    sourceScanId: r.source_scan_id == null ? null : Number(r.source_scan_id),
+    sourceOpportunityId: r.source_opportunity_id == null ? null : String(r.source_opportunity_id),
     calculationEnvelope: parseCalculationEnvelope(r.calculation_envelope, `execution ${r.id}`),
   };
 }

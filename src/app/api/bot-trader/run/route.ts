@@ -176,6 +176,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }, {});
       return NextResponse.json({ processed: decisions.length, byState, decisions });
     }
+    if (body?.ranked === true || (typeof body?.pairId === 'string' && body.pairId.length > 0)) {
+      return NextResponse.json({
+        error: 'BotTrader consumes only the canonical persisted Logs scan-completion stream. Complete a normal scan instead of invoking an alternate candidate source.',
+        reasonCode: 'canonical_logs_only',
+      }, { status: 409 });
+    }
     const pairId = body?.pairId;
     const marketTitle = body?.marketTitle;
 

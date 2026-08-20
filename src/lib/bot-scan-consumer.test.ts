@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createBotScanConsumer,
+  createPersistedBotScanPublisher,
   parseBotScanCandidate,
   type BotScanCandidate,
   type BotScanConsumerDeps,
@@ -128,6 +129,22 @@ function execution(overrides: Partial<BotExecutionResult> = {}): BotExecutionRes
   };
 }
 
+function scanDecision(scanId: number): BotScanDecision {
+  return {
+    scanId,
+    idempotencyKey: `scan:${scanId}`,
+    source: 'catch_up',
+    state: 'criteria_rejected',
+    reasonCode: 'no_opportunities',
+    reason: 'No opportunities',
+    receivedAt: '2026-08-11T12:00:10.000Z',
+    updatedAt: '2026-08-11T12:00:10.000Z',
+    attempts: 0,
+    placementCount: 0,
+    details: null,
+  };
+}
+
 function harness(options: {
   scans?: PersistedBotScan[];
   current?: BotScanCandidate[] | Error;
@@ -229,6 +246,35 @@ function harness(options: {
 }
 
 describe('durable BotTrader scan consumer', () => {
+  it('publishes a canonical Logs row before immediately consuming that exact scan', async () => {
+    const calls: string[] = [];
+    const publisher = createPersistedBotScanPublisher({
+      saveScanResult: vi.fn(async () => { calls.push('saved'); return { id: 91 }; }),
+      consumePersistedBotScan: vi.fn(async (scanId, source) => {
+        calls.push(`consumed:${scanId}:${source}`);
+        return { ...scanDecision(91), source };
+      }),
+    });
+
+    await expect(publisher('pair-91', {} as never, 'scheduled')).resolves.toMatchObject({
+      id: 91,
+      decision: { scanId: 91, source: 'scheduled' },
+      backlogProcessed: 0,
+    });
+    expect(calls).toEqual(['saved', 'consumed:91:scheduled']);
+  });
+
+  it('surfaces immediate-consumption failure after the canonical Logs row is durable', async () => {
+    const saveScanResult = vi.fn(async () => ({ id: 92 }));
+    const publisher = createPersistedBotScanPublisher({
+      saveScanResult,
+      consumePersistedBotScan: vi.fn(async () => { throw new Error('decision store unavailable'); }),
+    });
+
+    await expect(publisher('pair-92', {} as never, 'scan_api')).rejects.toThrow('decision store unavailable');
+    expect(saveScanResult).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ['Same-platform YES+YES Kalshi: A + B', 'internal'],
     ['Same-platform YES+NO Kalshi: A', 'internal'],
@@ -278,6 +324,8 @@ describe('durable BotTrader scan consumer', () => {
     expect(h.deps.execute).toHaveBeenCalledTimes(1);
     expect(h.deps.reserveOpportunity).toHaveBeenCalledWith(expect.any(Object), 'paper');
     expect(h.deps.execute).toHaveBeenCalledWith(expect.objectContaining({
+      sourceScanId: 41,
+      sourceOpportunityId: 'scan:41:opportunity:0',
       reservationMode: 'paper',
       kalshiMarketQuestion: 'Will Team A win on Kalshi?',
       pmMarketQuestion: 'Will Team A win on Polymarket?',
@@ -290,6 +338,22 @@ describe('durable BotTrader scan consumer', () => {
       pmSide: 'no',
     }));
     expect(result.placementCount).toBe(1);
+  });
+
+  it('treats the configured ROI threshold as inclusive and audits the exact opportunity lineage', async () => {
+    const atBoundary = candidate({ roiPct: 2 });
+    const h = harness({ scans: [scan({ candidates: [atBoundary] })], current: [atBoundary] });
+
+    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({ state: 'placed' });
+    expect(h.opportunityDecisions).toContainEqual(expect.objectContaining({
+      candidateIndex: 0,
+      state: 'eligible',
+      reasonCode: 'scan_eligible',
+      details: expect.objectContaining({
+        opportunityId: 'scan:41:opportunity:0',
+        scanId: 41,
+      }),
+    }));
   });
 
   it('promotes a paper candidate rejected by the legacy one-share venue minimum check', async () => {

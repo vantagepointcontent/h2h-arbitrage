@@ -788,7 +788,12 @@ describe('maybeExecuteBotTrade safety', () => {
       reasonCode: 'execution_completed',
       details: expect.objectContaining({ final: true, executionMode: 'paper' }),
     }));
-    expect((await import('./persistence')).persistExecution).toHaveBeenCalledOnce();
+    const persistence = await import('./persistence');
+    expect(persistence.persistExecution).toHaveBeenCalledOnce();
+    expect(persistence.persistExecution).toHaveBeenCalledWith(expect.objectContaining({
+      sourceScanId: 91,
+      sourceOpportunityId: 'scan:91:opportunity:0',
+    }));
   });
 
   it('durably surfaces an unhedged rollback alert even when the alert store fails', async () => {

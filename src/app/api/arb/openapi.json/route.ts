@@ -48,7 +48,7 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.4.0',
+    version: '1.5.1',
     description: 'Scanner, saved-market, and BotTrader settlement contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
@@ -74,8 +74,19 @@ const openapi = {
         },
       },
     },
-    '/api/logs': { get: { summary: 'Read scans with calculation envelopes', responses: { '200': { description: 'Scan log rows' } } } },
-    '/api/executions': { get: { summary: 'Read executions with calculation envelopes', responses: { '200': { description: 'Execution records' } } } },
+    '/api/logs': { get: { summary: 'Read immutable scan economics with field-level provenance', responses: { '200': {
+      description: 'Scan log rows. Historical economics are scan-time evidence; Current ROI is fetched separately from persisted completed scans only.',
+      content: { 'application/json': { schema: { type: 'object', required: ['logs', 'count', 'total'], properties: {
+        logs: { type: 'array', items: { type: 'object', additionalProperties: true, required: ['historical_financials'], properties: {
+          historical_financials: { $ref: '#/components/schemas/HistoricalScanFinancials' },
+        } } },
+        count: { type: 'integer' }, total: { type: 'integer' },
+      } } } },
+    } } } },
+    '/api/executions': { get: { summary: 'Read executions with calculation envelopes and canonical Logs lineage', responses: { '200': {
+      description: 'Execution records',
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/ExecutionListResponse' } } },
+    } } } },
     '/api/positions': { get: { summary: 'Read positions with calculation provenance', responses: { '200': { description: 'Position records' } } } },
     '/api/bot-trader/positions': { get: { summary: 'Read bot positions joined to execution and settlement ledgers', responses: { '200': {
       description: 'Bot position records with authoritative per-leg settlement state',
@@ -89,6 +100,55 @@ const openapi = {
   components: {
     schemas: {
       CalculationEnvelope: calculationEnvelopeSchema,
+      ExecutionRecord: {
+        type: 'object', additionalProperties: true,
+        properties: {
+          id: { type: 'integer', minimum: 1 },
+          source: { type: 'string', enum: ['manual', 'bot'] },
+          sourceScanId: { type: ['integer', 'null'], minimum: 1 },
+          sourceOpportunityId: { type: ['string', 'null'] },
+          calculationEnvelope: { $ref: '#/components/schemas/CalculationEnvelope' },
+        },
+      },
+      ExecutionListResponse: {
+        type: 'object', additionalProperties: false,
+        required: ['success', 'count', 'executions'],
+        properties: {
+          success: { type: 'boolean' },
+          count: { type: 'integer', minimum: 0 },
+          executions: { type: 'array', items: { $ref: '#/components/schemas/ExecutionRecord' } },
+        },
+      },
+      HistoricalFinancialField: {
+        type: 'object', additionalProperties: false,
+        required: ['status', 'value', 'source', 'sourceRevision'],
+        properties: {
+          status: { type: 'string', enum: ['available', 'unavailable'] },
+          value: { type: ['number', 'null'] },
+          source: { type: 'string', enum: ['scan_result_scalar', 'raw_result_snapshot', 'unavailable'] },
+          sourceRevision: { type: 'string' },
+          reasonCode: { type: 'string' },
+          reason: { type: 'string' },
+        },
+      },
+      HistoricalScanFinancials: {
+        type: 'object', additionalProperties: false,
+        required: ['revision', 'scanId', 'envelope', 'fields'],
+        properties: {
+          revision: { type: 'integer', const: 1 },
+          scanId: nullableInteger,
+          envelope: { $ref: '#/components/schemas/CalculationEnvelope' },
+          fields: { type: 'object', additionalProperties: false,
+            required: ['roiPct', 'profitUsd', 'apyPct', 'stakeUsd'],
+            properties: {
+              roiPct: { $ref: '#/components/schemas/HistoricalFinancialField' },
+              profitUsd: { $ref: '#/components/schemas/HistoricalFinancialField' },
+              apyPct: { $ref: '#/components/schemas/HistoricalFinancialField' },
+              stakeUsd: { $ref: '#/components/schemas/HistoricalFinancialField' },
+            },
+          },
+        },
+      },
       CalculationTotals: {
         type: 'object', additionalProperties: false,
         required: ['grossCostMicros', 'grossPayoutMicros', 'grossProfitMicros', 'totalFeesMicros', 'netPnlMicros'],

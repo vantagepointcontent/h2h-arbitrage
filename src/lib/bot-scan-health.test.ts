@@ -21,11 +21,13 @@ beforeEach(async () => {
     market_title TEXT,
     scanned_at TEXT NOT NULL,
     positive_arb_count INTEGER NOT NULL DEFAULT 0,
-    raw_result TEXT
+    raw_result TEXT,
+    scan_status TEXT NOT NULL DEFAULT 'completed'
   )`);
   await db.batch([
-    { sql: 'INSERT INTO scan_results VALUES (?,?,?,?,?,?)', args: [41, 'm-41', 'Terminal', '2026-08-16T17:00:00.000Z', 0, '{}'] },
-    { sql: 'INSERT INTO scan_results VALUES (?,?,?,?,?,?)', args: [42, 'm-42', 'In progress', '2026-08-16T17:01:00.000Z', 1, '{}'] },
+    { sql: 'INSERT INTO scan_results VALUES (?,?,?,?,?,?,?)', args: [41, 'm-41', 'Terminal', '2026-08-16T17:00:00.000Z', 0, '{}', 'completed'] },
+    { sql: 'INSERT INTO scan_results VALUES (?,?,?,?,?,?,?)', args: [42, 'm-42', 'In progress', '2026-08-16T17:01:00.000Z', 1, '{}', 'completed'] },
+    { sql: 'INSERT INTO scan_results VALUES (?,?,?,?,?,?,?)', args: [43, 'm-43', 'Incomplete publication', '2026-08-16T17:02:00.000Z', 9, '{}', 'incomplete'] },
   ], 'write');
   db.close();
 });
@@ -63,6 +65,8 @@ describe('getBotScanHealth terminal decision semantics', () => {
     db.close();
 
     await expect(getBotScanHealth()).resolves.toMatchObject({
+      latestCompletedScanId: 42,
+      latestPositiveScanId: 42,
       latestDecisionScanId: 42,
       opportunitiesEvaluated: 1,
       eligibleCount: 1,
