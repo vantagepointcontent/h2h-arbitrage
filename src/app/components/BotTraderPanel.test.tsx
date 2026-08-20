@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BotTraderPanel, { positionRoiBps } from './BotTraderPanel';
+import { summarizeBotPerformance } from '@/lib/bot-positions';
 
 const mutationMocks = vi.hoisted(() => ({
   updateSettingsFromBrowser: vi.fn<(input: unknown) => Promise<{ ok: boolean; status: number; data: Record<string, unknown> | null; message: string | null; correlationId: string | null }>>(async () => ({
@@ -509,18 +510,13 @@ describe('BotTraderPanel', () => {
       realizedPnlCents: 3,
     };
     const scopedPositions = [verified, unverified, unavailable, settled];
+    const performance = summarizeBotPerformance(scopedPositions as never, new Date('2026-08-11T14:00:00.000Z'));
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = String(input);
       if (url.includes('/analytics')) return response({ success: true, analytics: {
         ...analytics,
         positions: scopedPositions,
-        performance: {
-          ...analytics.performance,
-          positionIds: scopedPositions.map(({ id }) => id),
-          capital: { deployedCents: 388, currentCents: 298, heldToResolutionCents: 300, excludedOpenCostCents: 97 },
-          pnl: { realizedCents: 3, unrealizedCents: 4, totalCents: 7, roiBps: 180 },
-          valuation: { fresh: 1, stale: 1, unavailable: 1, pendingSettlement: 0, asOf: '2026-08-11T12:00:00.000Z' },
-        },
+        performance,
       } });
       if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
       throw new Error(`Unexpected fetch: ${url}`);
