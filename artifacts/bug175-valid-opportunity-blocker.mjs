@@ -62,6 +62,7 @@ for (const relationship of registry.relationships) {
 }
 const db = createClient({ url: `file:${path.join(root, 'data', 'edgefinder.db')}` });
 let postDeploy;
+let reviewedControlScan;
 try {
   postDeploy = (await db.execute(`SELECT COUNT(DISTINCT s.id) AS completed_scans,
       COUNT(candidate.key) AS persisted_candidates,
@@ -70,6 +71,11 @@ try {
         AND json_extract(candidate.value, '$.propositionRelationship') IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_candidates_at_or_above_threshold
     FROM scan_results s LEFT JOIN json_each(json_extract(s.raw_result, '$.allArbs')) candidate
     WHERE s.scan_status='completed' AND s.scanned_at >= '2026-08-20T09:35:11.646Z'`)).rows[0];
+  reviewedControlScan = (await db.execute(`SELECT id, market_id, scanned_at, best_roi_pct, positive_arb_count, scan_status
+    FROM scan_results
+    WHERE market_id='4157052a-5b8c-477f-93a0-ef4e8797644d'
+      AND scanned_at >= '2026-08-20T09:35:11.646Z'
+    ORDER BY id DESC LIMIT 1`)).rows[0] ?? null;
 } finally { db.close(); }
 const report = {
   revision: 1,
@@ -77,6 +83,7 @@ const report = {
   deployment: { commit: '4f32696dadbcea709773aed7142f6ba40822e96c', buildId: 'PtdzAfrx6ExTPLo7U3xk0' },
   policy: 'Read-only production verification. No unreviewed relationship was promoted and no stale trade was replayed.',
   postDeploy,
+  reviewedControlScan,
   reviewedRegistryLiveChecks: checks,
   conclusion: checks.every((check) => !check.qualifiesBeforeFees)
     ? 'No server-reviewed exact relationship currently has a positive executable gross edge; fees can only worsen these costs.'
@@ -84,4 +91,4 @@ const report = {
 };
 const outputPath = path.join(root, 'artifacts', 'bug175-valid-opportunity-blocker.json');
 await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify({ outputPath, postDeploy, checks: checks.map(({ humanLabel, grossCostMicros, grossEdgeMicrosBeforeFees, qualifiesBeforeFees, blocker }) => ({ humanLabel, grossCostMicros, grossEdgeMicrosBeforeFees, qualifiesBeforeFees, blocker })), conclusion: report.conclusion }, null, 2));
+console.log(JSON.stringify({ outputPath, postDeploy, reviewedControlScan, checks: checks.map(({ humanLabel, grossCostMicros, grossEdgeMicrosBeforeFees, qualifiesBeforeFees, blocker }) => ({ humanLabel, grossCostMicros, grossEdgeMicrosBeforeFees, qualifiesBeforeFees, blocker })), conclusion: report.conclusion }, null, 2));

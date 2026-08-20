@@ -1,16 +1,24 @@
 {
   "revision": 1,
-  "generatedAt": "2026-08-20T09:47:50.130Z",
+  "generatedAt": "2026-08-20T09:54:53.533Z",
   "deployment": {
     "commit": "4f32696dadbcea709773aed7142f6ba40822e96c",
     "buildId": "PtdzAfrx6ExTPLo7U3xk0"
   },
   "policy": "Read-only production verification. No unreviewed relationship was promoted and no stale trade was replayed.",
   "postDeploy": {
-    "completed_scans": 198,
-    "persisted_candidates": 63,
-    "candidates_at_or_above_threshold": 10,
+    "completed_scans": 314,
+    "persisted_candidates": 111,
+    "candidates_at_or_above_threshold": 20,
     "reviewed_candidates_at_or_above_threshold": 0
+  },
+  "reviewedControlScan": {
+    "id": 815241,
+    "market_id": "4157052a-5b8c-477f-93a0-ef4e8797644d",
+    "scanned_at": "2026-08-20T09:45:43.067Z",
+    "best_roi_pct": 0.5939999999999964,
+    "positive_arb_count": 6,
+    "scan_status": "completed"
   },
   "reviewedRegistryLiveChecks": [
     {
