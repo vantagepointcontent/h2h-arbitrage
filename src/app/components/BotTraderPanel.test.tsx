@@ -404,8 +404,10 @@ describe('BotTraderPanel', () => {
     expect(row?.textContent).toContain('$1.00');
     expect(row?.textContent).toContain('+$0.03');
     const settledCells = Array.from(row!.querySelectorAll('td'));
-    expect(settledCells[7].textContent).toBe('+$0.03');
-    expect(settledCells[9].textContent).toBe('$0.03');
+    expect(settledCells[6].textContent).toBe('+$0.03');
+    expect(settledCells[8].textContent).toBe('$0.03');
+    expect(settledCells[9].textContent).toContain('Settled (paper)');
+    expect(settledCells[9].querySelector('span')?.className).toContain('status-positive');
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
     expect(screen.getByText('Settlement ledger').parentElement?.textContent).toContain('Simulated paper settlement');
     expect(screen.getByTestId('kalshi-settlement-leg').textContent).toContain('simulated credited');
@@ -429,8 +431,9 @@ describe('BotTraderPanel', () => {
     expect(screen.getByRole('link', { name: 'Open exact Polymarket NO market for Trump 2026' }).getAttribute('href')).toBe('https://polymarket.com/event/trump-2026');
     const row = screen.getByRole('link', { name: 'Open Trump 2026 market' }).closest('tr')!;
     const cells = Array.from(row.querySelectorAll('td'));
-    expect(cells[2].textContent).toBe('K: RepublicansPM: Republicans');
-    expect(cells[4].textContent).toBe('Kalshi YESPM NO');
+    expect(cells[2].textContent).toBe('Legacy/Unknown');
+    expect(cells[3].textContent).toBe('Kalshi YESPM NO');
+    expect(row.textContent).not.toContain('Republicans');
     expect(screen.getByRole('link', { name: 'Export exact legs CSV' }).getAttribute('href')).toBe('/api/bot-trader/positions/export?method=all&mode=paper&range=30d');
     expect(screen.getByText('Verified trades').parentElement?.textContent).toBe('Verified trades50');
     expect(screen.getByText('Open positions').parentElement?.textContent).toBe('Open positions12');
@@ -443,12 +446,14 @@ describe('BotTraderPanel', () => {
     expect(screen.getByText(/\$10\.50 staked/)).toBeTruthy();
   });
 
-  it('places canonical per-leg outcomes between Market and Method without mixing them with contract sides', async () => {
+  it('keeps outcomes out of collapsed rows and shows exact per-venue identity only after expansion', async () => {
     const oppositeOutcomes = {
       ...positions[0],
       id: 2,
       executionId: 10,
       marketTitle: 'NY-21 House Election Winner',
+      kalshiMarketQuestion: 'Will the Republican candidate win NY-21?',
+      pmMarketQuestion: 'Will the Democratic candidate win NY-21?',
       kalshiOutcomeLabel: 'Republican',
       pmOutcomeLabel: 'Democratic',
       kalshiSide: 'yes',
@@ -479,24 +484,40 @@ describe('BotTraderPanel', () => {
     const market = await screen.findByRole('link', { name: 'Open NY-21 House Election Winner market' });
     const table = market.closest('table')!;
     expect(Array.from(table.querySelectorAll('th')).map((header) => header.textContent?.trim())).toEqual([
-      '', 'Market', 'Outcome', 'Method', 'Strategy', 'Buy Cost', 'Current Value', 'P&L', 'ROI', 'Entry Arb Profit', 'Status', 'Opened',
+      '', 'Market', 'Method', 'Strategy', 'Buy Cost', 'Current Value', 'P&L', 'ROI', 'Entry Arb Profit', 'Status', 'Opened',
     ]);
     const row = market.closest('tr')!;
     const cells = Array.from(row.querySelectorAll('td'));
-    expect(cells).toHaveLength(12);
-    expect(cells[2].textContent).toBe('K: RepublicanPM: Democratic');
-    expect(cells[2].textContent).not.toMatch(/YES|NO/);
-    expect(cells[3].textContent).toBe('Legacy/Unknown');
-    expect(cells[4].textContent).toBe('Kalshi YESPM YES');
-    expect(cells[2].getAttribute('aria-label')).toBe('Placed outcomes: Kalshi Republican; Polymarket Democratic');
-    expect(cells[2].className).toContain('lg:table-cell');
-    expect(row.querySelector('[data-testid="responsive-position-outcome"]')?.textContent).toBe('K: Republican · PM: Democratic');
+    expect(cells).toHaveLength(11);
+    expect(cells[2].textContent).toBe('Legacy/Unknown');
+    expect(cells[2].querySelector('span')?.className).toContain('status-warning');
+    expect(cells[3].textContent).toBe('Kalshi YESPM YES');
+    expect(row.textContent).not.toContain('Republican');
+    expect(row.textContent).not.toContain('Democratic');
+    expect(row.querySelector('[data-testid="responsive-position-outcome"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand NY-21 House Election Winner' }));
+    expect(screen.getByTestId('kalshi-placed-identity').textContent).toContain('Selected market choiceRepublican');
+    expect(screen.getByTestId('kalshi-placed-identity').textContent).toContain('SideYES');
+    expect(screen.getByTestId('kalshi-placed-identity').textContent).toContain('Will the Republican candidate win NY-21?');
+    expect(screen.getByTestId('kalshi-placed-identity').textContent).toContain('KXTRUMP-26');
+    expect(screen.getByTestId('polymarket-placed-identity').textContent).toContain('Selected market choiceDemocratic');
+    expect(screen.getByTestId('polymarket-placed-identity').textContent).toContain('SideYES');
+    expect(screen.getByTestId('polymarket-placed-identity').textContent).toContain('Will the Democratic candidate win NY-21?');
+    expect(screen.getByTestId('polymarket-placed-identity').textContent).toContain('held-republican-token');
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse NY-21 House Election Winner' }));
 
     const legacyRow = screen.getByText('Legacy market').closest('tr')!;
-    expect(Array.from(legacyRow.querySelectorAll('td'))[2].textContent).toBe('Outcome unavailable');
-    expect(Array.from(legacyRow.querySelectorAll('td'))[2].getAttribute('title')).toBe('Execution-time selected outcome was not persisted');
     expect(legacyRow.textContent).not.toContain('Fabricated candidate');
     expect(legacyRow.textContent).not.toContain('Fabricated opponent');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Legacy market' }));
+    expect(screen.getByTestId('kalshi-placed-identity').textContent).toContain('Selected market choiceUnavailable');
+    expect(screen.getByTestId('polymarket-placed-identity').textContent).toContain('Selected market choiceUnavailable');
+    expect(Array.from(screen.getByTestId('kalshi-placed-identity').querySelectorAll('span')).filter((node) => node.textContent === 'Unavailable').every((node) => node.className.includes('status-warning'))).toBe(true);
+    expect(Array.from(screen.getByTestId('polymarket-placed-identity').querySelectorAll('span')).filter((node) => node.textContent === 'Unavailable').every((node) => node.className.includes('status-warning'))).toBe(true);
+    expect(screen.getAllByText('Execution-time selected outcome was not persisted').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Fabricated candidate')).toBeNull();
+    expect(screen.queryByText('Fabricated opponent')).toBeNull();
   });
 
   it('renders the canonical immutable Entry Arb Profit between dynamic ROI and Status', async () => {
@@ -521,8 +542,8 @@ describe('BotTraderPanel', () => {
 
     const market = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const headers = Array.from(market.closest('table')!.querySelectorAll('th'));
-    expect(headers[9].textContent).toBe('Entry Arb Profit');
-    expect(headers[9].getAttribute('title')).toBe('Net profit expected from the verified placed arb if held to settlement, captured at entry');
+    expect(headers[8].textContent).toBe('Entry Arb Profit');
+    expect(headers[8].getAttribute('title')).toBe('Net profit expected from the verified placed arb if held to settlement, captured at entry');
     const entryHeader = screen.getByRole('columnheader', { name: 'Entry Arb Profit' });
     expect(entryHeader).toHaveAccessibleDescription('Net profit expected from the verified placed arb if held to settlement, captured at entry');
     entryHeader.focus();
@@ -530,17 +551,17 @@ describe('BotTraderPanel', () => {
     expect(entryHeader.className).toContain('focus-visible:ring');
 
     const cells = Array.from(market.closest('tr')!.querySelectorAll('td'));
-    expect(cells[8].textContent).toBe('-22.7%');
-    expect(cells[9].textContent).toBe('$0.79');
-    expect(cells[9].className).toContain('status-positive');
-    expect(cells[9]).toHaveAccessibleName('Entry Arb Profit $0.79 USDC');
-    expect(cells[9]).toHaveAccessibleDescription(/Simulated paper placement snapshot; Simulated placement fills; captured 2026-08-08T16:00:00.000Z/);
-    expect(cells[9].getAttribute('title')).toContain('Simulated paper placement snapshot');
-    cells[9].focus();
-    expect(cells[9]).toHaveFocus();
-    expect(cells[9].className).toContain('focus-visible:ring');
-    expect(cells[10].textContent).toContain('open');
-    expect(cells[10].textContent).toContain('Verified arb');
+    expect(cells[7].textContent).toBe('-22.7%');
+    expect(cells[8].textContent).toBe('$0.79');
+    expect(cells[8].className).toContain('status-positive');
+    expect(cells[8]).toHaveAccessibleName('Entry Arb Profit $0.79 USDC');
+    expect(cells[8]).toHaveAccessibleDescription(/Simulated paper placement snapshot; Simulated placement fills; captured 2026-08-08T16:00:00.000Z/);
+    expect(cells[8].getAttribute('title')).toContain('Simulated paper placement snapshot');
+    cells[8].focus();
+    expect(cells[8]).toHaveFocus();
+    expect(cells[8].className).toContain('focus-visible:ring');
+    expect(cells[9].textContent).toContain('open');
+    expect(cells[9].textContent).toContain('Verified arb');
     const responsiveEntryProfit = screen.getByTestId('responsive-entry-arb-profit');
     expect(responsiveEntryProfit.textContent).toBe('Entry arb $0.79');
     expect(responsiveEntryProfit).toHaveAccessibleName('Entry Arb Profit $0.79 USDC');
@@ -573,7 +594,7 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     const market = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
-    const entryCell = Array.from(market.closest('tr')!.querySelectorAll('td'))[9];
+    const entryCell = Array.from(market.closest('tr')!.querySelectorAll('td'))[8];
     expect(entryCell.textContent).toBe('Unavailable');
     expect(entryCell.textContent).not.toContain('$0.00');
     expect(entryCell.getAttribute('title')).toBeNull();
@@ -628,7 +649,7 @@ describe('BotTraderPanel', () => {
     await screen.findByText('Invalid execution mode');
     for (const marketTitle of ['Invalid execution mode', 'Invalid provenance', 'Invalid captured timestamp']) {
       const row = screen.getByText(marketTitle).closest('tr')!;
-      const entryCell = Array.from(row.querySelectorAll('td'))[9];
+      const entryCell = Array.from(row.querySelectorAll('td'))[8];
       expect(entryCell.textContent).toBe('Unavailable');
       expect(entryCell).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
       expect(row.querySelector('[data-testid="responsive-entry-arb-profit"]')).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
@@ -662,7 +683,7 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
-    const entryCell = Array.from(row.querySelectorAll('td'))[9];
+    const entryCell = Array.from(row.querySelectorAll('td'))[8];
     expect(entryCell.textContent).toBe('Unavailable');
     expect(entryCell).toHaveAccessibleDescription('Unavailable; expand position details for the exact reason and provenance');
     expect(entryCell).not.toHaveAccessibleDescription('Fabricated unavailable reason');
@@ -696,8 +717,8 @@ describe('BotTraderPanel', () => {
     }));
     render(<BotTraderPanel />);
 
-    const negativeCell = Array.from((await screen.findByText('Negative entry arb')).closest('tr')!.querySelectorAll('td'))[9];
-    const zeroCell = Array.from(screen.getByText('Zero entry arb').closest('tr')!.querySelectorAll('td'))[9];
+    const negativeCell = Array.from((await screen.findByText('Negative entry arb')).closest('tr')!.querySelectorAll('td'))[8];
+    const zeroCell = Array.from(screen.getByText('Zero entry arb').closest('tr')!.querySelectorAll('td'))[8];
     expect(negativeCell.textContent).toBe('-$0.01');
     expect(negativeCell.className).toContain('status-negative');
     expect(zeroCell.textContent).toBe('$0.00');
@@ -729,8 +750,9 @@ describe('BotTraderPanel', () => {
     render(<BotTraderPanel />);
 
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
-    expect(Array.from(row.querySelectorAll('td'))[2].textContent).toBe('Outcome unavailable');
-    expect(Array.from(row.querySelectorAll('td'))[4].textContent).toBe('Kalshi YESPM YES');
+    expect(Array.from(row.querySelectorAll('td'))[2].textContent).toBe('Legacy/Unknown');
+    expect(Array.from(row.querySelectorAll('td'))[3].textContent).toBe('Kalshi YESPM YES');
+    expect(row.textContent).not.toContain('Republican');
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('Kalshi YES entry');
     expect(screen.getByTestId('polymarket-entry-cost').textContent).toContain('Polymarket YES entry');
@@ -798,24 +820,35 @@ describe('BotTraderPanel', () => {
 
     const invalidRow = (await screen.findByText('Invalid exposure row')).closest('tr')!;
     expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Invalid exposure');
+    expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.className).toContain('status-negative');
     expect(invalidRow.querySelector('[data-testid="responsive-exposure-classification"]')?.textContent).toBe('Invalid exposure');
     expect(invalidRow.querySelector('[data-testid="responsive-exposure-classification"]')?.closest('td')).toBe(invalidRow.querySelectorAll('td')[1]);
-    expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.closest('td')).toBe(invalidRow.querySelectorAll('td')[10]);
-    expect(Array.from(invalidRow.querySelectorAll('td'))[6].textContent).toBe('$0.88');
-    expect(Array.from(invalidRow.querySelectorAll('td'))[7].textContent).toBe('-$0.09');
-    expect(Array.from(invalidRow.querySelectorAll('td'))[8].textContent).toBe('-9.3%');
+    expect(invalidRow.querySelector('[data-testid="desktop-exposure-classification"]')?.closest('td')).toBe(invalidRow.querySelectorAll('td')[9]);
+    expect(Array.from(invalidRow.querySelectorAll('td'))[5].textContent).toBe('$0.88');
+    expect(Array.from(invalidRow.querySelectorAll('td'))[6].textContent).toBe('-$0.09');
+    expect(Array.from(invalidRow.querySelectorAll('td'))[7].textContent).toBe('-9.3%');
     expect(invalidRow.textContent).not.toContain('Both exact held contracts pay on Republican YES');
-    expect(screen.getByText('Unverified exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Relationship unverified');
-    expect(screen.getByText('Missing identity row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Legacy identity missing');
-    expect(screen.getByText('No exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('No exposure');
-    expect(screen.getByText('Settlement unresolved row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]')?.textContent).toBe('Settlement unresolved');
+    const unverifiedBadge = screen.getByText('Unverified exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]');
+    expect(unverifiedBadge?.textContent).toBe('Relationship unverified');
+    expect(unverifiedBadge?.className).toContain('status-warning');
+    const missingBadge = screen.getByText('Missing identity row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]');
+    expect(missingBadge?.textContent).toBe('Legacy identity missing');
+    expect(missingBadge?.className).toContain('status-warning');
+    const noExposureBadge = screen.getByText('No exposure row').closest('tr')?.querySelector('[data-testid="desktop-exposure-classification"]');
+    expect(noExposureBadge?.textContent).toBe('No exposure');
+    expect(noExposureBadge?.className).toContain('text-secondary');
+    const unresolvedRow = screen.getByText('Settlement unresolved row').closest('tr')!;
+    const unresolvedBadge = unresolvedRow.querySelector('[data-testid="desktop-exposure-classification"]');
+    expect(unresolvedBadge?.textContent).toBe('Settlement unresolved');
+    expect(unresolvedBadge?.className).toContain('status-warning');
+    expect(unresolvedRow.querySelector('td:nth-last-child(2) span')?.className).toContain('status-warning');
 
     const missingRow = screen.getByText('Missing identity row').closest('tr')!;
     const missingCells = Array.from(missingRow.querySelectorAll('td'));
+    expect(missingCells[5].textContent).toBe('Unavailable');
     expect(missingCells[6].textContent).toBe('Unavailable');
     expect(missingCells[7].textContent).toBe('Unavailable');
     expect(missingCells[8].textContent).toBe('Unavailable');
-    expect(missingCells[9].textContent).toBe('Unavailable');
     expect(missingRow.textContent).not.toContain('Polymarket entry token is missing from immutable evidence');
     const disclosure = screen.getByRole('button', { name: 'Expand Missing identity row' });
     expect(disclosure).toHaveAccessibleDescription(/Polymarket entry token is missing from immutable evidence/);
@@ -832,6 +865,61 @@ describe('BotTraderPanel', () => {
     expect(vi.mocked(fetch).mock.calls.every(([input]) => String(input).includes('/analytics') || String(input).includes('/status'))).toBe(true);
   });
 
+  it('uses sign colors for money and percentages while keeping primary values white and warnings amber', async () => {
+    vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
+    const exposureOnly = {
+      ...positions[0],
+      selectionMethod: 'roi' as const,
+      relationshipValidity: 'unresolved_relationship' as const,
+      legacyExposureVerdict: { ...positions[0].legacyExposureVerdict, relationshipValidity: 'unresolved_relationship' as const },
+      excludedFromVerifiedTotals: true,
+    };
+    const styled = [{ ...exposureOnly, id: 2, marketTitle: 'Positive mark' }, {
+      ...exposureOnly, id: 3, marketTitle: 'Negative mark', currentValueCents: 90,
+    }, {
+      ...exposureOnly, id: 4, marketTitle: 'Zero mark', currentValueCents: 97,
+    }, {
+      ...exposureOnly, id: 5, marketTitle: 'Legacy last-known mark', lastValuationAt: '2026-08-11T12:00:00.000Z',
+      valuationFailureReason: 'Legacy last-known valuation retained from immutable evidence',
+    }, {
+      ...exposureOnly, id: 6, marketTitle: 'Unavailable mark', currentValueCents: null, lastValuationAt: null,
+    }];
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/analytics')) return response({ success: true, analytics: { ...analytics, positions: styled, performance: { ...analytics.performance, positionIds: styled.map(({ id }) => id) } } });
+      if (url.includes('/status')) return response({ enabled: false, mode: 'paper', selectionMethod: 'hybrid', todayCount: 0, todayStakeUsd: 0 });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    render(<BotTraderPanel />);
+
+    const rowCells = (title: string) => Array.from(screen.getByText(title).closest('tr')!.querySelectorAll('td'));
+    await screen.findByText('Positive mark');
+    const positive = rowCells('Positive mark');
+    expect(positive[2].querySelector('span')?.className).toContain('text-primary');
+    expect(positive[3].className).toContain('text-primary');
+    expect(positive[4].className).toContain('text-primary');
+    expect(positive[5].className).toContain('text-primary');
+    expect(positive[6].className).toContain('status-positive');
+    expect(positive[7].className).toContain('status-positive');
+    expect(positive.slice(4, 8).every((cell) => !cell.className.includes('status-info'))).toBe(true);
+
+    const negative = rowCells('Negative mark');
+    expect(negative[6].className).toContain('status-negative');
+    expect(negative[7].className).toContain('status-negative');
+    const zero = rowCells('Zero mark');
+    expect(zero[6].className).toContain('text-primary');
+    expect(zero[7].className).toContain('text-primary');
+    const legacy = rowCells('Legacy last-known mark');
+    expect(legacy[5].textContent).toContain('Legacy last-known');
+    expect(legacy[5].className).toContain('status-warning');
+    expect(legacy[6].className).toContain('status-positive');
+    expect(legacy[7].className).toContain('status-positive');
+    const unavailable = rowCells('Unavailable mark');
+    expect(unavailable[5].className).toContain('status-warning');
+    expect(unavailable[6].className).toContain('status-warning');
+    expect(unavailable[7].className).toContain('status-warning');
+  });
+
   it('maps buy cost, indicative current value, P&L, and percentage ROI into their labelled columns', async () => {
     vi.setSystemTime(new Date('2026-08-11T13:45:00.000Z'));
     stubInitialFetch();
@@ -841,11 +929,11 @@ describe('BotTraderPanel', () => {
     const row = marketLink.closest('tr');
     expect(row).toBeTruthy();
     const cells = Array.from(row!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells).toHaveLength(12);
-    expect(cells[5]).toBe('$0.97');
-    expect(cells[6]).toBe('$1.02');
-    expect(cells[7]).toBe('+$0.05');
-    expect(cells[8]).toBe('+5.2%');
+    expect(cells).toHaveLength(11);
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('$1.02');
+    expect(cells[6]).toBe('+$0.05');
+    expect(cells[7]).toBe('+5.2%');
   });
 
   it('keeps indicative P&L and ROI visible for stale marks', async () => {
@@ -855,11 +943,11 @@ describe('BotTraderPanel', () => {
 
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells[5]).toBe('$0.97');
-    expect(cells[6]).toBe('$1.02 · Stale');
-    expect(cells[7]).toBe('+$0.05');
-    expect(cells[8]).toBe('+5.2%');
-    expect(cells[7]).not.toContain('executable');
+    expect(cells[4]).toBe('$0.97');
+    expect(cells[5]).toBe('$1.02 · Stale');
+    expect(cells[6]).toBe('+$0.05');
+    expect(cells[7]).toBe('+5.2%');
+    expect(cells[6]).not.toContain('executable');
   });
 
   it('shows unavailable open marks and safely suppresses ROI when buy cost is zero', async () => {
@@ -879,10 +967,10 @@ describe('BotTraderPanel', () => {
 
     const marketLink = await screen.findByRole('link', { name: 'Open Trump 2026 market' });
     const cells = Array.from(marketLink.closest('tr')!.querySelectorAll('td')).map((cell) => cell.textContent?.trim());
-    expect(cells[5]).toBe('$0.00');
+    expect(cells[4]).toBe('$0.00');
+    expect(cells[5]).toBe('Unavailable');
     expect(cells[6]).toBe('Unavailable');
     expect(cells[7]).toBe('Unavailable');
-    expect(cells[8]).toBe('Unavailable');
     expect(marketLink.closest('tr')!.textContent).not.toContain('Valuation unavailable: no executable mark has been recorded');
     expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Valuation unavailable: no executable mark has been recorded/);
   });
@@ -915,8 +1003,8 @@ describe('BotTraderPanel', () => {
     const expand = await screen.findByRole('button', { name: 'Expand Trump 2026' });
     fireEvent.click(expand);
 
-    expect(screen.getByText('KXTRUMP-26')).toBeTruthy();
-    expect(screen.getByText('0xabc')).toBeTruthy();
+    expect(screen.getAllByText('KXTRUMP-26').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0xabc').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Collapse Trump 2026' })).toBeTruthy();
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('1 unit');
     expect(screen.getByTestId('kalshi-entry-cost').textContent).toContain('45.000000¢ exact fill');
@@ -1032,12 +1120,12 @@ describe('BotTraderPanel', () => {
     }));
     render(<BotTraderPanel />);
     const row = (await screen.findByText('Trump 2026')).closest('tr')!;
-    expect(Array.from(row.querySelectorAll('td'))[5].textContent).toBe('Unavailable');
-    expect(Array.from(row.querySelectorAll('td'))[6].textContent).toBe('$1.02');
+    expect(Array.from(row.querySelectorAll('td'))[4].textContent).toBe('Unavailable');
+    expect(Array.from(row.querySelectorAll('td'))[5].textContent).toBe('$1.02');
+    expect(Array.from(row.querySelectorAll('td'))[6].textContent).toBe('Unavailable');
     expect(Array.from(row.querySelectorAll('td'))[7].textContent).toBe('Unavailable');
-    expect(Array.from(row.querySelectorAll('td'))[8].textContent).toBe('Unavailable');
-    expect(Array.from(row.querySelectorAll('td'))[7].textContent).not.toContain('+$0.05');
-    expect(Array.from(row.querySelectorAll('td'))[8].textContent).not.toContain('+5.2%');
+    expect(Array.from(row.querySelectorAll('td'))[6].textContent).not.toContain('+$0.05');
+    expect(Array.from(row.querySelectorAll('td'))[7].textContent).not.toContain('+5.2%');
     expect(row.textContent).not.toContain('Buy Cost unavailable:');
     expect(screen.getByRole('button', { name: 'Expand Trump 2026' })).toHaveAccessibleDescription(/Legacy paper position lacks authoritative entry fill and fee data/);
     fireEvent.click(screen.getByRole('button', { name: 'Expand Trump 2026' }));
