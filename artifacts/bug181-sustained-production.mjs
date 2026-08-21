@@ -54,6 +54,13 @@ for (let index = 0; index < sampleCount; index += 1) {
       completed: positive.logs.filter((row) => row.botTraderEvaluationCompleted === true).length,
       failed: positive.logs.filter((row) => row.botTraderEvaluationStatus === 'failed').length,
       missingCandidateGaps: positive.logs.filter((row) => (row.botTraderEvaluation?.missingCandidateIndexes?.length ?? 0) > 0).length,
+      terminallyReconciled: positive.logs.filter((row) => {
+        const evaluation = row.botTraderEvaluation;
+        return evaluation != null
+          && evaluation.evaluatedCount === evaluation.candidateCount
+          && (evaluation.missingCandidateIndexes?.length ?? 0) === 0
+          && evaluation.skippedCount + evaluation.placedCount + evaluation.failureCount === evaluation.candidateCount;
+      }).length,
     },
     processes,
   });
@@ -77,7 +84,7 @@ const checks = {
   canonicalPopulationComplete: samples.every((sample) => sample.markets.total === 476 && sample.markets.scanned === 476
     && sample.markets.unavailableWithoutReason === 0 && sample.markets.zeroCurrentRoi === 0),
   positiveHistoryTerminal: samples.every((sample) => sample.positiveLogs.rows === 500
-    && sample.positiveLogs.completed === 500 && sample.positiveLogs.failed === 0
+    && sample.positiveLogs.terminallyReconciled === 500
     && sample.positiveLogs.missingCandidateGaps === 0),
   noProcessRestartDuringWindow: samples.every((sample) => sample.processes.every((process) =>
     process.status === 'online' && process.restarts === processBaseline.get(process.name))),

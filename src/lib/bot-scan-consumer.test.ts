@@ -309,21 +309,25 @@ describe('durable BotTrader scan consumer', () => {
     });
   });
 
-  it('treats an operator reset tombstone as a terminal audited skip for every contained candidate', () => {
+  it('reconciles operator reset scan summaries from each terminal candidate audit', () => {
+    const scanDecision = {
+      state: 'reset_cleared',
+      reasonCode: 'ops854_reset_cleared',
+      reason: 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.',
+      receivedAt: '2026-08-11T12:00:00.000Z',
+      updatedAt: '2026-08-20T10:00:00.000Z',
+      attempts: 0,
+      placementCount: 0,
+      details: null,
+    };
     expect(summarizeBotScanEvaluation({
       scanId: 43,
       candidateIndexes: [0, 1],
-      scanDecision: {
-        state: 'reset_cleared',
-        reasonCode: 'ops854_reset_cleared',
-        reason: 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.',
-        receivedAt: '2026-08-11T12:00:00.000Z',
-        updatedAt: '2026-08-20T10:00:00.000Z',
-        attempts: 0,
-        placementCount: 0,
-        details: null,
-      },
-      candidateDecisions: [],
+      scanDecision,
+      candidateDecisions: [
+        { candidateIndex: 0, state: 'skipped', reasonCode: 'ops854_reset_cleared', finalResult: 'reset_cleared', executionId: null, details: { stage: 'operator_reset', payloadUnavailable: 0 } },
+        { candidateIndex: 1, state: 'skipped', reasonCode: 'ops854_reset_cleared', finalResult: 'reset_cleared', executionId: null, details: { stage: 'operator_reset', payloadUnavailable: 0 } },
+      ],
     })).toMatchObject({
       status: 'completed',
       botTraderEvaluationCompleted: true,
@@ -333,6 +337,25 @@ describe('durable BotTrader scan consumer', () => {
       failureCount: 0,
       missingCandidateIndexes: [],
       reason: 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.',
+    });
+
+    expect(summarizeBotScanEvaluation({
+      scanId: 44,
+      candidateIndexes: [0, 1],
+      scanDecision,
+      candidateDecisions: [
+        { candidateIndex: 0, state: 'skipped', reasonCode: 'ops854_reset_cleared', finalResult: 'reset_cleared', executionId: null, details: { stage: 'operator_reset', payloadUnavailable: 0 } },
+        { candidateIndex: 1, state: 'failed', reasonCode: 'reset_candidate_payload_unavailable', finalResult: 'reset_cleared', executionId: null, details: { stage: 'operator_reset', payloadUnavailable: 1 } },
+      ],
+    })).toMatchObject({
+      status: 'failed',
+      botTraderEvaluationCompleted: false,
+      candidateCount: 2,
+      evaluatedCount: 2,
+      skippedCount: 1,
+      failureCount: 1,
+      missingCandidateIndexes: [],
+      failingCandidateIndexes: [1],
     });
   });
 

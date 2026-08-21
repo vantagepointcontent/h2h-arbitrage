@@ -118,6 +118,57 @@ describe('getBotScanHealth terminal decision semantics', () => {
     expect(persisted.rows[0]).toMatchObject({ status: 'partial', candidate_count: 2, evaluated_count: 1 });
   });
 
+  it('repairs reset scan summaries from persisted candidate failures during schema reconciliation', async () => {
+    const firstModule = await import('./bot-scan-consumer');
+    await firstModule.getBotScanHealth();
+    const db = createClient({ url: `file:${path.join(tempDir, 'data', 'edgefinder.db')}` });
+    await db.batch([
+      { sql: `UPDATE scan_results SET positive_arb_count=1,raw_result='{"allArbs":[{}]}' WHERE id=42`, args: [] },
+      {
+        sql: `INSERT INTO bot_scan_decisions
+          (scan_id,idempotency_key,source,state,reason_code,reason,received_at,updated_at)
+          VALUES (42,'scan:42','catch_up','reset_cleared','ops854_reset_cleared','Reset with unavailable payload',
+          '2026-08-16T17:01:01.000Z','2026-08-20T10:00:00.000Z')`,
+        args: [],
+      },
+      {
+        sql: `INSERT INTO bot_scan_evaluations
+          (scan_id,status,completed,reason,candidate_count,evaluated_count,eligible_count,
+           placement_attempt_count,placed_count,skipped_count,failure_count,missing_candidate_indexes,failing_candidate_indexes)
+          VALUES (42,'completed',1,'incorrect legacy summary',1,1,0,0,0,1,0,'[]','[]')`,
+        args: [],
+      },
+      {
+        sql: `INSERT INTO bot_opportunity_decisions
+          (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,
+           created_at,updated_at,details,final_result)
+          VALUES (42,0,'m-42','unknown','unknown','skipped','ops854_reset_cleared','incorrect legacy candidate audit',
+          '2026-08-20T10:00:00.000Z','2026-08-20T10:00:00.000Z',
+          '{"schemaVersion":1,"stage":"operator_reset","final":1,"payloadUnavailable":0}','reset_cleared')`,
+        args: [],
+      },
+    ], 'write');
+    db.close();
+
+    vi.resetModules();
+    const reconciledModule = await import('./bot-scan-consumer');
+    await reconciledModule.getBotScanHealth();
+
+    const verify = createClient({ url: `file:${path.join(tempDir, 'data', 'edgefinder.db')}` });
+    const [evaluation, candidateDecisions] = await Promise.all([
+      verify.execute('SELECT status,completed,candidate_count,evaluated_count,skipped_count,failure_count,missing_candidate_indexes,failing_candidate_indexes FROM bot_scan_evaluations WHERE scan_id=42'),
+      verify.execute('SELECT candidate_index,state,reason_code,final_result FROM bot_opportunity_decisions WHERE scan_id=42 ORDER BY candidate_index'),
+    ]);
+    verify.close();
+    expect(candidateDecisions.rows).toEqual([
+      expect.objectContaining({ candidate_index: 0, state: 'failed', reason_code: 'reset_candidate_payload_unavailable', final_result: 'reset_cleared' }),
+    ]);
+    expect(evaluation.rows).toEqual([expect.objectContaining({
+      status: 'failed', completed: 0, candidate_count: 1, evaluated_count: 1,
+      skipped_count: 0, failure_count: 1, missing_candidate_indexes: '[]', failing_candidate_indexes: '[0]',
+    })]);
+  });
+
   it('keeps lastExecutionOrSkip terminal while exposing the newest lease separately', async () => {
     const { getBotScanHealth } = await import('./bot-scan-consumer');
     await getBotScanHealth();

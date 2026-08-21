@@ -193,29 +193,8 @@ export function summarizeBotScanEvaluation(input: {
       failingCandidateIndexes: [],
     };
   }
-  if (input.scanDecision?.state === 'reset_cleared'
-    && input.scanDecision.reasonCode === 'ops854_reset_cleared') {
-    const candidateCount = new Set(input.candidateIndexes).size;
-    return {
-      scanId: input.scanId,
-      status: 'completed',
-      botTraderEvaluationCompleted: true,
-      reason: input.scanDecision.reason,
-      startedAt: input.scanDecision.receivedAt,
-      completedAt: input.scanDecision.updatedAt,
-      updatedAt: input.scanDecision.updatedAt,
-      settingsVersion: null,
-      candidateCount,
-      evaluatedCount: candidateCount,
-      eligibleCount: 0,
-      placementAttemptCount: 0,
-      placedCount: 0,
-      skippedCount: candidateCount,
-      failureCount: 0,
-      missingCandidateIndexes: [],
-      failingCandidateIndexes: [],
-    };
-  }
+  const resetCleared = input.scanDecision?.state === 'reset_cleared'
+    && input.scanDecision.reasonCode === 'ops854_reset_cleared';
   const expected = [...new Set(input.candidateIndexes)].sort((a, b) => a - b);
   const decisionsByIndex = new Map(input.candidateDecisions.map((item) => [item.candidateIndex, item]));
   const terminal = expected.flatMap((candidateIndex) => {
@@ -234,7 +213,7 @@ export function summarizeBotScanEvaluation(input: {
   const failedScan = input.scanDecision?.state === 'failed';
   const allTerminal = terminal.length === expected.length;
   const failingCandidateIndexes = terminal
-    .filter((item) => item.finalResult === 'failed'
+    .filter((item) => item.state === 'failed' || item.finalResult === 'failed'
       || (recordObject(item.details)?.stage === 'execution' && item.finalResult !== 'accepted'
         && input.scanDecision?.state !== 'daily_limit'))
     .map((item) => item.candidateIndex)
@@ -243,7 +222,7 @@ export function summarizeBotScanEvaluation(input: {
   if (disabled) status = 'not_run_disabled';
   else if (inProgress) status = 'pending';
   else if (partialExposure || (!allTerminal && terminal.length > 0)) status = 'partial';
-  else if (failedScan || !allTerminal) status = 'failed';
+  else if (failedScan || failingCandidateIndexes.length > 0 || !allTerminal) status = 'failed';
   else status = 'completed';
   const completed = status === 'completed';
   const decisionDetails = recordObject(input.scanDecision?.details);
@@ -262,7 +241,9 @@ export function summarizeBotScanEvaluation(input: {
   const skippedCount = terminal.filter((item) =>
     !failingCandidateIndexes.includes(item.candidateIndex) && item.finalResult !== 'accepted').length;
   const reason = completed
-    ? 'Every candidate has a terminal auditable BotTrader decision'
+    ? resetCleared
+      ? input.scanDecision?.reason ?? 'Operator reset candidate audits reconciled'
+      : 'Every candidate has a terminal auditable BotTrader decision'
     : input.scanDecision?.reason ?? 'BotTrader evaluation has not started';
   return {
     scanId: input.scanId,
@@ -1105,17 +1086,46 @@ async function ensureSchema(): Promise<void> {
        roi_pct,apy_pct,created_at,updated_at,details,opportunity_id,
        threshold_config_version,final_result,execution_id)
       SELECT s.id,CAST(candidate.key AS INTEGER),s.market_id,
-        CASE WHEN candidate.type='object' THEN COALESCE(json_extract(candidate.value,'$.artist'),'unknown') ELSE 'unknown' END,
-        CASE WHEN candidate.type='object' THEN COALESCE(json_extract(candidate.value,'$.strategy'),'unknown') ELSE 'unknown' END,
-        CASE WHEN candidate.type='object' THEN 'skipped' ELSE 'failed' END,
-        CASE WHEN candidate.type='object' THEN 'ops854_reset_cleared' ELSE 'reset_candidate_payload_unavailable' END,
-        d.reason || CASE WHEN candidate.type='object' THEN ''
+        CASE WHEN candidate.type='object' AND json_type(candidate.value,'$.artist')='text'
+          AND json_type(candidate.value,'$.strategy')='text' THEN json_extract(candidate.value,'$.artist') ELSE 'unknown' END,
+        CASE WHEN candidate.type='object' AND json_type(candidate.value,'$.artist')='text'
+          AND json_type(candidate.value,'$.strategy')='text' THEN json_extract(candidate.value,'$.strategy') ELSE 'unknown' END,
+        CASE WHEN candidate.type='object'
+          AND json_type(candidate.value,'$.artist')='text' AND length(trim(json_extract(candidate.value,'$.artist')))>0
+          AND json_type(candidate.value,'$.strategy')='text' AND length(trim(json_extract(candidate.value,'$.strategy')))>0
+          AND json_type(candidate.value,'$.roiPct') IN ('integer','real')
+          AND json_type(candidate.value,'$.expectedProfit') IN ('integer','real')
+          AND json_type(candidate.value,'$.kalshiTicker')='text' AND length(trim(json_extract(candidate.value,'$.kalshiTicker')))>0
+          AND json_type(candidate.value,'$.pmConditionId')='text' AND length(trim(json_extract(candidate.value,'$.pmConditionId')))>0
+          THEN 'skipped' ELSE 'failed' END,
+        CASE WHEN candidate.type='object'
+          AND json_type(candidate.value,'$.artist')='text' AND length(trim(json_extract(candidate.value,'$.artist')))>0
+          AND json_type(candidate.value,'$.strategy')='text' AND length(trim(json_extract(candidate.value,'$.strategy')))>0
+          AND json_type(candidate.value,'$.roiPct') IN ('integer','real')
+          AND json_type(candidate.value,'$.expectedProfit') IN ('integer','real')
+          AND json_type(candidate.value,'$.kalshiTicker')='text' AND length(trim(json_extract(candidate.value,'$.kalshiTicker')))>0
+          AND json_type(candidate.value,'$.pmConditionId')='text' AND length(trim(json_extract(candidate.value,'$.pmConditionId')))>0
+          THEN 'ops854_reset_cleared' ELSE 'reset_candidate_payload_unavailable' END,
+        d.reason || CASE WHEN candidate.type='object'
+          AND json_type(candidate.value,'$.artist')='text' AND length(trim(json_extract(candidate.value,'$.artist')))>0
+          AND json_type(candidate.value,'$.strategy')='text' AND length(trim(json_extract(candidate.value,'$.strategy')))>0
+          AND json_type(candidate.value,'$.roiPct') IN ('integer','real')
+          AND json_type(candidate.value,'$.expectedProfit') IN ('integer','real')
+          AND json_type(candidate.value,'$.kalshiTicker')='text' AND length(trim(json_extract(candidate.value,'$.kalshiTicker')))>0
+          AND json_type(candidate.value,'$.pmConditionId')='text' AND length(trim(json_extract(candidate.value,'$.pmConditionId')))>0 THEN ''
           ELSE ' Candidate payload is malformed, so exact candidate fields are unavailable.' END,
         CASE WHEN candidate.type='object' THEN json_extract(candidate.value,'$.roiPct') ELSE NULL END,
         CASE WHEN candidate.type='object' THEN json_extract(candidate.value,'$.apyPct') ELSE NULL END,
         d.updated_at,d.updated_at,
         json_object('schemaVersion',1,'stage','operator_reset','final',1,
-          'resetReasonCode',d.reason_code,'payloadUnavailable',CASE WHEN candidate.type='object' THEN 0 ELSE 1 END),
+          'resetReasonCode',d.reason_code,'payloadUnavailable',CASE WHEN candidate.type='object'
+            AND json_type(candidate.value,'$.artist')='text' AND length(trim(json_extract(candidate.value,'$.artist')))>0
+            AND json_type(candidate.value,'$.strategy')='text' AND length(trim(json_extract(candidate.value,'$.strategy')))>0
+            AND json_type(candidate.value,'$.roiPct') IN ('integer','real')
+            AND json_type(candidate.value,'$.expectedProfit') IN ('integer','real')
+            AND json_type(candidate.value,'$.kalshiTicker')='text' AND length(trim(json_extract(candidate.value,'$.kalshiTicker')))>0
+            AND json_type(candidate.value,'$.pmConditionId')='text' AND length(trim(json_extract(candidate.value,'$.pmConditionId')))>0
+            THEN 0 ELSE 1 END),
         'scan:' || s.id || ':opportunity:' || candidate.key,
         NULL,'reset_cleared',NULL
       FROM scan_results s
@@ -1151,8 +1161,63 @@ async function ensureSchema(): Promise<void> {
         'scan:' || scan_id || ':opportunity:' || candidate_index,
         NULL,'reset_cleared',NULL
       FROM reset_missing`);
+      // Reclassify rows written by earlier BUG-181 builds too. INSERT OR IGNORE
+      // cannot repair an existing reset tombstone that treated any JSON object
+      // (including `{}`) as an auditable candidate.
+      await db.execute(`WITH reset_candidates AS (
+        SELECT o.scan_id,o.candidate_index,d.reason,d.reason_code,d.updated_at,candidate.value,
+          CASE WHEN candidate.type='object'
+            AND json_type(candidate.value,'$.artist')='text' AND length(trim(json_extract(candidate.value,'$.artist')))>0
+            AND json_type(candidate.value,'$.strategy')='text' AND length(trim(json_extract(candidate.value,'$.strategy')))>0
+            AND json_type(candidate.value,'$.roiPct') IN ('integer','real')
+            AND json_type(candidate.value,'$.expectedProfit') IN ('integer','real')
+            AND json_type(candidate.value,'$.kalshiTicker')='text' AND length(trim(json_extract(candidate.value,'$.kalshiTicker')))>0
+            AND json_type(candidate.value,'$.pmConditionId')='text' AND length(trim(json_extract(candidate.value,'$.pmConditionId')))>0
+            THEN 1 ELSE 0 END AS audit_valid
+        FROM bot_opportunity_decisions o
+        JOIN scan_results s ON s.id=o.scan_id
+        JOIN bot_scan_decisions d ON d.scan_id=o.scan_id
+        JOIN json_each(CASE WHEN json_valid(s.raw_result)
+          AND json_type(s.raw_result,'$.allArbs')='array' THEN s.raw_result
+          ELSE '{"allArbs":[]}' END,'$.allArbs') candidate
+          ON CAST(candidate.key AS INTEGER)=o.candidate_index
+        WHERE d.state='reset_cleared' AND d.reason_code='ops854_reset_cleared'
+          AND o.final_result='reset_cleared'
+      )
+      UPDATE bot_opportunity_decisions SET
+        outcome=CASE WHEN (SELECT audit_valid FROM reset_candidates r
+          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
+          THEN json_extract((SELECT value FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+            AND r.candidate_index=bot_opportunity_decisions.candidate_index),'$.artist') ELSE 'unknown' END,
+        strategy=CASE WHEN (SELECT audit_valid FROM reset_candidates r
+          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
+          THEN json_extract((SELECT value FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+            AND r.candidate_index=bot_opportunity_decisions.candidate_index),'$.strategy') ELSE 'unknown' END,
+        state=CASE WHEN (SELECT audit_valid FROM reset_candidates r
+          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
+          THEN 'skipped' ELSE 'failed' END,
+        reason_code=CASE WHEN (SELECT audit_valid FROM reset_candidates r
+          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
+          THEN 'ops854_reset_cleared' ELSE 'reset_candidate_payload_unavailable' END,
+        reason=(SELECT reason || CASE WHEN audit_valid=1 THEN ''
+          ELSE ' Candidate payload is malformed, so exact candidate fields are unavailable.' END
+          FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+            AND r.candidate_index=bot_opportunity_decisions.candidate_index),
+        details=(SELECT json_object('schemaVersion',1,'stage','operator_reset','final',1,
+          'resetReasonCode',reason_code,'payloadUnavailable',CASE WHEN audit_valid=1 THEN 0 ELSE 1 END)
+          FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+            AND r.candidate_index=bot_opportunity_decisions.candidate_index),
+        updated_at=(SELECT updated_at FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+          AND r.candidate_index=bot_opportunity_decisions.candidate_index)
+      WHERE EXISTS (SELECT 1 FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+        AND r.candidate_index=bot_opportunity_decisions.candidate_index)`);
       await db.execute(`UPDATE bot_scan_evaluations SET
-      status='completed', completed=1,
+      status=CASE WHEN EXISTS (SELECT 1 FROM bot_opportunity_decisions o
+        WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
+        THEN 'failed' ELSE 'completed' END,
+      completed=CASE WHEN EXISTS (SELECT 1 FROM bot_opportunity_decisions o
+        WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
+        THEN 0 ELSE 1 END,
       reason=(SELECT d.reason FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
       completed_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
       updated_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
@@ -1160,19 +1225,21 @@ async function ensureSchema(): Promise<void> {
         AND json_type(s.raw_result,'$.allArbs')='array'
         THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
         ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
-      evaluated_count=(SELECT CASE WHEN json_valid(s.raw_result)
-        AND json_type(s.raw_result,'$.allArbs')='array'
-        THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
-        ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
+      evaluated_count=(SELECT COUNT(*) FROM bot_opportunity_decisions o
+        WHERE o.scan_id=bot_scan_evaluations.scan_id AND o.final_result IS NOT NULL),
       eligible_count=0, placement_attempt_count=0, placed_count=0,
-      skipped_count=(SELECT CASE WHEN json_valid(s.raw_result)
-        AND json_type(s.raw_result,'$.allArbs')='array'
-        THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
-        ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
-      failure_count=0, missing_candidate_indexes='[]', failing_candidate_indexes='[]'
+      skipped_count=(SELECT COUNT(*) FROM bot_opportunity_decisions o
+        WHERE o.scan_id=bot_scan_evaluations.scan_id AND o.final_result IS NOT NULL
+          AND o.state<>'failed' AND o.final_result NOT IN ('failed','accepted')),
+      failure_count=(SELECT COUNT(*) FROM bot_opportunity_decisions o
+        WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed')),
+      missing_candidate_indexes='[]',
+      failing_candidate_indexes=COALESCE((SELECT json_group_array(candidate_index) FROM
+        (SELECT candidate_index FROM bot_opportunity_decisions o
+          WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed')
+          ORDER BY candidate_index)), '[]')
       WHERE scan_id IN (SELECT scan_id FROM bot_scan_decisions
-        WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')
-        AND (completed<>1 OR status<>'completed')`);
+        WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')`);
     }
     schemaReady = true;
   } finally {
