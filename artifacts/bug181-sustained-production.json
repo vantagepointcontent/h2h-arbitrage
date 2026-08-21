@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "startedAt": "2026-08-21T14:47:42.759Z",
-  "completedAt": "2026-08-21T14:50:15.758Z",
+  "startedAt": "2026-08-21T15:44:49.208Z",
+  "completedAt": "2026-08-21T15:47:32.814Z",
   "intervalMs": 30000,
   "sampleCount": 6,
   "checks": {
@@ -13,6 +13,7 @@
     "noOverdueMarkets": true,
     "cursorAlwaysCaughtUp": true,
     "canonicalPopulationComplete": true,
+    "hydratedMarketsWithinSla": true,
     "positiveHistoryTerminal": true,
     "noProcessRestartDuringWindow": true,
     "scanIdsAdvanced": true
@@ -20,10 +21,10 @@
   "passed": true,
   "samples": [
     {
-      "at": "2026-08-21T14:47:42.759Z",
+      "at": "2026-08-21T15:44:49.208Z",
       "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
       },
       "components": {
         "scanner": {
@@ -50,12 +51,12 @@
         "botTrader": {
           "state": "healthy",
           "reasons": [],
-          "heartbeatAt": "2026-08-21T14:47:39.157Z",
-          "heartbeatAgeMs": 3570,
+          "heartbeatAt": "2026-08-21T15:44:42.936Z",
+          "heartbeatAgeMs": 3829,
           "pendingScans": 0,
           "cursorLag": 0,
-          "cursorScanId": 836786,
-          "latestCompletedScanId": 837102,
+          "cursorScanId": 837879,
+          "latestCompletedScanId": 837879,
           "error": null
         }
       },
@@ -63,19 +64,19 @@
         "available": true,
         "mixedVersion": false,
         "stale": false,
-        "staleForMs": 37855,
+        "staleForMs": 25546,
         "expectedSchedulerVersion": "bug-165-v1",
         "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:47:04.872Z",
+        "heartbeatAt": "2026-08-21T15:44:21.219Z",
         "status": "ok",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:46:56.975Z",
-        "finishedAt": "2026-08-21T14:47:04.871Z",
-        "durationMs": 7896,
-        "successCount": 2,
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:43:02.459Z",
+        "finishedAt": "2026-08-21T15:44:21.218Z",
+        "durationMs": 78759,
+        "successCount": 79,
         "failureCount": 0,
-        "avgScanMs": 5531,
-        "maxScanMs": 7698,
+        "avgScanMs": 2692,
+        "maxScanMs": 13810,
         "openBreakers": 0,
         "capacity": {
           "configuredConcurrency": 3,
@@ -83,16 +84,16 @@
           "sufficientForFreshnessSla": true
         },
         "progress": {
-          "completedDueCount": 2,
-          "dueCount": 2
+          "completedDueCount": 79,
+          "dueCount": 79
         },
         "queue": {
           "eligibleCount": 476,
-          "dueCount": 0,
+          "dueCount": 28,
           "overdueCount": 0,
           "failedCount": 0,
           "inProgressCount": 0,
-          "oldestSuccessAgeMs": 3386127
+          "oldestSuccessAgeMs": 3304443
         }
       },
       "botWorkflow": {
@@ -103,35 +104,30 @@
         "requestedExecutionMode": "paper",
         "liveAuthorizationConfigured": false,
         "credentialsReady": false,
-        "latestCompletedScanId": 837102,
-        "latestCompletedScanAt": "2026-08-21T14:47:04.435Z",
+        "latestCompletedScanId": 837879,
+        "latestCompletedScanAt": "2026-08-21T15:44:20.874Z",
         "latestPositiveScanId": 760301,
         "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 836786,
-        "cursorUpdatedAt": "2026-08-21T14:47:04.532Z",
-        "latestDecisionScanId": 837102,
-        "latestDecisionAt": "2026-08-21T14:47:04.529Z",
+        "cursorScanId": 837879,
+        "cursorUpdatedAt": "2026-08-21T15:44:20.987Z",
+        "latestDecisionScanId": 837879,
+        "latestDecisionAt": "2026-08-21T15:44:20.984Z",
         "pendingScans": 0,
         "cursorLag": 0,
         "opportunitiesEvaluated": 21418,
         "eligibleCount": 0,
         "lastExecutionOrSkip": {
-          "scanId": 837102,
+          "scanId": 837879,
           "state": "criteria_rejected",
           "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:47:04.529Z"
+          "at": "2026-08-21T15:44:20.984Z"
         },
-        "inProgress": {
-          "scanId": 836787,
-          "state": "received",
-          "reason": "Persisted completed scan received",
-          "at": "2026-08-21T14:32:58.012Z"
-        },
+        "inProgress": null,
         "consumer": {
           "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:47:39.157Z",
-          "ageMs": 3586,
-          "processed": 1,
+          "lastSuccessAt": "2026-08-21T15:44:42.936Z",
+          "ageMs": 3868,
+          "processed": 0,
           "error": null
         }
       },
@@ -140,6 +136,18 @@
         "scanned": 476,
         "unavailableWithoutReason": 0,
         "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 476,
+        "stale": 0,
+        "refreshing": 0,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
       },
       "positiveLogs": {
         "total": 12668,
@@ -153,9 +161,9 @@
         {
           "name": "h2h-release-monitor",
           "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
         },
         {
           "name": "h2h-disk-monitor",
@@ -174,59 +182,59 @@
         {
           "name": "h2h-arbitrage",
           "status": "online",
-          "pid": 178113,
-          "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
         },
         {
           "name": "h2h-poller",
           "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
         },
         {
           "name": "h2h-scan-supervisor",
           "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
+          "pid": 231991,
+          "restarts": 7,
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
         },
         {
           "name": "h2h-db-maintenance",
           "status": "online",
-          "pid": 169548,
+          "pid": 231945,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
         },
         {
           "name": "h2h-ragnar",
           "status": "online",
-          "pid": 178029,
+          "pid": 231946,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
         },
         {
           "name": "h2h-watcher",
           "status": "online",
-          "pid": 169620,
+          "pid": 232017,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
         },
         {
           "name": "h2h-valuer",
           "status": "online",
-          "pid": 169621,
+          "pid": 232018,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
         }
       ]
     },
     {
-      "at": "2026-08-21T14:48:13.374Z",
+      "at": "2026-08-21T15:45:22.067Z",
       "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
       },
       "components": {
         "scanner": {
@@ -253,12 +261,12 @@
         "botTrader": {
           "state": "healthy",
           "reasons": [],
-          "heartbeatAt": "2026-08-21T14:48:10.061Z",
-          "heartbeatAgeMs": 3269,
+          "heartbeatAt": "2026-08-21T15:45:13.771Z",
+          "heartbeatAgeMs": 5963,
           "pendingScans": 0,
           "cursorLag": 0,
-          "cursorScanId": 837105,
-          "latestCompletedScanId": 837105,
+          "cursorScanId": 837879,
+          "latestCompletedScanId": 837879,
           "error": null
         }
       },
@@ -266,13 +274,853 @@
         "available": true,
         "mixedVersion": false,
         "stale": false,
-        "staleForMs": 8403,
+        "staleForMs": 58515,
         "expectedSchedulerVersion": "bug-165-v1",
         "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:48:04.927Z",
+        "heartbeatAt": "2026-08-21T15:44:21.219Z",
+        "status": "ok",
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:43:02.459Z",
+        "finishedAt": "2026-08-21T15:44:21.218Z",
+        "durationMs": 78759,
+        "successCount": 79,
+        "failureCount": 0,
+        "avgScanMs": 2692,
+        "maxScanMs": 13810,
+        "openBreakers": 0,
+        "capacity": {
+          "configuredConcurrency": 3,
+          "requiredConcurrency": 3,
+          "sufficientForFreshnessSla": true
+        },
+        "progress": {
+          "completedDueCount": 79,
+          "dueCount": 79
+        },
+        "queue": {
+          "eligibleCount": 476,
+          "dueCount": 28,
+          "overdueCount": 0,
+          "failedCount": 0,
+          "inProgressCount": 0,
+          "oldestSuccessAgeMs": 3304443
+        }
+      },
+      "botWorkflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 837879,
+        "latestCompletedScanAt": "2026-08-21T15:44:20.874Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 837879,
+        "cursorUpdatedAt": "2026-08-21T15:44:20.987Z",
+        "latestDecisionScanId": 837879,
+        "latestDecisionAt": "2026-08-21T15:44:20.984Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 837879,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T15:44:20.984Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-21T15:45:13.771Z",
+          "ageMs": 5989,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "markets": {
+        "total": 476,
+        "scanned": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 476,
+        "stale": 0,
+        "refreshing": 0,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
+      },
+      "positiveLogs": {
+        "total": 12668,
+        "rows": 500,
+        "completed": 475,
+        "failed": 25,
+        "missingCandidateGaps": 0,
+        "terminallyReconciled": 500
+      },
+      "processes": [
+        {
+          "name": "h2h-release-monitor",
+          "status": "online",
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
+        },
+        {
+          "name": "h2h-disk-monitor",
+          "status": "online",
+          "pid": 1360,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.201Z"
+        },
+        {
+          "name": "h2h-storage-retention",
+          "status": "online",
+          "pid": 1382,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.241Z"
+        },
+        {
+          "name": "h2h-arbitrage",
+          "status": "online",
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
+        },
+        {
+          "name": "h2h-poller",
+          "status": "online",
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
+        },
+        {
+          "name": "h2h-scan-supervisor",
+          "status": "online",
+          "pid": 231991,
+          "restarts": 7,
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
+        },
+        {
+          "name": "h2h-db-maintenance",
+          "status": "online",
+          "pid": 231945,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
+        },
+        {
+          "name": "h2h-ragnar",
+          "status": "online",
+          "pid": 231946,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
+        },
+        {
+          "name": "h2h-watcher",
+          "status": "online",
+          "pid": 232017,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
+        },
+        {
+          "name": "h2h-valuer",
+          "status": "online",
+          "pid": 232018,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
+        }
+      ]
+    },
+    {
+      "at": "2026-08-21T15:45:54.927Z",
+      "deployment": {
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
+      },
+      "components": {
+        "scanner": {
+          "state": "healthy",
+          "reason": null
+        },
+        "persistence": {
+          "state": "healthy",
+          "busyRetries": 0,
+          "exhaustedWrites": 0,
+          "lastBusyAt": null,
+          "lastExhaustedAt": null
+        },
+        "markets": {
+          "state": "healthy",
+          "reasons": [],
+          "total": 476,
+          "scanned": 476,
+          "availableApy": 0,
+          "unavailableWithReason": 476,
+          "unavailableWithoutReason": 0,
+          "zeroCurrentRoi": 0
+        },
+        "botTrader": {
+          "state": "healthy",
+          "reasons": [],
+          "heartbeatAt": "2026-08-21T15:45:44.648Z",
+          "heartbeatAgeMs": 7961,
+          "pendingScans": 0,
+          "cursorLag": 0,
+          "cursorScanId": 837902,
+          "latestCompletedScanId": 837902,
+          "error": null
+        }
+      },
+      "scheduler": {
+        "available": true,
+        "mixedVersion": false,
+        "stale": false,
+        "staleForMs": 1258,
+        "expectedSchedulerVersion": "bug-165-v1",
+        "observedSchedulerVersion": "bug-165-v1",
+        "heartbeatAt": "2026-08-21T15:45:51.351Z",
         "status": "running",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:48:04.927Z",
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:45:21.272Z",
+        "finishedAt": null,
+        "durationMs": null,
+        "successCount": 26,
+        "failureCount": 0,
+        "avgScanMs": 0,
+        "maxScanMs": 0,
+        "openBreakers": null,
+        "capacity": {
+          "configuredConcurrency": 3,
+          "requiredConcurrency": 3,
+          "sufficientForFreshnessSla": true
+        },
+        "progress": {
+          "completedDueCount": 26,
+          "dueCount": 29
+        },
+        "queue": {
+          "eligibleCount": 476,
+          "dueCount": 29,
+          "overdueCount": 0,
+          "failedCount": 0,
+          "inProgressCount": 0,
+          "oldestSuccessAgeMs": 3364575
+        }
+      },
+      "botWorkflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 837905,
+        "latestCompletedScanAt": "2026-08-21T15:45:49.374Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 837905,
+        "cursorUpdatedAt": "2026-08-21T15:45:49.466Z",
+        "latestDecisionScanId": 837905,
+        "latestDecisionAt": "2026-08-21T15:45:49.463Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 837905,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T15:45:49.463Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-21T15:45:44.648Z",
+          "ageMs": 7982,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "markets": {
+        "total": 476,
+        "scanned": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 473,
+        "stale": 0,
+        "refreshing": 3,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
+      },
+      "positiveLogs": {
+        "total": 12668,
+        "rows": 500,
+        "completed": 475,
+        "failed": 25,
+        "missingCandidateGaps": 0,
+        "terminallyReconciled": 500
+      },
+      "processes": [
+        {
+          "name": "h2h-release-monitor",
+          "status": "online",
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
+        },
+        {
+          "name": "h2h-disk-monitor",
+          "status": "online",
+          "pid": 1360,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.201Z"
+        },
+        {
+          "name": "h2h-storage-retention",
+          "status": "online",
+          "pid": 1382,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.241Z"
+        },
+        {
+          "name": "h2h-arbitrage",
+          "status": "online",
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
+        },
+        {
+          "name": "h2h-poller",
+          "status": "online",
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
+        },
+        {
+          "name": "h2h-scan-supervisor",
+          "status": "online",
+          "pid": 231991,
+          "restarts": 7,
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
+        },
+        {
+          "name": "h2h-db-maintenance",
+          "status": "online",
+          "pid": 231945,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
+        },
+        {
+          "name": "h2h-ragnar",
+          "status": "online",
+          "pid": 231946,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
+        },
+        {
+          "name": "h2h-watcher",
+          "status": "online",
+          "pid": 232017,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
+        },
+        {
+          "name": "h2h-valuer",
+          "status": "online",
+          "pid": 232018,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
+        }
+      ]
+    },
+    {
+      "at": "2026-08-21T15:46:28.040Z",
+      "deployment": {
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
+      },
+      "components": {
+        "scanner": {
+          "state": "healthy",
+          "reason": null
+        },
+        "persistence": {
+          "state": "healthy",
+          "busyRetries": 0,
+          "exhaustedWrites": 0,
+          "lastBusyAt": null,
+          "lastExhaustedAt": null
+        },
+        "markets": {
+          "state": "healthy",
+          "reasons": [],
+          "total": 476,
+          "scanned": 476,
+          "availableApy": 0,
+          "unavailableWithReason": 476,
+          "unavailableWithoutReason": 0,
+          "zeroCurrentRoi": 0
+        },
+        "botTrader": {
+          "state": "healthy",
+          "reasons": [],
+          "heartbeatAt": "2026-08-21T15:46:15.498Z",
+          "heartbeatAgeMs": 9964,
+          "pendingScans": 0,
+          "cursorLag": 0,
+          "cursorScanId": 837908,
+          "latestCompletedScanId": 837908,
+          "error": null
+        }
+      },
+      "scheduler": {
+        "available": true,
+        "mixedVersion": false,
+        "stale": false,
+        "staleForMs": 23612,
+        "expectedSchedulerVersion": "bug-165-v1",
+        "observedSchedulerVersion": "bug-165-v1",
+        "heartbeatAt": "2026-08-21T15:46:01.850Z",
+        "status": "ok",
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:45:21.272Z",
+        "finishedAt": "2026-08-21T15:46:01.849Z",
+        "durationMs": 40577,
+        "successCount": 29,
+        "failureCount": 0,
+        "avgScanMs": 3709,
+        "maxScanMs": 12599,
+        "openBreakers": 0,
+        "capacity": {
+          "configuredConcurrency": 3,
+          "requiredConcurrency": 3,
+          "sufficientForFreshnessSla": true
+        },
+        "progress": {
+          "completedDueCount": 29,
+          "dueCount": 29
+        },
+        "queue": {
+          "eligibleCount": 476,
+          "dueCount": 41,
+          "overdueCount": 0,
+          "failedCount": 0,
+          "inProgressCount": 0,
+          "oldestSuccessAgeMs": 3405074
+        }
+      },
+      "botWorkflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 837908,
+        "latestCompletedScanAt": "2026-08-21T15:46:01.514Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 837908,
+        "cursorUpdatedAt": "2026-08-21T15:46:01.629Z",
+        "latestDecisionScanId": 837908,
+        "latestDecisionAt": "2026-08-21T15:46:01.626Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 837908,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T15:46:01.626Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-21T15:46:15.498Z",
+          "ageMs": 9986,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "markets": {
+        "total": 476,
+        "scanned": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 476,
+        "stale": 0,
+        "refreshing": 0,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
+      },
+      "positiveLogs": {
+        "total": 12668,
+        "rows": 500,
+        "completed": 475,
+        "failed": 25,
+        "missingCandidateGaps": 0,
+        "terminallyReconciled": 500
+      },
+      "processes": [
+        {
+          "name": "h2h-release-monitor",
+          "status": "online",
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
+        },
+        {
+          "name": "h2h-disk-monitor",
+          "status": "online",
+          "pid": 1360,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.201Z"
+        },
+        {
+          "name": "h2h-storage-retention",
+          "status": "online",
+          "pid": 1382,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.241Z"
+        },
+        {
+          "name": "h2h-arbitrage",
+          "status": "online",
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
+        },
+        {
+          "name": "h2h-poller",
+          "status": "online",
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
+        },
+        {
+          "name": "h2h-scan-supervisor",
+          "status": "online",
+          "pid": 231991,
+          "restarts": 7,
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
+        },
+        {
+          "name": "h2h-db-maintenance",
+          "status": "online",
+          "pid": 231945,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
+        },
+        {
+          "name": "h2h-ragnar",
+          "status": "online",
+          "pid": 231946,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
+        },
+        {
+          "name": "h2h-watcher",
+          "status": "online",
+          "pid": 232017,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
+        },
+        {
+          "name": "h2h-valuer",
+          "status": "online",
+          "pid": 232018,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
+        }
+      ]
+    },
+    {
+      "at": "2026-08-21T15:46:59.870Z",
+      "deployment": {
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
+      },
+      "components": {
+        "scanner": {
+          "state": "healthy",
+          "reason": null
+        },
+        "persistence": {
+          "state": "healthy",
+          "busyRetries": 0,
+          "exhaustedWrites": 0,
+          "lastBusyAt": null,
+          "lastExhaustedAt": null
+        },
+        "markets": {
+          "state": "healthy",
+          "reasons": [],
+          "total": 476,
+          "scanned": 476,
+          "availableApy": 0,
+          "unavailableWithReason": 476,
+          "unavailableWithoutReason": 0,
+          "zeroCurrentRoi": 0
+        },
+        "botTrader": {
+          "state": "healthy",
+          "reasons": [],
+          "heartbeatAt": "2026-08-21T15:46:56.644Z",
+          "heartbeatAgeMs": 1939,
+          "pendingScans": 0,
+          "cursorLag": 0,
+          "cursorScanId": 837908,
+          "latestCompletedScanId": 837908,
+          "error": null
+        }
+      },
+      "scheduler": {
+        "available": true,
+        "mixedVersion": false,
+        "stale": false,
+        "staleForMs": 56733,
+        "expectedSchedulerVersion": "bug-165-v1",
+        "observedSchedulerVersion": "bug-165-v1",
+        "heartbeatAt": "2026-08-21T15:46:01.850Z",
+        "status": "ok",
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:45:21.272Z",
+        "finishedAt": "2026-08-21T15:46:01.849Z",
+        "durationMs": 40577,
+        "successCount": 29,
+        "failureCount": 0,
+        "avgScanMs": 3709,
+        "maxScanMs": 12599,
+        "openBreakers": 0,
+        "capacity": {
+          "configuredConcurrency": 3,
+          "requiredConcurrency": 3,
+          "sufficientForFreshnessSla": true
+        },
+        "progress": {
+          "completedDueCount": 29,
+          "dueCount": 29
+        },
+        "queue": {
+          "eligibleCount": 476,
+          "dueCount": 41,
+          "overdueCount": 0,
+          "failedCount": 0,
+          "inProgressCount": 0,
+          "oldestSuccessAgeMs": 3405074
+        }
+      },
+      "botWorkflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 837908,
+        "latestCompletedScanAt": "2026-08-21T15:46:01.514Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 837908,
+        "cursorUpdatedAt": "2026-08-21T15:46:01.629Z",
+        "latestDecisionScanId": 837908,
+        "latestDecisionAt": "2026-08-21T15:46:01.626Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 837908,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T15:46:01.626Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-21T15:46:56.644Z",
+          "ageMs": 1955,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "markets": {
+        "total": 476,
+        "scanned": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 476,
+        "stale": 0,
+        "refreshing": 0,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
+      },
+      "positiveLogs": {
+        "total": 12668,
+        "rows": 500,
+        "completed": 475,
+        "failed": 25,
+        "missingCandidateGaps": 0,
+        "terminallyReconciled": 500
+      },
+      "processes": [
+        {
+          "name": "h2h-release-monitor",
+          "status": "online",
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
+        },
+        {
+          "name": "h2h-disk-monitor",
+          "status": "online",
+          "pid": 1360,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.201Z"
+        },
+        {
+          "name": "h2h-storage-retention",
+          "status": "online",
+          "pid": 1382,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T06:49:54.241Z"
+        },
+        {
+          "name": "h2h-arbitrage",
+          "status": "online",
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
+        },
+        {
+          "name": "h2h-poller",
+          "status": "online",
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
+        },
+        {
+          "name": "h2h-scan-supervisor",
+          "status": "online",
+          "pid": 231991,
+          "restarts": 7,
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
+        },
+        {
+          "name": "h2h-db-maintenance",
+          "status": "online",
+          "pid": 231945,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
+        },
+        {
+          "name": "h2h-ragnar",
+          "status": "online",
+          "pid": 231946,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
+        },
+        {
+          "name": "h2h-watcher",
+          "status": "online",
+          "pid": 232017,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
+        },
+        {
+          "name": "h2h-valuer",
+          "status": "online",
+          "pid": 232018,
+          "restarts": 0,
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
+        }
+      ]
+    },
+    {
+      "at": "2026-08-21T15:47:32.814Z",
+      "deployment": {
+        "commit": "417ba19942c9355de3c9b875f6385255fdd3c247",
+        "buildId": "j4yKqSPvtqKAfh86v1343"
+      },
+      "components": {
+        "scanner": {
+          "state": "healthy",
+          "reason": null
+        },
+        "persistence": {
+          "state": "healthy",
+          "busyRetries": 0,
+          "exhaustedWrites": 0,
+          "lastBusyAt": null,
+          "lastExhaustedAt": null
+        },
+        "markets": {
+          "state": "healthy",
+          "reasons": [],
+          "total": 476,
+          "scanned": 476,
+          "availableApy": 0,
+          "unavailableWithReason": 476,
+          "unavailableWithoutReason": 0,
+          "zeroCurrentRoi": 0
+        },
+        "botTrader": {
+          "state": "healthy",
+          "reasons": [],
+          "heartbeatAt": "2026-08-21T15:47:27.551Z",
+          "heartbeatAgeMs": 2874,
+          "pendingScans": 0,
+          "cursorLag": 0,
+          "cursorScanId": 837935,
+          "latestCompletedScanId": 837935,
+          "error": null
+        }
+      },
+      "scheduler": {
+        "available": true,
+        "mixedVersion": false,
+        "stale": false,
+        "staleForMs": 28528,
+        "expectedSchedulerVersion": "bug-165-v1",
+        "observedSchedulerVersion": "bug-165-v1",
+        "heartbeatAt": "2026-08-21T15:47:01.897Z",
+        "status": "running",
+        "pollerPid": 231985,
+        "startedAt": "2026-08-21T15:47:01.897Z",
         "finishedAt": null,
         "durationMs": null,
         "successCount": 0,
@@ -296,29 +1144,29 @@
         "requestedExecutionMode": "paper",
         "liveAuthorizationConfigured": false,
         "credentialsReady": false,
-        "latestCompletedScanId": 837110,
-        "latestCompletedScanAt": "2026-08-21T14:48:12.779Z",
+        "latestCompletedScanId": 837938,
+        "latestCompletedScanAt": "2026-08-21T15:47:28.174Z",
         "latestPositiveScanId": 760301,
         "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 837110,
-        "cursorUpdatedAt": "2026-08-21T14:48:12.878Z",
-        "latestDecisionScanId": 837110,
-        "latestDecisionAt": "2026-08-21T14:48:12.876Z",
+        "cursorScanId": 837938,
+        "cursorUpdatedAt": "2026-08-21T15:47:28.289Z",
+        "latestDecisionScanId": 837938,
+        "latestDecisionAt": "2026-08-21T15:47:28.287Z",
         "pendingScans": 0,
         "cursorLag": 0,
         "opportunitiesEvaluated": 21418,
         "eligibleCount": 0,
         "lastExecutionOrSkip": {
-          "scanId": 837110,
+          "scanId": 837938,
           "state": "criteria_rejected",
           "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:48:12.876Z"
+          "at": "2026-08-21T15:47:28.287Z"
         },
         "inProgress": null,
         "consumer": {
           "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:48:10.061Z",
-          "ageMs": 3294,
+          "lastSuccessAt": "2026-08-21T15:47:27.551Z",
+          "ageMs": 2900,
           "processed": 0,
           "error": null
         }
@@ -328,6 +1176,18 @@
         "scanned": 476,
         "unavailableWithoutReason": 0,
         "zeroCurrentRoi": 0
+      },
+      "uiFreshness": {
+        "hydrated": true,
+        "total": 476,
+        "recognizedTotal": 476,
+        "unrecognized": [],
+        "fresh": 473,
+        "stale": 0,
+        "refreshing": 3,
+        "not_scanned": 0,
+        "staleWithoutReason": 0,
+        "renderedRows": 476
       },
       "positiveLogs": {
         "total": 12668,
@@ -341,9 +1201,9 @@
         {
           "name": "h2h-release-monitor",
           "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
+          "pid": 232297,
+          "restarts": 5,
+          "uptimeAt": "2026-08-21T15:42:38.466Z"
         },
         {
           "name": "h2h-disk-monitor",
@@ -362,833 +1222,51 @@
         {
           "name": "h2h-arbitrage",
           "status": "online",
-          "pid": 178113,
-          "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
+          "pid": 231513,
+          "restarts": 8,
+          "uptimeAt": "2026-08-21T15:41:23.814Z"
         },
         {
           "name": "h2h-poller",
           "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
+          "pid": 231985,
+          "restarts": 23,
+          "uptimeAt": "2026-08-21T15:41:37.621Z"
         },
         {
           "name": "h2h-scan-supervisor",
           "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
-        },
-        {
-          "name": "h2h-db-maintenance",
-          "status": "online",
-          "pid": 169548,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
-        },
-        {
-          "name": "h2h-ragnar",
-          "status": "online",
-          "pid": 178029,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
-        },
-        {
-          "name": "h2h-watcher",
-          "status": "online",
-          "pid": 169620,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
-        },
-        {
-          "name": "h2h-valuer",
-          "status": "online",
-          "pid": 169621,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-21T14:48:43.959Z",
-      "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
-      },
-      "components": {
-        "scanner": {
-          "state": "healthy",
-          "reason": null
-        },
-        "persistence": {
-          "state": "healthy",
-          "busyRetries": 0,
-          "exhaustedWrites": 0,
-          "lastBusyAt": null,
-          "lastExhaustedAt": null
-        },
-        "markets": {
-          "state": "healthy",
-          "reasons": [],
-          "total": 476,
-          "scanned": 476,
-          "availableApy": 0,
-          "unavailableWithReason": 476,
-          "unavailableWithoutReason": 0,
-          "zeroCurrentRoi": 0
-        },
-        "botTrader": {
-          "state": "healthy",
-          "reasons": [],
-          "heartbeatAt": "2026-08-21T14:48:40.898Z",
-          "heartbeatAgeMs": 3029,
-          "pendingScans": 0,
-          "cursorLag": 0,
-          "cursorScanId": 837111,
-          "latestCompletedScanId": 837111,
-          "error": null
-        }
-      },
-      "scheduler": {
-        "available": true,
-        "mixedVersion": false,
-        "stale": false,
-        "staleForMs": 30412,
-        "expectedSchedulerVersion": "bug-165-v1",
-        "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:48:13.515Z",
-        "status": "ok",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:48:04.927Z",
-        "finishedAt": "2026-08-21T14:48:13.514Z",
-        "durationMs": 8587,
-        "successCount": 9,
-        "failureCount": 0,
-        "avgScanMs": 2660,
-        "maxScanMs": 3119,
-        "openBreakers": 0,
-        "capacity": {
-          "configuredConcurrency": 3,
-          "requiredConcurrency": 3,
-          "sufficientForFreshnessSla": true
-        },
-        "progress": {
-          "completedDueCount": 9,
-          "dueCount": 9
-        },
-        "queue": {
-          "eligibleCount": 476,
-          "dueCount": 0,
-          "overdueCount": 0,
-          "failedCount": 0,
-          "inProgressCount": 0,
-          "oldestSuccessAgeMs": 3454771
-        }
-      },
-      "botWorkflow": {
-        "health": "healthy",
-        "degradedReasons": [],
-        "liveUnavailableReasons": [],
-        "effectiveExecutionMode": "paper",
-        "requestedExecutionMode": "paper",
-        "liveAuthorizationConfigured": false,
-        "credentialsReady": false,
-        "latestCompletedScanId": 837111,
-        "latestCompletedScanAt": "2026-08-21T14:48:12.932Z",
-        "latestPositiveScanId": 760301,
-        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 837111,
-        "cursorUpdatedAt": "2026-08-21T14:48:13.120Z",
-        "latestDecisionScanId": 837111,
-        "latestDecisionAt": "2026-08-21T14:48:13.117Z",
-        "pendingScans": 0,
-        "cursorLag": 0,
-        "opportunitiesEvaluated": 21418,
-        "eligibleCount": 0,
-        "lastExecutionOrSkip": {
-          "scanId": 837111,
-          "state": "criteria_rejected",
-          "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:48:13.117Z"
-        },
-        "inProgress": null,
-        "consumer": {
-          "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:48:40.898Z",
-          "ageMs": 3057,
-          "processed": 0,
-          "error": null
-        }
-      },
-      "markets": {
-        "total": 476,
-        "scanned": 476,
-        "unavailableWithoutReason": 0,
-        "zeroCurrentRoi": 0
-      },
-      "positiveLogs": {
-        "total": 12668,
-        "rows": 500,
-        "completed": 475,
-        "failed": 25,
-        "missingCandidateGaps": 0,
-        "terminallyReconciled": 500
-      },
-      "processes": [
-        {
-          "name": "h2h-release-monitor",
-          "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
-        },
-        {
-          "name": "h2h-disk-monitor",
-          "status": "online",
-          "pid": 1360,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.201Z"
-        },
-        {
-          "name": "h2h-storage-retention",
-          "status": "online",
-          "pid": 1382,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.241Z"
-        },
-        {
-          "name": "h2h-arbitrage",
-          "status": "online",
-          "pid": 178113,
+          "pid": 231991,
           "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
-        },
-        {
-          "name": "h2h-poller",
-          "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
-        },
-        {
-          "name": "h2h-scan-supervisor",
-          "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
+          "uptimeAt": "2026-08-21T15:41:37.629Z"
         },
         {
           "name": "h2h-db-maintenance",
           "status": "online",
-          "pid": 169548,
+          "pid": 231945,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
+          "uptimeAt": "2026-08-21T15:41:37.297Z"
         },
         {
           "name": "h2h-ragnar",
           "status": "online",
-          "pid": 178029,
+          "pid": 231946,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
+          "uptimeAt": "2026-08-21T15:41:37.298Z"
         },
         {
           "name": "h2h-watcher",
           "status": "online",
-          "pid": 169620,
+          "pid": 232017,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
+          "uptimeAt": "2026-08-21T15:41:37.811Z"
         },
         {
           "name": "h2h-valuer",
           "status": "online",
-          "pid": 169621,
+          "pid": 232018,
           "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-21T14:49:14.570Z",
-      "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
-      },
-      "components": {
-        "scanner": {
-          "state": "healthy",
-          "reason": null
-        },
-        "persistence": {
-          "state": "healthy",
-          "busyRetries": 0,
-          "exhaustedWrites": 0,
-          "lastBusyAt": null,
-          "lastExhaustedAt": null
-        },
-        "markets": {
-          "state": "healthy",
-          "reasons": [],
-          "total": 476,
-          "scanned": 476,
-          "availableApy": 0,
-          "unavailableWithReason": 476,
-          "unavailableWithoutReason": 0,
-          "zeroCurrentRoi": 0
-        },
-        "botTrader": {
-          "state": "healthy",
-          "reasons": [],
-          "heartbeatAt": "2026-08-21T14:49:11.703Z",
-          "heartbeatAgeMs": 2836,
-          "pendingScans": 0,
-          "cursorLag": 0,
-          "cursorScanId": 837111,
-          "latestCompletedScanId": 837111,
-          "error": null
-        }
-      },
-      "scheduler": {
-        "available": true,
-        "mixedVersion": false,
-        "stale": false,
-        "staleForMs": 969,
-        "expectedSchedulerVersion": "bug-165-v1",
-        "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:49:13.570Z",
-        "status": "running",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:49:13.570Z",
-        "finishedAt": null,
-        "durationMs": null,
-        "successCount": 0,
-        "failureCount": 0,
-        "avgScanMs": 0,
-        "maxScanMs": 0,
-        "openBreakers": null,
-        "capacity": {
-          "configuredConcurrency": 3,
-          "requiredConcurrency": 3,
-          "sufficientForFreshnessSla": true
-        },
-        "progress": null,
-        "queue": null
-      },
-      "botWorkflow": {
-        "health": "healthy",
-        "degradedReasons": [],
-        "liveUnavailableReasons": [],
-        "effectiveExecutionMode": "paper",
-        "requestedExecutionMode": "paper",
-        "liveAuthorizationConfigured": false,
-        "credentialsReady": false,
-        "latestCompletedScanId": 837111,
-        "latestCompletedScanAt": "2026-08-21T14:48:12.932Z",
-        "latestPositiveScanId": 760301,
-        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 837111,
-        "cursorUpdatedAt": "2026-08-21T14:48:13.120Z",
-        "latestDecisionScanId": 837111,
-        "latestDecisionAt": "2026-08-21T14:48:13.117Z",
-        "pendingScans": 0,
-        "cursorLag": 0,
-        "opportunitiesEvaluated": 21418,
-        "eligibleCount": 0,
-        "lastExecutionOrSkip": {
-          "scanId": 837111,
-          "state": "criteria_rejected",
-          "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:48:13.117Z"
-        },
-        "inProgress": null,
-        "consumer": {
-          "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:49:11.703Z",
-          "ageMs": 2854,
-          "processed": 0,
-          "error": null
-        }
-      },
-      "markets": {
-        "total": 476,
-        "scanned": 476,
-        "unavailableWithoutReason": 0,
-        "zeroCurrentRoi": 0
-      },
-      "positiveLogs": {
-        "total": 12668,
-        "rows": 500,
-        "completed": 475,
-        "failed": 25,
-        "missingCandidateGaps": 0,
-        "terminallyReconciled": 500
-      },
-      "processes": [
-        {
-          "name": "h2h-release-monitor",
-          "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
-        },
-        {
-          "name": "h2h-disk-monitor",
-          "status": "online",
-          "pid": 1360,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.201Z"
-        },
-        {
-          "name": "h2h-storage-retention",
-          "status": "online",
-          "pid": 1382,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.241Z"
-        },
-        {
-          "name": "h2h-arbitrage",
-          "status": "online",
-          "pid": 178113,
-          "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
-        },
-        {
-          "name": "h2h-poller",
-          "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
-        },
-        {
-          "name": "h2h-scan-supervisor",
-          "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
-        },
-        {
-          "name": "h2h-db-maintenance",
-          "status": "online",
-          "pid": 169548,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
-        },
-        {
-          "name": "h2h-ragnar",
-          "status": "online",
-          "pid": 178029,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
-        },
-        {
-          "name": "h2h-watcher",
-          "status": "online",
-          "pid": 169620,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
-        },
-        {
-          "name": "h2h-valuer",
-          "status": "online",
-          "pid": 169621,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-21T14:49:45.192Z",
-      "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
-      },
-      "components": {
-        "scanner": {
-          "state": "healthy",
-          "reason": null
-        },
-        "persistence": {
-          "state": "healthy",
-          "busyRetries": 0,
-          "exhaustedWrites": 0,
-          "lastBusyAt": null,
-          "lastExhaustedAt": null
-        },
-        "markets": {
-          "state": "healthy",
-          "reasons": [],
-          "total": 476,
-          "scanned": 476,
-          "availableApy": 0,
-          "unavailableWithReason": 476,
-          "unavailableWithoutReason": 0,
-          "zeroCurrentRoi": 0
-        },
-        "botTrader": {
-          "state": "healthy",
-          "reasons": [],
-          "heartbeatAt": "2026-08-21T14:49:42.530Z",
-          "heartbeatAgeMs": 2626,
-          "pendingScans": 0,
-          "cursorLag": 0,
-          "cursorScanId": 837114,
-          "latestCompletedScanId": 837114,
-          "error": null
-        }
-      },
-      "scheduler": {
-        "available": true,
-        "mixedVersion": false,
-        "stale": false,
-        "staleForMs": 28269,
-        "expectedSchedulerVersion": "bug-165-v1",
-        "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:49:16.887Z",
-        "status": "ok",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:49:13.570Z",
-        "finishedAt": "2026-08-21T14:49:16.886Z",
-        "durationMs": 3316,
-        "successCount": 3,
-        "failureCount": 0,
-        "avgScanMs": 3024,
-        "maxScanMs": 3074,
-        "openBreakers": 0,
-        "capacity": {
-          "configuredConcurrency": 3,
-          "requiredConcurrency": 3,
-          "sufficientForFreshnessSla": true
-        },
-        "progress": {
-          "completedDueCount": 3,
-          "dueCount": 3
-        },
-        "queue": {
-          "eligibleCount": 476,
-          "dueCount": 0,
-          "overdueCount": 0,
-          "failedCount": 0,
-          "inProgressCount": 0,
-          "oldestSuccessAgeMs": 3437073
-        }
-      },
-      "botWorkflow": {
-        "health": "healthy",
-        "degradedReasons": [],
-        "liveUnavailableReasons": [],
-        "effectiveExecutionMode": "paper",
-        "requestedExecutionMode": "paper",
-        "liveAuthorizationConfigured": false,
-        "credentialsReady": false,
-        "latestCompletedScanId": 837114,
-        "latestCompletedScanAt": "2026-08-21T14:49:16.409Z",
-        "latestPositiveScanId": 760301,
-        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 837114,
-        "cursorUpdatedAt": "2026-08-21T14:49:16.527Z",
-        "latestDecisionScanId": 837114,
-        "latestDecisionAt": "2026-08-21T14:49:16.523Z",
-        "pendingScans": 0,
-        "cursorLag": 0,
-        "opportunitiesEvaluated": 21418,
-        "eligibleCount": 0,
-        "lastExecutionOrSkip": {
-          "scanId": 837114,
-          "state": "criteria_rejected",
-          "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:49:16.523Z"
-        },
-        "inProgress": null,
-        "consumer": {
-          "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:49:42.530Z",
-          "ageMs": 2646,
-          "processed": 0,
-          "error": null
-        }
-      },
-      "markets": {
-        "total": 476,
-        "scanned": 476,
-        "unavailableWithoutReason": 0,
-        "zeroCurrentRoi": 0
-      },
-      "positiveLogs": {
-        "total": 12668,
-        "rows": 500,
-        "completed": 475,
-        "failed": 25,
-        "missingCandidateGaps": 0,
-        "terminallyReconciled": 500
-      },
-      "processes": [
-        {
-          "name": "h2h-release-monitor",
-          "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
-        },
-        {
-          "name": "h2h-disk-monitor",
-          "status": "online",
-          "pid": 1360,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.201Z"
-        },
-        {
-          "name": "h2h-storage-retention",
-          "status": "online",
-          "pid": 1382,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.241Z"
-        },
-        {
-          "name": "h2h-arbitrage",
-          "status": "online",
-          "pid": 178113,
-          "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
-        },
-        {
-          "name": "h2h-poller",
-          "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
-        },
-        {
-          "name": "h2h-scan-supervisor",
-          "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
-        },
-        {
-          "name": "h2h-db-maintenance",
-          "status": "online",
-          "pid": 169548,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
-        },
-        {
-          "name": "h2h-ragnar",
-          "status": "online",
-          "pid": 178029,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
-        },
-        {
-          "name": "h2h-watcher",
-          "status": "online",
-          "pid": 169620,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
-        },
-        {
-          "name": "h2h-valuer",
-          "status": "online",
-          "pid": 169621,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-21T14:50:15.758Z",
-      "deployment": {
-        "commit": "7786f833922f77652568ea1e4abb62a01390fffe",
-        "buildId": "11mtQF0yr4AlErGFbZpKr"
-      },
-      "components": {
-        "scanner": {
-          "state": "healthy",
-          "reason": null
-        },
-        "persistence": {
-          "state": "healthy",
-          "busyRetries": 0,
-          "exhaustedWrites": 0,
-          "lastBusyAt": null,
-          "lastExhaustedAt": null
-        },
-        "markets": {
-          "state": "healthy",
-          "reasons": [],
-          "total": 476,
-          "scanned": 476,
-          "availableApy": 0,
-          "unavailableWithReason": 476,
-          "unavailableWithoutReason": 0,
-          "zeroCurrentRoi": 0
-        },
-        "botTrader": {
-          "state": "healthy",
-          "reasons": [],
-          "heartbeatAt": "2026-08-21T14:50:13.381Z",
-          "heartbeatAgeMs": 2337,
-          "pendingScans": 0,
-          "cursorLag": 0,
-          "cursorScanId": 837114,
-          "latestCompletedScanId": 837114,
-          "error": null
-        }
-      },
-      "scheduler": {
-        "available": true,
-        "mixedVersion": false,
-        "stale": false,
-        "staleForMs": 58831,
-        "expectedSchedulerVersion": "bug-165-v1",
-        "observedSchedulerVersion": "bug-165-v1",
-        "heartbeatAt": "2026-08-21T14:49:16.887Z",
-        "status": "ok",
-        "pollerPid": 177018,
-        "startedAt": "2026-08-21T14:49:13.570Z",
-        "finishedAt": "2026-08-21T14:49:16.886Z",
-        "durationMs": 3316,
-        "successCount": 3,
-        "failureCount": 0,
-        "avgScanMs": 3024,
-        "maxScanMs": 3074,
-        "openBreakers": 0,
-        "capacity": {
-          "configuredConcurrency": 3,
-          "requiredConcurrency": 3,
-          "sufficientForFreshnessSla": true
-        },
-        "progress": {
-          "completedDueCount": 3,
-          "dueCount": 3
-        },
-        "queue": {
-          "eligibleCount": 476,
-          "dueCount": 0,
-          "overdueCount": 0,
-          "failedCount": 0,
-          "inProgressCount": 0,
-          "oldestSuccessAgeMs": 3437073
-        }
-      },
-      "botWorkflow": {
-        "health": "healthy",
-        "degradedReasons": [],
-        "liveUnavailableReasons": [],
-        "effectiveExecutionMode": "paper",
-        "requestedExecutionMode": "paper",
-        "liveAuthorizationConfigured": false,
-        "credentialsReady": false,
-        "latestCompletedScanId": 837114,
-        "latestCompletedScanAt": "2026-08-21T14:49:16.409Z",
-        "latestPositiveScanId": 760301,
-        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 837114,
-        "cursorUpdatedAt": "2026-08-21T14:49:16.527Z",
-        "latestDecisionScanId": 837114,
-        "latestDecisionAt": "2026-08-21T14:49:16.523Z",
-        "pendingScans": 0,
-        "cursorLag": 0,
-        "opportunitiesEvaluated": 21418,
-        "eligibleCount": 0,
-        "lastExecutionOrSkip": {
-          "scanId": 837114,
-          "state": "criteria_rejected",
-          "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T14:49:16.523Z"
-        },
-        "inProgress": null,
-        "consumer": {
-          "state": "healthy",
-          "lastSuccessAt": "2026-08-21T14:50:13.381Z",
-          "ageMs": 2371,
-          "processed": 0,
-          "error": null
-        }
-      },
-      "markets": {
-        "total": 476,
-        "scanned": 476,
-        "unavailableWithoutReason": 0,
-        "zeroCurrentRoi": 0
-      },
-      "positiveLogs": {
-        "total": 12668,
-        "rows": 500,
-        "completed": 475,
-        "failed": 25,
-        "missingCandidateGaps": 0,
-        "terminallyReconciled": 500
-      },
-      "processes": [
-        {
-          "name": "h2h-release-monitor",
-          "status": "online",
-          "pid": 171017,
-          "restarts": 4,
-          "uptimeAt": "2026-08-21T14:35:00.289Z"
-        },
-        {
-          "name": "h2h-disk-monitor",
-          "status": "online",
-          "pid": 1360,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.201Z"
-        },
-        {
-          "name": "h2h-storage-retention",
-          "status": "online",
-          "pid": 1382,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T06:49:54.241Z"
-        },
-        {
-          "name": "h2h-arbitrage",
-          "status": "online",
-          "pid": 178113,
-          "restarts": 7,
-          "uptimeAt": "2026-08-21T14:43:21.867Z"
-        },
-        {
-          "name": "h2h-poller",
-          "status": "online",
-          "pid": 177018,
-          "restarts": 20,
-          "uptimeAt": "2026-08-21T14:42:00.200Z"
-        },
-        {
-          "name": "h2h-scan-supervisor",
-          "status": "online",
-          "pid": 169589,
-          "restarts": 6,
-          "uptimeAt": "2026-08-21T14:33:58.810Z"
-        },
-        {
-          "name": "h2h-db-maintenance",
-          "status": "online",
-          "pid": 169548,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.506Z"
-        },
-        {
-          "name": "h2h-ragnar",
-          "status": "online",
-          "pid": 178029,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:43:00.423Z"
-        },
-        {
-          "name": "h2h-watcher",
-          "status": "online",
-          "pid": 169620,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.988Z"
-        },
-        {
-          "name": "h2h-valuer",
-          "status": "online",
-          "pid": 169621,
-          "restarts": 0,
-          "uptimeAt": "2026-08-21T14:33:58.989Z"
+          "uptimeAt": "2026-08-21T15:41:37.812Z"
         }
       ]
     }
