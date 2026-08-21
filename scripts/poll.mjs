@@ -9,7 +9,7 @@ let FRESHNESS_SLA_MS;
 // 60s — gentle, since most markets have 5-30min adaptive intervals.
 const POLL_WAKE_MS = Math.max(1_000, Number(process.env.H2H_POLL_WAKE_MS) || 60_000);
 let SCAN_TIMEOUT_MS;
-const SCAN_LEASE_GRACE_MS = Math.max(100, Number(process.env.H2H_SCAN_LEASE_GRACE_MS) || 5_000);
+const SCAN_LEASE_GRACE_MS = Math.max(100, Number(process.env.H2H_SCAN_LEASE_GRACE_MS) || 15_000);
 
 // ── SETTINGS-001: hot-reload scanner settings from /api/settings ──────────
 // DB-backed overrides beat env. Refreshed each wake cycle; failures keep

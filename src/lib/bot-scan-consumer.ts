@@ -20,7 +20,8 @@ export type BotScanDecisionState =
   | 'disabled'
   | 'stale'
   | 'daily_limit'
-  | 'duplicate_replay';
+  | 'duplicate_replay'
+  | 'reset_cleared';
 
 export interface BotScanFees {
   kalshiFee: number;
@@ -187,6 +188,29 @@ export function summarizeBotScanEvaluation(input: {
       placementAttemptCount: 0,
       placedCount: 0,
       skippedCount: 0,
+      failureCount: 0,
+      missingCandidateIndexes: [],
+      failingCandidateIndexes: [],
+    };
+  }
+  if (input.scanDecision?.state === 'reset_cleared'
+    && input.scanDecision.reasonCode === 'ops854_reset_cleared') {
+    const candidateCount = new Set(input.candidateIndexes).size;
+    return {
+      scanId: input.scanId,
+      status: 'completed',
+      botTraderEvaluationCompleted: true,
+      reason: input.scanDecision.reason,
+      startedAt: input.scanDecision.receivedAt,
+      completedAt: input.scanDecision.updatedAt,
+      updatedAt: input.scanDecision.updatedAt,
+      settingsVersion: null,
+      candidateCount,
+      evaluatedCount: candidateCount,
+      eligibleCount: 0,
+      placementAttemptCount: 0,
+      placedCount: 0,
+      skippedCount: candidateCount,
       failureCount: 0,
       missingCandidateIndexes: [],
       failingCandidateIndexes: [],
@@ -972,15 +996,18 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
 const DB_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
 let schemaReady = false;
 
-function dbClient() {
+async function dbClient() {
   const db = createClient({ url: `file:${DB_PATH}` });
-  void db.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+  // Finish connection setup before callers issue queries. A fire-and-forget
+  // PRAGMA raced the first BotTrader write and caused libsql commits to fail
+  // with "SQL statements in progress" during concurrent scan publication.
+  await db.execute('PRAGMA busy_timeout = 5000');
   return db;
 }
 
 async function ensureSchema(): Promise<void> {
   if (schemaReady) return;
-  const db = dbClient();
+  const db = await dbClient();
   try {
     await db.batch([
       `CREATE TABLE IF NOT EXISTS bot_scan_decisions (
@@ -1065,6 +1092,88 @@ async function ensureSchema(): Promise<void> {
           reason='Historical decision lacked a terminal result and was reconciled without replaying execution',
           final_result='legacy_incomplete', updated_at=COALESCE(updated_at, created_at)
       WHERE final_result IS NULL`);
+    // OPS-854 deliberately tombstoned the pre-reset BotTrader population while
+    // preserving immutable Logs scans. Reconcile those tombstones as terminal
+    // audited skips instead of showing every historical Positive Arb as a
+    // failed/incomplete consumer gap.
+    const scanResultsTable = await db.execute(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='scan_results'",
+    );
+    if (scanResultsTable.rows.length > 0) {
+      await db.execute(`INSERT OR IGNORE INTO bot_opportunity_decisions
+      (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,
+       roi_pct,apy_pct,created_at,updated_at,details,opportunity_id,
+       threshold_config_version,final_result,execution_id)
+      SELECT s.id,CAST(candidate.key AS INTEGER),s.market_id,
+        CASE WHEN candidate.type='object' THEN COALESCE(json_extract(candidate.value,'$.artist'),'unknown') ELSE 'unknown' END,
+        CASE WHEN candidate.type='object' THEN COALESCE(json_extract(candidate.value,'$.strategy'),'unknown') ELSE 'unknown' END,
+        CASE WHEN candidate.type='object' THEN 'skipped' ELSE 'failed' END,
+        CASE WHEN candidate.type='object' THEN 'ops854_reset_cleared' ELSE 'reset_candidate_payload_unavailable' END,
+        d.reason || CASE WHEN candidate.type='object' THEN ''
+          ELSE ' Candidate payload is malformed, so exact candidate fields are unavailable.' END,
+        CASE WHEN candidate.type='object' THEN json_extract(candidate.value,'$.roiPct') ELSE NULL END,
+        CASE WHEN candidate.type='object' THEN json_extract(candidate.value,'$.apyPct') ELSE NULL END,
+        d.updated_at,d.updated_at,
+        json_object('schemaVersion',1,'stage','operator_reset','final',1,
+          'resetReasonCode',d.reason_code,'payloadUnavailable',CASE WHEN candidate.type='object' THEN 0 ELSE 1 END),
+        'scan:' || s.id || ':opportunity:' || candidate.key,
+        NULL,'reset_cleared',NULL
+      FROM scan_results s
+      JOIN bot_scan_decisions d ON d.scan_id=s.id
+      JOIN json_each(CASE WHEN json_valid(s.raw_result)
+        AND json_type(s.raw_result,'$.allArbs')='array' THEN s.raw_result
+        ELSE '{"allArbs":[]}' END,'$.allArbs') candidate
+      WHERE d.state='reset_cleared' AND d.reason_code='ops854_reset_cleared'
+        AND s.scan_status='completed' AND s.positive_arb_count>0
+        AND json_valid(s.raw_result) AND json_type(s.raw_result,'$.allArbs')='array'`);
+      await db.execute(`WITH RECURSIVE reset_missing
+      (scan_id,market_id,reason,reason_code,updated_at,candidate_index,candidate_count) AS (
+        SELECT s.id,s.market_id,d.reason,d.reason_code,d.updated_at,0,s.positive_arb_count
+        FROM scan_results s JOIN bot_scan_decisions d ON d.scan_id=s.id
+        WHERE d.state='reset_cleared' AND d.reason_code='ops854_reset_cleared'
+          AND s.scan_status='completed' AND s.positive_arb_count>0
+          AND CASE WHEN json_valid(s.raw_result)
+            THEN COALESCE(json_type(s.raw_result,'$.allArbs'),'missing') ELSE 'invalid' END<>'array'
+        UNION ALL
+        SELECT scan_id,market_id,reason,reason_code,updated_at,candidate_index+1,candidate_count
+        FROM reset_missing WHERE candidate_index+1<candidate_count
+      )
+      INSERT OR IGNORE INTO bot_opportunity_decisions
+        (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,
+         roi_pct,apy_pct,created_at,updated_at,details,opportunity_id,
+         threshold_config_version,final_result,execution_id)
+      SELECT scan_id,candidate_index,market_id,'unknown','unknown','failed',
+        'reset_candidate_payload_unavailable',
+        reason || ' Candidate payload is malformed, so exact candidate fields are unavailable.',
+        NULL,NULL,updated_at,updated_at,
+        json_object('schemaVersion',1,'stage','operator_reset','final',1,
+          'resetReasonCode',reason_code,'payloadUnavailable',1),
+        'scan:' || scan_id || ':opportunity:' || candidate_index,
+        NULL,'reset_cleared',NULL
+      FROM reset_missing`);
+      await db.execute(`UPDATE bot_scan_evaluations SET
+      status='completed', completed=1,
+      reason=(SELECT d.reason FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
+      completed_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
+      updated_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
+      candidate_count=(SELECT CASE WHEN json_valid(s.raw_result)
+        AND json_type(s.raw_result,'$.allArbs')='array'
+        THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
+        ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
+      evaluated_count=(SELECT CASE WHEN json_valid(s.raw_result)
+        AND json_type(s.raw_result,'$.allArbs')='array'
+        THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
+        ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
+      eligible_count=0, placement_attempt_count=0, placed_count=0,
+      skipped_count=(SELECT CASE WHEN json_valid(s.raw_result)
+        AND json_type(s.raw_result,'$.allArbs')='array'
+        THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
+        ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id),
+      failure_count=0, missing_candidate_indexes='[]', failing_candidate_indexes='[]'
+      WHERE scan_id IN (SELECT scan_id FROM bot_scan_decisions
+        WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')
+        AND (completed<>1 OR status<>'completed')`);
+    }
     schemaReady = true;
   } finally {
     db.close();
@@ -1298,7 +1407,7 @@ function rowToDecision(row: Record<string, unknown>): BotScanDecision {
 
 async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const result = await db.execute({ sql: "SELECT * FROM scan_results WHERE id = ? AND scan_status = 'completed'", args: [scanId] });
     const row = result.rows[0] as unknown as Record<string, unknown> | undefined;
@@ -1308,7 +1417,7 @@ async function loadScan(scanId: number): Promise<PersistedBotScan | null> {
 
 async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const result = await db.execute({
       sql: `SELECT s.* FROM scan_results s
@@ -1328,7 +1437,7 @@ async function listBacklog(limit: number): Promise<PersistedBotScan[]> {
 
 async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<BotScanDecision | null> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   const owner = crypto.randomUUID();
   const now = new Date();
   const expires = new Date(now.getTime() + 15 * 60_000).toISOString();
@@ -1380,7 +1489,7 @@ async function appendEvent(db: ReturnType<typeof createClient>, scanId: number, 
 
 async function updateDecision(scanId: number, leaseOwner: string, update: DecisionUpdate, release: boolean): Promise<BotScanDecision> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const current = await db.execute({ sql: 'SELECT source, attempts, placement_count FROM bot_scan_decisions WHERE scan_id=? AND lease_owner=?', args: [scanId, leaseOwner] });
     const prior = current.rows[0] as unknown as Record<string, unknown> | undefined;
@@ -1401,14 +1510,14 @@ async function updateDecision(scanId: number, leaseOwner: string, update: Decisi
 
 async function recordReplay(scanId: number, source: BotScanSource) {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try { await appendEvent(db, scanId, source, 'duplicate_replay', 'duplicate_replay', 'Scan was already claimed or processed; no duplicate placement was attempted', null); }
   finally { db.close(); }
 }
 
 async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: number, candidate: BotScanCandidate, state: string, reasonCode: string, reason: string, details?: unknown) {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   const now = new Date().toISOString();
   const audit = details && typeof details === 'object' ? details as Record<string, unknown> : null;
   const configVersion = typeof audit?.configVersion === 'string' ? audit.configVersion : null;
@@ -1434,7 +1543,7 @@ async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: n
 
 async function advanceCursor() {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   const now = new Date().toISOString();
   try {
     const contiguous = await db.execute(`WITH current AS (
@@ -1517,7 +1626,7 @@ export async function processBotScanBacklog(limit = 100): Promise<BotScanDecisio
 
 export async function getBotScanDecisions(limit = 100): Promise<BotScanDecision[]> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const result = await db.execute({ sql: 'SELECT * FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT ?', args: [Math.min(500, Math.max(1, limit))] });
     return (result.rows as unknown as Record<string, unknown>[]).map(rowToDecision);
@@ -1558,7 +1667,7 @@ export async function getBotScanEvaluationSummaries(scanIds: number[]): Promise<
   const ids = [...new Set(scanIds)].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 500);
   const evaluations = new Map<number, BotScanEvaluationEnvelope>();
   if (ids.length === 0) return evaluations;
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const placeholders = ids.map(() => '?').join(',');
     const read = async () => db.execute({
@@ -1596,7 +1705,7 @@ export async function getBotScanHealth(): Promise<{
   inProgress: { scanId: number; state: 'received'; reason: string; at: string } | null;
 }> {
   await ensureSchema();
-  const db = dbClient();
+  const db = await dbClient();
   try {
     const [latest, latestPositive, cursor, decision, terminalDecision, inProgress, pending, opportunityCounts] = await Promise.all([
       db.execute("SELECT id,scanned_at FROM scan_results WHERE scan_status='completed' ORDER BY id DESC LIMIT 1"),

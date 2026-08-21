@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
-const { processBacklogMock } = vi.hoisted(() => ({
+const { processBacklogMock, getBotScanHealthMock } = vi.hoisted(() => ({
   processBacklogMock: vi.fn(async () => [{ state: 'placed' }, { state: 'disabled' }]),
+  getBotScanHealthMock: vi.fn(async () => ({
+    pendingScans: 0, cursorLag: 0, cursorScanId: 42, latestCompletedScanId: 42,
+  })),
 }));
-vi.mock('@/lib/bot-scan-consumer', () => ({ processBotScanBacklog: processBacklogMock }));
+vi.mock('@/lib/bot-scan-consumer', () => ({
+  processBotScanBacklog: processBacklogMock,
+  getBotScanHealth: getBotScanHealthMock,
+}));
 
 function makeRequest(body: unknown, token?: string): NextRequest {
   return new NextRequest('http://localhost/api/bot-trader/run', {
@@ -65,6 +71,10 @@ describe('/api/bot-trader/run token guard', () => {
     const res = await POST(makeRequest({ catchUp: true, limit: 25 }, 'secret-token'));
     expect(res.status).toBe(200);
     expect(processBacklogMock).toHaveBeenCalledWith(25);
-    expect(await res.json()).toMatchObject({ processed: 2, byState: { placed: 1, disabled: 1 } });
+    expect(await res.json()).toMatchObject({
+      processed: 2,
+      byState: { placed: 1, disabled: 1 },
+      scanHealth: { pendingScans: 0, cursorLag: 0, cursorScanId: 42, latestCompletedScanId: 42 },
+    });
   });
 });

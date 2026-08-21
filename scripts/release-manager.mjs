@@ -393,21 +393,50 @@ async function restartAndVerify(repoRoot, expected, options = {}) {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   if (!healthy) throw new Error(`PM2 restarted but release health was not accepted: ${lastError}`);
-  await execFileAsync('pm2', [
-    'start', 'ecosystem.config.js', '--only', 'h2h-poller,h2h-scan-supervisor', '--update-env',
-  ], { cwd: repoRoot });
   // PM2 `start --only` restarts an existing process without updating its
   // executable path. Recreate release-packaged daemons so a promotion or
   // rollback actually follows the active symlink instead of stale root dist/.
   await execFileAsync('pm2', [
-    'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-db-maintenance',
+    'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-ragnar', 'h2h-db-maintenance',
   ], { cwd: repoRoot }).catch((error) => {
     const detail = `${error?.stdout ?? ''}\n${error?.stderr ?? ''}`;
     if (!/Process or Namespace .* not found/i.test(detail)) throw error;
   });
   await execFileAsync('pm2', [
-    'start', 'ecosystem.config.js', '--only', 'h2h-watcher,h2h-valuer,h2h-ragnar,h2h-db-maintenance', '--update-env',
+    'start', 'ecosystem.config.js', '--only', 'h2h-ragnar,h2h-db-maintenance', '--update-env',
   ], { cwd: repoRoot });
+  // Restore the canonical Logs consumer before restarting scan producers so a
+  // release cannot create a mixed-version producer-to-consumer window.
+  await execFileAsync('pm2', [
+    'start', 'ecosystem.config.js', '--only', 'h2h-poller,h2h-scan-supervisor', '--update-env',
+  ], { cwd: repoRoot });
+  await execFileAsync('pm2', [
+    'start', 'ecosystem.config.js', '--only', 'h2h-watcher,h2h-valuer', '--update-env',
+  ], { cwd: repoRoot });
+  // A promotion can interrupt three in-flight 30s scan workers. Allow one
+  // supervisor detection/recovery interval plus a complete replacement cycle
+  // before failing the release, while keeping rollout recovery bounded.
+  const pipelineDeadline = Date.now() + (options.pipelineHealthTimeoutMs ?? 180_000);
+  let pipelineHealthy = false;
+  while (Date.now() < pipelineDeadline) {
+    try {
+      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(5_000) });
+      const body = await response.json();
+      if (response.ok && body.deployment?.commit === expected.commit
+        && body.deployment?.buildId === expected.buildId
+        && body.components?.scanner?.state === 'healthy'
+        && body.components?.markets?.state === 'healthy'
+        && body.components?.botTrader?.state === 'healthy') {
+        pipelineHealthy = true;
+        break;
+      }
+      lastError = `pipeline scanner=${body.components?.scanner?.state ?? 'missing'} markets=${body.components?.markets?.state ?? 'missing'} botTrader=${body.components?.botTrader?.state ?? 'missing'}`;
+    } catch (error) {
+      lastError = error.message;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  if (!pipelineHealthy) throw new Error(`Release identity is current but the coordinated pipeline did not recover: ${lastError}`);
   await execFileAsync('pm2', ['start', 'ecosystem.config.js', '--only', 'h2h-release-monitor', '--update-env'], { cwd: repoRoot });
   await execFileAsync('pm2', ['save'], { cwd: repoRoot });
 }

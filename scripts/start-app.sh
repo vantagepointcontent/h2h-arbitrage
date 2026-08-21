@@ -23,4 +23,4 @@ if [ -n "$PIDS" ]; then
 fi
 
 echo "[pre-start] Starting Next.js on port ${PORT}..."
-exec ./node_modules/next/dist/bin/next start -p 3000 -H 0.0.0.0
+exec node --env-file-if-exists=.env.local ./node_modules/next/dist/bin/next start -p 3000 -H 0.0.0.0

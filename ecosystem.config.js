@@ -64,6 +64,7 @@ module.exports = {
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
+      node_args: '--env-file-if-exists=.env.local',
 
       restart_delay: 5000,
       max_restarts: Infinity,
@@ -85,6 +86,7 @@ module.exports = {
         H2H_SCAN_MIN_TIMEOUT_MS: '18000',
         H2H_SCAN_TIMEOUT_MS: '21000',
         H2H_RETRY_SCAN_TIMEOUT_MS: '30000',
+        H2H_SCAN_LEASE_GRACE_MS: '15000',
         H2H_API_TOKEN: process.env.H2H_API_TOKEN
       },
 
@@ -105,6 +107,7 @@ module.exports = {
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
+      node_args: '--env-file-if-exists=.env.local',
       restart_delay: 5000,
       max_restarts: Infinity,
       min_uptime: 15000,
@@ -214,6 +217,7 @@ module.exports = {
       cwd: '/home/scott/h2h-arbitrage',
       instances: 1,
       exec_mode: 'fork',
+      node_args: '--env-file-if-exists=.env.local',
       restart_delay: 5000,
       max_restarts: Infinity,
       min_uptime: 15000,

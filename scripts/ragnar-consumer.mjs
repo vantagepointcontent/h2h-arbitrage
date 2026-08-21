@@ -37,6 +37,7 @@ async function consume() {
     await writeHealth({
       state: 'healthy', attemptedAt, lastSuccessAt: new Date().toISOString(),
       processed: Number(body.processed || 0), byState: body.byState || {}, error: null,
+      ...(body.scanHealth && typeof body.scanHealth === 'object' ? body.scanHealth : {}),
     });
     if (Number(body.processed || 0) > 0) {
       console.log(`[ragnar] consumed ${body.processed} persisted scan(s)`, body.byState || {});

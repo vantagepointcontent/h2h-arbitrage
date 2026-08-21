@@ -123,6 +123,49 @@ describe('saved-market scan supervisor runtime inspection', () => {
     expect(result.detail).toContain('scan-worker-telemetry-health.json');
   });
 
+  it('restarts a stale BotTrader consumer independently without restarting the scanner', async () => {
+    mocks.execFile.mockImplementation((_command, _args, _options, callback) => callback(null, '', ''));
+    const result = await inspectSavedMarketScanner({
+      now,
+      healthSnapshot: {
+        sqliteContention: { exhaustedWrites: 0 },
+        components: {
+          botTrader: { state: 'degraded', reasons: ['Ragnar consumer heartbeat is stale or missing'] },
+          markets: { state: 'healthy' },
+        },
+      },
+    });
+
+    expect(mocks.execFile).toHaveBeenCalledWith(
+      'pm2', ['restart', 'h2h-ragnar', '--update-env'], expect.objectContaining({ cwd: expect.any(String) }), expect.any(Function),
+    );
+    expect(result).toMatchObject({
+      state: 'degraded',
+      degradedReason: 'bot_trader_degraded',
+      recoveryAction: { type: 'ragnar_restart' },
+    });
+  });
+
+  it('surfaces Markets projection degradation without masking scanner health or restart loops', async () => {
+    const result = await inspectSavedMarketScanner({
+      now,
+      healthSnapshot: {
+        sqliteContention: { exhaustedWrites: 0 },
+        components: {
+          botTrader: { state: 'healthy', reasons: [] },
+          markets: { state: 'degraded', reasons: ['4 unavailable APY field(s) lack a specific reason'] },
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      state: 'degraded',
+      degradedReason: 'markets_projection_degraded',
+      recoveryAction: null,
+    });
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
   it('durably records and delivers a degraded operational alert', async () => {
     const alertSender = vi.fn().mockResolvedValue({ delivered: true, destination: 'telegram' });
     const result = await inspectSavedMarketScanner({

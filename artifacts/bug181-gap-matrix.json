@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-21T12:47:35.867Z",
+  "window": {
+    "since": "2026-08-21T11:47:35.867Z",
+    "completions": 986,
+    "markets": 476,
+    "first_id": 834274,
+    "last_id": 835259,
+    "first_at": "2026-08-21T11:49:39.083Z",
+    "last_at": "2026-08-21T12:45:55.077Z",
+    "positive": 0
+  },
+  "gapMatrix": {
+    "scheduler": {
+      "heartbeatAt": "2026-08-21T12:47:02.737Z",
+      "status": "idle",
+      "queue": {
+        "eligibleCount": 476,
+        "dueCount": 0,
+        "overdueCount": 0,
+        "failedCount": 0,
+        "inProgressCount": 3,
+        "oldestSuccessAgeMs": 3211505
+      },
+      "progress": null,
+      "samples": [
+        {
+          "position": "early",
+          "index": 0,
+          "marketId": "1779565300940-jqb54rc",
+          "title": "Maine Senate Election Winner",
+          "linkedUrlsPresent": true,
+          "persistedScanAt": "2026-08-21T12:32:44.125Z",
+          "schedulerLastAttemptAt": "2026-08-21T12:32:42.029Z",
+          "schedulerLastSuccessAt": "2026-08-21T12:32:44.617Z",
+          "nextDueAt": "2026-08-21T13:02:44.617Z",
+          "inProgress": false,
+          "failureReason": null
+        },
+        {
+          "position": "middle",
+          "index": 238,
+          "marketId": "1782999196726-house-ms01",
+          "title": "MS-01 House Election Winner",
+          "linkedUrlsPresent": true,
+          "persistedScanAt": "2026-08-21T12:28:42.966Z",
+          "schedulerLastAttemptAt": "2026-08-21T12:28:40.805Z",
+          "schedulerLastSuccessAt": "2026-08-21T12:28:43.363Z",
+          "nextDueAt": "2026-08-21T12:58:43.363Z",
+          "inProgress": false,
+          "failureReason": null
+        },
+        {
+          "position": "late",
+          "index": 475,
+          "marketId": "7248f46f-20bf-43ef-9f44-15e47a0eef9a",
+          "title": "LigaPro Serie A (Ecuador): 2026 Winner",
+          "linkedUrlsPresent": true,
+          "persistedScanAt": "2026-08-21T12:36:49.465Z",
+          "schedulerLastAttemptAt": "2026-08-21T12:36:47.286Z",
+          "schedulerLastSuccessAt": "2026-08-21T12:36:49.868Z",
+          "nextDueAt": "2026-08-21T13:06:49.868Z",
+          "inProgress": false,
+          "failureReason": null
+        }
+      ]
+    },
+    "persistedScans": {
+      "completions": 986,
+      "markets": 476,
+      "first_id": 834274,
+      "last_id": 835259,
+      "first_at": "2026-08-21T11:49:39.083Z",
+      "last_at": "2026-08-21T12:45:55.077Z",
+      "positive": 0
+    },
+    "marketsProjection": {
+      "database": {
+        "total": 634,
+        "scanned": 634,
+        "apy_available": 0,
+        "unavailable_with_reason": 634,
+        "unavailable_without_reason": 0,
+        "zero_current_roi": 0
+      },
+      "api": {
+        "total": 476,
+        "scanned": 476,
+        "apyAvailable": 0,
+        "unavailableWithReason": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      }
+    },
+    "botTrader": {
+      "consumerWindow": {
+        "decisions": 986,
+        "first_scan_id": 834274,
+        "last_scan_id": 835259,
+        "first_at": "2026-08-21T11:49:39.162Z",
+        "last_at": "2026-08-21T12:45:55.176Z"
+      },
+      "cursor": {
+        "last_scan_id": 835259,
+        "updated_at": "2026-08-21T12:45:55.179Z"
+      },
+      "workflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 835259,
+        "latestCompletedScanAt": "2026-08-21T12:45:55.077Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 835259,
+        "cursorUpdatedAt": "2026-08-21T12:45:55.179Z",
+        "latestDecisionScanId": 835259,
+        "latestDecisionAt": "2026-08-21T12:45:55.176Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 835259,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T12:45:55.176Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-21T12:47:34.041Z",
+          "ageMs": 1812,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "heartbeat": {
+        "state": "healthy",
+        "attemptedAt": "2026-08-21T12:47:33.763Z",
+        "error": null,
+        "pid": 81665,
+        "lastSuccessAt": "2026-08-21T12:47:34.041Z",
+        "processed": 0,
+        "byState": {},
+        "latestCompletedScanId": 835259,
+        "latestCompletedScanAt": "2026-08-21T12:45:55.077Z",
+        "latestPositiveScanId": 760301,
+        "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+        "cursorScanId": 835259,
+        "cursorUpdatedAt": "2026-08-21T12:45:55.179Z",
+        "latestDecisionScanId": 835259,
+        "latestDecisionAt": "2026-08-21T12:45:55.176Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 835259,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-21T12:45:55.176Z"
+        },
+        "inProgress": null
+      },
+      "gaps": {
+        "positive_without_scan_decision": 0,
+        "positive_without_completed_evaluation": 0,
+        "zero_arb_na": 53820
+      },
+      "positiveEvaluationStatuses": [
+        {
+          "status": "completed",
+          "decision_state": "reset_cleared",
+          "reason_code": "ops854_reset_cleared",
+          "count": 12668
+        }
+      ],
+      "positiveCandidateAudit": {
+        "candidate_decisions": 21185,
+        "terminal_candidate_decisions": 21185,
+        "legacy_incomplete": 0
+      }
+    },
+    "workerTelemetry": {
+      "lastReceivedAt": "2026-08-21T12:45:55.357Z",
+      "lastPersistedAt": "2026-08-21T12:45:55.377Z",
+      "lastFailureAt": "2026-08-21T12:39:34.427Z",
+      "lastDrainAttemptAt": "2026-08-21T12:45:55.368Z",
+      "writeFailures": 9237,
+      "pendingSnapshots": 0,
+      "oldestPendingAt": null,
+      "recoveredSnapshots": 10294,
+      "error": null
+    },
+    "uiApiHealth": {
+      "scanner": {
+        "state": "healthy",
+        "reason": "Ragnar consumer state is degraded; BotTrader cursor health evidence is missing or malformed"
+      },
+      "persistence": {
+        "state": "healthy",
+        "busyRetries": 0,
+        "exhaustedWrites": 0,
+        "lastBusyAt": null,
+        "lastExhaustedAt": null
+      },
+      "markets": {
+        "state": "healthy",
+        "reasons": [],
+        "total": 476,
+        "scanned": 476,
+        "availableApy": 0,
+        "unavailableWithReason": 476,
+        "unavailableWithoutReason": 0,
+        "zeroCurrentRoi": 0
+      },
+      "botTrader": {
+        "state": "healthy",
+        "reasons": [],
+        "heartbeatAt": "2026-08-21T12:47:34.041Z",
+        "heartbeatAgeMs": 1794,
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "cursorScanId": 835259,
+        "latestCompletedScanId": 835259,
+        "error": null
+      }
+    }
+  },
+  "integrity": {
+    "sqlite": "ok",
+    "foreignKeyViolations": 0,
+    "savedJsonCount": 476,
+    "apiSavedMarketCount": 476
+  }
+}

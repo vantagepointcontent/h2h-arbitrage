@@ -33,9 +33,11 @@ describe('operator capacity gates', () => {
     expect(ecosystem).toContain("H2H_POLL_CONCURRENCY: '3'");
     expect(ecosystem).toContain("H2H_SCAN_TIMEOUT_MS: '21000'");
     expect(ecosystem).toContain("H2H_RETRY_SCAN_TIMEOUT_MS: '30000'");
+    expect(ecosystem).toContain("H2H_SCAN_LEASE_GRACE_MS: '15000'");
     const monitor = await readFile(path.join(root, 'scripts', 'disk-capacity-monitor.mjs'), 'utf8');
     const retention = await readFile(path.join(root, 'scripts', 'storage-retention.mjs'), 'utf8');
     const supervisor = await readFile(path.join(root, 'scripts', 'scan-supervisor.mjs'), 'utf8');
+    const poller = await readFile(path.join(root, 'scripts', 'poll.mjs'), 'utf8');
     const maintenance = await readFile(path.join(root, 'scripts', 'db-maintenance.mjs'), 'utf8');
     const watcher = await readFile(path.join(root, 'scripts', 'ws-watcher.ts'), 'utf8');
     const healthRoute = await readFile(path.join(root, 'src', 'app', 'api', 'health', 'route.ts'), 'utf8');
@@ -45,10 +47,15 @@ describe('operator capacity gates', () => {
     expect(supervisor).toContain("process.env.pm_id !== undefined");
     expect(supervisor).toContain("'h2h-poller'");
     expect(supervisor).toContain('.corrupt.');
+    expect(poller).toContain('Math.max(adaptiveTimeoutMs(market.id), SCAN_TIMEOUT_MS) + SCAN_LEASE_GRACE_MS');
     expect(maintenance).toContain("checkpoint(db, 'PASSIVE')");
     expect(maintenance).not.toContain('throw new Error(`SQLITE_BUSY during wal_checkpoint');
     expect(watcher).toContain('withSqliteBusyRetry(() => syncSubscriptions())');
     expect(healthRoute).toContain('saved-market-scanner-health.json');
     expect(healthRoute).toContain('fullScanHealth');
+    expect(healthRoute).toContain('ragnar-consumer-health.json');
+    expect(healthRoute).toContain('classifyBotConsumerHealth');
+    expect(healthRoute).toContain('summarizeMarketsProjectionHealth');
+    expect(healthRoute).toContain('components:');
   });
 });

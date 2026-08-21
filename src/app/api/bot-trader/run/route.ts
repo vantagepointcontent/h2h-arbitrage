@@ -6,7 +6,7 @@ import { rankBotCandidates } from '@/lib/bot-candidate-selection';
 import { getManualMatches } from '@/lib/manual-matches';
 import { refreshSingleMarket, type SingleRefreshResult } from '@/app/api/saved-markets/refresh/refresh-single';
 import logger from '@/lib/logger';
-import { processBotScanBacklog } from '@/lib/bot-scan-consumer';
+import { getBotScanHealth, processBotScanBacklog } from '@/lib/bot-scan-consumer';
 import { auditArbClassification } from '@/lib/arb-types';
 
 function authorized(request: NextRequest): boolean {
@@ -174,7 +174,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         counts[decision.state] = (counts[decision.state] ?? 0) + 1;
         return counts;
       }, {});
-      return NextResponse.json({ processed: decisions.length, byState, decisions });
+      const scanHealth = await getBotScanHealth();
+      return NextResponse.json({ processed: decisions.length, byState, decisions, scanHealth });
     }
     if (body?.ranked === true || (typeof body?.pairId === 'string' && body.pairId.length > 0)) {
       return NextResponse.json({

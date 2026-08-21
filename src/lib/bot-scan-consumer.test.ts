@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import {
   createBotScanConsumer,
   createPersistedBotScanPublisher,
@@ -258,6 +259,13 @@ function harness(options: {
 }
 
 describe('durable BotTrader scan consumer', () => {
+  it('finishes SQLite connection PRAGMAs before issuing BotTrader queries', async () => {
+    const source = await readFile(new URL('./bot-scan-consumer.ts', import.meta.url), 'utf8');
+
+    expect(source).not.toContain("void db.execute('PRAGMA busy_timeout = 5000')");
+    expect(source).toMatch(/async function dbClient\(\)[\s\S]+await db\.execute\('PRAGMA busy_timeout = 5000'\)[\s\S]+return db/);
+  });
+
   it('marks a scan completed only when every contained candidate has a terminal audit decision', () => {
     const completed = summarizeBotScanEvaluation({
       scanId: 41,
@@ -298,6 +306,33 @@ describe('durable BotTrader scan consumer', () => {
       status: 'partial', botTraderEvaluationCompleted: false,
       candidateCount: 2, evaluatedCount: 1, failureCount: 1,
       missingCandidateIndexes: [1], failingCandidateIndexes: [0],
+    });
+  });
+
+  it('treats an operator reset tombstone as a terminal audited skip for every contained candidate', () => {
+    expect(summarizeBotScanEvaluation({
+      scanId: 43,
+      candidateIndexes: [0, 1],
+      scanDecision: {
+        state: 'reset_cleared',
+        reasonCode: 'ops854_reset_cleared',
+        reason: 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.',
+        receivedAt: '2026-08-11T12:00:00.000Z',
+        updatedAt: '2026-08-20T10:00:00.000Z',
+        attempts: 0,
+        placementCount: 0,
+        details: null,
+      },
+      candidateDecisions: [],
+    })).toMatchObject({
+      status: 'completed',
+      botTraderEvaluationCompleted: true,
+      candidateCount: 2,
+      evaluatedCount: 2,
+      skippedCount: 2,
+      failureCount: 0,
+      missingCandidateIndexes: [],
+      reason: 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.',
     });
   });
 

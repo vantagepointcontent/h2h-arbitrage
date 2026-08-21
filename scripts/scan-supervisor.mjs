@@ -19,6 +19,7 @@ const RESTART_COOLDOWN_MS = 5 * 60_000;
 const RETENTION_COOLDOWN_MS = 15 * 60_000;
 const ALERT_REPEAT_MS = 15 * 60_000;
 let lastRestartAt = 0;
+let lastRagnarRestartAt = 0;
 let lastRetentionAt = 0;
 
 async function readJson(file, fallback = null) {
@@ -181,7 +182,7 @@ export async function inspectSavedMarketScanner(options = {}) {
   const disk = evaluateDiskCapacity('scan', diskSnapshot, {
     reserveBytes: Number(process.env.H2H_DISK_RESERVE_BYTES) || 15_000_000_000,
   });
-  const result = assessSavedMarketScannerHealth({
+  let result = assessSavedMarketScannerHealth({
     now,
     deployment: { commit: manifest.commit ?? null, buildId: manifest.buildId ?? null },
     workerBundle: { exists: await exists(workerPath), path: workerPath },
@@ -211,7 +212,43 @@ export async function inspectSavedMarketScanner(options = {}) {
     lastRestartAt = now;
     recoveryAction = { ...recoveryAction, type: 'poller_restart', at: new Date(now).toISOString() };
   }
-  const alertSubject = { ...result, recoveryAction };
+  const botTrader = applicationHealth?.components?.botTrader ?? null;
+  const markets = applicationHealth?.components?.markets ?? null;
+  const botReasons = Array.isArray(botTrader?.reasons) ? botTrader.reasons.filter((value) => typeof value === 'string') : [];
+  const marketsReasons = Array.isArray(markets?.reasons) ? markets.reasons.filter((value) => typeof value === 'string') : [];
+  const botRestartRecommended = botTrader?.state === 'degraded'
+    && botReasons.some((reason) => /heartbeat is stale or missing|consumer state is (?:degraded|missing)/i.test(reason));
+  if (botRestartRecommended && now - lastRagnarRestartAt >= RESTART_COOLDOWN_MS) {
+    await execFileAsync('pm2', ['restart', 'h2h-ragnar', '--update-env'], { cwd: ROOT });
+    lastRagnarRestartAt = now;
+    if (!recoveryAction) recoveryAction = { type: 'ragnar_restart', at: new Date(now).toISOString() };
+  }
+  if (result.state === 'healthy' && botTrader?.state === 'degraded') {
+    result = {
+      ...result,
+      state: 'degraded',
+      degradedReason: 'bot_trader_degraded',
+      detail: botReasons.join('; ') || 'BotTrader consumer or cursor is degraded',
+      restartRecommended: botRestartRecommended,
+    };
+  } else if (result.state === 'healthy' && markets?.state === 'degraded') {
+    result = {
+      ...result,
+      state: 'degraded',
+      degradedReason: 'markets_projection_degraded',
+      detail: marketsReasons.join('; ') || 'Canonical Markets projection is degraded',
+      restartRecommended: false,
+    };
+  }
+  const alertSubject = {
+    ...result,
+    recoveryAction,
+    components: {
+      scanner: { state: result.degradedReason?.startsWith('bot_trader_') || result.degradedReason?.startsWith('markets_') ? 'healthy' : result.state },
+      botTrader,
+      markets,
+    },
+  };
   const operationalAlert = await publishOperationalAlert(alertSubject, options, now);
   const snapshot = { ...alertSubject, operationalAlert };
   await atomicWrite(HEALTH_FILE, snapshot);

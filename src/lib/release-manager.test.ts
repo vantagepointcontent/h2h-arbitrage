@@ -66,21 +66,32 @@ describe('isolated production releases', () => {
     expect(nextConfig).not.toMatch(/distDir:\s*['"]\.next['"]/);
     expect(startApp).toContain('release-manager.mjs verify-active');
     expect(startApp).toContain('H2H_NEXT_DIST_DIR=.h2h-releases/active/.next');
+    expect(startApp).toContain('node --env-file-if-exists=.env.local');
     expect(verifier).toContain('release-manager.mjs build');
     expect(health).toContain('deployment:');
     expect(health).toContain('H2H_BUILD_ID');
     expect(ecosystem).toContain("name: 'h2h-release-monitor'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ragnar-consumer.mjs'");
+    expect(ecosystem).toMatch(/name: 'h2h-poller'[\s\S]+node_args: '--env-file-if-exists=\.env\.local'/);
+    expect(ecosystem).toMatch(/name: 'h2h-scan-supervisor'[\s\S]+node_args: '--env-file-if-exists=\.env\.local'/);
+    expect(ecosystem).toMatch(/name: 'h2h-ragnar'[\s\S]+node_args: '--env-file-if-exists=\.env\.local'/);
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/ws-watcher.mjs'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/position-valuer.mjs'");
     expect(ecosystem).toContain("node_args: '--env-file-if-exists=.env.local'");
     expect(ecosystem).not.toContain("node_args: '--env-file=.env.local'");
     expect(ecosystem).toContain("script: './.h2h-releases/active/.next/db-maintenance.mjs'");
     const releaseManager = await readFile(path.join(repo, 'scripts', 'release-manager.mjs'), 'utf8');
+    for (const processName of [
+      'h2h-arbitrage', 'h2h-poller', 'h2h-scan-supervisor',
+      'h2h-watcher', 'h2h-valuer', 'h2h-ragnar', 'h2h-db-maintenance',
+    ]) expect(releaseManager).toContain(processName);
     expect(releaseManager)
-      .toMatch(/h2h-arbitrage[\s\S]+h2h-poller[\s\S]+h2h-scan-supervisor[\s\S]+h2h-watcher[\s\S]+h2h-valuer[\s\S]+h2h-db-maintenance/);
-    expect(releaseManager)
-      .toMatch(/'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-db-maintenance'[\s\S]+'start', 'ecosystem\.config\.js'/);
+      .toMatch(/'delete', 'h2h-watcher', 'h2h-valuer', 'h2h-ragnar', 'h2h-db-maintenance'[\s\S]+'start', 'ecosystem\.config\.js'/);
+    expect(releaseManager).toContain("body.components?.scanner?.state === 'healthy'");
+    expect(releaseManager).toContain("body.components?.markets?.state === 'healthy'");
+    expect(releaseManager).toContain("body.components?.botTrader?.state === 'healthy'");
+    expect(releaseManager.indexOf("'h2h-ragnar,h2h-db-maintenance'"))
+      .toBeLessThan(releaseManager.indexOf("'h2h-poller,h2h-scan-supervisor'"));
   });
 
   it('materializes detached dependencies and preserves generated runtime package aliases', async () => {
