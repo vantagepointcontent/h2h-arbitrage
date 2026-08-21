@@ -147,6 +147,11 @@ describe('getBotScanHealth terminal decision semantics', () => {
           '{"schemaVersion":1,"stage":"operator_reset","final":1,"payloadUnavailable":0}','reset_cleared')`,
         args: [],
       },
+      {
+        sql: `DELETE FROM bot_consumer_schema_migrations
+          WHERE name='bug181-reset-candidate-reconciliation-v2'`,
+        args: [],
+      },
     ], 'write');
     db.close();
 
@@ -155,9 +160,10 @@ describe('getBotScanHealth terminal decision semantics', () => {
     await reconciledModule.getBotScanHealth();
 
     const verify = createClient({ url: `file:${path.join(tempDir, 'data', 'edgefinder.db')}` });
-    const [evaluation, candidateDecisions] = await Promise.all([
+    const [evaluation, candidateDecisions, migrations] = await Promise.all([
       verify.execute('SELECT status,completed,candidate_count,evaluated_count,skipped_count,failure_count,missing_candidate_indexes,failing_candidate_indexes FROM bot_scan_evaluations WHERE scan_id=42'),
       verify.execute('SELECT candidate_index,state,reason_code,final_result FROM bot_opportunity_decisions WHERE scan_id=42 ORDER BY candidate_index'),
+      verify.execute("SELECT name FROM bot_consumer_schema_migrations WHERE name='bug181-reset-candidate-reconciliation-v2'"),
     ]);
     verify.close();
     expect(candidateDecisions.rows).toEqual([
@@ -167,6 +173,7 @@ describe('getBotScanHealth terminal decision semantics', () => {
       status: 'failed', completed: 0, candidate_count: 1, evaluated_count: 1,
       skipped_count: 0, failure_count: 1, missing_candidate_indexes: '[]', failing_candidate_indexes: '[0]',
     })]);
+    expect(migrations.rows).toEqual([expect.objectContaining({ name: 'bug181-reset-candidate-reconciliation-v2' })]);
   });
 
   it('keeps lastExecutionOrSkip terminal while exposing the newest lease separately', async () => {

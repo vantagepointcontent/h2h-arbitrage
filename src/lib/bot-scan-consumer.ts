@@ -1059,6 +1059,10 @@ async function ensureSchema(): Promise<void> {
         missing_candidate_indexes TEXT NOT NULL DEFAULT '[]',
         failing_candidate_indexes TEXT NOT NULL DEFAULT '[]'
       )`,
+      `CREATE TABLE IF NOT EXISTS bot_consumer_schema_migrations (
+        name TEXT PRIMARY KEY,
+        completed_at TEXT NOT NULL
+      )`,
     ], 'write');
     for (const migration of [
       'ALTER TABLE bot_opportunity_decisions ADD COLUMN threshold_config_version TEXT',
@@ -1080,7 +1084,10 @@ async function ensureSchema(): Promise<void> {
     const scanResultsTable = await db.execute(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='scan_results'",
     );
-    if (scanResultsTable.rows.length > 0) {
+    const resetReconciliation = await db.execute(
+      "SELECT 1 FROM bot_consumer_schema_migrations WHERE name='bug181-reset-candidate-reconciliation-v2'",
+    );
+    if (scanResultsTable.rows.length > 0 && resetReconciliation.rows.length === 0) {
       await db.execute(`INSERT OR IGNORE INTO bot_opportunity_decisions
       (scan_id,candidate_index,market_id,outcome,strategy,state,reason_code,reason,
        roi_pct,apy_pct,created_at,updated_at,details,opportunity_id,
@@ -1183,33 +1190,22 @@ async function ensureSchema(): Promise<void> {
           ON CAST(candidate.key AS INTEGER)=o.candidate_index
         WHERE d.state='reset_cleared' AND d.reason_code='ops854_reset_cleared'
           AND o.final_result='reset_cleared'
+      ), invalid_reset_candidates AS (
+        SELECT * FROM reset_candidates WHERE audit_valid=0
       )
       UPDATE bot_opportunity_decisions SET
-        outcome=CASE WHEN (SELECT audit_valid FROM reset_candidates r
-          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
-          THEN json_extract((SELECT value FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
-            AND r.candidate_index=bot_opportunity_decisions.candidate_index),'$.artist') ELSE 'unknown' END,
-        strategy=CASE WHEN (SELECT audit_valid FROM reset_candidates r
-          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
-          THEN json_extract((SELECT value FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
-            AND r.candidate_index=bot_opportunity_decisions.candidate_index),'$.strategy') ELSE 'unknown' END,
-        state=CASE WHEN (SELECT audit_valid FROM reset_candidates r
-          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
-          THEN 'skipped' ELSE 'failed' END,
-        reason_code=CASE WHEN (SELECT audit_valid FROM reset_candidates r
-          WHERE r.scan_id=bot_opportunity_decisions.scan_id AND r.candidate_index=bot_opportunity_decisions.candidate_index)=1
-          THEN 'ops854_reset_cleared' ELSE 'reset_candidate_payload_unavailable' END,
-        reason=(SELECT reason || CASE WHEN audit_valid=1 THEN ''
-          ELSE ' Candidate payload is malformed, so exact candidate fields are unavailable.' END
-          FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+        outcome='unknown', strategy='unknown', state='failed',
+        reason_code='reset_candidate_payload_unavailable',
+        reason=(SELECT reason || ' Candidate payload is malformed, so exact candidate fields are unavailable.'
+          FROM invalid_reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
             AND r.candidate_index=bot_opportunity_decisions.candidate_index),
         details=(SELECT json_object('schemaVersion',1,'stage','operator_reset','final',1,
-          'resetReasonCode',reason_code,'payloadUnavailable',CASE WHEN audit_valid=1 THEN 0 ELSE 1 END)
-          FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+          'resetReasonCode',reason_code,'payloadUnavailable',1)
+          FROM invalid_reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
             AND r.candidate_index=bot_opportunity_decisions.candidate_index),
-        updated_at=(SELECT updated_at FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+        updated_at=(SELECT updated_at FROM invalid_reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
           AND r.candidate_index=bot_opportunity_decisions.candidate_index)
-      WHERE EXISTS (SELECT 1 FROM reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
+      WHERE EXISTS (SELECT 1 FROM invalid_reset_candidates r WHERE r.scan_id=bot_opportunity_decisions.scan_id
         AND r.candidate_index=bot_opportunity_decisions.candidate_index)`);
       await db.execute(`UPDATE bot_scan_evaluations SET
       status=CASE WHEN EXISTS (SELECT 1 FROM bot_opportunity_decisions o
@@ -1219,8 +1215,10 @@ async function ensureSchema(): Promise<void> {
         WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
         THEN 0 ELSE 1 END,
       reason=(SELECT d.reason FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
+      started_at=(SELECT d.received_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
       completed_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
       updated_at=(SELECT d.updated_at FROM bot_scan_decisions d WHERE d.scan_id=bot_scan_evaluations.scan_id),
+      settings_version=NULL,
       candidate_count=(SELECT CASE WHEN json_valid(s.raw_result)
         AND json_type(s.raw_result,'$.allArbs')='array'
         THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
@@ -1239,7 +1237,43 @@ async function ensureSchema(): Promise<void> {
           WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed')
           ORDER BY candidate_index)), '[]')
       WHERE scan_id IN (SELECT scan_id FROM bot_scan_decisions
-        WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')`);
+        WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')
+        AND (reason IS NOT (SELECT d.reason FROM bot_scan_decisions d
+            WHERE d.scan_id=bot_scan_evaluations.scan_id)
+          OR started_at IS NOT (SELECT d.received_at FROM bot_scan_decisions d
+            WHERE d.scan_id=bot_scan_evaluations.scan_id)
+          OR completed_at IS NOT (SELECT d.updated_at FROM bot_scan_decisions d
+            WHERE d.scan_id=bot_scan_evaluations.scan_id)
+          OR updated_at IS NOT (SELECT d.updated_at FROM bot_scan_decisions d
+            WHERE d.scan_id=bot_scan_evaluations.scan_id)
+          OR settings_version IS NOT NULL
+          OR candidate_count<>(SELECT CASE WHEN json_valid(s.raw_result)
+            AND json_type(s.raw_result,'$.allArbs')='array'
+            THEN COALESCE(json_array_length(json_extract(s.raw_result,'$.allArbs')),s.positive_arb_count)
+            ELSE s.positive_arb_count END FROM scan_results s WHERE s.id=bot_scan_evaluations.scan_id)
+          OR eligible_count<>0 OR placement_attempt_count<>0 OR placed_count<>0
+          OR missing_candidate_indexes<>'[]'
+          OR status<>CASE WHEN EXISTS (SELECT 1 FROM bot_opportunity_decisions o
+            WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
+            THEN 'failed' ELSE 'completed' END
+          OR completed<>CASE WHEN EXISTS (SELECT 1 FROM bot_opportunity_decisions o
+            WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
+            THEN 0 ELSE 1 END
+          OR evaluated_count<>(SELECT COUNT(*) FROM bot_opportunity_decisions o
+            WHERE o.scan_id=bot_scan_evaluations.scan_id AND o.final_result IS NOT NULL)
+          OR skipped_count<>(SELECT COUNT(*) FROM bot_opportunity_decisions o
+            WHERE o.scan_id=bot_scan_evaluations.scan_id AND o.final_result IS NOT NULL
+              AND o.state<>'failed' AND o.final_result NOT IN ('failed','accepted'))
+          OR failure_count<>(SELECT COUNT(*) FROM bot_opportunity_decisions o
+            WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed'))
+          OR failing_candidate_indexes<>COALESCE((SELECT json_group_array(candidate_index) FROM
+            (SELECT candidate_index FROM bot_opportunity_decisions o
+              WHERE o.scan_id=bot_scan_evaluations.scan_id AND (o.state='failed' OR o.final_result='failed')
+              ORDER BY candidate_index)), '[]'))`);
+      await db.execute({
+        sql: `INSERT INTO bot_consumer_schema_migrations(name,completed_at) VALUES (?,?)`,
+        args: ['bug181-reset-candidate-reconciliation-v2', new Date().toISOString()],
+      });
     }
     schemaReady = true;
   } finally {

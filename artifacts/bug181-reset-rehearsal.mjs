@@ -19,6 +19,7 @@ try {
       reason TEXT, completed_at TEXT, updated_at TEXT, candidate_count INTEGER, evaluated_count INTEGER,
       eligible_count INTEGER, placement_attempt_count INTEGER, placed_count INTEGER, skipped_count INTEGER,
       failure_count INTEGER, missing_candidate_indexes TEXT, failing_candidate_indexes TEXT)`,
+    `CREATE TABLE bot_consumer_schema_migrations (name TEXT PRIMARY KEY, completed_at TEXT NOT NULL)`,
   ], 'write');
   const reason = 'Cleared by OPS-854 reset baseline. Original state is retained in audit backup.';
   await db.batch([
@@ -204,10 +205,15 @@ try {
         ORDER BY candidate_index)), '[]')
     WHERE scan_id IN (SELECT scan_id FROM bot_scan_decisions
       WHERE state='reset_cleared' AND reason_code='ops854_reset_cleared')`);
+  await db.execute({
+    sql: `INSERT INTO bot_consumer_schema_migrations(name,completed_at) VALUES (?,?)`,
+    args: ['bug181-reset-candidate-reconciliation-v2', new Date().toISOString()],
+  });
 
   const candidates = await db.execute('SELECT * FROM bot_opportunity_decisions ORDER BY candidate_index');
   const evaluations = await db.execute('SELECT * FROM bot_scan_evaluations ORDER BY scan_id');
   const integrity = await db.execute('PRAGMA integrity_check');
+  const migrations = await db.execute('SELECT name FROM bot_consumer_schema_migrations');
   if (candidates.rows.length !== 8 || candidates.rows.some((row) => row.final_result !== 'reset_cleared')) {
     throw new Error('Reset candidate audit rehearsal did not create eight terminal reset tombstones');
   }
@@ -224,6 +230,9 @@ try {
       || evaluation.status !== (failing.length === 0 ? 'completed' : 'failed')) {
       throw new Error(`Reset evaluation ${evaluation.scan_id} does not reconcile with its candidate audits`);
     }
+  }
+  if (migrations.rows[0]?.name !== 'bug181-reset-candidate-reconciliation-v2') {
+    throw new Error('Reset reconciliation completion marker was not persisted');
   }
   console.log(JSON.stringify({ candidateAudits: candidates.rows.length, evaluations: evaluations.rows, integrity: integrity.rows[0] }, null, 2));
 } finally {
