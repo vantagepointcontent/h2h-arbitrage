@@ -4,27 +4,51 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Check, Clock, DollarSign, LayoutGrid, Loader2, Rows3, TrendingUp, Zap } from "lucide-react";
 
-import { OverviewSort, SavedMarket, compareSavedMarketApy, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalCurrentMarketMetrics, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary } from "@/app/lib/page-shared";
+import { OverviewSort, SavedMarket, compareSavedMarketApy, formatPercent, formatCurrency, formatProfitDisplay, formatRelativeTime, isMarketExpired, getCanonicalCurrentMarketMetrics, getCanonicalMatchState, formatCanonicalMatchState, getMarketApySummary, getSavedMarketScheduleView } from "@/app/lib/page-shared";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
 import { CompactStrategyDisplay } from "./ArbLegBreakdown";
 import { DataTable } from "@/components/ui";
 import { OpportunityQueue } from "./opportunities/OpportunityQueue";
 import { buildOpportunityViewModel, rankOpportunities } from "./opportunities/opportunity-view-model";
 
-const MARKET_SCAN_STALE_MS = 15 * 60_000;
+type OverviewMarketFreshness = "fresh" | "stale" | "refreshing" | "not_scanned";
 
-function MarketFreshness({ scannedAt, refreshing, nowMs }: { scannedAt?: string | null; refreshing: boolean; nowMs: number }) {
-  if (refreshing) {
-    return <span className="inline-flex items-center justify-end gap-1 text-[var(--status-info)]"><Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />Refreshing</span>;
+export function getOverviewMarketFreshness(
+  market: Pick<SavedMarket, "scheduler">,
+  scannedAt: string | null | undefined,
+  _refreshing: boolean,
+  nowMs: number,
+): { state: OverviewMarketFreshness; observedAt: string | null; reason: string | null; freshnessSlaMs: number } {
+  const freshnessSlaMs = market.scheduler?.freshnessSlaMs ?? 60 * 60_000;
+  const schedule = getSavedMarketScheduleView(market.scheduler, scannedAt, nowMs, freshnessSlaMs);
+  const observedAt = market.scheduler?.lastSuccessAt ?? scannedAt ?? null;
+  if (schedule.status === "scanning") {
+    return { state: "refreshing", observedAt, reason: schedule.reason, freshnessSlaMs };
   }
-  if (!scannedAt) return <span className="text-[var(--text-secondary)]">Not scanned</span>;
-  const scannedMs = Date.parse(scannedAt);
-  const stale = !Number.isFinite(scannedMs) || nowMs - scannedMs > MARKET_SCAN_STALE_MS;
-  const age = formatRelativeTime(scannedAt);
-  if (stale) {
-    return <span className="inline-flex items-center justify-end gap-1 text-[var(--status-warning)]" title="Scan is more than 15 minutes old"><AlertTriangle aria-hidden="true" className="h-3 w-3" />Stale · {age}</span>;
+  if (schedule.status === "unavailable") {
+    return { state: "not_scanned", observedAt, reason: schedule.reason, freshnessSlaMs };
   }
-  return <span className="inline-flex items-center justify-end gap-1 text-[var(--text-secondary)]"><Check aria-hidden="true" className="h-3 w-3 text-[var(--status-positive)]" />Fresh · {age}</span>;
+  if (schedule.status === "overdue" || schedule.status === "failed" || schedule.status === "rate_limited") {
+    return { state: "stale", observedAt, reason: schedule.reason, freshnessSlaMs };
+  }
+  return { state: "fresh", observedAt, reason: schedule.reason, freshnessSlaMs };
+}
+
+export function MarketFreshness({ market, scannedAt, refreshing, nowMs }: { market: Pick<SavedMarket, "scheduler">; scannedAt?: string | null; refreshing: boolean; nowMs: number }) {
+  const freshness = getOverviewMarketFreshness(market, scannedAt, refreshing, nowMs);
+  if (freshness.state === "refreshing") {
+    return <span data-market-freshness="refreshing" className="inline-flex items-center justify-end gap-1 text-[var(--status-info)]"><Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />Refreshing</span>;
+  }
+  if (freshness.state === "not_scanned" || !freshness.observedAt) {
+    return <span data-market-freshness="not_scanned" className="text-[var(--text-secondary)]" title={freshness.reason ?? undefined}>Not scanned</span>;
+  }
+  const age = formatRelativeTime(freshness.observedAt);
+  if (freshness.state === "stale") {
+    const slaMinutes = Math.round(freshness.freshnessSlaMs / 60_000);
+    const title = freshness.reason ?? `Scan is past its ${slaMinutes}-minute freshness SLA`;
+    return <span data-market-freshness="stale" className="inline-flex items-center justify-end gap-1 text-[var(--status-warning)]" title={title}><AlertTriangle aria-hidden="true" className="h-3 w-3" />Stale · {age}</span>;
+  }
+  return <span data-market-freshness="fresh" className="inline-flex items-center justify-end gap-1 text-[var(--text-secondary)]"><Check aria-hidden="true" className="h-3 w-3 text-[var(--status-positive)]" />Fresh · {age}</span>;
 }
 
 function MatchState({ market }: { market: SavedMarket }) {
@@ -51,9 +75,9 @@ type MetricProvenance = "current" | "stale" | "unavailable" | "refreshing";
 function getMetricProvenance(market: SavedMarket, scannedAt: string | null | undefined, nowMs: number): MetricProvenance {
   const matchState = getCanonicalMatchState(market);
   if (matchState.status === "unavailable") return "unavailable";
-  if (matchState.status === "refreshing") return "refreshing";
-  const scannedMs = scannedAt ? Date.parse(scannedAt) : Number.NaN;
-  return !Number.isFinite(scannedMs) || nowMs - scannedMs > MARKET_SCAN_STALE_MS ? "stale" : "current";
+  const freshness = getOverviewMarketFreshness(market, scannedAt, matchState.status === "refreshing", nowMs);
+  if (freshness.state === "refreshing") return "refreshing";
+  return freshness.state === "fresh" ? "current" : "stale";
 }
 
 function MetricProvenanceLabel({ provenance }: { provenance: Exclude<MetricProvenance, "current"> }) {
@@ -583,7 +607,7 @@ function OverviewPanelInner({
                     </td>
                     <td className={`whitespace-nowrap text-right font-semibold ${metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
                     <td className="whitespace-nowrap text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
-                    <td className="whitespace-nowrap text-right text-[10px]"><MarketFreshness scannedAt={scannedAt} refreshing={matchState.status === "refreshing"} nowMs={renderedAt} /></td>
+                    <td className="whitespace-nowrap text-right text-[10px]"><MarketFreshness market={m} scannedAt={scannedAt} refreshing={matchState.status === "refreshing"} nowMs={renderedAt} /></td>
                   </tr>
                 );
               })}

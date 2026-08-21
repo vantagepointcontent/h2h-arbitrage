@@ -228,14 +228,17 @@ describe('UI-104 Markets table hierarchy', () => {
     vi.setSystemTime(new Date('2026-08-13T12:30:00.000Z'));
     const active = marketWithOpportunity('active', 'Active market');
     active.lastScanResult = { ...active.lastScanResult!, scannedAt: '2026-08-13T12:29:00.000Z' } as SavedMarket['lastScanResult'];
+    active.scheduler = { lastSuccessAt: '2026-08-13T12:29:00.000Z', freshnessSlaMs: 15 * 60_000 };
     const stale = marketWithOpportunity('stale', 'Stale market');
     stale.lastScanResult = { ...stale.lastScanResult!, scannedAt: '2026-08-13T12:00:00.000Z' } as SavedMarket['lastScanResult'];
+    stale.scheduler = { lastSuccessAt: '2026-08-13T12:00:00.000Z', freshnessSlaMs: 15 * 60_000 };
     const refreshing = market('refreshing', 'Refreshing market');
     refreshing.lastScanResult = {
       scannedAt: '2026-08-13T12:29:00.000Z', bestRoiPct: 0, bestProfit: 0,
       strategy: 'No arb', matchedCount: 0, outcomeCount: 0, kalshiCount: 0, pmCount: 0,
       matchStatus: 'refreshing', allArbs: [],
     } as SavedMarket['lastScanResult'];
+    refreshing.scheduler = { lastSuccessAt: '2026-08-13T12:29:00.000Z', freshnessSlaMs: 15 * 60_000, inProgress: true };
 
     render(<OverviewPanel {...props} layout="table" markets={[active, stale, refreshing]} />);
 
@@ -260,6 +263,7 @@ describe('UI-104 Markets table hierarchy', () => {
       matchStatus,
       matchError: matchStatus === 'unavailable' ? 'Venue unavailable' : undefined,
     } as SavedMarket['lastScanResult'];
+    affected.scheduler = { lastSuccessAt: scannedAt, freshnessSlaMs: 15 * 60_000 };
 
     render(<OverviewPanel {...props} layout="table" markets={[affected]} />);
 
