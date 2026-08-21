@@ -38,7 +38,11 @@ const consumerWindow = await one(`SELECT COUNT(*) AS decisions, MIN(scan_id) AS 
 const cursor = await one(`SELECT last_scan_id,updated_at FROM bot_scan_cursor WHERE consumer='bot_trader'`);
 const gaps = await one(`SELECT
   SUM(CASE WHEN s.positive_arb_count>0 AND d.scan_id IS NULL THEN 1 ELSE 0 END) AS positive_without_scan_decision,
-  SUM(CASE WHEN s.positive_arb_count>0 AND (e.scan_id IS NULL OR e.completed<>1) THEN 1 ELSE 0 END) AS positive_without_completed_evaluation,
+  SUM(CASE WHEN s.positive_arb_count>0 AND (e.scan_id IS NULL
+    OR e.evaluated_count<>e.candidate_count
+    OR json_array_length(e.missing_candidate_indexes)>0
+    OR e.skipped_count+e.placed_count+e.failure_count<>e.candidate_count)
+    THEN 1 ELSE 0 END) AS positive_without_terminal_evaluation,
   SUM(CASE WHEN s.positive_arb_count<=0 AND e.status='not_applicable_no_positive_arb' THEN 1 ELSE 0 END) AS zero_arb_na
   FROM scan_results s
   LEFT JOIN bot_scan_decisions d ON d.scan_id=s.id

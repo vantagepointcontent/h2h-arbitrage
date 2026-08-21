@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-21T13:25:18.244Z",
+  "capturedAt": "2026-08-21T14:51:50.463Z",
   "window": {
-    "since": "2026-08-21T12:25:18.244Z",
-    "completions": 965,
-    "markets": 476,
-    "first_id": 834820,
-    "last_id": 835784,
-    "first_at": "2026-08-21T12:26:14.341Z",
-    "last_at": "2026-08-21T13:25:03.622Z",
+    "since": "2026-08-21T13:51:50.463Z",
+    "completions": 874,
+    "markets": 472,
+    "first_id": 836248,
+    "last_id": 837121,
+    "first_at": "2026-08-21T13:51:58.555Z",
+    "last_at": "2026-08-21T14:51:39.882Z",
     "positive": 0
   },
   "gapMatrix": {
     "scheduler": {
-      "heartbeatAt": "2026-08-21T13:25:04.873Z",
+      "heartbeatAt": "2026-08-21T14:51:40.232Z",
       "status": "ok",
       "queue": {
         "eligibleCount": 476,
@@ -21,11 +21,11 @@
         "overdueCount": 0,
         "failedCount": 0,
         "inProgressCount": 0,
-        "oldestSuccessAgeMs": 2001402
+        "oldestSuccessAgeMs": 3280936
       },
       "progress": {
-        "completedDueCount": 16,
-        "dueCount": 16
+        "completedDueCount": 6,
+        "dueCount": 6
       },
       "samples": [
         {
@@ -34,10 +34,10 @@
           "marketId": "1779565300940-jqb54rc",
           "title": "Maine Senate Election Winner",
           "linkedUrlsPresent": true,
-          "persistedScanAt": "2026-08-21T13:05:28.586Z",
-          "schedulerLastAttemptAt": "2026-08-21T13:05:25.870Z",
-          "schedulerLastSuccessAt": "2026-08-21T13:05:29.840Z",
-          "nextDueAt": "2026-08-21T13:35:29.840Z",
+          "persistedScanAt": "2026-08-21T14:40:02.834Z",
+          "schedulerLastAttemptAt": "2026-08-21T14:40:00.187Z",
+          "schedulerLastSuccessAt": "2026-08-21T14:40:03.469Z",
+          "nextDueAt": "2026-08-21T15:10:03.469Z",
           "inProgress": false,
           "failureReason": null
         },
@@ -47,10 +47,10 @@
           "marketId": "1782999196726-house-ms01",
           "title": "MS-01 House Election Winner",
           "linkedUrlsPresent": true,
-          "persistedScanAt": "2026-08-21T13:00:42.258Z",
-          "schedulerLastAttemptAt": "2026-08-21T13:00:40.394Z",
-          "schedulerLastSuccessAt": "2026-08-21T13:00:44.049Z",
-          "nextDueAt": "2026-08-21T13:30:44.049Z",
+          "persistedScanAt": "2026-08-21T14:34:53.092Z",
+          "schedulerLastAttemptAt": "2026-08-21T14:34:50.993Z",
+          "schedulerLastSuccessAt": "2026-08-21T14:34:53.488Z",
+          "nextDueAt": "2026-08-21T15:04:53.488Z",
           "inProgress": false,
           "failureReason": null
         },
@@ -60,22 +60,22 @@
           "marketId": "7248f46f-20bf-43ef-9f44-15e47a0eef9a",
           "title": "LigaPro Serie A (Ecuador): 2026 Winner",
           "linkedUrlsPresent": true,
-          "persistedScanAt": "2026-08-21T13:10:05.873Z",
-          "schedulerLastAttemptAt": "2026-08-21T13:10:04.094Z",
-          "schedulerLastSuccessAt": "2026-08-21T13:10:07.785Z",
-          "nextDueAt": "2026-08-21T13:40:07.785Z",
+          "persistedScanAt": "2026-08-21T14:16:06.995Z",
+          "schedulerLastAttemptAt": "2026-08-21T14:15:58.990Z",
+          "schedulerLastSuccessAt": "2026-08-21T14:16:06.995Z",
+          "nextDueAt": "2026-08-21T15:16:06.995Z",
           "inProgress": false,
           "failureReason": null
         }
       ]
     },
     "persistedScans": {
-      "completions": 965,
-      "markets": 476,
-      "first_id": 834820,
-      "last_id": 835784,
-      "first_at": "2026-08-21T12:26:14.341Z",
-      "last_at": "2026-08-21T13:25:03.622Z",
+      "completions": 874,
+      "markets": 472,
+      "first_id": 836248,
+      "last_id": 837121,
+      "first_at": "2026-08-21T13:51:58.555Z",
+      "last_at": "2026-08-21T14:51:39.882Z",
       "positive": 0
     },
     "marketsProjection": {
@@ -98,15 +98,15 @@
     },
     "botTrader": {
       "consumerWindow": {
-        "decisions": 965,
-        "first_scan_id": 834820,
-        "last_scan_id": 835784,
-        "first_at": "2026-08-21T12:26:14.427Z",
-        "last_at": "2026-08-21T13:25:04.541Z"
+        "decisions": 874,
+        "first_scan_id": 836248,
+        "last_scan_id": 837121,
+        "first_at": "2026-08-21T13:51:59.084Z",
+        "last_at": "2026-08-21T14:51:39.985Z"
       },
       "cursor": {
-        "last_scan_id": 835784,
-        "updated_at": "2026-08-21T13:25:04.544Z"
+        "last_scan_id": 837121,
+        "updated_at": "2026-08-21T14:51:39.989Z"
       },
       "workflow": {
         "health": "healthy",
@@ -116,72 +116,78 @@
         "requestedExecutionMode": "paper",
         "liveAuthorizationConfigured": false,
         "credentialsReady": false,
-        "latestCompletedScanId": 835784,
-        "latestCompletedScanAt": "2026-08-21T13:25:03.622Z",
+        "latestCompletedScanId": 837121,
+        "latestCompletedScanAt": "2026-08-21T14:51:39.882Z",
         "latestPositiveScanId": 760301,
         "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 835784,
-        "cursorUpdatedAt": "2026-08-21T13:25:04.544Z",
-        "latestDecisionScanId": 835784,
-        "latestDecisionAt": "2026-08-21T13:25:04.541Z",
+        "cursorScanId": 837121,
+        "cursorUpdatedAt": "2026-08-21T14:51:39.989Z",
+        "latestDecisionScanId": 837121,
+        "latestDecisionAt": "2026-08-21T14:51:39.985Z",
         "pendingScans": 0,
         "cursorLag": 0,
         "opportunitiesEvaluated": 21418,
         "eligibleCount": 0,
         "lastExecutionOrSkip": {
-          "scanId": 835784,
+          "scanId": 837121,
           "state": "criteria_rejected",
           "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T13:25:04.541Z"
+          "at": "2026-08-21T14:51:39.985Z"
         },
         "inProgress": null,
         "consumer": {
           "state": "healthy",
-          "lastSuccessAt": "2026-08-21T13:25:15.902Z",
-          "ageMs": 2336,
+          "lastSuccessAt": "2026-08-21T14:51:45.901Z",
+          "ageMs": 4546,
           "processed": 0,
           "error": null
         }
       },
       "heartbeat": {
         "state": "healthy",
-        "attemptedAt": "2026-08-21T13:25:15.624Z",
+        "attemptedAt": "2026-08-21T14:51:45.626Z",
         "error": null,
-        "pid": 113953,
-        "lastSuccessAt": "2026-08-21T13:25:15.902Z",
+        "pid": 178029,
+        "lastSuccessAt": "2026-08-21T14:51:45.901Z",
         "processed": 0,
         "byState": {},
-        "latestCompletedScanId": 835784,
-        "latestCompletedScanAt": "2026-08-21T13:25:03.622Z",
+        "latestCompletedScanId": 837121,
+        "latestCompletedScanAt": "2026-08-21T14:51:39.882Z",
         "latestPositiveScanId": 760301,
         "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
-        "cursorScanId": 835784,
-        "cursorUpdatedAt": "2026-08-21T13:25:04.544Z",
-        "latestDecisionScanId": 835784,
-        "latestDecisionAt": "2026-08-21T13:25:04.541Z",
+        "cursorScanId": 837121,
+        "cursorUpdatedAt": "2026-08-21T14:51:39.989Z",
+        "latestDecisionScanId": 837121,
+        "latestDecisionAt": "2026-08-21T14:51:39.985Z",
         "pendingScans": 0,
         "cursorLag": 0,
         "opportunitiesEvaluated": 21418,
         "eligibleCount": 0,
         "lastExecutionOrSkip": {
-          "scanId": 835784,
+          "scanId": 837121,
           "state": "criteria_rejected",
           "reason": "No Positive Arb — BotTrader not applicable",
-          "at": "2026-08-21T13:25:04.541Z"
+          "at": "2026-08-21T14:51:39.985Z"
         },
         "inProgress": null
       },
       "gaps": {
         "positive_without_scan_decision": 0,
-        "positive_without_completed_evaluation": 0,
-        "zero_arb_na": 54168
+        "positive_without_terminal_evaluation": 0,
+        "zero_arb_na": 54754
       },
       "positiveEvaluationStatuses": [
         {
           "status": "completed",
           "decision_state": "reset_cleared",
           "reason_code": "ops854_reset_cleared",
-          "count": 12668
+          "count": 12643
+        },
+        {
+          "status": "failed",
+          "decision_state": "reset_cleared",
+          "reason_code": "ops854_reset_cleared",
+          "count": 25
         }
       ],
       "positiveCandidateAudit": {
@@ -191,14 +197,14 @@
       }
     },
     "workerTelemetry": {
-      "lastReceivedAt": "2026-08-21T13:25:04.780Z",
-      "lastPersistedAt": "2026-08-21T13:25:04.800Z",
-      "lastFailureAt": "2026-08-21T13:09:43.571Z",
-      "lastDrainAttemptAt": "2026-08-21T13:25:04.788Z",
-      "writeFailures": 9281,
+      "lastReceivedAt": "2026-08-21T14:51:40.175Z",
+      "lastPersistedAt": "2026-08-21T14:51:40.183Z",
+      "lastFailureAt": "2026-08-21T14:33:44.090Z",
+      "lastDrainAttemptAt": "2026-08-21T14:51:40.182Z",
+      "writeFailures": 9697,
       "pendingSnapshots": 0,
       "oldestPendingAt": null,
-      "recoveredSnapshots": 10352,
+      "recoveredSnapshots": 10683,
       "error": null
     },
     "uiApiHealth": {
@@ -226,12 +232,12 @@
       "botTrader": {
         "state": "healthy",
         "reasons": [],
-        "heartbeatAt": "2026-08-21T13:25:15.902Z",
-        "heartbeatAgeMs": 2307,
+        "heartbeatAt": "2026-08-21T14:51:45.901Z",
+        "heartbeatAgeMs": 4527,
         "pendingScans": 0,
         "cursorLag": 0,
-        "cursorScanId": 835784,
-        "latestCompletedScanId": 835784,
+        "cursorScanId": 837121,
+        "latestCompletedScanId": 837121,
         "error": null
       }
     }

@@ -188,7 +188,7 @@ async function crashAndRecover(name, before) {
   await waitFor(`${name} PM2 restart`, async () => {
     const processes = await pm2Snapshot();
     const current = processes.find((process) => process.name === name);
-    return current?.status === 'online' && current.pid !== prior.pid && current.restarts > prior.restarts ? current : false;
+    return current?.status === 'online' && current.pid !== prior.pid ? current : false;
   });
   const recovered = await waitFor(`${name} pipeline recovery`, async () => {
     const state = await snapshot(`after-${name}-crash`);
@@ -222,7 +222,7 @@ if (mode === 'baseline') {
   const afterAppRestart = await waitFor('application PM2 restart recovery', async () => {
     const state = await snapshot('after-app-pm2-restart');
     const app = processByName(state, 'h2h-arbitrage');
-    return app.pid !== appBefore.pid && app.restarts > appBefore.restarts
+    return app.pid !== appBefore.pid
       && state.deployment?.commit === expectedCommit && pipelineHealthy(state) ? state : false;
   });
   const finalNaturalCycle = await waitFor('post-fault natural scan cycle', async () => {

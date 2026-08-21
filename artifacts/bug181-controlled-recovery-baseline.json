@@ -1,0 +1,181 @@
+{
+  "label": "before-release-promotion",
+  "at": "2026-08-21T13:51:34.379Z",
+  "deployment": {
+    "commit": "602d86b6c9c96d06b54be709379b65e419259448",
+    "buildId": "pyZA1oDxoiKVew4UsK9ZL"
+  },
+  "components": {
+    "scanner": {
+      "state": "healthy",
+      "reason": null
+    },
+    "persistence": {
+      "state": "healthy",
+      "busyRetries": 0,
+      "exhaustedWrites": 0,
+      "lastBusyAt": null,
+      "lastExhaustedAt": null
+    },
+    "markets": {
+      "state": "healthy",
+      "reasons": [],
+      "total": 476,
+      "scanned": 476,
+      "availableApy": 0,
+      "unavailableWithReason": 476,
+      "unavailableWithoutReason": 0,
+      "zeroCurrentRoi": 0
+    },
+    "botTrader": {
+      "state": "healthy",
+      "reasons": [],
+      "heartbeatAt": "2026-08-21T13:51:26.321Z",
+      "heartbeatAgeMs": 8014,
+      "pendingScans": 0,
+      "cursorLag": 0,
+      "cursorScanId": 836247,
+      "latestCompletedScanId": 836247,
+      "error": null
+    }
+  },
+  "scheduler": {
+    "available": true,
+    "mixedVersion": false,
+    "stale": false,
+    "staleForMs": 39775,
+    "expectedSchedulerVersion": "bug-165-v1",
+    "observedSchedulerVersion": "bug-165-v1",
+    "heartbeatAt": "2026-08-21T13:50:54.560Z",
+    "status": "ok",
+    "pollerPid": 113992,
+    "startedAt": "2026-08-21T13:50:34.519Z",
+    "finishedAt": "2026-08-21T13:50:54.560Z",
+    "durationMs": 20041,
+    "successCount": 3,
+    "failureCount": 0,
+    "avgScanMs": 9337,
+    "maxScanMs": 19760,
+    "openBreakers": 0,
+    "capacity": {
+      "configuredConcurrency": 3,
+      "requiredConcurrency": 3,
+      "sufficientForFreshnessSla": true
+    },
+    "progress": {
+      "completedDueCount": 3,
+      "dueCount": 3
+    },
+    "queue": {
+      "eligibleCount": 476,
+      "dueCount": 0,
+      "overdueCount": 0,
+      "failedCount": 0,
+      "inProgressCount": 0,
+      "oldestSuccessAgeMs": 3476760
+    }
+  },
+  "botWorkflow": {
+    "health": "healthy",
+    "degradedReasons": [],
+    "liveUnavailableReasons": [],
+    "effectiveExecutionMode": "paper",
+    "requestedExecutionMode": "paper",
+    "liveAuthorizationConfigured": false,
+    "credentialsReady": false,
+    "latestCompletedScanId": 836247,
+    "latestCompletedScanAt": "2026-08-21T13:50:53.814Z",
+    "latestPositiveScanId": 760301,
+    "latestPositiveScanAt": "2026-08-14T17:46:28.069Z",
+    "cursorScanId": 836247,
+    "cursorUpdatedAt": "2026-08-21T13:50:54.329Z",
+    "latestDecisionScanId": 836247,
+    "latestDecisionAt": "2026-08-21T13:50:54.326Z",
+    "pendingScans": 0,
+    "cursorLag": 0,
+    "opportunitiesEvaluated": 21418,
+    "eligibleCount": 0,
+    "lastExecutionOrSkip": {
+      "scanId": 836247,
+      "state": "criteria_rejected",
+      "reason": "No Positive Arb — BotTrader not applicable",
+      "at": "2026-08-21T13:50:54.326Z"
+    },
+    "inProgress": null,
+    "consumer": {
+      "state": "healthy",
+      "lastSuccessAt": "2026-08-21T13:51:26.321Z",
+      "ageMs": 8030,
+      "processed": 0,
+      "error": null
+    }
+  },
+  "markets": {
+    "total": 476,
+    "scanned": 476,
+    "unavailableWithoutReason": 0,
+    "falseZeroCurrentRoi": 0
+  },
+  "positiveLogs": {
+    "returned": 500,
+    "total": 12668,
+    "reconciled": 500,
+    "unreconciled": 0,
+    "truthfulFailures": 0
+  },
+  "processes": [
+    {
+      "name": "h2h-arbitrage",
+      "status": "online",
+      "pid": 113878,
+      "restarts": 4,
+      "uptimeAt": "2026-08-21T13:22:04.422Z",
+      "script": "/home/scott/h2h-arbitrage/scripts/start-app.sh",
+      "cwd": "/home/scott/h2h-arbitrage"
+    },
+    {
+      "name": "h2h-poller",
+      "status": "online",
+      "pid": 113992,
+      "restarts": 16,
+      "uptimeAt": "2026-08-21T13:22:20.880Z",
+      "script": "/home/scott/h2h-arbitrage/scripts/poll.mjs",
+      "cwd": "/home/scott/h2h-arbitrage"
+    },
+    {
+      "name": "h2h-ragnar",
+      "status": "online",
+      "pid": 113953,
+      "restarts": 0,
+      "uptimeAt": "2026-08-21T13:22:20.590Z",
+      "script": "/home/scott/h2h-arbitrage/.h2h-releases/active/.next/ragnar-consumer.mjs",
+      "cwd": "/home/scott/h2h-arbitrage"
+    },
+    {
+      "name": "h2h-scan-supervisor",
+      "status": "online",
+      "pid": 113993,
+      "restarts": 4,
+      "uptimeAt": "2026-08-21T13:22:20.885Z",
+      "script": "/home/scott/h2h-arbitrage/scripts/scan-supervisor.mjs",
+      "cwd": "/home/scott/h2h-arbitrage"
+    }
+  ],
+  "database": {
+    "integrity": "ok",
+    "foreignKeyViolations": 0,
+    "scans": {
+      "completed_count": 92172,
+      "max_scan_id": 836247,
+      "positive_count": 12668
+    },
+    "cursor": null,
+    "evaluations": {
+      "positive_scans": 12668,
+      "missing_evaluations": 0,
+      "unreconciled": 25,
+      "candidate_failures": 0
+    },
+    "duplicateCandidateGroups": 0
+  }
+}

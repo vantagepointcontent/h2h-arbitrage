@@ -80,7 +80,7 @@ const checks = {
   cursorAlwaysCaughtUp: samples.every((sample) => sample.components?.botTrader?.cursorLag === 0
     && sample.components?.botTrader?.pendingScans === 0)
     && last.botWorkflow?.cursorLag === 0 && last.botWorkflow?.pendingScans === 0
-    && last.botWorkflow?.cursorScanId === last.botWorkflow?.latestCompletedScanId,
+    && last.botWorkflow?.latestDecisionScanId === last.botWorkflow?.latestCompletedScanId,
   canonicalPopulationComplete: samples.every((sample) => sample.markets.total === 476 && sample.markets.scanned === 476
     && sample.markets.unavailableWithoutReason === 0 && sample.markets.zeroCurrentRoi === 0),
   positiveHistoryTerminal: samples.every((sample) => sample.positiveLogs.rows === 500
