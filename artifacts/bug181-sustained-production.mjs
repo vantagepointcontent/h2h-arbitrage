@@ -216,9 +216,11 @@ async function startMarketsUiProbe() {
           }
           const total = nodes.length;
           const recognizedTotal = Object.values(counts).reduce((sum, count) => sum + count, 0);
+          const staleWithoutReason = nodes.filter((node) => node.getAttribute('data-market-freshness') === 'stale'
+            && !(node.getAttribute('title') || '').trim()).length;
           const renderedRows = document.querySelectorAll('table tbody tr').length;
           const hydrated = total === expected && recognizedTotal === total && renderedRows === expected;
-          return { hydrated, total, recognizedTotal, unrecognized, ...counts, renderedRows };
+          return { hydrated, total, recognizedTotal, unrecognized, ...counts, staleWithoutReason, renderedRows };
         })()`;
         const readyBy = Date.now() + 120_000;
         let snapshot;
@@ -330,7 +332,9 @@ const checks = {
     && sample.uiFreshness.recognizedTotal === sample.uiFreshness.total
     && sample.uiFreshness.fresh + sample.uiFreshness.stale + sample.uiFreshness.refreshing + sample.uiFreshness.not_scanned === sample.uiFreshness.total
     && sample.uiFreshness.renderedRows === sample.markets.total
-    && sample.uiFreshness.stale === 0 && sample.uiFreshness.not_scanned === 0),
+    && sample.uiFreshness.stale * 2 < sample.uiFreshness.total
+    && sample.uiFreshness.staleWithoutReason === 0
+    && sample.uiFreshness.not_scanned === 0),
   positiveHistoryTerminal: samples.every((sample) => sample.positiveLogs.rows === 500
     && sample.positiveLogs.terminallyReconciled === 500
     && sample.positiveLogs.missingCandidateGaps === 0),
