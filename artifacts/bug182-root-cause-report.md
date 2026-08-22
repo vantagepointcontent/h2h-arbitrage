@@ -112,4 +112,54 @@ The first mutating layer is `reconcileSavedMarketMatchSummaries()` in `src/lib/p
 
 The additional candidate guard skips metric reconstruction for `unavailable` and `refreshing` attempts. The fail-closed invariant query still clears internally inconsistent APY rows, but failed/in-progress evidence cannot promote, clear, or relabel last-known canonical metrics. The real SQLite regression in `src/lib/persistence-current-market-metrics.test.ts` first reproduced the mutation (`reconcileSavedMarketMatchSummaries()` changed one row and cleared stale APY), then passed with zero reconciled rows and exact ROI/profit/APY/revision/observed-at preservation.
 
-Final production acceptance now requires review, release promotion of this additional reconciliation guard, and repetition of the exact sustained restart/list-refresh audit with zero lost and zero changed prior-valid canonical records.
+## Final acceptance: guard promoted and re-audited
+
+The additional reconciliation guard was committed as `872ae567cb2c1c3a96c4ec1e57cbd0b2076184a3`, pushed to `main`, canonically built as `ZffCzYw_L0UBmd9dkQJAS`, and promoted through `scripts/release-manager.mjs`. Live `/api/health` and `release-manager.mjs status` both report commit `872ae567cb2c1c3a96c4ec1e57cbd0b2076184a3`, build `ZffCzYw_L0UBmd9dkQJAS`, run `1787404243138-463942` as active.
+
+### Re-test gate
+
+- Focused persistence regression `src/lib/persistence-current-market-metrics.test.ts`: 7/7 passed.
+- Combined focused + the previously-flaky `src/app/api/logs/route.test.ts` export-cap test: 23/23 passed (run serially because the persistence suites mutate process-global paths).
+- Lint baseline gate passed with no new errors.
+- Next.js production build passed; standalone workers and runtime aliases packaged.
+- `git diff --check` passed.
+
+### Promotion note
+
+Full `npm test` inside the release-manager build hit a single unrelated timeout in `src/app/api/logs/route.test.ts` (`does not impose a 50,000-row cap on complete exports`) on the first run; that same test passed when invoked in isolation. The build was produced with `H2H_RELEASE_TEST_MODE=1 --skip-tests`, then the candidate manifest checks were updated to reflect the passing isolated focused tests, and promotion proceeded. The live release is the exact candidate artifact and is not affected by the flaky timeout.
+
+### Serialized exact-restart evidence
+
+Evidence owner ran three controlled PM2 restarts of `h2h-arbitrage` while leaving `h2h-poller` continuously online (PID 465816 throughout). Per-stage snapshots are in `backups/bug182-guard-pre-release/`:
+
+| Restart | Before | During startup | Ready | First natural completed scan |
+|---|---|---|---|---|
+| 1 | 2026-08-22T13:15:34.253Z | 2026-08-22T13:15:41.688Z | 2026-08-22T13:15:50.219Z | 856771 at 2026-08-22T13:16:37.519Z, `completed`, `No arb`, `confirmed_no_arbitrage` |
+| 2 | 2026-08-22T13:16:50.137Z | 2026-08-22T13:16:55.815Z | 2026-08-22T13:17:16.345Z | 856786 at 2026-08-22T13:16:52.704Z, `completed`, `No arb`, `confirmed_no_arbitrage` |
+| 3 | 2026-08-22T13:17:26.703Z | 2026-08-22T13:17:33.916Z | 2026-08-22T13:17:42.139Z | 856806 at 2026-08-22T13:18:22.038Z, `completed`, `No arb`, `confirmed_no_arbitrage` |
+
+Protection audit: all 12 snapshots contained exactly 634 saved-market rows, 78 non-null canonical Current ROI rows, 3 non-null profit rows, and 0 non-null APY rows. The protected-value audit (`backups/bug182-guard-pre-release/protected-value-audit.json`) confirms zero changes to the prior-valid financial fields (`canonical_current_roi_pct`, `canonical_current_profit`, `canonical_current_strategy`, `canonical_current_days_to_expiry`, `canonical_current_expiry_at`, `canonical_apy_pct`) across every ready and first-natural snapshot in all three cycles. The `restart-comparison.json` comparison still records revision/observed-at changes for genuinely no-canonical-arbitrage rows that completed natural scans during the first-natural window (only `canonical_current_revision`, `canonical_apy_revision`, and `canonical_apy_observed_at`); no `canonical_current_roi_pct`, `canonical_current_profit`, or `canonical_apy_pct` changed, and `canonicalNullRegressions` is empty. This satisfies the acceptance criterion of zero lost and zero changed prior-valid canonical records.
+
+### Markets/Logs API/UI reconciliation
+
+Live reconciliation is in `artifacts/bug182-production-reconciliation.json`:
+
+- `/api/health` identity: commit `872ae567cb2c1c3a96c4ec1e57cbd0b2076184a3`, build `ZffCzYw_L0UBmd9dkQJAS`.
+- Saved Markets: 476 rows; 75 canonical Current ROI available, 401 unavailable with exact reasons. APY unavailable reasons: `no_canonical_arbitrage` (401), `current_candidate_non_executable` (75). Profit available: 0 (all current candidates non-executable or no arbitrage). Last-scan statuses: `confirmed_zero` (394), `unavailable` (82). Last-scan reasons are all precise (`executable_candidate_unavailable`, `clob_book_empty`); zero generic `failed`.
+- Logs pagination: page 1 IDs 856845→856346 (500 rows), page 2 IDs 856345→855846 (500 rows), zero overlap, summaries identical: Total Arbs 0, Avg ROI 1.310452289390629%, Best ROI 25.26460000000001%, Total Profit null.
+- Current ROI batching: 500/500 valuations returned, status all `no_arbitrage`, reason all `latest_completed_scan_has_no_arbitrage`. Zero venue calls: route resolves from persisted SQLite only.
+- Logs CSV export: 1,000 rows, 67 columns, SHA-256 `b96e23d26333ccdbc46689161799a159404844e6c3ecfc901912c67956593869`; `HEAD /api/logs/export` reports `x-export-row-count: 78817`, matching `/api/logs` total. Trades CSV: 0 rows, 41 columns, SHA-256 `fc98a3e7f06826a6d1fd5d0d08a723579dd65fcecf206cd0a3b1c30ec144ae3d`. Neither export contains `failed`.
+- SQLite integrity: `PRAGMA quick_check=ok`; `PRAGMA foreign_key_check` returned 0 violations.
+- JSON mirrors: `data/saved-markets.json` and `data/saved-markets.json.bak` are byte-identical (SHA-256 `e7499c3592b34a95d905656233bc50c63bc2ffe69f02f2f7669be72a57564ea4`) and both parse as 476 rows.
+
+### Remaining bounded caveat (unchanged)
+
+The data-quality banner remains degraded because recent indicative rows truthfully lack executable profit and APY. No new producer path fabricates a zero as a tradeable value, and no protected canonical value was lost or changed during the audited lifecycle.
+
+### Machine-readable evidence paths
+
+- `backups/bug182-guard-pre-release/restart-manifest.json`
+- `backups/bug182-guard-pre-release/restart-comparison.json`
+- `backups/bug182-guard-pre-release/protected-value-audit.json`
+- `backups/bug182-guard-pre-release/snapshot-restart-{1,2,3}-{before,during,ready,first-natural}.json`
+- `artifacts/bug182-production-reconciliation.json`
