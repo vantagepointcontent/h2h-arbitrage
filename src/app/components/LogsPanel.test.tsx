@@ -225,8 +225,8 @@ describe('LogsPanel', () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
-      if (url === '/api/logs/current-roi') {
-        expect(JSON.parse(String(init?.body))).toEqual({ ids: [91] });
+      if (url.startsWith('/api/logs/current-roi?')) {
+        expect(new URL(url, 'http://localhost').searchParams.get('ids')).toBe('91');
         return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: -1.234, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:00:00.000Z', scanId: 123 }] }) });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
@@ -248,7 +248,7 @@ describe('LogsPanel', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [legacy], total: 1 }) });
-      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{
+      if (url.startsWith('/api/logs/current-roi?')) return Promise.resolve({ ok: true, json: async () => ({ valuations: [{
         id: 91,
         status: 'never_scanned',
         reasonCode: 'no_completed_scan_for_exact_pair',
@@ -295,8 +295,8 @@ describe('LogsPanel', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [lowDisplayed, highDisplayed], total: 2 }) });
-      if (url === '/api/logs/current-roi') {
-        const ids = JSON.parse(String(init?.body)).ids as number[];
+      if (url.startsWith('/api/logs/current-roi?')) {
+        const ids = new URL(url, 'http://localhost').searchParams.get('ids')!.split(',').map(Number);
         return Promise.resolve({ ok: true, json: async () => ({ valuations: ids.map((id) => ({
           id,
           status: 'never_scanned',
@@ -333,7 +333,7 @@ describe('LogsPanel', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
-      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status }] }) });
+      if (url.startsWith('/api/logs/current-roi?')) return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status }] }) });
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
       return Promise.resolve({ json: async () => [] });
     }));
@@ -346,13 +346,14 @@ describe('LogsPanel', () => {
     const rows = Array.from({ length: 100 }, (_, index) => ({
       ...comparisonLog(), id: index + 1, market_id: 'same-linked-market', market_name: `Market row ${index + 1}`,
     }));
-    const currentBodies: number[][] = [];
+    const currentBatches: number[][] = [];
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: rows, total: rows.length }) });
-      if (url === '/api/logs/current-roi') {
-        const ids = JSON.parse(String(init?.body)).ids as number[];
-        currentBodies.push(ids);
+      if (url.startsWith('/api/logs/current-roi?')) {
+        expect(init?.method).toBeUndefined();
+        const ids = new URL(url, 'http://localhost').searchParams.get('ids')!.split(',').map(Number);
+        currentBatches.push(ids);
         return Promise.resolve({ ok: true, json: async () => ({ valuations: ids.map((id) => ({ id, status: 'no_arbitrage' })) }) });
       }
       if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
@@ -360,9 +361,9 @@ describe('LogsPanel', () => {
     }));
 
     render(createElement(LogsPanel));
-    await waitFor(() => expect(currentBodies).toHaveLength(1), { timeout: 5_000 });
-    expect(currentBodies).toHaveLength(1);
-    expect(currentBodies[0]).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
+    await waitFor(() => expect(currentBatches).toHaveLength(1), { timeout: 5_000 });
+    expect(currentBatches).toHaveLength(1);
+    expect(currentBatches[0]).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
   });
 
   it('ignores an out-of-order Current ROI response from a superseded Logs generation', async () => {
@@ -376,8 +377,8 @@ describe('LogsPanel', () => {
         logRequest += 1;
         return Promise.resolve({ ok: true, json: async () => ({ logs: [logRequest === 1 ? comparisonLog() : replacement], total: 1 }) });
       }
-      if (url === '/api/logs/current-roi') {
-        const [id] = JSON.parse(String(init?.body)).ids as number[];
+      if (url.startsWith('/api/logs/current-roi?')) {
+        const [id] = new URL(url, 'http://localhost').searchParams.get('ids')!.split(',').map(Number);
         if (id === 91) return oldCurrent;
         return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 92, status: 'available', roiPct: 7.77 }] }) });
       }
@@ -394,6 +395,31 @@ describe('LogsPanel', () => {
     await Promise.resolve();
     expect(screen.queryByText('99.99%')).toBeNull();
     expect(screen.getByText('7.77%')).toBeTruthy();
+  });
+
+  it('keeps the last persisted Current ROI visible when a later lookup fails', async () => {
+    let currentRequests = 0;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/logs?')) {
+        return Promise.resolve({ ok: true, json: async () => ({ logs: [comparisonLog()], total: 1 }) });
+      }
+      if (url.startsWith('/api/logs/current-roi?')) {
+        currentRequests += 1;
+        return currentRequests === 1
+          ? Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'available', roiPct: 2.5 }] }) })
+          : Promise.resolve({ ok: false, json: async () => ({ error: 'database temporarily busy' }) });
+      }
+      if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });
+      return Promise.resolve({ json: async () => [] });
+    }));
+
+    render(createElement(LogsPanel));
+    expect(await screen.findByText('2.50%')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(currentRequests).toBe(2));
+    expect(screen.getByText('2.50%')).toBeTruthy();
+    expect(screen.queryByText('Unavailable / failed')).toBeNull();
   });
 
   it('uses the complete non-ROI-filtered dataset maximum for an accessible ROI slider and clamps on filter changes', async () => {
@@ -918,7 +944,7 @@ describe('LogsPanel', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/logs?')) return Promise.resolve({ ok: true, json: async () => ({ logs: [malformedLog], total: 1 }) });
-      if (url === '/api/logs/current-roi') return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'no_arbitrage' }] }) });
+      if (url.startsWith('/api/logs/current-roi?')) return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'no_arbitrage' }] }) });
       if (url === '/api/logs/91') return Promise.resolve({
         ok: true,
         json: async () => ({
@@ -1042,7 +1068,7 @@ function logsFetch(rowsOrFactory: unknown[] | (() => unknown[])) {
       const logs = typeof rowsOrFactory === 'function' ? rowsOrFactory() : rowsOrFactory;
       return Promise.resolve({ ok: true, json: async () => ({ logs, total: logs.length }) });
     }
-    if (url === '/api/logs/current-roi') {
+    if (url.startsWith('/api/logs/current-roi?')) {
       return Promise.resolve({ ok: true, json: async () => ({ valuations: [{ id: 91, status: 'no_arbitrage' }] }) });
     }
     if (url.startsWith('/api/logs/export')) return Promise.resolve({ headers: new Headers() });

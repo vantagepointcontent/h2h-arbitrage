@@ -34,6 +34,48 @@ function scan(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Logs data-quality persistence guardrail', () => {
+  it('does not publish a non-executable zero profit as an available financial value', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-quality-non-executable-'));
+    const dbPath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    const persistence = await import('./persistence');
+
+    const saved = await persistence.saveScanResult('indicative-only', scan({
+      bestProfit: 0,
+      totalStake: 0,
+      positiveArbCount: 0,
+      raw: { allArbs: [{
+        roiPct: 2.5,
+        expectedProfit: 0,
+        totalStake: 0,
+        strategy: 'Buy YES Kalshi + NO PM',
+        executionStatus: 'non_executable',
+        executionBlocker: 'Kalshi executable quote unavailable',
+      }] },
+    }));
+
+    const history = await persistence.queryScanHistory({ limit: 1 });
+    const { resolveHistoricalScanFinancials } = await import('./historical-scan-financials');
+    expect(resolveHistoricalScanFinancials(history.rows[0]).fields.profitUsd).toMatchObject({
+      status: 'unavailable',
+      reasonCode: 'current_candidate_non_executable',
+    });
+    const db = createClient({ url: `file:${dbPath}` });
+    const snapshot = JSON.parse(String((await db.execute({
+      sql: 'SELECT snapshot_json FROM logs_data_quality_batches WHERE scan_id = ?', args: [saved.id],
+    })).rows[0].snapshot_json));
+    expect(snapshot.fields.profit).toMatchObject({
+      denominator: 1,
+      available: 0,
+      unavailable: 1,
+      reasons: { current_candidate_non_executable: 1 },
+    });
+    expect(snapshot.breaches).not.toContainEqual(expect.objectContaining({
+      field: 'profit', trigger: 'all_zero_population',
+    }));
+    db.close();
+  });
+
   it('persists every completed batch and emits a durable alert on an immediate breach', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-quality-'));
     const dbPath = path.join(tempDir, 'logs.db');

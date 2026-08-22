@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   persistAndConsumeBotScan: vi.fn(async () => undefined),
   reserveSavedMarketPublication: vi.fn(),
   reconcileSavedMarketMatchSummary: vi.fn(),
+  updateSavedMarketScanResult: vi.fn(async () => true),
+  fetchClobMarkets: vi.fn(),
+  getClobAskDepths: vi.fn(),
+  getClobPrices: vi.fn(),
   acquireSavedMarketScanLock: vi.fn(),
   releaseSavedMarketScanLock: vi.fn(async () => undefined),
 }));
@@ -25,15 +29,18 @@ vi.mock('@/lib/kalshi', () => ({
 }));
 vi.mock('@/lib/polymarket', () => ({
   extractPolymarketSlug: () => 'tx-07',
-  fetchPolymarketEvent: vi.fn(async () => ({ id: 'pm-event', title: 'TX-07', markets: [], active: true })),
+  fetchPolymarketEvent: vi.fn(async () => ({
+    id: 'pm-event', title: 'TX-07', active: true,
+    markets: [{ id: 'pm-yes', conditionId: 'pm-condition', question: 'Will TX-07 occur?', outcomePrices: '[0.4,0.6]' }],
+  })),
   fetchPolymarketMarketAsEvent: vi.fn(),
   isPolymarketMarketUrl: () => false,
   parseOutcomePrices: () => [0, 0],
 }));
 vi.mock('@/lib/polymarket-clob', () => ({
-  fetchClobMarkets: vi.fn(async () => new Map()),
-  getClobAskDepths: vi.fn(),
-  getClobPrices: vi.fn(),
+  fetchClobMarkets: mocks.fetchClobMarkets,
+  getClobAskDepths: mocks.getClobAskDepths,
+  getClobPrices: mocks.getClobPrices,
 }));
 vi.mock('@/lib/matcher', () => ({
   buildKalshiArbShape: vi.fn(),
@@ -55,7 +62,7 @@ vi.mock('@/lib/persistence', () => ({
   findSavedMarketByUrls: mocks.findSavedMarketByUrls,
   reserveSavedMarketPublication: mocks.reserveSavedMarketPublication,
   reconcileSavedMarketMatchSummary: mocks.reconcileSavedMarketMatchSummary,
-  updateSavedMarketScanResult: vi.fn(async () => true),
+  updateSavedMarketScanResult: mocks.updateSavedMarketScanResult,
   appendScanHistory: mocks.appendScanHistory,
 }));
 vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
@@ -79,7 +86,7 @@ vi.mock('@/lib/scan-links', () => ({
   getUnavailableScanPlatforms: () => [],
 }));
 vi.mock('@/lib/scan-request', () => ({ parseScanCapital: () => 1000 }));
-vi.mock('@/lib/scan-clob-selection', () => ({ selectMatchedClobConditionIds: () => [] }));
+vi.mock('@/lib/scan-clob-selection', () => ({ selectMatchedClobConditionIds: () => ['pm-condition'] }));
 
 import { executeFullScan } from './scan-execution';
 
@@ -95,7 +102,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.upstream.mockReset();
-    mocks.upstream.mockResolvedValue([]);
+    mocks.upstream.mockResolvedValue([{ ticker: 'KXTX07-YES', title: 'Will TX-07 occur?', yes_ask: 40, no_ask: 60 }]);
     mocks.appendScanHistory.mockReset();
     mocks.appendScanHistory.mockResolvedValue(undefined);
     mocks.acquireSavedMarketScanLock.mockResolvedValue({
@@ -105,6 +112,18 @@ describe('POST /api/scan saved-market lifecycle', () => {
     mocks.findSavedMarketByUrls.mockResolvedValue({ id: 'tx-07', eventTitle: 'TX-07' });
     mocks.reserveSavedMarketPublication.mockResolvedValue(41);
     mocks.reconcileSavedMarketMatchSummary.mockResolvedValue(undefined);
+    mocks.fetchClobMarkets.mockResolvedValue(new Map([['pm-condition', {
+      condition_id: 'pm-condition',
+      tokens: [{ outcome: 'Yes', price: 0.4 }, { outcome: 'No', price: 0.6 }],
+    }]]));
+    mocks.getClobPrices.mockResolvedValue({
+      yesPrice: 0.4, noPrice: 0.6, bestBid: 0.39, bestAsk: 0.4, lastTradePrice: 0.4,
+    });
+    mocks.getClobAskDepths.mockResolvedValue({
+      yesAskDepth: 500, noAskDepth: 500, yesBid: 0.39, noBid: 0.59,
+      yesBidDepth: 500, noBidDepth: 500,
+      yesMinOrderSize: 1, noMinOrderSize: 1, yesTickSize: 0.01, noTickSize: 0.01,
+    });
   });
 
   it('publishes refreshing before waiting for upstream market data', async () => {
@@ -208,6 +227,44 @@ describe('POST /api/scan saved-market lifecycle', () => {
     });
   });
 
+  it('does not publish a completed sparse scan when one venue returns no usable market data', async () => {
+    mocks.upstream.mockResolvedValue([]);
+
+    const response = await executeFullScan(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ reasonCode: 'kalshi_market_data_unavailable', fullScanPersisted: false });
+    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
+    expect(mocks.persistAndConsumeBotScan).not.toHaveBeenCalled();
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('tx-07', expect.objectContaining({
+      matchStatus: 'unavailable',
+      matchError: expect.stringContaining('Kalshi'),
+      publicationGeneration: 41,
+    }));
+  });
+
+  it.each([
+    ['metadata request failure', () => mocks.fetchClobMarkets.mockRejectedValueOnce(new Error('CLOB timeout')), 'clob_metadata_unavailable'],
+    ['missing metadata for a selected condition', () => mocks.fetchClobMarkets.mockResolvedValueOnce(new Map()), 'clob_metadata_incomplete'],
+    ['per-book request failure', () => mocks.getClobPrices.mockRejectedValueOnce(new Error('book timeout')), 'clob_book_unavailable'],
+    ['empty executable book', () => mocks.getClobPrices.mockResolvedValueOnce(null), 'clob_book_empty'],
+  ])('preserves the prior completed publication on %s', async (_label, arrange, reasonCode) => {
+    arrange();
+
+    const response = await executeFullScan(request());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ reasonCode, fullScanPersisted: false });
+    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
+    expect(mocks.persistAndConsumeBotScan).not.toHaveBeenCalled();
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('tx-07', expect.objectContaining({
+      matchStatus: 'unavailable',
+      matchError: expect.stringContaining(reasonCode),
+      publicationGeneration: 41,
+    }));
+  });
+
   it('cannot let an older failed scan overwrite a newer generation', async () => {
     let currentGeneration = 41;
     const accepted: string[] = [];
@@ -229,7 +286,6 @@ describe('POST /api/scan saved-market lifecycle', () => {
   });
 
   it('persists requested scan capital separately from aggregate candidate stake', async () => {
-    mocks.upstream.mockResolvedValue([]);
     mocks.calculateAllArbitrages.mockReturnValue([
       {
         artist: 'Candidate A',
@@ -301,8 +357,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
     });
   });
 
-  it('does not persist an indicative non-executable quote as a completed positive arb', async () => {
-    mocks.upstream.mockResolvedValue([]);
+  it('does not replace a completed publication with a wholly non-executable candidate set', async () => {
     mocks.calculateAllArbitrages.mockReturnValue([{
       artist: 'Indicative only',
       kalshi: { ticker: 'KXTX07-I', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 0, noAskDepth: 0 },
@@ -320,12 +375,13 @@ describe('POST /api/scan saved-market lifecycle', () => {
     }]);
 
     const response = await executeFullScan(request());
-    expect(response.status).toBe(200);
-    expect(mocks.persistAndConsumeBotScan).toHaveBeenLastCalledWith(
-      'tx-07',
-      expect.objectContaining({ positiveArbCount: 0, bestProfit: 0, totalStake: 0 }),
-      'scan_api',
-    );
-    expect(mocks.appendScanHistory).toHaveBeenLastCalledWith(expect.objectContaining({ positiveArbCount: 0, totalProfit: 0 }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      reasonCode: 'executable_candidate_unavailable',
+      fullScanPersisted: false,
+    });
+    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
+    expect(mocks.persistAndConsumeBotScan).not.toHaveBeenCalled();
+    expect(mocks.appendScanHistory).not.toHaveBeenCalled();
   });
 });

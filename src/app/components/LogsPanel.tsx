@@ -222,7 +222,6 @@ export default function LogsPanel() {
     const generation = ++requestGeneration.current;
     currentRoiGeneration.current += 1;
     currentRoiRequested.current.clear();
-    setCurrentRoiById(new Map());
     loadingMoreGeneration.current = null;
     lastRequestedCursor.current = null;
     lastLoadScrollTop.current = -1;
@@ -388,7 +387,9 @@ export default function LogsPanel() {
     ids.forEach((id) => currentRoiRequested.current.add(id));
     setCurrentRoiById((current) => {
       const next = new Map(current);
-      ids.forEach((id) => next.set(id, { status: 'loading' }));
+      ids.forEach((id) => {
+        if (!next.has(id)) next.set(id, { status: 'loading' });
+      });
       return next;
     });
     const batches = Array.from({ length: Math.ceil(ids.length / CURRENT_ROI_BATCH_SIZE) }, (_, index) => (
@@ -397,11 +398,8 @@ export default function LogsPanel() {
     void (async () => {
       const pages: Array<Array<CurrentRoiValuation & { id: number }>> = [];
       for (const batch of batches) {
-        const response = await fetch('/api/logs/current-roi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: batch }),
-        });
+        const params = new URLSearchParams({ ids: batch.join(',') });
+        const response = await fetch(`/api/logs/current-roi?${params.toString()}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Current ROI request failed');
         const data = await response.json();
         if (!Array.isArray(data?.valuations)) throw new Error('Invalid current ROI response');
@@ -419,7 +417,16 @@ export default function LogsPanel() {
       if (!currentRoiMounted.current || generation !== currentRoiGeneration.current) return;
       setCurrentRoiById((current) => {
         const next = new Map(current);
-        ids.forEach((id) => next.set(id, { status: 'upstream_failure' }));
+        ids.forEach((id) => {
+          const existing = next.get(id);
+          if (!existing || existing.status === 'loading') {
+            next.set(id, {
+              status: 'upstream_failure',
+              reasonCode: 'current_roi_lookup_failed',
+              reason: 'The persisted Current ROI lookup failed; retry the Logs refresh.',
+            });
+          }
+        });
         return next;
       });
     });

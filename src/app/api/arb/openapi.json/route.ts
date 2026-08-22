@@ -97,7 +97,7 @@ const openapi = {
           totalArbs: { type: 'integer', minimum: 0, description: 'Always equals direct + cross + internal under the identical server-side filter scope.' },
           avgRoi: { type: ['number', 'null'], description: 'Average immutable scan-time ROI across rows with selected-candidate evidence; no-arb and unavailable rows are excluded.' },
           bestRoi: { type: ['number', 'null'], description: 'Best immutable scan-time ROI across rows with selected-candidate evidence.' },
-          totalProfit: { type: ['number', 'null'], description: 'Sum of persisted scan-time indicative profit across rows with selected-candidate evidence.' },
+          totalProfit: { type: ['number', 'null'], description: 'Sum of authoritative persisted profit for canonically valid executable opportunities in this exact filter scope; null when none has authoritative profit evidence.' },
           arbTypeCounts: { type: 'object', required: ['direct', 'cross', 'internal'], properties: {
             direct: { type: 'integer', minimum: 0 },
             cross: { type: 'integer', minimum: 0 },
@@ -106,6 +106,19 @@ const openapi = {
         } },
       } } } },
     } } } },
+    '/api/logs/current-roi': { get: {
+      operationId: 'getPersistedCurrentLogRoi',
+      summary: 'Read Current ROI from persisted completed exact-market scans without venue calls',
+      parameters: [{
+        name: 'ids', in: 'query', required: true,
+        description: 'Comma-separated batch of 1-100 positive scan-result IDs.',
+        schema: { type: 'string' },
+      }],
+      responses: {
+        '200': { description: 'Persisted Current ROI valuations with precise unavailable reasons' },
+        '400': { description: 'Invalid or oversized ID batch' },
+      },
+    } },
     '/api/executions': { get: { summary: 'Read executions with calculation envelopes and canonical Logs lineage', responses: { '200': {
       description: 'Execution records',
       content: { 'application/json': { schema: { $ref: '#/components/schemas/ExecutionListResponse' } } },

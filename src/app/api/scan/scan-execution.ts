@@ -48,6 +48,20 @@ export async function executeFullScan(request: NextRequest) {
   let publicationGeneration: number | null = null;
   let fullScanPersisted = false;
   let scanLock: SavedMarketScanLock | null = null;
+  const failIncompleteScan = async (reasonCode: string, detail: string) => {
+    const error = `${reasonCode}: ${detail} The prior completed scan remains canonical.`;
+    if (savedMarketId && publicationGeneration != null) {
+      await reconcileSavedMarketMatchSummary(savedMarketId, {
+        matchedCount: 0,
+        matchStatus: 'unavailable',
+        matchError: error,
+        matchedPairs: undefined,
+        scannedAt: new Date().toISOString(),
+        publicationGeneration,
+      }).catch(() => {});
+    }
+    return NextResponse.json({ error, reasonCode, fullScanPersisted: false }, { status: 503 });
+  };
   try {
     const parsed = await parseJsonObject(request);
     if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -233,6 +247,19 @@ export async function executeFullScan(request: NextRequest) {
     
     const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
     const pmFilteredCount = pmMarketsRaw.length;
+
+    // A one-sided empty venue response is not evidence of a completed zero-arb
+    // scan. Publishing it as `confirmed_zero` erased the prior canonical
+    // Markets projection and added sparse `No arb` rows to Logs during ordinary
+    // credential/feed degradation. Preserve the prior durable values and make
+    // the failed replacement attempt explicit instead.
+    if (kalshiMarkets.length === 0 || pmMarketsRaw.length === 0) {
+      const platform = kalshiMarkets.length === 0 ? 'Kalshi' : 'Polymarket';
+      const reasonCode = kalshiMarkets.length === 0
+        ? 'kalshi_market_data_unavailable'
+        : 'polymarket_market_data_unavailable';
+      return failIncompleteScan(reasonCode, `${platform} returned no usable market data.`);
+    }
     
     // DEBUG: Log the filtered markets
     if (DEBUG_H2H) {
@@ -269,8 +296,8 @@ export async function executeFullScan(request: NextRequest) {
         'CLOB metadata',
       );
     } catch (e: any) {
-      if (DEBUG_H2H) logger.debug('[scan] CLOB metadata unavailable, falling back to gamma prices', { error: e.message });
-      clobMap = new Map();
+      if (DEBUG_H2H) logger.debug('[scan] CLOB metadata unavailable', { error: e.message });
+      return failIncompleteScan('clob_metadata_unavailable', `CLOB metadata request failed: ${e.message ?? 'unknown error'}.`);
     }
 
     // Build a case-insensitive CLOB map (conditionIds are lowercase hex, but normalize defensively)
@@ -279,27 +306,29 @@ export async function executeFullScan(request: NextRequest) {
       clobMapLower.set(key.toLowerCase(), val);
     }
 
+    const selectedConditionIds = new Set(conditionIds.map(id => id.toLowerCase()));
+    const missingConditionIds = [...selectedConditionIds].filter(id => !clobMapLower.has(id));
+    if (missingConditionIds.length > 0) {
+      return failIncompleteScan(
+        'clob_metadata_incomplete',
+        `CLOB metadata omitted ${missingConditionIds.length}/${selectedConditionIds.size} selected condition(s).`,
+      );
+    }
+
     // Enrich markets with CLOB prices in PARALLEL (was sequential — neg-risk
     // markets each make 2 HTTP calls, so 20 outcomes = 40 sequential requests).
     // getClobPrices already uses the internal CLOB semaphore for book fetches.
-    const pmMarkets: any[] = await Promise.all(
+    const enrichmentResults = await Promise.all(
       pmMarketsRaw.map(async (m) => {
-        const clob = clobMapLower.get(m.conditionId?.toLowerCase()) ?? clobMap.get(m.conditionId);
-        if (!clob) return m;
+        const conditionId = typeof m.conditionId === 'string' ? m.conditionId.toLowerCase() : '';
+        const clob = clobMapLower.get(conditionId) ?? clobMap.get(m.conditionId);
+        if (!clob || !selectedConditionIds.has(conditionId)) return { market: m, failure: null };
         try {
           const [live, depth] = await Promise.all([getClobPrices(clob), getClobAskDepths(clob)]);
           if (!live) {
-            // The CLOB was reachable but has no executable asks. Keep its token
-            // prices for display (the same values shown by Polymarket), but mark
-            // them non-executable so they cannot create an arbitrage signal.
-            const yes = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'Yes')?.price ?? 0;
-            const no = clob.tokens?.find((t: { outcome?: string; price?: number }) => t.outcome === 'No')?.price ?? 0;
             return {
-              ...m,
-              clobEmpty: true,
-              outcomePrices: JSON.stringify([yes, no]),
-              bestAsk: 0,
-              bestBid: 0,
+              market: m,
+              failure: { reasonCode: 'clob_book_empty', detail: `CLOB returned no executable book for ${conditionId}.` },
             };
           }
 
@@ -307,7 +336,7 @@ export async function executeFullScan(request: NextRequest) {
             logger.debug('[scan] CLOB neg_risk', { negRisk: clob.neg_risk, conditionId: m.conditionId?.slice(0, 12), question: m.question?.slice(0, 40) });
           }
 
-          return {
+          return { market: {
             ...m,
             outcomePrices: JSON.stringify([live.yesPrice.toFixed(6), live.noPrice.toFixed(6)]),
             bestBid: live.bestBid != null ? live.bestBid : m.bestBid,
@@ -327,12 +356,21 @@ export async function executeFullScan(request: NextRequest) {
             yesTickSize: depth.yesTickSize,
             noTickSize: depth.noTickSize,
             neg_risk: clob.neg_risk,
+          }, failure: null };
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : 'unknown error';
+          return {
+            market: m,
+            failure: { reasonCode: 'clob_book_unavailable', detail: `CLOB book request failed for ${conditionId}: ${detail}.` },
           };
-        } catch {
-          return m;
         }
       }),
     );
+    const enrichmentFailure = enrichmentResults.find(result => result.failure != null)?.failure;
+    if (enrichmentFailure) {
+      return failIncompleteScan(enrichmentFailure.reasonCode, enrichmentFailure.detail);
+    }
+    const pmMarkets: any[] = enrichmentResults.map(result => result.market);
 
     // Step 1: auto-match (skip if manual mode requested)
     const kalshiRawCount = kalshiMarkets.length;
@@ -466,6 +504,12 @@ export async function executeFullScan(request: NextRequest) {
           && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
           && o.arbitrage.arbType !== null
           && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
+        if (netArbs.length > 0 && !netArbs.some(o => o.arbitrage?.executionStatus === 'executable')) {
+          return failIncompleteScan(
+            'executable_candidate_unavailable',
+            `All ${netArbs.length} selected candidate(s) lacked complete executable price evidence.`,
+          );
+        }
         const bestNetArb = netArbs.length > 0
           ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;

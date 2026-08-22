@@ -2253,8 +2253,26 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   const generation = Number(current.rows[0].scan_publication_generation);
   if (result.publicationGeneration != null && result.publicationGeneration !== generation) return false;
   if (isStaleMatchPublication(previous, result)) return false;
-  const prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan');
+  let prepared = await prepareCanonicalMatchResult(result, previous, 'saved_market_scan');
   if (!prepared) return false;
+  const economicCandidates = (prepared.allArbs ?? []).filter((candidate) => {
+    const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
+      ? candidate.arbType : null;
+    const classification = auditArbClassification(candidate.strategy, declared);
+    return classification.valid && classification.canonicalType !== null
+      && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
+  });
+  const incompleteCandidateReplacement = prepared.matchStatus === 'matched'
+    && economicCandidates.length > 0
+    && !economicCandidates.some(candidate => candidate.executionStatus == null || candidate.executionStatus === 'executable');
+  if (incompleteCandidateReplacement) {
+    prepared = await prepareCanonicalMatchResult({
+      ...prepared,
+      matchStatus: 'unavailable',
+      matchError: `executable_candidate_unavailable: All ${economicCandidates.length} selected candidate(s) lacked complete executable price evidence. The prior completed scan remains canonical.`,
+    }, previous, 'saved_market_scan');
+    if (!prepared) return false;
+  }
   const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
   const canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;

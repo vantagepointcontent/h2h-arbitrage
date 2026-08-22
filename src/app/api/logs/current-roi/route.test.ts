@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({ getCurrentLogRoiBatch: vi.fn() }));
 vi.mock('@/lib/current-log-roi.server', () => mocks);
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 
 function request(body: unknown) {
@@ -65,4 +65,25 @@ describe('POST /api/logs/current-roi', () => {
     expect(responses.map((response) => response.status)).toEqual(Array(11).fill(200));
     expect(mocks.getCurrentLogRoiBatch).toHaveBeenCalledTimes(11);
   });
+});
+
+describe('GET /api/logs/current-roi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('serves the browser read-only batch without requiring mutation authorization', async () => {
+    mocks.getCurrentLogRoiBatch.mockResolvedValue([{ id: 7, status: 'available', roiPct: 1.2 }]);
+
+    const response = await GET(new NextRequest('http://localhost/api/logs/current-roi?ids=7,8,7'));
+
+    expect(response.status).toBe(200);
+    expect(mocks.getCurrentLogRoiBatch).toHaveBeenCalledWith([7, 8, 7]);
+    await expect(response.json()).resolves.toEqual({ valuations: [{ id: 7, status: 'available', roiPct: 1.2 }] });
+  });
+
+  it.each(['', '0', '1.5', Array.from({ length: 101 }, (_, index) => index + 1).join(',')])(
+    'rejects invalid browser batch %s', async (ids) => {
+      expect((await GET(new NextRequest(`http://localhost/api/logs/current-roi?ids=${ids}`))).status).toBe(400);
+      expect(mocks.getCurrentLogRoiBatch).not.toHaveBeenCalled();
+    },
+  );
 });

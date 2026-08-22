@@ -9,6 +9,7 @@ export type HistoricalFinancialReasonCode =
   | 'historical_profit_not_persisted'
   | 'historical_apy_not_persisted'
   | 'historical_stake_not_persisted'
+  | 'current_candidate_non_executable'
   | 'confirmed_no_arbitrage';
 
 export type HistoricalFinancialField =
@@ -54,6 +55,8 @@ type RawFinancialSnapshot = {
   apyPct?: unknown;
   totalStake?: unknown;
   strategy?: unknown;
+  executionStatus?: unknown;
+  executionBlocker?: unknown;
 };
 
 const FIELD_METADATA: Record<HistoricalFinancialFieldName, {
@@ -179,6 +182,15 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
         status: 'unavailable', value: null, source: 'unavailable', sourceRevision: scalarRevision,
         reasonCode: 'confirmed_no_arbitrage',
         reason: 'The completed scan found no candidate opportunity; this financial metric is not applicable.',
+      } satisfies HistoricalFinancialField];
+    }
+    if (name !== 'roiPct' && raw?.executionStatus === 'non_executable') {
+      const blocker = typeof raw.executionBlocker === 'string' && raw.executionBlocker.trim()
+        ? ` ${raw.executionBlocker.trim()}` : '';
+      return [name, {
+        status: 'unavailable', value: null, source: 'unavailable', sourceRevision: rawRevision,
+        reasonCode: 'current_candidate_non_executable',
+        reason: `The selected scan candidate was indicative but not executable; no tradeable ${name === 'profitUsd' ? 'profit' : name === 'apyPct' ? 'APY' : 'stake'} was established.${blocker}`,
       } satisfies HistoricalFinancialField];
     }
     const persistedField = provenance?.[name];
